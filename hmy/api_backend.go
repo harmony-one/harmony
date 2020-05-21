@@ -387,7 +387,7 @@ var (
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(
 	addr common.Address, block *types.Block,
-) (*staking.ValidatorRPCEnchanced, error) {
+) (*staking.ValidatorRPCEnhanced, error) {
 	bc := b.hmy.BlockChain()
 	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
@@ -399,7 +399,7 @@ func (b *APIBackend) GetValidatorInformation(
 	// At the last block of epoch, block epoch is e while val.LastEpochInCommittee
 	// is already updated to e+1. So need the >= check rather than ==
 	inCommittee := wrapper.LastEpochInCommittee.Cmp(now) >= 0
-	defaultReply := &staking.ValidatorRPCEnchanced{
+	defaultReply := &staking.ValidatorRPCEnhanced{
 		CurrentlyInCommittee: inCommittee,
 		Wrapper:              *wrapper,
 		Performance:          nil,
@@ -410,6 +410,7 @@ func (b *APIBackend) GetValidatorInformation(
 		).String(),
 		EPoSWinningStake: nil,
 		BootedStatus:     nil,
+		ActiveStatus:     wrapper.Validator.Status.String(),
 		Lifetime: &staking.AccumulatedOverLifetime{
 			wrapper.BlockReward,
 			wrapper.Counters,

@@ -578,7 +578,7 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 // GetValidatorInformation ..
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
-) (*staking.ValidatorRPCEnchanced, error) {
+) (*staking.ValidatorRPCEnhanced, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -594,7 +594,7 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(
 // GetValidatorInformationByBlockNumber ..
 func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
 	ctx context.Context, address string, blockNr uint64,
-) (*staking.ValidatorRPCEnchanced, error) {
+) (*staking.ValidatorRPCEnhanced, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -612,13 +612,13 @@ func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
 
 func (s *PublicBlockChainAPI) getAllValidatorInformation(
 	ctx context.Context, page int, blockNr rpc.BlockNumber,
-) ([]*staking.ValidatorRPCEnchanced, error) {
+) ([]*staking.ValidatorRPCEnhanced, error) {
 	if page < -1 {
 		return nil, errors.Errorf("page given %d cannot be less than -1", page)
 	}
 	addresses := s.b.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.ValidatorRPCEnchanced, 0), nil
+		return make([]*staking.ValidatorRPCEnhanced, 0), nil
 	}
 	validatorsNum := len(addresses)
 	start := 0
@@ -629,7 +629,7 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 			validatorsNum = len(addresses) - start
 		}
 	}
-	validators := make([]*staking.ValidatorRPCEnchanced, validatorsNum)
+	validators := make([]*staking.ValidatorRPCEnhanced, validatorsNum)
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNr)
@@ -648,7 +648,7 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 // If page is -1, return all else return the pagination.
 func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	ctx context.Context, page int,
-) ([]*staking.ValidatorRPCEnchanced, error) {
+) ([]*staking.ValidatorRPCEnhanced, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -669,7 +669,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 	if err != nil {
 		return nil, err
 	}
-	return res.([]*staking.ValidatorRPCEnchanced), nil
+	return res.([]*staking.ValidatorRPCEnhanced), nil
 
 }
 
@@ -677,7 +677,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 // If page is -1, return all else return the pagination.
 func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
 	ctx context.Context, page int, blockNr uint64,
-) ([]*staking.ValidatorRPCEnchanced, error) {
+) ([]*staking.ValidatorRPCEnhanced, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
