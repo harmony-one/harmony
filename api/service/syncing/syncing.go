@@ -231,6 +231,10 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	peers = limitNumPeers(peers, randSeed)
+
 	utils.Logger().Debug().
 		Int("len", len(peers)).
 		Bool("isBeacon", isBeacon).
@@ -243,10 +247,6 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		ss.syncConfig.CloseConnections()
 	}
 	ss.syncConfig = &SyncConfig{}
-
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
 
 	var wg sync.WaitGroup
 	for _, peer := range peers {
