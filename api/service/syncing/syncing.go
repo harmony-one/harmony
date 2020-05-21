@@ -245,7 +245,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	ss.syncConfig = &SyncConfig{}
 
 	// limit the number of dns peers to connect
-	peers = limitPeersWithBound(peers, numPeersLowBound, numPeersHighBound)
+	peers = limitNumPeers(peers)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
@@ -272,11 +272,14 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	return nil
 }
 
-// limitPeersWithBound will limit number of peers to release some server end sources.
-func limitPeersWithBound(ps []p2p.Peer, lowBound, highBound int) []p2p.Peer {
-	targetSize := calcNumPeersWithBound(len(ps), lowBound, highBound)
+// limitNumPeers limits number of peers to release some server end sources.
+func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
+	targetSize := calcNumPeersWithBound(len(ps), numPeersLowBound, numPeersHighBound)
+	if targetSize <= len(ps) {
+		return ps
+	}
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(randSeed))
 	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
 
 	return ps[:targetSize]
