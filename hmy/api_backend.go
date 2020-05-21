@@ -479,6 +479,26 @@ func (b *APIBackend) GetValidatorInformation(
 			count := 0
 			for i := epochFrom.Int64(); i < now.Int64(); i++ {
 				if apr, ok := epochToAPRs[i]; ok {
+					// hack for fixing apr of epoch 186
+					// get the snapshot for epoch 186 and 187
+					// multiply apr with snapshot-stake-187, and divide by snapshot-stake-186
+					if i == 186 {
+						if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+							big.NewInt(186), addr,
+						); err == nil {
+							if snapshotNextEpoch, err := bc.ReadValidatorSnapshotAtEpoch(
+								big.NewInt(187), addr,
+							); err == nil {
+								totalDel := snapshot.Validator.TotalDelegation()
+								totalDelNext := snapshotNextEpoch.Validator.TotalDelegation()
+								if totalDel.Cmp(big.NewInt(0)) > 0 {
+									apr = apr.Mul(
+										numeric.NewDecFromBigInt(totalDelNext),
+									).Quo(numeric.NewDecFromBigInt(totalDel))
+								}
+							}
+						}
+					}
 					total = total.Add(apr)
 				}
 				count++
