@@ -69,7 +69,7 @@ func TestLimitPeersWithBound(t *testing.T) {
 		{11, 5},
 		{100, 5},
 	}
-	for i, test := range tests {
+	for _, test := range tests {
 		ps := makePeersForTest(test.size)
 
 		res := limitNumPeers(ps, 1)
