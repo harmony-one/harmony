@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
 
@@ -382,11 +383,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			blockHeader := node.Blockchain().GetHeaderByHash(hash)
-			if blockHeader == nil {
-				continue
-			}
-			encodedBlockHeader, err := rlp.EncodeToBytes(blockHeader)
+			encodedBlockHeader, err := node.getEncodedBlockHeaderByHash(hash)
 
 			if err == nil {
 				response.Payload = append(response.Payload, encodedBlockHeader)
@@ -397,11 +394,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			block := node.Blockchain().GetBlockByHash(hash)
-			if block == nil {
-				continue
-			}
-			encodedBlock, err := rlp.EncodeToBytes(block)
+			encodedBlock, err := node.getEncodedBlockByHash(hash)
 
 			if err == nil {
 				response.Payload = append(response.Payload, encodedBlock)
@@ -479,4 +472,50 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 	}
 	return response, nil
+}
+
+const (
+	headerCacheSize = 10000
+	blockCacheSize  = 10000
+)
+
+var (
+	// Cached fields for block header and block requests
+	headerReqCache, _ = lru.New(headerCacheSize)
+	blockReqCache, _  = lru.New(blockCacheSize)
+
+	errHeaderNotExist = errors.New("header not exist")
+	errBlockNotExist  = errors.New("block not exist")
+)
+
+func (node *Node) getEncodedBlockHeaderByHash(hash common.Hash) ([]byte, error) {
+	if b, ok := headerReqCache.Get(hash); ok {
+		return b.([]byte), nil
+	}
+	h := node.Blockchain().GetHeaderByHash(hash)
+	if h == nil {
+		return nil, errHeaderNotExist
+	}
+	b, err := rlp.EncodeToBytes(h)
+	if err != nil {
+		return nil, err
+	}
+	headerReqCache.Add(hash, b)
+	return b, nil
+}
+
+func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
+	if b, ok := blockReqCache.Get(hash); ok {
+		return b.([]byte), nil
+	}
+	blk := node.Blockchain().GetBlockByHash(hash)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	b, err := rlp.EncodeToBytes(blk)
+	if err != nil {
+		return nil, err
+	}
+	blockReqCache.Add(hash, b)
+	return b, nil
 }

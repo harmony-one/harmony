@@ -716,8 +716,7 @@ func main() {
 		}
 	}()
 
-	if nodeConfig.ShardID != shard.BeaconChainShardID &&
-		currentNode.NodeConfig.Role() != nodeconfig.ExplorerNode {
+	if nodeConfig.ShardID != shard.BeaconChainShardID {
 		utils.Logger().Info().
 			Uint32("shardID", currentNode.Blockchain().ShardID()).
 			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
