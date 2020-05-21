@@ -23,6 +23,19 @@ err() {
    exit "${code}"
 }
 
+# b: beginning
+# r: range
+# return random number between b ~ b+r
+random() {
+   local b=$1
+   local r=$2
+   if [ $r -le 0 ]; then
+      r=100
+   fi
+   local rand=$(( $(od -A n -t d -N 3 /dev/urandom | grep -oE '[0-9]+') % r ))
+   echo $(( b + rand ))
+}
+
 # https://www.linuxjournal.com/content/validating-ip-address-bash-script
 function valid_ip()
 {
@@ -596,10 +609,12 @@ any_new_binaries() {
    ${do_not_download} && return 0
    outdir="${1}"
    mkdir -p "${outdir}"
-   curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
-   if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
-      msg "failed to downloaded harmony public signing key"
-      return 1
+   if ${verify}; then
+      curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
+      if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
+         msg "failed to downloaded harmony public signing key"
+         return 1
+      fi
    fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
@@ -865,8 +880,9 @@ rm_bls_pass() {
 {
    while ${loop}
    do
-      msg "re-downloading binaries in 5m"
-      sleep 300
+      msg "re-downloading binaries in 5~10m"
+      redl_sec=$( random 300 300 )
+      sleep $redl_sec
       if any_new_binaries staging
       then
          msg "binaries did not change"
@@ -874,8 +890,9 @@ rm_bls_pass() {
       fi
       while ! download_binaries staging
       do
-         msg "staging download failed; retrying in 30s"
-         sleep 30
+         msg "staging download failed; retrying in 30~60s"
+         retry_sec=$( random 30 30 )
+         sleep $retry_sec
       done
       if diff staging/harmony-checksums.txt harmony-checksums.txt
       then
@@ -971,7 +988,7 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
    run() {
-      (sleep 30 && rm_bls_pass)&
+      (sleep 60 && rm_bls_pass)&
       env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    }
    case "${blspass:+set}" in
