@@ -810,6 +810,7 @@ read_bls_pass() {
          unset -v passphrase
          read -rsp "Enter passphrase for the BLS key file $f: " passphrase
          echo ${passphrase} | tee $passfile
+         chmod og-wr $passfile
          echo "Passphrase is temporarely saved to: $passfile"
          prompt_save=true
       fi
