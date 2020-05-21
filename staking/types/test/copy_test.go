@@ -27,9 +27,9 @@ func TestCopyValidatorWrapper(t *testing.T) {
 		{staking.ValidatorWrapper{}},
 	}
 	for i, test := range tests {
-		cp := CopyValidatorWrapper(&test.w)
+		cp := CopyValidatorWrapper(test.w)
 
-		if err := assertValidatorWrapperDeepCopy(*cp, test.w); err != nil {
+		if err := assertValidatorWrapperDeepCopy(cp, test.w); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
