@@ -22,6 +22,7 @@ require (
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/handlers v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.2
+	github.com/gorilla/websocket v1.4.2
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
@@ -34,18 +35,18 @@ require (
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
-	github.com/libp2p/go-libp2p v0.7.4
-	github.com/libp2p/go-libp2p-core v0.5.1
+	github.com/libp2p/go-libp2p v0.9.2
+	github.com/libp2p/go-libp2p-core v0.5.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
-	github.com/libp2p/go-libp2p-discovery v0.3.0
+	github.com/libp2p/go-libp2p-discovery v0.4.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.5.0
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
-	github.com/libp2p/go-libp2p-peerstore v0.2.3
-	github.com/libp2p/go-libp2p-pubsub v0.2.7-0.20200325112436-d3d43e32bef3
-	github.com/multiformats/go-multiaddr v0.2.1
-	github.com/multiformats/go-multiaddr-net v0.1.4
+	github.com/libp2p/go-libp2p-peerstore v0.2.4
+	github.com/libp2p/go-libp2p-pubsub v0.3.0
+	github.com/multiformats/go-multiaddr v0.2.2
+	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -60,12 +61,9 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/uber/jaeger-client-go v2.20.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
-	go.uber.org/zap v1.14.1 // indirect
-	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
+	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
-	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
 	golang.org/x/tools v0.0.0-20200408032209-46bd65c8538f
 	google.golang.org/grpc v1.28.1
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
