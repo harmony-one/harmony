@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
@@ -36,6 +37,11 @@ const (
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
 	SyncLoopFrequency               = 1    // unit in second
 	LastMileBlocksSize              = 50
+
+	// after cutting off a number of connected peers, the result number of peers
+	// shall be between numPeersLowBound and numPeersHighBound
+	numPeersLowBound  = 3
+	numPeersHighBound = 5
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -237,6 +243,9 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		ss.syncConfig.CloseConnections()
 	}
 	ss.syncConfig = &SyncConfig{}
+
+	// limit the number of dns peers to connect
+	peers = limitPeersWithBound(peers, numPeersLowBound, numPeersHighBound)
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
@@ -261,6 +270,31 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Msg("[SYNC] Finished making connection to peers")
 
 	return nil
+}
+
+// limitPeersWithBound will limit number of peers to release some server end sources.
+func limitPeersWithBound(ps []p2p.Peer, lowBound, highBound int) []p2p.Peer {
+	targetSize := calcNumPeersWithBound(len(ps), lowBound, highBound)
+
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
+
+	return ps[:targetSize]
+}
+
+// Peers are expected to limited at half of the size, capped between lowBound and highBound.
+func calcNumPeersWithBound(size int, lowBound, highBound int) int {
+	if size < lowBound {
+		return size
+	}
+	expLen := size / 2
+	if expLen < lowBound {
+		expLen = lowBound
+	}
+	if expLen > highBound {
+		expLen = highBound
+	}
+	return expLen
 }
 
 // GetActivePeerNumber returns the number of active peers
