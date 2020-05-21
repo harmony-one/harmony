@@ -33,7 +33,15 @@ First approach - geneate from code
   * [net.go](https://github.com/johnwhitton/harmony/blob/swagger-update/internal/hmyapi/apiv1/net.go#L10): API specific documentation
 * Notes : goswagger only supports openAPI spec 2.0 and is not actively maintained
 
-Second approach: document all APIs in swagger.yml and generate UI from this
+Second approach: document all APIs in swagger.yml and generate UI from this - see section 3
+
+2. Generate Postman Collection from Open API Specification
+
+* The generated Postman collection can be found [here](https://documenter.getpostman.com/view/6221615/Szt7BBFG)
+* This was done by [manually importing the swagger.yml](https://stackoverflow.com/questions/39072216/how-to-import-swagger-apis-into-postman) and publishing it
+
+3. Generate an Interactive developer playground using Swagger
+
 * This is the [Swaagger](https://prototype.johnwhitton.dev/swagger/swaggerui/) site which is interactive
 * The site is generated using [runSwagger.sh](https://github.com/johnwhitton/harmony/blob/swagger-update/swagger/runSwagger.sh)
 * High level process flow is
@@ -43,14 +51,26 @@ Second approach: document all APIs in swagger.yml and generate UI from this
   * turn the updated sit into a go package using statik
   * build the swagger ui and run it
 
-2. Generate Postman Collection from Open API Specification
-
-* The generated Postman collection can be found here
-* This was done by [manually importing the swagger.yml](https://stackoverflow.com/questions/39072216/how-to-import-swagger-apis-into-postman) and publishing it
-3. Generate an Interactive developer playground using Swagger
 4. Generate the [OpenAPI 3.0 specification](https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md) from the codebase
+
+This is still to be done and estimated two to three days to document all the API's
+
 5. Generate clients automatically
+
+Some prototyping has been done on this and is exciting for future SDK development. Please see the following
+
+* [Support for Open API spec 3.0 #1122](https://github.com/go-swagger/go-swagger/issues/1122)
+* [gnostic - openapi to protobuf](https://github.com/googleapis/gnostic)
+* [gnostic go generator](https://github.com/googleapis/gnostic-go-generator)
+
+And these medium articles
+
+* [Generation from go source code](https://medium.com/@pedram.esmaeeli/generate-swagger-specification-from-go-source-code-648615f7b9d9)
+* [Serve Swagger UI within go application](https://medium.com/@ribice/serve-swaggerui-within-your-golang-application-5486748a5ed4)
+
 6. Optionally generate code from the open API spec
+
+Once the API layer was completely specified other tools such as code generation could be used.
 
 ### Hosted Endpoints
 
@@ -58,9 +78,8 @@ Currently there are two hosted endpoints
 
 1. [Swaagger](https://prototype.johnwhitton.dev/swagger/swaggerui/): This allows interactive prototyping for developers
 2. [Redux](https://prototype.johnwhitton.dev/docs): This provides developer documentation but is not interactive.
-3. [Postman - openapi](
-4. [Postman complete documentation](
-Initial prototyping is using a local deploy on an aws instance and can be viewd [here](http://54.201.207.240:8080/swaggerui/).
+3. [Postman - openapi](https://documenter.getpostman.com/view/6221615/Szt7BBFG)
+4. [Postman complete documentation](https://documenter.getpostman.com/view/6221615/Szt7BB28)
 
 
 ## Installation
@@ -76,7 +95,7 @@ sudo chmod +x /usr/local/bin/swagger
 
 Installing Swagger UI
 ```
-cd /home/ec2-user/go/src/github.com/harmony-one/harmony/swagge
+cd /home/ec2-user/go/src/github.com/harmony-one/harmony/swagger
 git clone git@github.com:swagger-api/swagger-ui.git
 mv ./swagger-ui/dist swaggerui 
 rm -rf ./swagger-ui
@@ -123,5 +142,4 @@ swagger serve swagger.json --port 8082 --host=0.0.0.0 --no-open
 * [Create golang documentation with SwaggerUI](https://www.ribice.ba/swagger-golang/)
 * [Generation from go source code](https://medium.com/@pedram.esmaeeli/generate-swagger-specification-from-go-source-code-648615f7b9d9)
 * [Serve Swagger UI within go application](https://medium.com/@ribice/serve-swaggerui-within-your-golang-application-5486748a5ed4)
-* Swagger URL - http://54.201.207.240:8080/swaggerui/
  
