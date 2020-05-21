@@ -36,7 +36,9 @@ func SubmitTransaction(
 	ctx context.Context, b Backend, tx *types.Transaction,
 ) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
-		return common.Hash{}, err
+		// legacy behavior is to never return error and always return tx hash
+		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
+		return tx.Hash(), nil
 	}
 	if tx.To() == nil {
 		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Epoch())
@@ -63,7 +65,9 @@ func SubmitStakingTransaction(
 	ctx context.Context, b Backend, tx *staking.StakingTransaction,
 ) (common.Hash, error) {
 	if err := b.SendStakingTx(ctx, tx); err != nil {
-		return common.Hash{}, err
+		// legacy behavior is to never return error and always return tx hash
+		utils.Logger().Warn().Err(err).Msg("Could not submit staking transaction")
+		return tx.Hash(), nil
 	}
 	utils.Logger().Info().Str("fullhash", tx.Hash().Hex()).Msg("Submitted Staking transaction")
 	return tx.Hash(), nil

@@ -156,6 +156,8 @@ type Node struct {
 	keysToAddrsMutex sync.Mutex
 	// TransactionErrorSink contains error messages for any failed transaction, in memory only
 	TransactionErrorSink *types.TransactionErrorSink
+	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
+	BroadcastInvalidTx bool
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -259,13 +261,19 @@ func (node *Node) AddPendingStakingTransaction(
 ) error {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+		var err error
 		for i := range errs {
 			if errs[i] != nil {
-				return errs[i]
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
+				err = errs[i]
+				break
 			}
 		}
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-		node.tryBroadcastStaking(newStakingTx)
+		if err == nil || node.BroadcastInvalidTx {
+			utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+			node.tryBroadcastStaking(newStakingTx)
+		}
+		return err
 	}
 	return nil
 }
@@ -275,14 +283,19 @@ func (node *Node) AddPendingStakingTransaction(
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
 		errs := node.addPendingTransactions(types.Transactions{newTx})
+		var err error
 		for i := range errs {
 			if errs[i] != nil {
 				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
-				return errs[i]
+				err = errs[i]
+				break
 			}
 		}
-		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-		node.tryBroadcast(newTx)
+		if err == nil || node.BroadcastInvalidTx {
+			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+			node.tryBroadcast(newTx)
+		}
+		return err
 	}
 	return nil
 }

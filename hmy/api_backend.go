@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -32,6 +33,11 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
+)
+
+var (
+	// ErrFinalizedTransaction is returned if the transaction to be submitted is already on-chain
+	ErrFinalizedTransaction = errors.New("transaction already finalized")
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -122,8 +128,11 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
-	return nil
+	tx, _, _, _ := rawdb.ReadTransaction(b.ChainDb(), signedTx.Hash())
+	if tx == nil {
+		return b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+	}
+	return ErrFinalizedTransaction
 }
 
 // ChainConfig ...
@@ -362,11 +371,12 @@ func (b *APIBackend) IsLeader() bool {
 }
 
 // SendStakingTx adds a staking transaction
-func (b *APIBackend) SendStakingTx(
-	ctx context.Context,
-	newStakingTx *staking.StakingTransaction) error {
-	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
-	return nil
+func (b *APIBackend) SendStakingTx(ctx context.Context, signedStakingTx *staking.StakingTransaction) error {
+	stx, _, _, _ := rawdb.ReadStakingTransaction(b.ChainDb(), signedStakingTx.Hash())
+	if stx == nil {
+		return b.hmy.nodeAPI.AddPendingStakingTransaction(signedStakingTx)
+	}
+	return ErrFinalizedTransaction
 }
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch

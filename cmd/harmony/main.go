@@ -110,8 +110,9 @@ var (
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
 	// Blacklist of addresses
-	blacklistPath   = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
-	webHookYamlPath = flag.String(
+	blacklistPath      = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
+	broadcastInvalidTx = flag.Bool("broadcast_invalid_tx", false, "Broadcast invalid transactions to sync pool state (default: false)")
+	webHookYamlPath    = flag.String(
 		"webhook_yaml", "", "path for yaml config reporting double signing",
 	)
 	// aws credentials
@@ -460,6 +461,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	currentNode.BroadcastInvalidTx = *broadcastInvalidTx
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
