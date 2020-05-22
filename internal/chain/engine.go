@@ -188,6 +188,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
+	if parentHeader == nil {
+		return errors.Errorf(
+			"[VerifySeal] no parent header found for block %x at %d", header.Hash(), header.Number().Uint64(),
+		)
+	}
 	if chain.Config().IsStaking(parentHeader.Epoch()) {
 		slotList, err := chain.ReadShardState(parentHeader.Epoch())
 		if err != nil {
@@ -555,6 +560,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 func GetPublicKeys(
 	chain engine.ChainReader, header *block.Header, reCalculate bool,
 ) ([]*bls.PublicKey, error) {
+	if header == nil {
+		return nil, errors.New("nil header provided")
+	}
 	shardState := new(shard.State)
 	var err error
 	if reCalculate {

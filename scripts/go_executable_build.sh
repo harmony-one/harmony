@@ -245,7 +245,7 @@ function release
 
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rtvsd" option; do
+while getopts "hp:a:o:b:f:rtvsdS" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;

@@ -46,7 +46,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 // BroadcastCXReceiptsWithShardID broadcasts cross shard receipts to given ToShardID
 func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig []byte, commitBitmap []byte, toShardID uint32) {
 	myShardID := node.Consensus.ShardID
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Uint32("toShardID", toShardID).
 		Uint32("myShardID", myShardID).
 		Uint64("blockNum", block.NumberU64()).
@@ -54,7 +54,7 @@ func (node *Node) BroadcastCXReceiptsWithShardID(block *types.Block, commitSig [
 
 	cxReceipts, err := node.Blockchain().ReadCXReceipts(toShardID, block.NumberU64(), block.Hash())
 	if err != nil || len(cxReceipts) == 0 {
-		utils.Logger().Info().Uint32("ToShardID", toShardID).
+		utils.Logger().Debug().Uint32("ToShardID", toShardID).
 			Int("numCXReceipts", len(cxReceipts)).
 			Msg("[CXMerkleProof] No receipts found for the destination shard")
 		return

@@ -125,7 +125,7 @@ func (node *Node) explorerMessageHandler(
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
-	utils.Logger().Debug().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
+	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, true); err == nil {
 		if len(block.Header().ShardState()) > 0 {
 			node.Consensus.UpdateConsensusInformation()
@@ -172,7 +172,8 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		utils.Logger().Debug().Err(err).
+			Msgf("[Explorer] Error retrieving transaction history for address %s", address)
 		return make([]common.Hash, 0), nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
@@ -204,7 +205,8 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		utils.Logger().Debug().Err(err).
+			Msgf("[Explorer] Staking transaction history for address %s not found", address)
 		return make([]common.Hash, 0), nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {

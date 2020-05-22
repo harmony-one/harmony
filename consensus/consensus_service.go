@@ -78,7 +78,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().
+		utils.Logger().Debug().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
 			Msg("Member")

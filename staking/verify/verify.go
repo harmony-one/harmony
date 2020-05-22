@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
@@ -23,6 +22,7 @@ var (
 func AggregateSigForCommittee(
 	chain *core.BlockChain,
 	committee *shard.Committee,
+	decider quorum.Decider,
 	aggSignature *bls.Sign,
 	hash common.Hash,
 	blockNum, viewID uint64,
@@ -41,15 +41,6 @@ func AggregateSigForCommittee(
 		return err
 	}
 
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityStake, committee.ShardID,
-	)
-	decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
-		return nil, nil
-	})
-	if _, err := decider.SetVoters(committee, epoch); err != nil {
-		return err
-	}
 	if !decider.IsQuorumAchievedByMask(mask) {
 		return errQuorumVerifyAggSign
 	}
