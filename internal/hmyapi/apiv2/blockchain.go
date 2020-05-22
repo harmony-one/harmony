@@ -176,6 +176,20 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	return result, nil
 }
 
+// GetValidatorKeys returns list of bls public keys in the committee for a particular epoch.
+func (s *PublicBlockChainAPI) GetValidatorKeys(ctx context.Context, epoch int64) ([]string, error) {
+	committee, err := s.b.GetValidators(big.NewInt(epoch))
+	if err != nil {
+		return nil, err
+	}
+
+	validators := make([]string, len(committee.Slots))
+	for i, v := range committee.Slots {
+		validators[i] = v.BLSPublicKey.Hex()
+	}
+	return validators, nil
+}
+
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
 	if err := s.isBeaconShard(); err != nil {
