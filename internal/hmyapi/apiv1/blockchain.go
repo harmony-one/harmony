@@ -71,7 +71,7 @@ func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum rpc.BlockNumber)
 	// since they are never greater than latest
 	if blockNum != rpc.PendingBlockNumber &&
 		blockNum != rpc.LatestBlockNumber &&
-		uint64(blockNum) > s.b.CurrentBlock().NumberU64() {
+		uint64(blockNum) > (s.b.CurrentBlock().NumberU64() + 1) {
 		return ErrRequestedBlockTooHigh
 	}
 	return nil
