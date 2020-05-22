@@ -414,6 +414,7 @@ func (b *APIBackend) GetValidatorInformation(
 			wrapper.BlockReward,
 			wrapper.Counters,
 			zero,
+			nil,
 		},
 	}
 
@@ -447,54 +448,62 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
+	latestAPR := numeric.ZeroDec()
+	l := len(stats.APRs)
+	if l > 0 {
+		latestAPR = stats.APRs[l-1].Value
+	}
+	defaultReply.Lifetime.APR = latestAPR
+	defaultReply.Lifetime.EpochAPRs = stats.APRs
+
 	// average apr cache keys
-	key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
-	prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
+	// key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
+	// prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
 
 	// delete entry for previous epoch
-	b.apiCache.Forget(prevKey)
+	// b.apiCache.Forget(prevKey)
 
 	// calculate last APRHistoryLength epochs for averaging APR
-	epochFrom := bc.Config().StakingEpoch
-	nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
-	if nowMinus.Cmp(epochFrom) > 0 {
-		epochFrom = nowMinus
-	}
+	// epochFrom := bc.Config().StakingEpoch
+	// nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
+	// if nowMinus.Cmp(epochFrom) > 0 {
+	// 	epochFrom = nowMinus
+	// }
 
-	if len(stats.APRs) > 0 && stats.APRs[0].Epoch.Cmp(epochFrom) > 0 {
-		epochFrom = stats.APRs[0].Epoch
-	}
+	// if len(stats.APRs) > 0 && stats.APRs[0].Epoch.Cmp(epochFrom) > 0 {
+	// 	epochFrom = stats.APRs[0].Epoch
+	// }
 
-	epochToAPRs := map[int64]numeric.Dec{}
-	for i := 0; i < len(stats.APRs); i++ {
-		entry := stats.APRs[i]
-		epochToAPRs[entry.Epoch.Int64()] = entry.Value
-	}
+	// epochToAPRs := map[int64]numeric.Dec{}
+	// for i := 0; i < len(stats.APRs); i++ {
+	// 	entry := stats.APRs[i]
+	// 	epochToAPRs[entry.Epoch.Int64()] = entry.Value
+	// }
 
 	// at this point, validator is active and has apr's for the recent 100 epochs
 	// compute average apr over history
-	if avgAPR, err := b.SingleFlightRequest(
-		key, func() (interface{}, error) {
-			total := numeric.ZeroDec()
-			count := 0
-			for i := epochFrom.Int64(); i < now.Int64(); i++ {
-				if apr, ok := epochToAPRs[i]; ok {
-					total = total.Add(apr)
-				}
-				count++
-			}
-			if count == 0 {
-				return nil, errors.New("no apr snapshots available")
-			}
-			return total.QuoInt64(int64(count)), nil
-		},
-	); err != nil {
-		// could not compute average apr from snapshot
-		// assign the latest apr available from stats
-		defaultReply.Lifetime.APR = numeric.ZeroDec()
-	} else {
-		defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
-	}
+	// if avgAPR, err := b.SingleFlightRequest(
+	// 	key, func() (interface{}, error) {
+	// 		total := numeric.ZeroDec()
+	// 		count := 0
+	// 		for i := epochFrom.Int64(); i < now.Int64(); i++ {
+	// 			if apr, ok := epochToAPRs[i]; ok {
+	// 				total = total.Add(apr)
+	// 			}
+	// 			count++
+	// 		}
+	// 		if count == 0 {
+	// 			return nil, errors.New("no apr snapshots available")
+	// 		}
+	// 		return total.QuoInt64(int64(count)), nil
+	// 	},
+	// ); err != nil {
+	// 	// could not compute average apr from snapshot
+	// 	// assign the latest apr available from stats
+	// 	defaultReply.Lifetime.APR = numeric.ZeroDec()
+	// } else {
+	// 	defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
+	// }
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.ComputedMetrics = stats
