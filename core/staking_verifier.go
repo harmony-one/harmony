@@ -87,6 +87,9 @@ func VerifyAndCreateValidatorFromMsg(
 	if msg.Amount.Sign() == -1 {
 		return nil, errNegativeAmount
 	}
+	if msg.Amount.Cmp(msg.MinSelfDelegation) == -1 {
+		return nil, errInsufficientBalanceForStake
+	}
 	if stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errors.Wrapf(
 			errValidatorExist, common2.MustAddressToBech32(msg.ValidatorAddress),
