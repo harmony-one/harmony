@@ -636,10 +636,9 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 	}
 	for i := start; i < start+validatorsNum; i++ {
 		information, err := s.b.GetValidatorInformation(addresses[i], block)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			validators[i-start] = information
 		}
-		validators[i-start] = information
 	}
 	return validators, nil
 }
