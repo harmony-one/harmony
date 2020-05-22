@@ -414,6 +414,7 @@ func (b *APIBackend) GetValidatorInformation(
 			wrapper.BlockReward,
 			wrapper.Counters,
 			zero,
+			nil,
 		},
 	}
 
@@ -494,6 +495,7 @@ func (b *APIBackend) GetValidatorInformation(
 		defaultReply.Lifetime.APR = numeric.ZeroDec()
 	} else {
 		defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
+		defaultReply.Lifetime.EpochAPRs = stats.APRs
 	}
 
 	if defaultReply.CurrentlyInCommittee {
