@@ -510,20 +510,6 @@ download_binaries() {
    (cd "${outdir}" && exec openssl sha256 $(cut -c35- md5sum.txt)) > "${outdir}/harmony-checksums.txt"
 }
 
-check_free_disk() {
-   local dir
-   dir="${1:-.}"
-   local free_disk=$(df -BG $dir | tail -n 1 | awk ' { print $4 } ' | tr -d G)
-   # need at least 50G free disk space
-   local need_disk=50
-
-   if [ $free_disk -gt $need_disk ]; then
-      return 0
-   else
-      return 1
-   fi
-}
-
 _curl_check_exist() {
    local url=$1
    local statuscode=$(curl -I --silent --output /dev/null --write-out "%{http_code}" $url)
