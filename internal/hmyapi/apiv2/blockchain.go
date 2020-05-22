@@ -144,9 +144,6 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEn
 
 // GetValidators returns validators list for a particular epoch.
 func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (map[string]interface{}, error) {
-	if err := s.isBeaconShard(); err != nil {
-		return nil, err
-	}
 	committee, err := s.b.GetValidators(big.NewInt(epoch))
 	if err != nil {
 		return nil, err
