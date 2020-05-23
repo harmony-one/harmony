@@ -280,9 +280,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	if consensus.Decider.IsAllSigsCollected() {
-		go func() {
+		go func(viewID uint64) {
 			consensus.commitFinishChan <- viewID
 			logger.Info().Msg("[OnCommit] 100% Enough commits received")
-		}()
+		}(consensus.viewID)
 	}
 }

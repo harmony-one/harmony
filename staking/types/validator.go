@@ -157,6 +157,7 @@ type AccumulatedOverLifetime struct {
 	BlockReward *big.Int    `json:"reward-accumulated"`
 	Signing     counters    `json:"blocks"`
 	APR         numeric.Dec `json:"apr"`
+	EpochAPRs   []APREntry  `json:"epoch-apr"`
 }
 
 func (w ValidatorWrapper) String() string {

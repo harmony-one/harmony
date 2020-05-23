@@ -938,7 +938,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		pool.priced.Put(tx)
 		pool.journalTx(from, tx)
 
-		logger.Warn().
+		logger.Info().
 			Str("hash", tx.Hash().Hex()).
 			Interface("from", from).
 			Interface("to", tx.To()).
@@ -964,7 +964,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	}
 	pool.journalTx(from, tx)
 
-	logger.Warn().
+	logger.Info().
 		Str("hash", hash.Hex()).
 		Interface("from", from).
 		Interface("to", tx.To()).
@@ -1275,7 +1275,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
 			hash := tx.Hash()
 			if pool.promoteTx(addr, tx) {
-				logger.Warn().Str("hash", hash.Hex()).Msg("Promoting queued transaction")
+				logger.Info().Str("hash", hash.Hex()).Msg("Promoting queued transaction")
 				promoted = append(promoted, tx)
 			}
 		}
