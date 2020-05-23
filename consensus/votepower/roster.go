@@ -143,13 +143,9 @@ func AggregateRosters(
 					AccommodateHarmonyVote: *voteCard,
 					ShardID:                roster.ShardID,
 				}
-				if _, ok := result[voteCard.EarningAccount]; ok {
-					result[voteCard.EarningAccount] = append(
-						result[voteCard.EarningAccount], voterID,
-					)
-				} else {
-					result[voteCard.EarningAccount] = []VoteOnSubcomittee{voterID}
-				}
+				result[voteCard.EarningAccount] = append(
+					result[voteCard.EarningAccount], voterID,
+				)
 			}
 		}
 	}

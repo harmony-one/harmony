@@ -33,14 +33,14 @@ func (args *SendTxArgs) setDefaults(ctx context.Context, b Backend) error {
 		*(*uint64)(args.Gas) = 90000
 	}
 	// TODO(ricl): add check for shardID
-	if args.GasPrice == nil {
-		// TODO(ricl): port
-		// price, err := b.SuggestPrice(ctx)
-		// if err != nil {
-		// 	return err
-		// }
-		// args.GasPrice = (*hexutil.Big)(price)
-	}
+	// if args.GasPrice == nil {
+	//	 TODO(ricl): port
+	//	 price, err := b.SuggestPrice(ctx)
+	//	 if err != nil {
+	//	 	 return err
+	//	 }
+	//	args.GasPrice = (*hexutil.Big)(price)
+	// }
 	if args.Value == nil {
 		args.Value = new(hexutil.Big)
 	}

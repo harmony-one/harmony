@@ -9,14 +9,14 @@ export GO111MODULE:=on
 .PHONY: all libs exe test
 
 all: libs
-	./scripts/go_executable_build.sh
+	./scripts/go_executable_build.sh -S
 
 libs:
 	make -C $(TOP)/mcl -j8
 	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
 
 exe:
-	./scripts/go_executable_build.sh
+	./scripts/go_executable_build.sh -S
 
 race:
 	./scripts/go_executable_build.sh -r

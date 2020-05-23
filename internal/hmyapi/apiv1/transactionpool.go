@@ -39,8 +39,8 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 
 // GetTransactionsHistory returns the list of transactions hashes that involve a particular address.
 func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, args TxHistoryArgs) (map[string]interface{}, error) {
-	address := args.Address
-	result := []common.Hash{}
+	var address string
+	var result []common.Hash
 	var err error
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address

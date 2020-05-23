@@ -93,7 +93,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().
+		utils.Logger().Debug().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
 			Msg("Member")
@@ -418,7 +418,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider = decider
 	}
 
-	committeeToSet := &shard.Committee{}
+	var committeeToSet *shard.Committee
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(

@@ -102,7 +102,13 @@ func (s *Service) Run() *http.Server {
 
 	// Do serving now.
 	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
-	server := &http.Server{Addr: addr, Handler: s.router}
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      s.router,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			utils.Logger().Warn().Err(err).Msg("server.ListenAndServe()")

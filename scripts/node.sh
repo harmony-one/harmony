@@ -188,6 +188,7 @@ options:
    -r address     start a pprof profiling server listening on the specified address
    -I             use statically linked Harmony binary (default: true)
    -R tracefile   enable p2p trace using tracefile (default: off)
+   -L             limit broadcasting of invalid transactions (default: off)
 
 examples:
 
@@ -239,7 +240,7 @@ BUCKET=pub.harmony.one
 OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node broadcast_invalid_tx
 start_clean=false
 loop=true
 run_as_root=true
@@ -260,12 +261,13 @@ static=true
 verify=false
 minpeers=6
 max_bls_keys_per_node=10
+broadcast_invalid_tx=true
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m: opt
+while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m:L opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -302,6 +304,7 @@ do
    y) staking_mode=false;;
    A) archival=true;;
    R) TRACEFILE="${OPTARG}";;
+   L) broadcast_invalid_tx=false;;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -329,25 +332,15 @@ mainnet)
   dns_zone=t.hmny.io
   syncdir=mainnet.min
   ;;
-testnet)  # TODO: update Testnet configs once LRTN is upgraded
+testnet)
   bootnodes=(
-    /ip4/54.218.73.167/tcp/9876/p2p/QmWBVCPXQmc2ULigm3b9ayCZa15gj25kywiQQwPhHCZeXj
-    /ip4/18.232.171.117/tcp/9876/p2p/QmfJ71Eb7XTDs8hX2vPJ8un4L7b7RiDk6zCzWVxLXGA6MA
+    /ip4/54.86.126.90/tcp/9850/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
+    /ip4/52.40.84.2/tcp/9850/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
   )
   REL=testnet
   network_type=testnet
-  dns_zone=p.hmny.io
+  dns_zone=b.hmny.io
   syncdir=lrtn
-  ;;
-tnet)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9889/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9889/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
-  REL=tnet
-  network_type=testnet
-  dns_zone=tn.hmny.io
-  syncdir=tnet
   ;;
 staking)
   bootnodes=(
@@ -377,16 +370,6 @@ stn|stress|stressnet)
   network_type=stressnet
   dns_zone=stn.hmny.io
   syncdir=stn
-  ;;
-devnet)
-  bootnodes=(
-    /ip4/54.86.126.90/tcp/9870/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
-    /ip4/52.40.84.2/tcp/9870/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
-  )
-  REL=devnet
-  network_type=devnet
-  dns_zone=pga.hmny.io
-  syncdir=devnet
   ;;
 *)
   err 64 "${network}: invalid network"
@@ -827,7 +810,8 @@ read_bls_pass() {
          unset -v passphrase
          read -rsp "Enter passphrase for the BLS key file $f: " passphrase
          echo ${passphrase} | tee $passfile
-         echo "Passphrase is temporarely saved to: $passfile"
+         chmod og-wr $passfile
+         echo "Passphrase is temporarily saved to: $passfile"
          prompt_save=true
       fi
    done
@@ -911,6 +895,7 @@ do
       -blacklist="${blacklist}"
       -min_peers="${minpeers}"
       -max_bls_keys_per_node="${max_bls_keys_per_node}"
+      -broadcast_invalid_tx="${broadcast_invalid_tx}"
    )
    args+=(
       -is_archival="${archival}"

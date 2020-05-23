@@ -111,9 +111,8 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, msg.Amount),
 	}
-	zero := big.NewInt(0)
-	wrapper.Counters.NumBlocksSigned = zero
-	wrapper.Counters.NumBlocksToSign = zero
+	wrapper.Counters.NumBlocksSigned = big.NewInt(0)
+	wrapper.Counters.NumBlocksToSign = big.NewInt(0)
 	wrapper.BlockReward = big.NewInt(0)
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
@@ -167,7 +166,7 @@ func VerifyAndEditValidatorFromMsg(
 
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
-		return nil, errors.WithMessage(err, "Validator snapshot not found.")
+		return nil, errors.WithMessage(err, "validator snapshot not found.")
 	}
 	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 

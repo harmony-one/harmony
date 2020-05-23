@@ -221,7 +221,7 @@ func newRPCStakingTransaction(
 
 	stakingTxType := tx.StakingType()
 	message := tx.StakingMessage()
-	fields := make(map[string]interface{}, 0)
+	fields := make(map[string]interface{})
 
 	switch stakingTxType {
 	case types2.DirectiveCreateValidator:

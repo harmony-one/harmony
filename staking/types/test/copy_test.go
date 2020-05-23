@@ -15,14 +15,6 @@ import (
 )
 
 var (
-	zeroDec     = numeric.ZeroDec()
-	oneThirdDec = numeric.NewDecWithPrec(33, 2)
-	halfDec     = numeric.NewDecWithPrec(5, 1)
-	twoThirdDec = numeric.NewDecWithPrec(66, 2)
-	oneDec      = numeric.OneDec()
-)
-
-var (
 	testPub = shard.BLSPublicKey{1}
 )
 
@@ -35,9 +27,9 @@ func TestCopyValidatorWrapper(t *testing.T) {
 		{staking.ValidatorWrapper{}},
 	}
 	for i, test := range tests {
-		cp := CopyValidatorWrapper(&test.w)
+		cp := CopyValidatorWrapper(test.w)
 
-		if err := assertValidatorWrapperDeepCopy(*cp, test.w); err != nil {
+		if err := assertValidatorWrapperDeepCopy(cp, test.w); err != nil {
 			t.Errorf("Test %v: %v", i, err)
 		}
 	}
@@ -253,13 +245,6 @@ func assertCommissionDeepCopy(c1, c2 staking.Commission) error {
 		return fmt.Errorf("UpdateHeight: %v", err)
 	}
 	return nil
-}
-
-func assertCommissionRatesDeepCopy(cr1, cr2 staking.CommissionRates) error {
-	if !reflect.DeepEqual(cr1, cr2) {
-		return errors.New("not deep equal")
-	}
-	return assertCommissionRatesCopy(cr1, cr2)
 }
 
 func assertCommissionRatesCopy(cr1, cr2 staking.CommissionRates) error {
