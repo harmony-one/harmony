@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -212,6 +213,44 @@ func (bc *BlockChain) CommitOffChainData(
 			utils.Logger().
 				Err(err).
 				Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
+		}
+		// fix the possible wrong apr in the staking epoch
+		stakingEpoch := bc.Config().StakingEpoch
+		secondStakingEpoch := big.NewInt(0).Add(stakingEpoch, common.Big1)
+		thirdStakingEpoch := big.NewInt(0).Add(secondStakingEpoch, common.Big1)
+		isThirdStakingEpoch := block.Epoch().Cmp(thirdStakingEpoch) == 0
+		if isThirdStakingEpoch {
+			// we have to do it for all validators, not only currently elected
+			if validators, err := bc.ReadValidatorList(); err == nil {
+				for _, addr := range validators {
+					// get wrapper from the second staking epoch
+					if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+						secondStakingEpoch, addr,
+					); err == nil {
+						if block := bc.GetBlockByNumber(
+							shard.Schedule.EpochLastBlock(stakingEpoch.Uint64()),
+						); block != nil {
+							if aprComputed, err := apr.ComputeForValidator(
+								bc, block, snapshot.Validator,
+							); err == nil {
+								stats, ok := tempValidatorStats[addr]
+								if !ok {
+									stats, err = bc.ReadValidatorStats(addr)
+									if err != nil {
+										continue
+									}
+								}
+								for i := range stats.APRs {
+									if stats.APRs[i].Epoch.Cmp(stakingEpoch) == 0 {
+										stats.APRs[i] = staking.APREntry{stakingEpoch, *aprComputed}
+									}
+								}
+								tempValidatorStats[addr] = stats
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

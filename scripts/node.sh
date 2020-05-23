@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200507.0"
+version="v1 20200521.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -21,6 +21,19 @@ err() {
    shift 1
    msg "$@"
    exit "${code}"
+}
+
+# b: beginning
+# r: range
+# return random number between b ~ b+r
+random() {
+   local b=$1
+   local r=$2
+   if [ $r -le 0 ]; then
+      r=100
+   fi
+   local rand=$(( $(od -A n -t d -N 3 /dev/urandom | grep -oE '[0-9]+') % r ))
+   echo $(( b + rand ))
 }
 
 # https://www.linuxjournal.com/content/validating-ip-address-bash-script
@@ -171,7 +184,6 @@ options:
    -n port        specify the public base port of the node (default: 9000)
    -T nodetype    specify the node type (validator, explorer; default: validator)
    -i shardid     specify the shard id (valid only with explorer node; default: 1)
-   -b             download harmony_db files from shard specified by -i <shardid> (default: off)
    -a dbfile      specify the db file to download (default:off)
    -U FOLDER      specify the upgrade folder to download binaries
    -P             enable public rpc end point (default:off)
@@ -188,7 +200,8 @@ options:
    -r address     start a pprof profiling server listening on the specified address
    -I             use statically linked Harmony binary (default: true)
    -R tracefile   enable p2p trace using tracefile (default: off)
-   -L             limit broadcasting of invalid transactions (default: off)
+   -l             limit broadcasting of invalid transactions (default: off)
+   -L log_level   logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: $log_level)
 
 examples:
 
@@ -239,8 +252,8 @@ usage() {
 BUCKET=pub.harmony.one
 OS=$(uname -s)
 
-unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id download_harmony_db db_file_to_dl
-unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node broadcast_invalid_tx
+unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id broadcast_invalid_tx
+unset upgrade_rel public_rpc staking_mode pub_port multi_key blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node log_level
 start_clean=false
 loop=true
 run_as_root=true
@@ -249,7 +262,6 @@ download_only=false
 network=mainnet
 node_type=validator
 shard_id=-1
-download_harmony_db=false
 public_rpc=false
 staking_mode=false
 multi_key=false
@@ -262,17 +274,17 @@ verify=false
 minpeers=6
 max_bls_keys_per_node=10
 broadcast_invalid_tx=true
+log_level=3
 ${BLSKEYFILE=}
 ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDN:T:i:ba:U:PvVyzn:MAIB:r:Y:f:R:m:L opt
+while getopts :1chk:sSp:dDN:T:i:U:PvVyzn:MAIB:r:Y:f:R:m:L:l opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
-   b) download_harmony_db=true;;
    c) start_clean=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
@@ -290,7 +302,6 @@ do
    T) node_type="${OPTARG}";;
    i) shard_id="${OPTARG}";;
    I) static=true;;
-   a) db_file_to_dl="${OPTARG}";;
    U) upgrade_rel="${OPTARG}";;
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
@@ -304,7 +315,8 @@ do
    y) staking_mode=false;;
    A) archival=true;;
    R) TRACEFILE="${OPTARG}";;
-   L) broadcast_invalid_tx=false;;
+   l) broadcast_invalid_tx=false;;
+   L) log_level="${OPTARG}";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -476,22 +488,8 @@ download_binaries() {
       verify_checksum "${outdir}" "${bin}" md5sum.txt || return $?
       msg "downloaded ${bin}"
    done
-   chmod +x "${outdir}/harmony"
+   chmod +x "${outdir}/harmony" "${outdir}/node.sh"
    (cd "${outdir}" && exec openssl sha256 $(cut -c35- md5sum.txt)) > "${outdir}/harmony-checksums.txt"
-}
-
-check_free_disk() {
-   local dir
-   dir="${1:-.}"
-   local free_disk=$(df -BG $dir | tail -n 1 | awk ' { print $4 } ' | tr -d G)
-   # need at least 50G free disk space
-   local need_disk=50
-
-   if [ $free_disk -gt $need_disk ]; then
-      return 0
-   else
-      return 1
-   fi
 }
 
 _curl_check_exist() {
@@ -519,67 +517,17 @@ _curl_download() {
    fi
 }
 
-download_harmony_db_file() {
-   local shard_id
-   shard_id="${1}"
-   local file_to_dl="${2}"
-   local outdir=db
-   if ! check_free_disk; then
-      err 70 "do not have enough free disk space to download db tarball"
-   fi
-
-   url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/md5sum.txt"
-   rm -f "${outdir}/md5sum.txt"
-   if ! _curl_download $url "${outdir}" md5sum.txt; then
-      err 70 "cannot download md5sum.txt"
-   fi
-
-   if [ -n "${file_to_dl}" ]; then
-      if grep -q "${file_to_dl}" "${outdir}/md5sum.txt"; then
-         url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/${file_to_dl}"
-         if _curl_download $url "${outdir}" ${file_to_dl}; then
-            verify_checksum "${outdir}" "${file_to_dl}" md5sum.txt || return $?
-            msg "downloaded ${file_to_dl}, extracting ..."
-            tar -C "${outdir}" -xvf "${outdir}/${file_to_dl}"
-         else
-            msg "can't download ${file_to_dl}"
-         fi
-      fi
-      return
-   fi
-
-   files=$(awk '{ print $2 }' ${outdir}/md5sum.txt)
-   echo "[available harmony db files for shard ${shard_id}]"
-   grep -oE "harmony_db_${shard_id}"-.*.tar "${outdir}/md5sum.txt"
-   echo
-   for file in $files; do
-      if [[ $file =~ "harmony_db_${shard_id}" ]]; then
-         echo -n "Do you want to download ${file} (choose one only) [y/n]?"
-         read yesno
-         if [[ "$yesno" = "y" || "$yesno" = "Y" ]]; then
-            url="http://${BUCKET}.s3.amazonaws.com/${FOLDER}/db/$file"
-            if _curl_download $url "${outdir}" $file; then
-               verify_checksum "${outdir}" "${file}" md5sum.txt || return $?
-               msg "downloaded $file, extracting ..."
-               tar -C "${outdir}" -xvf "${outdir}/${file}"
-            else
-               msg "can't download $file"
-            fi
-            break
-         fi
-      fi
-   done
-}
-
 any_new_binaries() {
    local outdir
    ${do_not_download} && return 0
    outdir="${1}"
    mkdir -p "${outdir}"
-   curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
-   if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
-      msg "failed to downloaded harmony public signing key"
-      return 1
+   if ${verify}; then
+      curl -L https://harmony.one/pubkey -o "${outdir}/harmony_pubkey.pem"
+      if ! grep -q "BEGIN\ PUBLIC\ KEY" "${outdir}/harmony_pubkey.pem"; then
+         msg "failed to downloaded harmony public signing key"
+         return 1
+      fi
    fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
    if diff $outdir/md5sum.txt.new md5sum.txt
@@ -599,11 +547,6 @@ if ${download_only}; then
       download_binaries staging || err 69 "download node software failed"
       msg "downloaded files are in staging direectory"
    fi
-   exit 0
-fi
-
-if ${download_harmony_db}; then
-   download_harmony_db_file "${shard_id}" "${db_file_to_dl}" || err 70 "download harmony_db file failed"
    exit 0
 fi
 
@@ -653,15 +596,11 @@ fi
 
 NODE_PORT=${pub_port:-9000}
 PUB_IP=
-PUSHGATEWAY_IP=
-PUSHGATEWAY_PORT=
 
 if [ "$OS" == "Linux" ]; then
    if ${run_as_root}; then
       setup_env
    fi
-# Kill existing soldier/node
-   fuser -k -n tcp $NODE_PORT
 fi
 
 # find my public ip address
@@ -846,8 +785,9 @@ rm_bls_pass() {
 {
    while ${loop}
    do
-      msg "re-downloading binaries in 5m"
-      sleep 300
+      msg "re-downloading binaries in 5~10m"
+      redl_sec=$( random 300 300 )
+      sleep $redl_sec
       if any_new_binaries staging
       then
          msg "binaries did not change"
@@ -855,8 +795,9 @@ rm_bls_pass() {
       fi
       while ! download_binaries staging
       do
-         msg "staging download failed; retrying in 30s"
-         sleep 30
+         msg "staging download failed; retrying in 30~60s"
+         retry_sec=$( random 30 30 )
+         sleep $retry_sec
       done
       if diff staging/harmony-checksums.txt harmony-checksums.txt
       then
@@ -896,6 +837,7 @@ do
       -min_peers="${minpeers}"
       -max_bls_keys_per_node="${max_bls_keys_per_node}"
       -broadcast_invalid_tx="${broadcast_invalid_tx}"
+      -verbosity="${log_level}"
    )
    args+=(
       -is_archival="${archival}"
@@ -952,7 +894,7 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
    run() {
-      (sleep 30 && rm_bls_pass)&
+      (sleep 60 && rm_bls_pass)&
       env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    }
    case "${blspass:+set}" in

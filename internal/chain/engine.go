@@ -189,8 +189,8 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
 	if parentHeader == nil {
-		return errors.Errorf(
-			"[VerifySeal] no parent header found for block %x at %d", header.Hash(), header.Number().Uint64(),
+		return errors.New(
+			"[VerifySeal] no parent header found",
 		)
 	}
 	if chain.Config().IsStaking(parentHeader.Epoch()) {
