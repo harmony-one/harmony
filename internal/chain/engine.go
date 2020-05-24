@@ -172,6 +172,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
+	if header == nil {
+		return errors.New("[VerifySeal] nil block header")
+	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
 
 	if err != nil {
