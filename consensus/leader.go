@@ -262,19 +262,20 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	viewID := consensus.viewID
-
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
-
-		next := consensus.NextBlockDue
-		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
-		time.AfterFunc(2*time.Second, func() {
-			<-time.After(time.Until(next))
+		go func(viewID uint64) {
+			consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
+			// Always wait for 2 seconds as minimum grace period
+			time.Sleep(2 * time.Second)
+			if n := time.Now(); n.Before(consensus.NextBlockDue) {
+				// Sleep to wait for the full block time
+				time.Sleep(consensus.NextBlockDue.Sub(n))
+			}
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 			consensus.commitFinishChan <- viewID
-		})
+		}(consensus.viewID)
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
