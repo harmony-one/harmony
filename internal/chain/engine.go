@@ -332,10 +332,14 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
+		lockPeriod := staking.LockPeriodInEpoch
+		if chain.Config().IsQuickUnlock(header.Epoch()) {
+			lockPeriod = staking.LockPeriodInEpochV2
+		}
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod,
 			)
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}
