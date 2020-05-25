@@ -16,6 +16,7 @@ ENV LD_LIBRARY_PATH=${BLS_DIR}/lib:${MCL_DIR}/lib
 ENV GIMME_GO_VERSION="1.14.1"
 ENV PATH="/root/bin:${PATH}"
 
+RUN apt-get update -y
 RUN apt install libgmp-dev libssl-dev curl git \
 psmisc dnsutils jq make gcc g++ bash tig tree sudo vim \
 silversearcher-ag unzip emacs-nox nano bash-completion -y
