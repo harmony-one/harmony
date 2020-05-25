@@ -126,7 +126,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
-									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 								go func(blk *types.Block) {
 									node.BeaconBlockChannel <- blk
