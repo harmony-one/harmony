@@ -8,7 +8,7 @@
 //     BasePath: /
 //     Version: 0.0.1
 //     License: MIT http://opensource.org/licenses/MIT
-//     Contact: Stephen Tse<s@harmony.one> http://harmony.one
+//     Contact: John Whitton<john@johnwhitton.come> https://johnwhitton.dev
 //
 //     Consumes:
 //     - application/json
