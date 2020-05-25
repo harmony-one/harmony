@@ -30,7 +30,7 @@ var (
 		CrossLinkEpoch:   big.NewInt(186),
 		StakingEpoch:     big.NewInt(186),
 		PreStakingEpoch:  big.NewInt(185),
-		QuickUnlockEpoch: big.NewInt(190), // Around May 25 11:44 PM PST 2020
+		QuickUnlockEpoch: big.NewInt(191),
 		EIP155Epoch:      big.NewInt(28),
 		S3Epoch:          big.NewInt(28),
 		ReceiptLogEpoch:  big.NewInt(101),
