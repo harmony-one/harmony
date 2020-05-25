@@ -110,6 +110,20 @@ func TestUnlockedFullPeriod(t *testing.T) {
 	}
 }
 
+func TestQuickUnlock(t *testing.T) {
+	lastEpochInCommittee := big.NewInt(44)
+	curEpoch := big.NewInt(44)
+
+	epoch7 := big.NewInt(44)
+	amount7 := big.NewInt(4000)
+	delegation.Undelegate(epoch7, amount7)
+
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 0)
+	if result.Cmp(big.NewInt(4000)) != 0 {
+		t.Errorf("removing an unlocked undelegation fails")
+	}
+}
+
 func TestUnlockedFullPeriodFail(t *testing.T) {
 	delegation := NewDelegation(delegatorAddr, delegationAmt)
 	lastEpochInCommittee := big.NewInt(34)
@@ -136,19 +150,5 @@ func TestUnlockedPremature(t *testing.T) {
 	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("premature delegation shouldn't be unlocked")
-	}
-}
-
-func TestQuickUnlock(t *testing.T) {
-	lastEpochInCommittee := big.NewInt(54)
-	curEpoch := big.NewInt(54)
-
-	epoch7 := big.NewInt(54)
-	amount7 := big.NewInt(4000)
-	delegation.Undelegate(epoch7, amount7)
-
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 0)
-	if result.Cmp(big.NewInt(4000)) != 0 {
-		t.Errorf("removing an unlocked undelegation fails")
 	}
 }

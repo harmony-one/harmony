@@ -282,10 +282,8 @@ func (node *Node) BroadcastCrossLink() {
 		batchSize := crossLinkBatchSize
 		diff := curBlock.Number().Uint64() - latestBlockNum
 
-		if diff > 100 {
-			// Increase batch size by 1 for every 100 blocks beyond
-			batchSize += int(diff-100) / 100
-		}
+		// Increase batch size by 1 for every 100 blocks beyond
+		batchSize += int(diff) / 100
 
 		// Cap at a sane size to avoid overload network
 		if batchSize > crossLinkBatchSize*2 {
