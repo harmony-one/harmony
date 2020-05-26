@@ -102,9 +102,9 @@ type CacheConfig struct {
 // block. The Blockchain manages chain imports, reverts, chain reorganisations.
 //
 // Importing blocks in to the block chain happens according to the set of rules
-// defined by the two stage Validator. Processing of blocks is done using the
+// defined by the two stage validator. Processing of blocks is done using the
 // Processor which processes the included transaction. The validation of the state
-// is done in the second part of the Validator. Failing results in aborting of
+// is done in the second part of the validator. Failing results in aborting of
 // the import.
 //
 // The BlockChain also helps in returning blocks from **any** chain included
@@ -170,7 +170,7 @@ type BlockChain struct {
 }
 
 // NewBlockChain returns a fully initialised block chain using information
-// available in the database. It initialises the default Ethereum Validator and
+// available in the database. It initialises the default Ethereum validator and
 // Processor.
 func NewBlockChain(
 	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
@@ -833,14 +833,15 @@ func (bc *BlockChain) Stop() {
 		for _, offset := range []uint64{0, 1, triesInMemory - 1} {
 			if number := bc.CurrentBlock().NumberU64(); number > offset {
 				recent := bc.GetHeaderByNumber(number - offset)
-
-				utils.Logger().Info().
-					Str("block", recent.Number().String()).
-					Str("hash", recent.Hash().Hex()).
-					Str("root", recent.Root().Hex()).
-					Msg("Writing cached state to disk")
-				if err := triedb.Commit(recent.Root(), true); err != nil {
-					utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
+				if recent != nil {
+					utils.Logger().Info().
+						Str("block", recent.Number().String()).
+						Str("hash", recent.Hash().Hex()).
+						Str("root", recent.Root().Hex()).
+						Msg("Writing cached state to disk")
+					if err := triedb.Commit(recent.Root(), true); err != nil {
+						utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
+					}
 				}
 			}
 		}
@@ -1137,32 +1138,34 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 			// Find the next state trie we need to commit
 			header := bc.GetHeaderByNumber(current - triesInMemory)
-			chosen := header.Number().Uint64()
+			if header != nil {
+				chosen := header.Number().Uint64()
 
-			// If we exceeded out time allowance, flush an entire trie to disk
-			if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
-				// If we're exceeding limits but haven't reached a large enough memory gap,
-				// warn the user that the system is becoming unstable.
-				if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					utils.Logger().Info().
-						Dur("time", bc.gcproc).
-						Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-						Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
-						Msg("State in memory for too long, committing")
+				// If we exceeded out time allowance, flush an entire trie to disk
+				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
+					// If we're exceeding limits but haven't reached a large enough memory gap,
+					// warn the user that the system is becoming unstable.
+					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+						utils.Logger().Info().
+							Dur("time", bc.gcproc).
+							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
+							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Msg("State in memory for too long, committing")
+					}
+					// Flush an entire trie and restart the counters
+					triedb.Commit(header.Root(), true)
+					lastWrite = chosen
+					bc.gcproc = 0
 				}
-				// Flush an entire trie and restart the counters
-				triedb.Commit(header.Root(), true)
-				lastWrite = chosen
-				bc.gcproc = 0
-			}
-			// Garbage collect anything below our required write retention
-			for !bc.triegc.Empty() {
-				root, number := bc.triegc.Pop()
-				if uint64(-number) > chosen {
-					bc.triegc.Push(root, number)
-					break
+				// Garbage collect anything below our required write retention
+				for !bc.triegc.Empty() {
+					root, number := bc.triegc.Pop()
+					if uint64(-number) > chosen {
+						bc.triegc.Push(root, number)
+						break
+					}
+					triedb.Dereference(root.(common.Hash))
 				}
-				triedb.Dereference(root.(common.Hash))
 			}
 		}
 	}
@@ -1975,7 +1978,7 @@ func (bc *BlockChain) DeleteFromPendingSlashingCandidates(
 	bc.pendingSlashingCandidatesMU.Lock()
 	defer bc.pendingSlashingCandidatesMU.Unlock()
 	current := bc.ReadPendingSlashingCandidates()
-	bc.pendingSlashes = current.SetDifference(processed)
+	bc.pendingSlashes = processed.SetDifference(current)
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
@@ -2128,6 +2131,9 @@ func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	}
 
 	previousHeader := bc.GetHeaderByNumber(block.NumberU64() - 1)
+	if previousHeader == nil {
+		return false
+	}
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
@@ -2365,8 +2371,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 					QuoInt64(int64(len(wrapper.SlotPubKeys)))
 			}
 			for i := range stats.MetricsPerShard {
-				metric := stats.MetricsPerShard[i]
-				metric.Vote.RawStake = spread
+				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}
 		}
 
@@ -2389,19 +2394,17 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				} else {
 					now := currentEpochSuperCommittee.Epoch
 					// only insert if APR for current epoch does not exists
-					if _, ok := stats.APRs[now.Int64()]; !ok {
-						stats.APRs[now.Int64()] = *aprComputed
-						// check and clean aprs for epochs prior to current minus APRHistoryLength
-						nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength)).Int64()
-						keysToRemove := []int64{}
-						for i := range stats.APRs {
-							if i < nowMinus100 {
-								keysToRemove = append(keysToRemove, i)
-							}
-						}
-						for i := range keysToRemove {
-							delete(stats.APRs, keysToRemove[i])
-						}
+					aprEntry := staking.APREntry{now, *aprComputed}
+					l := len(stats.APRs)
+					// first time inserting apr for validator or
+					// apr for current epoch does not exists
+					// check the last entry's epoch, if not same, insert
+					if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
+						stats.APRs = append(stats.APRs, aprEntry)
+					}
+					// if history is more than staking.APRHistoryLength, pop front
+					if l > staking.APRHistoryLength {
+						stats.APRs = stats.APRs[1:]
 					}
 				}
 			} else {
@@ -2489,6 +2492,33 @@ func (bc *BlockChain) ReadDelegationsByDelegator(
 		}
 	}
 	blockNum := bc.CurrentBlock().Number()
+	for _, index := range rawResult {
+		if index.BlockNum.Cmp(blockNum) <= 0 {
+			m = append(m, index)
+		} else {
+			// Filter out index that's created beyond current height of chain.
+			// This only happens when there is a chain rollback.
+			utils.Logger().Warn().Msgf("Future delegation index encountered. Skip: %+v", index)
+		}
+	}
+	return m, nil
+}
+
+// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
+func (bc *BlockChain) ReadDelegationsByDelegatorAt(
+	delegator common.Address, blockNum *big.Int,
+) (m staking.DelegationIndexes, err error) {
+	rawResult := staking.DelegationIndexes{}
+	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
+		by := cached.([]byte)
+		if err := rlp.DecodeBytes(by, &rawResult); err != nil {
+			return nil, err
+		}
+	} else {
+		if rawResult, err = rawdb.ReadDelegationsByDelegator(bc.db, delegator); err != nil {
+			return nil, err
+		}
+	}
 	for _, index := range rawResult {
 		if index.BlockNum.Cmp(blockNum) <= 0 {
 			m = append(m, index)
@@ -2625,11 +2655,15 @@ func (bc *BlockChain) prepareStakingMetaData(
 				blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
-			if ok {
-				delegations = append(delegations, selfIndex)
-			} else {
-				delegations = staking.DelegationIndexes{selfIndex}
+			if !ok {
+				// If the cache doesn't have it, load it from DB for the first time.
+				delegations, err = bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
+				if err != nil {
+					return nil, nil, err
+				}
 			}
+
+			delegations = append(delegations, selfIndex)
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:

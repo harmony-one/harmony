@@ -79,17 +79,6 @@ func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingCrosslinkKey, bytes)
 }
 
-// DeletePendingCrossLinks stores last pending crosslinks into database.
-func DeletePendingCrossLinks(db DatabaseDeleter) error {
-	return db.Delete(pendingCrosslinkKey)
-}
-
-// ReadPendingSlashingCandidates retrieves last pending slashing candidates
-// TODO(audit): the pending slashes written in DB is never used.
-func ReadPendingSlashingCandidates(db DatabaseReader) ([]byte, error) {
-	return db.Get(pendingSlashingKey)
-}
-
 // WritePendingSlashingCandidates stores last pending slashing candidates into database.
 func WritePendingSlashingCandidates(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingSlashingKey, bytes)
@@ -253,6 +242,7 @@ func WriteValidatorList(
 }
 
 // ReadDelegationsByDelegator retrieves the list of validators delegated by a delegator
+// Returns empty results instead of error if there is not data found.
 func ReadDelegationsByDelegator(db DatabaseReader, delegator common.Address) (staking.DelegationIndexes, error) {
 	data, err := db.Get(delegatorValidatorListKey(delegator))
 	if err != nil || len(data) == 0 {

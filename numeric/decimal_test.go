@@ -73,6 +73,27 @@ func TestNewDecFromStr(t *testing.T) {
 	}
 }
 
+func TestDec_Copy(t *testing.T) {
+	tests := []struct {
+		d Dec
+	}{
+		{},
+		{NewDec(0)},
+		{NewDec(1)},
+		{NewDecWithPrec(12340, 4)},
+	}
+	for tcIndex, tc := range tests {
+		cp := tc.d.Copy()
+
+		assert.True(t, tc.d.IsNil() == cp.IsNil(), "IsNil not equal, tc %v", tcIndex)
+		if tc.d.IsNil() {
+			continue
+		}
+		assert.True(t, tc.d.Equal(cp), "equality was incorrect, res %v, exp %v, tc %v", cp, tc.d, tcIndex)
+		assert.False(t, tc.d == cp, "deepcopy return the original pointer %p, tc %v", cp, tcIndex)
+	}
+}
+
 func TestDecString(t *testing.T) {
 	tests := []struct {
 		d    Dec

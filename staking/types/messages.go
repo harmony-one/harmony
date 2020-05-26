@@ -14,12 +14,6 @@ import (
 // Directive says what kind of payload follows
 type Directive byte
 
-// StakeMsg defines the interface of Stake Message
-type StakeMsg interface {
-	Type() Directive
-	Copy() StakeMsg
-}
-
 const (
 	// DirectiveCreateValidator ...
 	DirectiveCreateValidator Directive = iota
@@ -52,6 +46,12 @@ func (d Directive) String() string {
 	return fmt.Sprintf("Directive %+v", byte(d))
 }
 
+// StakeMsg defines the interface of Stake Message
+type StakeMsg interface {
+	Type() Directive
+	Copy() StakeMsg
+}
+
 // CreateValidator - type for creating a new validator
 type CreateValidator struct {
 	ValidatorAddress   common.Address `json:"validator-address"`
@@ -62,6 +62,39 @@ type CreateValidator struct {
 	SlotPubKeys        []shard.BLSPublicKey `json:"slot-pub-keys"`
 	SlotKeySigs        []shard.BLSSignature `json:"slot-key-sigs"`
 	Amount             *big.Int             `json:"amount"`
+}
+
+// Type of CreateValidator
+func (v CreateValidator) Type() Directive {
+	return DirectiveCreateValidator
+}
+
+// Copy returns a deep copy of the CreateValidator as a StakeMsg interface
+func (v CreateValidator) Copy() StakeMsg {
+	cp := CreateValidator{
+		ValidatorAddress: v.ValidatorAddress,
+		Description:      v.Description,
+		CommissionRates:  v.CommissionRates.Copy(),
+	}
+
+	if v.SlotPubKeys != nil {
+		cp.SlotPubKeys = make([]shard.BLSPublicKey, len(v.SlotPubKeys))
+		copy(cp.SlotPubKeys, v.SlotPubKeys)
+	}
+	if v.SlotKeySigs != nil {
+		cp.SlotKeySigs = make([]shard.BLSSignature, len(v.SlotKeySigs))
+		copy(cp.SlotKeySigs, v.SlotKeySigs)
+	}
+	if v.MinSelfDelegation != nil {
+		cp.MinSelfDelegation = new(big.Int).Set(v.MinSelfDelegation)
+	}
+	if v.MaxTotalDelegation != nil {
+		cp.MaxTotalDelegation = new(big.Int).Set(v.MaxTotalDelegation)
+	}
+	if v.Amount != nil {
+		cp.Amount = new(big.Int).Set(v.Amount)
+	}
+	return cp
 }
 
 // EditValidator - type for edit existing validator
@@ -77,11 +110,65 @@ type EditValidator struct {
 	EPOSStatus         effective.Eligibility `json:"epos-eligibility-status" rlp:"nil"`
 }
 
+// Type of EditValidator
+func (v EditValidator) Type() Directive {
+	return DirectiveEditValidator
+}
+
+// Copy returns a deep copy of the EditValidator as a StakeMsg interface
+func (v EditValidator) Copy() StakeMsg {
+	cp := EditValidator{
+		ValidatorAddress: v.ValidatorAddress,
+		Description:      v.Description,
+		EPOSStatus:       v.EPOSStatus,
+	}
+	if v.CommissionRate != nil {
+		cr := v.CommissionRate.Copy()
+		cp.CommissionRate = &cr
+	}
+	if v.MinSelfDelegation != nil {
+		cp.MinSelfDelegation = new(big.Int).Set(v.MinSelfDelegation)
+	}
+	if v.MaxTotalDelegation != nil {
+		cp.MaxTotalDelegation = new(big.Int).Set(v.MaxTotalDelegation)
+	}
+	if v.SlotKeyToRemove != nil {
+		keyRem := *v.SlotKeyToRemove
+		cp.SlotKeyToRemove = &keyRem
+	}
+	if v.SlotKeyToAdd != nil {
+		keyAdd := *v.SlotKeyToAdd
+		cp.SlotKeyToAdd = &keyAdd
+	}
+	if v.SlotKeyToAddSig != nil {
+		sigAdd := *v.SlotKeyToAddSig
+		cp.SlotKeyToAddSig = &sigAdd
+	}
+	return cp
+}
+
 // Delegate - type for delegating to a validator
 type Delegate struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
 	ValidatorAddress common.Address `json:"validator_address"`
 	Amount           *big.Int       `json:"amount"`
+}
+
+// Type of Delegate
+func (v Delegate) Type() Directive {
+	return DirectiveDelegate
+}
+
+// Copy returns a deep copy of the Delegate as a StakeMsg interface
+func (v Delegate) Copy() StakeMsg {
+	cp := Delegate{
+		DelegatorAddress: v.DelegatorAddress,
+		ValidatorAddress: v.ValidatorAddress,
+	}
+	if v.Amount != nil {
+		cp.Amount = new(big.Int).Set(v.Amount)
+	}
+	return cp
 }
 
 // Undelegate - type for removing delegation responsibility
@@ -91,29 +178,26 @@ type Undelegate struct {
 	Amount           *big.Int       `json:"amount"`
 }
 
-// CollectRewards - type for collecting token rewards
-type CollectRewards struct {
-	DelegatorAddress common.Address `json:"delegator_address"`
-}
-
-// Type of CreateValidator
-func (v CreateValidator) Type() Directive {
-	return DirectiveCreateValidator
-}
-
-// Type of EditValidator
-func (v EditValidator) Type() Directive {
-	return DirectiveEditValidator
-}
-
-// Type of Delegate
-func (v Delegate) Type() Directive {
-	return DirectiveDelegate
-}
-
 // Type of Undelegate
 func (v Undelegate) Type() Directive {
 	return DirectiveUndelegate
+}
+
+// Copy returns a deep copy of the Undelegate as a StakeMsg interface
+func (v Undelegate) Copy() StakeMsg {
+	cp := Undelegate{
+		DelegatorAddress: v.DelegatorAddress,
+		ValidatorAddress: v.ValidatorAddress,
+	}
+	if v.Amount != nil {
+		cp.Amount = new(big.Int).Set(v.Amount)
+	}
+	return cp
+}
+
+// CollectRewards - type for collecting token rewards
+type CollectRewards struct {
+	DelegatorAddress common.Address `json:"delegator_address"`
 }
 
 // Type of CollectRewards
@@ -121,34 +205,9 @@ func (v CollectRewards) Type() Directive {
 	return DirectiveCollectRewards
 }
 
-// Copy deep copy of the interface
-func (v CreateValidator) Copy() StakeMsg {
-	v1 := v
-	v1.Description = v.Description
-	return v1
-}
-
-// Copy deep copy of the interface
-func (v EditValidator) Copy() StakeMsg {
-	v1 := v
-	v1.Description = v.Description
-	return v1
-}
-
-// Copy deep copy of the interface
-func (v Delegate) Copy() StakeMsg {
-	v1 := v
-	return v1
-}
-
-// Copy deep copy of the interface
-func (v Undelegate) Copy() StakeMsg {
-	v1 := v
-	return v1
-}
-
-// Copy deep copy of the interface
+// Copy returns a deep copy of the CollectRewards as a StakeMsg interface
 func (v CollectRewards) Copy() StakeMsg {
-	v1 := v
-	return v1
+	return CollectRewards{
+		DelegatorAddress: v.DelegatorAddress,
+	}
 }

@@ -3,6 +3,8 @@ package consensus
 import (
 	"encoding/binary"
 
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -30,19 +32,40 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
 
-	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-		msg_pb.MessageType_PREPARED, consensus.blockNum, consensus.blockHash,
+	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
+		msg_pb.MessageType_PREPARED, consensus.blockNum,
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
+	var encodedBlock []byte
+	if preparedMsg != nil {
+		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
+		utils.Logger().Debug().
+			Interface("Block", block).
+			Interface("preparedMsg", preparedMsg).
+			Msg("[constructViewChangeMessage] found prepared msg")
+		if block != nil {
+			if err := consensus.BlockVerifier(block); err == nil {
+				tmpEncoded, err := rlp.EncodeToBytes(block)
+				if err != nil {
+					consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed encoding block")
+				}
+				encodedBlock = tmpEncoded
+			} else {
+				consensus.getLogger().Err(err).Msg("[constructViewChangeMessage] Failed validating prepared block")
+			}
+		}
+	}
+
 	var msgToSign []byte
-	if preparedMsg == nil {
+	if len(encodedBlock) == 0 {
 		msgToSign = NIL // m2 type message
 		vcMsg.Payload = []byte{}
 	} else {
 		// m1 type message
 		msgToSign = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 		vcMsg.Payload = append(msgToSign[:0:0], msgToSign...)
+		vcMsg.PreparedBlock = encodedBlock
 	}
 
 	utils.Logger().Debug().
@@ -91,6 +114,18 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.P
 	// sender address
 	vcMsg.SenderPubkey = pubKey.Serialize()
 	vcMsg.Payload = consensus.m1Payload
+	if len(consensus.m1Payload) != 0 {
+		block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
+		if block != nil {
+			encodedBlock, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				consensus.getLogger().Err(err).Msg("[constructNewViewMessage] Failed encoding prepared block")
+			}
+			if len(encodedBlock) != 0 {
+				vcMsg.PreparedBlock = encodedBlock
+			}
+		}
+	}
 
 	sig2arr := consensus.GetNilSigsArray(viewID)
 	utils.Logger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")

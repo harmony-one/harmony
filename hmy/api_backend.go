@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -32,6 +33,11 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
+)
+
+var (
+	// ErrFinalizedTransaction is returned if the transaction to be submitted is already on-chain
+	ErrFinalizedTransaction = errors.New("transaction already finalized")
 )
 
 // APIBackend An implementation of internal/hmyapi/Backend. Full client.
@@ -122,8 +128,11 @@ func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uin
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	b.hmy.nodeAPI.AddPendingTransaction(signedTx)
-	return nil
+	tx, _, _, _ := rawdb.ReadTransaction(b.ChainDb(), signedTx.Hash())
+	if tx == nil {
+		return b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+	}
+	return ErrFinalizedTransaction
 }
 
 // ChainConfig ...
@@ -229,7 +238,6 @@ func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscripti
 }
 
 // GetPoolTransactions returns pool transactions.
-// TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.txPool.Pending()
 	if err != nil {
@@ -240,6 +248,11 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+// GetPoolStats returns the number of pending and queued transactions
+func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
+	return b.hmy.txPool.Stats()
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -358,11 +371,12 @@ func (b *APIBackend) IsLeader() bool {
 }
 
 // SendStakingTx adds a staking transaction
-func (b *APIBackend) SendStakingTx(
-	ctx context.Context,
-	newStakingTx *staking.StakingTransaction) error {
-	b.hmy.nodeAPI.AddPendingStakingTransaction(newStakingTx)
-	return nil
+func (b *APIBackend) SendStakingTx(ctx context.Context, signedStakingTx *staking.StakingTransaction) error {
+	stx, _, _, _ := rawdb.ReadStakingTransaction(b.ChainDb(), signedStakingTx.Hash())
+	if stx == nil {
+		return b.hmy.nodeAPI.AddPendingStakingTransaction(signedStakingTx)
+	}
+	return ErrFinalizedTransaction
 }
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
@@ -383,7 +397,7 @@ var (
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(
 	addr common.Address, block *types.Block,
-) (*staking.ValidatorRPCEnchanced, error) {
+) (*staking.ValidatorRPCEnhanced, error) {
 	bc := b.hmy.BlockChain()
 	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
@@ -395,7 +409,7 @@ func (b *APIBackend) GetValidatorInformation(
 	// At the last block of epoch, block epoch is e while val.LastEpochInCommittee
 	// is already updated to e+1. So need the >= check rather than ==
 	inCommittee := wrapper.LastEpochInCommittee.Cmp(now) >= 0
-	defaultReply := &staking.ValidatorRPCEnchanced{
+	defaultReply := &staking.ValidatorRPCEnhanced{
 		CurrentlyInCommittee: inCommittee,
 		Wrapper:              *wrapper,
 		Performance:          nil,
@@ -406,10 +420,12 @@ func (b *APIBackend) GetValidatorInformation(
 		).String(),
 		EPoSWinningStake: nil,
 		BootedStatus:     nil,
+		ActiveStatus:     wrapper.Validator.Status.String(),
 		Lifetime: &staking.AccumulatedOverLifetime{
 			wrapper.BlockReward,
 			wrapper.Counters,
 			zero,
+			nil,
 		},
 	}
 
@@ -429,6 +445,12 @@ func (b *APIBackend) GetValidatorInformation(
 	) % shard.Schedule.BlocksPerEpoch()
 	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
+	if defaultReply.CurrentlyInCommittee {
+		defaultReply.Performance = &staking.CurrentEpochPerformance{
+			CurrentSigningPercentage: *computed,
+		}
+	}
+
 	stats, err := bc.ReadValidatorStats(addr)
 	if err != nil {
 		// when validator has no stats, default boot-status to not booted
@@ -437,52 +459,64 @@ func (b *APIBackend) GetValidatorInformation(
 		return defaultReply, nil
 	}
 
+	latestAPR := numeric.ZeroDec()
+	l := len(stats.APRs)
+	if l > 0 {
+		latestAPR = stats.APRs[l-1].Value
+	}
+	defaultReply.Lifetime.APR = latestAPR
+	defaultReply.Lifetime.EpochAPRs = stats.APRs
+
 	// average apr cache keys
-	key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
-	prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
+	// key := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64())
+	// prevKey := fmt.Sprintf("apr-%s-%d", addr.Hex(), now.Uint64()-1)
 
 	// delete entry for previous epoch
-	b.apiCache.Forget(prevKey)
+	// b.apiCache.Forget(prevKey)
 
 	// calculate last APRHistoryLength epochs for averaging APR
-	epochFrom := bc.Config().StakingEpoch
-	nowMinus100 := now.Sub(now, big.NewInt(staking.APRHistoryLength))
-	if nowMinus100.Cmp(epochFrom) > 0 {
-		epochFrom = nowMinus100
-	}
+	// epochFrom := bc.Config().StakingEpoch
+	// nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
+	// if nowMinus.Cmp(epochFrom) > 0 {
+	// 	epochFrom = nowMinus
+	// }
 
+	// if len(stats.APRs) > 0 && stats.APRs[0].Epoch.Cmp(epochFrom) > 0 {
+	// 	epochFrom = stats.APRs[0].Epoch
+	// }
+
+	// epochToAPRs := map[int64]numeric.Dec{}
+	// for i := 0; i < len(stats.APRs); i++ {
+	// 	entry := stats.APRs[i]
+	// 	epochToAPRs[entry.Epoch.Int64()] = entry.Value
+	// }
+
+	// at this point, validator is active and has apr's for the recent 100 epochs
 	// compute average apr over history
-	if avgAPR, err := b.SingleFlightRequest(
-		key, func() (interface{}, error) {
-			total := numeric.ZeroDec()
-			count := 0
-			activated := false
-			for i := nowMinus100.Int64(); i < now.Int64(); i++ {
-				if apr, ok := stats.APRs[i]; ok {
-					total = total.Add(apr)
-					activated = true
-				}
-				if activated {
-					count = count + 1
-				}
-			}
-			if count == 0 {
-				return nil, errors.New("no apr snapshots available")
-			}
-			return total.QuoInt64(int64(count)), nil
-		},
-	); err != nil {
-		// could not compute average apr from snapshot
-		// assign the latest apr available from stats
-		defaultReply.Lifetime.APR = numeric.ZeroDec()
-	} else {
-		defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
-	}
+	// if avgAPR, err := b.SingleFlightRequest(
+	// 	key, func() (interface{}, error) {
+	// 		total := numeric.ZeroDec()
+	// 		count := 0
+	// 		for i := epochFrom.Int64(); i < now.Int64(); i++ {
+	// 			if apr, ok := epochToAPRs[i]; ok {
+	// 				total = total.Add(apr)
+	// 			}
+	// 			count++
+	// 		}
+	// 		if count == 0 {
+	// 			return nil, errors.New("no apr snapshots available")
+	// 		}
+	// 		return total.QuoInt64(int64(count)), nil
+	// 	},
+	// ); err != nil {
+	// 	// could not compute average apr from snapshot
+	// 	// assign the latest apr available from stats
+	// 	defaultReply.Lifetime.APR = numeric.ZeroDec()
+	// } else {
+	// 	defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
+	// }
 
 	if defaultReply.CurrentlyInCommittee {
-		defaultReply.Performance = &staking.CurrentEpochPerformance{
-			CurrentSigningPercentage: *computed,
-		}
 		defaultReply.ComputedMetrics = stats
 		defaultReply.EPoSWinningStake = &stats.TotalEffectiveStake
 	}
@@ -570,20 +604,21 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
-// GetDelegationsByDelegator returns all delegation information of a delegator
-func (b *APIBackend) GetDelegationsByDelegator(
-	delegator common.Address,
+// GetDelegationsByDelegatorByBlock returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegatorByBlock(
+	delegator common.Address, block *types.Block,
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().ReadDelegationsByDelegator(delegator)
+	delegationIndexes, err := b.hmy.BlockChain().
+		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(
-			delegationIndexes[i].ValidatorAddress,
+		wrapper, err := b.hmy.BlockChain().ReadValidatorInformationAt(
+			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
 			return nil, nil
@@ -597,6 +632,14 @@ func (b *APIBackend) GetDelegationsByDelegator(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+// GetDelegationsByDelegator returns all delegation information of a delegator
+func (b *APIBackend) GetDelegationsByDelegator(
+	delegator common.Address,
+) ([]common.Address, []*staking.Delegation) {
+	block := b.hmy.BlockChain().CurrentBlock()
+	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
@@ -617,13 +660,13 @@ func (b *APIBackend) GetShardState() (*shard.State, error) {
 }
 
 // GetCurrentStakingErrorSink ..
-func (b *APIBackend) GetCurrentStakingErrorSink() []staking.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredStakingTransactionSink()
+func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
-func (b *APIBackend) GetCurrentTransactionErrorSink() []types.RPCTransactionError {
-	return b.hmy.nodeAPI.ErroredTransactionSink()
+func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
+	return b.hmy.nodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..
@@ -700,8 +743,11 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	validatorSpreads := map[common.Address]numeric.Dec{}
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
-		if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
-			return nil, err
+		// before staking skip computing
+		if b.hmy.BlockChain().Config().IsStaking(prevCommittee.Epoch) {
+			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
+				return nil, err
+			}
 		}
 		rawStakes = b.readAndUpdateRawStakes(thenE, decider, comm, rawStakes, validatorSpreads)
 		then.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
@@ -713,12 +759,17 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range nowCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		if _, err := decider.SetVoters(&comm, nowCommittee.Epoch); err != nil {
-			return nil, err
+			return nil, errors.Wrapf(
+				err,
+				"committee is only available from staking epoch: %v, current epoch: %v",
+				b.hmy.BlockChain().Config().StakingEpoch,
+				b.hmy.BlockChain().CurrentHeader().Epoch(),
+			)
 		}
 		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
 		now.Deciders[fmt.Sprintf("shard-%d", comm.ShardID)] = decider
 	}
-	then.MedianStake = effective.Median(rawStakes)
+	now.MedianStake = effective.Median(rawStakes)
 
 	return &quorum.Transition{then, now}, nil
 }
@@ -778,6 +829,8 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 			blsKeys = append(blsKeys, key.SerializeToHexStr())
 		}
 	}
+	c := commonRPC.C{}
+	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.nodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
 		blsKeys,
@@ -792,5 +845,6 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.DNSZone,
 		cfg.GetArchival(),
 		b.hmy.nodeAPI.GetNodeBootTime(),
+		c,
 	}
 }

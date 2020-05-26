@@ -262,11 +262,11 @@ func (l *txList) Add(tx types.PoolTransaction, priceBump uint64) (bool, types.Po
 		}
 	}
 	// Otherwise overwrite the old transaction with the current one
-	l.txs.Put(tx)
 	cost, err := tx.Cost()
 	if err != nil {
 		return false, nil
 	}
+	l.txs.Put(tx)
 	if l.costcap.Cmp(cost) < 0 {
 		l.costcap = cost
 	}

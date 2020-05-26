@@ -26,8 +26,8 @@ const (
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
 	BLSVerificationStr       = "harmony-one"
-	TenThousand              = 10
-	APRHistoryLength         = 100
+	TenThousand              = 10000
+	APRHistoryLength         = 30
 )
 
 var (
@@ -40,7 +40,7 @@ var (
 		"total delegation can not be bigger than max_total_delegation",
 	)
 	errMinSelfDelegationTooSmall = errors.New(
-		"min_self_delegation has to be greater than 10,000 ONE",
+		"min_self_delegation must be greater than or equal to 10,000 ONE",
 	)
 	errInvalidMaxTotalDelegation = errors.New(
 		"max_total_delegation can not be less than min_self_delegation",
@@ -49,7 +49,7 @@ var (
 		"commission rate and change rate can not be larger than max commission rate",
 	)
 	errInvalidCommissionRate = errors.New(
-		"commission rate, change rate and max rate should be within 0-100 percent",
+		"commission rate, change rate and max rate should be a value ranging from 0.0 to 1.0",
 	)
 	errNeedAtLeastOneSlotKey = errors.New("need at least one slot key")
 	errBLSKeysNotMatchSigs   = errors.New(
@@ -125,7 +125,7 @@ func NewComputed(
 // NewEmptyStats ..
 func NewEmptyStats() *ValidatorStats {
 	return &ValidatorStats{
-		map[int64]numeric.Dec{},
+		[]APREntry{},
 		numeric.ZeroDec(),
 		[]VoteWithCurrentEpochEarning{},
 		effective.Booted,
@@ -138,8 +138,8 @@ type CurrentEpochPerformance struct {
 	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
 }
 
-// ValidatorRPCEnchanced contains extra information for RPC consumer
-type ValidatorRPCEnchanced struct {
+// ValidatorRPCEnhanced contains extra information for RPC consumer
+type ValidatorRPCEnhanced struct {
 	Wrapper              ValidatorWrapper         `json:"validator"`
 	Performance          *CurrentEpochPerformance `json:"current-epoch-performance"`
 	ComputedMetrics      *ValidatorStats          `json:"metrics"`
@@ -148,6 +148,7 @@ type ValidatorRPCEnchanced struct {
 	EPoSStatus           string                   `json:"epos-status"`
 	EPoSWinningStake     *numeric.Dec             `json:"epos-winning-stake"`
 	BootedStatus         *string                  `json:"booted-status"`
+	ActiveStatus         string                   `json:"active-status"`
 	Lifetime             *AccumulatedOverLifetime `json:"lifetime"`
 }
 
@@ -156,6 +157,7 @@ type AccumulatedOverLifetime struct {
 	BlockReward *big.Int    `json:"reward-accumulated"`
 	Signing     counters    `json:"blocks"`
 	APR         numeric.Dec `json:"apr"`
+	EpochAPRs   []APREntry  `json:"epoch-apr"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -182,10 +184,16 @@ type VoteWithCurrentEpochEarning struct {
 	Earned *big.Int                    `json:"earned-reward"`
 }
 
+// APREntry ..
+type APREntry struct {
+	Epoch *big.Int
+	Value numeric.Dec
+}
+
 // ValidatorStats to record validator's performance and history records
 type ValidatorStats struct {
 	// APRs is the APR history containing APR's of epochs
-	APRs map[int64]numeric.Dec `json:"-"`
+	APRs []APREntry `json:"-"`
 	// TotalEffectiveStake is the total effective stake this validator has
 	TotalEffectiveStake numeric.Dec `json:"-"`
 	// MetricsPerShard ..
@@ -257,7 +265,7 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return errNilMaxTotalDelegation
 	}
 
-	// MinSelfDelegation must be >= 1 ONE
+	// MinSelfDelegation must be >= 10000 ONE
 	if v.MinSelfDelegation.Cmp(minimumStake) < 0 {
 		return errors.Wrapf(
 			errMinSelfDelegationTooSmall,
@@ -283,25 +291,27 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 
 	if v.MaxRate.LT(zeroPercent) || v.MaxRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", v.MaxRate.String(),
+			errInvalidCommissionRate, "max rate:%s", v.MaxRate.String(),
 		)
 	}
 
 	if v.MaxChangeRate.LT(zeroPercent) || v.MaxChangeRate.GT(hundredPercent) {
 		return errors.Wrapf(
-			errInvalidCommissionRate, "rate:%s", v.MaxChangeRate.String(),
+			errInvalidCommissionRate, "max change rate:%s", v.MaxChangeRate.String(),
 		)
 	}
 
 	if v.Rate.GT(v.MaxRate) {
 		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", v.MaxRate.String(),
+			errCommissionRateTooLarge,
+			"rate:%s max rate:%s", v.Rate.String(), v.MaxRate.String(),
 		)
 	}
 
 	if v.MaxChangeRate.GT(v.MaxRate) {
 		return errors.Wrapf(
-			errCommissionRateTooLarge, "rate:%s", v.MaxChangeRate.String(),
+			errCommissionRateTooLarge,
+			"rate:%s max change rate:%s", v.Rate.String(), v.MaxChangeRate.String(),
 		)
 	}
 
@@ -385,9 +395,9 @@ func MarshalValidator(validator Validator) ([]byte, error) {
 }
 
 // UnmarshalValidator unmarshal binary into Validator object
-func UnmarshalValidator(by []byte) (*Validator, error) {
-	decoded := &Validator{}
-	err := rlp.DecodeBytes(by, decoded)
+func UnmarshalValidator(by []byte) (Validator, error) {
+	decoded := Validator{}
+	err := rlp.DecodeBytes(by, &decoded)
 	return decoded, err
 }
 

@@ -132,7 +132,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 
 		toAddress = &delegateMsg.ValidatorAddress
 	case staking.DirectiveUndelegate:
-		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
+		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
 			return nil, err
 		}

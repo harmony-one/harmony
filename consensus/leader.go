@@ -1,10 +1,8 @@
 package consensus
 
 import (
-	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -18,6 +16,7 @@ import (
 func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
 	copy(consensus.blockHash[:], blockHash[:])
+
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
 	if err != nil {
@@ -62,9 +61,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 			quorum.Prepare,
 			key,
 			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
-			common.BytesToHash(consensus.blockHash[:]),
-			consensus.blockNum,
-			consensus.viewID,
+			block.Hash(),
+			block.NumberU64(),
+			block.Header().ViewID().Uint64(),
 		); err != nil {
 			return
 		}
@@ -165,7 +164,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	logger = logger.With().
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
-	logger.Info().Msg("[OnPrepare] Received New Prepare Signature")
+	logger.Debug().Msg("[OnPrepare] Received New Prepare Signature")
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare, validatorPubKey,
 		&sign, recvMsg.BlockHash,
@@ -222,9 +221,18 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
 	}
-
+	// Must have the corresponding block to verify committed message.
+	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		consensus.getLogger().Info().
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnCommit] Failed finding a matching block for committed message")
+		return
+	}
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		new(big.Int).SetUint64(consensus.epoch), recvMsg.BlockHash, recvMsg.BlockNum, consensus.viewID)
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -238,7 +246,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	logger = logger.With().
 		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
 		Logger()
-	logger.Info().Msg("[OnCommit] Received new commit message")
+	logger.Debug().Msg("[OnCommit] Received new commit message")
 
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Commit, validatorPubKey,
@@ -254,20 +262,19 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
+	viewID := consensus.viewID
+
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
-		go func(viewID uint64) {
-			consensus.getLogger().Debug().Msg("[OnCommit] Starting Grace Period")
-			// Always wait for 2 seconds as minimum grace period
-			time.Sleep(2 * time.Second)
-			if n := time.Now(); n.Before(consensus.NextBlockDue) {
-				// Sleep to wait for the full block time
-				time.Sleep(consensus.NextBlockDue.Sub(n))
-			}
-			logger.Debug().Msg("[OnCommit] Commit Grace Period Ended")
+
+		next := consensus.NextBlockDue
+		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
+		time.AfterFunc(2*time.Second, func() {
+			<-time.After(time.Until(next))
+			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 			consensus.commitFinishChan <- viewID
-		}(consensus.viewID)
+		})
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}

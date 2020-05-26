@@ -1,7 +1,6 @@
 package node
 
 import (
-	"container/ring"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -148,19 +147,17 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan map[service.Type]chan *msg_pb.Message
-	isFirstTime        bool // the node was started with a fresh database
-	// Last 1024 staking transaction error, only in memory
-	errorSink struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}
+	serviceMessageChan  map[service.Type]chan *msg_pb.Message
+	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
 	keysToAddrsEpoch *big.Int
 	keysToAddrsMutex sync.Mutex
+	// TransactionErrorSink contains error messages for any failed transaction, in memory only
+	TransactionErrorSink *types.TransactionErrorSink
+	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
+	BroadcastInvalidTx bool
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -230,10 +227,11 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().
+		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
 		Int("totalPending", pendingCount).
 		Int("totalQueued", queueCount).
-		Msg("Got more transactions")
+		Msg("[addPendingTransactions] Adding more transactions")
 	return errs
 }
 
@@ -263,13 +261,19 @@ func (node *Node) AddPendingStakingTransaction(
 ) error {
 	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
+		var err error
 		for i := range errs {
 			if errs[i] != nil {
-				return errs[i]
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
+				err = errs[i]
+				break
 			}
 		}
-		utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
-		node.tryBroadcastStaking(newStakingTx)
+		if err == nil || node.BroadcastInvalidTx {
+			utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+			node.tryBroadcastStaking(newStakingTx)
+		}
+		return err
 	}
 	return nil
 }
@@ -279,13 +283,19 @@ func (node *Node) AddPendingStakingTransaction(
 func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 	if newTx.ShardID() == node.NodeConfig.ShardID {
 		errs := node.addPendingTransactions(types.Transactions{newTx})
+		var err error
 		for i := range errs {
 			if errs[i] != nil {
-				return errs[i]
+				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
+				err = errs[i]
+				break
 			}
 		}
-		utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-		node.tryBroadcast(newTx)
+		if err == nil || node.BroadcastInvalidTx {
+			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+			node.tryBroadcast(newTx)
+		}
+		return err
 	}
 	return nil
 }
@@ -362,7 +372,7 @@ func (node *Node) Start() error {
 		return errors.New("have no topics to listen to")
 	}
 	weighted := make([]*semaphore.Weighted, len(allTopics))
-	const maxMessageHandlers = 200
+	const maxMessageHandlers = 2000
 	ctx := context.Background()
 	ownID := node.host.GetID()
 	errChan := make(chan error)
@@ -389,7 +399,7 @@ func (node *Node) Start() error {
 						sem.Release(1)
 					}()
 				} else {
-					utils.Logger().Info().
+					utils.Logger().Warn().
 						Msg("could not acquire semaphore to process incoming message")
 				}
 			}
@@ -432,12 +442,7 @@ func New(
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
-	const sinkSize = 4096
-	node.errorSink = struct {
-		sync.Mutex
-		failedStakingTxns *ring.Ring
-		failedTxns        *ring.Ring
-	}{sync.Mutex{}, ring.New(sinkSize), ring.New(sinkSize)}
+	node.TransactionErrorSink = types.NewTransactionErrorSink()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -489,26 +494,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
-		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain,
-			func(payload []types.RPCTransactionError) {
-				if len(payload) > 0 {
-					node.errorSink.Lock()
-					for i := range payload {
-						node.errorSink.failedTxns.Value = payload[i]
-						node.errorSink.failedTxns = node.errorSink.failedTxns.Next()
-					}
-					node.errorSink.Unlock()
-				}
-			},
-			func(payload []staking.RPCTransactionError) {
-				node.errorSink.Lock()
-				for i := range payload {
-					node.errorSink.failedStakingTxns.Value = payload[i]
-					node.errorSink.failedStakingTxns = node.errorSink.failedStakingTxns.Next()
-				}
-				node.errorSink.Unlock()
-			},
-		)
+		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
 

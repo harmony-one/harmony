@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/block"
+
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -33,6 +36,7 @@ func (bc *BlockChain) CommitOffChainData(
 	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
 	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
 	isStaking := bc.chainConfig.IsStaking(block.Epoch())
+	isPreStaking := bc.chainConfig.IsPreStaking(block.Epoch())
 	header := block.Header()
 	isNewEpoch := len(header.ShardState()) > 0
 	// Cross-shard txns
@@ -94,25 +98,24 @@ func (bc *BlockChain) CommitOffChainData(
 	//	}
 	//}
 
-	newEpoch := new(big.Int).Add(header.Epoch(), common.Big1)
+	nextBlockEpoch, err := bc.getNextBlockEpoch(header)
+	if err != nil {
+		return NonStatTy, err
+	}
+
 	// Shard State and Validator Update
 	if isNewEpoch {
 		// Write shard state for the new epoch
-		newShardState, err := bc.WriteShardStateBytes(batch, newEpoch, header.ShardState())
+		_, err := bc.WriteShardStateBytes(batch, nextBlockEpoch, header.ShardState())
 		if err != nil {
 			header.Logger(utils.Logger()).Warn().Err(err).Msg("cannot store shard state")
 			return NonStatTy, err
-		}
-
-		if err == nil && newShardState.Epoch != nil && bc.chainConfig.IsStaking(newShardState.Epoch) {
-			// After staking, the epoch will be decided by the epoch in the shard state.
-			newEpoch = new(big.Int).Set(newShardState.Epoch)
 		}
 	}
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block, state, epoch, newEpoch,
+		batch, block, state, epoch, nextBlockEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")
@@ -123,6 +126,9 @@ func (bc *BlockChain) CommitOffChainData(
 	// This snapshot of the state is consistent with the state used for election
 	if isBeaconChain && shard.Schedule.IsLastBlock(header.Number().Uint64()+1) {
 		// Update snapshots for all validators
+		// Beacon chain always snapshot for the next epoch as cur_epoch + 1
+		// as beacon chain won't have gap in epochs.
+		newEpoch := big.NewInt(0).Add(header.Epoch(), big.NewInt(1))
 		if err := bc.UpdateValidatorSnapshots(batch, newEpoch, state, newVals); err != nil {
 			return NonStatTy, err
 		}
@@ -181,10 +187,7 @@ func (bc *BlockChain) CommitOffChainData(
 		for i, c := uint32(0), shard.Schedule.InstanceForEpoch(
 			epoch,
 		).NumShards(); i < c; i++ {
-			if err := bc.LastContinuousCrossLink(batch, i); err != nil {
-				utils.Logger().Info().
-					Err(err).Msg("Could not roll up last continuous crosslink")
-			}
+			bc.LastContinuousCrossLink(batch, i)
 		}
 	}
 
@@ -211,6 +214,44 @@ func (bc *BlockChain) CommitOffChainData(
 				Err(err).
 				Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
 		}
+		// fix the possible wrong apr in the staking epoch
+		stakingEpoch := bc.Config().StakingEpoch
+		secondStakingEpoch := big.NewInt(0).Add(stakingEpoch, common.Big1)
+		thirdStakingEpoch := big.NewInt(0).Add(secondStakingEpoch, common.Big1)
+		isThirdStakingEpoch := block.Epoch().Cmp(thirdStakingEpoch) == 0
+		if isThirdStakingEpoch {
+			// we have to do it for all validators, not only currently elected
+			if validators, err := bc.ReadValidatorList(); err == nil {
+				for _, addr := range validators {
+					// get wrapper from the second staking epoch
+					if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+						secondStakingEpoch, addr,
+					); err == nil {
+						if block := bc.GetBlockByNumber(
+							shard.Schedule.EpochLastBlock(stakingEpoch.Uint64()),
+						); block != nil {
+							if aprComputed, err := apr.ComputeForValidator(
+								bc, block, snapshot.Validator,
+							); err == nil {
+								stats, ok := tempValidatorStats[addr]
+								if !ok {
+									stats, err = bc.ReadValidatorStats(addr)
+									if err != nil {
+										continue
+									}
+								}
+								for i := range stats.APRs {
+									if stats.APRs[i].Epoch.Cmp(stakingEpoch) == 0 {
+										stats.APRs[i] = staking.APREntry{stakingEpoch, *aprComputed}
+									}
+								}
+								tempValidatorStats[addr] = stats
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Update block reward accumulator and slashes
@@ -231,6 +272,7 @@ func (bc *BlockChain) CommitOffChainData(
 						stats, err = bc.ReadValidatorStats(paid[i].Addr)
 						if err != nil {
 							utils.Logger().Info().Err(err).
+								Str("addr", paid[i].Addr.Hex()).
 								Str("bls-earning-key", paid[i].EarningKey.Hex()).
 								Msg("could not read validator stats to update for earning per key")
 							continue
@@ -248,34 +290,8 @@ func (bc *BlockChain) CommitOffChainData(
 
 				}
 			}
-			type t struct {
-				addr  common.Address
-				stats *staking.ValidatorStats
-			}
 
-			sortedStats, i := make([]t, len(tempValidatorStats)), 0
-			for key := range tempValidatorStats {
-				sortedStats[i] = t{key, tempValidatorStats[key]}
-				i++
-			}
-
-			sort.SliceStable(
-				sortedStats,
-				func(i, j int) bool {
-					return bytes.Compare(
-						sortedStats[i].addr[:], sortedStats[j].addr[:],
-					) == -1
-				},
-			)
-			for _, stat := range sortedStats {
-				if err := rawdb.WriteValidatorStats(
-					batch, stat.addr, stat.stats,
-				); err != nil {
-					utils.Logger().Info().Err(err).
-						Str("validator address", stat.addr.Hex()).
-						Msg("could not update stats for validator")
-				}
-			}
+			bc.writeValidatorStats(tempValidatorStats, batch)
 
 			records := slash.Records{}
 			if s := header.Slashes(); len(s) > 0 {
@@ -287,10 +303,65 @@ func (bc *BlockChain) CommitOffChainData(
 				}
 			}
 		} else {
+			if isNewEpoch && isPreStaking {
+				// if prestaking and last block, write out the validator stats
+				// so that it is available for the staking epoch
+				bc.writeValidatorStats(tempValidatorStats, batch)
+			}
 			// block reward never accumulate before staking
 			bc.WriteBlockRewardAccumulator(batch, common.Big0, block.Number().Uint64())
 		}
 	}
 
 	return CanonStatTy, nil
+}
+
+func (bc *BlockChain) writeValidatorStats(
+	tempValidatorStats map[common.Address]*staking.ValidatorStats,
+	batch rawdb.DatabaseWriter,
+) {
+	type t struct {
+		addr  common.Address
+		stats *staking.ValidatorStats
+	}
+
+	sortedStats, i := make([]t, len(tempValidatorStats)), 0
+	for key := range tempValidatorStats {
+		sortedStats[i] = t{key, tempValidatorStats[key]}
+		i++
+	}
+
+	sort.SliceStable(
+		sortedStats,
+		func(i, j int) bool {
+			return bytes.Compare(
+				sortedStats[i].addr[:], sortedStats[j].addr[:],
+			) == -1
+		},
+	)
+	for _, stat := range sortedStats {
+		if err := rawdb.WriteValidatorStats(
+			batch, stat.addr, stat.stats,
+		); err != nil {
+			utils.Logger().Info().Err(err).
+				Str("validator address", stat.addr.Hex()).
+				Msg("could not update stats for validator")
+		}
+	}
+}
+
+func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
+	nextBlockEpoch := header.Epoch()
+	if len(header.ShardState()) > 0 {
+		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
+		decodeShardState, err := shard.DecodeWrapper(header.ShardState())
+		if err != nil {
+			return nil, err
+		}
+		if decodeShardState.Epoch != nil && bc.chainConfig.IsStaking(decodeShardState.Epoch) {
+			// After staking, the epoch will be decided by the epoch in the shard state.
+			nextBlockEpoch = new(big.Int).Set(decodeShardState.Epoch)
+		}
+	}
+	return nextBlockEpoch, nil
 }

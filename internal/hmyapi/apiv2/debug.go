@@ -2,7 +2,6 @@ package apiv2
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -23,7 +22,7 @@ func NewDebugAPI(b Backend) *DebugAPI {
 //  curl -H "Content-Type: application/json" -d '{"method":"debug_setLogVerbosity","params":[0],"id":1}' http://localhost:9123
 func (*DebugAPI) SetLogVerbosity(ctx context.Context, level int) (map[string]interface{}, error) {
 	if level < int(log.LvlCrit) || level > int(log.LvlTrace) {
-		return nil, errors.New("invalid log level")
+		return nil, ErrInvalidLogLevel
 	}
 
 	verbosity := log.Lvl(level)

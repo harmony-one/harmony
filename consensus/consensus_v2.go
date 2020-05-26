@@ -197,7 +197,7 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 	if err != nil ||
 		len(lastCommits) < shard.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_COMMITTED, consensus.blockNum-1,
+			msg_pb.MessageType_COMMITTED, blockNum,
 		)
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
@@ -527,6 +527,9 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(
 		newBlock.NumberU64() - 1,
 	)
+	if previousHeader == nil {
+		return vrfBlockNumbers
+	}
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 
@@ -549,6 +552,10 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,
 	)
+	if previousHeader == nil {
+		return false
+	}
+
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 	vrfProof := [96]byte{}

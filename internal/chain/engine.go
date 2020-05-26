@@ -172,6 +172,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
+	if header == nil {
+		return errors.New("[VerifySeal] nil block header")
+	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
 
 	if err != nil {
@@ -188,6 +191,11 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
+	if parentHeader == nil {
+		return errors.New(
+			"[VerifySeal] no parent header found",
+		)
+	}
 	if chain.Config().IsStaking(parentHeader.Epoch()) {
 		slotList, err := chain.ReadShardState(parentHeader.Epoch())
 		if err != nil {
@@ -248,11 +256,12 @@ func (e *engineImpl) Finalize(
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	isNewEpoch := len(header.ShardState()) > 0
+	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	if isBeaconChain && isNewEpoch && inStakingEra {
+	if isBeaconChain && isNewEpoch && inPreStakingEra {
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
 		}
@@ -381,17 +390,12 @@ func applySlashes(
 	// First group slashes by same signed blocks
 	for i := range doubleSigners {
 		thisKey := keyStruct{
-			height:  doubleSigners[i].Evidence.AlreadyCastBallot.Height,
-			viewID:  doubleSigners[i].Evidence.AlreadyCastBallot.ViewID,
+			height:  doubleSigners[i].Evidence.Height,
+			viewID:  doubleSigners[i].Evidence.ViewID,
 			shardID: doubleSigners[i].Evidence.Moment.ShardID,
 			epoch:   doubleSigners[i].Evidence.Moment.Epoch.Uint64(),
 		}
-
-		if _, ok := groupedRecords[thisKey]; ok {
-			groupedRecords[thisKey] = append(groupedRecords[thisKey], doubleSigners[i])
-		} else {
-			groupedRecords[thisKey] = slash.Records{doubleSigners[i]}
-		}
+		groupedRecords[thisKey] = append(groupedRecords[thisKey], doubleSigners[i])
 	}
 
 	sortedKeys := []keyStruct{}
@@ -553,6 +557,9 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 func GetPublicKeys(
 	chain engine.ChainReader, header *block.Header, reCalculate bool,
 ) ([]*bls.PublicKey, error) {
+	if header == nil {
+		return nil, errors.New("nil header provided")
+	}
 	shardState := new(shard.State)
 	var err error
 	if reCalculate {

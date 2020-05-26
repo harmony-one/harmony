@@ -18,7 +18,7 @@ TRACEPTR=
 VERBOSE=
 GO_GCFLAGS="all=-c 2"
 DEBUG=false
-STATIC=false
+STATIC=true
 
 unset -v progdir
 case "${0}" in
@@ -62,6 +62,7 @@ OPTIONS:
    -t             full analysis on {pointer} build option (default: $TRACEPTR)
    -v             verbose build process (default: $VERBOSE)
    -s             build static linux executable (default: $STATIC)
+   -S             build non-static linux executable
 
 
 ACTION:
@@ -128,6 +129,8 @@ function build_only
    pushd $BINDIR
    if [ "$STATIC" == "true" ]; then
       $MD5 "${!SRC[@]}" > md5sum.txt
+      cp -pf ../scripts/node.sh .
+      $MD5 node.sh >> md5sum.txt
    else
       for lib in "${!LIB[@]}"; do
          if [ -e ${LIB[$lib]} ]; then
@@ -242,7 +245,7 @@ function release
 
 
 ################################ MAIN FUNCTION ##############################
-while getopts "hp:a:o:b:f:rtvsd" option; do
+while getopts "hp:a:o:b:f:rtvsdS" option; do
    case $option in
       h) usage ;;
       p) PROFILE=$OPTARG ;;
@@ -255,6 +258,7 @@ while getopts "hp:a:o:b:f:rtvsd" option; do
       v) VERBOSE='-v -x' ;;
       d) DEBUG=true ;;
       s) STATIC=true ;;
+      S) STATIC=false ;;
    esac
 done
 

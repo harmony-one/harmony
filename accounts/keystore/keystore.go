@@ -54,22 +54,15 @@ var KeyStoreType = reflect.TypeOf(&KeyStore{})
 // KeyStoreScheme is the protocol scheme prefixing account and wallet URLs.
 const KeyStoreScheme = "keystore"
 
-// Maximum time between wallet refreshes (if filesystem notifications don't work).
-const walletRefreshCycle = 3 * time.Second
-
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
-	storage  keyStore                     // Storage backend, might be cleartext or encrypted
-	cache    *accountCache                // In-memory account cache over the filesystem storage
-	changes  chan struct{}                // Channel receiving change notifications from the cache
-	unlocked map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
-
-	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
-	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
-	updateScope event.SubscriptionScope // Subscription scope tracking current live listeners
-	updating    bool                    // Whether the event notification loop is running
-
-	mu sync.RWMutex
+	storage    keyStore                     // Storage backend, might be cleartext or encrypted
+	cache      *accountCache                // In-memory account cache over the filesystem storage
+	changes    chan struct{}                // Channel receiving change notifications from the cache
+	unlocked   map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
+	wallets    []accounts.Wallet            // Wallet wrappers around the individual key files
+	updateFeed event.Feed                   // Event feed to notify wallet additions/removals
+	mu         sync.RWMutex
 }
 
 type unlocked struct {
@@ -175,50 +168,6 @@ func (ks *KeyStore) refreshWallets() {
 	// Fire all wallet events and return
 	for _, event := range events {
 		ks.updateFeed.Send(event)
-	}
-}
-
-// Subscribe implements accounts.Backend, creating an async subscription to
-// receive notifications on the addition or removal of keystore wallets.
-func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
-	// We need the mutex to reliably start/stop the update loop
-	ks.mu.Lock()
-	defer ks.mu.Unlock()
-
-	// Subscribe the caller and track the subscriber count
-	sub := ks.updateScope.Track(ks.updateFeed.Subscribe(sink))
-
-	// Subscribers require an active notification loop, start it
-	if !ks.updating {
-		ks.updating = true
-		go ks.updater()
-	}
-	return sub
-}
-
-// updater is responsible for maintaining an up-to-date list of wallets stored in
-// the keystore, and for firing wallet addition/removal events. It listens for
-// account change events from the underlying account cache, and also periodically
-// forces a manual refresh (only triggers for systems where the filesystem notifier
-// is not running).
-func (ks *KeyStore) updater() {
-	for {
-		// Wait for an account update or a refresh timeout
-		select {
-		case <-ks.changes:
-		case <-time.After(walletRefreshCycle):
-		}
-		// Run the wallet refresher
-		ks.refreshWallets()
-
-		// If all our subscribers left, stop the updater
-		ks.mu.Lock()
-		if ks.updateScope.Count() == 0 {
-			ks.updating = false
-			ks.mu.Unlock()
-			return
-		}
-		ks.mu.Unlock()
 	}
 }
 

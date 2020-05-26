@@ -197,8 +197,11 @@ func AccumulateRewardsAndCountSigs(
 
 		allSignersShare := numeric.ZeroDec()
 		for j := range payable {
-			voterShare := votingPower.Voters[payable[j].BLSPublicKey].OverallPercent
-			allSignersShare = allSignersShare.Add(voterShare)
+			voter := votingPower.Voters[payable[j].BLSPublicKey]
+			if !voter.IsHarmonyNode {
+				voterShare := voter.OverallPercent
+				allSignersShare = allSignersShare.Add(voterShare)
+			}
 		}
 		for beaconMember := range payable {
 			// TODO Give out whatever leftover to the last voter/handle
@@ -298,8 +301,11 @@ func AccumulateRewardsAndCountSigs(
 
 				allSignersShare := numeric.ZeroDec()
 				for j := range payableSigners {
-					voterShare := votingPower.Voters[payableSigners[j].BLSPublicKey].OverallPercent
-					allSignersShare = allSignersShare.Add(voterShare)
+					voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
+					if !voter.IsHarmonyNode {
+						voterShare := voter.OverallPercent
+						allSignersShare = allSignersShare.Add(voterShare)
+					}
 				}
 
 				for j := range payableSigners {

@@ -1,8 +1,6 @@
 package consensus
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -95,7 +93,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().
+		utils.Logger().Debug().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
 			Msg("Member")
@@ -187,27 +185,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
-}
-
-// Returns a string representation of this consensus
-func (consensus *Consensus) String() string {
-	duty := ""
-	if consensus.IsLeader() {
-		duty = "leader"
-	} else {
-		duty = "validator"
-	}
-
-	return fmt.Sprintf(
-		"[Duty:%s Pub:%s Header:%s Num:%d View:%d Shard:%d Epoch:%d]",
-		duty,
-		consensus.PubKey.SerializeToHexStr(),
-		hex.EncodeToString(consensus.blockHeader),
-		consensus.blockNum,
-		consensus.viewID,
-		consensus.ShardID,
-		consensus.epoch,
-	)
 }
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
@@ -333,13 +310,6 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	consensus.blockNum = blockNum
 }
 
-// SetEpochNum sets the epoch in consensus object
-func (consensus *Consensus) SetEpochNum(epoch uint64) {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.epoch = epoch
-}
-
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
@@ -356,7 +326,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myEpoch", consensus.epoch).
 		Uint64("myBlock", consensus.blockNum).
 		Uint64("myViewID", consensus.viewID).
 		Interface("phase", consensus.phase).
@@ -422,6 +391,18 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	curHeader := consensus.ChainReader.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
+
+	// Overwrite nextEpoch if the shard state has a epoch number
+	if len(curHeader.ShardState()) > 0 {
+		nextShardState, err := curHeader.GetShardState()
+		if err != nil {
+			return Syncing
+		}
+		if nextShardState.Epoch != nil {
+			nextEpoch = nextShardState.Epoch
+		}
+	}
+
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
 		!consensus.ChainReader.Config().IsStaking(curEpoch)
@@ -437,7 +418,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		consensus.Decider = decider
 	}
 
-	committeeToSet := &shard.Committee{}
+	var committeeToSet *shard.Committee
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
@@ -452,12 +433,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
-	if len(curHeader.ShardState()) > 0 {
-		// increase curEpoch by one if it's the last block
-		consensus.SetEpochNum(curEpoch.Uint64() + 1)
-		consensus.getLogger().Info().
-			Uint64("headerNum", curHeader.Number().Uint64()).
-			Msg("Epoch updated for nextEpoch curEpoch")
+	// genesis block is a special case that will have shard state and needs to skip processing
+	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
+	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
 			nextEpoch, consensus.ChainReader,
@@ -482,7 +460,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		committeeToSet = subComm
 		epochToSet = nextEpoch
 	} else {
-		consensus.SetEpochNum(curEpoch.Uint64())
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
 			utils.Logger().Error().
@@ -527,9 +504,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Uint32("shard-id", consensus.ShardID).
 		Msg("[UpdateConsensusInformation] changing committee")
 
-	// take care of possible leader change during the curEpoch
-	if !shard.Schedule.IsLastBlock(curHeader.Number().Uint64()) &&
-		curHeader.Number().Uint64() != 0 {
+	// take care of possible leader change during the epoch
+	if len(curHeader.ShardState()) == 0 && curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).

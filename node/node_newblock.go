@@ -45,14 +45,18 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 
-					utils.Logger().Debug().
+					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					newBlock, err := node.proposeNewBlock()
+					if err != nil {
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+					}
 
+					err = node.Blockchain().Validator().ValidateHeader(newBlock, true)
 					if err == nil {
-						utils.Logger().Debug().
+						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
 							Uint64("viewID", newBlock.Header().ViewID().Uint64()).
@@ -65,7 +69,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Verifying New Block Header!!!!!!!!!")
 					}
 				}
 			}
@@ -182,15 +186,18 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
-				if err := node.VerifyCrossLink(pending); err != nil {
-					invalidToDelete = append(invalidToDelete, pending)
+
+				// Crosslink is already verified before it's accepted to pending,
+				// no need to verify again in proposal.
+				if !node.Blockchain().Config().IsCrossLink(pending.Epoch()) {
 					utils.Logger().Debug().
-						AnErr("[proposeNewBlock] pending crosslink verification failed", err)
+						AnErr("[proposeNewBlock] pending crosslink that's before crosslink epoch", err)
 					continue
 				}
+
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
-			utils.Logger().Debug().
+			utils.Logger().Info().
 				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
 					len(crossLinksToPropose), len(allPending),
 				)

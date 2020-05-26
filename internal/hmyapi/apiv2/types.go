@@ -157,12 +157,15 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 
 // newRPCTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCTransaction {
-	var signer types.Signer = types.FrontierSigner{}
-	if tx.Protected() {
-		signer = types.NewEIP155Signer(tx.ChainID())
+// Note that all txs on Harmony are replay protected (post EIP155 epoch).
+func newRPCTransaction(
+	tx *types.Transaction, blockHash common.Hash,
+	blockNumber uint64, timestamp uint64, index uint64,
+) *RPCTransaction {
+	from, err := tx.SenderAddress()
+	if err != nil {
+		return nil
 	}
-	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
@@ -206,7 +209,10 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 
 // newRPCStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash, blockNumber uint64, timestamp uint64, index uint64) *RPCStakingTransaction {
+func newRPCStakingTransaction(
+	tx *types2.StakingTransaction, blockHash common.Hash,
+	blockNumber uint64, timestamp uint64, index uint64,
+) *RPCStakingTransaction {
 	from, err := tx.SenderAddress()
 	if err != nil {
 		return nil
@@ -215,7 +221,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 
 	stakingTxType := tx.StakingType()
 	message := tx.StakingMessage()
-	fields := make(map[string]interface{}, 0)
+	fields := make(map[string]interface{})
 
 	switch stakingTxType {
 	case types2.DirectiveCreateValidator:
@@ -346,19 +352,11 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 	return result
 }
 
-// newRPCPendingTransaction returns a pending transaction that will serialize to the RPC representation
-func newRPCPendingTransaction(tx *types.Transaction) *RPCTransaction {
-	return newRPCTransaction(tx, common.Hash{}, 0, 0, 0)
-}
-
-// newRPCPendingStakingTransaction returns a pending transaction that will serialize to the RPC representation
-func newRPCPendingStakingTransaction(tx *types2.StakingTransaction) *RPCStakingTransaction {
-	return newRPCStakingTransaction(tx, common.Hash{}, 0, 0, 0)
-}
-
 // RPCBlock represents a block that will serialize to the RPC representation of a block
 type RPCBlock struct {
 	Number           *big.Int         `json:"number"`
+	ViewID           *big.Int         `json:"viewID"`
+	Epoch            *big.Int         `json:"epoch"`
 	Hash             common.Hash      `json:"hash"`
 	ParentHash       common.Hash      `json:"parentHash"`
 	Nonce            types.BlockNonce `json:"nonce"`
@@ -388,6 +386,8 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*big.Int)(head.Number()),
+		"viewID":           (*big.Int)(head.ViewID()),
+		"epoch":            (*big.Int)(head.Epoch()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header

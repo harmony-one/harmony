@@ -129,6 +129,20 @@ func prepareOrders(
 	essentials := map[common.Address]*effective.SlotOrder{}
 	totalStaked, tempZero := big.NewInt(0), numeric.ZeroDec()
 
+	// Avoid duplicate BLS keys as harmony nodes
+	instance := shard.Schedule.InstanceForEpoch(stakedReader.CurrentBlock().Epoch())
+	for _, account := range instance.HmyAccounts() {
+		pub := &bls.PublicKey{}
+		if err := pub.DeserializeHexStr(account.BLSPublicKey); err != nil {
+			continue
+		}
+		pubKey := shard.BLSPublicKey{}
+		if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
+			continue
+		}
+		blsKeys[pubKey] = struct{}{}
+	}
+
 	for i := range candidates {
 		validator, err := stakedReader.ReadValidatorInformation(
 			candidates[i],
@@ -146,15 +160,6 @@ func prepareOrders(
 			continue
 		}
 
-		validatorStake := big.NewInt(0)
-		for i := range validator.Delegations {
-			validatorStake.Add(
-				validatorStake, validator.Delegations[i].Amount,
-			)
-		}
-
-		totalStaked.Add(totalStaked, validatorStake)
-
 		found := false
 		for _, key := range validator.SlotPubKeys {
 			if _, ok := blsKeys[key]; ok {
@@ -167,6 +172,15 @@ func prepareOrders(
 		if found {
 			continue
 		}
+
+		validatorStake := big.NewInt(0)
+		for i := range validator.Delegations {
+			validatorStake.Add(
+				validatorStake, validator.Delegations[i].Amount,
+			)
+		}
+
+		totalStaked.Add(totalStaked, validatorStake)
 
 		essentials[validator.Address] = &effective.SlotOrder{
 			validatorStake,
@@ -240,6 +254,7 @@ var (
 	ErrComputeForEpochInPast = errors.New("cannot compute for epoch in past")
 )
 
+// This is the shard state computation logic before staking epoch.
 func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()

@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -112,9 +111,8 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Delegations = []staking.Delegation{
 		staking.NewDelegation(v.Address, msg.Amount),
 	}
-	zero := big.NewInt(0)
-	wrapper.Counters.NumBlocksSigned = zero
-	wrapper.Counters.NumBlocksToSign = zero
+	wrapper.Counters.NumBlocksSigned = big.NewInt(0)
+	wrapper.Counters.NumBlocksToSign = big.NewInt(0)
 	wrapper.BlockReward = big.NewInt(0)
 	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
 	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
@@ -168,7 +166,7 @@ func VerifyAndEditValidatorFromMsg(
 
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)
 	if err != nil {
-		return nil, errors.WithMessage(err, "Validator snapshot not found.")
+		return nil, errors.WithMessage(err, "validator snapshot not found.")
 	}
 	rateAtBeginningOfEpoch := snapshotValidator.Validator.Rate
 
@@ -194,7 +192,7 @@ const oneThousand = 1000
 var (
 	oneAsBigInt           = big.NewInt(denominations.One)
 	minimumDelegation     = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneThousand))
-	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be at least 1000 ONE")
+	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be greater than or equal to 1000 ONE")
 )
 
 // VerifyAndDelegateFromMsg verifies the delegate message using the stateDB
@@ -208,14 +206,14 @@ func VerifyAndDelegateFromMsg(
 	if stateDB == nil {
 		return nil, nil, errStateDBIsMissing
 	}
+	if !stateDB.IsValidator(msg.ValidatorAddress) {
+		return nil, nil, errValidatorNotExist
+	}
 	if msg.Amount.Sign() == -1 {
 		return nil, nil, errNegativeAmount
 	}
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
 		return nil, nil, errDelegationTooSmall
-	}
-	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, nil, errValidatorNotExist
 	}
 	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 	if err != nil {

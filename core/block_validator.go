@@ -36,7 +36,7 @@ import (
 // BlockValidator is responsible for validating block headers, uncles and
 // processed state.
 //
-// BlockValidator implements Validator.
+// BlockValidator implements validator.
 type BlockValidator struct {
 	config *params.ChainConfig     // Chain configuration options
 	bc     *BlockChain             // Canonical block chain
@@ -125,7 +125,13 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 // given engine. Verifying the seal may be done optionally here, or explicitly
 // via the VerifySeal method.
 func (v *BlockValidator) ValidateHeader(block *types.Block, seal bool) error {
-	return v.engine.VerifyHeader(v.bc, block.Header(), true)
+	if block == nil {
+		return errors.New("block is nil")
+	}
+	if h := block.Header(); h != nil {
+		return v.engine.VerifyHeader(v.bc, h, true)
+	}
+	return errors.New("header field was nil")
 }
 
 // ValidateHeaders verifies a batch of blocks' headers concurrently. The method returns a quit channel

@@ -24,3 +24,12 @@ type (
 		MaxChangeRate numeric.Dec `json:"max-change-rate"`
 	}
 )
+
+// Copy deep copies the staking.CommissionRates
+func (cr CommissionRates) Copy() CommissionRates {
+	return CommissionRates{
+		Rate:          cr.Rate.Copy(),
+		MaxRate:       cr.MaxRate.Copy(),
+		MaxChangeRate: cr.MaxChangeRate.Copy(),
+	}
+}

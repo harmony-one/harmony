@@ -112,7 +112,7 @@ based library dependencies (`libbls` and `mcl`) setup correctly for you. You can
 versions easily, an example:
 
 ```
-$ eval $(gimme 1.13.6)
+$ eval $(gimme 1.14.1)
 ```
 
 Note that changing the go version might mean that dependencies won't work out right when trying to
@@ -129,7 +129,7 @@ brew install openssl
 
 ## Dev Environment Setup
 
-The required go version is: **go1.13.6**
+The required go version is: **go1.14.1**
 
 ```bash
 export GOPATH=$HOME/<path_of_your_choice>

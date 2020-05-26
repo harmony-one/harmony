@@ -126,7 +126,7 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 if [ "${NOBUILD}" != "true" ]; then
    pushd $ROOT
-   scripts/go_executable_build.sh
+   scripts/go_executable_build.sh -S
    popd
 fi
 

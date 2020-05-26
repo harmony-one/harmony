@@ -20,6 +20,8 @@ var (
 	ErrInsufficientEpoch = errors.New("insufficient past epochs to compute apr")
 	// ErrCouldNotRetreiveHeaderByNumber is returned when fail to retrieve header by number
 	ErrCouldNotRetreiveHeaderByNumber = errors.New("could not retrieve header by number")
+	// ErrZeroStakeOneEpochAgo is returned when total delegation is zero for one epoch ago
+	ErrZeroStakeOneEpochAgo = errors.New("zero total delegation one epoch ago")
 )
 
 // Reader ..
@@ -46,12 +48,12 @@ var (
 
 func expectedRewardPerYear(
 	now, oneEpochAgo *block.Header,
-	curValidator, snapshotLastEpoch *staking.ValidatorWrapper,
+	wrapper, snapshot *staking.ValidatorWrapper,
 ) (*big.Int, error) {
 	timeNow, oneTAgo := now.Time(), oneEpochAgo.Time()
 	diffTime, diffReward :=
 		new(big.Int).Sub(timeNow, oneTAgo),
-		new(big.Int).Sub(curValidator.BlockReward, snapshotLastEpoch.BlockReward)
+		new(big.Int).Sub(wrapper.BlockReward, snapshot.BlockReward)
 
 	// impossibility but keep sane
 	if diffTime.Sign() == -1 {
@@ -64,7 +66,7 @@ func expectedRewardPerYear(
 	// TODO some more sanity checks of some sort?
 	expectedValue := new(big.Int).Div(diffReward, diffTime)
 	expectedPerYear := new(big.Int).Mul(expectedValue, oneYear)
-	utils.Logger().Info().Interface("now", curValidator).Interface("before", snapshotLastEpoch).
+	utils.Logger().Info().Interface("now", wrapper).Interface("before", snapshot).
 		Uint64("diff-reward", diffReward.Uint64()).
 		Uint64("diff-time", diffTime.Uint64()).
 		Interface("expected-value", expectedValue).
@@ -77,7 +79,7 @@ func expectedRewardPerYear(
 func ComputeForValidator(
 	bc Reader,
 	block *types.Block,
-	validatorNow *staking.ValidatorWrapper,
+	wrapper *staking.ValidatorWrapper,
 ) (*numeric.Dec, error) {
 	oneEpochAgo, zero :=
 		new(big.Int).Sub(block.Epoch(), common.Big1),
@@ -88,9 +90,9 @@ func ComputeForValidator(
 		Uint64("one-epoch-ago", oneEpochAgo.Uint64()).
 		Msg("apr - begin compute for validator ")
 
-	oneSnapshotAgo, err := bc.ReadValidatorSnapshotAtEpoch(
-		oneEpochAgo,
-		validatorNow.Address,
+	snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
+		block.Epoch(),
+		wrapper.Address,
 	)
 
 	if err != nil {
@@ -121,7 +123,7 @@ func ComputeForValidator(
 
 	estimatedRewardPerYear, err := expectedRewardPerYear(
 		block.Header(), headerOneEpochAgo,
-		validatorNow, oneSnapshotAgo.Validator,
+		wrapper, snapshot.Validator,
 	)
 
 	if err != nil {
@@ -132,7 +134,16 @@ func ComputeForValidator(
 		return &zero, nil
 	}
 
-	total := numeric.NewDecFromBigInt(validatorNow.TotalDelegation())
+	total := numeric.NewDecFromBigInt(snapshot.Validator.TotalDelegation())
+	if total.IsZero() {
+		return nil, errors.Wrapf(
+			ErrZeroStakeOneEpochAgo,
+			"current epoch %d, one-epoch-ago %d",
+			block.Epoch().Uint64(),
+			oneEpochAgo.Uint64(),
+		)
+	}
+
 	result := numeric.NewDecFromBigInt(estimatedRewardPerYear).Quo(
 		total,
 	)

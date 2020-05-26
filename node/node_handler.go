@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
-	proto_discovery "github.com/harmony-one/harmony/api/proto/discovery"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
@@ -59,6 +57,13 @@ func (node *Node) processSkippedMsgTypeByteValue(
 
 // HandleMessage parses the message and dispatch the actions.
 func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
+	// log in-coming metrics
+	node.host.LogRecvMessage(content)
+	utils.Logger().Debug().
+		Int64("TotalIn", node.host.GetBandwidthTotals().TotalIn).
+		Float64("RateIn", node.host.GetBandwidthTotals().RateIn).
+		Msg("[metrics][p2p] traffic in in bytes")
+
 	msgCategory, err := proto.GetMessageCategory(content)
 	if err != nil {
 		utils.Logger().Error().
@@ -141,8 +146,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 				// skip first byte which is blockMsgType
 				node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 			}
-		case proto_node.PING:
-			node.pingMessageHandler(msgPayload, sender)
 		}
 	default:
 		utils.Logger().Error().
@@ -233,7 +236,18 @@ func (node *Node) BroadcastSlash(witness *slash.Record) {
 
 // BroadcastCrossLink is called by consensus leader to
 // send the new header as cross link to beacon chain.
-func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
+func (node *Node) BroadcastCrossLink() {
+	curBlock := node.Blockchain().CurrentBlock()
+	if curBlock == nil {
+		return
+	}
+
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID ||
+		!node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
+		// no need to broadcast crosslink if it's beacon chain or it's not crosslink epoch
+		return
+	}
+
 	// no point to broadcast the crosslink if we aren't even in the right epoch yet
 	if !node.Blockchain().Config().IsCrossLink(
 		node.Blockchain().CurrentHeader().Epoch(),
@@ -246,36 +260,50 @@ func (node *Node) BroadcastCrossLink(newBlock *types.Block) {
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
 	headers := []*block.Header{}
-	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(newBlock.ShardID())
+	lastLink, err := node.Beaconchain().ReadShardLastCrossLink(curBlock.ShardID())
 	var latestBlockNum uint64
 
 	// TODO chao: record the missing crosslink in local database instead of using latest crosslink
 	// if cannot find latest crosslink, broadcast latest 3 block headers
 	if err != nil {
 		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLink] ReadShardLastCrossLink Failed")
-		header := node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 2)
+		header := node.Blockchain().GetHeaderByNumber(curBlock.NumberU64() - 2)
 		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
-		header = node.Blockchain().GetHeaderByNumber(newBlock.NumberU64() - 1)
+		header = node.Blockchain().GetHeaderByNumber(curBlock.NumberU64() - 1)
 		if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
-		headers = append(headers, newBlock.Header())
+		headers = append(headers, curBlock.Header())
 	} else {
 		latestBlockNum = lastLink.BlockNum()
-		for blockNum := latestBlockNum + 1; blockNum <= newBlock.NumberU64(); blockNum++ {
+
+		batchSize := crossLinkBatchSize
+		diff := curBlock.Number().Uint64() - latestBlockNum
+
+		if diff > 100 {
+			// Increase batch size by 1 for every 100 blocks beyond
+			batchSize += int(diff-100) / 100
+		}
+
+		// Cap at a sane size to avoid overload network
+		if batchSize > crossLinkBatchSize*2 {
+			batchSize = crossLinkBatchSize * 2
+		}
+
+		for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
 			header := node.Blockchain().GetHeaderByNumber(blockNum)
 			if header != nil && node.Blockchain().Config().IsCrossLink(header.Epoch()) {
 				headers = append(headers, header)
-				if len(headers) == crossLinkBatchSize {
+				if len(headers) == batchSize {
 					break
 				}
 			}
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, newBlock.NumberU64(), len(headers))
+	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
 	for _, header := range headers {
 		utils.Logger().Debug().Msgf(
 			"[BroadcastCrossLink] Broadcasting %d",
@@ -416,10 +444,6 @@ func (node *Node) PostConsensusProcessing(
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID &&
-			node.Blockchain().Config().IsCrossLink(newBlock.Epoch()) {
-			node.BroadcastCrossLink(newBlock)
-		}
 		node.BroadcastCXReceipts(newBlock)
 	} else {
 		if node.Consensus.Mode() != consensus.Listening {
@@ -447,6 +471,10 @@ func (node *Node) PostConsensusProcessing(
 
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
+
+	// Clear metrics after one consensus cycle
+	node.host.ResetMetrics()
+	utils.Logger().Debug().Msg("[metrics][p2p] Reset after 1 consensus cycle")
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if len(newBlock.Header().ShardState()) > 0 {
@@ -478,59 +506,6 @@ func (node *Node) PostConsensusProcessing(
 				}
 			}
 		}
-	}
-}
-
-func (node *Node) pingMessageHandler(msgPayload []byte, sender libp2p_peer.ID) {
-	ping, err := proto_discovery.GetPingMessage(msgPayload)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msg("Can't get Ping Message")
-	}
-
-	peer := p2p.Peer{
-		IP:              ping.Node.IP,
-		Port:            ping.Node.Port,
-		PeerID:          ping.Node.PeerID,
-		ConsensusPubKey: nil,
-	}
-
-	if ping.Node.PubKey != nil {
-		peer.ConsensusPubKey = &bls.PublicKey{}
-		if err := peer.ConsensusPubKey.Deserialize(ping.Node.PubKey[:]); err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Msg("UnmarshalBinary Failed")
-		}
-	}
-
-	utils.Logger().Debug().
-		Str("Version", ping.NodeVer).
-		Str("IP", peer.IP).
-		Str("Port", peer.Port).
-		Interface("PeerID", peer.PeerID).
-		Msg("[PING] PeerInfo")
-
-	if senderStr := string(sender); senderStr != "" {
-		_, ok := node.duplicatedPing.LoadOrStore(senderStr, true)
-		if ok {
-			return
-		}
-	}
-
-	if err := node.host.ConnectHostPeer(peer); err != nil {
-		utils.Logger().Info().Err(err).
-			Str("peer", peer.String()).
-			Msg("could not direct connect to this peer")
-	}
-
-	if ping.Node.Role != proto_node.ClientRole {
-		node.AddPeers([]*p2p.Peer{&peer})
-		utils.Logger().Info().
-			Str("Peer", peer.String()).
-			Int("# Peers", node.host.GetPeerCount()).
-			Msg("Add Peer to Node")
 	}
 }
 

@@ -5,10 +5,10 @@ import (
 	"io"
 	"math/big"
 	"sync/atomic"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -72,24 +72,6 @@ type StakingTransaction struct {
 	hash atomic.Value
 	size atomic.Value
 	from atomic.Value
-}
-
-// RPCTransactionError ..
-type RPCTransactionError struct {
-	TxHashID             string `json:"tx-hash-id"`
-	StakingDirective     string `json:"directive-kind"`
-	TimestampOfRejection int64  `json:"time-at-rejection"`
-	ErrMessage           string `json:"error-message"`
-}
-
-// NewRPCTransactionError ...
-func NewRPCTransactionError(hash common.Hash, directive Directive, err error) RPCTransactionError {
-	return RPCTransactionError{
-		TxHashID:             hash.Hex(),
-		StakingDirective:     directive.String(),
-		TimestampOfRejection: time.Now().Unix(),
-		ErrMessage:           err.Error(),
-	}
 }
 
 // StakeMsgFulfiller is signature of callback intended to produce the StakeMsg

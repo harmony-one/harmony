@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/hash"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
@@ -127,8 +129,6 @@ func (w *Worker) CommitTransactions(
 	// STAKING - only beaconchain process staking transaction
 	if w.chain.ShardID() == shard.BeaconChainShardID {
 		for _, tx := range pendingStaking {
-			// TODO: merge staking transaction processing with normal transaction processing.
-			// <<THESE CODE ARE DUPLICATED AS ABOVE
 			// If we don't have enough gas for any further transactions then we're done
 			if w.current.gasPool.Gas() < params.TxGas {
 				utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
@@ -180,6 +180,9 @@ func (w *Worker) commitStakingTransaction(
 	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		utils.Logger().Error().
+			Err(err).Interface("stkTxn", tx).
+			Msg("Staking transaction failed commitment")
 		return nil, err
 	}
 	if receipt == nil {
@@ -215,8 +218,8 @@ func (w *Worker) commitTransaction(
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		utils.Logger().Error().
-			Err(err).Str("stakingTxId", tx.Hash().Hex()).
-			Msg("Offchain ValidatorMap Read/Write Error")
+			Err(err).Interface("txn", tx).
+			Msg("Transaction failed commitment")
 		return nil, errNilReceipt
 	}
 	if receipt == nil {
@@ -374,11 +377,36 @@ func (w *Worker) verifySlashes(
 		return successes, failures
 	}
 
+	seenEvidences := map[common.Hash]struct{}{}
+
 	for i := range d {
+		evidenceHash := hash.FromRLPNew256(d[i].Evidence)
+		if existing, ok := seenEvidences[evidenceHash]; ok {
+			utils.Logger().Warn().
+				Interface("slashRecord1", existing).
+				Interface("slashRecord2", d[i]).
+				Msg("Duplicate slash records with different reporters")
+			failures = append(failures, d[i])
+		} else {
+			seenEvidences[evidenceHash] = struct{}{}
+
+			// In addition, need to count the same evidence with first and second vote swapped as seen
+			swapVote := d[i].Evidence
+			tmp := swapVote.ConflictingVotes.FirstVote
+			swapVote.ConflictingVotes.FirstVote = swapVote.ConflictingVotes.SecondVote
+			swapVote.ConflictingVotes.SecondVote = tmp
+			swapHash := hash.FromRLPNew256(swapVote)
+			seenEvidences[swapHash] = struct{}{}
+		}
+
 		if err := slash.Verify(
 			w.chain, workingState, &d[i],
 		); err != nil {
+			utils.Logger().Warn().Err(err).
+				Interface("slashRecord", d[i]).
+				Msg("Slash failed verification")
 			failures = append(failures, d[i])
+			continue
 		}
 		successes = append(successes, d[i])
 	}
