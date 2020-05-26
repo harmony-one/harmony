@@ -87,13 +87,13 @@ func ResetConfInt(value *int, envViper *viper.Viper, configFileViper *viper.Vipe
 // ResetConfBool resets Bool value to value from config files and system environment variable
 func ResetConfBool(value *bool, envViper *viper.Viper, configFileViper *viper.Viper, sectionName string, flagName string) {
 	var confRet = configFileViper.GetBool(getConfName(sectionName, flagName))
-	if confRet != false {
+	if confRet {
 		*value = confRet
 		return
 	}
 
 	var envRet = envViper.GetBool(getEnvName(sectionName, flagName))
-	if envRet != false {
+	if envRet {
 		*value = envRet
 		return
 	}

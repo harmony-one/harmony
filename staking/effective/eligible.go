@@ -21,6 +21,19 @@ const (
 	Banned
 )
 
+func (e Eligibility) String() string {
+	switch e {
+	case Active:
+		return "active"
+	case Inactive:
+		return "inactive"
+	case Banned:
+		return doubleSigningBanned
+	default:
+		return "unknown"
+	}
+}
+
 // Candidacy is a more semantically meaningful
 // value that is derived from core protocol logic but
 // meant more for the presentation of user, like at RPC

@@ -72,6 +72,7 @@ var (
 	onlyLogTps  = flag.Bool("only_log_tps", false, "Only log TPS if true")
 	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
 	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
+	dnsPort     = flag.String("dns_port", "9000", "port of dns node")
 	//Leader needs to have a minimal number of peers to start consensus
 	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
 	// Key file to store the private key
@@ -110,8 +111,9 @@ var (
 	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
 	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
 	// Blacklist of addresses
-	blacklistPath   = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
-	webHookYamlPath = flag.String(
+	blacklistPath      = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
+	broadcastInvalidTx = flag.Bool("broadcast_invalid_tx", false, "Broadcast invalid transactions to sync pool state (default: false)")
+	webHookYamlPath    = flag.String(
 		"webhook_yaml", "", "path for yaml config reporting double signing",
 	)
 	// aws credentials
@@ -290,7 +292,7 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		os.Exit(100)
 	}
 
-	keyFiles := []os.FileInfo{}
+	var keyFiles []os.FileInfo
 	legacyBLSFile := true
 
 	if len(awsEncryptedBLSKeyFiles) > 0 {
@@ -460,6 +462,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, *isArchival)
+	currentNode.BroadcastInvalidTx = *broadcastInvalidTx
 
 	switch {
 	case *networkType == nodeconfig.Localnet:
@@ -474,9 +477,9 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 	case *dnsZone != "":
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*port))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(*dnsZone, syncing.GetSyncingPort(*dnsPort))
 	case *dnsFlag:
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*port))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider("t.hmny.io", syncing.GetSyncingPort(*dnsPort))
 	default:
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 

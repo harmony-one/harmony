@@ -138,8 +138,8 @@ type CurrentEpochPerformance struct {
 	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
 }
 
-// ValidatorRPCEnchanced contains extra information for RPC consumer
-type ValidatorRPCEnchanced struct {
+// ValidatorRPCEnhanced contains extra information for RPC consumer
+type ValidatorRPCEnhanced struct {
 	Wrapper              ValidatorWrapper         `json:"validator"`
 	Performance          *CurrentEpochPerformance `json:"current-epoch-performance"`
 	ComputedMetrics      *ValidatorStats          `json:"metrics"`
@@ -148,6 +148,7 @@ type ValidatorRPCEnchanced struct {
 	EPoSStatus           string                   `json:"epos-status"`
 	EPoSWinningStake     *numeric.Dec             `json:"epos-winning-stake"`
 	BootedStatus         *string                  `json:"booted-status"`
+	ActiveStatus         string                   `json:"active-status"`
 	Lifetime             *AccumulatedOverLifetime `json:"lifetime"`
 }
 

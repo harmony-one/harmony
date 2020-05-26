@@ -630,7 +630,6 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 		}
 	}
 	tc.stateSnap = tc.state.Copy()
-	return
 }
 
 func (tc *applyTestCase) apply() {
@@ -781,7 +780,7 @@ func makeVoteData(kp blsKeyPair, block *types.Block) Vote {
 }
 
 func makeTestAddress(item interface{}) common.Address {
-	s := fmt.Sprintf("harmony.one.%s", item)
+	s := fmt.Sprintf("harmony.one.%v", item)
 	return common.BytesToAddress([]byte(s))
 }
 

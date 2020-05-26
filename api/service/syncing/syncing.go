@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
@@ -36,6 +37,11 @@ const (
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
 	SyncLoopFrequency               = 1    // unit in second
 	LastMileBlocksSize              = 50
+
+	// after cutting off a number of connected peers, the result number of peers
+	// shall be between numPeersLowBound and numPeersHighBound
+	numPeersLowBound  = 3
+	numPeersHighBound = 5
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -225,6 +231,10 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	peers = limitNumPeers(peers, randSeed)
+
 	utils.Logger().Debug().
 		Int("len", len(peers)).
 		Bool("isBeacon", isBeacon).
@@ -237,6 +247,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		ss.syncConfig.CloseConnections()
 	}
 	ss.syncConfig = &SyncConfig{}
+
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
@@ -261,6 +272,34 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Msg("[SYNC] Finished making connection to peers")
 
 	return nil
+}
+
+// limitNumPeers limits number of peers to release some server end sources.
+func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
+	targetSize := calcNumPeersWithBound(len(ps), numPeersLowBound, numPeersHighBound)
+	if len(ps) <= targetSize {
+		return ps
+	}
+
+	r := rand.New(rand.NewSource(randSeed))
+	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
+
+	return ps[:targetSize]
+}
+
+// Peers are expected to limited at half of the size, capped between lowBound and highBound.
+func calcNumPeersWithBound(size int, lowBound, highBound int) int {
+	if size < lowBound {
+		return size
+	}
+	expLen := size / 2
+	if expLen < lowBound {
+		expLen = lowBound
+	}
+	if expLen > highBound {
+		expLen = highBound
+	}
+	return expLen
 }
 
 // GetActivePeerNumber returns the number of active peers

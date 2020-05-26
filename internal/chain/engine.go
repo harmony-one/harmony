@@ -399,12 +399,7 @@ func applySlashes(
 			shardID: doubleSigners[i].Evidence.Moment.ShardID,
 			epoch:   doubleSigners[i].Evidence.Moment.Epoch.Uint64(),
 		}
-
-		if _, ok := groupedRecords[thisKey]; ok {
-			groupedRecords[thisKey] = append(groupedRecords[thisKey], doubleSigners[i])
-		} else {
-			groupedRecords[thisKey] = slash.Records{doubleSigners[i]}
-		}
+		groupedRecords[thisKey] = append(groupedRecords[thisKey], doubleSigners[i])
 	}
 
 	sortedKeys := []keyStruct{}

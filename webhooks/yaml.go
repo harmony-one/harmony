@@ -64,6 +64,9 @@ func DoPost(url string, record interface{}) (*ReportResult, error) {
 	}
 	defer resp.Body.Close()
 	result, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 	anon := ReportResult{}
 	if err := json.Unmarshal(result, &anon); err != nil {
 		return nil, err
