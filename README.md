@@ -148,6 +148,20 @@ make
 
 ```
 
+For AWS linux also need
+```
+sudo yum install  gmp-devel openssl-devel
+sudo yum install gcc-c++ glibc-static openssl-static crypto-static gmp-static
+cd ../mcl/
+make clean
+cd ../bls/
+make clean
+make minimised_static
+cd ../harmony/
+make linux_static
+/scripts/go_executable_build.sh
+```
+
 Note: make sure to run `scripts/install_build_tools.sh`to make sure build tools are of correct versions.
 
 ## Build
