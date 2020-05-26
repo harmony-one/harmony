@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rakyll/statik/fs"
-//	_ "github.com/harmony-one/harmony/docs/swaggerui" // statik files
+	_ "github.com/harmony-one/harmony/statik/swaggerui" // statik files
 	"github.com/gorilla/mux"
 )
 

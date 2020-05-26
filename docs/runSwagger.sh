@@ -5,6 +5,6 @@ cp -rf ./swagger-ui/dist swaggerui
 # rm -rf ./swagger-ui
 cp swagger.yml ./swaggerui/.
 cp index.html ./swaggerui/.
-statik -src=/home/ec2-user/go/src/github.com/harmony-one/harmony/docs/swaggerui -p docs -dest ../
-mv statik.go swaggerui.go
+statik -src=/home/ec2-user/go/src/github.com/harmony-one/harmony/docs/swaggerui -dest ../
+mv ../statik/statik.go ../statik/swaggerui.go
 rm -rf swaggerui

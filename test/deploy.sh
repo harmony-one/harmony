@@ -166,7 +166,7 @@ while IFS='' read -r line || [[ -n "$line" ]]; do
 
   case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
   case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
-  case "${mode}" in explorer*) args=("${args[@]}" -node_type=explorer -shard_id=0 -public_rpc=true);; esac
+  case "${mode}" in explorer*) args=("${args[@]}" -node_type=explorer -shard_id=0 -public_rpc=true -swagger=8180);; esac
   case "${mode}" in
   client) ;;
   *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;

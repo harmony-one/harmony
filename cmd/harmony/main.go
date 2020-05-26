@@ -41,6 +41,7 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
 	"github.com/harmony-one/harmony/docs"
+	"github.com/harmony-one/harmony/statik"
 )
 
 // Version string variables
