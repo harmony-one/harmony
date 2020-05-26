@@ -25,77 +25,83 @@ var EpochTBD = big.NewInt(10000000)
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:         MainnetChainID,
-		CrossTxEpoch:    big.NewInt(28),
-		CrossLinkEpoch:  big.NewInt(186),
-		StakingEpoch:    big.NewInt(186),
-		PreStakingEpoch: big.NewInt(185),
-		EIP155Epoch:     big.NewInt(28),
-		S3Epoch:         big.NewInt(28),
-		ReceiptLogEpoch: big.NewInt(101),
+		ChainID:          MainnetChainID,
+		CrossTxEpoch:     big.NewInt(28),
+		CrossLinkEpoch:   big.NewInt(186),
+		StakingEpoch:     big.NewInt(186),
+		PreStakingEpoch:  big.NewInt(185),
+		QuickUnlockEpoch: big.NewInt(191),
+		EIP155Epoch:      big.NewInt(28),
+		S3Epoch:          big.NewInt(28),
+		ReceiptLogEpoch:  big.NewInt(101),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:         TestnetChainID,
-		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
-		StakingEpoch:    big.NewInt(2),
-		PreStakingEpoch: big.NewInt(1),
-		EIP155Epoch:     big.NewInt(0),
-		S3Epoch:         big.NewInt(0),
-		ReceiptLogEpoch: big.NewInt(0),
+		ChainID:          TestnetChainID,
+		CrossTxEpoch:     big.NewInt(0),
+		CrossLinkEpoch:   big.NewInt(2),
+		StakingEpoch:     big.NewInt(2),
+		PreStakingEpoch:  big.NewInt(1),
+		QuickUnlockEpoch: big.NewInt(0),
+		EIP155Epoch:      big.NewInt(0),
+		S3Epoch:          big.NewInt(0),
+		ReceiptLogEpoch:  big.NewInt(0),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:         PangaeaChainID,
-		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
-		StakingEpoch:    big.NewInt(2),
-		PreStakingEpoch: big.NewInt(1),
-		EIP155Epoch:     big.NewInt(0),
-		S3Epoch:         big.NewInt(0),
-		ReceiptLogEpoch: big.NewInt(0),
+		ChainID:          PangaeaChainID,
+		CrossTxEpoch:     big.NewInt(0),
+		CrossLinkEpoch:   big.NewInt(2),
+		StakingEpoch:     big.NewInt(2),
+		PreStakingEpoch:  big.NewInt(1),
+		QuickUnlockEpoch: big.NewInt(0),
+		EIP155Epoch:      big.NewInt(0),
+		S3Epoch:          big.NewInt(0),
+		ReceiptLogEpoch:  big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
 	// All features except for CrossLink are enabled at launch.
 	PartnerChainConfig = &ChainConfig{
-		ChainID:         PartnerChainID,
-		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
-		StakingEpoch:    big.NewInt(2),
-		PreStakingEpoch: big.NewInt(1),
-		EIP155Epoch:     big.NewInt(0),
-		S3Epoch:         big.NewInt(0),
-		ReceiptLogEpoch: big.NewInt(0),
+		ChainID:          PartnerChainID,
+		CrossTxEpoch:     big.NewInt(0),
+		CrossLinkEpoch:   big.NewInt(2),
+		StakingEpoch:     big.NewInt(2),
+		PreStakingEpoch:  big.NewInt(1),
+		QuickUnlockEpoch: big.NewInt(0),
+		EIP155Epoch:      big.NewInt(0),
+		S3Epoch:          big.NewInt(0),
+		ReceiptLogEpoch:  big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
-		ChainID:         StressnetChainID,
-		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
-		StakingEpoch:    big.NewInt(2),
-		PreStakingEpoch: big.NewInt(1),
-		EIP155Epoch:     big.NewInt(0),
-		S3Epoch:         big.NewInt(0),
-		ReceiptLogEpoch: big.NewInt(0),
+		ChainID:          StressnetChainID,
+		CrossTxEpoch:     big.NewInt(0),
+		CrossLinkEpoch:   big.NewInt(2),
+		StakingEpoch:     big.NewInt(2),
+		PreStakingEpoch:  big.NewInt(1),
+		QuickUnlockEpoch: big.NewInt(0),
+		EIP155Epoch:      big.NewInt(0),
+		S3Epoch:          big.NewInt(0),
+		ReceiptLogEpoch:  big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:         TestnetChainID,
-		CrossTxEpoch:    big.NewInt(0),
-		CrossLinkEpoch:  big.NewInt(2),
-		StakingEpoch:    big.NewInt(2),
-		PreStakingEpoch: big.NewInt(0),
-		EIP155Epoch:     big.NewInt(0),
-		S3Epoch:         big.NewInt(0),
-		ReceiptLogEpoch: big.NewInt(0),
+		ChainID:          TestnetChainID,
+		CrossTxEpoch:     big.NewInt(0),
+		CrossLinkEpoch:   big.NewInt(2),
+		StakingEpoch:     big.NewInt(2),
+		PreStakingEpoch:  big.NewInt(0),
+		QuickUnlockEpoch: big.NewInt(0),
+		EIP155Epoch:      big.NewInt(0),
+		S3Epoch:          big.NewInt(0),
+		ReceiptLogEpoch:  big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -107,6 +113,7 @@ var (
 		big.NewInt(0),             // CrossLinkEpoch
 		big.NewInt(0),             // StakingEpoch
 		big.NewInt(0),             // PreStakingEpoch
+		big.NewInt(0),             // QuickUnlockEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
 		big.NewInt(0),             // ReceiptLogEpoch
@@ -121,6 +128,7 @@ var (
 		big.NewInt(0), // CrossLinkEpoch
 		big.NewInt(0), // StakingEpoch
 		big.NewInt(0), // PreStakingEpoch
+		big.NewInt(0), // QuickUnlockEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
 		big.NewInt(0), // ReceiptLogEpoch
@@ -164,6 +172,9 @@ type ChainConfig struct {
 
 	// PreStakingEpoch is the epoch we allow staking transactions
 	PreStakingEpoch *big.Int `json:"prestaking-epoch,omitempty"`
+
+	// QuickUnlockEpoch is the epoch when undelegation will be unlocked at the current epoch
+	QuickUnlockEpoch *big.Int `json:"quick-unlock-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -220,6 +231,11 @@ func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 // IsPreStaking determines whether staking transactions are allowed
 func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
 	return isForked(c.PreStakingEpoch, epoch)
+}
+
+// IsQuickUnlock determines whether it's the epoch when the undelegation should be unlocked at end of current epoch
+func (c *ChainConfig) IsQuickUnlock(epoch *big.Int) bool {
+	return isForked(c.QuickUnlockEpoch, epoch)
 }
 
 // IsCrossLink returns whether epoch is either equal to the CrossLink fork epoch or greater.

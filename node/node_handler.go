@@ -126,7 +126,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 						for _, block := range blocks {
 							if block.ShardID() == 0 {
 								utils.Logger().Info().
-									Uint64("block", blocks[0].NumberU64()).
 									Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
 								go func(blk *types.Block) {
 									node.BeaconBlockChannel <- blk
@@ -282,10 +281,8 @@ func (node *Node) BroadcastCrossLink() {
 		batchSize := crossLinkBatchSize
 		diff := curBlock.Number().Uint64() - latestBlockNum
 
-		if diff > 100 {
-			// Increase batch size by 1 for every 100 blocks beyond
-			batchSize += int(diff-100) / 100
-		}
+		// Increase batch size by 1 for every 100 blocks beyond
+		batchSize += int(diff) / 100
 
 		// Cap at a sane size to avoid overload network
 		if batchSize > crossLinkBatchSize*2 {

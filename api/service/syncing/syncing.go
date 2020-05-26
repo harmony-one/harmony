@@ -597,7 +597,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
 
 			if !verifyAllSig {
-				utils.Logger().Debug().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
 					bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 				}
@@ -615,11 +615,6 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 				block.NumberU64(),
 				block.ShardID(),
 			)
-
-		utils.Logger().Debug().
-			Interface("block", bc.CurrentBlock()).
-			Msg("[SYNC] UpdateBlockAndStatus: Rolling back current block!")
-		bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
 		return err
 	}
 	utils.Logger().Info().
