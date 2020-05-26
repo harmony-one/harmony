@@ -41,7 +41,6 @@ import (
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
 	"github.com/harmony-one/harmony/docs"
-	"github.com/harmony-one/harmony/statik"
 )
 
 // Version string variables
@@ -132,7 +131,7 @@ func initSetup() {
 
 	// Setup swagger
 	if addr := *swagger; addr != "" {
-		go func() { docs.DocServer() }()
+		go func() { docs.DocServer(addr) }()
 	}
 
 	// maybe request passphrase for bls key.

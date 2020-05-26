@@ -198,6 +198,7 @@ options:
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
    -r address     start a pprof profiling server listening on the specified address
+   -w address     start a swagger api server listening on the specified address
    -I             use statically linked Harmony binary (default: true)
    -R tracefile   enable p2p trace using tracefile (default: off)
    -l             limit broadcasting of invalid transactions (default: off)
@@ -269,6 +270,7 @@ blsfolder=./.hmy/blskeys
 archival=false
 blacklist=./.hmy/blacklist.txt
 pprof=""
+swagger=""
 static=true
 verify=false
 minpeers=6
@@ -306,6 +308,7 @@ do
    P) public_rpc=true;;
    B) blacklist="${OPTARG}";;
    r) pprof="${OPTARG}";;
+   w) swagger="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
    V) LD_LIBRARY_PATH=. ./harmony -version
@@ -862,6 +865,12 @@ do
       -pprof "${pprof}"
       )
    fi
+   if [ ! -z "${swagger}" ]; then
+      args+=(
+      -swagger "${swagger}"
+      )
+   fi
+# backward compatible with older harmony node software
 # backward compatible with older harmony node software
    case "${node_type}" in
    validator)

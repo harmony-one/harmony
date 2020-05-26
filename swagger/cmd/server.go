@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/rakyll/statik/fs"
-//	"github.com/ribice/golang-swaggerui-example/cmd/api"
-//	_ "github.com/harmony-one/harmony/swagger/cmd/swagger"
 	_ "github.com/harmony-one/harmony/swagger/cmd/swaggerui" // statik files
 
 	"github.com/gorilla/mux"

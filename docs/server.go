@@ -5,11 +5,11 @@ import (
 	"net/http"
 
 	"github.com/rakyll/statik/fs"
-	_ "github.com/harmony-one/harmony/statik/swaggerui" // statik files
+	_ "github.com/harmony-one/harmony/docs/swaggerui" // statik files
 	"github.com/gorilla/mux"
 )
 
-func DocServer() {
+func DocServer(p string) {
 	router := mux.NewRouter().StrictSlash(true)
 	statikFS, err := fs.New()
 	if err != nil {
@@ -20,7 +20,7 @@ func DocServer() {
 	sh := http.StripPrefix("/swaggerui/", staticServer)
 	router.PathPrefix("/swaggerui/").Handler(sh)
 //	registerV1Routes(router)
-	log.Fatal(http.ListenAndServe(":8180", router))
+	log.Fatal(http.ListenAndServe(":"+p, router))
 }
 
 /*
