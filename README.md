@@ -38,8 +38,8 @@ $ git reset --hard origin/master
 
 ```
 $ git fetch
-$ git checkout s3
-$ git reset --hard origin/s3
+$ git checkout t3
+$ git reset --hard origin/t3
 ```
 
 And now run the local blockchain
@@ -118,13 +118,20 @@ $ eval $(gimme 1.14.1)
 Note that changing the go version might mean that dependencies won't work out right when trying to
 run `test/debug.sh` again, get the correct environment again easily by `exec bash`.
 
-## Installation Requirements for directly on your machine
+## Installation Requirements for directly on your MacOS X
 
 GMP and OpenSSL
 
 ```bash
 brew install gmp
 brew install openssl
+
+```
+
+## On Linux Box (assuming Amazon Linux 2 or Cent OS)
+
+```bash
+sudo yum install glibc-static gmp-devel gmp-static openssl-libs openssl-static gcc-c++
 ```
 
 ## Dev Environment Setup
@@ -243,11 +250,9 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - EPoS staking mechanism
 - Kademlia routing
 
-### Features To Be Implemented
+### Features Planned after Mainnet Open Staking
 
-- Leader rotation
-
-### Features Planned after Mainnet
-
+- Resharding
 - Integration with WASM
 - Fast state synchronization
+- Auditable privacy asset using ZK proof
