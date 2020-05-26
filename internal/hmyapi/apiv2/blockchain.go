@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -206,39 +205,6 @@ func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 	return shard.Schedule.EpochLastBlock(epoch), nil
 }
 
-func (s *PublicBlockChainAPI) getBlockSigners(ctx context.Context, blockNr uint64) (shard.SlotList, *internal_bls.Mask, error) {
-	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
-	if err != nil {
-		return nil, nil, err
-	}
-	blockWithSigners, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr+1))
-	if err != nil {
-		return nil, nil, err
-	}
-	committee, err := s.b.GetValidators(block.Epoch())
-	if err != nil {
-		return nil, nil, err
-	}
-	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
-	for i, validator := range committee.Slots {
-		pubkeys[i] = new(bls.PublicKey)
-		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
-	}
-	mask, err := internal_bls.NewMask(pubkeys, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
-	if err != nil {
-		return nil, nil, err
-	}
-	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
-	if err != nil {
-		return nil, nil, err
-	}
-	return committee.Slots, mask, nil
-}
-
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint64) ([]string, error) {
 	if blockNr == 0 || blockNr >= uint64(s.BlockNumber()) {
@@ -247,7 +213,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr uint6
 	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
 		return nil, err
 	}
-	slots, mask, err := s.getBlockSigners(ctx, blockNr)
+	slots, mask, err := s.b.GetBlockSigners(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +240,7 @@ func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNr ui
 	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
 		return nil, err
 	}
-	slots, mask, err := s.getBlockSigners(ctx, blockNr)
+	slots, mask, err := s.b.GetBlockSigners(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +263,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr uint64,
 	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
 		return false, err
 	}
-	slots, mask, err := s.getBlockSigners(ctx, blockNr)
+	slots, mask, err := s.b.GetBlockSigners(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return false, err
 	}

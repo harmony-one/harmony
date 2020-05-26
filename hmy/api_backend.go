@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -20,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
@@ -847,4 +849,34 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		b.hmy.nodeAPI.GetNodeBootTime(),
 		c,
 	}
+}
+
+// GetBlockSigners ..
+func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *internal_bls.Mask, error) {
+	block, err := b.BlockByNumber(ctx, blockNr)
+	if err != nil {
+		return nil, nil, err
+	}
+	blockWithSigners, err := b.BlockByNumber(ctx, blockNr+1)
+	if err != nil {
+		return nil, nil, err
+	}
+	committee, err := b.GetValidators(block.Epoch())
+	if err != nil {
+		return nil, nil, err
+	}
+	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	for i, validator := range committee.Slots {
+		pubkeys[i] = new(bls.PublicKey)
+		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
+	}
+	mask, err := internal_bls.NewMask(pubkeys, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
+	if err != nil {
+		return nil, nil, err
+	}
+	return committee.Slots, mask, nil
 }
