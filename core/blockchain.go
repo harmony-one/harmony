@@ -2404,6 +2404,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 	return validatorStats, nil
 }
 
+// ComputeAndUpdateAPR ...
 func (bc *BlockChain) ComputeAndUpdateAPR(
 	block *types.Block, now *big.Int,
 	wrapper *staking.ValidatorWrapper, stats *staking.ValidatorStats,
