@@ -138,8 +138,6 @@ type Node struct {
 	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Duplicated Ping Message Received
-	duplicatedPing sync.Map
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
 	// node configuration, including group ID, shard ID, etc
