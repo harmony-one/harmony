@@ -283,7 +283,7 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 	return l.txs.Forward(threshold)
 }
 
-// Filter removes all transactions from the list with a cost or gas limit higher
+// FilterCost removes all transactions from the list with a cost or gas limit higher
 // than the provided thresholds. Every removed transaction is returned for any
 // post-removal maintenance. Strict-mode invalidated transactions are also
 // returned.
@@ -292,7 +292,7 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 // a point in calculating all the costs or if the balance covers all. If the threshold
 // is lower than the costgas cap, the caps will be reset to a new high after removing
 // the newly invalidated transactions.
-func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.PoolTransactions, types.PoolTransactions) {
+func (l *txList) FilterCost(costLimit *big.Int, gasLimit uint64) (types.PoolTransactions, types.PoolTransactions) {
 	// If all transactions are below the threshold, short circuit
 	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
 		return nil, nil
@@ -300,18 +300,26 @@ func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.PoolTransact
 	l.costcap = new(big.Int).Set(costLimit) // Lower the caps to the thresholds
 	l.gascap = gasLimit
 
-	// Filter out all the transactions above the account's funds
-	removed := l.txs.Filter(func(tx types.PoolTransaction) bool {
+	return l.Filter(func(tx types.PoolTransaction) bool {
 		cost, err := tx.Cost()
 		if err != nil {
 			return true // failure should lead to removal of the tx
 		}
 		return cost.Cmp(costLimit) > 0 || tx.Gas() > gasLimit
 	})
+}
 
+// Filter iterates over the list of transactions and removes all of them for which
+// the specified function evaluates to true. Moreover, it returns all transactions
+// that were invalidated from the filter
+func (l *txList) Filter(
+	filter func(types.PoolTransaction) bool,
+) (types.PoolTransactions, types.PoolTransactions) {
 	// If the list was strict, filter anything above the lowest nonce
 	var invalids types.PoolTransactions
 
+	// Filter out all the transactions above the account's funds
+	removed := l.txs.Filter(filter)
 	if l.strict && len(removed) > 0 {
 		lowest := uint64(math.MaxUint64)
 		for _, tx := range removed {
