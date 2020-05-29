@@ -245,8 +245,15 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	if err != nil {
 		return nil, err
 	}
+	queued, err := b.hmy.txPool.Queued()
+	if err != nil {
+		return nil, err
+	}
 	var txs types.PoolTransactions
 	for _, batch := range pending {
+		txs = append(txs, batch...)
+	}
+	for _, batch := range queued {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
