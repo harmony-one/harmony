@@ -15,6 +15,7 @@ USER=$(whoami)
 set -eo pipefail
 
 export GO111MODULE=on
+OS=$(uname -s)
 
 mkdir -p .hmy
 if [ -f ".hmy/blspass.txt" ]
@@ -77,6 +78,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -n             dryrun mode (default: $DRYRUN)
    -N network     network type (default: $NETWORK)
    -B             don't build the binary
+   -v             verbosity in log (default: $VERBOSE)
 
 This script will build all the binaries and start harmony and based on the configuration file.
 
@@ -95,6 +97,7 @@ SHARDS=2
 DRYRUN=
 SYNC=true
 NETWORK=localnet
+VERBOSE=false
 
 while getopts "hD:m:s:nBN:" option; do
    case $option in
@@ -105,6 +108,7 @@ while getopts "hD:m:s:nBN:" option; do
       n) DRYRUN=echo ;;
       B) NOBUILD=true ;;
       N) NETWORK=$OPTARG ;;
+      v) VERBOSE=true ;;
    esac
 done
 
@@ -126,7 +130,13 @@ cleanup
 # Also it's recommended to use `go build` for testing the whole exe. 
 if [ "${NOBUILD}" != "true" ]; then
    pushd $ROOT
-   scripts/go_executable_build.sh -S
+   if [ "$OS" = "Darwin" ]; then
+   # MacOS doesn't support static build
+      scripts/go_executable_build.sh -S
+   else
+   # Static build on Linux platform
+      scripts/go_executable_build.sh -s
+   fi
    popd
 fi
 
@@ -145,7 +155,14 @@ echo "bootnode launched." + " $BN_MA"
 
 unset -v base_args
 declare -a base_args args
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false)
+
+if $VERBOSE; then
+   verbosity=5
+else
+   verbosity=3
+fi
+
+base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false -verbosity="${verbosity}")
 sleep 2
 
 # Start nodes
