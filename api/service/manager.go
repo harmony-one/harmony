@@ -1,8 +1,6 @@
 package service
 
 import (
-	"time"
-
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -28,7 +26,6 @@ const (
 	Consensus
 	BlockProposal
 	NetworkInfo
-	PeerDiscovery
 )
 
 func (t Type) String() string {
@@ -43,18 +40,10 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case NetworkInfo:
 		return "NetworkInfo"
-	case PeerDiscovery:
-		return "PeerDiscovery"
 	default:
 		return "Unknown"
 	}
 }
-
-// Constants for timing.
-const (
-	// WaitForStatusUpdate is the delay time to update new status. Currently set 1 second for development. Should be 30 minutes for production.
-	WaitForStatusUpdate = time.Minute * 1
-)
 
 // Action is type of service action.
 type Action struct {
@@ -114,11 +103,6 @@ func (m *Manager) InitServiceMap() {
 	m.services = make(map[Type]Interface)
 }
 
-// SendAction sends action to action channel which is observed by service manager.
-func (m *Manager) SendAction(action *Action) {
-	m.actionChannel <- action
-}
-
 // TakeAction is how service manager handles the action.
 func (m *Manager) TakeAction(action *Action) {
 	if m.services == nil {
@@ -145,8 +129,6 @@ func (m *Manager) StartServiceManager() chan *Action {
 			select {
 			case action := <-ch:
 				m.TakeAction(action)
-			case <-time.After(WaitForStatusUpdate):
-				utils.Logger().Info().Msg("Waiting for new action")
 			}
 		}
 	}()
