@@ -214,24 +214,39 @@ func (bc *BlockChain) CommitOffChainData(
 				Err(err).
 				Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
 		}
-		// fix the possible wrong apr in the staking epoch
+		// let's fix previous aprs at the epoch transition from 191 to 192
+		// this code will be removed after the rolling upgrade
 		stakingEpoch := bc.Config().StakingEpoch
 		secondStakingEpoch := big.NewInt(0).Add(stakingEpoch, common.Big1)
-		thirdStakingEpoch := big.NewInt(0).Add(secondStakingEpoch, common.Big1)
-		isThirdStakingEpoch := block.Epoch().Cmp(thirdStakingEpoch) == 0
-		if isThirdStakingEpoch {
-			// we have to do it for all validators, not only currently elected
-			if validators, err := bc.ReadValidatorList(); err == nil {
-				for _, addr := range validators {
-					// get wrapper from the second staking epoch
+		fixEpoch := big.NewInt(0).Add(stakingEpoch, big.NewInt(5)) // epoch 191
+		isFixEpoch := block.Epoch().Cmp(fixEpoch) == 0
+		fixEpochPlus := big.NewInt(0).Add(fixEpoch, common.Big1) // epoch 192
+		if isFixEpoch {
+			validators, _ := bc.ReadValidatorList()
+			for _, addr := range validators {
+				// loop for epochs 187->191
+				reset := false
+				for i := secondStakingEpoch.Int64(); i <= fixEpochPlus.Int64(); i++ {
+					epoch := big.NewInt(i)
+					// read snapshot to be used as wrapper
 					if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
-						secondStakingEpoch, addr,
+						epoch, addr,
 					); err == nil {
-						if block := bc.GetBlockByNumber(
-							shard.Schedule.EpochLastBlock(stakingEpoch.Uint64()),
-						); block != nil {
+						oneEpochAgo := big.NewInt(i - 1)
+						shardState, _ := bc.ReadShardState(oneEpochAgo)
+						committee := shardState.StakedValidators()
+						if _, elected := committee.LookupSet[addr]; !elected {
+							continue
+						}
+						epochLastBlock := bc.GetBlockByNumber(
+							shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64()),
+						)
+						if epochLastBlock == nil || block.Epoch().Cmp(oneEpochAgo) == 0 {
+							epochLastBlock = block
+						}
+						if epochLastBlock != nil {
 							if aprComputed, err := apr.ComputeForValidator(
-								bc, block, snapshot.Validator,
+								bc, epochLastBlock, snapshot.Validator,
 							); err == nil {
 								stats, ok := tempValidatorStats[addr]
 								if !ok {
@@ -240,11 +255,12 @@ func (bc *BlockChain) CommitOffChainData(
 										continue
 									}
 								}
-								for i := range stats.APRs {
-									if stats.APRs[i].Epoch.Cmp(stakingEpoch) == 0 {
-										stats.APRs[i] = staking.APREntry{stakingEpoch, *aprComputed}
-									}
+								if !reset {
+									// ignore the previous aprs and reinitialize it
+									reset = true
+									stats.APRs = []staking.APREntry{}
 								}
+								stats.APRs = append(stats.APRs, staking.APREntry{oneEpochAgo, *aprComputed})
 								tempValidatorStats[addr] = stats
 							}
 						}
