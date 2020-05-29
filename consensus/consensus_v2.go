@@ -257,12 +257,6 @@ func (consensus *Consensus) tryCatchup() {
 				continue
 			}
 
-			if consensus.BlockVerifier == nil {
-				// do nothing
-			} else if err := consensus.BlockVerifier(tmpBlock); err != nil {
-				consensus.getLogger().Info().Msg("[TryCatchup] block verification failed")
-				continue
-			}
 			committedMsg = msgs[i]
 			block = tmpBlock
 			break
