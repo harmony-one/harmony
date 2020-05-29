@@ -21,7 +21,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
-	err := consensus.verifySenderKey(msg)
+	err := consensus.VerifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
@@ -45,7 +45,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		return false
 	}
 
-	if err := verifyMessageSig(senderKey, msg); err != nil {
+	if err := VerifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msg(
 			"Failed to verify sender's signature",
 		)
@@ -65,7 +65,7 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[leaderSanityChecks] Checking new message")
-	err := consensus.verifySenderKey(msg)
+	err := consensus.VerifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
@@ -75,7 +75,7 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 			)
 		} else {
 			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] verifySenderKey failed",
+				"[%s] VerifySenderKey failed",
 				msg.GetType().String(),
 			)
 		}
@@ -85,7 +85,7 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 	if err != nil {
 		return false
 	}
-	if err = verifyMessageSig(senderKey, msg); err != nil {
+	if err = VerifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msgf(
 			"[%s] Failed to verify sender's signature",
 			msg.GetType().String(),
@@ -220,7 +220,7 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 		}
 		return false
 	}
-	if err := verifyMessageSig(senderKey, msg); err != nil {
+	if err := VerifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msgf(
 			"[%s] Failed To Verify Sender's Signature",
 			msg.GetType().String(),

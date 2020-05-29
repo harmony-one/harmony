@@ -29,8 +29,8 @@ type MessageCategory byte
 const (
 	Consensus MessageCategory = iota
 	Node
-	Client
-	DRand
+	Client // deprecated
+	DRand  // not used
 )
 
 const (

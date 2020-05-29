@@ -179,8 +179,8 @@ func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey shard.BLSPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
+// VerifyMessageSig verify the signature of the message are valid from the signer's public key.
+func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
@@ -201,8 +201,8 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	return nil
 }
 
-// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
-func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
+// VerifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
+func (consensus *Consensus) VerifySenderKey(msg *msg_pb.Message) error {
 	senderKey := shard.BLSPublicKey{}
 
 	copy(senderKey[:], msg.GetConsensus().SenderPubkey[:])
