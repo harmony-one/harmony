@@ -616,7 +616,7 @@ func (pool *TxPool) Content() (map[common.Address]types.PoolTransactions, map[co
 	return pending, queued
 }
 
-// Pending retrieves all currently processable transactions, grouped by origin
+// Pending retrieves all currently executable transactions, grouped by origin
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
 func (pool *TxPool) Pending() (map[common.Address]types.PoolTransactions, error) {
@@ -628,6 +628,20 @@ func (pool *TxPool) Pending() (map[common.Address]types.PoolTransactions, error)
 		pending[addr] = list.Flatten()
 	}
 	return pending, nil
+}
+
+// Queued retrieves all currently non-executable transactions, grouped by origin
+// account and sorted by nonce. The returned transaction set is a copy and can be
+// freely modified by calling code.
+func (pool *TxPool) Queued() (map[common.Address]types.PoolTransactions, error) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	queued := make(map[common.Address]types.PoolTransactions)
+	for addr, list := range pool.queue {
+		queued[addr] = list.Flatten()
+	}
+	return queued, nil
 }
 
 // Locals retrieves the accounts currently considered local by the pool.
