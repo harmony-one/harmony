@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	types2 "github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -208,7 +208,7 @@ func newRPCTransaction(
 
 // newRPCStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Hash,
+func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) *RPCStakingTransaction {
 	from, err := tx.SenderAddress()
@@ -217,13 +217,15 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 	}
 	v, r, s := tx.RawSignatureValues()
 
-	stakingTxType := tx.StakingType()
-	message := tx.StakingMessage()
 	fields := map[string]interface{}{}
 
-	switch stakingTxType {
-	case types2.DirectiveCreateValidator:
-		msg, ok := message.(types2.CreateValidator)
+	switch tx.StakingType() {
+	case staking.DirectiveCreateValidator:
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCreateValidator)
+		if err != nil {
+			return nil
+		}
+		msg, ok := rawMsg.(*staking.CreateValidator)
 		if !ok {
 			return nil
 		}
@@ -246,8 +248,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"details":            msg.Description.Details,
 			"slotPubKeys":        msg.SlotPubKeys,
 		}
-	case types2.DirectiveEditValidator:
-		msg, ok := message.(types2.EditValidator)
+	case staking.DirectiveEditValidator:
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
+		if err != nil {
+			return nil
+		}
+		msg, ok := rawMsg.(*staking.EditValidator)
 		if !ok {
 			return nil
 		}
@@ -273,8 +279,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"slotPubKeyToAdd":    msg.SlotKeyToAdd,
 			"slotPubKeyToRemove": msg.SlotKeyToRemove,
 		}
-	case types2.DirectiveCollectRewards:
-		msg, ok := message.(types2.CollectRewards)
+	case staking.DirectiveCollectRewards:
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
+		if err != nil {
+			return nil
+		}
+		msg, ok := rawMsg.(*staking.CollectRewards)
 		if !ok {
 			return nil
 		}
@@ -285,8 +295,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 		}
-	case types2.DirectiveDelegate:
-		msg, ok := message.(types2.Delegate)
+	case staking.DirectiveDelegate:
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
+		if err != nil {
+			return nil
+		}
+		msg, ok := rawMsg.(*staking.Delegate)
 		if !ok {
 			return nil
 		}
@@ -303,8 +317,12 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 			"validatorAddress": validatorAddress,
 			"amount":           (*hexutil.Big)(msg.Amount),
 		}
-	case types2.DirectiveUndelegate:
-		msg, ok := message.(types2.Undelegate)
+	case staking.DirectiveUndelegate:
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
+		if err != nil {
+			return nil
+		}
+		msg, ok := rawMsg.(*staking.Undelegate)
 		if !ok {
 			return nil
 		}
@@ -332,7 +350,7 @@ func newRPCStakingTransaction(tx *types2.StakingTransaction, blockHash common.Ha
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
 		S:         (*hexutil.Big)(s),
-		Type:      stakingTxType.String(),
+		Type:      tx.StakingType().String(),
 		Msg:       fields,
 	}
 	if blockHash != (common.Hash{}) {
@@ -423,11 +441,11 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs) (map[string]interface{
 		fields["transactions"] = transactions
 
 		if blockArgs.InclStaking {
-			formatStakingTx := func(tx *types2.StakingTransaction) (interface{}, error) {
+			formatStakingTx := func(tx *staking.StakingTransaction) (interface{}, error) {
 				return tx.Hash(), nil
 			}
 			if blockArgs.FullTx {
-				formatStakingTx = func(tx *types2.StakingTransaction) (interface{}, error) {
+				formatStakingTx = func(tx *staking.StakingTransaction) (interface{}, error) {
 					return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
 				}
 			}

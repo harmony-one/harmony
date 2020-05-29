@@ -90,6 +90,7 @@ type Consensus struct {
 	// whether to ignore viewID check
 	ignoreViewIDCheck bool
 	// global consensus mutex
+	// TODO(optimization): Avoid mutex and use more efficient locking primitives
 	mutex sync.Mutex
 	// consensus information update mutex
 	infoMutex sync.Mutex
