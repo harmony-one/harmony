@@ -39,7 +39,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
-	if consensus.current.Mode() == ViewChanging {
+	if consensus.IsViewChangingMode() {
 		consensus.getLogger().Debug().
 			Msg("[OnAnnounce] Still in ViewChanging Mode, Exiting !!")
 		return
@@ -308,7 +308,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.tryCatchup()
-	if consensus.current.Mode() == ViewChanging {
+	if consensus.IsViewChangingMode() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Still in ViewChanging mode, Exiting!!")
 		return
 	}

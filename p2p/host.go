@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -15,7 +16,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_metrics "github.com/libp2p/go-libp2p-core/metrics"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_peerstore "github.com/libp2p/go-libp2p-core/peerstore"
@@ -35,12 +35,9 @@ type Host interface {
 	ConnectHostPeer(Peer) error
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-	AllTopics() []*libp2p_pubsub.Topic
+	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
-	// libp2p.metrics related
-	GetBandwidthTotals() libp2p_metrics.Stats
-	LogRecvMessage(msg []byte)
-	ResetMetrics()
+	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
 }
 
 // Peer is the object for a p2p peer (node)
@@ -52,19 +49,14 @@ type Peer struct {
 	PeerID          libp2p_peer.ID // PeerID, the pubkey for communication
 }
 
-func (p Peer) String() string {
-	BLSPubKey := "nil"
-	if p.ConsensusPubKey != nil {
-		BLSPubKey = p.ConsensusPubKey.SerializeToHexStr()
-	}
-	return fmt.Sprintf(
-		"BLSPubKey:%s-%s/%s[%d]", BLSPubKey,
-		net.JoinHostPort(p.IP, p.Port), p.PeerID, len(p.Addrs),
-	)
-}
-
 const (
-	// MaxMessageSize is the 2048Kb
+	// SetAsideForConsensus set the number of active validation goroutines for the consensus topic
+	SetAsideForConsensus = 1 << 13
+	// SetAsideOtherwise set the number of active validation goroutines for other topic
+	SetAsideOtherwise = 1 << 13
+	// MaxMessageHandlers ..
+	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
+	// MaxMessageSize is 2Mb
 	MaxMessageSize = 1 << 21
 )
 
@@ -75,6 +67,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
+
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr),
@@ -87,7 +80,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	}
 
 	options := []libp2p_pubsub.Option{
+		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
+		libp2p_pubsub.WithValidateQueueSize(512),
+		// WithPeerOutboundQueueSize is an option to set the buffer size for outbound messages to a peer. We start dropping messages to a peer if the outbound queue if full.
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
+		// WithValidateWorkers sets the number of synchronous validation worker goroutines. Defaults to NumCPU.
+		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
+		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
+		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
 		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
 	}
 
@@ -120,22 +120,20 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	newMetrics := libp2p_metrics.NewBandwidthCounter()
-
 	// has to save the private key for host
 	h := &HostV2{
-		h:       p2pHost,
-		joiner:  topicJoiner{pubsub},
-		joined:  map[string]*libp2p_pubsub.Topic{},
-		self:    *self,
-		priKey:  key,
-		logger:  &subLogger,
-		metrics: newMetrics,
+		h:      p2pHost,
+		pubsub: pubsub,
+		joined: map[string]*libp2p_pubsub.Topic{},
+		self:   *self,
+		priKey: key,
+		logger: &subLogger,
 	}
 
 	if err != nil {
 		return nil, err
 	}
+
 	utils.Logger().Info().
 		Str("self", net.JoinHostPort(self.IP, self.Port)).
 		Interface("PeerID", self.PeerID).
@@ -144,30 +142,20 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	return h, nil
 }
 
-type topicJoiner struct {
-	pubsub *libp2p_pubsub.PubSub
-}
-
-func (tj topicJoiner) JoinTopic(topic string) (*libp2p_pubsub.Topic, error) {
-	th, err := tj.pubsub.Join(topic)
-	if err != nil {
-		return nil, err
-	}
-	return th, nil
-}
-
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
 	h      libp2p_host.Host
-	joiner topicJoiner
+	pubsub *libp2p_pubsub.PubSub
 	joined map[string]*libp2p_pubsub.Topic
 	self   Peer
 	priKey libp2p_crypto.PrivKey
 	lock   sync.Mutex
-	// logger
 	logger *zerolog.Logger
-	// metrics
-	metrics *libp2p_metrics.BandwidthCounter
+}
+
+// PubSub ..
+func (host *HostV2) PubSub() *libp2p_pubsub.PubSub {
+	return host.pubsub
 }
 
 // C .. -> (total known peers, connected, not connected)
@@ -185,12 +173,13 @@ func (host *HostV2) C() (int, int, int) {
 	return len(peers), connected, not
 }
 
-func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
+// GetOrJoin ..
+func (host *HostV2) GetOrJoin(topic string) (*libp2p_pubsub.Topic, error) {
 	host.lock.Lock()
 	defer host.lock.Unlock()
 	if t, ok := host.joined[topic]; ok {
 		return t, nil
-	} else if t, err := host.joiner.JoinTopic(topic); err != nil {
+	} else if t, err := host.pubsub.Join(topic); err != nil {
 		return nil, errors.Wrapf(err, "cannot join pubsub topic %x", topic)
 	} else {
 		host.joined[topic] = t
@@ -203,24 +192,23 @@ func (host *HostV2) getTopic(topic string) (*libp2p_pubsub.Topic, error) {
 // message for sending.
 func (host *HostV2) SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) (err error) {
 
+	if len(msg) == 0 {
+		return errors.New("cannot send out empty message")
+	}
+
 	for _, group := range groups {
-		t, e := host.getTopic(string(group))
+		t, e := host.GetOrJoin(string(group))
 		if e != nil {
 			err = e
 			continue
 		}
+
 		e = t.Publish(context.Background(), msg)
 		if e != nil {
 			err = e
 			continue
 		}
-		// log out-going metrics
-		host.metrics.LogSentMessage(int64(len(msg)))
 	}
-	host.logger.Debug().
-		Int64("TotalOut", host.GetBandwidthTotals().TotalOut).
-		Float64("RateOut", host.GetBandwidthTotals().RateOut).
-		Msg("[metrics][p2p] traffic out in bytes")
 
 	return err
 }
@@ -277,21 +265,6 @@ func (host *HostV2) GetPeerCount() int {
 	return host.h.Peerstore().Peers().Len()
 }
 
-// GetBandwidthTotals returns total bandwidth of a node
-func (host *HostV2) GetBandwidthTotals() libp2p_metrics.Stats {
-	return host.metrics.GetBandwidthTotals()
-}
-
-// LogRecvMessage logs received message on node
-func (host *HostV2) LogRecvMessage(msg []byte) {
-	host.metrics.LogRecvMessage(int64(len(msg)))
-}
-
-// ResetMetrics resets metrics counters
-func (host *HostV2) ResetMetrics() {
-	host.metrics.Reset()
-}
-
 // ConnectHostPeer connects to peer host
 func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	ctx := context.Background()
@@ -314,15 +287,11 @@ func (host *HostV2) ConnectHostPeer(peer Peer) error {
 	return nil
 }
 
-// AllTopics ..
-func (host *HostV2) AllTopics() []*libp2p_pubsub.Topic {
-	host.lock.Lock()
-	defer host.lock.Unlock()
-	topics := []*libp2p_pubsub.Topic{}
-	for _, g := range host.joined {
-		topics = append(topics, g)
-	}
-	return topics
+// NamedTopic represents pubsub topic
+// Name is the human readable topic, groupID
+type NamedTopic struct {
+	Name  string
+	Topic *libp2p_pubsub.Topic
 }
 
 // ConstructMessage constructs the p2p message as [messageType, contentSize, content]

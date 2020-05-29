@@ -191,51 +191,6 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls_core.PublicKey, message *msg_pb.Message) error {
-	signature := message.Signature
-	message.Signature = nil
-	// TODO(audit): do not marshal message again here.
-	messageBytes, err := protobuf.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	msgSig := bls_core.Sign{}
-	err = msgSig.Deserialize(signature)
-	if err != nil {
-		return err
-	}
-	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
-		return errors.New("failed to verify the signature")
-	}
-	message.Signature = signature
-	return nil
-}
-
-// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
-func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
-	senderKey := bls.SerializedPublicKey{}
-
-	copy(senderKey[:], msg.GetConsensus().SenderPubkey[:])
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return shard.ErrValidNotInCommittee
-	}
-	return nil
-}
-
-func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) error {
-	vcMsg := msg.GetViewchange()
-	senderKey := bls.SerializedPublicKey{}
-	copy(senderKey[:], vcMsg.SenderPubkey)
-
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return shard.ErrValidNotInCommittee
-	}
-	return nil
-}
-
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
