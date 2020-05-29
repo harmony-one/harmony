@@ -79,9 +79,6 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.Equal(t, uint64(0), consensus.viewID)
 	assert.Equal(t, uint32(shard.BeaconChainShardID), consensus.ShardID)
 
-	assert.IsType(t, make(chan []byte), consensus.MsgChan)
-	assert.NotNil(t, consensus.MsgChan)
-
 	assert.IsType(t, make(chan struct{}), consensus.syncReadyChan)
 	assert.NotNil(t, consensus.syncReadyChan)
 
