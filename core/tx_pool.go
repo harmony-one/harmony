@@ -616,7 +616,7 @@ func (pool *TxPool) Content() (map[common.Address]types.PoolTransactions, map[co
 	return pending, queued
 }
 
-// Pending retrieves all currently processable transactions, grouped by origin
+// Pending retrieves all currently executable transactions, grouped by origin
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
 func (pool *TxPool) Pending() (map[common.Address]types.PoolTransactions, error) {
@@ -628,6 +628,20 @@ func (pool *TxPool) Pending() (map[common.Address]types.PoolTransactions, error)
 		pending[addr] = list.Flatten()
 	}
 	return pending, nil
+}
+
+// Queued retrieves all currently non-executable transactions, grouped by origin
+// account and sorted by nonce. The returned transaction set is a copy and can be
+// freely modified by calling code.
+func (pool *TxPool) Queued() (map[common.Address]types.PoolTransactions, error) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	queued := make(map[common.Address]types.PoolTransactions)
+	for addr, list := range pool.queue {
+		queued[addr] = list.Flatten()
+	}
+	return queued, nil
 }
 
 // Locals retrieves the accounts currently considered local by the pool.
@@ -1262,7 +1276,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas)
-		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+		drops, _ := list.FilterCost(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
@@ -1435,14 +1449,25 @@ func (pool *TxPool) demoteUnexecutables() {
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
-		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+		drops, invalids := list.FilterCost(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+		// Drop all staking transactions that are now invalid, queue any invalids back for later
+		stakingDrops, stakingInvalids := list.Filter(func(tx types.PoolTransaction) bool {
+			if _, ok := tx.(*staking.StakingTransaction); !ok {
+				// Do not remove anything other than staking transactions
+				return false
+			}
+			err := pool.validateTx(tx, false)
+			return err != nil
+		})
+		drops = append(drops, stakingDrops...)
+		invalids = append(invalids, stakingInvalids...)
 		for _, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
-			pool.txErrorSink.Add(tx, fmt.Errorf("removed unpayable pending transaction"))
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable pending transaction")
+			pool.txErrorSink.Add(tx, fmt.Errorf("removed unexecutable pending transaction"))
+			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unexecutable pending transaction")
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
@@ -1451,7 +1476,7 @@ func (pool *TxPool) demoteUnexecutables() {
 				pool.txErrorSink.Add(tx, err)
 			}
 		}
-		// If there's a gap in front, alert (should never happen) and postpone all transactions
+		// If there's a gap in front, alert (should never happen)
 		if list.Len() > 0 && list.txs.Get(nonce) == nil {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()

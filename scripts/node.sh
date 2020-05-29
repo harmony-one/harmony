@@ -530,7 +530,7 @@ any_new_binaries() {
       fi
    fi
    curl -sSf http://${BUCKET}.s3.amazonaws.com/${FOLDER}/md5sum.txt -o "${outdir}/md5sum.txt.new" || return $?
-   if diff $outdir/md5sum.txt.new md5sum.txt
+   if diff "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
    then
       rm "${outdir}/md5sum.txt.new"
    else
