@@ -384,59 +384,60 @@ var (
 // verify message signature
 func (node *Node) validateShardBoundMessage(
 	ctx context.Context, payload []byte,
-) (*msg_pb.Message, error) {
+) (*msg_pb.Message, *bls.PublicKey, error) {
 	var (
 		m         msg_pb.Message
 		senderKey *bls.PublicKey
 	)
+	entryTime := time.Now()
+	defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 	var senderPubKeyViaWire []byte
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
-			return nil, errors.WithStack(errWrongShardID)
+			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
-			return nil, errors.WithStack(errWrongShardID)
+			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 	} else {
-		return nil, errors.WithStack(errNoSenderPubKey)
+		return nil, nil, errors.WithStack(errNoSenderPubKey)
 	}
 
 	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
-		return nil, errors.WithStack(errNotRightKeySize)
+		return nil, nil, errors.WithStack(errNotRightKeySize)
 	}
 
 	err := node.Consensus.VerifySenderKey(&m)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
-	// TODO: do pubkey deserialization only once, expose the pubkey to
-	// all message handlers
+
 	key, err := bls_cosi.BytesToBLSPublicKey(
 		senderPubKeyViaWire,
 	)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 	senderKey = key
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
-		return nil, errors.WithStack(shard.ErrValidNotInCommittee)
+		return nil, nil, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
-		return nil, errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 
-	return &m, nil
+	return &m, senderKey, nil
 }
 
 var (
@@ -497,6 +498,7 @@ func (node *Node) Start() error {
 	type p2pHandlerConsensus func(
 		ctx context.Context,
 		msg *msg_pb.Message,
+		key *bls.PublicKey,
 	) error
 
 	// other p2p message handler function
@@ -512,6 +514,7 @@ func (node *Node) Start() error {
 		handleCArg     *msg_pb.Message
 		handleE        p2pHandlerElse
 		handleEArg     []byte
+		senderPubKey   *bls.PublicKey
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
@@ -564,7 +567,7 @@ func (node *Node) Start() error {
 					}
 
 					// validate consensus message
-					validMsg, err := node.validateShardBoundMessage(
+					validMsg, senderPubKey, err := node.validateShardBoundMessage(
 						context.TODO(), openBox[proto.MessageCategoryBytes:],
 					)
 
@@ -577,6 +580,7 @@ func (node *Node) Start() error {
 						consensusBound: true,
 						handleC:        node.Consensus.HandleMessageUpdate,
 						handleCArg:     validMsg,
+						senderPubKey:   senderPubKey,
 					}
 					return true
 
@@ -624,7 +628,7 @@ func (node *Node) Start() error {
 									errChan <- withError{err, nil}
 								}
 							} else {
-								if err := msg.handleC(ctx, msg.handleCArg); err != nil {
+								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
 									errChan <- withError{err, nil}
 								}
 							}
