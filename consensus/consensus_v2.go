@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -18,8 +19,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	errSenderPubKeyNotLeader = errors.New("sender pubkey doesn't match leader")
+)
+
 // HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message) error {
+func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -36,17 +41,24 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
-	case t == msg_pb.MessageType_ANNOUNCE &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
+	case t == msg_pb.MessageType_ANNOUNCE && intendedForValidator:
+
+		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
+			return errSenderPubKeyNotLeader
+		}
 		consensus.onAnnounce(msg)
-	case t == msg_pb.MessageType_PREPARED &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
+	case t == msg_pb.MessageType_PREPARED && intendedForValidator:
+		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
+			return errSenderPubKeyNotLeader
+		}
 		consensus.onPrepared(msg)
-	case t == msg_pb.MessageType_COMMITTED &&
-		intendedForValidator &&
-		consensus.validatorSanityChecks(msg):
+	case t == msg_pb.MessageType_COMMITTED && intendedForValidator:
+		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
+			return errSenderPubKeyNotLeader
+		}
 		consensus.onCommitted(msg)
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE &&
