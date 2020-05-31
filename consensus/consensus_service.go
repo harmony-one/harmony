@@ -21,6 +21,31 @@ import (
 	"github.com/rs/zerolog"
 )
 
+func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message, senderKey *bls.PublicKey) bool {
+	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
+		consensus.getLogger().Warn().Msgf(
+			"[%s] SenderKey not match leader PubKey",
+			msg.GetType().String(),
+		)
+		return false
+	}
+
+	return consensus.senderKeySanityChecks(msg, senderKey)
+}
+
+func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey *bls.PublicKey) bool {
+	if err := VerifyMessageSig(senderKey, msg); err != nil {
+		consensus.getLogger().Error().Err(err).Msgf(
+			"[%s] Failed to verify sender's signature",
+			msg.GetType().String(),
+		)
+		return false
+	}
+
+	return true
+}
+
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
 func (consensus *Consensus) WaitForNewRandomness() {
 	go func() {
