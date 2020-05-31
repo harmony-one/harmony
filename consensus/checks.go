@@ -11,50 +11,6 @@ import (
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
 
-func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
-	if msg.GetConsensus() == nil {
-		consensus.getLogger().Warn().Msg("[validatorSanityChecks] malformed message")
-		return false
-	}
-	consensus.getLogger().Debug().
-		Uint64("blockNum", msg.GetConsensus().BlockNum).
-		Uint64("viewID", msg.GetConsensus().ViewId).
-		Str("msgType", msg.Type.String()).
-		Msg("[validatorSanityChecks] Checking new message")
-	err := consensus.VerifySenderKey(msg)
-	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
-				Hex("senderKey", msg.GetConsensus().SenderPubkey).
-				Msg("sender key not in this slot's subcommittee")
-		} else {
-			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
-		}
-		return false
-	}
-	senderKey, err := bls.BytesToBLSPublicKey(msg.GetConsensus().SenderPubkey)
-	if err != nil {
-		return false
-	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
-		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		consensus.getLogger().Warn().Msgf(
-			"[%s] SenderKey not match leader PubKey",
-			msg.GetType().String(),
-		)
-		return false
-	}
-
-	if err := VerifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msg(
-			"Failed to verify sender's signature",
-		)
-		return false
-	}
-
-	return true
-}
-
 func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 	if msg.GetConsensus() == nil {
 		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")

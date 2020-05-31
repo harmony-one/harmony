@@ -42,37 +42,35 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
-	case t == msg_pb.MessageType_ANNOUNCE && intendedForValidator:
-
-		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
-			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
-			return errSenderPubKeyNotLeader
-		}
+	case t == msg_pb.MessageType_ANNOUNCE &&
+		intendedForValidator &&
+		consensus.validatorSanityChecks(msg, senderKey):
 		consensus.onAnnounce(msg)
-	case t == msg_pb.MessageType_PREPARED && intendedForValidator:
-		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
-			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
-			return errSenderPubKeyNotLeader
-		}
+	case t == msg_pb.MessageType_PREPARED &&
+		intendedForValidator &&
+		consensus.validatorSanityChecks(msg, senderKey):
 		consensus.onPrepared(msg)
-	case t == msg_pb.MessageType_COMMITTED && intendedForValidator:
-		if !senderKey.IsEqual(consensus.LeaderPubKey) &&
-			consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
-			return errSenderPubKeyNotLeader
-		}
+	case t == msg_pb.MessageType_COMMITTED &&
+		intendedForValidator &&
+		consensus.validatorSanityChecks(msg, senderKey):
 		consensus.onCommitted(msg)
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE &&
-		intendedForLeader:
+		intendedForLeader &&
+		consensus.senderKeySanityChecks(msg, senderKey):
 		consensus.onPrepare(msg)
 	case t == msg_pb.MessageType_COMMIT &&
-		intendedForLeader:
+		intendedForLeader &&
+		consensus.senderKeySanityChecks(msg, senderKey):
 		consensus.onCommit(msg)
-	case t == msg_pb.MessageType_VIEWCHANGE:
+	case t == msg_pb.MessageType_VIEWCHANGE &&
+		consensus.senderKeySanityChecks(msg, senderKey):
 		consensus.onViewChange(msg)
-	case t == msg_pb.MessageType_NEWVIEW:
+	case t == msg_pb.MessageType_NEWVIEW &&
+		consensus.senderKeySanityChecks(msg, senderKey):
 		consensus.onNewView(msg)
 	}
+
 	return nil
 }
 

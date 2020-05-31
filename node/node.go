@@ -433,10 +433,6 @@ func (node *Node) validateShardBoundMessage(
 		return nil, nil, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
-	if err := consensus.VerifyMessageSig(senderKey, &m); err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
 	return &m, senderKey, nil
 }
 
