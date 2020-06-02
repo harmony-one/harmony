@@ -17,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -213,60 +212,6 @@ func (bc *BlockChain) CommitOffChainData(
 			utils.Logger().
 				Err(err).
 				Msg("[UpdateValidatorVotingPower] Failed to decode shard state")
-		}
-		// let's fix previous aprs at the epoch transition from 191 to 192
-		// this code will be removed after the rolling upgrade
-		stakingEpoch := bc.Config().StakingEpoch
-		secondStakingEpoch := big.NewInt(0).Add(stakingEpoch, common.Big1)
-		fixEpoch := big.NewInt(0).Add(stakingEpoch, big.NewInt(5)) // epoch 191
-		isFixEpoch := block.Epoch().Cmp(fixEpoch) == 0
-		fixEpochPlus := big.NewInt(0).Add(fixEpoch, common.Big1) // epoch 192
-		if isFixEpoch {
-			validators, _ := bc.ReadValidatorList()
-			for _, addr := range validators {
-				// loop for epochs 187->191
-				reset := false
-				for i := secondStakingEpoch.Int64(); i <= fixEpochPlus.Int64(); i++ {
-					epoch := big.NewInt(i)
-					// read snapshot to be used as wrapper
-					if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
-						epoch, addr,
-					); err == nil {
-						oneEpochAgo := big.NewInt(i - 1)
-						shardState, _ := bc.ReadShardState(oneEpochAgo)
-						committee := shardState.StakedValidators()
-						if _, elected := committee.LookupSet[addr]; !elected {
-							continue
-						}
-						epochLastBlock := bc.GetBlockByNumber(
-							shard.Schedule.EpochLastBlock(oneEpochAgo.Uint64()),
-						)
-						if epochLastBlock == nil || block.Epoch().Cmp(oneEpochAgo) == 0 {
-							epochLastBlock = block
-						}
-						if epochLastBlock != nil {
-							if aprComputed, err := apr.ComputeForValidator(
-								bc, epochLastBlock, snapshot.Validator,
-							); err == nil {
-								stats, ok := tempValidatorStats[addr]
-								if !ok {
-									stats, err = bc.ReadValidatorStats(addr)
-									if err != nil {
-										continue
-									}
-								}
-								if !reset {
-									// ignore the previous aprs and reinitialize it
-									reset = true
-									stats.APRs = []staking.APREntry{}
-								}
-								stats.APRs = append(stats.APRs, staking.APREntry{oneEpochAgo, *aprComputed})
-								tempValidatorStats[addr] = stats
-							}
-						}
-					}
-				}
-			}
 		}
 	}
 
