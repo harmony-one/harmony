@@ -1996,10 +1996,11 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(bytes) == 0 {
+		by, err := rawdb.ReadPendingCrossLinks(bc.db)
+		if err != nil || len(by) == 0 {
 			return nil, err
 		}
+		bytes = by
 	}
 	cls := []types.CrossLink{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
