@@ -387,6 +387,10 @@ dryrun)
   bootnodes=(
     /ip4/54.86.126.90/tcp/9909/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv
     /ip4/52.40.84.2/tcp/9909/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29
+    /ip4/3.21.240.96/tcp/9000/p2p/QmXPqqVy8ZARufr4dFsz21ToDm8NefHbxmFCArqWcnymUo
+    /ip4/54.70.135.85/tcp/9000/p2p/QmNmURRNuYnHJd8rKQ9FNtvraEbP8R7UAxDXUqUGKnTaaR
+    /ip4/13.52.79.16/tcp/9000/p2p/QmeR41B4p8VAPZwVEhe5DohaTKE4fhTCBzXea5XXEdybma
+    /ip4/54.226.180.154/tcp/9000/p2p/QmWNvjjWtvff6WqVTLJKgLKuY77cE4L8tURdHH1ih6Hvds
   )
   REL=DRY
   network_type=mainnet
