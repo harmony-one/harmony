@@ -64,7 +64,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 
 		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
 			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
-			return err
 		}
 	}
 	if err := consensus.msgSender.SendWithRetry(
