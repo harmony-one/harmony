@@ -12,6 +12,10 @@ const (
 	mainnetEpochBlock1 = 344064 // 21 * 2^14
 	blocksPerEpoch     = 16384  // 2^14
 
+	shortEpochFirstBlock      = 3534600 // TBD
+	blocksPerShortEpoch       = 225     // 1/2 hour
+	lastEpochBeforeShortEpoch = 195
+
 	mainnetVdfDifficulty  = 50000 // This takes about 100s to finish the vdf
 	mainnetConsensusRatio = float64(0.1)
 
@@ -29,8 +33,8 @@ const (
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
 	mainnetV2_0Epoch = 185 // prestaking epoch
-	mainnetV2_1Epoch = 300 // open slots increase from 320 - 480  (TODO): update the epoch
-	mainnetV2_2Epoch = 300 // open slots increase from 480 - 640  (TODO): update the epoch
+	mainnetV2_1Epoch = 196 // open slots increase from 320 - 480  (TODO): update the epoch
+	mainnetV2_2Epoch = 197 // open slots increase from 480 - 640  (TODO): update the epoch
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.dry.hmny.io"
@@ -93,33 +97,58 @@ func (mainnetSchedule) BlocksPerEpoch() uint64 {
 
 func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case blockNum >= mainnetEpochBlock1:
-		return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
-	default:
-		return big.NewInt(0)
+	if blockNum < shortEpochFirstBlock {
+		switch {
+		case blockNum >= mainnetEpochBlock1:
+			return big.NewInt(int64((blockNum-mainnetEpochBlock1)/blocks) + 1)
+		default:
+			return big.NewInt(0)
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerShortEpoch)
+		return big.NewInt(int64((blockNum-shortEpochFirstBlock)/stakingBlocks) + lastEpochBeforeShortEpoch + 1)
 	}
 }
 
 func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case blockNum < mainnetEpochBlock1-1:
-		return false
-	case blockNum == mainnetEpochBlock1-1:
-		return true
-	default:
-		return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
+	if blockNum < shortEpochFirstBlock-1 {
+		switch {
+		case blockNum < mainnetEpochBlock1-1:
+			return false
+		case blockNum == mainnetEpochBlock1-1:
+			return true
+		default:
+			return ((blockNum-mainnetEpochBlock1)%blocks == blocks-1)
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerShortEpoch)
+		switch {
+		case blockNum == shortEpochFirstBlock-1:
+			return true
+		default:
+			return ((blockNum-shortEpochFirstBlock)%stakingBlocks == stakingBlocks-1)
+		}
 	}
 }
 
 func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	blocks := ms.BlocksPerEpoch()
-	switch {
-	case epochNum == 0:
-		return mainnetEpochBlock1 - 1
-	default:
-		return mainnetEpochBlock1 - 1 + blocks*epochNum
+	if epochNum < lastEpochBeforeShortEpoch {
+		switch {
+		case epochNum == 0:
+			return mainnetEpochBlock1 - 1
+		default:
+			return mainnetEpochBlock1 - 1 + blocks*epochNum
+		}
+	} else {
+		stakingBlocks := uint64(blocksPerShortEpoch)
+		switch {
+		case epochNum == lastEpochBeforeShortEpoch:
+			return shortEpochFirstBlock - 1
+		default:
+			return shortEpochFirstBlock - 1 + stakingBlocks*(epochNum-lastEpochBeforeShortEpoch)
+		}
 	}
 }
 
