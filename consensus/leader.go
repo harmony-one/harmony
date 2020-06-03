@@ -71,7 +71,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 			consensus.getLogger().Warn().Err(err).Msg(
 				"[Announce] Leader prepareBitmap SetKey failed",
 			)
-			return
 		}
 	}
 	// Construct broadcast p2p message
