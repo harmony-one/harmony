@@ -482,7 +482,7 @@ func (node *Node) BootstrapConsensus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	min := node.Consensus.MinPeers
-	needFriends := make(chan struct{})
+	enoughMinPeers := make(chan struct{})
 	const checkEvery = 3 * time.Second
 	go func() {
 		for {
@@ -490,7 +490,7 @@ func (node *Node) BootstrapConsensus() error {
 			numPeersNow := node.host.GetPeerCount()
 			if numPeersNow >= min {
 				utils.Logger().Info().Msg("[bootstrap] StartConsensus")
-				needFriends <- struct{}{}
+				enoughMinPeers <- struct{}{}
 				return
 			}
 			utils.Logger().Info().
@@ -504,7 +504,7 @@ func (node *Node) BootstrapConsensus() error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-needFriends:
+	case <-enoughMinPeers:
 		go func() {
 			node.startConsensus <- struct{}{}
 		}()
