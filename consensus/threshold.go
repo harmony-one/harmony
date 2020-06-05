@@ -51,6 +51,11 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
 	for i, key := range consensus.PubKey.PublicKey {
+		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+			continue
+		}
+
 		if _, err := consensus.Decider.SubmitVote(
 			quorum.Commit,
 			key,
@@ -60,10 +65,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			blockObj.Header().ViewID().Uint64(),
 		); err != nil {
 			return err
-		}
-
-		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
-			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
 		}
 	}
 	if err := consensus.msgSender.SendWithRetry(
@@ -75,7 +76,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Hex("blockHash", consensus.blockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] Sent Prepared Message!!")

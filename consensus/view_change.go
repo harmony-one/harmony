@@ -211,9 +211,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			for i, key := range consensus.PubKey.PublicKey {
+				if err := consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true); err != nil {
+					consensus.getLogger().Warn().Msgf("[onViewChange] bhpBitmap setkey failed for key at index %d", i)
+					continue
+				}
 				priKey := consensus.priKey.PrivateKey[i]
 				consensus.bhpSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(msgToSign)
-				consensus.bhpBitmap[recvMsg.ViewID].SetKey(key, true)
 			}
 			// if m1Payload is empty, we just add one
 			if len(consensus.m1Payload) == 0 {
@@ -222,9 +225,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
 			for i, key := range consensus.PubKey.PublicKey {
+				if err := consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true); err != nil {
+					consensus.getLogger().Warn().Msgf("[onViewChange] nilBitmap setkey failed for key at index %d", i)
+					continue
+				}
 				priKey := consensus.priKey.PrivateKey[i]
 				consensus.nilSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(NIL)
-				consensus.nilBitmap[recvMsg.ViewID].SetKey(key, true)
 			}
 		}
 	}
@@ -411,6 +417,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 			for i, key := range consensus.PubKey.PublicKey {
+				if err := consensus.commitBitmap.SetKey(key, true); err != nil {
+					consensus.getLogger().Debug().
+						Msg("[OnViewChange] New Leader commit bitmap set failed")
+					continue
+				}
+
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
 					quorum.Commit,
@@ -424,11 +436,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 					return
 				}
 
-				if err := consensus.commitBitmap.SetKey(key, true); err != nil {
-					consensus.getLogger().Debug().
-						Msg("[OnViewChange] New Leader commit bitmap set failed")
-					return
-				}
 			}
 		}
 
