@@ -421,8 +421,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 			for i, key := range consensus.PubKey.PublicKey {
 				if err := consensus.commitBitmap.SetKey(key, true); err != nil {
-					consensus.getLogger().Debug().
-						Msg("[OnViewChange] New Leader commit bitmap set failed")
+					consensus.getLogger().Warn().
+						Msgf("[OnViewChange] New Leader commit bitmap set failed for key at index %d", i)
 					continue
 				}
 

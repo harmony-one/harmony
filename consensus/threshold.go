@@ -52,7 +52,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	// in prepare and so this is the actual block.
 	for i, key := range consensus.PubKey.PublicKey {
 		if err := consensus.commitBitmap.SetKey(key, true); err != nil {
-			consensus.getLogger().Debug().Msg("[OnPrepare] Leader commit bitmap set failed")
+			consensus.getLogger().Warn().Msgf("[OnPrepare] Leader commit bitmap set failed for key at index %d", i)
 			continue
 		}
 
