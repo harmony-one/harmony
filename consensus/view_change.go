@@ -240,9 +240,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 		for i, key := range consensus.PubKey.PublicKey {
+			if err := consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key, true); err != nil {
+				consensus.getLogger().Warn().Msgf("[onViewChange] viewIDBitmap setkey failed for key at index %d", i)
+				continue
+			}
 			priKey := consensus.priKey.PrivateKey[i]
 			consensus.viewIDSigs[recvMsg.ViewID][key.SerializeToHexStr()] = priKey.SignHash(viewIDBytes)
-			consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key, true)
 		}
 	}
 
