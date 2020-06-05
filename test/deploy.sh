@@ -99,7 +99,7 @@ SYNC=true
 NETWORK=localnet
 VERBOSE=false
 
-while getopts "hD:m:s:nBN:" option; do
+while getopts "hD:m:s:nBN:v" option; do
    case $option in
       h) usage ;;
       D) DURATION=$OPTARG ;;
