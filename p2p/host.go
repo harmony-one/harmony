@@ -80,7 +80,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
 		libp2p_pubsub.WithValidateQueueSize(64),
 		// WithPeerOutboundQueueSize is an option to set the buffer size for outbound messages to a peer. We start dropping messages to a peer if the outbound queue if full.
-		libp2p_pubsub.WithPeerOutboundQueueSize(32),
+		libp2p_pubsub.WithPeerOutboundQueueSize(64),
 		// WithValidateWorkers sets the number of synchronous validation worker goroutines. Defaults to NumCPU.  We are using async validation, so NumCPU * 2.
 		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
 		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
