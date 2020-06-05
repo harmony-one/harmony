@@ -57,6 +57,13 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	for i, key := range consensus.PubKey.PublicKey {
+		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg(
+				"[Announce] Leader prepareBitmap SetKey failed",
+			)
+			continue
+		}
+
 		if _, err := consensus.Decider.SubmitVote(
 			quorum.Prepare,
 			key,
@@ -66,11 +73,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 			block.Header().ViewID().Uint64(),
 		); err != nil {
 			return
-		}
-		if err := consensus.prepareBitmap.SetKey(key, true); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg(
-				"[Announce] Leader prepareBitmap SetKey failed",
-			)
 		}
 	}
 	// Construct broadcast p2p message
