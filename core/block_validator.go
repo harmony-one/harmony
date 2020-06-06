@@ -116,7 +116,7 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 	if root := statedb.IntermediateRoot(v.config.IsS3(header.Epoch())); header.Root() != root {
 		dump, _ := rlp.EncodeToBytes(header)
 		const msg = "invalid merkle root (remote: %x local: %x, rlp dump %s)"
-		return errors.Errorf(msg, header.Root(), root, hex.EncodeToString(dump))
+		return fmt.Errorf(msg, header.Root(), root, hex.EncodeToString(dump))
 	}
 	return nil
 }
@@ -125,6 +125,9 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.DB, re
 // given engine. Verifying the seal may be done optionally here, or explicitly
 // via the VerifySeal method.
 func (v *BlockValidator) ValidateHeader(block *types.Block, seal bool) error {
+	if block == nil {
+		return errors.New("block is nil")
+	}
 	if h := block.Header(); h != nil {
 		return v.engine.VerifyHeader(v.bc, h, true)
 	}

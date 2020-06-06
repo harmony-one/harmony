@@ -1996,10 +1996,11 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(bytes) == 0 {
+		by, err := rawdb.ReadPendingCrossLinks(bc.db)
+		if err != nil || len(by) == 0 {
 			return nil, err
 		}
+		bytes = by
 	}
 	cls := []types.CrossLink{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {
@@ -2317,6 +2318,13 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 				} else {
 					stats.BootedStatus = effective.LostEPoSAuction
 				}
+
+				// compute APR for the exiting validators
+				if err := bc.ComputeAndUpdateAPR(
+					block, currentEpochSuperCommittee.Epoch, wrapper, stats,
+				); err != nil {
+					return nil, err
+				}
 			}
 			validatorStats[currentValidator] = stats
 		}
@@ -2375,46 +2383,57 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 		}
 
-		// This means it's already in staking epoch
+		// This means it's already in staking epoch, and
+		// compute APR for validators in current committee only
 		if currentEpochSuperCommittee.Epoch != nil {
-			wrapper, err := state.ValidatorWrapper(key)
-			if err != nil {
-				return nil, err
-			}
-
-			if wrapper.Delegations[0].Amount.Cmp(common.Big0) > 0 {
-				if aprComputed, err := apr.ComputeForValidator(
-					bc, block, wrapper,
-				); err != nil {
-					if errors.Cause(err) == apr.ErrInsufficientEpoch {
-						utils.Logger().Info().Err(err).Msg("apr could not be computed")
-					} else {
-						return nil, err
-					}
-				} else {
-					now := currentEpochSuperCommittee.Epoch
-					// only insert if APR for current epoch does not exists
-					aprEntry := staking.APREntry{now, *aprComputed}
-					l := len(stats.APRs)
-					// first time inserting apr for validator or
-					// apr for current epoch does not exists
-					// check the last entry's epoch, if not same, insert
-					if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
-						stats.APRs = append(stats.APRs, aprEntry)
-					}
-					// if history is more than staking.APRHistoryLength, pop front
-					if l > staking.APRHistoryLength {
-						stats.APRs = stats.APRs[1:]
-					}
+			if _, ok := existing.LookupSet[key]; ok {
+				wrapper, err := state.ValidatorWrapper(key)
+				if err != nil {
+					return nil, err
 				}
-			} else {
-				utils.Logger().Info().Msg("zero total delegation, skipping apr computation")
+
+				if err := bc.ComputeAndUpdateAPR(
+					block, currentEpochSuperCommittee.Epoch, wrapper, stats,
+				); err != nil {
+					return nil, err
+				}
 			}
 		}
 		validatorStats[key] = stats
 	}
 
 	return validatorStats, nil
+}
+
+// ComputeAndUpdateAPR ...
+func (bc *BlockChain) ComputeAndUpdateAPR(
+	block *types.Block, now *big.Int,
+	wrapper *staking.ValidatorWrapper, stats *staking.ValidatorStats,
+) error {
+	if aprComputed, err := apr.ComputeForValidator(
+		bc, block, wrapper,
+	); err != nil {
+		if errors.Cause(err) == apr.ErrInsufficientEpoch {
+			utils.Logger().Info().Err(err).Msg("apr could not be computed")
+		} else {
+			return err
+		}
+	} else {
+		// only insert if APR for current epoch does not exists
+		aprEntry := staking.APREntry{now, *aprComputed}
+		l := len(stats.APRs)
+		// first time inserting apr for validator or
+		// apr for current epoch does not exists
+		// check the last entry's epoch, if not same, insert
+		if l == 0 || stats.APRs[l-1].Epoch.Cmp(now) != 0 {
+			stats.APRs = append(stats.APRs, aprEntry)
+		}
+		// if history is more than staking.APRHistoryLength, pop front
+		if l > staking.APRHistoryLength {
+			stats.APRs = stats.APRs[1:]
+		}
+	}
+	return nil
 }
 
 // UpdateValidatorSnapshots updates the content snapshot of all validators

@@ -172,6 +172,9 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
+	if header == nil {
+		return errors.New("[VerifySeal] nil block header")
+	}
 	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
 
 	if err != nil {
@@ -189,8 +192,8 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	parentHash := header.ParentHash()
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
 	if parentHeader == nil {
-		return errors.Errorf(
-			"[VerifySeal] no parent header found for block %x at %d", header.Hash(), header.Number().Uint64(),
+		return errors.New(
+			"[VerifySeal] no parent header found",
 		)
 	}
 	if chain.Config().IsStaking(parentHeader.Epoch()) {
@@ -332,10 +335,14 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
+		lockPeriod := staking.LockPeriodInEpoch
+		if chain.Config().IsQuickUnlock(header.Epoch()) {
+			lockPeriod = staking.LockPeriodInEpochV2
+		}
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod,
 			)
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}

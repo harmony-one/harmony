@@ -18,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -183,9 +182,6 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.Bloc
 
 // GetValidators returns validators list for a particular epoch.
 func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (map[string]interface{}, error) {
-	if err := s.isBeaconShard(); err != nil {
-		return nil, err
-	}
 	committee, err := s.b.GetValidators(big.NewInt(epoch))
 	if err != nil {
 		return nil, err
@@ -217,6 +213,20 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	return result, nil
 }
 
+// GetValidatorKeys returns list of bls public keys in the committee for a particular epoch.
+func (s *PublicBlockChainAPI) GetValidatorKeys(ctx context.Context, epoch int64) ([]string, error) {
+	committee, err := s.b.GetValidators(big.NewInt(epoch))
+	if err != nil {
+		return nil, err
+	}
+
+	validators := make([]string, len(committee.Slots))
+	for i, v := range committee.Slots {
+		validators[i] = v.BLSPublicKey.Hex()
+	}
+	return validators, nil
+}
+
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -241,33 +251,12 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
 		return nil, err
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	slots, mask, err := s.b.GetBlockSigners(ctx, blockNr)
 	if err != nil {
 		return nil, err
 	}
-	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
-	if err != nil {
-		return nil, err
-	}
-	committee, err := s.b.GetValidators(block.Epoch())
-	if err != nil {
-		return nil, err
-	}
-	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
-	for i, validator := range committee.Slots {
-		pubkeys[i] = new(bls.PublicKey)
-		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
-	}
-	mask, err := internal_bls.NewMask(pubkeys, nil)
-	if err != nil {
-		return nil, err
-	}
-	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
-	if err != nil {
-		return nil, err
-	}
-	result := []string{}
-	for _, validator := range committee.Slots {
+	signers := []string{}
+	for _, validator := range slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return nil, err
@@ -275,10 +264,33 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 		blsPublicKey := new(bls.PublicKey)
 		validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
 		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
-			result = append(result, oneAddress)
+			signers = append(signers, oneAddress)
 		}
 	}
-	return result, nil
+	return signers, nil
+}
+
+// GetBlockSignerKeys returns bls public keys that signed the block.
+func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
+	if uint64(blockNr) == 0 {
+		return []string{}, nil
+	}
+	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+		return nil, err
+	}
+	slots, mask, err := s.b.GetBlockSigners(ctx, blockNr)
+	if err != nil {
+		return nil, err
+	}
+	signers := []string{}
+	for _, validator := range slots {
+		blsPublicKey := new(bls.PublicKey)
+		validator.BLSPublicKey.ToLibBLSPublicKey(blsPublicKey)
+		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+			signers = append(signers, validator.BLSPublicKey.Hex())
+		}
+	}
+	return signers, nil
 }
 
 // IsBlockSigner returns true if validator with address signed blockNr block.
@@ -289,32 +301,11 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.Blo
 	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
 		return false, err
 	}
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	slots, mask, err := s.b.GetBlockSigners(ctx, blockNr)
 	if err != nil {
 		return false, err
 	}
-	blockWithSigners, err := s.b.BlockByNumber(ctx, blockNr+1)
-	if err != nil {
-		return false, err
-	}
-	committee, err := s.b.GetValidators(block.Epoch())
-	if err != nil {
-		return false, err
-	}
-	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
-	for i, validator := range committee.Slots {
-		pubkeys[i] = new(bls.PublicKey)
-		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
-	}
-	mask, err := internal_bls.NewMask(pubkeys, nil)
-	if err != nil {
-		return false, err
-	}
-	err = mask.SetMask(blockWithSigners.Header().LastCommitBitmap())
-	if err != nil {
-		return false, err
-	}
-	for _, validator := range committee.Slots {
+	for _, validator := range slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return false, err
@@ -683,17 +674,16 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 			validatorsNum = len(addresses) - start
 		}
 	}
-	validators := make([]*staking.ValidatorRPCEnhanced, validatorsNum)
+	validators := []*staking.ValidatorRPCEnhanced{}
 	block, err := s.b.BlockByNumber(ctx, rpc.BlockNumber(blockNr))
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the block information for block number: %d", blockNr)
 	}
 	for i := start; i < start+validatorsNum; i++ {
 		information, err := s.b.GetValidatorInformation(addresses[i], block)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			validators = append(validators, information)
 		}
-		validators[i-start] = information
 	}
 	return validators, nil
 }

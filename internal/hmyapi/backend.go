@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
@@ -81,6 +82,7 @@ type Backend interface {
 	GetLastCrossLinks() ([]*types.CrossLink, error)
 	GetLatestChainHeaders() *block.HeaderPair
 	GetNodeMetadata() commonRPC.NodeMetadata
+	GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
 }
 
 // GetAPIs returns all the APIs.

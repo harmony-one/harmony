@@ -62,7 +62,7 @@ var (
 	errDuplicateSlotKeys       = errors.New("slot keys can not have duplicates")
 	// ErrExcessiveBLSKeys ..
 	ErrExcessiveBLSKeys        = errors.New("more slot keys provided than allowed")
-	errCannotChangeBannedTaint = errors.New("cannot change validator banned status")
+	errCannotChangeBannedTrait = errors.New("cannot change validator banned status")
 )
 
 // ValidatorSnapshotReader ..
@@ -157,6 +157,7 @@ type AccumulatedOverLifetime struct {
 	BlockReward *big.Int    `json:"reward-accumulated"`
 	Signing     counters    `json:"blocks"`
 	APR         numeric.Dec `json:"apr"`
+	EpochAPRs   []APREntry  `json:"epoch-apr"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -644,7 +645,7 @@ func UpdateValidatorFromEditMsg(validator *Validator, edit *EditValidator, epoch
 
 	switch validator.Status {
 	case effective.Banned:
-		return errCannotChangeBannedTaint
+		return errCannotChangeBannedTrait
 	default:
 		switch edit.EPOSStatus {
 		case effective.Active, effective.Inactive:

@@ -36,8 +36,6 @@ type Consensus struct {
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
-	// channel to receive consensus message
-	MsgChan chan []byte
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
@@ -90,6 +88,7 @@ type Consensus struct {
 	// whether to ignore viewID check
 	ignoreViewIDCheck bool
 	// global consensus mutex
+	// TODO(optimization): Avoid mutex and use more efficient locking primitives
 	mutex sync.Mutex
 	// consensus information update mutex
 	infoMutex sync.Mutex
@@ -202,7 +201,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.viewID = 0
 	consensus.ShardID = shard
-	consensus.MsgChan = make(chan []byte)
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)

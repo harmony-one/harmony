@@ -543,6 +543,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			return
 		}
 		hasBlock = true
+		if consensus.BlockVerifier(preparedBlock); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[onNewView] Prepared block verification failed")
+			return
+		}
 	}
 
 	if m2Mask == nil || m2Mask.Bitmap == nil ||
@@ -605,10 +609,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	// NewView message is verified, change state to normal consensus
 	if hasBlock {
 		// Construct and send the commit message
-		if consensus.BlockVerifier(preparedBlock); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[onNewView] Prepared block verification failed")
-			return
-		}
 		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
