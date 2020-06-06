@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200521.0"
+version="v1 20200606.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -339,7 +339,7 @@ mainnet)
     /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
-  REL=mainnet
+  REL=main
   network_type=mainnet
   dns_zone=t.hmny.io
   syncdir=mainnet.min
@@ -537,6 +537,7 @@ any_new_binaries() {
       mv "${outdir}/md5sum.txt.new" "${outdir}/md5sum.txt"
       return 1
    fi
+   return 0
 }
 
 if ${download_only}; then
@@ -785,8 +786,8 @@ rm_bls_pass() {
 {
    while ${loop}
    do
-      msg "re-downloading binaries in 5~10m"
-      redl_sec=$( random 300 300 )
+      msg "re-downloading binaries in 30~60m"
+      redl_sec=$( random 1800 1800 )
       sleep $redl_sec
       if any_new_binaries staging
       then
@@ -795,8 +796,8 @@ rm_bls_pass() {
       fi
       while ! download_binaries staging
       do
-         msg "staging download failed; retrying in 30~60s"
-         retry_sec=$( random 30 30 )
+         msg "staging download failed; retrying in 10~30m"
+         retry_sec=$( random 600 1200 )
          sleep $retry_sec
       done
       if diff staging/harmony-checksums.txt harmony-checksums.txt
