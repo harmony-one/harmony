@@ -77,17 +77,26 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
-	traceFile := os.Getenv("P2P_TRACEFILE")
 
-	const MaxSize = 2_145_728
+	const MaxSize = 2145728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
 		libp2p_pubsub.WithMaxMessageSize(MaxSize),
 	}
+
+	traceFile := os.Getenv("P2P_TRACEFILE")
 	if len(traceFile) > 0 {
-		tracer, _ := libp2p_pubsub.NewJSONTracer(traceFile)
-		options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+		pi, err := libp2p_peer.AddrInfoFromP2pAddr(ma.StringCast(traceFile))
+		if err == nil {
+			tracer, _ := libp2p_pubsub.NewRemoteTracer(ctx, p2pHost, *pi)
+			options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+		} else {
+			utils.Logger().Info().
+				Str("RemoteTracer", traceFile).
+				Msg("can't get address from P2P_TRACEFILE")
+		}
 	}
+
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
