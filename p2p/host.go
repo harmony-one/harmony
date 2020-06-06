@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -75,7 +76,6 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
-
 	options := []libp2p_pubsub.Option{
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
 		libp2p_pubsub.WithValidateQueueSize(64),
@@ -85,6 +85,19 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
 		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
 		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
+	}
+
+	traceFile := os.Getenv("P2P_TRACEFILE")
+	if len(traceFile) > 0 {
+		pi, err := libp2p_peer.AddrInfoFromP2pAddr(ma.StringCast(traceFile))
+		if err == nil {
+			tracer, _ := libp2p_pubsub.NewRemoteTracer(ctx, p2pHost, *pi)
+			options = append(options, libp2p_pubsub.WithEventTracer(tracer))
+		} else {
+			utils.Logger().Info().
+				Str("RemoteTracer", traceFile).
+				Msg("can't get address from P2P_TRACEFILE")
+		}
 	}
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
