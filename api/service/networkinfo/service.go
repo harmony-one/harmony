@@ -167,10 +167,6 @@ func (s *Service) Init() error {
 	utils.Logger().Info().Str("Rendezvous", string(s.Rendezvous)).Msg("Announcing ourselves...")
 	s.discovery = libp2pdis.NewRoutingDiscovery(s.dht)
 	libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-
-	// Everyone is beacon client, which means everyone is connected via beacon client topic
-	// 0 is beacon chain FIXME: use a constant
-	libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
 	utils.Logger().Info().Msg("Successfully announced!")
 
 	return nil
@@ -201,18 +197,7 @@ func (s *Service) DoService() {
 		case <-s.stopChan:
 			return
 		case <-tick.C:
-			var g sync.WaitGroup
-			g.Add(2) // 2 Advertise call
-			go func() {
-				defer g.Done()
-				libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
-			}()
-			go func() {
-				defer g.Done()
-				// 0 is beacon chain FIXME: use a constant
-				libp2pdis.Advertise(ctx, s.discovery, string(nodeconfig.NewClientGroupIDByShardID(0)))
-			}()
-			g.Wait()
+			libp2pdis.Advertise(ctx, s.discovery, string(s.Rendezvous))
 			utils.Logger().Info().
 				Str("Rendezvous", string(s.Rendezvous)).
 				Msg("Successfully announced!")
