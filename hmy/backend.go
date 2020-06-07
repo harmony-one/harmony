@@ -11,6 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // Harmony implements the Harmony full node service.
@@ -53,6 +54,7 @@ type NodeAPI interface {
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
 	PeerConnectivity() (int, int, int)
+	ListPeer(topic string) []peer.ID
 }
 
 // New creates a new Harmony object (including the

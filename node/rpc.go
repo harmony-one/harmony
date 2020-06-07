@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -46,6 +47,11 @@ func (node *Node) IsCurrentlyLeader() bool {
 // PeerConnectivity ..
 func (node *Node) PeerConnectivity() (int, int, int) {
 	return node.host.C()
+}
+
+// ListPeer return list of peers for a certain topic
+func (node *Node) ListPeer(topic string) []peer.ID {
+	return node.host.ListPeer(topic)
 }
 
 // PendingCXReceipts returns node.pendingCXReceiptsProof

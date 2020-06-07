@@ -33,6 +33,7 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 )
@@ -886,4 +887,9 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 		return nil, nil, err
 	}
 	return committee.Slots, mask, nil
+}
+
+// ListPeer return list of peerID of a certain topic
+func (b *APIBackend) ListPeer(topic string) []peer.ID {
+	return b.hmy.nodeAPI.ListPeer(topic)
 }

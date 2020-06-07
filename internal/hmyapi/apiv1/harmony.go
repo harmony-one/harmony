@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/harmony-one/harmony/api/proto"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // PublicHarmonyAPI provides an API to access Harmony related information.
@@ -46,4 +47,9 @@ func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
 func (s *PublicHarmonyAPI) GetNodeMetadata() commonRPC.NodeMetadata {
 	return s.b.GetNodeMetadata()
+}
+
+// ListPeer returns a list of peer ID for a topic
+func (s *PublicHarmonyAPI) ListPeer(topic string) []peer.ID {
+	return s.b.ListPeer(topic)
 }

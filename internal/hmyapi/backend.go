@@ -23,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 // Backend ..
@@ -83,6 +84,7 @@ type Backend interface {
 	GetLatestChainHeaders() *block.HeaderPair
 	GetNodeMetadata() commonRPC.NodeMetadata
 	GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
+	ListPeer(topic string) []peer.ID
 }
 
 // GetAPIs returns all the APIs.

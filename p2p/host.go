@@ -38,6 +38,7 @@ type Host interface {
 	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
+	ListPeer(topic string) []libp2p_peer.ID
 }
 
 // Peer is the object for a p2p peer (node)
@@ -167,6 +168,17 @@ func (host *HostV2) C() (int, int, int) {
 		}
 	}
 	return len(peers), connected, not
+}
+
+// ListPeer return list of PeerID for a certain topic
+func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
+	peers := host.joined[topic].ListPeers()
+	utils.Logger().Debug().
+		Interface("Peers", peers).
+		Str("Topic", topic).
+		Msg("ListPeer")
+
+	return peers
 }
 
 // GetOrJoin ..
