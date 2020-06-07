@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -107,6 +108,16 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 				Msg("can't add event tracer from P2P_TRACEFILE")
 		}
 	}
+
+	// set pubsub global options
+	libp2p_pubsub.GossipSubDlazy = 4
+	libp2p_pubsub.GossipSubGossipFactor = 0.15
+	libp2p_pubsub.GossipSubHeartbeatInitialDelay = 50 * time.Millisecond
+	libp2p_pubsub.GossipSubD = 5
+	libp2p_pubsub.GossipSubDlo = 4
+	libp2p_pubsub.GossipSubHistoryLength = 2
+	libp2p_pubsub.GossipSubHistoryGossip = 2
+	libp2p_pubsub.GossipSubGossipRetransmission = 2
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
