@@ -86,14 +86,22 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
 	if len(traceFile) > 0 {
-		pi, err := libp2p_peer.AddrInfoFromP2pAddr(ma.StringCast(traceFile))
-		if err == nil {
-			tracer, _ := libp2p_pubsub.NewRemoteTracer(ctx, p2pHost, *pi)
+		var tracer libp2p_pubsub.EventTracer
+		var tracerErr error
+		if strings.HasPrefix(traceFile, "file:") {
+			tracer, tracerErr = libp2p_pubsub.NewJSONTracer(strings.TrimPrefix(traceFile, "file:"))
+		} else {
+			pi, err := libp2p_peer.AddrInfoFromP2pAddr(ma.StringCast(traceFile))
+			if err == nil {
+				tracer, tracerErr = libp2p_pubsub.NewRemoteTracer(ctx, p2pHost, *pi)
+			}
+		}
+		if tracerErr == nil && tracer != nil {
 			options = append(options, libp2p_pubsub.WithEventTracer(tracer))
 		} else {
-			utils.Logger().Info().
-				Str("RemoteTracer", traceFile).
-				Msg("can't get address from P2P_TRACEFILE")
+			utils.Logger().Warn().
+				Str("Tracer", traceFile).
+				Msg("can't add event tracer from P2P_TRACEFILE")
 		}
 	}
 
