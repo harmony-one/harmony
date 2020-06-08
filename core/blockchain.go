@@ -540,7 +540,7 @@ func (bc *BlockChain) repair(head **types.Block) error {
 				Str("number", (*head).Number().String()).
 				Str("hash", (*head).Hash().Hex()).
 				Msg("Rewound blockchain to past state")
-			return nil
+			return bc.removeInValidatorList(valsToRemove)
 		}
 		// Repair last commit sigs
 		lastSig := (*head).Header().LastCommitSignature()
@@ -557,9 +557,12 @@ func (bc *BlockChain) repair(head **types.Block) error {
 				}
 			}
 		}
-		(*head) = bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
+		block := bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
+		if block == nil {
+			return fmt.Errorf("missing block %d [%x]", (*head).NumberU64()-1, (*head).ParentHash())
+		}
+		*head = block
 	}
-	return bc.removeInValidatorList(valsToRemove)
 }
 
 // This func is used to remove the validator addresses from the validator list.
