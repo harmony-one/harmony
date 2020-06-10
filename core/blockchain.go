@@ -540,7 +540,7 @@ func (bc *BlockChain) repair(head **types.Block) error {
 				Str("number", (*head).Number().String()).
 				Str("hash", (*head).Hash().Hex()).
 				Msg("Rewound blockchain to past state")
-			return bc.removeInValidatorList(valsToRemove)
+			return nil
 		}
 		// Repair last commit sigs
 		lastSig := (*head).Header().LastCommitSignature()
@@ -557,12 +557,9 @@ func (bc *BlockChain) repair(head **types.Block) error {
 				}
 			}
 		}
-		block := bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
-		if block == nil {
-			return fmt.Errorf("missing block %d [%x]", (*head).NumberU64()-1, (*head).ParentHash())
-		}
-		*head = block
+		(*head) = bc.GetBlock((*head).ParentHash(), (*head).NumberU64()-1)
 	}
+	return bc.removeInValidatorList(valsToRemove)
 }
 
 // This func is used to remove the validator addresses from the validator list.
@@ -1999,11 +1996,10 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 	if cached, ok := bc.pendingCrossLinksCache.Get(pendingCLCacheKey); ok {
 		bytes = cached.([]byte)
 	} else {
-		by, err := rawdb.ReadPendingCrossLinks(bc.db)
-		if err != nil || len(by) == 0 {
+		bytes, err := rawdb.ReadPendingCrossLinks(bc.db)
+		if err != nil || len(bytes) == 0 {
 			return nil, err
 		}
-		bytes = by
 	}
 	cls := []types.CrossLink{}
 	if err := rlp.DecodeBytes(bytes, &cls); err != nil {

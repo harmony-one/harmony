@@ -2,11 +2,10 @@ package consensus
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"time"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -19,20 +18,45 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	errSenderPubKeyNotLeader = errors.New("sender pubkey doesn't match leader")
-)
+// handlemessageupdate will update the consensus state according to received message
+func (consensus *Consensus) handleMessageUpdate(payload []byte) {
+	if len(payload) == 0 {
+		return
+	}
+	msg := &msg_pb.Message{}
+	if err := protobuf.Unmarshal(payload, msg); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("Failed to unmarshal message payload.")
+		return
+	}
 
-// HandleMessageUpdate will update the consensus state according to received message
-func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
-	// so we just ignore those messages
 	if (consensus.current.Mode() == ViewChanging) &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
 			msg.Type == msg_pb.MessageType_COMMIT) {
-		return nil
+		return
+	}
+
+	if msg.Type == msg_pb.MessageType_VIEWCHANGE ||
+		msg.Type == msg_pb.MessageType_NEWVIEW {
+		if msg.GetViewchange() != nil &&
+			msg.GetViewchange().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn().
+				Uint32("myShardId", consensus.ShardID).
+				Uint32("receivedShardId", msg.GetViewchange().ShardId).
+				Msg("Received view change message from different shard")
+			return
+		}
+	} else {
+		if msg.GetConsensus() != nil &&
+			msg.GetConsensus().ShardId != consensus.ShardID {
+			consensus.getLogger().Warn().
+				Uint32("myShardId", consensus.ShardID).
+				Uint32("receivedShardId", msg.GetConsensus().ShardId).
+				Msg("Received consensus message from different shard")
+			return
+		}
 	}
 
 	intendedForValidator, intendedForLeader :=
@@ -43,34 +67,32 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	// Handle validator intended messages first
 	case t == msg_pb.MessageType_ANNOUNCE &&
 		intendedForValidator &&
-		consensus.validatorSanityChecks(msg, senderKey):
+		consensus.validatorSanityChecks(msg):
 		consensus.onAnnounce(msg)
 	case t == msg_pb.MessageType_PREPARED &&
 		intendedForValidator &&
-		consensus.validatorSanityChecks(msg, senderKey):
+		consensus.validatorSanityChecks(msg):
 		consensus.onPrepared(msg)
 	case t == msg_pb.MessageType_COMMITTED &&
 		intendedForValidator &&
-		consensus.validatorSanityChecks(msg, senderKey):
+		consensus.validatorSanityChecks(msg):
 		consensus.onCommitted(msg)
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE &&
 		intendedForLeader &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+		consensus.leaderSanityChecks(msg):
 		consensus.onPrepare(msg)
 	case t == msg_pb.MessageType_COMMIT &&
 		intendedForLeader &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+		consensus.leaderSanityChecks(msg):
 		consensus.onCommit(msg)
 	case t == msg_pb.MessageType_VIEWCHANGE &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+		consensus.viewChangeSanityCheck(msg):
 		consensus.onViewChange(msg)
 	case t == msg_pb.MessageType_NEWVIEW &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+		consensus.viewChangeSanityCheck(msg):
 		consensus.onNewView(msg)
 	}
-
-	return nil
 }
 
 func (consensus *Consensus) finalizeCommits() {
@@ -153,10 +175,11 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	// Sleep to wait for the full block time
-	consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
-	<-time.After(time.Until(consensus.NextBlockDue))
-
+	if n := time.Now(); n.Before(consensus.NextBlockDue) {
+		// Sleep to wait for the full block time
+		consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+		time.Sleep(consensus.NextBlockDue.Sub(n))
+	}
 	// Send signal to Node to propose the new block for consensus
 	consensus.ReadySignal <- struct{}{}
 
@@ -320,7 +343,7 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Debug().
@@ -462,6 +485,9 @@ func (consensus *Consensus) Start(
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 				consensus.announce(newBlock)
+
+			case msg := <-consensus.MsgChan:
+				consensus.handleMessageUpdate(msg)
 
 			case viewID := <-consensus.commitFinishChan:
 				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
