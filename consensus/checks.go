@@ -4,10 +4,87 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
+
+func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[validatorSanityChecks] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[validatorSanityChecks] Checking new message")
+	senderKey, err := consensus.verifySenderKey(msg)
+	if err != nil {
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().
+				Msg("sender key not in this slot's subcommittee")
+		} else {
+			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
+		}
+		return false
+	}
+
+	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
+		consensus.getLogger().Warn().Msgf(
+			"[%s] SenderKey not match leader PubKey",
+			msg.GetType().String(),
+		)
+		return false
+	}
+
+	if err := verifyMessageSig(senderKey, msg); err != nil {
+		consensus.getLogger().Error().Err(err).Msg(
+			"Failed to verify sender's signature",
+		)
+		return false
+	}
+
+	return true
+}
+
+func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
+	if msg.GetConsensus() == nil {
+		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Uint64("blockNum", msg.GetConsensus().BlockNum).
+		Uint64("viewID", msg.GetConsensus().ViewId).
+		Str("msgType", msg.Type.String()).
+		Msg("[leaderSanityChecks] Checking new message")
+	senderKey, err := consensus.verifySenderKey(msg)
+	if err != nil {
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().Msgf(
+				"[%s] sender key not in this slot's subcommittee",
+				msg.GetType().String(),
+			)
+		} else {
+			consensus.getLogger().Error().Err(err).Msgf(
+				"[%s] verifySenderKey failed",
+				msg.GetType().String(),
+			)
+		}
+		return false
+	}
+	if err = verifyMessageSig(senderKey, msg); err != nil {
+		consensus.getLogger().Error().Err(err).Msgf(
+			"[%s] Failed to verify sender's signature",
+			msg.GetType().String(),
+		)
+		return false
+	}
+
+	return true
+}
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
@@ -107,6 +184,38 @@ func (consensus *Consensus) onPreparedSanityChecks(
 		}
 	}
 
+	return true
+}
+
+func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
+	if msg.GetViewchange() == nil {
+		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
+		return false
+	}
+	consensus.getLogger().Debug().
+		Msg("[viewChangeSanityCheck] Checking new message")
+	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
+	if err != nil {
+		if err == shard.ErrValidNotInCommittee {
+			consensus.getLogger().Info().Msgf(
+				"[%s] sender key not in this slot's subcommittee",
+				msg.GetType().String(),
+			)
+		} else {
+			consensus.getLogger().Error().Err(err).Msgf(
+				"[%s] VerifySenderKey Failed",
+				msg.GetType().String(),
+			)
+		}
+		return false
+	}
+	if err := verifyMessageSig(senderKey, msg); err != nil {
+		consensus.getLogger().Error().Err(err).Msgf(
+			"[%s] Failed To Verify Sender's Signature",
+			msg.GetType().String(),
+		)
+		return false
+	}
 	return true
 }
 

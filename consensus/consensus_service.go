@@ -21,31 +21,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message, senderKey *bls.PublicKey) bool {
-	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
-		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
-		consensus.getLogger().Warn().Msgf(
-			"[%s] SenderKey not match leader PubKey",
-			msg.GetType().String(),
-		)
-		return false
-	}
-
-	return consensus.senderKeySanityChecks(msg, senderKey)
-}
-
-func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey *bls.PublicKey) bool {
-	if err := VerifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] Failed to verify sender's signature",
-			msg.GetType().String(),
-		)
-		return false
-	}
-
-	return true
-}
-
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
 func (consensus *Consensus) WaitForNewRandomness() {
 	go func() {
@@ -194,8 +169,8 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// VerifyMessageSig verify the signature of the message are valid from the signer's public key.
-func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
+// Verify the signature of the message are valid from the signer's public key.
+func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
@@ -214,6 +189,33 @@ func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 	}
 	message.Signature = signature
 	return nil
+}
+
+// verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
+func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
+	consensusMsg := msg.GetConsensus()
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !consensus.IsValidatorInCommittee(senderKey) {
+		return nil, shard.ErrValidNotInCommittee
+	}
+	return senderKey, nil
+}
+
+func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
+	vcMsg := msg.GetViewchange()
+	senderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	if !consensus.IsValidatorInCommittee(senderKey) {
+		return nil, shard.ErrValidNotInCommittee
+	}
+	return senderKey, nil
 }
 
 // SetViewID set the viewID to the height of the blockchain
