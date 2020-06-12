@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"math/big"
+	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -275,9 +276,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 
 // SetBlockNum sets the blockNum in consensus object, called at node bootstrap
 func (consensus *Consensus) SetBlockNum(blockNum uint64) {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.blockNum = blockNum
+	atomic.StoreUint64(&consensus.blockNum, blockNum)
 }
 
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
