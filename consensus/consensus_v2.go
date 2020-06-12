@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -260,7 +261,7 @@ func (consensus *Consensus) tryCatchup() {
 
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
-		consensus.blockNum = consensus.blockNum + 1
+		atomic.AddUint64(&consensus.blockNum, 1)
 		consensus.viewID = committedMsg.ViewID + 1
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
