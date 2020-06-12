@@ -26,7 +26,7 @@ const (
 	PangaeaWSPattern = "wss://ws.s%d.os.hmny.io"
 )
 
-func (pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ps pangaeaSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(params.PangaeaChainConfig.StakingEpoch) >= 0:
 		return pangaeaV1
@@ -66,13 +66,18 @@ func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {
 	return mainnetRandomnessStartingEpoch
 }
 
-func (pangaeaSchedule) GetNetworkID() NetworkID {
+func (ps pangaeaSchedule) GetNetworkID() NetworkID {
 	return Pangaea
 }
 
 // GetShardingStructure is the sharding structure for mainnet.
-func (pangaeaSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+func (ps pangaeaSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, PangaeaHTTPPattern, PangaeaWSPattern)
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ps pangaeaSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
 }
 
 var pangaeaReshardingEpoch = []*big.Int{

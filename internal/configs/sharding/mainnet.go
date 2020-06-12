@@ -38,12 +38,21 @@ const (
 	MainNetWSPattern = "wss://ws.s%d.t.hmny.io"
 )
 
+var (
+	// map of epochs skipped due to staking launch on mainnet
+	skippedEpochs = map[uint32][]*big.Int{
+		1: []*big.Int{big.NewInt(181), big.NewInt(182), big.NewInt(183), big.NewInt(184), big.NewInt(185)},
+		2: []*big.Int{big.NewInt(184), big.NewInt(185)},
+		3: []*big.Int{big.NewInt(183), big.NewInt(184), big.NewInt(185)},
+	}
+)
+
 // MainnetSchedule is the mainnet sharding configuration schedule.
 var MainnetSchedule mainnetSchedule
 
 type mainnetSchedule struct{}
 
-func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(big.NewInt(mainnetV2_2Epoch)) >= 0:
 		return mainnetV2_2
@@ -87,7 +96,7 @@ func (mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (mainnetSchedule) BlocksPerEpoch() uint64 {
+func (ms mainnetSchedule) BlocksPerEpoch() uint64 {
 	return blocksPerEpoch
 }
 
@@ -145,6 +154,18 @@ func (ms mainnetSchedule) GetNetworkID() NetworkID {
 // GetShardingStructure is the sharding structure for mainnet.
 func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ms mainnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	if skipped, exists := skippedEpochs[shardID]; exists {
+		for _, e := range skipped {
+			if epoch.Cmp(e) == 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch), big.NewInt(mainnetV2_2Epoch)}
