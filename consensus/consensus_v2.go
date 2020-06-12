@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"sync/atomic"
 	"time"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -283,7 +284,7 @@ func (consensus *Consensus) tryCatchup() {
 
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
-		consensus.blockNum = consensus.blockNum + 1
+		atomic.AddUint64(&consensus.blockNum, 1)
 		consensus.viewID = committedMsg.ViewID + 1
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
