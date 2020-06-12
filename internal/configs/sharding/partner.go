@@ -27,7 +27,7 @@ const (
 	PartnerWSPattern = "wss://ws.s%d.ps.hmny.io"
 )
 
-func (partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ps partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(params.PartnerChainConfig.StakingEpoch) >= 0:
 		return partnerV1
@@ -36,7 +36,7 @@ func (partnerSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (partnerSchedule) BlocksPerEpoch() uint64 {
+func (ps partnerSchedule) BlocksPerEpoch() uint64 {
 	return partnerBlocksPerEpoch
 }
 
@@ -75,6 +75,11 @@ func (ps partnerSchedule) GetNetworkID() NetworkID {
 // GetShardingStructure is the sharding structure for partner.
 func (ps partnerSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, PartnerHTTPPattern, PartnerWSPattern)
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ps partnerSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
 }
 
 var partnerReshardingEpoch = []*big.Int{

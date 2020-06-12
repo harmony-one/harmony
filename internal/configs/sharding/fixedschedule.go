@@ -61,6 +61,11 @@ func (s fixedSchedule) GetShardingStructure(numShard, shardID int) []map[string]
 	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetHTTPPattern)
 }
 
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (s fixedSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
+}
+
 // NewFixedSchedule returns a sharding configuration schedule that uses the
 // given config instance for all epochs.  Useful for testing.
 func NewFixedSchedule(instance Instance) Schedule {
