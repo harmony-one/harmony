@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -162,6 +163,10 @@ type Node struct {
 	TransactionErrorSink *types.TransactionErrorSink
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
+
+	// metrics of p2p messages
+	NumValidMessages   uint32
+	NumInvalidMessages uint32
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -395,6 +400,7 @@ func (node *Node) validateShardBoundMessage(
 	defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(err)
 	}
 	var senderPubKeyViaWire []byte
@@ -402,19 +408,23 @@ func (node *Node) validateShardBoundMessage(
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
+			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
+			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 	} else {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(errNoSenderPubKey)
 	}
 
 	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(errNotRightKeySize)
 	}
 
@@ -427,14 +437,17 @@ func (node *Node) validateShardBoundMessage(
 		senderPubKeyViaWire,
 	)
 	if err != nil {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(err)
 	}
 	senderKey = key
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
+	atomic.AddUint32(&node.NumValidMessages, 1)
 	return &m, senderKey, nil
 }
 
@@ -813,6 +826,18 @@ func New(
 			}
 		}()
 	}
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				utils.Logger().Info().Uint32("ValidMessage", node.NumValidMessages).Uint32("InvalidMessage", node.NumInvalidMessages).Msg("MsgValidator")
+				atomic.StoreUint32(&node.NumInvalidMessages, 0)
+				atomic.StoreUint32(&node.NumValidMessages, 0)
+			}
+		}
+	}()
 
 	return &node
 }
