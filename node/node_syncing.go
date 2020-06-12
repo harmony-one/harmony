@@ -26,7 +26,6 @@ const (
 	lastMileThreshold = 4
 	inSyncThreshold   = 1 // unit in number of block
 	SyncFrequency     = 60
-	MinConnectedPeers = 10 // minimum number of peers connected to in node syncing
 )
 
 // getNeighborPeers is a helper function to return list of peers
@@ -223,7 +222,7 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
-	if node.stateSync.GetActivePeerNumber() < MinConnectedPeers {
+	if node.stateSync.GetActivePeerNumber() < syncing.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
