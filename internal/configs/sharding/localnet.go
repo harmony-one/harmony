@@ -28,7 +28,7 @@ const (
 	localnetRandomnessStartingEpoch = 0
 )
 
-func (localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(params.LocalnetChainConfig.StakingEpoch) >= 0:
 		return localnetV2
@@ -106,6 +106,11 @@ func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[str
 		})
 	}
 	return res
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ls localnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
 }
 
 var (
