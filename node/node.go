@@ -604,7 +604,8 @@ func (node *Node) Start() error {
 
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
-			libp2p_pubsub.WithValidatorTimeout(50*time.Microsecond),
+			libp2p_pubsub.WithValidatorTimeout(50*time.Millisecond),
+			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
 		); err != nil {
 			return err
