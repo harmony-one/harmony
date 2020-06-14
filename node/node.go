@@ -573,7 +573,7 @@ func (node *Node) Start() error {
 
 					// validate consensus message
 					validMsg, senderPubKey, err := node.validateShardBoundMessage(
-						context.TODO(), openBox[proto.MessageCategoryBytes:],
+						ctx, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
