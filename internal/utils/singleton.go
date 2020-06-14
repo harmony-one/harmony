@@ -53,12 +53,6 @@ func SetLogVerbosity(verbosity log.Lvl) {
 // AddLogFile creates a StreamHandler that outputs JSON logs
 // into rotating files with specified max file size
 func AddLogFile(filepath string, maxSize int) {
-	AddLogHandler(log.StreamHandler(&lumberjack.Logger{
-		Filename: filepath,
-		MaxSize:  maxSize,
-		Compress: true,
-	}, log.JSONFormat()))
-
 	setZeroLoggerFileOutput(filepath, maxSize)
 }
 
