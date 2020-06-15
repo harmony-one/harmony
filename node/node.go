@@ -549,7 +549,7 @@ func (node *Node) Start() error {
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 				entryTime := time.Now()
-				defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
+				defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
 
 				hmyMsg := msg.GetData()
 
@@ -558,7 +558,7 @@ func (node *Node) Start() error {
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
 							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), nil,
+						)), msg.GetFrom(),
 					}
 					return false
 				}
@@ -583,7 +583,7 @@ func (node *Node) Start() error {
 					)
 
 					if err != nil {
-						errChan <- withError{err, validMsg}
+						errChan <- withError{err, msg.GetFrom()}
 						return false
 					}
 
@@ -606,8 +606,18 @@ func (node *Node) Start() error {
 					return false
 				}
 
-				return true
+				select {
+				case <-ctx.Done():
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						utils.Logger().Info().
+							Str("topic", topicNamed).Msg("exceeded validation deadline")
+					}
+					errChan <- withError{errors.WithStack(ctx.Err()), nil}
+				default:
+					return true
+				}
 
+				return true
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			libp2p_pubsub.WithValidatorTimeout(50*time.Millisecond),
@@ -654,7 +664,7 @@ func (node *Node) Start() error {
 						case <-ctx.Done():
 							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 								utils.Logger().Info().
-									Str("topic", topicNamed).Msg("exceeded deadline")
+									Str("topic", topicNamed).Msg("exceeded handler deadline")
 							}
 							errChan <- withError{errors.WithStack(ctx.Err()), nil}
 						default:
