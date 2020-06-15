@@ -31,6 +31,9 @@ var (
 	// ZeroLog
 	zeroLogger      *zerolog.Logger
 	zeroLoggerLevel = zerolog.Disabled
+
+	onceForSampleLogger sync.Once
+	sampledLogger       *zerolog.Logger
 )
 
 // SetLogContext used to print out loggings of node with port and ip.
@@ -172,6 +175,24 @@ func Logger() *zerolog.Logger {
 		zeroLogger = &logger
 	}
 	return zeroLogger
+}
+
+// SampledLogger returns a sampled zerolog singleton to be used in criticial path like p2p message handling
+func SampledLogger() *zerolog.Logger {
+	// Will let 3 log messages per period of 1 second.
+	// Over 3 log messages, 1 every 100 messages are logged.
+	onceForSampleLogger.Do(func() {
+		sLog := zeroLogger.Sample(
+			&zerolog.BurstSampler{
+				Burst:       3,
+				Period:      1 * time.Second,
+				NextSampler: &zerolog.BasicSampler{N: 100},
+			},
+		)
+		sampledLogger = &sLog
+	})
+
+	return sampledLogger
 }
 
 func updateZeroLogLevel(level int) {
