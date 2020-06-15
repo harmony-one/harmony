@@ -395,7 +395,7 @@ func (node *Node) validateShardBoundMessage(
 		senderKey *bls.PublicKey
 	)
 	entryTime := time.Now()
-	defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
+	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
