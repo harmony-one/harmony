@@ -448,6 +448,7 @@ var (
 	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 	errConvertToValidMessage             = errors.New("convert p2p message to valid message")
+	errUnkonwnP2PMessageType             = errors.New("unknown p2p message type")
 )
 
 // Start kicks off the node message handling
@@ -523,6 +524,11 @@ func (node *Node) Start() error {
 		senderPubKey   *bls.PublicKey
 	}
 
+	type p2pSenderInfo struct {
+		source    libp2p_peer.ID
+		forwarder libp2p_peer.ID
+	}
+
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	for i := range allTopics {
@@ -553,7 +559,7 @@ func (node *Node) Start() error {
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
 							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), msg.GetFrom(),
+						)), p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
 					}
 					return false
 				}
@@ -567,7 +573,8 @@ func (node *Node) Start() error {
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
 						errChan <- withError{
-							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
+							errors.WithStack(errConsensusMessageOnUnexpectedTopic),
+							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
 						}
 						return false
 					}
@@ -578,7 +585,8 @@ func (node *Node) Start() error {
 					)
 
 					if err != nil {
-						errChan <- withError{err, msg.GetFrom()}
+						errChan <- withError{err,
+							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom}}
 						return false
 					}
 
@@ -598,6 +606,10 @@ func (node *Node) Start() error {
 						handleEArg:     openBox,
 					}
 				default:
+					errChan <- withError{
+						errors.WithStack(errUnkonwnP2PMessageType),
+						proto.MessageCategory(openBox[proto.MessageCategoryBytes-1]),
+					}
 					return false
 				}
 
@@ -607,7 +619,7 @@ func (node *Node) Start() error {
 						utils.Logger().Warn().
 							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
 					}
-					errChan <- withError{errors.WithStack(ctx.Err()), nil}
+					errChan <- withError{errors.WithStack(ctx.Err()), msg}
 				default:
 					return true
 				}
@@ -647,7 +659,7 @@ func (node *Node) Start() error {
 								}
 							} else {
 								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-									errChan <- withError{err, nil}
+									errChan <- withError{err, msg.senderPubKey}
 								}
 							}
 						} else {
