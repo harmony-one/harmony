@@ -63,6 +63,11 @@ func (p Peer) String() string {
 	)
 }
 
+const (
+	// MaxMessageSize is the 2048Kb
+	MaxMessageSize = 1 << 21
+)
+
 // NewHost ..
 func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
@@ -78,10 +83,9 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
-	const MaxSize = 2145728
 	options := []libp2p_pubsub.Option{
 		libp2p_pubsub.WithPeerOutboundQueueSize(64),
-		libp2p_pubsub.WithMaxMessageSize(MaxSize),
+		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
 	}
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
