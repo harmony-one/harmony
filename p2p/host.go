@@ -56,6 +56,8 @@ const (
 	SetAsideOtherwise = 1 << 12
 	// MaxMessageHandlers ..
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
+	// MaxMessageSize is the 256Kb
+	MaxMessageSize = 1 << 18
 )
 
 // NewHost ..
@@ -85,6 +87,8 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		libp2p_pubsub.WithValidateWorkers(runtime.NumCPU() * 2),
 		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
 		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
+		// WithMaxMessageSize sets the global maximum message size for pubsub wire messages. The default value is 1MiB (DefaultMaxMessageSize).
+		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
 	}
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
