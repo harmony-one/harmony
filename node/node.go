@@ -603,8 +603,8 @@ func (node *Node) Start() error {
 				select {
 				case <-ctx.Done():
 					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-						utils.Logger().Info().
-							Str("topic", topicNamed).Msg("exceeded validation deadline")
+						utils.Logger().Warn().
+							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
 					}
 					errChan <- withError{errors.WithStack(ctx.Err()), nil}
 				default:
@@ -658,8 +658,8 @@ func (node *Node) Start() error {
 						select {
 						case <-ctx.Done():
 							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-								utils.Logger().Info().
-									Str("topic", topicNamed).Msg("exceeded handler deadline")
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded handler deadline")
 							}
 							errChan <- withError{errors.WithStack(ctx.Err()), nil}
 						default:
