@@ -447,6 +447,7 @@ func (node *Node) validateShardBoundMessage(
 var (
 	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
+	errConvertToValidMessage             = errors.New("convert p2p message to valid message")
 )
 
 // Start kicks off the node message handling
@@ -661,7 +662,7 @@ func (node *Node) Start() error {
 								utils.Logger().Warn().
 									Str("topic", topicNamed).Msg("[context] exceeded handler deadline")
 							}
-							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+							errChan <- withError{errors.WithStack(ctx.Err()), msg}
 						default:
 							return
 						}
@@ -671,22 +672,26 @@ func (node *Node) Start() error {
 		}()
 
 		go func() {
+			// This is the mainloop to process all the incoming p2p messages
 
 			for {
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
-					errChan <- withError{errors.WithStack(err), nil}
+					errChan <- withError{errors.WithStack(err), nextMsg}
 					continue
 				}
 
+				// It is safe to skip your own messages, as leader commit its own signature directly into the protocol
 				if nextMsg.GetFrom() == ownID {
 					continue
 				}
 
+				// send the validated messages to msgChan, let the application layer handle the valid messages now
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
 					msgChan <- validatedMessage
+				} else {
+					errChan <- withError{errors.WithStack(errConvertToValidMessage), nextMsg}
 				}
-
 			}
 		}()
 	}
