@@ -551,7 +551,7 @@ func (node *Node) Start() error {
 				if len(hmyMsg) < p2pMsgPrefixSize {
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
-							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
+							errMsgHadNoHMYPayLoadAssumption, "on topic %s (len:%d)", topicNamed, len(hmyMsg),
 						)), nil,
 					}
 					return false
@@ -617,7 +617,8 @@ func (node *Node) Start() error {
 		go func() {
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				// should not take more than 3 seconds to process one message
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				msg := msg
 
 				go func() {
