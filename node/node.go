@@ -444,7 +444,7 @@ func (node *Node) validateShardBoundMessage(
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(shard.ErrValidNotInCommittee)
+		return &m, nil, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
@@ -549,7 +549,7 @@ func (node *Node) Start() error {
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 				entryTime := time.Now()
-				defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
+				defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
 
 				hmyMsg := msg.GetData()
 
@@ -583,7 +583,7 @@ func (node *Node) Start() error {
 					)
 
 					if err != nil {
-						errChan <- withError{err, msg}
+						errChan <- withError{err, validMsg}
 						return false
 					}
 
