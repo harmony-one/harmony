@@ -536,11 +536,6 @@ func (node *Node) Start() error {
 		senderPubKey   *bls.PublicKey
 	}
 
-	type p2pSenderInfo struct {
-		source    libp2p_peer.ID
-		forwarder libp2p_peer.ID
-	}
-
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	for i := range allTopics {
@@ -571,7 +566,7 @@ func (node *Node) Start() error {
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
 							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
+						)), msg.GetFrom(),
 					}
 					return false
 				}
@@ -586,7 +581,7 @@ func (node *Node) Start() error {
 					if !isConsensusBound {
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic),
-							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
+							msg.GetFrom(),
 						}
 						return false
 					}
@@ -598,7 +593,8 @@ func (node *Node) Start() error {
 
 					if err != nil {
 						errChan <- withError{err,
-							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom}}
+							msg.GetFrom(),
+						}
 						return false
 					}
 
