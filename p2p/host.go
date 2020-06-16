@@ -56,8 +56,8 @@ const (
 	SetAsideOtherwise = 1 << 12
 	// MaxMessageHandlers ..
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
-	// MaxMessageSize is the 256Kb
-	MaxMessageSize = 1 << 18
+	// MaxMessageSize is 2Mb
+	MaxMessageSize = 1 << 21
 )
 
 // NewHost ..
