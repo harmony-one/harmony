@@ -231,8 +231,8 @@ type Validator struct {
 	CreationHeight *big.Int `json:"creation-height"`
 }
 
-// DoNotEnforceMaxBLS ..
-const DoNotEnforceMaxBLS = -1
+// MaxBLSPerValidator ..
+const MaxBLSPerValidator = 106
 
 var (
 	oneAsBigInt  = big.NewInt(denominations.One)
@@ -240,7 +240,7 @@ var (
 )
 
 // SanityCheck checks basic requirements of a validator
-func (v *Validator) SanityCheck(oneThirdExtrn int) error {
+func (v *Validator) SanityCheck() error {
 	if _, err := v.EnsureLength(); err != nil {
 		return err
 	}
@@ -249,11 +249,10 @@ func (v *Validator) SanityCheck(oneThirdExtrn int) error {
 		return errNeedAtLeastOneSlotKey
 	}
 
-	if c := len(v.SlotPubKeys); oneThirdExtrn != DoNotEnforceMaxBLS &&
-		c > oneThirdExtrn {
+	if c := len(v.SlotPubKeys); c > MaxBLSPerValidator {
 		return errors.Wrapf(
 			ErrExcessiveBLSKeys, "have: %d allowed: %d",
-			c, oneThirdExtrn,
+			c, MaxBLSPerValidator,
 		)
 	}
 
@@ -341,12 +340,8 @@ var (
 )
 
 // SanityCheck checks the basic requirements
-func (w *ValidatorWrapper) SanityCheck(
-	oneThirdExternalValidator int,
-) error {
-	if err := w.Validator.SanityCheck(
-		oneThirdExternalValidator,
-	); err != nil {
+func (w *ValidatorWrapper) SanityCheck() error {
+	if err := w.Validator.SanityCheck(); err != nil {
 		return err
 	}
 	// Self delegation must be >= MinSelfDelegation
