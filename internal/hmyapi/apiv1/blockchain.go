@@ -569,6 +569,18 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 	return newHeaderInformation(header)
 }
 
+// GetHeaderByNumber returns block header at given number
+func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*HeaderInformation, error) {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
+		return nil, err
+	}
+	header, err := s.b.HeaderByNumber(context.Background(), blockNum)
+	if err != nil {
+		return nil, err
+	}
+	return newHeaderInformation(header), nil
+}
+
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
