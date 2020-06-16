@@ -745,14 +745,12 @@ func (db *DB) ValidatorWrapperCopy(
 	return &val, nil
 }
 
-const doNotEnforceMaxBLS = -1
-
 // UpdateValidatorWrapper updates staking information of
 // a given validator (including delegation info)
 func (db *DB) UpdateValidatorWrapper(
 	addr common.Address, val *stk.ValidatorWrapper,
 ) error {
-	if err := val.SanityCheck(doNotEnforceMaxBLS); err != nil {
+	if err := val.SanityCheck(); err != nil {
 		return err
 	}
 

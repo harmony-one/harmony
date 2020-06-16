@@ -114,8 +114,7 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Counters.NumBlocksSigned = big.NewInt(0)
 	wrapper.Counters.NumBlocksToSign = big.NewInt(0)
 	wrapper.BlockReward = big.NewInt(0)
-	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
-	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
+	if err := wrapper.SanityCheck(); err != nil {
 		return nil, err
 	}
 	return wrapper, nil
@@ -180,8 +179,7 @@ func VerifyAndEditValidatorFromMsg(
 	) {
 		return nil, errCommissionRateChangeTooFast
 	}
-	maxBLSKeyAllowed := shard.ExternalSlotsAvailableForEpoch(epoch) / 3
-	if err := wrapper.SanityCheck(maxBLSKeyAllowed); err != nil {
+	if err := wrapper.SanityCheck(); err != nil {
 		return nil, err
 	}
 	return wrapper, nil
@@ -232,9 +230,7 @@ func VerifyAndDelegateFromMsg(
 		delegation := &wrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
 			delegation.Amount.Add(delegation.Amount, msg.Amount)
-			if err := wrapper.SanityCheck(
-				staking.DoNotEnforceMaxBLS,
-			); err != nil {
+			if err := wrapper.SanityCheck(); err != nil {
 				return nil, nil, err
 			}
 			return wrapper, msg.Amount, nil
@@ -247,7 +243,7 @@ func VerifyAndDelegateFromMsg(
 			msg.DelegatorAddress, msg.Amount,
 		),
 	)
-	if err := wrapper.SanityCheck(staking.DoNotEnforceMaxBLS); err != nil {
+	if err := wrapper.SanityCheck(); err != nil {
 		return nil, nil, err
 	}
 	return wrapper, msg.Amount, nil
@@ -287,9 +283,7 @@ func VerifyAndUndelegateFromMsg(
 			if err := delegation.Undelegate(epoch, msg.Amount); err != nil {
 				return nil, err
 			}
-			if err := wrapper.SanityCheck(
-				staking.DoNotEnforceMaxBLS,
-			); err != nil {
+			if err := wrapper.SanityCheck(); err != nil {
 				// allow self delegation to go below min self delegation
 				// but set the status to inactive
 				if errors.Cause(err) == staking.ErrInvalidSelfDelegation {
