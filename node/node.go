@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -160,6 +161,10 @@ type Node struct {
 	TransactionErrorSink *types.TransactionErrorSink
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
+
+	// metrics of p2p messages
+	NumValidMessages   uint32
+	NumInvalidMessages uint32
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -390,9 +395,10 @@ func (node *Node) validateShardBoundMessage(
 		senderKey *bls.PublicKey
 	)
 	entryTime := time.Now()
-	defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
+	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(err)
 	}
 	var senderPubKeyViaWire []byte
@@ -400,19 +406,23 @@ func (node *Node) validateShardBoundMessage(
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
+			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
+			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 	} else {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(errNoSenderPubKey)
 	}
 
 	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(errNotRightKeySize)
 	}
 
@@ -420,20 +430,25 @@ func (node *Node) validateShardBoundMessage(
 		senderPubKeyViaWire,
 	)
 	if err != nil {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, errors.WithStack(err)
 	}
 	senderKey = key
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
-		return nil, nil, errors.WithStack(shard.ErrValidNotInCommittee)
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
+		return &m, nil, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
+	atomic.AddUint32(&node.NumValidMessages, 1)
 	return &m, senderKey, nil
 }
 
 var (
 	errMsgHadNoHMYPayLoadAssumption      = errors.New("did not have sufficient size for hmy msg")
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
+	errConvertToValidMessage             = errors.New("convert p2p message to valid message")
+	errUnkonwnP2PMessageType             = errors.New("unknown p2p message type")
 )
 
 // Start kicks off the node message handling
@@ -484,7 +499,7 @@ func (node *Node) Start() error {
 
 	pubsub := node.host.PubSub()
 	ownID := node.host.GetID()
-	errChan := make(chan withError)
+	errChan := make(chan withError, 100)
 
 	// p2p consensus message handler function
 	type p2pHandlerConsensus func(
@@ -509,6 +524,11 @@ func (node *Node) Start() error {
 		senderPubKey   *bls.PublicKey
 	}
 
+	type p2pSenderInfo struct {
+		source    libp2p_peer.ID
+		forwarder libp2p_peer.ID
+	}
+
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	for i := range allTopics {
@@ -530,7 +550,7 @@ func (node *Node) Start() error {
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
 				entryTime := time.Now()
-				defer utils.Logger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
+				defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
 
 				hmyMsg := msg.GetData()
 
@@ -539,7 +559,7 @@ func (node *Node) Start() error {
 					errChan <- withError{
 						errors.WithStack(errors.Wrapf(
 							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), nil,
+						)), p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
 					}
 					return false
 				}
@@ -553,18 +573,20 @@ func (node *Node) Start() error {
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
 						errChan <- withError{
-							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
+							errors.WithStack(errConsensusMessageOnUnexpectedTopic),
+							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
 						}
 						return false
 					}
 
 					// validate consensus message
 					validMsg, senderPubKey, err := node.validateShardBoundMessage(
-						context.TODO(), openBox[proto.MessageCategoryBytes:],
+						ctx, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
-						errChan <- withError{err, msg}
+						errChan <- withError{err,
+							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom}}
 						return false
 					}
 
@@ -584,14 +606,29 @@ func (node *Node) Start() error {
 						handleEArg:     openBox,
 					}
 				default:
+					errChan <- withError{
+						errors.WithStack(errUnkonwnP2PMessageType),
+						proto.MessageCategory(openBox[proto.MessageCategoryBytes-1]),
+					}
 					return false
 				}
 
-				return true
+				select {
+				case <-ctx.Done():
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+						utils.Logger().Warn().
+							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
+					}
+					errChan <- withError{errors.WithStack(ctx.Err()), msg}
+				default:
+					return true
+				}
 
+				return false
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
-			libp2p_pubsub.WithValidatorTimeout(50*time.Microsecond),
+			libp2p_pubsub.WithValidatorTimeout(50*time.Millisecond),
+			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
 		); err != nil {
 			return err
@@ -603,7 +640,8 @@ func (node *Node) Start() error {
 		go func() {
 
 			for msg := range msgChan {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				// should not take more than 3 seconds to process one message
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				msg := msg
 
 				go func() {
@@ -621,7 +659,7 @@ func (node *Node) Start() error {
 								}
 							} else {
 								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-									errChan <- withError{err, nil}
+									errChan <- withError{err, msg.senderPubKey}
 								}
 							}
 						} else {
@@ -633,10 +671,10 @@ func (node *Node) Start() error {
 						select {
 						case <-ctx.Done():
 							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-								utils.Logger().Info().
-									Str("topic", topicNamed).Msg("exceeded deadline")
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded handler deadline")
 							}
-							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+							errChan <- withError{errors.WithStack(ctx.Err()), msg}
 						default:
 							return
 						}
@@ -646,30 +684,34 @@ func (node *Node) Start() error {
 		}()
 
 		go func() {
+			// This is the mainloop to process all the incoming p2p messages
 
 			for {
 				nextMsg, err := sub.Next(context.Background())
 				if err != nil {
-					errChan <- withError{errors.WithStack(err), nil}
+					errChan <- withError{errors.WithStack(err), nextMsg}
 					continue
 				}
 
+				// It is safe to skip your own messages, as leader commit its own signature directly into the protocol
 				if nextMsg.GetFrom() == ownID {
 					continue
 				}
 
+				// send the validated messages to msgChan, let the application layer handle the valid messages now
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
 					msgChan <- validatedMessage
+				} else {
+					errChan <- withError{errors.WithStack(errConvertToValidMessage), nextMsg}
 				}
-
 			}
 		}()
 	}
 
 	for e := range errChan {
-		utils.Logger().Debug().
+		utils.SampledLogger().Info().
 			Interface("item", e.payload).
-			Msgf("issue while handling incoming p2p message: %v", e.err)
+			Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
 	}
 	// NOTE never gets here
 	return nil
@@ -807,6 +849,18 @@ func New(
 			}
 		}()
 	}
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				utils.Logger().Info().Uint32("ValidMessage", node.NumValidMessages).Uint32("InvalidMessage", node.NumInvalidMessages).Msg("MsgValidator")
+				atomic.StoreUint32(&node.NumInvalidMessages, 0)
+				atomic.StoreUint32(&node.NumValidMessages, 0)
+			}
+		}
+	}()
 
 	return &node
 }

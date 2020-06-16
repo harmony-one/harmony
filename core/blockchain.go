@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1731,6 +1732,10 @@ func (bc *BlockChain) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	}
 	shardState, err := rawdb.ReadShardState(bc.db, epoch)
 	if err != nil {
+		if strings.Contains(err.Error(), rawdb.MsgNoShardStateFromDB) &&
+			shard.Schedule.IsSkippedEpoch(bc.ShardID(), epoch) {
+			return nil, fmt.Errorf("epoch skipped on chain: %w", err)
+		}
 		return nil, err
 	}
 	bc.shardStateCache.Add(cacheKey, shardState)

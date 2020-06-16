@@ -43,6 +43,9 @@ type Schedule interface {
 
 	// GetShardingStructure returns sharding structure.
 	GetShardingStructure(int, int) []map[string]interface{}
+
+	// IsSkippedEpoch returns if epoch was skipped on shard chain
+	IsSkippedEpoch(uint32, *big.Int) bool
 }
 
 // Instance is one sharding configuration instance.

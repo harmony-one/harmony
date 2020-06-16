@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -18,7 +19,6 @@ const (
 // MessageSender is the wrapper object that controls how a consensus message is sent
 type MessageSender struct {
 	blockNum        uint64 // The current block number at consensus
-	blockNumMutex   sync.Mutex
 	messagesToRetry sync.Map
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
@@ -28,13 +28,12 @@ type MessageSender struct {
 
 // MessageRetry controls the message that can be retried
 type MessageRetry struct {
-	blockNum      uint64 // The block number this message is for
-	groups        []nodeconfig.GroupID
-	p2pMsg        []byte
-	msgType       msg_pb.MessageType
-	retryCount    int
-	isActive      bool
-	isActiveMutex sync.Mutex
+	blockNum   uint64 // The block number this message is for
+	groups     []nodeconfig.GroupID
+	p2pMsg     []byte
+	msgType    msg_pb.MessageType
+	retryCount int
+	isActive   uint32 // 0 is false, != 0 is true, in order to use atomic.Load/Store functions
 }
 
 // NewMessageSender initializes the consensus message sender.
@@ -44,9 +43,7 @@ func NewMessageSender(host p2p.Host) *MessageSender {
 
 // Reset resets the sender's state for new block
 func (sender *MessageSender) Reset(blockNum uint64) {
-	sender.blockNumMutex.Lock()
-	sender.blockNum = blockNum
-	sender.blockNumMutex.Unlock()
+	atomic.StoreUint64(&sender.blockNum, blockNum)
 	sender.StopAllRetriesExceptCommitted()
 	sender.messagesToRetry.Range(func(key interface{}, value interface{}) bool {
 		if msgRetry, ok := value.(*MessageRetry); ok {
@@ -60,9 +57,9 @@ func (sender *MessageSender) Reset(blockNum uint64) {
 
 // SendWithRetry sends message with retry logic.
 func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []nodeconfig.GroupID, p2pMsg []byte) error {
-	willRetry := sender.retryTimes != 0
-	msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0, isActive: willRetry}
-	if willRetry {
+	if sender.retryTimes != 0 {
+		msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0}
+		atomic.StoreUint32(&msgRetry.isActive, 1)
 		sender.messagesToRetry.Store(msgType, &msgRetry)
 		go func() {
 			sender.Retry(&msgRetry)
@@ -86,22 +83,18 @@ func (sender *MessageSender) Retry(msgRetry *MessageRetry) {
 			return
 		}
 
-		msgRetry.isActiveMutex.Lock()
-		if !msgRetry.isActive {
-			msgRetry.isActiveMutex.Unlock()
+		isActive := atomic.LoadUint32(&msgRetry.isActive)
+		if isActive == 0 {
 			// Retry is stopped
 			return
 		}
-		msgRetry.isActiveMutex.Unlock()
 
 		if msgRetry.msgType != msg_pb.MessageType_COMMITTED {
-			sender.blockNumMutex.Lock()
-			if msgRetry.blockNum < sender.blockNum {
-				sender.blockNumMutex.Unlock()
+			senderBlockNum := atomic.LoadUint64(&sender.blockNum)
+			if msgRetry.blockNum < senderBlockNum {
 				// Block already moved ahead, no need to retry old block's messages
 				return
 			}
-			sender.blockNumMutex.Unlock()
 		}
 
 		msgRetry.retryCount++
@@ -118,9 +111,7 @@ func (sender *MessageSender) StopRetry(msgType msg_pb.MessageType) {
 	data, ok := sender.messagesToRetry.Load(msgType)
 	if ok {
 		msgRetry := data.(*MessageRetry)
-		msgRetry.isActiveMutex.Lock()
-		msgRetry.isActive = false
-		msgRetry.isActiveMutex.Unlock()
+		atomic.StoreUint32(&msgRetry.isActive, 0)
 	}
 }
 
@@ -129,9 +120,7 @@ func (sender *MessageSender) StopAllRetriesExceptCommitted() {
 	sender.messagesToRetry.Range(func(k, v interface{}) bool {
 		if msgRetry, ok := v.(*MessageRetry); ok {
 			if msgRetry.msgType != msg_pb.MessageType_COMMITTED {
-				msgRetry.isActiveMutex.Lock()
-				msgRetry.isActive = false
-				msgRetry.isActiveMutex.Unlock()
+				atomic.StoreUint32(&msgRetry.isActive, 0)
 			}
 		}
 		return true

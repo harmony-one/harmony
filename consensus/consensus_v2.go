@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -13,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -25,6 +27,8 @@ var (
 
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
+	entryTime := time.Now()
+	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:handle_consensus_message]")
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -260,7 +264,7 @@ func (consensus *Consensus) tryCatchup() {
 
 		// TODO(Chao): Explain the reasoning for these code
 		consensus.blockHash = [32]byte{}
-		consensus.blockNum = consensus.blockNum + 1
+		atomic.AddUint64(&consensus.blockNum, 1)
 		consensus.viewID = committedMsg.ViewID + 1
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
@@ -320,7 +324,7 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Debug().

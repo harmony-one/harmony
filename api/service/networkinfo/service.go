@@ -45,9 +45,11 @@ var (
 )
 
 const (
-	waitInRetry       = 2 * time.Second
+	waitInRetry       = 5 * time.Second
 	connectionTimeout = 3 * time.Minute
-	findPeerInterval  = 60 * time.Second
+
+	minFindPeerInterval = 5    // initial find peer interval during bootstrap
+	maxFindPeerInterval = 1800 // max find peer interval, every 30 minutes
 
 	// register to bootnode every ticker
 	dhtTicker = 6 * time.Hour
@@ -191,6 +193,9 @@ func (s *Service) DoService() {
 	defer tick.Stop()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	peerInterval := minFindPeerInterval
+	intervalTick := time.NewTicker(time.Duration(peerInterval) * time.Second)
+	defer intervalTick.Stop()
 	for {
 		select {
 		case <-s.stopChan:
@@ -211,7 +216,7 @@ func (s *Service) DoService() {
 			utils.Logger().Info().
 				Str("Rendezvous", string(s.Rendezvous)).
 				Msg("Successfully announced!")
-		case <-time.After(findPeerInterval):
+		case <-intervalTick.C:
 			var err error
 			s.peerInfo, err = s.discovery.FindPeers(
 				ctx, string(s.Rendezvous), coredis.Limit(discoveryLimit),
@@ -220,8 +225,13 @@ func (s *Service) DoService() {
 				utils.Logger().Error().Err(err).Msg("FindPeers")
 				return
 			}
+			if peerInterval < maxFindPeerInterval {
+				peerInterval *= 2
+				intervalTick.Stop()
+				intervalTick = time.NewTicker(time.Duration(peerInterval) * time.Second)
+			}
 
-			s.findPeers(ctx)
+			go s.findPeers(ctx)
 		}
 	}
 }

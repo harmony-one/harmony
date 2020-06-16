@@ -40,7 +40,7 @@ const (
 
 	// after cutting off a number of connected peers, the result number of peers
 	// shall be between numPeersLowBound and numPeersHighBound
-	numPeersLowBound  = 3
+	NumPeersLowBound  = 3
 	numPeersHighBound = 5
 )
 
@@ -276,7 +276,7 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 
 // limitNumPeers limits number of peers to release some server end sources.
 func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
-	targetSize := calcNumPeersWithBound(len(ps), numPeersLowBound, numPeersHighBound)
+	targetSize := calcNumPeersWithBound(len(ps), NumPeersLowBound, numPeersHighBound)
 	if len(ps) <= targetSize {
 		return ps
 	}

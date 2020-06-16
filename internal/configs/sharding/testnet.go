@@ -26,7 +26,7 @@ const (
 	TestNetWSPattern = "wss://ws.s%d.b.hmny.io"
 )
 
-func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(params.TestnetChainConfig.StakingEpoch) >= 0:
 		return testnetV1
@@ -35,7 +35,7 @@ func (testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (testnetSchedule) BlocksPerEpoch() uint64 {
+func (ts testnetSchedule) BlocksPerEpoch() uint64 {
 	return testnetBlocksPerEpoch
 }
 
@@ -74,6 +74,11 @@ func (ts testnetSchedule) GetNetworkID() NetworkID {
 // GetShardingStructure is the sharding structure for testnet.
 func (ts testnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, TestNetHTTPPattern, TestNetWSPattern)
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ts testnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
 }
 
 var testnetReshardingEpoch = []*big.Int{
