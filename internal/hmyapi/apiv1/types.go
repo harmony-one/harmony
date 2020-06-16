@@ -6,15 +6,16 @@ import (
 	"strings"
 	"time"
 
-	staking "github.com/harmony-one/harmony/staking/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -70,16 +71,17 @@ type RPCCXReceipt struct {
 
 // HeaderInformation represents the latest consensus information
 type HeaderInformation struct {
-	BlockHash        common.Hash `json:"blockHash"`
-	BlockNumber      uint64      `json:"blockNumber"`
-	ShardID          uint32      `json:"shardID"`
-	Leader           string      `json:"leader"`
-	ViewID           uint64      `json:"viewID"`
-	Epoch            uint64      `json:"epoch"`
-	Timestamp        string      `json:"timestamp"`
-	UnixTime         uint64      `json:"unixtime"`
-	LastCommitSig    string      `json:"lastCommitSig"`
-	LastCommitBitmap string      `json:"lastCommitBitmap"`
+	BlockHash        common.Hash       `json:"blockHash"`
+	BlockNumber      uint64            `json:"blockNumber"`
+	ShardID          uint32            `json:"shardID"`
+	Leader           string            `json:"leader"`
+	ViewID           uint64            `json:"viewID"`
+	Epoch            uint64            `json:"epoch"`
+	Timestamp        string            `json:"timestamp"`
+	UnixTime         uint64            `json:"unixtime"`
+	LastCommitSig    string            `json:"lastCommitSig"`
+	LastCommitBitmap string            `json:"lastCommitBitmap"`
+	CrossLinks       *types.CrossLinks `json:"crossLinks,omitempty"`
 }
 
 // RPCDelegation represents a particular delegation to a validator
@@ -120,8 +122,18 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 	if err != nil {
 		bechAddr = header.Coinbase().Hex()
 	}
-
 	result.Leader = bechAddr
+
+	if header.ShardID() == shard.BeaconChainShardID {
+		decodedCrossLinks := &types.CrossLinks{}
+		err = rlp.DecodeBytes(header.CrossLinks(), decodedCrossLinks)
+		if err != nil {
+			result.CrossLinks = &types.CrossLinks{}
+		} else {
+			result.CrossLinks = decodedCrossLinks
+		}
+	}
+
 	return result
 }
 

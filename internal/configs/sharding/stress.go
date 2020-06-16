@@ -27,7 +27,7 @@ const (
 	StressNetWSPattern = "wss://ws.s%d.stn.hmny.io"
 )
 
-func (stressnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ss stressnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case epoch.Cmp(params.StressnetChainConfig.StakingEpoch) >= 0:
 		return stressnetV1
@@ -36,7 +36,7 @@ func (stressnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (stressnetSchedule) BlocksPerEpoch() uint64 {
+func (ss stressnetSchedule) BlocksPerEpoch() uint64 {
 	return stressnetBlocksPerEpoch
 }
 
@@ -75,6 +75,11 @@ func (ss stressnetSchedule) GetNetworkID() NetworkID {
 // GetShardingStructure is the sharding structure for stressnet.
 func (ss stressnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, StressNetHTTPPattern, StressNetWSPattern)
+}
+
+// IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
+func (ss stressnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+	return false
 }
 
 var stressnetReshardingEpoch = []*big.Int{
