@@ -503,7 +503,7 @@ func (node *Node) Start() error {
 	}
 	pubsub := node.host.PubSub()
 	ownID := node.host.GetID()
-	errChan := make(chan withError)
+	errChan := make(chan withError, 100)
 
 	// p2p consensus message handler function
 	type p2pHandlerConsensus func(
@@ -617,7 +617,7 @@ func (node *Node) Start() error {
 					return true
 				}
 
-				return true
+				return false
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			libp2p_pubsub.WithValidatorTimeout(50*time.Millisecond),
