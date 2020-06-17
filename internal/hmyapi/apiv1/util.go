@@ -38,7 +38,7 @@ func SubmitTransaction(
 	if err := b.SendTx(ctx, tx); err != nil {
 		// legacy behavior is to never return error and always return tx hash
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-		return tx.Hash(), nil
+		return tx.Hash(), err
 	}
 	if tx.To() == nil {
 		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Epoch())
