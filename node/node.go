@@ -294,7 +294,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 			node.tryBroadcast(newTx)
 		}
 		return err
-	}else{	
+	} else {
 		return errors.New("shard do not match")
 	}
 }
