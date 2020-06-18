@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -126,6 +127,13 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
+	// Handler
+	NumMessageHandled uint32
+	NumPrepare        uint32
+	NumCommit         uint32
+	NumAnnounce       uint32
+	NumPrepared       uint32
+	NumCommitted      uint32
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -208,5 +216,31 @@ func New(
 	consensus.ReadySignal = make(chan struct{})
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
+
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				utils.Logger().Info().
+					Uint32("ConsensusMsg", consensus.NumMessageHandled).
+					Uint32("PrepareMsg", consensus.NumPrepare).
+					Uint32("CommitMsg", consensus.NumCommit).
+					Uint32("AnnounceMsg", consensus.NumAnnounce).
+					Uint32("PreparedMsg", consensus.NumPrepared).
+					Uint32("CommittedMsg", consensus.NumCommitted).
+					Msg("ConsensusMessageHandler")
+
+				atomic.StoreUint32(&consensus.NumMessageHandled, 0)
+				atomic.StoreUint32(&consensus.NumPrepare, 0)
+				atomic.StoreUint32(&consensus.NumCommit, 0)
+				atomic.StoreUint32(&consensus.NumAnnounce, 0)
+				atomic.StoreUint32(&consensus.NumPrepared, 0)
+				atomic.StoreUint32(&consensus.NumCommitted, 0)
+			}
+		}
+	}()
+
 	return &consensus, nil
 }
