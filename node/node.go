@@ -389,41 +389,53 @@ var (
 // verify message signature
 func (node *Node) validateShardBoundMessage(
 	ctx context.Context, payload []byte,
-) (*msg_pb.Message, *bls.PublicKey, error) {
+) (*msg_pb.Message, *bls.PublicKey, bool, error) {
 	var (
 		m         msg_pb.Message
 		senderKey *bls.PublicKey
 	)
 	entryTime := time.Now()
-	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
+	defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, true, errors.WithStack(err)
 	}
+	if node.Consensus.IsLeader() {
+		switch m.Type {
+		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
+			return nil, nil, true, nil
+		}
+	} else {
+		switch m.Type {
+		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			return nil, nil, true, nil
+		}
+	}
+
 	var senderPubKeyViaWire []byte
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
-			return nil, nil, errors.WithStack(errWrongShardID)
+			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
-			return nil, nil, errors.WithStack(errWrongShardID)
+			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 	} else {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(errNoSenderPubKey)
+		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
 	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(errNotRightKeySize)
+		return nil, nil, true, errors.WithStack(errNotRightKeySize)
 	}
 
 	key, err := bls_cosi.BytesToBLSPublicKey(
@@ -431,17 +443,17 @@ func (node *Node) validateShardBoundMessage(
 	)
 	if err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, true, errors.WithStack(err)
 	}
 	senderKey = key
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return &m, nil, errors.WithStack(shard.ErrValidNotInCommittee)
+		return &m, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
-	return &m, senderKey, nil
+	return &m, senderKey, false, nil
 }
 
 var (
@@ -580,7 +592,7 @@ func (node *Node) Start() error {
 					}
 
 					// validate consensus message
-					validMsg, senderPubKey, err := node.validateShardBoundMessage(
+					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
 						ctx, openBox[proto.MessageCategoryBytes:],
 					)
 
@@ -588,6 +600,10 @@ func (node *Node) Start() error {
 						errChan <- withError{err,
 							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom}}
 						return false
+					}
+
+					if ignore {
+						return true
 					}
 
 					msg.ValidatorData = validated{
