@@ -24,10 +24,14 @@ const (
 	TestNetHTTPPattern = "https://api.s%d.b.hmny.io"
 	// TestNetWSPattern is the websocket pattern for testnet.
 	TestNetWSPattern = "wss://ws.s%d.b.hmny.io"
+
+	testnetV2Epoch = 6050 // per shard, reduce internal node from 15 to 8, and external nodes from 5 to 22
 )
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case epoch.Cmp(big.NewInt(testnetV2Epoch)) >= 0:
+		return testnetV2
 	case epoch.Cmp(params.TestnetChainConfig.StakingEpoch) >= 0:
 		return testnetV1
 	default: // genesis
@@ -88,3 +92,4 @@ var testnetReshardingEpoch = []*big.Int{
 
 var testnetV0 = MustNewInstance(4, 16, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
 var testnetV1 = MustNewInstance(4, 20, 15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV2 = MustNewInstance(4, 30, 8, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
