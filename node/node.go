@@ -294,9 +294,8 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 			node.tryBroadcast(newTx)
 		}
 		return err
-	} else {
-		return errors.New("shard do not match")
 	}
+	return errors.New("shard do not match")
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
