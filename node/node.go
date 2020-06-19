@@ -75,7 +75,7 @@ const (
 	// GlobalRxWorkers is the number of concurrent global message handlers.
 	GlobalRxWorkers = 32
 	// MsgChanBuffer is the buffer of consensus message handlers.
-	MsgChanBuffer = 64
+	MsgChanBuffer = 256
 )
 
 func (state State) String() string {
@@ -639,9 +639,13 @@ func (node *Node) Start() error {
 				return false
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
-			libp2p_pubsub.WithValidatorTimeout(50*time.Millisecond),
+			libp2p_pubsub.WithValidatorTimeout(250*time.Millisecond),
 			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
+			// WithValidatorInline is an option that sets the validation disposition to synchronous:
+			// it will be executed inline in validation front-end, without spawning a new goroutine.
+			// This is suitable for simple or cpu-bound validators that do not block.
+			libp2p_pubsub.WithValidatorInline(true),
 		); err != nil {
 			return err
 		}
@@ -650,12 +654,10 @@ func (node *Node) Start() error {
 		msgChan := make(chan validated, MsgChanBuffer)
 
 		go func() {
-
-			for msg := range msgChan {
-				// should not take more than 3 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				msg := msg
-
+			for m := range msgChan {
+				// should not take more than 10 seconds to process one message
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				msg := m
 				go func() {
 					defer cancel()
 
