@@ -74,6 +74,8 @@ const (
 	ShardRxWorkers = 32
 	// GlobalRxWorkers is the number of concurrent global message handlers.
 	GlobalRxWorkers = 32
+	// MsgChanBuffer is the buffer of consensus message handlers.
+	MsgChanBuffer = 64
 )
 
 func (state State) String() string {
@@ -645,7 +647,7 @@ func (node *Node) Start() error {
 		}
 
 		sem := semaphore.NewWeighted(p2p.MaxMessageHandlers)
-		msgChan := make(chan validated)
+		msgChan := make(chan validated, MsgChanBuffer)
 
 		go func() {
 
