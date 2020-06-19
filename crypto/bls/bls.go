@@ -1,10 +1,18 @@
 package bls
 
 import (
-	"fmt"
-
 	"github.com/harmony-one/bls/ffi/go/bls"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
+)
+
+const (
+	blsPubKeyCacheSize = 1024
+)
+
+var (
+	// BLSPubKeyCache is the Cache of the Deserialized BLS PubKey
+	BLSPubKeyCache, _ = lru.New(blsPubKeyCacheSize)
 )
 
 func init() {
@@ -18,14 +26,32 @@ func RandPrivateKey() *bls.SecretKey {
 	return &sec
 }
 
+var (
+	errEmptyInput = errors.New("BytesToBLSPublicKey: empty input")
+	errPubKeyCast = errors.New("BytesToBLSPublicKey: cast error")
+)
+
 // BytesToBLSPublicKey converts bytes into bls.PublicKey pointer.
 func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
 	if len(bytes) == 0 {
-		return nil, fmt.Errorf("[BytesToBLSPublicKey] bytes is empty")
+		return nil, errEmptyInput
+	}
+	kkey := string(bytes)
+	if k, ok := BLSPubKeyCache.Get(kkey); ok {
+		if pk, ok := k.(bls.PublicKey); ok {
+			return &pk, nil
+		}
+		return nil, errPubKeyCast
 	}
 	pubKey := &bls.PublicKey{}
 	err := pubKey.Deserialize(bytes)
-	return pubKey, err
+
+	if err == nil {
+		BLSPubKeyCache.Add(kkey, *pubKey)
+		return pubKey, nil
+	}
+
+	return nil, err
 }
 
 // AggregateSig aggregates all the BLS signature into a single multi-signature.
