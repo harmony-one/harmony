@@ -165,6 +165,7 @@ type Node struct {
 	BroadcastInvalidTx bool
 
 	// metrics of p2p messages
+	NumTotalMessages   uint32
 	NumValidMessages   uint32
 	NumInvalidMessages uint32
 }
@@ -396,6 +397,7 @@ func (node *Node) validateShardBoundMessage(
 		m         msg_pb.Message
 		senderKey *bls.PublicKey
 	)
+	atomic.AddUint32(&node.NumTotalMessages, 1)
 	entryTime := time.Now()
 	defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
@@ -859,9 +861,14 @@ func New(
 		for {
 			select {
 			case <-ticker.C:
-				utils.Logger().Info().Uint32("ValidMessage", node.NumValidMessages).Uint32("InvalidMessage", node.NumInvalidMessages).Msg("MsgValidator")
+				utils.Logger().Info().
+					Uint32("TotalMessage", node.NumTotalMessages).
+					Uint32("ValidMessage", node.NumValidMessages).
+					Uint32("InvalidMessage", node.NumInvalidMessages).
+					Msg("MsgValidator")
 				atomic.StoreUint32(&node.NumInvalidMessages, 0)
 				atomic.StoreUint32(&node.NumValidMessages, 0)
+				atomic.StoreUint32(&node.NumTotalMessages, 0)
 			}
 		}
 	}()
