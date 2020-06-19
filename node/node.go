@@ -602,6 +602,7 @@ func (node *Node) Start() error {
 						return false
 					}
 
+					// ignore the further processing of the p2p messages as it is not intended for this node
 					if ignore {
 						return true
 					}
@@ -718,6 +719,10 @@ func (node *Node) Start() error {
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
 					msgChan <- validatedMessage
 				} else {
+					// continue if ValidatorData is nil
+					if nextMsg.ValidatorData == nil {
+						continue
+					}
 					errChan <- withError{errors.WithStack(errConvertToValidMessage), nextMsg}
 				}
 			}
