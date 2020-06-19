@@ -77,7 +77,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
-func NewEPoSRound(stakedReader StakingCandidatesReader) (
+func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader) (
 	*CompletedEPoSRound, error,
 ) {
 	eligibleCandidate, err := prepareOrders(stakedReader)
@@ -85,7 +85,7 @@ func NewEPoSRound(stakedReader StakingCandidatesReader) (
 		return nil, err
 	}
 	maxExternalSlots := shard.ExternalSlotsAvailableForEpoch(
-		stakedReader.CurrentBlock().Epoch(),
+		epoch,
 	)
 	median, winners := effective.Apply(
 		eligibleCandidate, maxExternalSlots,
@@ -300,7 +300,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 }
 
 func eposStakedCommittee(
-	s shardingconfig.Instance, stakerReader DataProvider,
+	epoch *big.Int, s shardingconfig.Instance, stakerReader DataProvider,
 ) (*shard.State, error) {
 	shardCount := int(s.NumShards())
 	shardState := &shard.State{}
@@ -329,7 +329,7 @@ func eposStakedCommittee(
 	}
 
 	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
-	completedEPoSRound, err := NewEPoSRound(stakerReader)
+	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader)
 
 	if err != nil {
 		return nil, err
@@ -384,7 +384,7 @@ func (def partialStakingEnabled) Compute(
 		return nil, ErrComputeForEpochInPast
 	}
 	utils.AnalysisStart("computeEPoSStakedCommittee")
-	shardState, err := eposStakedCommittee(instance, stakerReader)
+	shardState, err := eposStakedCommittee(epoch, instance, stakerReader)
 	utils.AnalysisEnd("computeEPoSStakedCommittee")
 
 	if err != nil {

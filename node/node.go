@@ -74,6 +74,8 @@ const (
 	ShardRxWorkers = 32
 	// GlobalRxWorkers is the number of concurrent global message handlers.
 	GlobalRxWorkers = 32
+	// MsgChanBuffer is the buffer of consensus message handlers.
+	MsgChanBuffer = 64
 )
 
 func (state State) String() string {
@@ -163,6 +165,7 @@ type Node struct {
 	BroadcastInvalidTx bool
 
 	// metrics of p2p messages
+	NumTotalMessages   uint32
 	NumValidMessages   uint32
 	NumInvalidMessages uint32
 }
@@ -389,41 +392,54 @@ var (
 // verify message signature
 func (node *Node) validateShardBoundMessage(
 	ctx context.Context, payload []byte,
-) (*msg_pb.Message, *bls.PublicKey, error) {
+) (*msg_pb.Message, *bls.PublicKey, bool, error) {
 	var (
 		m         msg_pb.Message
 		senderKey *bls.PublicKey
 	)
+	atomic.AddUint32(&node.NumTotalMessages, 1)
 	entryTime := time.Now()
-	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
+	defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, true, errors.WithStack(err)
 	}
+	if node.Consensus.IsLeader() {
+		switch m.Type {
+		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
+			return nil, nil, true, nil
+		}
+	} else {
+		switch m.Type {
+		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			return nil, nil, true, nil
+		}
+	}
+
 	var senderPubKeyViaWire []byte
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
-			return nil, nil, errors.WithStack(errWrongShardID)
+			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeCon.GetSenderPubkey()
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
-			return nil, nil, errors.WithStack(errWrongShardID)
+			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderPubKeyViaWire = maybeVC.GetSenderPubkey()
 	} else {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(errNoSenderPubKey)
+		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
 	if len(senderPubKeyViaWire) != shard.PublicKeySizeInBytes {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(errNotRightKeySize)
+		return nil, nil, true, errors.WithStack(errNotRightKeySize)
 	}
 
 	key, err := bls_cosi.BytesToBLSPublicKey(
@@ -431,17 +447,17 @@ func (node *Node) validateShardBoundMessage(
 	)
 	if err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, true, errors.WithStack(err)
 	}
 	senderKey = key
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return &m, nil, errors.WithStack(shard.ErrValidNotInCommittee)
+		return &m, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
-	return &m, senderKey, nil
+	return &m, senderKey, false, nil
 }
 
 var (
@@ -524,11 +540,6 @@ func (node *Node) Start() error {
 		senderPubKey   *bls.PublicKey
 	}
 
-	type p2pSenderInfo struct {
-		source    libp2p_peer.ID
-		forwarder libp2p_peer.ID
-	}
-
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	for i := range allTopics {
@@ -556,12 +567,7 @@ func (node *Node) Start() error {
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
-					errChan <- withError{
-						errors.WithStack(errors.Wrapf(
-							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
-					}
-					return false
+					return true
 				}
 
 				openBox := hmyMsg[p2pMsgPrefixSize:]
@@ -574,20 +580,26 @@ func (node *Node) Start() error {
 					if !isConsensusBound {
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic),
-							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom},
+							msg.GetFrom(),
 						}
 						return false
 					}
 
 					// validate consensus message
-					validMsg, senderPubKey, err := node.validateShardBoundMessage(
+					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
 						ctx, openBox[proto.MessageCategoryBytes:],
 					)
 
 					if err != nil {
 						errChan <- withError{err,
-							p2pSenderInfo{msg.GetFrom(), msg.ReceivedFrom}}
+							msg.GetFrom(),
+						}
 						return false
+					}
+
+					// ignore the further processing of the p2p messages as it is not intended for this node
+					if ignore {
+						return true
 					}
 
 					msg.ValidatorData = validated{
@@ -635,7 +647,7 @@ func (node *Node) Start() error {
 		}
 
 		sem := semaphore.NewWeighted(p2p.MaxMessageHandlers)
-		msgChan := make(chan validated)
+		msgChan := make(chan validated, MsgChanBuffer)
 
 		go func() {
 
@@ -702,6 +714,10 @@ func (node *Node) Start() error {
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
 					msgChan <- validatedMessage
 				} else {
+					// continue if ValidatorData is nil
+					if nextMsg.ValidatorData == nil {
+						continue
+					}
 					errChan <- withError{errors.WithStack(errConvertToValidMessage), nextMsg}
 				}
 			}
@@ -855,9 +871,14 @@ func New(
 		for {
 			select {
 			case <-ticker.C:
-				utils.Logger().Info().Uint32("ValidMessage", node.NumValidMessages).Uint32("InvalidMessage", node.NumInvalidMessages).Msg("MsgValidator")
+				utils.Logger().Info().
+					Uint32("TotalMessage", node.NumTotalMessages).
+					Uint32("ValidMessage", node.NumValidMessages).
+					Uint32("InvalidMessage", node.NumInvalidMessages).
+					Msg("MsgValidator")
 				atomic.StoreUint32(&node.NumInvalidMessages, 0)
 				atomic.StoreUint32(&node.NumValidMessages, 0)
+				atomic.StoreUint32(&node.NumTotalMessages, 0)
 			}
 		}
 	}()

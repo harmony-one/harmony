@@ -27,6 +27,7 @@ var (
 
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
+	atomic.AddUint32(&consensus.NumMessageHandled, 1)
 	entryTime := time.Now()
 	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:handle_consensus_message]")
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
@@ -42,6 +43,19 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	intendedForValidator, intendedForLeader :=
 		!consensus.IsLeader(),
 		consensus.IsLeader()
+
+	switch msg.Type {
+	case msg_pb.MessageType_ANNOUNCE:
+		atomic.AddUint32(&consensus.NumAnnounce, 1)
+	case msg_pb.MessageType_PREPARED:
+		atomic.AddUint32(&consensus.NumPrepared, 1)
+	case msg_pb.MessageType_COMMITTED:
+		atomic.AddUint32(&consensus.NumCommitted, 1)
+	case msg_pb.MessageType_PREPARE:
+		atomic.AddUint32(&consensus.NumPrepare, 1)
+	case msg_pb.MessageType_COMMIT:
+		atomic.AddUint32(&consensus.NumCommit, 1)
+	}
 
 	switch t := msg.Type; true {
 	// Handle validator intended messages first

@@ -179,7 +179,7 @@ func TestValidator_SanityCheck(t *testing.T) {
 	for i, test := range tests {
 		v := makeValidValidator()
 		test.editValidator(&v)
-		err := v.SanityCheck(DoNotEnforceMaxBLS)
+		err := v.SanityCheck()
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}
@@ -242,7 +242,7 @@ func TestValidatorWrapper_SanityCheck(t *testing.T) {
 	for i, test := range tests {
 		vw := makeValidValidatorWrapper()
 		test.editValidatorWrapper(&vw)
-		err := vw.SanityCheck(DoNotEnforceMaxBLS)
+		err := vw.SanityCheck()
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
 		}

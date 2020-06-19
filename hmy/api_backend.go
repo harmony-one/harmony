@@ -552,7 +552,9 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	res, err := b.SingleFlightRequest(
 		key,
 		func() (interface{}, error) {
-			return committee.NewEPoSRound(b.hmy.BlockChain())
+			// Compute for next epoch
+			epoch := big.NewInt(0).Add(b.CurrentBlock().Epoch(), big.NewInt(1))
+			return committee.NewEPoSRound(epoch, b.hmy.BlockChain())
 		},
 	)
 	if err != nil {

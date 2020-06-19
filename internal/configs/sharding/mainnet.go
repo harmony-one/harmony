@@ -29,8 +29,8 @@ const (
 	mainnetV1_4Epoch = 46
 	mainnetV1_5Epoch = 54
 	mainnetV2_0Epoch = 185 // prestaking epoch
-	mainnetV2_1Epoch = 300 // open slots increase from 320 - 480  (TODO): update the epoch
-	mainnetV2_2Epoch = 300 // open slots increase from 480 - 640  (TODO): update the epoch
+	mainnetV2_1Epoch = 208 // open slots increase from 320 - 480
+	mainnetV2_2Epoch = 213 // open slots increase from 480 - 640
 
 	// MainNetHTTPPattern is the http pattern for mainnet.
 	MainNetHTTPPattern = "https://api.s%d.t.hmny.io"
