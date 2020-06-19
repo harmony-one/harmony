@@ -567,12 +567,7 @@ func (node *Node) Start() error {
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
-					errChan <- withError{
-						errors.WithStack(errors.Wrapf(
-							errMsgHadNoHMYPayLoadAssumption, "on topic %s", topicNamed,
-						)), msg.GetFrom(),
-					}
-					return false
+					return true
 				}
 
 				openBox := hmyMsg[p2pMsgPrefixSize:]
