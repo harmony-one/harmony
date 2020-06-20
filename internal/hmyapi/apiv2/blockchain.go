@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -986,4 +987,9 @@ func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 		return nil, err
 	}
 	return s.b.GetLastCrossLinks()
+}
+
+// GetLatestChainHeaders ..
+func (s *PublicBlockChainAPI) GetLatestChainHeaders() *block.HeaderPair {
+	return s.b.GetLatestChainHeaders()
 }
