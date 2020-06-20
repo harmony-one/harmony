@@ -179,6 +179,7 @@ func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
 	for k, v := range s.publicKeys {
 		if v.IsEqual(pubKey) {
 			idx = k
+			break
 		}
 	}
 	return idx
