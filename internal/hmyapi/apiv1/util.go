@@ -36,7 +36,6 @@ func SubmitTransaction(
 	ctx context.Context, b Backend, tx *types.Transaction,
 ) (common.Hash, error) {
 	if err := b.SendTx(ctx, tx); err != nil {
-		// legacy behavior is to never return error and always return tx hash
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
 		return tx.Hash(), err
 	}
