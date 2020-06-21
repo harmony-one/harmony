@@ -89,4 +89,5 @@ type Backend interface {
 	GetLatestChainHeaders() *block.HeaderPair
 	GetNodeMetadata() commonRPC.NodeMetadata
 	GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
+	IsStakingEpoch(epoch *big.Int) bool
 }
