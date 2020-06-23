@@ -763,6 +763,11 @@ func main() {
 			Msg("StartRPC failed")
 	}
 
+	if err := currentNode.BootstrapConsensus(); err != nil {
+		fmt.Println("could not bootstrap consensus", err.Error())
+		os.Exit(-1)
+	}
+
 	if err := currentNode.Start(); err != nil {
 		fmt.Println("could not begin network message handling for node", err.Error())
 		os.Exit(-1)
