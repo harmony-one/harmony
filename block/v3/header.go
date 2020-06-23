@@ -84,8 +84,8 @@ func (h *Header) SetParentHash(newParentHash common.Hash) {
 	h.fields.ParentHash = newParentHash
 }
 
-// Coinbase is the address of the node that proposed this block and all
-// transactions in it.
+// Coinbase is now the first 20 bytes of the SHA256 hash of the leader's
+// public BLS key. This is required for EVM compatibility.
 func (h *Header) Coinbase() common.Address {
 	return h.fields.Coinbase
 }
