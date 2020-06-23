@@ -538,8 +538,8 @@ func (node *Node) BootstrapConsensus() error {
 		go func() {
 			node.startConsensus <- struct{}{}
 		}()
+		return nil
 	}
-	return nil
 }
 
 // ConsensusMessageHandler passes received message in node_handler to consensus

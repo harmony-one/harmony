@@ -77,7 +77,10 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	}
 	ctx := context.Background()
 	p2pHost, err := libp2p.New(ctx,
-		libp2p.ListenAddrs(listenAddr), libp2p.Identity(key),
+		libp2p.ListenAddrs(listenAddr),
+		libp2p.Identity(key),
+		libp2p.EnableNATService(),
+		libp2p.ForceReachabilityPublic(),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")

@@ -524,7 +524,6 @@ func New(
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
 	node.startConsensus = make(chan struct{})
-	go node.BootstrapConsensus()
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
