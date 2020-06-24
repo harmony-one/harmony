@@ -5,6 +5,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -24,7 +25,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 	err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
+			utils.SampledLogger().Info().
 				Hex("senderKey", msg.GetConsensus().SenderPubkey).
 				Msg("sender key not in this slot's subcommittee")
 		} else {
