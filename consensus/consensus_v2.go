@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -22,9 +21,6 @@ import (
 
 // handlemessageupdate will update the consensus state according to received message
 func (consensus *Consensus) handleMessageUpdate(payload []byte) {
-	entryTime := time.Now()
-	defer utils.SampledLogger().Info().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:handle_consensus_message]")
-
 	if len(payload) == 0 {
 		return
 	}
