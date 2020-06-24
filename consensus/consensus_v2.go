@@ -175,7 +175,6 @@ func (consensus *Consensus) finalizeCommits() {
 		Uint64("epochNum", block.Epoch().Uint64()).
 		Uint64("ViewId", block.Header().ViewID().Uint64()).
 		Str("blockHash", block.Hash().String()).
-		Int("index", consensus.Decider.IndexOf(consensus.LeaderPubKey)).
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")

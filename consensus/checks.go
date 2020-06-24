@@ -3,6 +3,7 @@ package consensus
 import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -20,17 +21,21 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[validatorSanityChecks] Checking new message")
-	senderKey, err := consensus.verifySenderKey(msg)
+	err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
+				Hex("senderKey", msg.GetConsensus().SenderPubkey).
 				Msg("sender key not in this slot's subcommittee")
 		} else {
 			consensus.getLogger().Error().Err(err).Msg("VerifySenderKey failed")
 		}
 		return false
 	}
-
+	senderKey, err := bls.BytesToBLSPublicKey(msg.GetConsensus().SenderPubkey)
+	if err != nil {
+		return false
+	}
 	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
 		consensus.current.Mode() == Normal && !consensus.ignoreViewIDCheck {
 		consensus.getLogger().Warn().Msgf(
@@ -60,10 +65,11 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 		Uint64("viewID", msg.GetConsensus().ViewId).
 		Str("msgType", msg.Type.String()).
 		Msg("[leaderSanityChecks] Checking new message")
-	senderKey, err := consensus.verifySenderKey(msg)
+	err := consensus.verifySenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().Msgf(
+			consensus.getLogger().Info().
+				Hex("senderKey", msg.GetConsensus().SenderPubkey).Msgf(
 				"[%s] sender key not in this slot's subcommittee",
 				msg.GetType().String(),
 			)
@@ -73,6 +79,10 @@ func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
 				msg.GetType().String(),
 			)
 		}
+		return false
+	}
+	senderKey, err := bls.BytesToBLSPublicKey(msg.GetConsensus().SenderPubkey)
+	if err != nil {
 		return false
 	}
 	if err = verifyMessageSig(senderKey, msg); err != nil {
@@ -197,7 +207,8 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().Msgf(
+			consensus.getLogger().Info().
+				Hex("senderKey", msg.GetConsensus().SenderPubkey).Msgf(
 				"[%s] sender key not in this slot's subcommittee",
 				msg.GetType().String(),
 			)
