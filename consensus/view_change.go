@@ -136,6 +136,9 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Msg("[startViewChange]")
 
 	for i, key := range consensus.PubKey.PublicKey {
+		if !consensus.IsValidatorInCommittee(key) {
+			continue
+		}
 		msgToSend := consensus.constructViewChangeMessage(key, consensus.priKey.PrivateKey[i])
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
@@ -624,6 +627,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 		for i, key := range consensus.PubKey.PublicKey {
+			if !consensus.IsValidatorInCommittee(key) {
+				continue
+			}
 			network, err := consensus.construct(
 				msg_pb.MessageType_COMMIT,
 				commitPayload,
