@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -69,7 +70,7 @@ func (p Policy) String() string {
 type ParticipantTracker interface {
 	Participants() []*bls.PublicKey
 	ParticipantsKeyBytes() []shard.BLSPublicKey
-	IndexOf(*bls.PublicKey) int
+	IndexOf(shard.BLSPublicKey) int
 	ParticipantsCount() int64
 	NextAfter(*bls.PublicKey) (bool, *bls.PublicKey)
 	UpdateParticipants(pubKeys []*bls.PublicKey)
@@ -148,6 +149,7 @@ type cIdentities struct {
 	// Public keys of the committee including leader and validators
 	publicKeys     []*bls.PublicKey
 	publicKeysByte []shard.BLSPublicKey
+	keyIndexMap    sync.Map
 	prepare        *votepower.Round
 	commit         *votepower.Round
 	// viewIDSigs: every validator
@@ -174,20 +176,19 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
 	return bls_cosi.AggregateSig(sigs)
 }
 
-func (s *cIdentities) IndexOf(pubKey *bls.PublicKey) int {
-	idx := -1
-	for k, v := range s.publicKeys {
-		if v.IsEqual(pubKey) {
-			idx = k
-			break
-		}
+func (s *cIdentities) IndexOf(pubKey shard.BLSPublicKey) int {
+	if index, ok := s.keyIndexMap.Load(pubKey); ok {
+		return index.(int)
 	}
-	return idx
+	return -1
 }
 
 func (s *cIdentities) NextAfter(pubKey *bls.PublicKey) (bool, *bls.PublicKey) {
 	found := false
-	idx := s.IndexOf(pubKey)
+	pubKeyByte := shard.BLSPublicKey{}
+	pubKeyByte.FromLibBLSPublicKey(pubKey)
+
+	idx := s.IndexOf(pubKeyByte)
 	if idx != -1 {
 		found = true
 	}
@@ -205,14 +206,23 @@ func (s *cIdentities) ParticipantsKeyBytes() []shard.BLSPublicKey {
 
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 	keyBytes := []shard.BLSPublicKey{}
+	keyIndexMap := map[shard.BLSPublicKey]int{}
 	for i := range pubKeys {
 		k := shard.BLSPublicKey{}
 		k.FromLibBLSPublicKey(pubKeys[i])
 
 		keyBytes = append(keyBytes, k)
+		keyIndexMap[k] = i
 	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
+
+	for _, pubKey := range s.publicKeysByte {
+		s.keyIndexMap.Delete(pubKey)
+	}
 	s.publicKeysByte = keyBytes
+	for i, pubKey := range s.publicKeysByte {
+		s.keyIndexMap.Store(pubKey, i)
+	}
 }
 
 func (s *cIdentities) ParticipantsCount() int64 {
@@ -319,6 +329,7 @@ func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
 		publicKeys:     []*bls.PublicKey{},
 		publicKeysByte: []shard.BLSPublicKey{},
+		keyIndexMap:    sync.Map{},
 		prepare:        votepower.NewRound(),
 		commit:         votepower.NewRound(),
 		viewChange:     votepower.NewRound(),

@@ -167,6 +167,15 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
+	pubKeyBytes := shard.FromLibBLSPublicKeyUnsafe(pubKey)
+	if pubKeyBytes == nil {
+		return false
+	}
+	return consensus.Decider.IndexOf(*pubKeyBytes) != -1
+}
+
+// IsValidatorInCommitteeBytes returns whether the given validator BLS address is part of my committee
+func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey shard.BLSPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
@@ -193,17 +202,14 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 }
 
 // verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
-func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
-	consensusMsg := msg.GetConsensus()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
+func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
+	senderKey := shard.BLSPublicKey{}
 
-	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
+	copy(senderKey[:], msg.GetConsensus().SenderPubkey[:])
+	if !consensus.IsValidatorInCommitteeBytes(senderKey) {
+		return shard.ErrValidNotInCommittee
 	}
-	return senderKey, nil
+	return nil
 }
 
 func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
