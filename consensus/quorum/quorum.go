@@ -3,7 +3,6 @@ package quorum
 import (
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -149,7 +148,7 @@ type cIdentities struct {
 	// Public keys of the committee including leader and validators
 	publicKeys     []*bls.PublicKey
 	publicKeysByte []shard.BLSPublicKey
-	keyIndexMap    sync.Map
+	keyIndexMap    map[shard.BLSPublicKey]int
 	prepare        *votepower.Round
 	commit         *votepower.Round
 	// viewIDSigs: every validator
@@ -177,8 +176,8 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
 }
 
 func (s *cIdentities) IndexOf(pubKey shard.BLSPublicKey) int {
-	if index, ok := s.keyIndexMap.Load(pubKey); ok {
-		return index.(int)
+	if index, ok := s.keyIndexMap[pubKey]; ok {
+		return index
 	}
 	return -1
 }
@@ -215,14 +214,8 @@ func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
 		keyIndexMap[k] = i
 	}
 	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
-
-	for _, pubKey := range s.publicKeysByte {
-		s.keyIndexMap.Delete(pubKey)
-	}
 	s.publicKeysByte = keyBytes
-	for i, pubKey := range s.publicKeysByte {
-		s.keyIndexMap.Store(pubKey, i)
-	}
+	s.keyIndexMap = keyIndexMap
 }
 
 func (s *cIdentities) ParticipantsCount() int64 {
@@ -329,7 +322,7 @@ func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
 		publicKeys:     []*bls.PublicKey{},
 		publicKeysByte: []shard.BLSPublicKey{},
-		keyIndexMap:    sync.Map{},
+		keyIndexMap:    map[shard.BLSPublicKey]int{},
 		prepare:        votepower.NewRound(),
 		commit:         votepower.NewRound(),
 		viewChange:     votepower.NewRound(),
