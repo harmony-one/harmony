@@ -208,7 +208,7 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
-				Hex("senderKey", msg.GetConsensus().SenderPubkey).Msgf(
+				Hex("senderKey", msg.GetViewchange().SenderPubkey).Msgf(
 				"[%s] sender key not in this slot's subcommittee",
 				msg.GetType().String(),
 			)
