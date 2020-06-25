@@ -13,7 +13,7 @@ import (
 
 // defaultPageSize is to have default pagination.
 const (
-	defaultPageSize = uint32(100)
+	defaultPageSize = uint32(1000)
 )
 
 // ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
