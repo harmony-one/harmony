@@ -168,6 +168,7 @@ type Node struct {
 	NumTotalMessages   uint32
 	NumValidMessages   uint32
 	NumInvalidMessages uint32
+	NumSlotMessages    uint32
 	NumIgnoredMessages uint32
 }
 
@@ -441,7 +442,7 @@ func (node *Node) validateShardBoundMessage(
 
 	err := node.Consensus.VerifySenderKey(&m)
 	if err != nil {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
+		atomic.AddUint32(&node.NumSlotMessages, 1)
 		return nil, nil, true, errors.WithStack(err)
 	}
 
@@ -874,9 +875,11 @@ func New(
 					Uint32("TotalMessage", node.NumTotalMessages).
 					Uint32("ValidMessage", node.NumValidMessages).
 					Uint32("InvalidMessage", node.NumInvalidMessages).
+					Uint32("SlotMessage", node.NumSlotMessages).
 					Uint32("IgnoredMessage", node.NumIgnoredMessages).
 					Msg("MsgValidator")
 				atomic.StoreUint32(&node.NumInvalidMessages, 0)
+				atomic.StoreUint32(&node.NumSlotMessages, 0)
 				atomic.StoreUint32(&node.NumIgnoredMessages, 0)
 				atomic.StoreUint32(&node.NumValidMessages, 0)
 				atomic.StoreUint32(&node.NumTotalMessages, 0)
