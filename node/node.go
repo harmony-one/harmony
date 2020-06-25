@@ -168,6 +168,7 @@ type Node struct {
 	NumTotalMessages   uint32
 	NumValidMessages   uint32
 	NumInvalidMessages uint32
+	NumIgnoredMessages uint32
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -408,11 +409,7 @@ func (node *Node) validateShardBoundMessage(
 	if node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
-			return nil, nil, true, nil
-		}
-	} else {
-		switch m.Type {
-		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			atomic.AddUint32(&node.NumIgnoredMessages, 1)
 			return nil, nil, true, nil
 		}
 	}
@@ -444,6 +441,7 @@ func (node *Node) validateShardBoundMessage(
 
 	err := node.Consensus.VerifySenderKey(&m)
 	if err != nil {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, true, errors.WithStack(err)
 	}
 
@@ -459,6 +457,14 @@ func (node *Node) validateShardBoundMessage(
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return &m, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+	}
+
+	if !node.Consensus.IsLeader() {
+		switch m.Type {
+		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			atomic.AddUint32(&node.NumIgnoredMessages, 1)
+			return nil, nil, true, nil
+		}
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
@@ -868,8 +874,10 @@ func New(
 					Uint32("TotalMessage", node.NumTotalMessages).
 					Uint32("ValidMessage", node.NumValidMessages).
 					Uint32("InvalidMessage", node.NumInvalidMessages).
+					Uint32("IgnoredMessage", node.NumIgnoredMessages).
 					Msg("MsgValidator")
 				atomic.StoreUint32(&node.NumInvalidMessages, 0)
+				atomic.StoreUint32(&node.NumIgnoredMessages, 0)
 				atomic.StoreUint32(&node.NumValidMessages, 0)
 				atomic.StoreUint32(&node.NumTotalMessages, 0)
 			}
