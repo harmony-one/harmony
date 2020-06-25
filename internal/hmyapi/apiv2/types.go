@@ -99,7 +99,7 @@ type RPCUndelegation struct {
 	Epoch  *big.Int
 }
 
-func newHeaderInformation(header *block.Header) *HeaderInformation {
+func newHeaderInformation(header *block.Header, isStaking bool) *HeaderInformation {
 	if header == nil {
 		return nil
 	}
@@ -118,15 +118,19 @@ func newHeaderInformation(header *block.Header) *HeaderInformation {
 	sig := header.LastCommitSignature()
 	result.LastCommitSig = hex.EncodeToString(sig[:])
 
-	bechAddr, err := internal_common.AddressToBech32(header.Coinbase())
-	if err != nil {
-		bechAddr = header.Coinbase().Hex()
+	if isStaking {
+		result.Leader = strings.ToLower(header.Coinbase().Hex())
+	} else {
+		bechAddr, err := internal_common.AddressToBech32(header.Coinbase())
+		if err != nil {
+			bechAddr = header.Coinbase().Hex()
+		}
+		result.Leader = bechAddr
 	}
-	result.Leader = bechAddr
 
 	if header.ShardID() == shard.BeaconChainShardID {
 		decodedCrossLinks := &types.CrossLinks{}
-		err = rlp.DecodeBytes(header.CrossLinks(), decodedCrossLinks)
+		err := rlp.DecodeBytes(header.CrossLinks(), decodedCrossLinks)
 		if err != nil {
 			result.CrossLinks = &types.CrossLinks{}
 		} else {

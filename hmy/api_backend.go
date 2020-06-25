@@ -889,3 +889,8 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 	}
 	return committee.Slots, mask, nil
 }
+
+// IsStakingEpoch ...
+func (b *APIBackend) IsStakingEpoch(epoch *big.Int) bool {
+	return b.hmy.BlockChain().Config().IsStaking(epoch)
+}

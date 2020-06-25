@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -517,7 +518,7 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 // LatestHeader returns the latest header information
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
-	return newHeaderInformation(header)
+	return newHeaderInformation(header, s.b.IsStakingEpoch(header.Epoch()))
 }
 
 // GetHeaderByNumber returns block header at given number
@@ -529,7 +530,7 @@ func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, blockNum ui
 	if err != nil {
 		return nil, err
 	}
-	return newHeaderInformation(header), nil
+	return newHeaderInformation(header, s.b.IsStakingEpoch(header.Epoch())), nil
 }
 
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
@@ -986,4 +987,9 @@ func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 		return nil, err
 	}
 	return s.b.GetLastCrossLinks()
+}
+
+// GetLatestChainHeaders ..
+func (s *PublicBlockChainAPI) GetLatestChainHeaders() *block.HeaderPair {
+	return s.b.GetLatestChainHeaders()
 }
