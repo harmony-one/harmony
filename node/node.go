@@ -566,7 +566,7 @@ func (node *Node) Start() error {
 		if err := pubsub.RegisterTopicValidator(
 			topicNamed,
 			// this is the validation function called to quickly validate every p2p message
-			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) bool {
+			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
 				entryTime := time.Now()
 				defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
 
@@ -574,7 +574,7 @@ func (node *Node) Start() error {
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
-					return true
+					return libp2p_pubsub.ValidationAccept
 				}
 
 				openBox := hmyMsg[p2pMsgPrefixSize:]
@@ -588,7 +588,7 @@ func (node *Node) Start() error {
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
 						}
-						return false
+						return libp2p_pubsub.ValidationReject
 					}
 
 					// validate consensus message
@@ -598,12 +598,12 @@ func (node *Node) Start() error {
 
 					if err != nil {
 						errChan <- withError{err, msg.GetFrom()}
-						return false
+						return libp2p_pubsub.ValidationIgnore
 					}
 
 					// ignore the further processing of the p2p messages as it is not intended for this node
 					if ignore {
-						return true
+						return libp2p_pubsub.ValidationAccept
 					}
 
 					msg.ValidatorData = validated{
@@ -612,7 +612,7 @@ func (node *Node) Start() error {
 						handleCArg:     validMsg,
 						senderPubKey:   senderPubKey,
 					}
-					return true
+					return libp2p_pubsub.ValidationAccept
 
 				case proto.Node:
 					// TODO push the message parsing here, so can ban
@@ -622,7 +622,7 @@ func (node *Node) Start() error {
 						handleEArg:     openBox,
 					}
 				default:
-					return false
+					return libp2p_pubsub.ValidationIgnore
 				}
 
 				select {
@@ -633,10 +633,10 @@ func (node *Node) Start() error {
 					}
 					errChan <- withError{errors.WithStack(ctx.Err()), nil}
 				default:
-					return true
+					return libp2p_pubsub.ValidationAccept
 				}
 
-				return false
+				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			libp2p_pubsub.WithValidatorTimeout(250*time.Millisecond),
