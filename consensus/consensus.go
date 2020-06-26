@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
+	"github.com/tevino/abool"
 )
 
 const (
@@ -88,12 +89,10 @@ type Consensus struct {
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// whether to ignore viewID check
-	ignoreViewIDCheck bool
+	ignoreViewIDCheck *abool.AtomicBool
 	// global consensus mutex
 	// TODO(optimization): Avoid mutex and use more efficient locking primitives
 	mutex sync.Mutex
-	// consensus information update mutex
-	infoMutex sync.Mutex
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -211,5 +210,6 @@ func New(
 	consensus.ReadySignal = make(chan struct{})
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
+	consensus.ignoreViewIDCheck = abool.NewBool(false)
 	return &consensus, nil
 }
