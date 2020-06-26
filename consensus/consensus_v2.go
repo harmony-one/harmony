@@ -31,15 +31,6 @@ func (consensus *Consensus) IsViewChangingMode() bool {
 
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
-	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
-	// in order to avoid possible trap forever but drop PREPARE and COMMIT
-	// which are message types specifically for a node acting as leader
-	// so we just ignore those messages
-	if consensus.IsViewChangingMode() &&
-		(msg.Type == msg_pb.MessageType_PREPARE ||
-			msg.Type == msg_pb.MessageType_COMMIT) {
-		return nil
-	}
 
 	intendedForValidator, intendedForLeader :=
 		!consensus.IsLeader(),
@@ -59,20 +50,17 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		intendedForValidator &&
 		consensus.validatorSanityChecks(msg, senderKey):
 		consensus.onCommitted(msg)
+
 	// Handle leader intended messages now
-	case t == msg_pb.MessageType_PREPARE &&
-		intendedForLeader &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+	case t == msg_pb.MessageType_PREPARE && intendedForLeader:
 		consensus.onPrepare(msg)
-	case t == msg_pb.MessageType_COMMIT &&
-		intendedForLeader &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+	case t == msg_pb.MessageType_COMMIT && intendedForLeader:
 		consensus.onCommit(msg)
-	case t == msg_pb.MessageType_VIEWCHANGE &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+
+		// Handle view change messages
+	case t == msg_pb.MessageType_VIEWCHANGE:
 		consensus.onViewChange(msg)
-	case t == msg_pb.MessageType_NEWVIEW &&
-		consensus.senderKeySanityChecks(msg, senderKey):
+	case t == msg_pb.MessageType_NEWVIEW:
 		consensus.onNewView(msg)
 	}
 

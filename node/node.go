@@ -407,6 +407,18 @@ func (node *Node) validateShardBoundMessage(
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, true, errors.WithStack(err)
 	}
+
+	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
+	// in order to avoid possible trap forever but drop PREPARE and COMMIT
+	// which are message types specifically for a node acting as leader
+	// so we just ignore those messages
+	if node.Consensus.IsViewChangingMode() {
+		switch m.Type {
+		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			return nil, nil, true, nil
+		}
+	}
+
 	if node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:

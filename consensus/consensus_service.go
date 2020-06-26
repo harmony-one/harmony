@@ -31,8 +31,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message, senderKey
 		)
 		return false
 	}
-
-	return consensus.senderKeySanityChecks(msg, senderKey)
+	return true
 }
 
 func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey *bls.PublicKey) bool {
