@@ -88,8 +88,8 @@ type Consensus struct {
 	blockHeader []byte
 	// Shard Id which this node belongs to
 	ShardID uint32
-	// whether to ignore viewID check
-	ignoreViewIDCheck *abool.AtomicBool
+	// IgnoreViewIDCheck determines whether to ignore viewID check
+	IgnoreViewIDCheck *abool.AtomicBool
 	// global consensus mutex
 	// TODO(optimization): Avoid mutex and use more efficient locking primitives
 	mutex sync.Mutex
@@ -210,6 +210,6 @@ func New(
 	consensus.ReadySignal = make(chan struct{})
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
-	consensus.ignoreViewIDCheck = abool.NewBool(false)
+	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	return &consensus, nil
 }
