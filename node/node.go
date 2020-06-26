@@ -25,7 +25,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -440,24 +439,16 @@ func (node *Node) validateShardBoundMessage(
 		return nil, nil, true, errors.WithStack(errNotRightKeySize)
 	}
 
-	err := node.Consensus.VerifySenderKey(&m)
-	if err != nil {
-		atomic.AddUint32(&node.NumSlotMessages, 1)
-		return nil, nil, true, errors.WithStack(err)
-	}
-
-	key, err := bls_cosi.BytesToBLSPublicKey(
-		senderPubKeyViaWire,
-	)
-	if err != nil {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, true, errors.WithStack(err)
-	}
-	senderKey = key
-
-	if !node.Consensus.IsValidatorInCommittee(senderKey) {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return &m, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+	if maybeCon != nil {
+		if !node.Consensus.SenderSanityCheck(&m) {
+			atomic.AddUint32(&node.NumSlotMessages, 1)
+			return nil, nil, true, errNoSenderPubKey
+		}
+	} else if maybeVC != nil {
+		if !node.Consensus.ViewChangeSanityCheck(&m) {
+			atomic.AddUint32(&node.NumSlotMessages, 1)
+			return nil, nil, true, errNoSenderPubKey
+		}
 	}
 
 	if !node.Consensus.IsLeader() {
