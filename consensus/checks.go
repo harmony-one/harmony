@@ -1,10 +1,12 @@
 package consensus
 
 import (
+	protobuf "github.com/golang/protobuf/proto"
 	libbls "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -25,6 +27,28 @@ func (consensus *Consensus) VerifySenderKey(pubkey []byte, msg *msg_pb.Message) 
 	if !consensus.IsValidatorInCommitteeBytes(senderKey) {
 		return shard.ErrValidNotInCommittee
 	}
+	return nil
+}
+
+// VerifyMessageSig verify the signature of the message are valid from the signer's public key.
+func VerifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) error {
+	signature := message.Signature
+	message.Signature = nil
+	messageBytes, err := protobuf.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	msgSig := libbls.Sign{}
+	err = msgSig.Deserialize(signature)
+	if err != nil {
+		return err
+	}
+	msgHash := hash.Keccak256(messageBytes)
+	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+		return errors.New("failed to verify the signature")
+	}
+	message.Signature = signature
 	return nil
 }
 

@@ -204,28 +204,6 @@ func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey shard.BLSPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// VerifyMessageSig verify the signature of the message are valid from the signer's public key.
-func VerifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
-	signature := message.Signature
-	message.Signature = nil
-	messageBytes, err := protobuf.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	msgSig := bls.Sign{}
-	err = msgSig.Deserialize(signature)
-	if err != nil {
-		return err
-	}
-	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
-		return errors.New("failed to verify the signature")
-	}
-	message.Signature = signature
-	return nil
-}
-
 // SetViewID set the viewID to the height of the blockchain
 func (consensus *Consensus) SetViewID(height uint64) {
 	consensus.viewID = height
