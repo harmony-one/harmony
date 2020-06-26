@@ -24,13 +24,18 @@ var (
 	errSenderPubKeyNotLeader = errors.New("sender pubkey doesn't match leader")
 )
 
+// IsViewChangingMode return true if curernt mode is viewchanging
+func (consensus *Consensus) IsViewChangingMode() bool {
+	return consensus.current.Mode() == ViewChanging
+}
+
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.PublicKey) error {
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
 	// so we just ignore those messages
-	if (consensus.current.Mode() == ViewChanging) &&
+	if consensus.IsViewChangingMode() &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
 			msg.Type == msg_pb.MessageType_COMMIT) {
 		return nil
@@ -291,7 +296,7 @@ func (consensus *Consensus) tryCatchup() {
 	}
 	// catup up and skip from view change trap
 	if currentBlockNum < consensus.blockNum &&
-		consensus.current.Mode() == ViewChanging {
+		consensus.IsViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}

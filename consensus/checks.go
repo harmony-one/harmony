@@ -11,7 +11,7 @@ import (
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
 
-func (consensus *Consensus) leaderSanityChecks(msg *msg_pb.Message) bool {
+func (consensus *Consensus) SenderSanityCheck(msg *msg_pb.Message) bool {
 	if msg.GetConsensus() == nil {
 		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
 		return false
@@ -82,7 +82,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
 				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
 				Msg("[OnAnnounce] Leader is malicious")
-			if consensus.current.Mode() == ViewChanging {
+			if consensus.IsViewChangingMode() {
 				consensus.getLogger().Debug().Msg(
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
@@ -153,7 +153,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 	return true
 }
 
-func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
+func (consensus *Consensus) ViewChangeSanityCheck(msg *msg_pb.Message) bool {
 	if msg.GetViewchange() == nil {
 		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
 		return false
@@ -201,7 +201,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 			Msg("[onViewChange] New Leader Has Lower Blocknum")
 		return false
 	}
-	if consensus.current.Mode() == ViewChanging &&
+	if consensus.IsViewChangingMode() &&
 		consensus.current.ViewID() > recvMsg.ViewID {
 		consensus.getLogger().Warn().
 			Uint64("MyViewChangingID", consensus.current.ViewID()).
@@ -227,7 +227,7 @@ func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false
 	}
-	if consensus.current.Mode() != ViewChanging {
+	if !consensus.IsViewChangingMode() {
 		consensus.getLogger().Warn().
 			Msg("[onNewView] Not in ViewChanging mode, ignoring the new view message")
 		return false
