@@ -397,6 +397,7 @@ func (node *Node) validateShardBoundMessage(
 	var (
 		m         msg_pb.Message
 		senderKey *bls.PublicKey
+		err       error
 	)
 	atomic.AddUint32(&node.NumTotalMessages, 1)
 	entryTime := time.Now()
@@ -439,16 +440,10 @@ func (node *Node) validateShardBoundMessage(
 		return nil, nil, true, errors.WithStack(errNotRightKeySize)
 	}
 
-	if maybeCon != nil {
-		if !node.Consensus.SenderSanityCheck(&m) {
-			atomic.AddUint32(&node.NumSlotMessages, 1)
-			return nil, nil, true, errNoSenderPubKey
-		}
-	} else if maybeVC != nil {
-		if !node.Consensus.ViewChangeSanityCheck(&m) {
-			atomic.AddUint32(&node.NumSlotMessages, 1)
-			return nil, nil, true, errNoSenderPubKey
-		}
+	senderKey, err = node.Consensus.SenderSanityCheck(senderPubKeyViaWire, &m)
+	if err != nil {
+		atomic.AddUint32(&node.NumSlotMessages, 1)
+		return nil, nil, true, errors.WithStack(err)
 	}
 
 	if !node.Consensus.IsLeader() {

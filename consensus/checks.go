@@ -1,55 +1,48 @@
 package consensus
 
 import (
+	libbls "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/pkg/errors"
 )
 
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
 
-func (consensus *Consensus) SenderSanityCheck(msg *msg_pb.Message) bool {
-	if msg.GetConsensus() == nil {
-		consensus.getLogger().Warn().Msg("[leaderSanityChecks] malformed message")
-		return false
+var (
+	errBytesToBLSPubKey = errors.New("bytes to bls pubkey failed")
+)
+
+// VerifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
+func (consensus *Consensus) VerifySenderKey(pubkey []byte, msg *msg_pb.Message) error {
+	senderKey := shard.BLSPublicKey{}
+
+	copy(senderKey[:], pubkey[:])
+	if !consensus.IsValidatorInCommitteeBytes(senderKey) {
+		return shard.ErrValidNotInCommittee
 	}
-	consensus.getLogger().Debug().
-		Uint64("blockNum", msg.GetConsensus().BlockNum).
-		Uint64("viewID", msg.GetConsensus().ViewId).
-		Str("msgType", msg.Type.String()).
-		Msg("[leaderSanityChecks] Checking new message")
-	err := consensus.VerifySenderKey(msg)
+	return nil
+}
+
+func (consensus *Consensus) SenderSanityCheck(pubkey []byte, msg *msg_pb.Message) (*libbls.PublicKey, error) {
+	err := consensus.VerifySenderKey(pubkey, msg)
 	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
-				Hex("senderKey", msg.GetConsensus().SenderPubkey).Msgf(
-				"[%s] sender key not in this slot's subcommittee",
-				msg.GetType().String(),
-			)
-		} else {
-			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] VerifySenderKey failed",
-				msg.GetType().String(),
-			)
-		}
-		return false
+		return nil, err
 	}
-	senderKey, err := bls.BytesToBLSPublicKey(msg.GetConsensus().SenderPubkey)
+	senderKey, err := bls.BytesToBLSPublicKey(pubkey)
 	if err != nil {
-		return false
+		return nil, errBytesToBLSPubKey
 	}
-	if err = VerifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] Failed to verify sender's signature",
-			msg.GetType().String(),
-		)
-		return false
+	err = VerifyMessageSig(senderKey, msg)
+	if err != nil {
+		return nil, err
 	}
 
-	return true
+	return senderKey, nil
 }
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
@@ -150,39 +143,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 		}
 	}
 
-	return true
-}
-
-func (consensus *Consensus) ViewChangeSanityCheck(msg *msg_pb.Message) bool {
-	if msg.GetViewchange() == nil {
-		consensus.getLogger().Warn().Msg("[viewChangeSanityCheck] malformed message")
-		return false
-	}
-	consensus.getLogger().Debug().
-		Msg("[viewChangeSanityCheck] Checking new message")
-	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
-	if err != nil {
-		if err == shard.ErrValidNotInCommittee {
-			consensus.getLogger().Info().
-				Hex("senderKey", msg.GetViewchange().SenderPubkey).Msgf(
-				"[%s] sender key not in this slot's subcommittee",
-				msg.GetType().String(),
-			)
-		} else {
-			consensus.getLogger().Error().Err(err).Msgf(
-				"[%s] VerifySenderKey Failed",
-				msg.GetType().String(),
-			)
-		}
-		return false
-	}
-	if err := VerifyMessageSig(senderKey, msg); err != nil {
-		consensus.getLogger().Error().Err(err).Msgf(
-			"[%s] Failed To Verify Sender's Signature",
-			msg.GetType().String(),
-		)
-		return false
-	}
 	return true
 }
 
