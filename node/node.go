@@ -598,7 +598,7 @@ func (node *Node) Start() error {
 
 					if err != nil {
 						errChan <- withError{err, msg.GetFrom()}
-						return libp2p_pubsub.ValidationIgnore
+						return libp2p_pubsub.ValidationReject
 					}
 
 					// ignore the further processing of the p2p messages as it is not intended for this node
