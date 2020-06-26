@@ -160,9 +160,11 @@ func (consensus *Consensus) ResetState() {
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.infoMutex.Lock()
-	defer consensus.infoMutex.Unlock()
-	consensus.ignoreViewIDCheck = !consensus.ignoreViewIDCheck
+	if consensus.ignoreViewIDCheck.IsSet() {
+		consensus.ignoreViewIDCheck.UnSet()
+	} else {
+		consensus.ignoreViewIDCheck.Set()
+	}
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
@@ -254,14 +256,14 @@ func (consensus *Consensus) RegisterRndChannel(rndChannel chan [548]byte) {
 // Check viewID, caller's responsibility to hold lock when change ignoreViewIDCheck
 func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	// just ignore consensus check for the first time when node join
-	if consensus.ignoreViewIDCheck {
+	if consensus.ignoreViewIDCheck.IsSet() {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
 		consensus.viewID = msg.ViewID
 		consensus.current.SetViewID(msg.ViewID)
 		consensus.LeaderPubKey = msg.SenderPubkey
-		consensus.ignoreViewIDCheck = false
+		consensus.ignoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
@@ -485,7 +487,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Debug().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
-			consensus.ignoreViewIDCheck = true
+			consensus.ignoreViewIDCheck.Set()
 			hasError = true
 		} else {
 			consensus.getLogger().Debug().
