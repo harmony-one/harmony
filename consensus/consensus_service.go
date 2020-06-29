@@ -160,11 +160,7 @@ func (consensus *Consensus) ResetState() {
 
 // ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
 func (consensus *Consensus) ToggleConsensusCheck() {
-	if consensus.IgnoreViewIDCheck.IsSet() {
-		consensus.IgnoreViewIDCheck.UnSet()
-	} else {
-		consensus.IgnoreViewIDCheck.Set()
-	}
+	consensus.IgnoreViewIDCheck.Toggle()
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
