@@ -133,7 +133,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(
+					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
 						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
 				}
 			}()
@@ -150,7 +150,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	}
 	// Dump new block into level db.
 	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, true).Dump(block, block.NumberU64())
+	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
@@ -163,7 +163,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Debug().Err(err).
 			Msgf("[Explorer] Error retrieving transaction history for address %s", address)
@@ -196,7 +196,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Debug().Err(err).
 			Msgf("[Explorer] Staking transaction history for address %s not found", address)
@@ -229,7 +229,7 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return 0, nil
@@ -252,7 +252,7 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
 	addressData := &explorer.Address{}
 	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port, false).GetDB().Get([]byte(key), nil)
+	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
 		return 0, nil

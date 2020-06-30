@@ -3,7 +3,6 @@ package explorer
 import (
 	"fmt"
 	"math/big"
-	"os"
 	"path"
 	"sync"
 
@@ -44,25 +43,20 @@ type Storage struct {
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
-func GetStorageInstance(ip, port string, remove bool) *Storage {
+func GetStorageInstance(ip, port string) *Storage {
 	once.Do(func() {
 		storage = &Storage{}
-		storage.Init(ip, port, remove)
+		storage.Init(ip, port)
 	})
 	return storage
 }
 
 // Init initializes the block update.
-func (storage *Storage) Init(ip, port string, remove bool) {
+func (storage *Storage) Init(ip, port string) {
 	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
 	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
 	var err error
-	if remove {
-		var err = os.RemoveAll(dbFileName)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("Failed to remove existing database files")
-		}
-	}
+
 	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
 	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
 	options := &opt.Options{
@@ -83,15 +77,15 @@ func (storage *Storage) GetDB() *leveldb.DB {
 
 // Dump extracts information from block and index them into lvdb for explorer.
 func (storage *Storage) Dump(block *types.Block, height uint64) {
-	storage.lock.Lock()
-	defer storage.lock.Unlock()
-	if block == nil {
-		return
-	}
-
 	// Skip dump for redundant blocks with lower block number than the checkpoint block number
 	blockCheckpoint := GetCheckpointKey(block.Header().Number())
 	if _, err := storage.GetDB().Get([]byte(blockCheckpoint), nil); err == nil {
+		return
+	}
+
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
+	if block == nil {
 		return
 	}
 
