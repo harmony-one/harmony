@@ -16,7 +16,7 @@ func TestGetAddressKey(t *testing.T) {
 // TestInit ..
 func TestInit(t *testing.T) {
 	nodeconfig.GetDefaultConfig().DBDir = "/tmp"
-	ins := GetStorageInstance("1.1.1.1", "3333", true)
+	ins := GetStorageInstance("1.1.1.1", "3333")
 	if err := ins.GetDB().Put([]byte{1}, []byte{2}, nil); err != nil {
 		t.Fatal("(*LDBDatabase).Put failed:", err)
 	}

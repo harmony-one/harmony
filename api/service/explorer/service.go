@@ -51,7 +51,7 @@ func New(selfPeer *p2p.Peer) *Service {
 // StartService starts explorer service.
 func (s *Service) StartService() {
 	utils.Logger().Info().Msg("Starting explorer service.")
-	s.Init(true)
+	s.Init()
 	s.server = s.Run()
 }
 
@@ -75,8 +75,8 @@ func GetExplorerPort(nodePort string) string {
 }
 
 // Init is to initialize for ExplorerService.
-func (s *Service) Init(remove bool) {
-	s.Storage = GetStorageInstance(s.IP, s.Port, remove)
+func (s *Service) Init() {
+	s.Storage = GetStorageInstance(s.IP, s.Port)
 }
 
 // Run is to run serving explorer.
