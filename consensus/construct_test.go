@@ -63,9 +63,13 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
+	leaderKey := shard.BLSPublicKey{}
+	leaderKey.FromLibBLSPublicKey(leaderPubKey)
+	validatorKey := shard.BLSPublicKey{}
+	validatorKey.FromLibBLSPublicKey(validatorPubKey)
 	consensus.Decider.SubmitVote(
 		quorum.Prepare,
-		leaderPubKey,
+		leaderKey,
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
@@ -73,7 +77,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	)
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare,
-		validatorPubKey,
+		validatorKey,
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,

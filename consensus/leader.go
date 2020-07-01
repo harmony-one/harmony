@@ -64,9 +64,9 @@ func (consensus *Consensus) announce(block *types.Block) {
 			continue
 		}
 
-		if _, err := consensus.Decider.SubmitVote(
+		if _, err := consensus.Decider.AddNewVote(
 			quorum.Prepare,
-			key,
+			consensus.PubKey.PublicKeyBytes[i],
 			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
 			block.Hash(),
 			block.NumberU64(),
@@ -115,6 +115,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
+	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
 		consensus.blockNum, consensus.viewID, recvMsg.BlockHash,
 	) {
@@ -123,29 +124,27 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
-		//return
 	}
 
-	validatorPubKey := recvMsg.SenderPubkey
 	prepareSig := recvMsg.Payload
 	prepareBitmap := consensus.prepareBitmap
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	logger := consensus.getLogger().With().
-		Str("validatorPubKey", validatorPubKey.SerializeToHexStr()).Logger()
-
 	// proceed only when the message is not received before
-	signed := consensus.Decider.ReadBallot(quorum.Prepare, validatorPubKey)
+	signed := consensus.Decider.ReadBallot(quorum.Prepare, recvMsg.SenderPubkeyBytes)
 	if signed != nil {
-		logger.Debug().
+		consensus.getLogger().Debug().
+			Str("validatorPubKey", recvMsg.SenderPubkeyBytes.Hex()).
 			Msg("[OnPrepare] Already Received prepare message from the validator")
 		return
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		// already have enough signatures
-		logger.Debug().Msg("[OnPrepare] Received Additional Prepare Message")
+		consensus.getLogger().Debug().
+			Str("validatorPubKey", recvMsg.SenderPubkeyBytes.Hex()).
+			Msg("[OnPrepare] Received Additional Prepare Message")
 		return
 	}
 
@@ -162,12 +161,12 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	logger = logger.With().
+	consensus.getLogger().Debug().
 		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
-		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).Logger()
-	logger.Debug().Msg("[OnPrepare] Received New Prepare Signature")
-	if _, err := consensus.Decider.SubmitVote(
-		quorum.Prepare, validatorPubKey,
+		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).
+		Msg("[OnPrepare] Received New Prepare Signature")
+	if _, err := consensus.Decider.AddNewVote(
+		quorum.Prepare, recvMsg.SenderPubkeyBytes,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
@@ -249,8 +248,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Logger()
 	logger.Debug().Msg("[OnCommit] Received new commit message")
 
-	if _, err := consensus.Decider.SubmitVote(
-		quorum.Commit, validatorPubKey,
+	if _, err := consensus.Decider.AddNewVote(
+		quorum.Commit, recvMsg.SenderPubkeyBytes,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {

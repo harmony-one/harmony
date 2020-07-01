@@ -13,7 +13,7 @@ import (
 func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 	if consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
-			quorum.Commit, recvMsg.SenderPubkey,
+			quorum.Commit, recvMsg.SenderPubkeyBytes,
 		); alreadyCastBallot != nil {
 			firstPubKey := bls.PublicKey{}
 			alreadyCastBallot.SignerPubKey.ToLibBLSPublicKey(&firstPubKey)

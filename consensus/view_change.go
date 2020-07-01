@@ -345,6 +345,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 				copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 				preparedMsg.SenderPubkey = newLeaderKey
+				copy(preparedMsg.SenderPubkeyBytes[:], newLeaderKey.Serialize())
 				consensus.getLogger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
 				consensus.FBFTLog.AddMessage(&preparedMsg)
 
@@ -432,7 +433,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
 					quorum.Commit,
-					key,
+					consensus.PubKey.PublicKeyBytes[i],
 					priKey.SignHash(commitPayload),
 					common.BytesToHash(consensus.blockHash[:]),
 					block.NumberU64(),
@@ -597,6 +598,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 		preparedMsg.SenderPubkey = senderKey
+		preparedMsg.SenderPubkeyBytes = recvMsg.SenderPubkeyBytes
 		consensus.FBFTLog.AddMessage(&preparedMsg)
 
 		if hasBlock {
