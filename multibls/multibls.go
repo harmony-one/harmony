@@ -3,6 +3,8 @@ package multibls
 import (
 	"strings"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
@@ -13,7 +15,8 @@ type PrivateKey struct {
 
 // PublicKey stores the bls public keys that belongs to the node
 type PublicKey struct {
-	PublicKey []*bls.PublicKey
+	PublicKey      []*bls.PublicKey
+	PublicKeyBytes []shard.BLSPublicKey
 }
 
 // SerializeToHexStr wrapper
@@ -41,10 +44,13 @@ func (multiKey PublicKey) Contains(pubKey *bls.PublicKey) bool {
 // GetPublicKey wrapper
 func (multiKey PrivateKey) GetPublicKey() *PublicKey {
 	pubKeys := make([]*bls.PublicKey, len(multiKey.PrivateKey))
+	pubKeysBytes := make([]shard.BLSPublicKey, len(multiKey.PrivateKey))
 	for i, key := range multiKey.PrivateKey {
 		pubKeys[i] = key.GetPublicKey()
+		pubKeysBytes[i].FromLibBLSPublicKey(pubKeys[i])
 	}
-	return &PublicKey{PublicKey: pubKeys}
+
+	return &PublicKey{PublicKey: pubKeys, PublicKeyBytes: pubKeysBytes}
 }
 
 // GetPrivateKey creates a multibls PrivateKey using bls.SecretKey

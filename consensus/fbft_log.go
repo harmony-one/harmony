@@ -3,6 +3,8 @@ package consensus
 import (
 	"fmt"
 
+	"github.com/harmony-one/harmony/shard"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -21,20 +23,21 @@ type FBFTLog struct {
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
 type FBFTMessage struct {
-	MessageType   msg_pb.MessageType
-	ViewID        uint64
-	BlockNum      uint64
-	BlockHash     common.Hash
-	Block         []byte
-	SenderPubkey  *bls.PublicKey
-	LeaderPubkey  *bls.PublicKey
-	Payload       []byte
-	ViewchangeSig *bls.Sign
-	ViewidSig     *bls.Sign
-	M2AggSig      *bls.Sign
-	M2Bitmap      *bls_cosi.Mask
-	M3AggSig      *bls.Sign
-	M3Bitmap      *bls_cosi.Mask
+	MessageType       msg_pb.MessageType
+	ViewID            uint64
+	BlockNum          uint64
+	BlockHash         common.Hash
+	Block             []byte
+	SenderPubkey      *bls.PublicKey
+	SenderPubkeyBytes shard.BLSPublicKey
+	LeaderPubkey      *bls.PublicKey
+	Payload           []byte
+	ViewchangeSig     *bls.Sign
+	ViewidSig         *bls.Sign
+	M2AggSig          *bls.Sign
+	M2Bitmap          *bls_cosi.Mask
+	M3AggSig          *bls.Sign
+	M3Bitmap          *bls_cosi.Mask
 }
 
 // String ..
@@ -45,7 +48,7 @@ func (m *FBFTMessage) String() string {
 		m.ViewID,
 		m.BlockNum,
 		m.BlockHash.Hex(),
-		m.SenderPubkey.SerializeToHexStr(),
+		m.SenderPubkeyBytes.Hex(),
 		m.LeaderPubkey.SerializeToHexStr(),
 	)
 }
@@ -242,11 +245,14 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
+
 	pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
 	pbftMsg.SenderPubkey = pubKey
+	copy(pbftMsg.SenderPubkeyBytes[:], consensusMsg.SenderPubkey[:])
+
 	return &pbftMsg, nil
 }
 
@@ -291,6 +297,7 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 		return nil, err
 	}
 	pbftMsg.SenderPubkey = pubKey
+	copy(pbftMsg.SenderPubkeyBytes[:], vcMsg.SenderPubkey[:])
 	pbftMsg.LeaderPubkey = leaderKey
 	pbftMsg.ViewchangeSig = &vcSig
 	pbftMsg.ViewidSig = &vcSig1
@@ -320,6 +327,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		return nil, err
 	}
 	FBFTMsg.SenderPubkey = pubKey
+	copy(FBFTMsg.SenderPubkeyBytes[:], vcMsg.SenderPubkey[:])
 
 	if len(vcMsg.M3Aggsigs) > 0 {
 		m3Sig := bls.Sign{}

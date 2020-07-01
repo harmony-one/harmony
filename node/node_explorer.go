@@ -231,7 +231,7 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
 		return 0, nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
@@ -254,7 +254,7 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 	key := explorer.GetAddressKey(address)
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot get storage db instance")
+		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
 		return 0, nil
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {

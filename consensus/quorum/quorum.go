@@ -79,7 +79,7 @@ type ParticipantTracker interface {
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, PubKey *bls.PublicKey,
+		p Phase, pubkey shard.BLSPublicKey,
 		sig *bls.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
@@ -92,7 +92,7 @@ type SignatoryTracker interface {
 type SignatureReader interface {
 	SignatoryTracker
 	ReadAllBallots(Phase) []*votepower.Ballot
-	ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot
+	ReadBallot(p Phase, pubkey shard.BLSPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
 	AggregateVotes(p Phase) *bls.Sign
@@ -115,6 +115,11 @@ type Decider interface {
 	DependencyInjectionWriter
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
+	AddNewVote(
+		p Phase, pubkey shard.BLSPublicKey,
+		sig *bls.Sign, headerHash common.Hash,
+		height, viewID uint64,
+	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
@@ -237,15 +242,16 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) SubmitVote(
-	p Phase, PubKey *bls.PublicKey,
+	p Phase, pubkey shard.BLSPublicKey,
 	sig *bls.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
-	// Note safe to assume by this point because key has been
-	// checked earlier
-	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
+	if ballet := s.ReadBallot(p, pubkey); ballet != nil {
+		return nil, errors.Errorf("vote is already submitted %x", pubkey)
+	}
+
 	ballot := &votepower.Ballot{
-		SignerPubKey:    key,
+		SignerPubKey:    pubkey,
 		BlockHeaderHash: headerHash,
 		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
 		Height:          height,
@@ -253,11 +259,11 @@ func (s *cIdentities) SubmitVote(
 	}
 	switch p {
 	case Prepare:
-		s.prepare.BallotBox[key] = ballot
+		s.prepare.BallotBox[pubkey] = ballot
 	case Commit:
-		s.commit.BallotBox[key] = ballot
+		s.commit.BallotBox[pubkey] = ballot
 	case ViewChange:
-		s.viewChange.BallotBox[key] = ballot
+		s.viewChange.BallotBox[pubkey] = ballot
 	default:
 		return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
 	}
@@ -281,9 +287,8 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 	return s.ParticipantsCount()*2/3 + 1
 }
 
-func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ballot {
+func (s *cIdentities) ReadBallot(p Phase, pubkey shard.BLSPublicKey) *votepower.Ballot {
 	ballotBox := map[shard.BLSPublicKey]*votepower.Ballot{}
-	key := *shard.FromLibBLSPublicKeyUnsafe(PubKey)
 
 	switch p {
 	case Prepare:
@@ -294,7 +299,7 @@ func (s *cIdentities) ReadBallot(p Phase, PubKey *bls.PublicKey) *votepower.Ball
 		ballotBox = s.viewChange.BallotBox
 	}
 
-	payload, ok := ballotBox[key]
+	payload, ok := ballotBox[pubkey]
 	if !ok {
 		return nil
 	}
@@ -359,7 +364,7 @@ func NewDecider(p Policy, shardID uint32) Decider {
 			c.DependencyInjectionWriter,
 			c.DependencyInjectionWriter.(DependencyInjectionReader),
 			*votepower.NewRoster(shardID),
-			newBallotBox(),
+			newVoteTally(),
 		}
 	default:
 		// Should not be possible

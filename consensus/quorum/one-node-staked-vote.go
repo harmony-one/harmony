@@ -2,13 +2,17 @@ package quorum
 
 import (
 	"encoding/json"
-	errors2 "errors"
 	"math/big"
+
+	"github.com/harmony-one/harmony/internal/utils"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -24,15 +28,16 @@ type TallyResult struct {
 	theirPercent numeric.Dec
 }
 
-type voteBox struct {
-	voters       map[shard.BLSPublicKey]struct{}
-	currentTotal numeric.Dec
+type tallyAndQuorum struct {
+	tally          numeric.Dec
+	quorumAchieved bool
 }
 
-type box struct {
-	Prepare    *voteBox
-	Commit     *voteBox
-	ViewChange *voteBox
+// VoteTally is the vote tally for each phase
+type VoteTally struct {
+	Prepare    *tallyAndQuorum
+	Commit     *tallyAndQuorum
+	ViewChange *tallyAndQuorum
 }
 
 type stakedVoteWeight struct {
@@ -40,7 +45,7 @@ type stakedVoteWeight struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	roster    votepower.Roster
-	ballotBox box
+	voteTally VoteTally
 }
 
 // Policy ..
@@ -48,25 +53,63 @@ func (v *stakedVoteWeight) Policy() Policy {
 	return SuperMajorityStake
 }
 
-// IsQuorumAchieved ..
-func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
-	t := v.QuorumThreshold()
-	currentTotalPower, err := v.computeCurrentTotalPower(p)
+// AddNewVote ..
+func (v *stakedVoteWeight) AddNewVote(
+	p Phase, pubKeyBytes shard.BLSPublicKey,
+	sig *bls.Sign, headerHash common.Hash,
+	height, viewID uint64) (*votepower.Ballot, error) {
+
+	ballet, err := v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)
 
 	if err != nil {
-		utils.Logger().Error().
-			AnErr("bls error", err).
-			Msg("Failure in attempt bls-key reading")
-		return false
+		return ballet, err
 	}
 
+	// Accumulate total voting power
+	additionalVotePower := v.roster.Voters[pubKeyBytes].OverallPercent
+	tallyQuorum := func() *tallyAndQuorum {
+		switch p {
+		case Prepare:
+			return v.voteTally.Prepare
+		case Commit:
+			return v.voteTally.Commit
+		case ViewChange:
+			return v.voteTally.ViewChange
+		default:
+			// Should not happen
+			return nil
+		}
+	}()
+
+	tallyQuorum.tally = tallyQuorum.tally.Add(additionalVotePower)
+
+	t := v.QuorumThreshold()
+	tallyQuorum.quorumAchieved = tallyQuorum.tally.GT(t)
+
+	msg := "Attempt to reach quorum"
+	if tallyQuorum.quorumAchieved {
+		msg = "Quorum Achieved!"
+	}
 	utils.Logger().Info().
-		Str("policy", v.Policy().String()).
 		Str("phase", p.String()).
-		Str("threshold", t.String()).
-		Str("total-power-of-signers", currentTotalPower.String()).
-		Msg("Attempt to reach quorum")
-	return currentTotalPower.GT(t)
+		Str("total-power-of-signers", tallyQuorum.tally.String()).
+		Msg(msg)
+	return ballet, nil
+}
+
+// IsQuorumAchieved ..
+func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
+	switch p {
+	case Prepare:
+		return v.voteTally.Prepare.quorumAchieved
+	case Commit:
+		return v.voteTally.Commit.quorumAchieved
+	case ViewChange:
+		return v.voteTally.ViewChange.quorumAchieved
+	default:
+		// Should not happen
+		return false
+	}
 }
 
 // IsQuorumAchivedByMask ..
@@ -78,39 +121,19 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	}
 	return (*currentTotalPower).GT(threshold)
 }
-func (v *stakedVoteWeight) computeCurrentTotalPower(p Phase) (*numeric.Dec, error) {
-	ballot := func() *voteBox {
-		switch p {
-		case Prepare:
-			return v.ballotBox.Prepare
-		case Commit:
-			return v.ballotBox.Commit
-		case ViewChange:
-			return v.ballotBox.ViewChange
-		default:
-			// Should not happen
-			return nil
-		}
-	}()
 
-	members := v.Participants()
-	membersKeys := v.ParticipantsKeyBytes()
-	if len(members) != len(membersKeys) {
-		return nil, errors2.New("Participant keys are not matching")
+func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
+	switch p {
+	case Prepare:
+		return &v.voteTally.Prepare.tally, nil
+	case Commit:
+		return &v.voteTally.Commit.tally, nil
+	case ViewChange:
+		return &v.voteTally.ViewChange.tally, nil
+	default:
+		// Should not happen
+		return nil, errors.New("wrong phase is provided")
 	}
-
-	for i := range members {
-		w := membersKeys[i]
-		if _, didVote := ballot.voters[w]; !didVote &&
-			v.ReadBallot(p, members[i]) != nil {
-			ballot.currentTotal = ballot.currentTotal.Add(
-				v.roster.Voters[w].OverallPercent,
-			)
-			ballot.voters[w] = struct{}{}
-		}
-	}
-
-	return &ballot.currentTotal, nil
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
@@ -250,25 +273,21 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 	return false
 }
 
-func newBox() *voteBox {
-	return &voteBox{map[shard.BLSPublicKey]struct{}{}, numeric.ZeroDec()}
-}
-
-func newBallotBox() box {
-	return box{
-		Prepare:    newBox(),
-		Commit:     newBox(),
-		ViewChange: newBox(),
+func newVoteTally() VoteTally {
+	return VoteTally{
+		Prepare:    &tallyAndQuorum{numeric.NewDec(0), false},
+		Commit:     &tallyAndQuorum{numeric.NewDec(0), false},
+		ViewChange: &tallyAndQuorum{numeric.NewDec(0), false},
 	}
 }
 
 func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 	v.reset([]Phase{Prepare, Commit})
-	v.ballotBox.Prepare = newBox()
-	v.ballotBox.Commit = newBox()
+	v.voteTally.Prepare = &tallyAndQuorum{numeric.NewDec(0), false}
+	v.voteTally.Commit = &tallyAndQuorum{numeric.NewDec(0), false}
 }
 
 func (v *stakedVoteWeight) ResetViewChangeVotes() {
 	v.reset([]Phase{ViewChange})
-	v.ballotBox.ViewChange = newBox()
+	v.voteTally.ViewChange = &tallyAndQuorum{numeric.NewDec(0), false}
 }

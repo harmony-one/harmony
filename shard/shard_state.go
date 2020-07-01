@@ -38,6 +38,7 @@ type State struct {
 }
 
 // BLSPublicKey defines the bls public key
+// TODO(audit): wrap c bls key object with the raw bytes
 type BLSPublicKey [PublicKeySizeInBytes]byte
 
 // BLSSignature defines the bls signature

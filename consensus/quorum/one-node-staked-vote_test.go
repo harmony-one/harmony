@@ -105,11 +105,10 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 }
 
 func sign(d Decider, k secretKeyMap, p Phase) {
-	for _, v := range k {
-		pubKey := v.GetPublicKey()
+	for k, v := range k {
 		sig := v.Sign(msg)
 		// TODO Make upstream test provide meaningful test values
-		d.SubmitVote(p, pubKey, sig, common.Hash{}, 0, 0)
+		d.AddNewVote(p, k, sig, common.Hash{}, 0, 0)
 	}
 }
 
