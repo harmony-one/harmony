@@ -5,8 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
+	"github.com/harmony-one/abool
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -15,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
+  "github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -89,13 +89,11 @@ type Consensus struct {
 	blockHeader []byte
 	// Shard Id which this node belongs to
 	ShardID uint32
-	// whether to ignore viewID check
-	ignoreViewIDCheck bool
+	// IgnoreViewIDCheck determines whether to ignore viewID check
+	IgnoreViewIDCheck *abool.AtomicBool
 	// global consensus mutex
 	// TODO(optimization): Avoid mutex and use more efficient locking primitives
 	mutex sync.Mutex
-	// consensus information update mutex
-	infoMutex sync.Mutex
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -213,5 +211,6 @@ func New(
 	consensus.ReadySignal = make(chan struct{})
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
+	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	return &consensus, nil
 }
