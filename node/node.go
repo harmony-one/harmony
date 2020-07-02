@@ -400,8 +400,6 @@ func (node *Node) validateShardBoundMessage(
 		err       error
 	)
 	atomic.AddUint32(&node.NumTotalMessages, 1)
-	entryTime := time.Now()
-	defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:validate_shard_bound_message]")
 
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
@@ -567,9 +565,6 @@ func (node *Node) Start() error {
 			topicNamed,
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
-				entryTime := time.Now()
-				defer utils.SampledLogger().Debug().Str("cost", time.Now().Sub(entryTime).String()).Msg("[cost:topic_validator]")
-
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message
