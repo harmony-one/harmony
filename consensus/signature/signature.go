@@ -16,7 +16,7 @@ type signatureChainReader interface {
 func ConstructCommitPayload(
 	chain signatureChainReader, epoch *big.Int, blockHash common.Hash, blockNum, viewID uint64,
 ) []byte {
-	blockNumBytes := make([]byte, 8)
+	blockNumBytes := make([]byte, 8, 16+common.HashLength)
 	binary.LittleEndian.PutUint64(blockNumBytes, blockNum)
 	commitPayload := append(blockNumBytes, blockHash.Bytes()...)
 	if !chain.Config().IsStaking(epoch) {
