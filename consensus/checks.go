@@ -52,6 +52,7 @@ func VerifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) e
 	return nil
 }
 
+// SenderSanityCheck checks sender key and verify message signature
 func (consensus *Consensus) SenderSanityCheck(pubkey []byte, msg *msg_pb.Message) (*libbls.PublicKey, error) {
 	err := consensus.VerifySenderKey(pubkey, msg)
 	if err != nil {
