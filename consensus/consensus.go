@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/abool
+	"github.com/harmony-one/abool"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -14,7 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
-  "github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
