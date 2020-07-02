@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/abool"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -40,20 +41,6 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// State is a state of a node.
-type State byte
-
-// All constants except the NodeLeader below are for validators only.
-const (
-	NodeInit              State = iota // Node just started, before contacting BeaconChain
-	NodeWaitToJoin                     // Node contacted BeaconChain, wait to join Shard
-	NodeNotInSync                      // Node out of sync, might be just joined Shard or offline for a period of time
-	NodeOffline                        // Node is offline
-	NodeReadyForConsensus              // Node is ready for doing consensus
-	NodeDoingConsensus                 // Node is already doing consensus
-	NodeLeader                         // Node is the leader of some shard.
-)
-
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
@@ -70,26 +57,6 @@ const (
 	// GlobalRxWorkers is the number of concurrent global message handlers.
 	GlobalRxWorkers = 32
 )
-
-func (state State) String() string {
-	switch state {
-	case NodeInit:
-		return "NodeInit"
-	case NodeWaitToJoin:
-		return "NodeWaitToJoin"
-	case NodeNotInSync:
-		return "NodeNotInSync"
-	case NodeOffline:
-		return "NodeOffline"
-	case NodeReadyForConsensus:
-		return "NodeReadyForConsensus"
-	case NodeDoingConsensus:
-		return "NodeDoingConsensus"
-	case NodeLeader:
-		return "NodeLeader"
-	}
-	return "Unknown"
-}
 
 const (
 	maxBroadcastNodes       = 10              // broadcast at most maxBroadcastNodes peers that need in sync
@@ -118,7 +85,6 @@ type Node struct {
 	SelfPeer    p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	State      State      // State of the Node
 	stateMutex sync.Mutex // mutex for change node state
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
 	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
@@ -156,6 +122,8 @@ type Node struct {
 	TransactionErrorSink *types.TransactionErrorSink
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
+	// InSync flag indicates the node is in-sync or not
+	IsInSync *abool.AtomicBool
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -465,6 +433,7 @@ func New(
 		collection.DisableCache()
 	}
 	node.shardChains = collection
+	node.IsInSync = abool.NewBool(false)
 
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks

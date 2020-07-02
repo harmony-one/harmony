@@ -243,23 +243,17 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	}
 	// TODO: treat fake maximum height
 	if node.stateSync.IsOutOfSync(bc) {
-		node.stateMutex.Lock()
-		node.State = NodeNotInSync
-		node.stateMutex.Unlock()
+		node.IsInSync.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
 		node.stateSync.SyncLoop(bc, worker, false, node.Consensus)
 		if willJoinConsensus {
-			node.stateMutex.Lock()
-			node.State = NodeReadyForConsensus
-			node.stateMutex.Unlock()
+			node.IsInSync.Set()
 			node.Consensus.BlocksSynchronized()
 		}
 	}
-	node.stateMutex.Lock()
-	node.State = NodeReadyForConsensus
-	node.stateMutex.Unlock()
+	node.IsInSync.Set()
 }
 
 // SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
@@ -405,10 +399,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
-		if node.State != NodeNotInSync {
-			utils.Logger().Debug().
-				Str("state", node.State.String()).
-				Msg("[SYNC] new block received, but state is")
+		if node.IsInSync.IsSet() {
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
@@ -461,7 +452,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if node.State == NodeNotInSync {
+		if !node.IsInSync.IsSet() {
 			count := node.stateSync.RegisterNodeInfo()
 			utils.Logger().Debug().
 				Int("number", count).
