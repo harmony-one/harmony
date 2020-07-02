@@ -3,6 +3,8 @@ package consensus
 import (
 	"bytes"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -22,7 +24,7 @@ type NetworkMessage struct {
 
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(
-	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey *bls.PublicKey,
+	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey shard.BLSPublicKey,
 ) *msg_pb.ConsensusRequest {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
@@ -30,13 +32,13 @@ func (consensus *Consensus) populateMessageFields(
 	// 32 byte block hash
 	request.BlockHash = blockHash
 	// sender address
-	request.SenderPubkey = pubKey.Serialize()
+	request.SenderPubkey = pubKey[:]
 	return request
 }
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSign []byte, pubKey *bls.PublicKey, priKey *bls.SecretKey,
+	p msg_pb.MessageType, payloadForSign []byte, pubKey shard.BLSPublicKey, priKey *bls.SecretKey,
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,

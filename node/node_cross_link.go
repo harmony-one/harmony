@@ -185,7 +185,7 @@ func (node *Node) lookupDecider(
 				quorum.SuperMajorityStake, committee.ShardID,
 			)
 
-			decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+			decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
 				return nil, nil
 			})
 

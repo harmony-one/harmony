@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -397,8 +399,13 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 	count := uint32(0)
-	pubkeys := node.Consensus.Decider.Participants()
-	mask, err := internal_bls.NewMask(pubkeys, nil)
+	members := node.Consensus.Decider.Participants()
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
+	// TODO(audit): do not reconstruct the Mask
+	mask, err := internal_bls.NewMask(publicKeys, nil)
 	if err != nil {
 		return count
 	}
@@ -406,8 +413,8 @@ func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 	if err != nil {
 		return count
 	}
-	for _, key := range node.Consensus.PubKey.PublicKey {
-		if ok, err := mask.KeyEnabled(key); err == nil && ok {
+	for _, key := range node.Consensus.PubKey {
+		if ok, err := mask.KeyEnabled(key.Object); err == nil && ok {
 			count++
 		}
 	}

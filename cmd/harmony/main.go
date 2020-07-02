@@ -185,9 +185,9 @@ func passphraseForBLS() {
 	blsPassphrase = passphrase
 }
 
-func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys []*bls.PublicKey) {
+func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.PublicKeys) {
 	for _, key := range pubKeys {
-		keyStr := key.SerializeToHexStr()
+		keyStr := key.Bytes.Hex()
 		_, account := config.FindAccount(keyStr)
 		if account != nil {
 			initialAccounts = append(initialAccounts, account)
@@ -202,13 +202,13 @@ func setupLegacyNodeAccount() error {
 	if len(reshardingEpoch) > 0 {
 		for _, epoch := range reshardingEpoch {
 			config := shard.Schedule.InstanceForEpoch(epoch)
-			findAccountsByPubKeys(config, multiBLSPubKey.PublicKey)
+			findAccountsByPubKeys(config, multiBLSPubKey)
 			if len(initialAccounts) != 0 {
 				break
 			}
 		}
 	} else {
-		findAccountsByPubKeys(genesisShardingConfig, multiBLSPubKey.PublicKey)
+		findAccountsByPubKeys(genesisShardingConfig, multiBLSPubKey)
 	}
 
 	if len(initialAccounts) == 0 {
@@ -233,21 +233,21 @@ func setupStakingNodeAccount() error {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
 	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(
-		pubKey.PublicKey, shardID,
+		pubKey, shardID,
 	); err != nil {
 		return err
 	}
-	for _, blsKey := range pubKey.PublicKey {
+	for _, blsKey := range pubKey {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
-		initialAccount.BLSPublicKey = blsKey.SerializeToHexStr()
+		initialAccount.BLSPublicKey = blsKey.Bytes.Hex()
 		initialAccount.Address = ""
 		initialAccounts = append(initialAccounts, initialAccount)
 	}
 	return nil
 }
 
-func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey *multibls.PublicKey) error {
+func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey multibls.PublicKeys) error {
 	keyPasses := map[string]string{}
 	blsKeyFiles := []os.FileInfo{}
 	awsEncryptedBLSKeyFiles := []os.FileInfo{}
@@ -325,15 +325,15 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		}
 		// TODO: assumes order between public/private key pairs
 		multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
-		multibls.AppendPubKey(consensusMultiBLSPubKey, consensusPriKey.GetPublicKey())
+		consensusMultiBLSPubKey = append(consensusMultiBLSPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
 	}
 
 	return nil
 }
 
-func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
+func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKeys {
 	consensusMultiPriKey := &multibls.PrivateKey{}
-	consensusMultiPubKey := &multibls.PublicKey{}
+	consensusMultiPubKey := multibls.PublicKeys{}
 
 	if *blsKeyFile != "" {
 		consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
@@ -342,7 +342,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 			os.Exit(100)
 		}
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
-		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
+		consensusMultiPubKey = append(consensusMultiPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
 	} else if *cmkEncryptedBLSKey != "" {
 		consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(*cmkEncryptedBLSKey, awsSettingString)
 		if err != nil {
@@ -351,7 +351,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 		}
 
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
-		multibls.AppendPubKey(consensusMultiPubKey, consensusPriKey.GetPublicKey())
+		consensusMultiPubKey = append(consensusMultiPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
 	} else {
 		err := readMultiBLSKeys(consensusMultiPriKey, consensusMultiPubKey)
 		if err != nil {
@@ -364,7 +364,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKey {
 	nodeConfig.ConsensusPriKey = consensusMultiPriKey
 	nodeConfig.ConsensusPubKey = consensusMultiPubKey
 
-	return *consensusMultiPubKey
+	return consensusMultiPubKey
 }
 
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
@@ -398,7 +398,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	selfPeer := p2p.Peer{
 		IP:              *ip,
 		Port:            *port,
-		ConsensusPubKey: nodeConfig.ConsensusPubKey.PublicKey[0],
+		ConsensusPubKey: nodeConfig.ConsensusPubKey[0].Object,
 	}
 
 	myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
@@ -431,7 +431,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	currentConsensus, err := consensus.New(
 		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider,
 	)
-	currentConsensus.Decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+	currentConsensus.Decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
 		return currentConsensus.PubKey, nil
 	})
 

@@ -37,8 +37,14 @@ type State struct {
 	Shards []Committee `json:"shards"`
 }
 
-// BLSPublicKey defines the bls public key
-// TODO(audit): wrap c bls key object with the raw bytes
+// BLSPublicKeyWrapper defines the bls public key in both serialized and
+// deserialized form.
+type BLSPublicKeyWrapper struct {
+	Bytes  BLSPublicKey
+	Object *bls.PublicKey
+}
+
+// BLSPublicKey defines the serialized bls public key
 type BLSPublicKey [PublicKeySizeInBytes]byte
 
 // BLSSignature defines the bls signature

@@ -67,11 +67,10 @@ func (p Policy) String() string {
 
 // ParticipantTracker ..
 type ParticipantTracker interface {
-	Participants() []*bls.PublicKey
-	ParticipantsKeyBytes() []shard.BLSPublicKey
+	Participants() multibls.PublicKeys
 	IndexOf(shard.BLSPublicKey) int
 	ParticipantsCount() int64
-	NextAfter(*bls.PublicKey) (bool, *bls.PublicKey)
+	NextAfter(*shard.BLSPublicKeyWrapper) (bool, *shard.BLSPublicKeyWrapper)
 	UpdateParticipants(pubKeys []*bls.PublicKey)
 }
 
@@ -100,12 +99,12 @@ type SignatureReader interface {
 
 // DependencyInjectionWriter ..
 type DependencyInjectionWriter interface {
-	SetMyPublicKeyProvider(func() (*multibls.PublicKey, error))
+	SetMyPublicKeyProvider(func() (multibls.PublicKeys, error))
 }
 
 // DependencyInjectionReader ..
 type DependencyInjectionReader interface {
-	MyPublicKey() func() (*multibls.PublicKey, error)
+	MyPublicKey() func() (multibls.PublicKeys, error)
 }
 
 // Decider ..
@@ -151,18 +150,17 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys     []*bls.PublicKey
-	publicKeysByte []shard.BLSPublicKey
-	keyIndexMap    map[shard.BLSPublicKey]int
-	prepare        *votepower.Round
-	commit         *votepower.Round
+	publicKeys  []shard.BLSPublicKeyWrapper
+	keyIndexMap map[shard.BLSPublicKey]int
+	prepare     *votepower.Round
+	commit      *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
 }
 
 type depInject struct {
-	publicKeyProvider func() (*multibls.PublicKey, error)
+	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
 func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
@@ -187,39 +185,32 @@ func (s *cIdentities) IndexOf(pubKey shard.BLSPublicKey) int {
 	return -1
 }
 
-func (s *cIdentities) NextAfter(pubKey *bls.PublicKey) (bool, *bls.PublicKey) {
+func (s *cIdentities) NextAfter(pubKey *shard.BLSPublicKeyWrapper) (bool, *shard.BLSPublicKeyWrapper) {
 	found := false
-	pubKeyByte := shard.BLSPublicKey{}
-	pubKeyByte.FromLibBLSPublicKey(pubKey)
 
-	idx := s.IndexOf(pubKeyByte)
+	idx := s.IndexOf(pubKey.Bytes)
 	if idx != -1 {
 		found = true
 	}
 	idx = (idx + 1) % int(s.ParticipantsCount())
-	return found, s.publicKeys[idx]
+	return found, &s.publicKeys[idx]
 }
 
-func (s *cIdentities) Participants() []*bls.PublicKey {
+func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) ParticipantsKeyBytes() []shard.BLSPublicKey {
-	return s.publicKeysByte
-}
-
 func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
-	keyBytes := []shard.BLSPublicKey{}
+	keys := make([]shard.BLSPublicKeyWrapper, len(pubKeys))
 	keyIndexMap := map[shard.BLSPublicKey]int{}
 	for i := range pubKeys {
-		k := shard.BLSPublicKey{}
-		k.FromLibBLSPublicKey(pubKeys[i])
+		kBytes := shard.BLSPublicKey{}
+		kBytes.FromLibBLSPublicKey(pubKeys[i])
 
-		keyBytes = append(keyBytes, k)
-		keyIndexMap[k] = i
+		keys[i] = shard.BLSPublicKeyWrapper{Object: pubKeys[i], Bytes: kBytes}
+		keyIndexMap[kBytes] = i
 	}
-	s.publicKeys = append(pubKeys[:0:0], pubKeys...)
-	s.publicKeysByte = keyBytes
+	s.publicKeys = keys
 	s.keyIndexMap = keyIndexMap
 }
 
@@ -325,12 +316,11 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 
 func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		publicKeys:     []*bls.PublicKey{},
-		publicKeysByte: []shard.BLSPublicKey{},
-		keyIndexMap:    map[shard.BLSPublicKey]int{},
-		prepare:        votepower.NewRound(),
-		commit:         votepower.NewRound(),
-		viewChange:     votepower.NewRound(),
+		publicKeys:  []shard.BLSPublicKeyWrapper{},
+		keyIndexMap: map[shard.BLSPublicKey]int{},
+		prepare:     votepower.NewRound(),
+		commit:      votepower.NewRound(),
+		viewChange:  votepower.NewRound(),
 	}
 }
 
@@ -340,11 +330,11 @@ type composite struct {
 	SignatureReader
 }
 
-func (d *depInject) SetMyPublicKeyProvider(p func() (*multibls.PublicKey, error)) {
+func (d *depInject) SetMyPublicKeyProvider(p func() (multibls.PublicKeys, error)) {
 	d.publicKeyProvider = p
 }
 
-func (d *depInject) MyPublicKey() func() (*multibls.PublicKey, error) {
+func (d *depInject) MyPublicKey() func() (multibls.PublicKeys, error) {
 	return d.publicKeyProvider
 }
 

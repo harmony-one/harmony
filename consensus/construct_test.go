@@ -32,7 +32,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, blsPriKey.GetPublicKey(), blsPriKey); err != nil {
+	keyBytes := shard.BLSPublicKey{}
+	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
+	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, keyBytes, blsPriKey); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
 }
@@ -94,7 +96,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
 
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, blsPriKey.GetPublicKey(), blsPriKey)
+	keyBytes := shard.BLSPublicKey{}
+	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, keyBytes, blsPriKey)
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}

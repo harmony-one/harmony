@@ -13,11 +13,11 @@ import (
 func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 	if consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
-			quorum.Commit, recvMsg.SenderPubkeyBytes,
+			quorum.Commit, recvMsg.SenderPubkey.Bytes,
 		); alreadyCastBallot != nil {
 			firstPubKey := bls.PublicKey{}
 			alreadyCastBallot.SignerPubKey.ToLibBLSPublicKey(&firstPubKey)
-			if recvMsg.SenderPubkey.IsEqual(&firstPubKey) {
+			if recvMsg.SenderPubkey.Object.IsEqual(&firstPubKey) {
 				for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
 					firstSignedBlock := blk.Header()
 					areHeightsEqual := firstSignedBlock.Number().Uint64() == recvMsg.BlockNum
@@ -45,7 +45,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								Msg("could not read shard state")
 							return true
 						}
-						offender := shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
+						offender := shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey.Object)
 						if offender == nil {
 							consensus.getLogger().Error().
 								Str("msg", recvMsg.String()).
@@ -69,7 +69,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							return true
 						}
 
-						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
+						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey.Object)
 						if leaderShardKey == nil {
 							consensus.getLogger().Error().
 								Str("msg", recvMsg.String()).

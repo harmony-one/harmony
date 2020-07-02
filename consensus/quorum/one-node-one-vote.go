@@ -91,7 +91,7 @@ func (v *uniformVoteWeight) MarshalJSON() ([]byte, error) {
 	keysDump := v.Participants()
 	keys := make([]string, len(keysDump))
 	for i := range keysDump {
-		keys[i] = keysDump[i].SerializeToHexStr()
+		keys[i] = keysDump[i].Bytes.Hex()
 	}
 
 	return json.Marshal(t{v.Policy().String(), len(keys), keys})
@@ -104,9 +104,9 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	everyone := v.Participants()
-	for _, key := range identity.PublicKey {
+	for _, key := range identity {
 		for i := range everyone {
-			if key.IsEqual(everyone[i]) {
+			if key.Object.IsEqual(everyone[i].Object) {
 				return true
 			}
 		}
