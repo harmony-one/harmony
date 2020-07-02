@@ -4,7 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 
@@ -13,11 +12,11 @@ import (
 func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 	if consensus.couldThisBeADoubleSigner(recvMsg) {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
-			quorum.Commit, recvMsg.SenderPubkeyBytes,
+			quorum.Commit, recvMsg.SenderPubkey.Bytes,
 		); alreadyCastBallot != nil {
 			firstPubKey := bls.PublicKey{}
 			alreadyCastBallot.SignerPubKey.ToLibBLSPublicKey(&firstPubKey)
-			if recvMsg.SenderPubkey.IsEqual(&firstPubKey) {
+			if recvMsg.SenderPubkey.Object.IsEqual(&firstPubKey) {
 				for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
 					firstSignedBlock := blk.Header()
 					areHeightsEqual := firstSignedBlock.Number().Uint64() == recvMsg.BlockNum
@@ -45,13 +44,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								Msg("could not read shard state")
 							return true
 						}
-						offender := shard.FromLibBLSPublicKeyUnsafe(recvMsg.SenderPubkey)
-						if offender == nil {
-							consensus.getLogger().Error().
-								Str("msg", recvMsg.String()).
-								Msg("could not get shard key from sender's key")
-							return true
-						}
+
 						subComm, err := committee.FindCommitteeByID(
 							consensus.ShardID,
 						)
@@ -62,21 +55,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							return true
 						}
 
-						addr, err := subComm.AddressForBLSKey(*offender)
+						addr, err := subComm.AddressForBLSKey(recvMsg.SenderPubkey.Bytes)
 						if err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for bls key")
 							return true
 						}
 
-						leaderShardKey := shard.FromLibBLSPublicKeyUnsafe(consensus.LeaderPubKey)
-						if leaderShardKey == nil {
-							consensus.getLogger().Error().
-								Str("msg", recvMsg.String()).
-								Msg("could not get shard key from leader's key")
-							return true
-						}
-						leaderAddr, err := subComm.AddressForBLSKey(*leaderShardKey)
+						leaderAddr, err := subComm.AddressForBLSKey(consensus.LeaderPubKey.Bytes)
 						if err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not find address for leader bls key")
@@ -92,7 +78,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 										alreadyCastBallot.Signature,
 									},
 									SecondVote: slash.Vote{
-										*offender,
+										recvMsg.SenderPubkey.Bytes,
 										recvMsg.BlockHash,
 										common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 									}},

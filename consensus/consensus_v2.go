@@ -107,7 +107,10 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey.GetPublicKey(), leaderPriKey)
+	// TODO(audit): wrap bls private key with public key
+	leaderPubKeyBytes := shard.BLSPublicKey{}
+	leaderPubKeyBytes.FromLibBLSPublicKey(leaderPriKey.GetPublicKey())
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPubKeyBytes, leaderPriKey)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -544,7 +547,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 
 // ValidateVrfAndProof validates a VRF/Proof from hash of previous block
 func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
-	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey)
+	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey.Object)
 	var blockHash [32]byte
 	previousHeader := consensus.ChainReader.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,

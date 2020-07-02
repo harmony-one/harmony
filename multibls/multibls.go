@@ -13,28 +13,25 @@ type PrivateKey struct {
 	PrivateKey []*bls.SecretKey
 }
 
-// PublicKey stores the bls public keys that belongs to the node
-type PublicKey struct {
-	PublicKey      []*bls.PublicKey
-	PublicKeyBytes []shard.BLSPublicKey
-}
+// PublicKeys stores the bls public keys that belongs to the node
+type PublicKeys []shard.BLSPublicKeyWrapper
 
 // SerializeToHexStr wrapper
-func (multiKey *PublicKey) SerializeToHexStr() string {
+func (multiKey PublicKeys) SerializeToHexStr() string {
 	if multiKey == nil {
 		return ""
 	}
 	var builder strings.Builder
-	for _, pubKey := range multiKey.PublicKey {
-		builder.WriteString(pubKey.SerializeToHexStr() + ";")
+	for _, pubKey := range multiKey {
+		builder.WriteString(pubKey.Bytes.Hex() + ";")
 	}
 	return builder.String()
 }
 
 // Contains wrapper
-func (multiKey PublicKey) Contains(pubKey *bls.PublicKey) bool {
-	for _, key := range multiKey.PublicKey {
-		if key.IsEqual(pubKey) {
+func (multiKey PublicKeys) Contains(pubKey *bls.PublicKey) bool {
+	for _, key := range multiKey {
+		if key.Object.IsEqual(pubKey) {
 			return true
 		}
 	}
@@ -42,15 +39,15 @@ func (multiKey PublicKey) Contains(pubKey *bls.PublicKey) bool {
 }
 
 // GetPublicKey wrapper
-func (multiKey PrivateKey) GetPublicKey() *PublicKey {
-	pubKeys := make([]*bls.PublicKey, len(multiKey.PrivateKey))
-	pubKeysBytes := make([]shard.BLSPublicKey, len(multiKey.PrivateKey))
+func (multiKey PrivateKey) GetPublicKey() PublicKeys {
+	pubKeys := make([]shard.BLSPublicKeyWrapper, len(multiKey.PrivateKey))
 	for i, key := range multiKey.PrivateKey {
-		pubKeys[i] = key.GetPublicKey()
-		pubKeysBytes[i].FromLibBLSPublicKey(pubKeys[i])
+		wrapper := shard.BLSPublicKeyWrapper{Object: key.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		pubKeys[i] = wrapper
 	}
 
-	return &PublicKey{PublicKey: pubKeys, PublicKeyBytes: pubKeysBytes}
+	return pubKeys
 }
 
 // GetPrivateKey creates a multibls PrivateKey using bls.SecretKey
@@ -58,18 +55,11 @@ func GetPrivateKey(key *bls.SecretKey) *PrivateKey {
 	return &PrivateKey{PrivateKey: []*bls.SecretKey{key}}
 }
 
-// GetPublicKey creates a multibls PublicKey using bls.PublicKey
-func GetPublicKey(key *bls.PublicKey) *PublicKey {
-	return &PublicKey{PublicKey: []*bls.PublicKey{key}}
-}
-
-// AppendPubKey appends a PublicKey to multibls PublicKey
-func AppendPubKey(multiKey *PublicKey, key *bls.PublicKey) {
-	if multiKey != nil {
-		multiKey.PublicKey = append(multiKey.PublicKey, key)
-	} else {
-		multiKey = &PublicKey{PublicKey: []*bls.PublicKey{key}}
-	}
+// GetPublicKey creates a multibls PublicKeys using bls.PublicKeys
+func GetPublicKey(key *bls.PublicKey) PublicKeys {
+	keyBytes := shard.BLSPublicKey{}
+	keyBytes.FromLibBLSPublicKey(key)
+	return PublicKeys{shard.BLSPublicKeyWrapper{Object: key, Bytes: keyBytes}}
 }
 
 // AppendPriKey appends a SecretKey to multibls PrivateKey

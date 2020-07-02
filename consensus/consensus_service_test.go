@@ -40,8 +40,10 @@ func TestPopulateMessageFields(t *testing.T) {
 		},
 	}
 
+	keyBytes := shard.BLSPublicKey{}
+	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
 	consensusMsg := consensus.populateMessageFields(msg.GetConsensus(), consensus.blockHash[:],
-		blsPriKey.GetPublicKey())
+		keyBytes)
 
 	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")

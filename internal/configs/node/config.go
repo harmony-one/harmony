@@ -77,7 +77,7 @@ type ConfigType struct {
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey *multibls.PrivateKey
-	ConsensusPubKey *multibls.PublicKey
+	ConsensusPubKey multibls.PublicKeys
 	// Database directory
 	DBDir            string
 	networkType      NetworkType
@@ -268,15 +268,15 @@ func (conf *ConfigType) ShardIDFromKey(key *bls.PublicKey) (uint32, error) {
 // ShardIDFromConsensusKey returns the shard ID statically determined from the
 // consensus key.
 func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	return conf.ShardIDFromKey(conf.ConsensusPubKey.PublicKey[0])
+	return conf.ShardIDFromKey(conf.ConsensusPubKey[0].Object)
 }
 
 // ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
-func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicKey, sID uint32) error {
+func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys multibls.PublicKeys, sID uint32) error {
 	keyShardStrs := []string{}
 	isSameShard := true
 	for _, key := range pubkeys {
-		shardID, err := conf.ShardIDFromKey(key)
+		shardID, err := conf.ShardIDFromKey(key.Object)
 		if err != nil {
 			return err
 		}
@@ -285,7 +285,7 @@ func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys []*bls.PublicK
 		}
 		keyShardStrs = append(
 			keyShardStrs,
-			fmt.Sprintf("key: %s, shard id: %d", key.SerializeToHexStr(), shardID),
+			fmt.Sprintf("key: %s, shard id: %d", key.Bytes.Hex(), shardID),
 		)
 	}
 	if !isSameShard {

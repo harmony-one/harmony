@@ -683,9 +683,9 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 		return
 	}
 
-	for _, blskey := range node.Consensus.PubKey.PublicKey {
-		blsStr := blskey.SerializeToHexStr()
-		shardkey := shard.FromLibBLSPublicKeyUnsafe(blskey)
+	for _, blskey := range node.Consensus.PubKey {
+		blsStr := blskey.Bytes.Hex()
+		shardkey := shard.FromLibBLSPublicKeyUnsafe(blskey.Object)
 		if shardkey == nil {
 			utils.Logger().Error().
 				Int64("epoch", epoch.Int64()).

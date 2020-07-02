@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -76,9 +77,9 @@ type Consensus struct {
 	pubKeyLock sync.Mutex
 	// private/public keys of current node
 	priKey *multibls.PrivateKey
-	PubKey *multibls.PublicKey
+	PubKey multibls.PublicKeys
 	// the publickey of leader
-	LeaderPubKey *bls.PublicKey
+	LeaderPubKey *shard.BLSPublicKeyWrapper
 	viewID       uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
@@ -153,8 +154,8 @@ func (consensus *Consensus) VdfSeedSize() int {
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
 func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.SecretKey, error) {
-	for i, key := range consensus.PubKey.PublicKey {
-		if key.IsEqual(leaderKey) {
+	for i, key := range consensus.PubKey {
+		if key.Object.IsEqual(leaderKey) {
 			return consensus.priKey.PrivateKey[i], nil
 		}
 	}
@@ -163,7 +164,7 @@ func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.
 
 // GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
 func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
+	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
 // TODO: put shardId into chain reader's chain config

@@ -84,9 +84,13 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
 			Msg("Member")
 	}
-	consensus.LeaderPubKey = pubKeys[0]
-	utils.Logger().Info().
-		Str("info", consensus.LeaderPubKey.SerializeToHexStr()).Msg("My Leader")
+
+	allKeys := consensus.Decider.Participants()
+	if len(allKeys) != 0 {
+		consensus.LeaderPubKey = &allKeys[0]
+		utils.Logger().Info().
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	consensus.ResetState()
@@ -150,8 +154,12 @@ func (consensus *Consensus) ResetState() {
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
 	members := consensus.Decider.Participants()
-	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
-	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
+	prepareBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+	commitBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 	consensus.aggregatedPrepareSig = nil
@@ -164,12 +172,8 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
-func (consensus *Consensus) IsValidatorInCommittee(pubKey *bls.PublicKey) bool {
-	pubKeyBytes := shard.FromLibBLSPublicKeyUnsafe(pubKey)
-	if pubKeyBytes == nil {
-		return false
-	}
-	return consensus.Decider.IndexOf(*pubKeyBytes) != -1
+func (consensus *Consensus) IsValidatorInCommittee(pubKey shard.BLSPublicKey) bool {
+	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // IsValidatorInCommitteeBytes returns whether the given validator BLS address is part of my committee
@@ -210,17 +214,15 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
 	return nil
 }
 
-func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) (*bls.PublicKey, error) {
+func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) error {
 	vcMsg := msg.GetViewchange()
-	senderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
-	}
+	senderKey := shard.BLSPublicKey{}
+	copy(senderKey[:], vcMsg.SenderPubkey)
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
-		return nil, shard.ErrValidNotInCommittee
+		return shard.ErrValidNotInCommittee
 	}
-	return senderKey, nil
+	return nil
 }
 
 // SetViewID set the viewID to the height of the blockchain
@@ -263,7 +265,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
-			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()[:20]).
+			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("viewID and leaderKey override")
 		utils.Logger().Debug().
 			Uint64("viewID", consensus.viewID).
@@ -291,8 +293,15 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
+
+	// TODO(audit): keep a Mask in the Decider so it won't be reconstructed on the fly.
+	members := consensus.Decider.Participants()
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
 	return chain.ReadSignatureBitmapByPublicKeys(
-		sigAndBitmapPayload, consensus.Decider.Participants(),
+		sigAndBitmapPayload, publicKeys,
 	)
 }
 
@@ -310,7 +319,7 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 // retrieve corresponding blsPublicKey from Coinbase Address
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 	header *block.Header,
-) (*bls.PublicKey, error) {
+) (*shard.BLSPublicKeyWrapper, error) {
 	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
@@ -333,14 +342,14 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 					return nil, err
 				}
-				return committerKey, nil
+				return &shard.BLSPublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
 				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 					return nil, err
 				}
-				return committerKey, nil
+				return &shard.BLSPublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		}
 	}
@@ -385,7 +394,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// Only happens once, the flip-over to a new Decider policy
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
-		decider.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+		decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
 			return consensus.PubKey, nil
 		})
 		consensus.Decider = decider
@@ -487,7 +496,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			hasError = true
 		} else {
 			consensus.getLogger().Debug().
-				Str("leaderPubKey", leaderPubKey.SerializeToHexStr()).
+				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
 		}
@@ -501,7 +510,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.IsEqual(oldLeader) && consensus.IsLeader() {
+			if !consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
@@ -521,8 +530,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	for _, key := range consensus.PubKey.PublicKey {
-		if key.IsEqual(consensus.LeaderPubKey) {
+	for _, key := range consensus.PubKey {
+		if key.Object.IsEqual(consensus.LeaderPubKey.Object) {
 			return true
 		}
 	}
@@ -540,6 +549,10 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 
 func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 	members := consensus.Decider.Participants()
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
 	if _, ok := consensus.bhpSigs[viewID]; !ok {
 		consensus.bhpSigs[viewID] = map[string]*bls.Sign{}
 	}
@@ -550,15 +563,15 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 		consensus.viewIDSigs[viewID] = map[string]*bls.Sign{}
 	}
 	if _, ok := consensus.bhpBitmap[viewID]; !ok {
-		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+		bhpBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
 		consensus.bhpBitmap[viewID] = bhpBitmap
 	}
 	if _, ok := consensus.nilBitmap[viewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(members, nil)
+		nilBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
 		consensus.nilBitmap[viewID] = nilBitmap
 	}
 	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+		viewIDBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
 		consensus.viewIDBitmap[viewID] = viewIDBitmap
 	}
 }

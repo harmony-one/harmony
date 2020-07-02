@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"bytes"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -37,7 +39,7 @@ func (consensus *Consensus) validatorSanityChecks(msg *msg_pb.Message) bool {
 	if err != nil {
 		return false
 	}
-	if !senderKey.IsEqual(consensus.LeaderPubKey) &&
+	if !senderKey.IsEqual(consensus.LeaderPubKey.Object) &&
 		consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
 		consensus.getLogger().Warn().Msgf(
 			"[%s] SenderKey not match leader PubKey",
@@ -104,7 +106,7 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Str("ValidatorPubKey", recvMsg.SenderPubkey.SerializeToHexStr()).
+			Str("ValidatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
 			Msg("[OnCommit] BlockNum/viewID not match")
 		return false
 	}
@@ -117,15 +119,15 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
-			logMsgs[0].SenderPubkey.IsEqual(recvMsg.SenderPubkey) {
+			bytes.Equal(logMsgs[0].SenderPubkey.Bytes[:], recvMsg.SenderPubkey.Bytes[:]) {
 			consensus.getLogger().Debug().
-				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.SerializeToHexStr()).
+				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.Bytes.Hex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.SerializeToHexStr()).
+				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.Bytes.Hex()).
 				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
 				Uint64("recvMsg.ViewID", recvMsg.ViewID).
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
-				Str("LeaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
+				Str("LeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 				Msg("[OnAnnounce] Leader is malicious")
 			if consensus.current.Mode() == ViewChanging {
 				consensus.getLogger().Debug().Msg(
@@ -136,7 +138,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 			}
 		}
 		consensus.getLogger().Debug().
-			Str("leaderKey", consensus.LeaderPubKey.SerializeToHexStr()).
+			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("[OnAnnounce] Announce message received again")
 	}
 	return consensus.isRightBlockNumCheck(recvMsg)
@@ -205,7 +207,7 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 	}
 	consensus.getLogger().Debug().
 		Msg("[viewChangeSanityCheck] Checking new message")
-	senderKey, err := consensus.verifyViewChangeSenderKey(msg)
+	err := consensus.verifyViewChangeSenderKey(msg)
 	if err != nil {
 		if err == shard.ErrValidNotInCommittee {
 			consensus.getLogger().Info().
@@ -219,6 +221,10 @@ func (consensus *Consensus) viewChangeSanityCheck(msg *msg_pb.Message) bool {
 				msg.GetType().String(),
 			)
 		}
+		return false
+	}
+	senderKey, err := bls.BytesToBLSPublicKey(msg.GetViewchange().SenderPubkey)
+	if err != nil {
 		return false
 	}
 	if err := verifyMessageSig(senderKey, msg); err != nil {

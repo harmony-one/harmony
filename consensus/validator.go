@@ -59,11 +59,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 func (consensus *Consensus) prepare() {
 	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
-	for i, key := range consensus.PubKey.PublicKey {
-		if !consensus.IsValidatorInCommittee(key) {
+	for i, key := range consensus.PubKey {
+		if !consensus.IsValidatorInCommittee(key.Bytes) {
 			continue
 		}
-		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, key, consensus.priKey.PrivateKey[i])
+		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, key.Bytes, consensus.priKey.PrivateKey[i])
 		if err != nil {
 			consensus.getLogger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -210,15 +210,15 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
-	for i, key := range consensus.PubKey.PublicKey {
-		if !consensus.IsValidatorInCommittee(key) {
+	for i, key := range consensus.PubKey {
+		if !consensus.IsValidatorInCommittee(key.Bytes) {
 			continue
 		}
 
 		networkMessage, _ := consensus.construct(
 			msg_pb.MessageType_COMMIT,
 			commitPayload,
-			key, consensus.priKey.PrivateKey[i],
+			key.Bytes, consensus.priKey.PrivateKey[i],
 		)
 
 		if consensus.current.Mode() != Listening {

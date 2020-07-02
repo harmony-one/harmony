@@ -209,7 +209,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		d := quorum.NewDecider(
 			quorum.SuperMajorityStake, subComm.ShardID,
 		)
-		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
 			return nil, nil
 		})
 
@@ -524,7 +524,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 		}
 		// TODO(audit): reuse a singleton decider and not recreate it for every single block
 		d := quorum.NewDecider(quorum.SuperMajorityStake, subComm.ShardID)
-		d.SetMyPublicKeyProvider(func() (*multibls.PublicKey, error) {
+		d.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
 			return nil, nil
 		})
 

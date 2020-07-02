@@ -3,6 +3,8 @@ package consensus
 import (
 	"encoding/binary"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -30,7 +32,7 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 	vcMsg.SenderPubkey = pubKey.Serialize()
 
 	// next leader key already updated
-	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Serialize()
+	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Bytes[:]
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 		msg_pb.MessageType_PREPARED, consensus.blockNum,
@@ -98,7 +100,7 @@ func (consensus *Consensus) constructViewChangeMessage(pubKey *bls.PublicKey, pr
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.PublicKey, priKey *bls.SecretKey) []byte {
+func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey shard.BLSPublicKey, priKey *bls.SecretKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -112,7 +114,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, pubKey *bls.P
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
-	vcMsg.SenderPubkey = pubKey.Serialize()
+	vcMsg.SenderPubkey = pubKey[:]
 	vcMsg.Payload = consensus.m1Payload
 	if len(consensus.m1Payload) != 0 {
 		block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)

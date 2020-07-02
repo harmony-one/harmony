@@ -84,16 +84,19 @@ func (v *stakedVoteWeight) AddNewVote(
 	tallyQuorum.tally = tallyQuorum.tally.Add(additionalVotePower)
 
 	t := v.QuorumThreshold()
-	tallyQuorum.quorumAchieved = tallyQuorum.tally.GT(t)
 
-	msg := "Attempt to reach quorum"
-	if tallyQuorum.quorumAchieved {
-		msg = "Quorum Achieved!"
+	if !tallyQuorum.quorumAchieved {
+		tallyQuorum.quorumAchieved = tallyQuorum.tally.GT(t)
+
+		msg := "Attempt to reach quorum"
+		if tallyQuorum.quorumAchieved {
+			msg = "Quorum Achieved!"
+		}
+		utils.Logger().Info().
+			Str("phase", p.String()).
+			Str("total-power-of-signers", tallyQuorum.tally.String()).
+			Msg(msg)
 	}
-	utils.Logger().Info().
-		Str("phase", p.String()).
-		Str("total-power-of-signers", tallyQuorum.tally.String()).
-		Msg(msg)
 	return ballet, nil
 }
 
@@ -262,12 +265,10 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 		return false
 	}
 	identity, _ := pubKeyFunc()
-	for _, key := range identity.PublicKey {
-		if w := (shard.BLSPublicKey{}); w.FromLibBLSPublicKey(key) != nil {
-			_, ok := v.roster.Voters[w]
-			if ok {
-				return true
-			}
+	for _, key := range identity {
+		_, ok := v.roster.Voters[key.Bytes]
+		if ok {
+			return true
 		}
 	}
 	return false

@@ -23,21 +23,20 @@ type FBFTLog struct {
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
 type FBFTMessage struct {
-	MessageType       msg_pb.MessageType
-	ViewID            uint64
-	BlockNum          uint64
-	BlockHash         common.Hash
-	Block             []byte
-	SenderPubkey      *bls.PublicKey
-	SenderPubkeyBytes shard.BLSPublicKey
-	LeaderPubkey      *bls.PublicKey
-	Payload           []byte
-	ViewchangeSig     *bls.Sign
-	ViewidSig         *bls.Sign
-	M2AggSig          *bls.Sign
-	M2Bitmap          *bls_cosi.Mask
-	M3AggSig          *bls.Sign
-	M3Bitmap          *bls_cosi.Mask
+	MessageType   msg_pb.MessageType
+	ViewID        uint64
+	BlockNum      uint64
+	BlockHash     common.Hash
+	Block         []byte
+	SenderPubkey  *shard.BLSPublicKeyWrapper
+	LeaderPubkey  *shard.BLSPublicKeyWrapper
+	Payload       []byte
+	ViewchangeSig *bls.Sign
+	ViewidSig     *bls.Sign
+	M2AggSig      *bls.Sign
+	M2Bitmap      *bls_cosi.Mask
+	M3AggSig      *bls.Sign
+	M3Bitmap      *bls_cosi.Mask
 }
 
 // String ..
@@ -48,8 +47,8 @@ func (m *FBFTMessage) String() string {
 		m.ViewID,
 		m.BlockNum,
 		m.BlockHash.Hex(),
-		m.SenderPubkeyBytes.Hex(),
-		m.LeaderPubkey.SerializeToHexStr(),
+		m.SenderPubkey.Bytes.Hex(),
+		m.LeaderPubkey.Bytes.Hex(),
 	)
 }
 
@@ -250,8 +249,8 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	pbftMsg.SenderPubkey = pubKey
-	copy(pbftMsg.SenderPubkeyBytes[:], consensusMsg.SenderPubkey[:])
+	pbftMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	copy(pbftMsg.SenderPubkey.Bytes[:], consensusMsg.SenderPubkey[:])
 
 	return &pbftMsg, nil
 }
@@ -296,9 +295,11 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the viewid signature")
 		return nil, err
 	}
-	pbftMsg.SenderPubkey = pubKey
-	copy(pbftMsg.SenderPubkeyBytes[:], vcMsg.SenderPubkey[:])
-	pbftMsg.LeaderPubkey = leaderKey
+
+	pbftMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	copy(pbftMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+	pbftMsg.LeaderPubkey = &shard.BLSPublicKeyWrapper{Object: leaderKey}
+	copy(pbftMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
 	pbftMsg.ViewchangeSig = &vcSig
 	pbftMsg.ViewidSig = &vcSig1
 	return &pbftMsg, nil
@@ -326,9 +327,15 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
 		return nil, err
 	}
-	FBFTMsg.SenderPubkey = pubKey
-	copy(FBFTMsg.SenderPubkeyBytes[:], vcMsg.SenderPubkey[:])
 
+	FBFTMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+
+	members := consensus.Decider.Participants()
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
 	if len(vcMsg.M3Aggsigs) > 0 {
 		m3Sig := bls.Sign{}
 		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
@@ -336,7 +343,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
 			return nil, err
 		}
-		m3mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
+		m3mask, err := bls_cosi.NewMask(publicKeys, nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
 			return nil, err
@@ -353,7 +360,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")
 			return nil, err
 		}
-		m2mask, err := bls_cosi.NewMask(consensus.Decider.Participants(), nil)
+		m2mask, err := bls_cosi.NewMask(publicKeys, nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
 			return nil, err
