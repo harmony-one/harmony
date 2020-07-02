@@ -164,6 +164,7 @@ type Node struct {
 	BroadcastInvalidTx bool
 
 	// metrics of p2p messages
+	NumP2PMessages     uint32
 	NumTotalMessages   uint32
 	NumValidMessages   uint32
 	NumInvalidMessages uint32
@@ -565,6 +566,7 @@ func (node *Node) Start() error {
 			topicNamed,
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
+				atomic.AddUint32(&node.NumP2PMessages, 1)
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message
@@ -865,6 +867,7 @@ func New(
 			select {
 			case <-ticker.C:
 				utils.Logger().Info().
+					Uint32("P2PMessage", node.NumP2PMessages).
 					Uint32("TotalMessage", node.NumTotalMessages).
 					Uint32("ValidMessage", node.NumValidMessages).
 					Uint32("InvalidMessage", node.NumInvalidMessages).
@@ -876,6 +879,7 @@ func New(
 				atomic.StoreUint32(&node.NumIgnoredMessages, 0)
 				atomic.StoreUint32(&node.NumValidMessages, 0)
 				atomic.StoreUint32(&node.NumTotalMessages, 0)
+				atomic.StoreUint32(&node.NumP2PMessages, 0)
 			}
 		}
 	}()
