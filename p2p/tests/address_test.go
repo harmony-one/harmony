@@ -1,4 +1,4 @@
-package p2p_tests
+package p2ptests
 
 import (
 	"strings"
