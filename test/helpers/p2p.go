@@ -1,4 +1,4 @@
-package p2ptests
+package helpers
 
 import (
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -8,24 +8,28 @@ import (
 	"github.com/pkg/errors"
 )
 
-type host struct {
+// Host - struct for representing a host (IP / Port)
+type Host struct {
 	IP   string
 	Port string
 }
 
 var (
-	hosts     []host
-	topics    []string
-	bootnodes []string
+	// Hosts - host combinations
+	Hosts []Host
+	// Topics - p2p topics
+	Topics []string
+	// Bootnodes - p2p bootnodes
+	Bootnodes []string
 )
 
 func init() {
-	hosts = []host{
-		{IP: "127.0.0.1", Port: "5000"},
-		{IP: "8.8.8.8", Port: "5000"},
+	Hosts = []Host{
+		{IP: "127.0.0.1", Port: "9000"},
+		{IP: "8.8.8.8", Port: "9001"},
 	}
 
-	topics = []string{
+	Topics = []string{
 		"hmy/testnet/0.0.1/client/beacon",
 		"hmy/testnet/0.0.1/node/beacon",
 		"hmy/testnet/0.0.1/node/shard/1",
@@ -33,19 +37,20 @@ func init() {
 		"hmy/testnet/0.0.1/node/shard/3",
 	}
 
-	bootnodes = []string{
+	Bootnodes = []string{
 		"/ip4/54.86.126.90/tcp/9850/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
 		"/ip4/52.40.84.2/tcp/9850/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29",
 	}
 }
 
-func createNode(address string, port string) (p2p.Host, *bls.PublicKey, error) {
-	nodePrivateKey, _, err := generatePrivateKey()
+// GenerateHost - test helper to generate a new host
+func GenerateHost(address string, port string) (p2p.Host, *bls.PublicKey, error) {
+	nodePrivateKey, _, err := GeneratePrivateKey()
 	if err != nil {
 		return nil, nil, errors.New("failed to generate private key for node")
 	}
 
-	peer, err := generatePeer(address, port)
+	peer, err := GeneratePeer(address, port)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -58,7 +63,8 @@ func createNode(address string, port string) (p2p.Host, *bls.PublicKey, error) {
 	return host, peer.ConsensusPubKey, nil
 }
 
-func generatePeer(address string, port string) (p2p.Peer, error) {
+// GeneratePeer - test helper to generate a new peer
+func GeneratePeer(address string, port string) (p2p.Peer, error) {
 	peerPrivateKey := harmony_bls.RandPrivateKey()
 	peerPublicKey := peerPrivateKey.GetPublicKey()
 	if peerPrivateKey == nil || peerPublicKey == nil {
@@ -70,7 +76,8 @@ func generatePeer(address string, port string) (p2p.Peer, error) {
 	return peer, nil
 }
 
-func generatePrivateKey() (privateKey libp2p_crypto.PrivKey, publicKey libp2p_crypto.PubKey, err error) {
+// GeneratePrivateKey - test helper to generate a new private key to be used for p2p
+func GeneratePrivateKey() (privateKey libp2p_crypto.PrivKey, publicKey libp2p_crypto.PubKey, err error) {
 	privateKey, publicKey, err = libp2p_crypto.GenerateKeyPair(libp2p_crypto.RSA, 2048)
 	if err != nil {
 		return nil, nil, err

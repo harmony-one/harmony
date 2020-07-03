@@ -3,14 +3,15 @@ package p2ptests
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/test/helpers"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHostSetup(t *testing.T) {
 	t.Parallel()
 
-	hostData := hosts[0]
-	host, pubKey, err := createNode(hostData.IP, hostData.Port)
+	hostData := helpers.Hosts[0]
+	host, pubKey, err := helpers.GenerateHost(hostData.IP, hostData.Port)
 	assert.NoError(t, err)
 
 	peer := host.GetSelfPeer()
@@ -26,13 +27,13 @@ func TestHostSetup(t *testing.T) {
 func TestAddPeer(t *testing.T) {
 	t.Parallel()
 
-	hostData := hosts[0]
-	host, _, err := createNode(hostData.IP, hostData.Port)
+	hostData := helpers.Hosts[0]
+	host, _, err := helpers.GenerateHost(hostData.IP, hostData.Port)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, host.GetID())
 
-	discoveredHostData := hosts[1]
-	discoveredHost, _, err := createNode(discoveredHostData.IP, discoveredHostData.Port)
+	discoveredHostData := helpers.Hosts[1]
+	discoveredHost, _, err := helpers.GenerateHost(discoveredHostData.IP, discoveredHostData.Port)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, discoveredHost.GetID())
 
@@ -65,13 +66,13 @@ func TestAddPeer(t *testing.T) {
 func TestConnectionToInvalidPeer(t *testing.T) {
 	t.Parallel()
 
-	hostData := hosts[0]
-	host, _, err := createNode(hostData.IP, hostData.Port)
+	hostData := helpers.Hosts[0]
+	host, _, err := helpers.GenerateHost(hostData.IP, hostData.Port)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, host.GetID())
 
-	discoveredHostData := hosts[1]
-	discoveredHost, _, err := createNode(discoveredHostData.IP, discoveredHostData.Port)
+	discoveredHostData := helpers.Hosts[1]
+	discoveredHost, _, err := helpers.GenerateHost(discoveredHostData.IP, discoveredHostData.Port)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, discoveredHost.GetID())
 
