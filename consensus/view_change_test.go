@@ -5,6 +5,7 @@ import (
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -123,17 +124,25 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	assert.Equal(t, int64(0), consensus.Decider.ParticipantsCount())
 
 	blsKeys := []*bls.PublicKey{}
+	wrappedBLSKeys := []*shard.BLSPublicKeyWrapper{}
+
 	keyCount := int64(5)
 	for i := int64(0); i < keyCount; i++ {
 		blsKey := harmony_bls.RandPrivateKey()
-		blsKeys = append(blsKeys, blsKey.GetPublicKey())
+		blsPubKey := blsKey.GetPublicKey()
+		bytes := shard.BLSPublicKey{}
+		bytes.FromLibBLSPublicKey(blsPubKey)
+		wrapped := &shard.BLSPublicKeyWrapper{Object: blsPubKey, Bytes: bytes}
+
+		blsKeys = append(blsKeys, blsPubKey)
+		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
 	}
 
 	consensus.Decider.UpdateParticipants(blsKeys)
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
 
-	consensus.LeaderPubKey = blsKeys[0]
+	consensus.LeaderPubKey = wrappedBLSKeys[0]
+	nextKey := consensus.GetNextLeaderKey()
 
-	assert.NotPanics(t, func() { consensus.GetNextLeaderKey() })
-	assert.Equal(t, consensus.GetNextLeaderKey(), blsKeys[1])
+	assert.Equal(t, nextKey, wrappedBLSKeys[1])
 }
