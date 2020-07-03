@@ -13,18 +13,20 @@ func TestBasicViewChanging(t *testing.T) {
 	assert.NoError(t, err)
 
 	state := State{mode: Normal}
+
+	// Change Mode
 	assert.Equal(t, state.mode, consensus.current.mode)
 	assert.Equal(t, state.Mode(), consensus.current.Mode())
-	assert.Equal(t, state.viewID, consensus.current.viewID)
-	assert.Equal(t, state.ViewID(), consensus.current.ViewID())
-	assert.Equal(t, state.GetViewID(), consensus.current.GetViewID()) // Why are there two methods to retrieve the ViewID?
 
-	// Set new mode
 	consensus.current.SetMode(ViewChanging)
 	assert.Equal(t, ViewChanging, consensus.current.mode)
 	assert.Equal(t, ViewChanging, consensus.current.Mode())
 
-	// Set new view ID
+	// Change ViewID
+	assert.Equal(t, state.viewID, consensus.current.viewID)
+	assert.Equal(t, state.ViewID(), consensus.current.ViewID())
+	assert.Equal(t, state.GetViewID(), consensus.current.GetViewID()) // Why are there two methods to retrieve the ViewID?
+
 	newViewID := consensus.current.ViewID() + 1
 	consensus.current.SetViewID(newViewID)
 	assert.Equal(t, newViewID, consensus.current.viewID)
@@ -98,13 +100,8 @@ func testPhaseGroupSwitching(t *testing.T, consensus *Consensus, phases []FBFTPh
 
 	for _, phase := range phases {
 		consensus.switchPhase(desiredPhase, override)
-
-		if override {
-			assert.Equal(t, desiredPhase, consensus.phase)
-		} else {
-			expected := phaseMapping[phase]
-			assert.Equal(t, expected, (phase == consensus.phase))
-		}
+		expected := phaseMapping[phase]
+		assert.Equal(t, expected, (phase == consensus.phase))
 	}
 
 	assert.Equal(t, desiredPhase, consensus.phase)
@@ -134,6 +131,8 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 
 	consensus.Decider.UpdateParticipants(blsKeys)
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
+
+	assert.NotPanics(t, func() { consensus.GetNextLeaderKey() })
 
 	assert.Equal(t, consensus.GetNextLeaderKey(), blsKeys[0])
 }
