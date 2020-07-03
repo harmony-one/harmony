@@ -132,7 +132,8 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	consensus.Decider.UpdateParticipants(blsKeys)
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
 
-	assert.NotPanics(t, func() { consensus.GetNextLeaderKey() })
+	consensus.LeaderPubKey = blsKeys[0]
 
-	assert.Equal(t, consensus.GetNextLeaderKey(), blsKeys[0])
+	assert.NotPanics(t, func() { consensus.GetNextLeaderKey() })
+	assert.Equal(t, consensus.GetNextLeaderKey(), blsKeys[1])
 }
