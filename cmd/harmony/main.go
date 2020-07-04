@@ -177,6 +177,7 @@ func passphraseForBLS() {
 		fmt.Println("Internal nodes need to have blspass to decrypt blskey")
 		os.Exit(101)
 	}
+	fmt.Println(*blsPass)
 	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)

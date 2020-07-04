@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -84,9 +85,8 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	if err != nil {
 		return nil, errors.Wrapf(err, "attemped to load from %s", fileName)
 	}
-	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
-		passphrase = passphrase[:len(passphrase)-1]
-	}
+	passphrase = strings.TrimSpace(passphrase)
+
 	decryptedBytes, err := decrypt(encryptedPrivateKeyBytes, passphrase)
 	if err != nil {
 		return nil, err
@@ -129,6 +129,7 @@ func Readln(timeout time.Duration) (string, error) {
 }
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
+// TODO(Jacky): Determine whether to remove the awsSettingString
 func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.SecretKey, error) {
 	if awsSettingString == "" {
 		return nil, errors.New("aws credential is not set")
@@ -139,7 +140,7 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 		return nil, errors.New(awsSettingString + " is not a valid JSON string for setting aws configuration.")
 	}
 
-	// Initialize a session that the aws SDK uses to load
+	// Initialize a session that the aws SDK uses to loLoadAwsCMKEncryptedBLSKeyad
 	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	})
