@@ -510,7 +510,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			}
 
 			// If the leader changed and I myself become the leader
-			if !consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object) && consensus.IsLeader() {
+			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
+				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", consensus.PubKey.SerializeToHexStr()).
