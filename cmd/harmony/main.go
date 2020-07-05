@@ -247,7 +247,7 @@ func setupStakingNodeAccount() error {
 	return nil
 }
 
-func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey multibls.PublicKeys) error {
+func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMultiBLSPubKey *multibls.PublicKeys) error {
 	keyPasses := map[string]string{}
 	blsKeyFiles := []os.FileInfo{}
 	awsEncryptedBLSKeyFiles := []os.FileInfo{}
@@ -325,7 +325,7 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKey, consensusMul
 		}
 		// TODO: assumes order between public/private key pairs
 		multibls.AppendPriKey(consensusMultiBLSPriKey, consensusPriKey)
-		consensusMultiBLSPubKey = append(consensusMultiBLSPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
+		*consensusMultiBLSPubKey = append(*consensusMultiBLSPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
 	}
 
 	return nil
@@ -353,7 +353,7 @@ func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PublicKeys {
 		multibls.AppendPriKey(consensusMultiPriKey, consensusPriKey)
 		consensusMultiPubKey = append(consensusMultiPubKey, multibls.GetPublicKey(consensusPriKey.GetPublicKey())...)
 	} else {
-		err := readMultiBLSKeys(consensusMultiPriKey, consensusMultiPubKey)
+		err := readMultiBLSKeys(consensusMultiPriKey, &consensusMultiPubKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[Multi-BLS] ERROR when loading bls keys, err :%v\n", err)
 			os.Exit(100)
