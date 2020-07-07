@@ -76,8 +76,7 @@ type Consensus struct {
 	MinPeers   int
 	pubKeyLock sync.Mutex
 	// private/public keys of current node
-	priKey *multibls.PrivateKey
-	PubKey multibls.PublicKeys
+	priKey multibls.PrivateKeys
 	// the publickey of leader
 	LeaderPubKey *shard.BLSPublicKeyWrapper
 	viewID       uint64
@@ -152,18 +151,23 @@ func (consensus *Consensus) VdfSeedSize() int {
 	return int(consensus.Decider.ParticipantsCount()) * 2 / 3
 }
 
+// GetPublicKeys returns the public keys
+func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
+	return consensus.priKey.GetPublicKeys()
+}
+
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*bls.SecretKey, error) {
-	for i, key := range consensus.PubKey {
-		if key.Object.IsEqual(leaderKey) {
-			return consensus.priKey.PrivateKey[i], nil
+func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*shard.BLSPrivateKeyWrapper, error) {
+	for i, key := range consensus.priKey {
+		if key.Pub.Object.IsEqual(leaderKey) {
+			return &consensus.priKey[i], nil
 		}
 	}
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
 // GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, error) {
+func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*shard.BLSPrivateKeyWrapper, error) {
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
@@ -171,7 +175,7 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.SecretKey, erro
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey *multibls.PrivateKey,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}
@@ -190,9 +194,8 @@ func New(
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey
-		consensus.PubKey = multiBLSPriKey.GetPublicKey()
 		utils.Logger().Info().
-			Str("publicKey", consensus.PubKey.SerializeToHexStr()).Msg("My Public Key")
+			Str("publicKey", consensus.GetPublicKeys().SerializeToHexStr()).Msg("My Public Key")
 	} else {
 		utils.Logger().Error().Msg("the bls key is nil")
 		return nil, fmt.Errorf("nil bls key, aborting")

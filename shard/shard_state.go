@@ -37,6 +37,12 @@ type State struct {
 	Shards []Committee `json:"shards"`
 }
 
+// BLSPrivateKeyWrapper combines the bls private key and the corresponding public key
+type BLSPrivateKeyWrapper struct {
+	Pri *bls.SecretKey
+	Pub *BLSPublicKeyWrapper
+}
+
 // BLSPublicKeyWrapper defines the bls public key in both serialized and
 // deserialized form.
 type BLSPublicKeyWrapper struct {

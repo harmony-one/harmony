@@ -413,7 +413,7 @@ func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 	if err != nil {
 		return count
 	}
-	for _, key := range node.Consensus.PubKey {
+	for _, key := range node.Consensus.GetPublicKeys() {
 		if ok, err := mask.KeyEnabled(key.Object); err == nil && ok {
 			count++
 		}

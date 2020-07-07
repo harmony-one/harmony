@@ -577,7 +577,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if node.Consensus.PubKey.Contains(key) {
+		if node.Consensus.GetPublicKeys().Contains(key) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
@@ -683,7 +683,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 		return
 	}
 
-	for _, blskey := range node.Consensus.PubKey {
+	for _, blskey := range node.Consensus.GetPublicKeys() {
 		blsStr := blskey.Bytes.Hex()
 		shardkey := shard.FromLibBLSPublicKeyUnsafe(blskey.Object)
 		if shardkey == nil {

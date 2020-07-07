@@ -76,8 +76,7 @@ type ConfigType struct {
 	IP              string  // IP of the node.
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey *multibls.PrivateKey
-	ConsensusPubKey multibls.PublicKeys
+	ConsensusPriKey multibls.PrivateKeys
 	// Database directory
 	DBDir            string
 	networkType      NetworkType
@@ -268,7 +267,7 @@ func (conf *ConfigType) ShardIDFromKey(key *bls.PublicKey) (uint32, error) {
 // ShardIDFromConsensusKey returns the shard ID statically determined from the
 // consensus key.
 func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	return conf.ShardIDFromKey(conf.ConsensusPubKey[0].Object)
+	return conf.ShardIDFromKey(conf.ConsensusPriKey[0].Pub.Object)
 }
 
 // ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard

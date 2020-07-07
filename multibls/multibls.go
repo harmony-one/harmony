@@ -8,10 +8,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 )
 
-// PrivateKey stores the bls secret keys that belongs to the node
-type PrivateKey struct {
-	PrivateKey []*bls.SecretKey
-}
+// PrivateKeys stores the bls secret keys that belongs to the node
+type PrivateKeys []shard.BLSPrivateKeyWrapper
 
 // PublicKeys stores the bls public keys that belongs to the node
 type PublicKeys []shard.BLSPublicKeyWrapper
@@ -38,35 +36,20 @@ func (multiKey PublicKeys) Contains(pubKey *bls.PublicKey) bool {
 	return false
 }
 
-// GetPublicKey wrapper
-func (multiKey PrivateKey) GetPublicKey() PublicKeys {
-	pubKeys := make([]shard.BLSPublicKeyWrapper, len(multiKey.PrivateKey))
-	for i, key := range multiKey.PrivateKey {
-		wrapper := shard.BLSPublicKeyWrapper{Object: key.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
-		pubKeys[i] = wrapper
+// GetPublicKeys wrapper
+func (multiKey PrivateKeys) GetPublicKeys() PublicKeys {
+	pubKeys := make([]shard.BLSPublicKeyWrapper, len(multiKey))
+	for i, key := range multiKey {
+		pubKeys[i] = *key.Pub
 	}
 
 	return pubKeys
 }
 
-// GetPrivateKey creates a multibls PrivateKey using bls.SecretKey
-func GetPrivateKey(key *bls.SecretKey) *PrivateKey {
-	return &PrivateKey{PrivateKey: []*bls.SecretKey{key}}
-}
-
-// GetPublicKey creates a multibls PublicKeys using bls.PublicKeys
-func GetPublicKey(key *bls.PublicKey) PublicKeys {
-	keyBytes := shard.BLSPublicKey{}
-	keyBytes.FromLibBLSPublicKey(key)
-	return PublicKeys{shard.BLSPublicKeyWrapper{Object: key, Bytes: keyBytes}}
-}
-
-// AppendPriKey appends a SecretKey to multibls PrivateKey
-func AppendPriKey(multiKey *PrivateKey, key *bls.SecretKey) {
-	if multiKey != nil {
-		multiKey.PrivateKey = append(multiKey.PrivateKey, key)
-	} else {
-		multiKey = &PrivateKey{PrivateKey: []*bls.SecretKey{key}}
-	}
+// GetPrivateKeys creates a multibls PrivateKeys using bls.SecretKey
+func GetPrivateKeys(key *bls.SecretKey) PrivateKeys {
+	pub := key.GetPublicKey()
+	pubWrapper := shard.BLSPublicKeyWrapper{Object: pub}
+	pubWrapper.Bytes.FromLibBLSPublicKey(pub)
+	return PrivateKeys{shard.BLSPrivateKeyWrapper{Pri: key, Pub: &pubWrapper}}
 }

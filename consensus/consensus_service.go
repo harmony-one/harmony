@@ -93,6 +93,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
+	consensus.UpdateBitmaps()
 	consensus.ResetState()
 	consensus.ResetViewChangeState()
 	return consensus.Decider.ParticipantsCount()
@@ -143,6 +144,22 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
 	return sigs
 }
 
+// UpdateBitmaps update the bitmaps for prepare and commit phase
+func (consensus *Consensus) UpdateBitmaps() {
+	consensus.getLogger().Debug().
+		Str("Phase", consensus.phase.String()).
+		Msg("[UpdateBitmaps] Updating consensus bitmaps")
+	members := consensus.Decider.Participants()
+	publicKeys := []*bls.PublicKey{}
+	for _, key := range members {
+		publicKeys = append(publicKeys, key.Object)
+	}
+	prepareBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+	commitBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+	consensus.prepareBitmap = prepareBitmap
+	consensus.commitBitmap = commitBitmap
+}
+
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.getLogger().Debug().
@@ -153,15 +170,12 @@ func (consensus *Consensus) ResetState() {
 	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
-	members := consensus.Decider.Participants()
-	publicKeys := []*bls.PublicKey{}
-	for _, key := range members {
-		publicKeys = append(publicKeys, key.Object)
+	if consensus.prepareBitmap != nil {
+		consensus.prepareBitmap.Clear()
 	}
-	prepareBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
-	commitBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
-	consensus.prepareBitmap = prepareBitmap
-	consensus.commitBitmap = commitBitmap
+	if consensus.commitBitmap != nil {
+		consensus.commitBitmap.Clear()
+	}
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
 }
@@ -395,7 +409,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if isFirstTimeStaking || haventUpdatedDecider {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, consensus.ShardID)
 		decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
-			return consensus.PubKey, nil
+			return consensus.GetPublicKeys(), nil
 		})
 		consensus.Decider = decider
 	}
@@ -504,7 +518,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	for _, key := range pubKeys {
 		// in committee
-		if consensus.PubKey.Contains(key) {
+		myPubKeys := consensus.GetPublicKeys()
+		if myPubKeys.Contains(key) {
 			if hasError {
 				return Syncing
 			}
@@ -514,7 +529,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
 				go func() {
 					utils.Logger().Debug().
-						Str("myKey", consensus.PubKey.SerializeToHexStr()).
+						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Uint64("viewID", consensus.viewID).
 						Uint64("block", consensus.blockNum).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
@@ -531,8 +546,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	for _, key := range consensus.PubKey {
-		if key.Object.IsEqual(consensus.LeaderPubKey.Object) {
+	for _, key := range consensus.priKey {
+		if key.Pub.Object.IsEqual(consensus.LeaderPubKey.Object) {
 			return true
 		}
 	}

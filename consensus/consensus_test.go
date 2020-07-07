@@ -22,7 +22,7 @@ func TestNew(test *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(bls.RandPrivateKey()), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(bls.RandPrivateKey()), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
