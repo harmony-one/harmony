@@ -3,18 +3,16 @@ package blsloader
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	ffibls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -55,55 +53,56 @@ func loadKMSKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*ffibls.Secre
 	return secretKey, nil
 }
 
-// blsDirLoader is the helper structure
-type blsDirLoader struct {
-	dirPath   string
-	pp        passProvider
-	kcp       kmsClientProvider
-	resWriter io.Writer
-
+// blsDirLoadHelper is the helper structure
+type blsDirLoadHelper struct {
+	dirPath string
+	pp      passProvider
+	kcp     kmsClientProvider
+	// result field
 	secretKeys []*ffibls.SecretKey
 }
 
-func (loader *blsDirLoader) getKeyFilesFromDir(dir string) (multibls.PrivateKey, error) {
-	err := filepath.Walk(dir, loader.processFileWalk)
+func (helper *blsDirLoadHelper) getKeyFilesFromDir() (multibls.PrivateKey, error) {
+	err := filepath.Walk(helper.dirPath, helper.processFileWalk)
 	if err != nil {
 		return multibls.PrivateKey{}, err
 	}
-	return multibls.PrivateKey{PrivateKey: loader.secretKeys}, nil
+	return multibls.PrivateKey{PrivateKey: helper.secretKeys}, nil
 }
 
-// error types to be neglected for directory bls loading
-var skippingErrs = []error{
-	errUnknownExtension,
-	errNilPassProvider,
-	errNilKMSClientProvider,
-}
-
-func (loader *blsDirLoader) processFileWalk(path string, info os.FileInfo, err error) error {
-	key, err := loader.loadKeyFromFile(path, info)
+func (helper *blsDirLoadHelper) processFileWalk(path string, info os.FileInfo, err error) error {
+	key, err := helper.loadKeyFromFile(path, info)
 	if err != nil {
-		if errIsErrors(err, skippingErrs) {
+		if errIsErrors(err, helper.skippingErrors()) {
 			skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
-			loader.resWriter.Write([]byte(skipStr))
+			fmt.Println(skipStr)
 			return nil
 		}
 		return err
 	}
-	loader.secretKeys = append(loader.secretKeys, key)
+	helper.secretKeys = append(helper.secretKeys, key)
 	return nil
 }
 
-func (loader *blsDirLoader) loadKeyFromFile(path string, info os.FileInfo) (*ffibls.SecretKey, error) {
+// errors to be neglected for directory bls loading
+func (helper *blsDirLoadHelper) skippingErrors() []error {
+	return []error{
+		errUnknownExtension,
+		errNilPassProvider,
+		errNilKMSClientProvider,
+	}
+}
+
+func (helper *blsDirLoadHelper) loadKeyFromFile(path string, info os.FileInfo) (*ffibls.SecretKey, error) {
 	var (
 		key *ffibls.SecretKey
 		err error
 	)
 	switch {
 	case isBasicKeyFile(info):
-		key, err = loadBasicKeyFromFile(path, loader.pp)
+		key, err = loadBasicKeyFromFile(path, helper.pp)
 	case isKMSKeyFile(info):
-		key, err = loadKMSKeyFromFile(path, loader.kcp)
+		key, err = loadKMSKeyFromFile(path, helper.kcp)
 	default:
 		err = errUnknownExtension
 	}

@@ -9,7 +9,8 @@ const (
 )
 
 const (
-	defPromptTimeout = 1 * time.Second
+	defKmsPromptTimeout  = 1 * time.Second
+	defPassPromptTimeout = 10 * time.Second
 )
 
 const (
