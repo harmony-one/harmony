@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -18,7 +19,7 @@ import (
 //    dirPassProvider - provide passphrase from .pass files in a directory
 //    multiPassProvider - multiple passProviders that will provide the passphrase.
 type passProvider interface {
-	getPassphrase(blsPubStr string) (string, error)
+	getPassphrase(keyFile string) (string, error)
 }
 
 // promptPassProvider provides the bls password through console prompt.
@@ -26,8 +27,12 @@ type promptPassProvider struct{}
 
 const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
 
-func (provider *promptPassProvider) getPassphrase(blsPubStr string) (string, error) {
-	fmt.Printf(pwdPromptStr, blsPubStr)
+func newPromptPassProvider() *promptPassProvider {
+	return &promptPassProvider{}
+}
+
+func (provider *promptPassProvider) getPassphrase(keyFile string) (string, error) {
+	fmt.Printf(pwdPromptStr, keyFile)
 	hexBytes, err := terminal.ReadPassword(syscall.Stdin)
 	if err != nil {
 		return "", err
@@ -37,17 +42,23 @@ func (provider *promptPassProvider) getPassphrase(blsPubStr string) (string, err
 
 // filePassProvider provide the bls password from the single bls pass file
 type filePassProvider struct {
-	file string
+	fileName string
+
+	pass string
 }
 
-func (provider *filePassProvider) getPassphrase(blsPubStr string) (string, error) {
-	return readPassFromFile(provider.file)
+func newFilePassProvider(fileName string) *filePassProvider {
+	return &filePassProvider{fileName: fileName}
+}
+
+func (provider *filePassProvider) getPassphrase(keyFile string) (string, error) {
+	return readPassFromFile(provider.fileName)
 }
 
 func readPassFromFile(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return "", fmt.Errorf("cannot open passphrase file: [%s]", file)
+		return "", fmt.Errorf("cannot open passphrase file")
 	}
 	defer f.Close()
 
@@ -63,22 +74,24 @@ type dirPassProvider struct {
 	dirPath string
 }
 
-func (provider *dirPassProvider) getPassphrase(blsPubStr string) (string, error) {
-	file := filepath.Join(provider.dirPath, blsPubStr+passExt)
-	return readPassFromFile(file)
+func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
+	baseName := filepath.Base(keyFile)
+	pubKey := strings.TrimSuffix(baseName, basicKeyExt)
+	passFile := filepath.Join(provider.dirPath, pubKey+passExt)
+	return readPassFromFile(passFile)
 }
 
 // multiPassProvider is a slice of passProviders to provide the passphrase
 // of the given bls key. If a passProvider fails, will continue to the next provider.
 type multiPassProvider []passProvider
 
-func (provider multiPassProvider) getPassphrase(blsPubStr string) (string, error) {
+func (provider multiPassProvider) getPassphrase(keyStr string) (string, error) {
 	for _, pp := range provider {
-		pass, err := pp.getPassphrase(blsPubStr)
+		pass, err := pp.getPassphrase(keyStr)
 		if err != nil {
 			continue
 		}
 		return pass, err
 	}
-	return "", fmt.Errorf("cannot get passphrase for %s", blsPubStr)
+	return "", fmt.Errorf("cannot get passphrase for %s", keyStr)
 }
