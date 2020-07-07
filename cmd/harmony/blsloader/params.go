@@ -11,3 +11,8 @@ const (
 const (
 	defPromptTimeout = 1 * time.Second
 )
+
+const (
+	defWritePassDirMode  = 0600
+	defWritePassFileMode = 0600
+)

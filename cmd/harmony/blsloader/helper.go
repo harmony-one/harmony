@@ -1,11 +1,15 @@
 package blsloader
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	ffibls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -136,4 +140,49 @@ func isKMSKeyFile(info os.FileInfo) bool {
 		return false
 	}
 	return true
+}
+
+// keyFileToPassFile convert a key file base name to passphrase file base name
+func keyFileToPassFile(keyFileBase string) string {
+	return strings.Trim(keyFileBase, basicKeyExt) + passExt
+}
+
+// passFileToKeyFile convert a pass file base name to key file base name
+func passFileToKeyFile(passFileBase string) string {
+	return strings.Trim(passFileBase, passExt) + basicKeyExt
+}
+
+func promptGetPassword(prompt string) (string, error) {
+	if !strings.HasSuffix(prompt, ":") {
+		prompt += ":"
+	}
+	fmt.Print(prompt)
+	b, err := terminal.ReadPassword(syscall.Stdin)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+const yesNoPrompt = "[y/n]: "
+
+func promptYesNo(prompt string) (bool, error) {
+	if !strings.HasSuffix(prompt, yesNoPrompt) {
+		prompt = prompt + yesNoPrompt
+	}
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print(prompt)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return false, err
+		}
+		response = strings.ToLower(response)
+
+		if response == "y" || response == "yes" {
+			return true, nil
+		} else if response == "n" || response == "no" {
+			return false, nil
+		}
+	}
 }

@@ -5,10 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
-	"syscall"
-
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 // passProvider is the interface to provide the passphrase of a bls keys.
@@ -23,7 +19,13 @@ type passProvider interface {
 }
 
 // promptPassProvider provides the bls password through console prompt.
-type promptPassProvider struct{}
+type promptPassProvider struct {
+	// if enablePersist is true, after user enter the passphrase, the
+	// passphrase is also persisted into the persistDir
+	enablePersist bool
+	persistDir    string
+	mode          int
+}
 
 const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
 
@@ -31,13 +33,45 @@ func newPromptPassProvider() *promptPassProvider {
 	return &promptPassProvider{}
 }
 
+func (provider *promptPassProvider) setPersist(dirPath string, mode int) *promptPassProvider {
+	provider.enablePersist = true
+	os.MkdirAll(dirPath, defWritePassDirMode)
+	provider.persistDir = dirPath
+	provider.mode = mode
+
+	return provider
+}
+
 func (provider *promptPassProvider) getPassphrase(keyFile string) (string, error) {
-	fmt.Printf(pwdPromptStr, keyFile)
-	hexBytes, err := terminal.ReadPassword(syscall.Stdin)
+	prompt := fmt.Sprintf(pwdPromptStr, keyFile)
+	pass, err := promptGetPassword(prompt)
 	if err != nil {
 		return "", err
 	}
-	return string(hexBytes), nil
+	if provider.enablePersist {
+		if err := provider.persistPassphrase(keyFile, pass); err != nil {
+			return "", err
+		}
+	}
+	return pass, nil
+
+}
+
+func (provider *promptPassProvider) persistPassphrase(keyFile string, passPhrase string) error {
+	passFile := filepath.Join(provider.persistDir, filepath.Base(keyFile))
+	if _, err := os.Stat(passFile); os.IsNotExist(err) {
+		// file not exist. Go on create the file
+	} else if err == nil {
+		// File exist. Prompt user to overwrite pass file
+		overwrite, err := promptYesNo(fmt.Sprintf("pass file [%v] already exist. Overwrite? ", passFile))
+		if err != nil {
+			return err
+		}
+		if !overwrite {
+			return nil
+		}
+	}
+	return ioutil.WriteFile(passFile, []byte(passPhrase), defWritePassFileMode)
 }
 
 // filePassProvider provide the bls password from the single bls pass file
@@ -76,8 +110,8 @@ type dirPassProvider struct {
 
 func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
 	baseName := filepath.Base(keyFile)
-	pubKey := strings.TrimSuffix(baseName, basicKeyExt)
-	passFile := filepath.Join(provider.dirPath, pubKey+passExt)
+	passKeyBase := keyFileToPassFile(baseName)
+	passFile := filepath.Join(provider.dirPath, passKeyBase)
 	return readPassFromFile(passFile)
 }
 
