@@ -7,23 +7,19 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/pkg/errors"
 )
 
-type awsConfiguration struct {
+type AwsConfiguration struct {
 	AccessKey string `json:"aws-access-key-id"`
 	SecretKey string `json:"aws-secret-access-key"`
 	Region    string `json:"aws-region"`
@@ -83,7 +79,7 @@ func WriteToFile(filename string, data string) error {
 func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "attemped to load from %s", fileName)
+		return nil, errors.Wrapf(err, "attempted to load from %s", fileName)
 	}
 	passphrase = strings.TrimSpace(passphrase)
 
@@ -129,32 +125,7 @@ func Readln(timeout time.Duration) (string, error) {
 }
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
-// TODO(Jacky): Determine whether to remove the awsSettingString
-func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.SecretKey, error) {
-	if awsSettingString == "" {
-		return nil, errors.New("aws credential is not set")
-	}
-
-	var awsConfig awsConfiguration
-	if err := json.Unmarshal([]byte(awsSettingString), &awsConfig); err != nil {
-		return nil, errors.New(awsSettingString + " is not a valid JSON string for setting aws configuration.")
-	}
-
-	// Initialize a session that the aws SDK uses to loLoadAwsCMKEncryptedBLSKeyad
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
-
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create aws session")
-	}
-
-	// Create KMS service client
-	svc := kms.New(sess, &aws.Config{
-		Region:      aws.String(awsConfig.Region),
-		Credentials: credentials.NewStaticCredentials(awsConfig.AccessKey, awsConfig.SecretKey, ""),
-	})
-
+func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
@@ -165,7 +136,7 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 		return nil, err
 	}
 
-	clearKey, err := svc.Decrypt(&kms.DecryptInput{
+	clearKey, err := kmsClient.Decrypt(&kms.DecryptInput{
 		CiphertextBlob: unhexed,
 	})
 
@@ -276,6 +247,8 @@ func LoadNonHumanReadableBLSKeyWithPassPhrase(fileName, passFile string) (*ffi_b
 	}
 
 	priKey := &ffi_bls.SecretKey{}
-	priKey.DeserializeHexStr(string(decryptedBytes))
+	if err := priKey.DeserializeHexStr(string(decryptedBytes)); err != nil {
+		return nil, err
+	}
 	return priKey, nil
 }
