@@ -54,14 +54,11 @@ func (provider *promptPassProvider) getPassphrase(keyFile string) (string, error
 		}
 	}
 	return pass, nil
-
 }
 
 func (provider *promptPassProvider) persistPassphrase(keyFile string, passPhrase string) error {
 	passFile := filepath.Join(provider.persistDir, filepath.Base(keyFile))
-	if _, err := os.Stat(passFile); os.IsNotExist(err) {
-		// file not exist. Go on create the file
-	} else if err == nil {
+	if _, err := os.Stat(passFile); err == nil {
 		// File exist. Prompt user to overwrite pass file
 		overwrite, err := promptYesNo(fmt.Sprintf("pass file [%v] already exist. Overwrite? ", passFile))
 		if err != nil {
@@ -70,6 +67,9 @@ func (provider *promptPassProvider) persistPassphrase(keyFile string, passPhrase
 		if !overwrite {
 			return nil
 		}
+	} else if !os.IsNotExist(err) {
+		// Unknown error. Directly return
+		return err
 	}
 	return ioutil.WriteFile(passFile, []byte(passPhrase), defWritePassFileMode)
 }
@@ -106,6 +106,10 @@ func readPassFromFile(file string) (string, error) {
 // dirPassProvider provide the all bls password available in the directory.
 type dirPassProvider struct {
 	dirPath string
+}
+
+func newDirPassProvider(dirPath string) *dirPassProvider {
+	return &dirPassProvider{dirPath: }
 }
 
 func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {

@@ -125,9 +125,6 @@ type promptKMSProvider struct {
 }
 
 func newPromptKMSProvider(timeout time.Duration) *promptKMSProvider {
-	if timeout == 0 {
-		timeout = defPromptTimeout
-	}
 	return &promptKMSProvider{
 		baseKMSProvider: baseKMSProvider{},
 		timeout:         timeout,
@@ -157,6 +154,7 @@ func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
 }
 
 // prompt prompt the user to input a string for a certain field with timeout.
+// TODO(Jacky): refactor this into a prompt structure
 func (provider *promptKMSProvider) prompt(hint string) (string, error) {
 	var (
 		res string
