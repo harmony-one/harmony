@@ -26,15 +26,16 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	keyBytes := shard.BLSPublicKey{}
-	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
-	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, keyBytes, blsPriKey); err != nil {
+	pubKeyWrapper := shard.BLSPublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
+	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
+	priKeyWrapper := shard.BLSPrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, &priKeyWrapper); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
 }
@@ -56,12 +57,13 @@ func TestConstructPreparedMessage(test *testing.T) {
 	)
 	blsPriKey := bls.RandPrivateKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKey(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	consensus.ResetState()
+	consensus.UpdateBitmaps()
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
@@ -96,9 +98,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
 
-	keyBytes := shard.BLSPublicKey{}
-	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, keyBytes, blsPriKey)
+	pubKeyWrapper := shard.BLSPublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
+	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
+	priKeyWrapper := shard.BLSPrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, &priKeyWrapper)
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}

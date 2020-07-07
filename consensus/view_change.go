@@ -137,11 +137,11 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
 
-	for i, key := range consensus.PubKey {
-		if !consensus.IsValidatorInCommittee(key.Bytes) {
+	for _, key := range consensus.priKey {
+		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		msgToSend := consensus.constructViewChangeMessage(key.Object, consensus.priKey.PrivateKey[i])
+		msgToSend := consensus.constructViewChangeMessage(&key)
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
@@ -215,13 +215,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		if hasBlock {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-			for i, key := range consensus.PubKey {
-				if err := consensus.bhpBitmap[recvMsg.ViewID].SetKey(key.Object, true); err != nil {
+			for i, key := range consensus.priKey {
+				if err := consensus.bhpBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
 					consensus.getLogger().Warn().Msgf("[onViewChange] bhpBitmap setkey failed for key at index %d", i)
 					continue
 				}
-				priKey := consensus.priKey.PrivateKey[i]
-				consensus.bhpSigs[recvMsg.ViewID][key.Bytes.Hex()] = priKey.SignHash(msgToSign)
+				consensus.bhpSigs[recvMsg.ViewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(msgToSign)
 			}
 			// if m1Payload is empty, we just add one
 			if len(consensus.m1Payload) == 0 {
@@ -229,13 +228,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
-			for i, key := range consensus.PubKey {
-				if err := consensus.nilBitmap[recvMsg.ViewID].SetKey(key.Object, true); err != nil {
+			for i, key := range consensus.priKey {
+				if err := consensus.nilBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
 					consensus.getLogger().Warn().Msgf("[onViewChange] nilBitmap setkey failed for key at index %d", i)
 					continue
 				}
-				priKey := consensus.priKey.PrivateKey[i]
-				consensus.nilSigs[recvMsg.ViewID][key.Bytes.Hex()] = priKey.SignHash(NIL)
+				consensus.nilSigs[recvMsg.ViewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(NIL)
 			}
 		}
 	}
@@ -244,13 +242,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if !ok3 {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
-		for i, key := range consensus.PubKey {
-			if err := consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key.Object, true); err != nil {
+		for i, key := range consensus.priKey {
+			if err := consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
 				consensus.getLogger().Warn().Msgf("[onViewChange] viewIDBitmap setkey failed for key at index %d", i)
 				continue
 			}
-			priKey := consensus.priKey.PrivateKey[i]
-			consensus.viewIDSigs[recvMsg.ViewID][key.Bytes.Hex()] = priKey.SignHash(viewIDBytes)
+			consensus.viewIDSigs[recvMsg.ViewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(viewIDBytes)
 		}
 	}
 
@@ -424,18 +421,17 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
-			for i, key := range consensus.PubKey {
-				if err := consensus.commitBitmap.SetKey(key.Object, true); err != nil {
+			for i, key := range consensus.priKey {
+				if err := consensus.commitBitmap.SetKey(key.Pub.Object, true); err != nil {
 					consensus.getLogger().Warn().
 						Msgf("[OnViewChange] New Leader commit bitmap set failed for key at index %d", i)
 					continue
 				}
 
-				priKey := consensus.priKey.PrivateKey[i]
 				if _, err := consensus.Decider.SubmitVote(
 					quorum.Commit,
-					consensus.PubKey[i].Bytes,
-					priKey.SignHash(commitPayload),
+					key.Pub.Bytes,
+					key.Pri.SignHash(commitPayload),
 					common.BytesToHash(consensus.blockHash[:]),
 					block.NumberU64(),
 					block.Header().ViewID().Uint64(),
@@ -449,7 +445,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 		consensus.current.SetViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
-			recvMsg.ViewID, newLeaderKey.Bytes, newLeaderPriKey,
+			recvMsg.ViewID, newLeaderPriKey,
 		)
 
 		consensus.getLogger().Warn().
@@ -628,14 +624,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
-		for i, key := range consensus.PubKey {
-			if !consensus.IsValidatorInCommittee(key.Bytes) {
+		for _, key := range consensus.priKey {
+			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 				continue
 			}
 			network, err := consensus.construct(
 				msg_pb.MessageType_COMMIT,
 				commitPayload,
-				key.Bytes, consensus.priKey.PrivateKey[i],
+				&key,
 			)
 			if err != nil {
 				consensus.getLogger().Err(err).Msg("could not create commit message")

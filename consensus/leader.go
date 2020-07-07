@@ -3,8 +3,6 @@ package consensus
 import (
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -41,9 +39,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 
 	// TODO(audit): wrap bls private key with public key
-	leaderPubKeyBytes := shard.BLSPublicKey{}
-	leaderPubKeyBytes.FromLibBLSPublicKey(key.GetPublicKey())
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, leaderPubKeyBytes, key)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
@@ -62,8 +58,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.FBFTLog.AddBlock(block)
 
 	// Leader sign the block hash itself
-	for i, key := range consensus.PubKey {
-		if err := consensus.prepareBitmap.SetKey(key.Object, true); err != nil {
+	for i, key := range consensus.priKey {
+		if err := consensus.prepareBitmap.SetKey(key.Pub.Object, true); err != nil {
 			consensus.getLogger().Warn().Err(err).Msgf(
 				"[Announce] Leader prepareBitmap SetKey failed for key at index %d", i,
 			)
@@ -72,8 +68,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 		if _, err := consensus.Decider.AddNewVote(
 			quorum.Prepare,
-			key.Bytes,
-			consensus.priKey.PrivateKey[i].SignHash(consensus.blockHash[:]),
+			key.Pub.Bytes,
+			key.Pri.SignHash(consensus.blockHash[:]),
 			block.Hash(),
 			block.NumberU64(),
 			block.Header().ViewID().Uint64(),

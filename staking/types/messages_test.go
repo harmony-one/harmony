@@ -372,7 +372,7 @@ func cpTestDataSetup() {
 // 	validatorAddress  = common.Address(common.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
 // 	validatorAddress2 = common.Address(common.MustBech32ToAddress("one1d2rngmem4x2c6zxsjjz29dlah0jzkr0k2n88wc"))
 // 	delegatorAddress  = common.Address(common.MustBech32ToAddress("one16qsd5ant9v94jrs89mruzx62h7ekcfxmduh2rx"))
-// 	blsPubKey         = bls.RandPrivateKey().GetPublicKey()
+// 	blsPubKey         = bls.RandPrivateKey().GetPublicKeys()
 // )
 
 // func TestMsgCreateValidatorRLP(t *testing.T) {

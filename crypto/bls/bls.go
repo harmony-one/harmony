@@ -96,6 +96,12 @@ func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
 	return m, nil
 }
 
+// Clear clears the existing bits and aggregate public keys.
+func (m *Mask) Clear() {
+	m.Bitmap = make([]byte, m.Len())
+	m.AggregatePublic = &bls.PublicKey{}
+}
+
 // Mask returns a copy of the participation bitmask.
 func (m *Mask) Mask() []byte {
 	clone := make([]byte, len(m.Bitmap))
