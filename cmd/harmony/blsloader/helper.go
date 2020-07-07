@@ -6,13 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	ffibls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -21,26 +19,32 @@ var (
 	errNilKMSClientProvider = errors.New("no source for KMS provider")
 )
 
-// basicBLSLoader loads a single bls key through a key file and passphrase combination.
+// loadBasicKey loads a single bls key through a key file and passphrase combination.
 // The passphrase is provided by a slice of passProviders.
-func loadBasicKeyFromFile(blsKeyFile string, pps []passProvider) (*ffibls.SecretKey, error) {
+func loadBasicKey(blsKeyFile string, pps []passProvider) (*ffibls.SecretKey, error) {
 	if len(pps) == 0 {
 		return nil, errNilPassProvider
 	}
 	for _, pp := range pps {
-		pass, err := pp.getPassphrase(blsKeyFile)
+		secretKey, err := loadBasicKeyWithProvider(blsKeyFile, pp)
 		if err != nil {
-			fmt.Printf("unable to get passphrase from %s: %v\n", pp.toStr(), err)
-			continue
-		}
-		secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
-		if err != nil {
-			fmt.Printf("unable to decrypt bls key with %s: %v\n", pp.toStr(), err)
-			continue
+			console.println(err)
 		}
 		return secretKey, nil
 	}
 	return nil, fmt.Errorf("failed to load bls key %v", blsKeyFile)
+}
+
+func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*ffibls.SecretKey, error) {
+	pass, err := pp.getPassphrase(blsKeyFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get passphrase from %s", pp.toStr())
+	}
+	secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to decrypt bls key with %s\n", pp.toStr())
+	}
+	return secretKey, nil
 }
 
 // loadKMSKeyFromFile loads a single KMS BLS key from file
@@ -85,7 +89,7 @@ func (helper *blsDirLoadHelper) processFileWalk(path string, info os.FileInfo, e
 		}
 		// expected error. Skipping these files
 		skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
-		fmt.Println(skipStr)
+		console.println(skipStr)
 		return nil
 	}
 	helper.secretKeys = append(helper.secretKeys, key)
@@ -108,7 +112,7 @@ func (helper *blsDirLoadHelper) loadKeyFromFile(path string, info os.FileInfo) (
 	)
 	switch {
 	case isBasicKeyFile(info):
-		key, err = loadBasicKeyFromFile(path, helper.pps)
+		key, err = loadBasicKey(path, helper.pps)
 	case isKMSKeyFile(info):
 		key, err = loadKMSKeyFromFile(path, helper.kcp)
 	default:
@@ -169,8 +173,8 @@ func promptGetPassword(prompt string) (string, error) {
 	if !strings.HasSuffix(prompt, ":") {
 		prompt += ":"
 	}
-	fmt.Print(prompt)
-	b, err := terminal.ReadPassword(syscall.Stdin)
+	console.print(prompt)
+	b, err := console.readPassword()
 	if err != nil {
 		return "", err
 	}
@@ -185,8 +189,8 @@ func promptYesNo(prompt string) (bool, error) {
 	}
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print(prompt)
-		response, err := reader.ReadString('\n')
+		console.print(prompt)
+		response, err := console.readln()
 		if err != nil {
 			return false, err
 		}
