@@ -835,9 +835,9 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 	}
 
 	blsKeys := []string{}
-	if cfg.ConsensusPubKey != nil {
-		for _, key := range cfg.ConsensusPubKey {
-			blsKeys = append(blsKeys, key.Bytes.Hex())
+	if cfg.ConsensusPriKey != nil {
+		for _, key := range cfg.ConsensusPriKey {
+			blsKeys = append(blsKeys, key.Pub.Bytes.Hex())
 		}
 	}
 	c := commonRPC.C{}
