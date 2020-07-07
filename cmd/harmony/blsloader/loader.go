@@ -36,7 +36,7 @@ func (loader *Loader) LoadKeys() (multibls.PrivateKey, error) {
 
 func (loader *Loader) loadSingleBasicBlsKey() (multibls.PrivateKey, error) {
 	providers := loader.getPassProvidersSingleBasic()
-	secretKey, err := loadBasicKeyFromFile(*loader.BlsPassFile, providers)
+	secretKey, err := loadBasicKey(*loader.BlsPassFile, providers)
 	if err != nil {
 		return multibls.PrivateKey{}, errors2.Wrap(err, "")
 	}
