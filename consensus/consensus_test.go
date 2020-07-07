@@ -73,7 +73,7 @@ func TestConsensusInitialization(t *testing.T) {
 
 	// MultiBLS
 	assert.Equal(t, multiBLSPrivateKey, consensus.priKey)
-	assert.Equal(t, multiBLSPrivateKey.GetPublicKey(), consensus.PubKey)
+	assert.Equal(t, multiBLSPrivateKey.GetPublicKeys(), consensus.GetPublicKeys())
 
 	// Misc
 	assert.Equal(t, uint64(0), consensus.viewID)
@@ -105,7 +105,7 @@ func TestConsensusInitialization(t *testing.T) {
 }
 
 // GenerateConsensusForTesting - helper method to generate a basic consensus
-func GenerateConsensusForTesting() (p2p.Host, *multibls.PrivateKey, *Consensus, quorum.Decider, error) {
+func GenerateConsensusForTesting() (p2p.Host, multibls.PrivateKeys, *Consensus, quorum.Decider, error) {
 	hostData := helpers.Hosts[0]
 	host, _, err := helpers.GenerateHost(hostData.IP, hostData.Port)
 	if err != nil {
@@ -115,7 +115,7 @@ func GenerateConsensusForTesting() (p2p.Host, *multibls.PrivateKey, *Consensus, 
 	peer := host.GetSelfPeer()
 
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
-	multiBLSPrivateKey := multibls.GetPrivateKey(bls.RandPrivateKey())
+	multiBLSPrivateKey := multibls.GetPrivateKeys(bls.RandPrivateKey())
 
 	consensus, err := New(host, shard.BeaconChainShardID, peer, multiBLSPrivateKey, decider)
 	if err != nil {
