@@ -15,6 +15,7 @@ import (
 //    dirPassProvider - provide passphrase from .pass files in a directory
 //    multiPassProvider - multiple passProviders that will provide the passphrase.
 type passProvider interface {
+	toStr() string
 	getPassphrase(keyFile string) (string, error)
 }
 
@@ -31,6 +32,10 @@ const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
 
 func newPromptPassProvider() *promptPassProvider {
 	return &promptPassProvider{}
+}
+
+func (provider *promptPassProvider) toStr() string {
+	return "prompt"
 }
 
 func (provider *promptPassProvider) setPersist(dirPath string, mode int) *promptPassProvider {
@@ -85,6 +90,10 @@ func newFilePassProvider(fileName string) *filePassProvider {
 	return &filePassProvider{fileName: fileName}
 }
 
+func (provider *filePassProvider) toStr() string {
+	return "passphrase file " + provider.fileName
+}
+
 func (provider *filePassProvider) getPassphrase(keyFile string) (string, error) {
 	return readPassFromFile(provider.fileName)
 }
@@ -108,8 +117,12 @@ type dirPassProvider struct {
 	dirPath string
 }
 
+func (provider *dirPassProvider) toStr() string {
+	return "directory " + provider.dirPath
+}
+
 func newDirPassProvider(dirPath string) *dirPassProvider {
-	return &dirPassProvider{dirPath: }
+	return &dirPassProvider{dirPath: dirPath}
 }
 
 func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
@@ -117,19 +130,4 @@ func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
 	passKeyBase := keyFileToPassFile(baseName)
 	passFile := filepath.Join(provider.dirPath, passKeyBase)
 	return readPassFromFile(passFile)
-}
-
-// multiPassProvider is a slice of passProviders to provide the passphrase
-// of the given bls key. If a passProvider fails, will continue to the next provider.
-type multiPassProvider []passProvider
-
-func (provider multiPassProvider) getPassphrase(keyStr string) (string, error) {
-	for _, pp := range provider {
-		pass, err := pp.getPassphrase(keyStr)
-		if err != nil {
-			continue
-		}
-		return pass, err
-	}
-	return "", fmt.Errorf("cannot get passphrase for %s", keyStr)
 }

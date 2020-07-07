@@ -22,19 +22,25 @@ var (
 )
 
 // basicBLSLoader loads a single bls key through a key file and passphrase combination.
-func loadBasicKeyFromFile(blsKeyFile string, pp passProvider) (*ffibls.SecretKey, error) {
-	if pp == nil {
+// The passphrase is provided by a slice of passProviders.
+func loadBasicKeyFromFile(blsKeyFile string, pps []passProvider) (*ffibls.SecretKey, error) {
+	if len(pps) == 0 {
 		return nil, errNilPassProvider
 	}
-	pass, err := pp.getPassphrase(blsKeyFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get password")
+	for _, pp := range pps {
+		pass, err := pp.getPassphrase(blsKeyFile)
+		if err != nil {
+			fmt.Printf("unable to get passphrase from %s: %v\n", pp.toStr(), err)
+			continue
+		}
+		secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
+		if err != nil {
+			fmt.Printf("unable to decrypt bls key with %s: %v\n", pp.toStr(), err)
+			continue
+		}
+		return secretKey, nil
 	}
-	secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load BLS key")
-	}
-	return secretKey, nil
+	return nil, fmt.Errorf("failed to load bls key %v", blsKeyFile)
 }
 
 // loadKMSKeyFromFile loads a single KMS BLS key from file
@@ -53,10 +59,10 @@ func loadKMSKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*ffibls.Secre
 	return secretKey, nil
 }
 
-// blsDirLoadHelper is the helper structure
+// blsDirLoadHelper is the helper structure for loading bls keys in a directory
 type blsDirLoadHelper struct {
 	dirPath string
-	pp      passProvider
+	pps     []passProvider
 	kcp     kmsClientProvider
 	// result field
 	secretKeys []*ffibls.SecretKey
@@ -73,12 +79,14 @@ func (helper *blsDirLoadHelper) getKeyFilesFromDir() (multibls.PrivateKey, error
 func (helper *blsDirLoadHelper) processFileWalk(path string, info os.FileInfo, err error) error {
 	key, err := helper.loadKeyFromFile(path, info)
 	if err != nil {
-		if errIsErrors(err, helper.skippingErrors()) {
-			skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
-			fmt.Println(skipStr)
-			return nil
+		if !errIsErrors(err, helper.skippingErrors()) {
+			// unexpected error, return the error and break the file walk loop
+			return err
 		}
-		return err
+		// expected error. Skipping these files
+		skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
+		fmt.Println(skipStr)
+		return nil
 	}
 	helper.secretKeys = append(helper.secretKeys, key)
 	return nil
@@ -100,7 +108,7 @@ func (helper *blsDirLoadHelper) loadKeyFromFile(path string, info os.FileInfo) (
 	)
 	switch {
 	case isBasicKeyFile(info):
-		key, err = loadBasicKeyFromFile(path, helper.pp)
+		key, err = loadBasicKeyFromFile(path, helper.pps)
 	case isKMSKeyFile(info):
 		key, err = loadKMSKeyFromFile(path, helper.kcp)
 	default:
@@ -141,14 +149,20 @@ func isKMSKeyFile(info os.FileInfo) bool {
 	return true
 }
 
+// isPassphraseFile returns whether the given file is a pass file
+func isPassFile(info os.FileInfo) bool {
+	if info.IsDir() {
+		return false
+	}
+	if !strings.HasSuffix(info.Name(), passExt) {
+		return false
+	}
+	return true
+}
+
 // keyFileToPassFile convert a key file base name to passphrase file base name
 func keyFileToPassFile(keyFileBase string) string {
 	return strings.Trim(keyFileBase, basicKeyExt) + passExt
-}
-
-// passFileToKeyFile convert a pass file base name to key file base name
-func passFileToKeyFile(passFileBase string) string {
-	return strings.Trim(passFileBase, passExt) + basicKeyExt
 }
 
 func promptGetPassword(prompt string) (string, error) {
