@@ -42,6 +42,9 @@ type kmsClientProvider interface {
 
 	// getAWSConfig returns the AwsConfig for different implementations
 	getAWSConfig() (*AwsConfig, error)
+
+	// toStr return the string presentation of kmsClientProvider
+	toStr() string
 }
 
 // baseKMSProvider provide the kms client with singleton initialization through
@@ -71,6 +74,10 @@ func (provider *baseKMSProvider) getAWSConfig() (*AwsConfig, error) {
 	return nil, errors.New("not implemented")
 }
 
+func (provider *baseKMSProvider) toStr() string {
+	return "not implemented"
+}
+
 // sharedKMSProvider provide the kms session with the default aws config
 // locates in directory $HOME/.aws/config
 type sharedKMSProvider struct {
@@ -85,6 +92,10 @@ func newSharedKMSProvider() *sharedKMSProvider {
 
 func (provider *sharedKMSProvider) getAWSConfig() (*AwsConfig, error) {
 	return nil, nil
+}
+
+func (provider *sharedKMSProvider) toStr() string {
+	return "shared aws config"
 }
 
 // fileKMSProvider provide the kms session from a file with json data of structure
@@ -112,6 +123,10 @@ func (provider *fileKMSProvider) getAWSConfig() (*AwsConfig, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func (provider *fileKMSProvider) toStr() string {
+	return fmt.Sprintf("file %v", provider.file)
 }
 
 // promptKMSProvider provide a user interactive console for AWS config.
@@ -154,7 +169,6 @@ func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
 }
 
 // prompt prompt the user to input a string for a certain field with timeout.
-// TODO(Jacky): refactor this into a prompt structure
 func (provider *promptKMSProvider) prompt(hint string) (string, error) {
 	var (
 		res string
@@ -186,6 +200,10 @@ func (provider *promptKMSProvider) threadedPrompt(hint string) (string, error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func (provider *promptKMSProvider) toStr() string {
+	return "prompt"
 }
 
 func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
