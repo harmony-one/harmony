@@ -67,13 +67,13 @@ func (loader *basicSingleBlsLoader) getPromptPassProvider() passProvider {
 	return provider
 }
 
+// kmsSingleBlsLoader loads a single kms bls key
 type kmsSingleBlsLoader struct {
 	blsKeyFile string
 
 	kmsProviderConfig
 }
 
-// loadKeys load a single kms key file
 func (loader *kmsSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
 	provider, err := loader.getKmsClientProvider()
 	if err != nil {
@@ -90,7 +90,7 @@ func (loader *kmsSingleBlsLoader) getKmsClientProvider() (kmsProvider, error) {
 	return newLazyKmsProvider(loader.kmsProviderConfig)
 }
 
-// blsDirLoader is the helper structure for loading bls keys in a directory
+// blsDirLoader is the helper for loading bls keys in a directory
 type blsDirLoader struct {
 	// input fields
 	dirPath string
@@ -104,7 +104,6 @@ type blsDirLoader struct {
 	secretKeys []*bls_core.SecretKey
 }
 
-// loadKeys load all keys from the directory
 func (loader *blsDirLoader) loadKeys() (multibls.PrivateKeys, error) {
 	var err error
 	if loader.pps, err = loader.getPassProviders(); err != nil {
@@ -160,7 +159,7 @@ func (loader *blsDirLoader) loadKeyFiles() (multibls.PrivateKeys, error) {
 }
 
 func (loader *blsDirLoader) processFileWalk(path string, info os.FileInfo, err error) error {
-	key, err := loader.loadKeyFromFile(path, info)
+	key, err := loader.loadKeyFromFile(path)
 	if err != nil {
 		if !errIsErrors(err, loader.skippingErrors()) {
 			// unexpected error, return the error and break the file walk loop
@@ -184,7 +183,7 @@ func (loader *blsDirLoader) skippingErrors() []error {
 	}
 }
 
-func (loader *blsDirLoader) loadKeyFromFile(path string, info os.FileInfo) (*bls_core.SecretKey, error) {
+func (loader *blsDirLoader) loadKeyFromFile(path string) (*bls_core.SecretKey, error) {
 	var (
 		key *bls_core.SecretKey
 		err error
