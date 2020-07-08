@@ -5,7 +5,8 @@ import (
 	"os"
 	"strings"
 
-	ffibls "github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
@@ -19,7 +20,7 @@ var (
 
 // loadBasicKey loads a single bls key through a key file and passphrase combination.
 // The passphrase is provided by a slice of passProviders.
-func loadBasicKey(blsKeyFile string, pps []passProvider) (*ffibls.SecretKey, error) {
+func loadBasicKey(blsKeyFile string, pps []passProvider) (*bls_core.SecretKey, error) {
 	if len(pps) == 0 {
 		return nil, errNilPassProvider
 	}
@@ -33,7 +34,7 @@ func loadBasicKey(blsKeyFile string, pps []passProvider) (*ffibls.SecretKey, err
 	return nil, fmt.Errorf("failed to load bls key %v", blsKeyFile)
 }
 
-func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*ffibls.SecretKey, error) {
+func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.SecretKey, error) {
 	pass, err := pp.getPassphrase(blsKeyFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get passphrase from %s", pp.toStr())
@@ -46,7 +47,7 @@ func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*ffibls.Secre
 }
 
 // loadKmsKeyFromFile loads a single KMS BLS key from file
-func loadKmsKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*ffibls.SecretKey, error) {
+func loadKmsKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*bls_core.SecretKey, error) {
 	if kcp == nil {
 		return nil, errNilKMSClientProvider
 	}
@@ -123,8 +124,13 @@ func promptYesNo(prompt string) (bool, error) {
 	}
 }
 
-func secretKeyToMultiPrivateKey(secretKeys ...*ffibls.SecretKey) multibls.PrivateKey {
-	return multibls.PrivateKey{PrivateKey: secretKeys}
+func secretKeyToMultiPrivateKey(secretKeys ...*bls_core.SecretKey) multibls.PrivateKeys {
+	keys := make(multibls.PrivateKeys, 0, len(secretKeys))
+	for _, secretKey := range secretKeys {
+		key := bls.WrapperFromPrivateKey(secretKey)
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func stringIsSet(val *string) bool {
