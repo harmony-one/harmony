@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	ffibls "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/multibls"
 )
 
@@ -24,10 +24,10 @@ type Loader struct {
 }
 
 // LoadKeys load all keys from the input fields provided
-func (loader *Loader) LoadKeys() (multibls.PrivateKey, error) {
+func (loader *Loader) LoadKeys() (multibls.PrivateKeys, error) {
 	helper, err := loader.getHelper()
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	return helper.loadKeys()
 }
@@ -64,7 +64,7 @@ func (loader *Loader) getHelper() (loadHelper, error) {
 
 // loadHelper defines the interface to help load bls keys
 type loadHelper interface {
-	loadKeys() (multibls.PrivateKey, error)
+	loadKeys() (multibls.PrivateKeys, error)
 }
 
 // basicSingleBlsLoader loads a single bls key file with passphrase
@@ -75,14 +75,14 @@ type basicSingleBlsLoader struct {
 	persistPassphrase bool
 }
 
-func (loader *basicSingleBlsLoader) loadKeys() (multibls.PrivateKey, error) {
+func (loader *basicSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
 	providers, err := loader.getPassProviders()
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	secretKey, err := loadBasicKey(loader.blsKeyFile, providers)
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	return secretKeyToMultiPrivateKey(secretKey), nil
 }
@@ -126,14 +126,14 @@ type kmsSingleBlsLoader struct {
 	awsConfigFile *string
 }
 
-func (loader *kmsSingleBlsLoader) loadKeys() (multibls.PrivateKey, error) {
+func (loader *kmsSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
 	provider, err := loader.getKmsClientProvider()
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	secretKey, err := loadKmsKeyFromFile(loader.awsBlsKey, provider)
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	return secretKeyToMultiPrivateKey(secretKey), nil
 }
@@ -170,16 +170,16 @@ type blsDirLoader struct {
 	pps []passProvider
 	kcp kmsClientProvider
 	// result field
-	secretKeys []*ffibls.SecretKey
+	secretKeys []*bls.SecretKey
 }
 
-func (loader *blsDirLoader) loadKeys() (multibls.PrivateKey, error) {
+func (loader *blsDirLoader) loadKeys() (multibls.PrivateKeys, error) {
 	var err error
 	if loader.pps, err = loader.getPassProviders(); err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	if loader.kcp, err = loader.getKmsClientProvider(); err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	return loader.loadKeyFiles()
 }
@@ -231,10 +231,10 @@ func (loader *blsDirLoader) getKmsClientProvider() (kmsClientProvider, error) {
 	}
 }
 
-func (loader *blsDirLoader) loadKeyFiles() (multibls.PrivateKey, error) {
+func (loader *blsDirLoader) loadKeyFiles() (multibls.PrivateKeys, error) {
 	err := filepath.Walk(loader.dirPath, loader.processFileWalk)
 	if err != nil {
-		return multibls.PrivateKey{}, err
+		return multibls.PrivateKeys{}, err
 	}
 	return secretKeyToMultiPrivateKey(loader.secretKeys...), nil
 }
@@ -264,9 +264,9 @@ func (loader *blsDirLoader) skippingErrors() []error {
 	}
 }
 
-func (loader *blsDirLoader) loadKeyFromFile(path string, info os.FileInfo) (*ffibls.SecretKey, error) {
+func (loader *blsDirLoader) loadKeyFromFile(path string, info os.FileInfo) (*bls.SecretKey, error) {
 	var (
-		key *ffibls.SecretKey
+		key *bls.SecretKey
 		err error
 	)
 	switch {

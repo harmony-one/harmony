@@ -32,6 +32,19 @@ type PublicKeyWrapper struct {
 	Object *bls.PublicKey
 }
 
+// WrapperFromPrivateKey makes a PrivateKeyWrapper from bls secret key
+func WrapperFromPrivateKey(pri *bls.SecretKey) PrivateKeyWrapper {
+	pub := pri.GetPublicKey()
+	pubBytes := FromLibBLSPublicKeyUnsafe(pub)
+	return PrivateKeyWrapper{
+		Pri: pri,
+		Pub: &PublicKeyWrapper{
+			Bytes:  *pubBytes,
+			Object: pub,
+		},
+	}
+}
+
 // SerializedPublicKey defines the serialized bls public key
 type SerializedPublicKey [PublicKeySizeInBytes]byte
 

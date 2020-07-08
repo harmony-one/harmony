@@ -28,7 +28,7 @@ type promptPassProvider struct {
 const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
 
 func newPromptPassProvider() *promptPassProvider {
-	return &promptPassProvider{q}
+	return &promptPassProvider{}
 }
 
 func (provider *promptPassProvider) toStr() string {

@@ -3,9 +3,8 @@ package multibls
 import (
 	"strings"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 // PrivateKeys stores the bls secret keys that belongs to the node
@@ -47,9 +46,11 @@ func (multiKey PrivateKeys) GetPublicKeys() PublicKeys {
 }
 
 // GetPrivateKeys creates a multibls PrivateKeys using bls.SecretKey
-func GetPrivateKeys(key *bls_core.SecretKey) PrivateKeys {
-	pub := key.GetPublicKey()
-	pubWrapper := bls.PublicKeyWrapper{Object: pub}
-	pubWrapper.Bytes.FromLibBLSPublicKey(pub)
-	return PrivateKeys{bls.PrivateKeyWrapper{Pri: key, Pub: &pubWrapper}}
+func GetPrivateKeys(secretKeys ...*bls_core.SecretKey) PrivateKeys {
+	keys := make(PrivateKeys, 0, len(secretKeys))
+	for _, secretKey := range secretKeys {
+		key := bls.WrapperFromPrivateKey(secretKey)
+		keys = append(keys, key)
+	}
+	return keys
 }
