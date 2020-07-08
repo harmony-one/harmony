@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
@@ -15,7 +18,6 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -71,9 +73,9 @@ type ConflictingVotes struct {
 
 // Vote is the vote of the double signer
 type Vote struct {
-	SignerPubKey    shard.BLSPublicKey `json:"bls-public-key"`
-	BlockHeaderHash common.Hash        `json:"block-header-hash"`
-	Signature       []byte             `json:"bls-signature"`
+	SignerPubKey    bls.SerializedPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash             `json:"block-header-hash"`
+	Signature       []byte                  `json:"bls-signature"`
 }
 
 // Record is an proof of a slashing made by a witness of a double-signing event
@@ -169,8 +171,8 @@ func Verify(
 		candidate.Evidence.FirstVote,
 		candidate.Evidence.SecondVote
 	k1, k2 := len(first.SignerPubKey), len(second.SignerPubKey)
-	if k1 != shard.PublicKeySizeInBytes ||
-		k2 != shard.PublicKeySizeInBytes {
+	if k1 != bls.PublicKeySizeInBytes ||
+		k2 != bls.PublicKeySizeInBytes {
 		return errors.Wrapf(
 			errSignerKeyNotRightSize, "cast key %d double-signed key %d", k1, k2,
 		)
@@ -237,8 +239,8 @@ func Verify(
 		candidate.Evidence.SecondVote,
 	} {
 		// now the only real assurance, cryptography
-		signature := &bls.Sign{}
-		publicKey := &bls.PublicKey{}
+		signature := &bls_core.Sign{}
+		publicKey := &bls_core.PublicKey{}
 
 		if err := signature.Deserialize(ballot.Signature); err != nil {
 			return err

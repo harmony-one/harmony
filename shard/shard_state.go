@@ -8,9 +8,11 @@ import (
 	"sort"
 	"time"
 
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
@@ -20,15 +22,9 @@ import (
 )
 
 var (
-	emptyBLSPubKey = BLSPublicKey{}
+	emptyBLSPubKey = bls.SerializedPublicKey{}
 	// ErrShardIDNotInSuperCommittee ..
 	ErrShardIDNotInSuperCommittee = errors.New("shardID not in super committee")
-)
-
-// PublicKeySizeInBytes ..
-const (
-	PublicKeySizeInBytes    = 48
-	BLSSignatureSizeInBytes = 96
 )
 
 // State is the collection of all committees
@@ -37,29 +33,10 @@ type State struct {
 	Shards []Committee `json:"shards"`
 }
 
-// BLSPrivateKeyWrapper combines the bls private key and the corresponding public key
-type BLSPrivateKeyWrapper struct {
-	Pri *bls.SecretKey
-	Pub *BLSPublicKeyWrapper
-}
-
-// BLSPublicKeyWrapper defines the bls public key in both serialized and
-// deserialized form.
-type BLSPublicKeyWrapper struct {
-	Bytes  BLSPublicKey
-	Object *bls.PublicKey
-}
-
-// BLSPublicKey defines the serialized bls public key
-type BLSPublicKey [PublicKeySizeInBytes]byte
-
-// BLSSignature defines the bls signature
-type BLSSignature [BLSSignatureSizeInBytes]byte
-
 // Slot represents node id (BLS address)
 type Slot struct {
-	EcdsaAddress common.Address `json:"ecdsa-address"`
-	BLSPublicKey BLSPublicKey   `json:"bls-pubkey"`
+	EcdsaAddress common.Address          `json:"ecdsa-address"`
+	BLSPublicKey bls.SerializedPublicKey `json:"bls-pubkey"`
 	// nil means our node, 0 means not active, > 0 means staked node
 	EffectiveStake *numeric.Dec `json:"effective-stake" rlp:"nil"`
 }
@@ -92,8 +69,8 @@ type StateLegacy []CommitteeLegacy
 
 // SlotLegacy represents node id (BLS address)
 type SlotLegacy struct {
-	EcdsaAddress common.Address `json:"ecdsa-address"`
-	BLSPublicKey BLSPublicKey   `json:"bls-pubkey"`
+	EcdsaAddress common.Address          `json:"ecdsa-address"`
+	BLSPublicKey bls.SerializedPublicKey `json:"bls-pubkey"`
 }
 
 // SlotListLegacy is a list of SlotList.
@@ -307,58 +284,8 @@ func (ss *State) DeepCopy() *State {
 	return &r
 }
 
-// Big ..
-func (pk BLSPublicKey) Big() *big.Int {
-	return new(big.Int).SetBytes(pk[:])
-}
-
-// IsEmpty returns whether the bls public key is empty 0 bytes
-func (pk BLSPublicKey) IsEmpty() bool {
-	return bytes.Equal(pk[:], emptyBLSPubKey[:])
-}
-
-// Hex returns the hex string of bls public key
-func (pk BLSPublicKey) Hex() string {
-	return hex.EncodeToString(pk[:])
-}
-
-// MarshalText so that we can use this as JSON printable when used as
-// key in a map
-func (pk BLSPublicKey) MarshalText() (text []byte, err error) {
-	text = make([]byte, BLSSignatureSizeInBytes)
-	hex.Encode(text, pk[:])
-	return text, nil
-}
-
-// FromLibBLSPublicKeyUnsafe could give back nil, use only in cases when
-// have invariant that return value won't be nil
-func FromLibBLSPublicKeyUnsafe(key *bls.PublicKey) *BLSPublicKey {
-	result := &BLSPublicKey{}
-	if err := result.FromLibBLSPublicKey(key); err != nil {
-		return nil
-	}
-	return result
-}
-
-// FromLibBLSPublicKey replaces the key contents with the given key,
-func (pk *BLSPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
-	bytes := key.Serialize()
-	if len(bytes) != len(pk) {
-		return errors.Errorf(
-			"key size (BLS) size mismatch, expected %d have %d", len(pk), len(bytes),
-		)
-	}
-	copy(pk[:], bytes)
-	return nil
-}
-
-// ToLibBLSPublicKey copies the key contents into the given key.
-func (pk *BLSPublicKey) ToLibBLSPublicKey(key *bls.PublicKey) error {
-	return key.Deserialize(pk[:])
-}
-
-// CompareBLSPublicKey compares two BLSPublicKey, lexicographically.
-func CompareBLSPublicKey(k1, k2 BLSPublicKey) int {
+// CompareBLSPublicKey compares two SerializedPublicKey, lexicographically.
+func CompareBLSPublicKey(k1, k2 bls.SerializedPublicKey) int {
 	return bytes.Compare(k1[:], k2[:])
 }
 
@@ -417,13 +344,13 @@ var (
 
 func lookupBLSPublicKeys(
 	c *Committee,
-) ([]*bls.PublicKey, error) {
+) ([]*bls_core.PublicKey, error) {
 	key := c.Hash().Hex()
 	results, err, _ := blsKeyCache.Do(
 		key, func() (interface{}, error) {
-			slice := make([]*bls.PublicKey, len(c.Slots))
+			slice := make([]*bls_core.PublicKey, len(c.Slots))
 			for j := range c.Slots {
-				committerKey := &bls.PublicKey{}
+				committerKey := &bls_core.PublicKey{}
 				if err := c.Slots[j].BLSPublicKey.ToLibBLSPublicKey(
 					committerKey,
 				); err != nil {
@@ -443,11 +370,11 @@ func lookupBLSPublicKeys(
 		return nil, err
 	}
 
-	return results.([]*bls.PublicKey), nil
+	return results.([]*bls_core.PublicKey), nil
 }
 
 // BLSPublicKeys ..
-func (c *Committee) BLSPublicKeys() ([]*bls.PublicKey, error) {
+func (c *Committee) BLSPublicKeys() ([]*bls_core.PublicKey, error) {
 	if c == nil {
 		return nil, ErrSubCommitteeNil
 	}
@@ -464,7 +391,7 @@ var (
 )
 
 // AddressForBLSKey ..
-func (c *Committee) AddressForBLSKey(key BLSPublicKey) (*common.Address, error) {
+func (c *Committee) AddressForBLSKey(key bls.SerializedPublicKey) (*common.Address, error) {
 	if c == nil {
 		return nil, ErrSubCommitteeNil
 	}

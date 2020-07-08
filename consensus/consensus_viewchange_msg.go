@@ -3,7 +3,7 @@ package consensus
 import (
 	"encoding/binary"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -14,7 +14,7 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage(priKey *shard.BLSPrivateKeyWrapper) []byte {
+func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -99,7 +99,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *shard.BLSPrivateK
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *shard.BLSPrivateKeyWrapper) []byte {
+func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.PrivateKeyWrapper) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -55,8 +57,8 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *stakedVoteWeight) AddNewVote(
-	p Phase, pubKeyBytes shard.BLSPublicKey,
-	sig *bls.Sign, headerHash common.Hash,
+	p Phase, pubKeyBytes bls.SerializedPublicKey,
+	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
 	ballet, err := v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)
@@ -142,7 +144,7 @@ func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	pubKeys := mask.Publics
-	w := shard.BLSPublicKey{}
+	w := bls.SerializedPublicKey{}
 	currentTotal := numeric.ZeroDec()
 
 	for i := range pubKeys {
@@ -192,7 +194,7 @@ func (v *stakedVoteWeight) String() string {
 }
 
 // HACK later remove - unify votepower in UI (aka MarshalJSON)
-func (v *stakedVoteWeight) SetRawStake(key shard.BLSPublicKey, d numeric.Dec) {
+func (v *stakedVoteWeight) SetRawStake(key bls.SerializedPublicKey, d numeric.Dec) {
 	if voter, ok := v.roster.Voters[key]; ok {
 		voter.RawStake = d
 	}

@@ -9,11 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
+
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/pkg/errors"
@@ -251,8 +252,8 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 }
 
 // ShardIDFromKey returns the shard ID statically determined from the input key
-func (conf *ConfigType) ShardIDFromKey(key *bls.PublicKey) (uint32, error) {
-	var pubKey shard.BLSPublicKey
+func (conf *ConfigType) ShardIDFromKey(key *bls_core.PublicKey) (uint32, error) {
+	var pubKey bls.SerializedPublicKey
 	if err := pubKey.FromLibBLSPublicKey(key); err != nil {
 		return 0, errors.Wrapf(err,
 			"cannot convert libbls public key %s to internal form",

@@ -5,8 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/abool"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -14,7 +16,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	"github.com/pkg/errors"
 )
@@ -47,8 +48,8 @@ type Consensus struct {
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
-	aggregatedPrepareSig *bls.Sign
-	aggregatedCommitSig  *bls.Sign
+	aggregatedPrepareSig *bls_core.Sign
+	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 	// Commits collected from view change
@@ -57,11 +58,11 @@ type Consensus struct {
 	// after one of viewID has enough votes, we can reset and clean the map
 	// honest nodes will never double votes on different viewID
 	// bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	bhpSigs map[uint64]map[string]*bls.Sign
+	bhpSigs map[uint64]map[string]*bls_core.Sign
 	// nilSigs: there is no prepared message when view change,
 	// it's signature on m2 type (i.e. nil) messages
-	nilSigs      map[uint64]map[string]*bls.Sign
-	viewIDSigs   map[uint64]map[string]*bls.Sign
+	nilSigs      map[uint64]map[string]*bls_core.Sign
+	viewIDSigs   map[uint64]map[string]*bls_core.Sign
 	bhpBitmap    map[uint64]*bls_cosi.Mask
 	nilBitmap    map[uint64]*bls_cosi.Mask
 	viewIDBitmap map[uint64]*bls_cosi.Mask
@@ -78,7 +79,7 @@ type Consensus struct {
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
 	// the publickey of leader
-	LeaderPubKey *shard.BLSPublicKeyWrapper
+	LeaderPubKey *bls.PublicKeyWrapper
 	viewID       uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
@@ -157,7 +158,7 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*shard.BLSPrivateKeyWrapper, error) {
+func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
 	for i, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(leaderKey) {
 			return &consensus.priKey[i], nil
@@ -167,7 +168,7 @@ func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls.PublicKey) (*shar
 }
 
 // GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*shard.BLSPrivateKeyWrapper, error) {
+func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 

@@ -3,8 +3,9 @@ package staketest
 import (
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/shard"
 )
 
 func TestGetDefaultValidator(t *testing.T) {
@@ -24,15 +25,15 @@ func TestGetDefaultValidatorWrapper(t *testing.T) {
 func TestGetDefaultValidatorWithAddr(t *testing.T) {
 	tests := []struct {
 		addr common.Address
-		keys []shard.BLSPublicKey
+		keys []bls.SerializedPublicKey
 	}{
 		{
 			addr: common.BigToAddress(common.Big1),
-			keys: []shard.BLSPublicKey{{1}, {}},
+			keys: []bls.SerializedPublicKey{{1}, {}},
 		},
 		{
 			addr: common.Address{},
-			keys: make([]shard.BLSPublicKey, 0),
+			keys: make([]bls.SerializedPublicKey, 0),
 		},
 		{},
 	}
@@ -52,15 +53,15 @@ func TestGetDefaultValidatorWithAddr(t *testing.T) {
 func TestGetDefaultValidatorWrapperWithAddr(t *testing.T) {
 	tests := []struct {
 		addr common.Address
-		keys []shard.BLSPublicKey
+		keys []bls.SerializedPublicKey
 	}{
 		{
 			addr: common.BigToAddress(common.Big1),
-			keys: []shard.BLSPublicKey{{1}, {}},
+			keys: []bls.SerializedPublicKey{{1}, {}},
 		},
 		{
 			addr: common.Address{},
-			keys: make([]shard.BLSPublicKey, 0),
+			keys: make([]bls.SerializedPublicKey, 0),
 		},
 		{},
 	}

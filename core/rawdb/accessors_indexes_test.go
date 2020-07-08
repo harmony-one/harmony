@@ -20,16 +20,17 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -138,16 +139,16 @@ func TestMixedLookupStorage(t *testing.T) {
 func sampleCreateValidatorStakingTxn() *staking.StakingTransaction {
 	key, _ := crypto.GenerateKey()
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
-		p := &bls.PublicKey{}
+		p := &bls_core.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BLSPublicKey{}
+		pub := bls.SerializedPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 		messageBytes := []byte(staking.BLSVerificationStr)
-		privateKey := &bls.SecretKey{}
+		privateKey := &bls_core.SecretKey{}
 		privateKey.DeserializeHexStr(testBLSPrvKey)
 		msgHash := hash.Keccak256(messageBytes)
 		signature := privateKey.SignHash(msgHash[:])
-		var sig shard.BLSSignature
+		var sig bls.SerializedSignature
 		copy(sig[:], signature.Serialize())
 
 		ra, _ := numeric.NewDecFromStr("0.7")
@@ -169,8 +170,8 @@ func sampleCreateValidatorStakingTxn() *staking.StakingTransaction {
 			MinSelfDelegation:  big.NewInt(1e18),
 			MaxTotalDelegation: big.NewInt(3e18),
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []shard.BLSPublicKey{pub},
-			SlotKeySigs:        []shard.BLSSignature{sig},
+			SlotPubKeys:        []bls.SerializedPublicKey{pub},
+			SlotKeySigs:        []bls.SerializedSignature{sig},
 			Amount:             big.NewInt(1e18),
 		}
 	}

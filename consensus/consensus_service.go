@@ -4,9 +4,11 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -56,7 +58,7 @@ var (
 
 // Signs the consensus message and returns the marshaled message.
 func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
-	priKey *bls.SecretKey) ([]byte, error) {
+	priKey *bls_core.SecretKey) ([]byte, error) {
 	if err := consensus.signConsensusMessage(message, priKey); err != nil {
 		return empty, err
 	}
@@ -74,7 +76,7 @@ func (consensus *Consensus) GetViewID() uint64 {
 
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls.PublicKey) int64 {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls_core.PublicKey) int64 {
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
@@ -105,7 +107,7 @@ func NewFaker() *Consensus {
 }
 
 // Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
 	signature := priKey.SignHash(hash[:])
 	return signature.Serialize()
@@ -113,7 +115,7 @@ func (consensus *Consensus) signMessage(message []byte, priKey *bls.SecretKey) [
 
 // Sign on the consensus message signature field.
 func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
-	priKey *bls.SecretKey) error {
+	priKey *bls_core.SecretKey) error {
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -127,8 +129,8 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 }
 
 // GetViewIDSigsArray returns the signatures for viewID in viewchange
-func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls.Sign {
-	sigs := []*bls.Sign{}
+func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls_core.Sign {
+	sigs := []*bls_core.Sign{}
 	for _, sig := range consensus.viewIDSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
@@ -136,8 +138,8 @@ func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls.Sign {
 }
 
 // GetNilSigsArray returns the signatures for nil prepared message in viewchange
-func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls.Sign {
-	sigs := []*bls.Sign{}
+func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls_core.Sign {
+	sigs := []*bls_core.Sign{}
 	for _, sig := range consensus.nilSigs[viewID] {
 		sigs = append(sigs, sig)
 	}
@@ -150,7 +152,7 @@ func (consensus *Consensus) UpdateBitmaps() {
 		Str("Phase", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls.PublicKey{}
+	publicKeys := []*bls_core.PublicKey{}
 	for _, key := range members {
 		publicKeys = append(publicKeys, key.Object)
 	}
@@ -186,17 +188,17 @@ func (consensus *Consensus) ToggleConsensusCheck() {
 }
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
-func (consensus *Consensus) IsValidatorInCommittee(pubKey shard.BLSPublicKey) bool {
+func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // IsValidatorInCommitteeBytes returns whether the given validator BLS address is part of my committee
-func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey shard.BLSPublicKey) bool {
+func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // Verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) error {
+func verifyMessageSig(signerPubKey *bls_core.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
@@ -204,7 +206,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 		return err
 	}
 
-	msgSig := bls.Sign{}
+	msgSig := bls_core.Sign{}
 	err = msgSig.Deserialize(signature)
 	if err != nil {
 		return err
@@ -219,7 +221,7 @@ func verifyMessageSig(signerPubKey *bls.PublicKey, message *msg_pb.Message) erro
 
 // verifySenderKey verifys the message senderKey is properly signed and senderAddr is valid
 func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
-	senderKey := shard.BLSPublicKey{}
+	senderKey := bls.SerializedPublicKey{}
 
 	copy(senderKey[:], msg.GetConsensus().SenderPubkey[:])
 	if !consensus.IsValidatorInCommitteeBytes(senderKey) {
@@ -230,7 +232,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
 
 func (consensus *Consensus) verifyViewChangeSenderKey(msg *msg_pb.Message) error {
 	vcMsg := msg.GetViewchange()
-	senderKey := shard.BLSPublicKey{}
+	senderKey := bls.SerializedPublicKey{}
 	copy(senderKey[:], vcMsg.SenderPubkey)
 
 	if !consensus.IsValidatorInCommittee(senderKey) {
@@ -302,15 +304,15 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
-) (*bls.Sign, *bls_cosi.Mask, error) {
-	if offset+shard.BLSSignatureSizeInBytes > len(recvPayload) {
+) (*bls_core.Sign, *bls_cosi.Mask, error) {
+	if offset+bls.BLSSignatureSizeInBytes > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
 
 	// TODO(audit): keep a Mask in the Decider so it won't be reconstructed on the fly.
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls.PublicKey{}
+	publicKeys := []*bls_core.PublicKey{}
 	for _, key := range members {
 		publicKeys = append(publicKeys, key.Object)
 	}
@@ -333,7 +335,7 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 // retrieve corresponding blsPublicKey from Coinbase Address
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 	header *block.Header,
-) (*shard.BLSPublicKeyWrapper, error) {
+) (*bls.PublicKeyWrapper, error) {
 	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
@@ -347,7 +349,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 		return nil, err
 	}
 
-	committerKey := new(bls.PublicKey)
+	committerKey := new(bls_core.PublicKey)
 	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
 		if isStaking {
@@ -356,14 +358,14 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 					return nil, err
 				}
-				return &shard.BLSPublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
 				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
 					return nil, err
 				}
-				return &shard.BLSPublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		}
 	}
@@ -565,18 +567,18 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 
 func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls.PublicKey{}
+	publicKeys := []*bls_core.PublicKey{}
 	for _, key := range members {
 		publicKeys = append(publicKeys, key.Object)
 	}
 	if _, ok := consensus.bhpSigs[viewID]; !ok {
-		consensus.bhpSigs[viewID] = map[string]*bls.Sign{}
+		consensus.bhpSigs[viewID] = map[string]*bls_core.Sign{}
 	}
 	if _, ok := consensus.nilSigs[viewID]; !ok {
-		consensus.nilSigs[viewID] = map[string]*bls.Sign{}
+		consensus.nilSigs[viewID] = map[string]*bls_core.Sign{}
 	}
 	if _, ok := consensus.viewIDSigs[viewID]; !ok {
-		consensus.viewIDSigs[viewID] = map[string]*bls.Sign{}
+		consensus.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
 	}
 	if _, ok := consensus.bhpBitmap[viewID]; !ok {
 		bhpBitmap, _ := bls_cosi.NewMask(publicKeys, nil)

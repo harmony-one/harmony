@@ -3,9 +3,9 @@ package consensus
 import (
 	"bytes"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -19,12 +19,12 @@ type NetworkMessage struct {
 	Phase                      msg_pb.MessageType
 	Bytes                      []byte
 	FBFTMsg                    *FBFTMessage
-	OptionalAggregateSignature *bls.Sign
+	OptionalAggregateSignature *bls_core.Sign
 }
 
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(
-	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey shard.BLSPublicKey,
+	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
 ) *msg_pb.ConsensusRequest {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
@@ -38,7 +38,7 @@ func (consensus *Consensus) populateMessageFields(
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSign []byte, priKey *shard.BLSPrivateKeyWrapper,
+	p msg_pb.MessageType, payloadForSign []byte, priKey *bls.PrivateKeyWrapper,
 ) (*NetworkMessage, error) {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
@@ -49,7 +49,7 @@ func (consensus *Consensus) construct(
 	}
 	var (
 		consensusMsg *msg_pb.ConsensusRequest
-		aggSig       *bls.Sign
+		aggSig       *bls_core.Sign
 	)
 
 	consensusMsg = consensus.populateMessageFields(

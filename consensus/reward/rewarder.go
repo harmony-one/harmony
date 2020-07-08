@@ -3,6 +3,8 @@ package reward
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -12,7 +14,7 @@ type Payout struct {
 	ShardID     uint32
 	Addr        common.Address
 	NewlyEarned *big.Int
-	EarningKey  shard.BLSPublicKey
+	EarningKey  bls.SerializedPublicKey
 }
 
 // CompletedRound ..

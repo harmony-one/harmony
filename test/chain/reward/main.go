@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -13,7 +15,7 @@ import (
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
@@ -21,7 +23,6 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -34,20 +35,20 @@ var (
 )
 
 func init() {
-	bls.Init(bls.BLS12_381)
+	bls_core.Init(bls_core.BLS12_381)
 }
 
-func generateBLSKeySigPair() (shard.BLSPublicKey, shard.BLSSignature) {
-	p := &bls.PublicKey{}
+func generateBLSKeySigPair() (bls.SerializedPublicKey, bls.SerializedSignature) {
+	p := &bls_core.PublicKey{}
 	p.DeserializeHexStr(testBLSPubKey)
-	pub := shard.BLSPublicKey{}
+	pub := bls.SerializedPublicKey{}
 	pub.FromLibBLSPublicKey(p)
 	messageBytes := []byte(staking.BLSVerificationStr)
-	privateKey := &bls.SecretKey{}
+	privateKey := &bls_core.SecretKey{}
 	privateKey.DeserializeHexStr(testBLSPrvKey)
 	msgHash := hash.Keccak256(messageBytes)
 	signature := privateKey.SignHash(msgHash[:])
-	var sig shard.BLSSignature
+	var sig bls.SerializedSignature
 	copy(sig[:], signature.Serialize())
 	return pub, sig
 }
@@ -71,8 +72,8 @@ func createValidator() *staking.CreateValidator {
 	minSelfDel := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000))
 	maxTotalDel := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(100000))
 	pubKey, pubSig := generateBLSKeySigPair()
-	slotPubKeys := []shard.BLSPublicKey{pubKey}
-	slotKeySigs := []shard.BLSSignature{pubSig}
+	slotPubKeys := []bls.SerializedPublicKey{pubKey}
+	slotKeySigs := []bls.SerializedSignature{pubSig}
 	amount := new(big.Int).Mul(big.NewInt(5e18), big.NewInt(2000))
 	v := staking.CreateValidator{
 		ValidatorAddress:   validatorAddress,

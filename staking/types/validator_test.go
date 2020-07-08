@@ -6,20 +6,20 @@ import (
 	"strings"
 	"testing"
 
-	common "github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
 
 var (
 	blsPubSigPairs = makeBLSPubSigPairs(5)
-	hmyBLSPub      shard.BLSPublicKey
+	hmyBLSPub      bls.SerializedPublicKey
 
 	hmyBLSPubStr     = "c2962419d9999a87daa134f6d177f9ccabfe168a470587b13dd02ce91d1690a92170e5949d3dbdfc1b13fd7327dbef8c"
 	validatorAddr, _ = common2.Bech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy")
@@ -172,7 +172,9 @@ func TestValidator_SanityCheck(t *testing.T) {
 			errCommissionRateTooLarge,
 		},
 		{
-			func(v *Validator) { v.SlotPubKeys = []shard.BLSPublicKey{blsPubSigPairs[0].pub, blsPubSigPairs[0].pub} },
+			func(v *Validator) {
+				v.SlotPubKeys = []bls.SerializedPublicKey{blsPubSigPairs[0].pub, blsPubSigPairs[0].pub}
+			},
 			errDuplicateSlotKeys,
 		},
 	}
@@ -479,7 +481,7 @@ func TestContainsHarmonyBLSKeys(t *testing.T) {
 	}
 }
 
-func makeDeployAccountsFromBLSPubs(pubs []shard.BLSPublicKey) []genesis.DeployAccount {
+func makeDeployAccountsFromBLSPubs(pubs []bls.SerializedPublicKey) []genesis.DeployAccount {
 	das := make([]genesis.DeployAccount, 0, len(pubs))
 	for i, pub := range pubs {
 		das = append(das, genesis.DeployAccount{
@@ -689,8 +691,8 @@ func TestUpdateValidatorFromEditMsg(t *testing.T) {
 }
 
 type blsPubSigPair struct {
-	pub shard.BLSPublicKey
-	sig shard.BLSSignature
+	pub bls.SerializedPublicKey
+	sig bls.SerializedSignature
 }
 
 func makeBLSPubSigPairs(size int) []blsPubSigPair {
@@ -707,25 +709,25 @@ func makeBLSPubSigPair() blsPubSigPair {
 	msgHash := hash.Keccak256([]byte(BLSVerificationStr))
 	sig := blsPriv.SignHash(msgHash)
 
-	var shardPub shard.BLSPublicKey
+	var shardPub bls.SerializedPublicKey
 	copy(shardPub[:], blsPub.Serialize())
 
-	var shardSig shard.BLSSignature
+	var shardSig bls.SerializedSignature
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}
 }
 
-func getPubsFromPairs(pairs []blsPubSigPair, indexes []int) []shard.BLSPublicKey {
-	pubs := make([]shard.BLSPublicKey, 0, len(indexes))
+func getPubsFromPairs(pairs []blsPubSigPair, indexes []int) []bls.SerializedPublicKey {
+	pubs := make([]bls.SerializedPublicKey, 0, len(indexes))
 	for _, index := range indexes {
 		pubs = append(pubs, pairs[index].pub)
 	}
 	return pubs
 }
 
-func getSigsFromPairs(pairs []blsPubSigPair, indexes []int) []shard.BLSSignature {
-	sigs := make([]shard.BLSSignature, 0, len(indexes))
+func getSigsFromPairs(pairs []blsPubSigPair, indexes []int) []bls.SerializedSignature {
+	sigs := make([]bls.SerializedSignature, 0, len(indexes))
 	for _, index := range indexes {
 		sigs = append(sigs, pairs[index].sig)
 	}
@@ -744,7 +746,7 @@ func makeValidValidator() Validator {
 	}
 	v := Validator{
 		Address:              validatorAddr,
-		SlotPubKeys:          []shard.BLSPublicKey{blsPubSigPairs[0].pub},
+		SlotPubKeys:          []bls.SerializedPublicKey{blsPubSigPairs[0].pub},
 		LastEpochInCommittee: big.NewInt(20),
 		MinSelfDelegation:    tenK,
 		MaxTotalDelegation:   twelveK,

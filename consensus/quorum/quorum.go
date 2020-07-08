@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
@@ -68,18 +70,18 @@ func (p Policy) String() string {
 // ParticipantTracker ..
 type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
-	IndexOf(shard.BLSPublicKey) int
+	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NextAfter(*shard.BLSPublicKeyWrapper) (bool, *shard.BLSPublicKeyWrapper)
-	UpdateParticipants(pubKeys []*bls.PublicKey)
+	NextAfter(*bls.PublicKeyWrapper) (bool, *bls.PublicKeyWrapper)
+	UpdateParticipants(pubKeys []*bls_core.PublicKey)
 }
 
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, pubkey shard.BLSPublicKey,
-		sig *bls.Sign, headerHash common.Hash,
+		p Phase, pubkey bls.SerializedPublicKey,
+		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	// Caller assumes concurrency protection
@@ -91,10 +93,10 @@ type SignatoryTracker interface {
 type SignatureReader interface {
 	SignatoryTracker
 	ReadAllBallots(Phase) []*votepower.Ballot
-	ReadBallot(p Phase, pubkey shard.BLSPublicKey) *votepower.Ballot
+	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
-	AggregateVotes(p Phase) *bls.Sign
+	AggregateVotes(p Phase) *bls_core.Sign
 }
 
 // DependencyInjectionWriter ..
@@ -115,8 +117,8 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkey shard.BLSPublicKey,
-		sig *bls.Sign, headerHash common.Hash,
+		p Phase, pubkey bls.SerializedPublicKey,
+		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
@@ -150,8 +152,8 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys  []shard.BLSPublicKeyWrapper
-	keyIndexMap map[shard.BLSPublicKey]int
+	publicKeys  []bls.PublicKeyWrapper
+	keyIndexMap map[bls.SerializedPublicKey]int
 	prepare     *votepower.Round
 	commit      *votepower.Round
 	// viewIDSigs: every validator
@@ -163,11 +165,11 @@ type depInject struct {
 	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
-func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
+func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 	ballots := s.ReadAllBallots(p)
-	sigs := make([]*bls.Sign, 0, len(ballots))
+	sigs := make([]*bls_core.Sign, 0, len(ballots))
 	for _, ballot := range ballots {
-		sig := &bls.Sign{}
+		sig := &bls_core.Sign{}
 		// NOTE invariant that shouldn't happen by now
 		// but pointers are pointers
 		if ballot != nil {
@@ -178,14 +180,14 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls.Sign {
 	return bls_cosi.AggregateSig(sigs)
 }
 
-func (s *cIdentities) IndexOf(pubKey shard.BLSPublicKey) int {
+func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
 	if index, ok := s.keyIndexMap[pubKey]; ok {
 		return index
 	}
 	return -1
 }
 
-func (s *cIdentities) NextAfter(pubKey *shard.BLSPublicKeyWrapper) (bool, *shard.BLSPublicKeyWrapper) {
+func (s *cIdentities) NextAfter(pubKey *bls.PublicKeyWrapper) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
 	idx := s.IndexOf(pubKey.Bytes)
@@ -200,14 +202,14 @@ func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) UpdateParticipants(pubKeys []*bls.PublicKey) {
-	keys := make([]shard.BLSPublicKeyWrapper, len(pubKeys))
-	keyIndexMap := map[shard.BLSPublicKey]int{}
+func (s *cIdentities) UpdateParticipants(pubKeys []*bls_core.PublicKey) {
+	keys := make([]bls.PublicKeyWrapper, len(pubKeys))
+	keyIndexMap := map[bls.SerializedPublicKey]int{}
 	for i := range pubKeys {
-		kBytes := shard.BLSPublicKey{}
+		kBytes := bls.SerializedPublicKey{}
 		kBytes.FromLibBLSPublicKey(pubKeys[i])
 
-		keys[i] = shard.BLSPublicKeyWrapper{Object: pubKeys[i], Bytes: kBytes}
+		keys[i] = bls.PublicKeyWrapper{Object: pubKeys[i], Bytes: kBytes}
 		keyIndexMap[kBytes] = i
 	}
 	s.publicKeys = keys
@@ -233,8 +235,8 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) SubmitVote(
-	p Phase, pubkey shard.BLSPublicKey,
-	sig *bls.Sign, headerHash common.Hash,
+	p Phase, pubkey bls.SerializedPublicKey,
+	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
 	if ballet := s.ReadBallot(p, pubkey); ballet != nil {
@@ -278,8 +280,8 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 	return s.ParticipantsCount()*2/3 + 1
 }
 
-func (s *cIdentities) ReadBallot(p Phase, pubkey shard.BLSPublicKey) *votepower.Ballot {
-	ballotBox := map[shard.BLSPublicKey]*votepower.Ballot{}
+func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot {
+	ballotBox := map[bls.SerializedPublicKey]*votepower.Ballot{}
 
 	switch p {
 	case Prepare:
@@ -298,7 +300,7 @@ func (s *cIdentities) ReadBallot(p Phase, pubkey shard.BLSPublicKey) *votepower.
 }
 
 func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
-	m := map[shard.BLSPublicKey]*votepower.Ballot{}
+	m := map[bls.SerializedPublicKey]*votepower.Ballot{}
 	switch p {
 	case Prepare:
 		m = s.prepare.BallotBox
@@ -316,8 +318,8 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 
 func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		publicKeys:  []shard.BLSPublicKeyWrapper{},
-		keyIndexMap: map[shard.BLSPublicKey]int{},
+		publicKeys:  []bls.PublicKeyWrapper{},
+		keyIndexMap: map[bls.SerializedPublicKey]int{},
 		prepare:     votepower.NewRound(),
 		commit:      votepower.NewRound(),
 		viewChange:  votepower.NewRound(),

@@ -26,11 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/state"
@@ -40,7 +42,6 @@ import (
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -88,16 +89,16 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 // TODO: more staking tests in tx pool & testing lib
 func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingTransaction, error) {
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
-		p := &bls.PublicKey{}
+		p := &bls_core.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BLSPublicKey{}
+		pub := bls.SerializedPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 		messageBytes := []byte(staking.BLSVerificationStr)
-		privateKey := &bls.SecretKey{}
+		privateKey := &bls_core.SecretKey{}
 		privateKey.DeserializeHexStr(testBLSPrvKey)
 		msgHash := hash.Keccak256(messageBytes)
 		signature := privateKey.SignHash(msgHash[:])
-		var sig shard.BLSSignature
+		var sig bls.SerializedSignature
 		copy(sig[:], signature.Serialize())
 
 		ra, _ := numeric.NewDecFromStr("0.7")
@@ -119,8 +120,8 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 			MinSelfDelegation:  tenKOnes,
 			MaxTotalDelegation: twelveKOnes,
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []shard.BLSPublicKey{pub},
-			SlotKeySigs:        []shard.BLSSignature{sig},
+			SlotPubKeys:        []bls.SerializedPublicKey{pub},
+			SlotKeySigs:        []bls.SerializedSignature{sig},
 			Amount:             tenKOnes,
 		}
 	}

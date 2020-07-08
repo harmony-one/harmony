@@ -4,7 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -27,7 +27,7 @@ func BlockSigners(
 	if err != nil {
 		return nil, nil, err
 	}
-	mask, err := bls2.NewMask(committerKeys, nil)
+	mask, err := bls.NewMask(committerKeys, nil)
 	if err != nil {
 		return nil, nil, err
 	}

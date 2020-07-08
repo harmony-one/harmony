@@ -32,9 +32,9 @@ func TestConstructAnnounceMessage(test *testing.T) {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	pubKeyWrapper := shard.BLSPublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
+	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := shard.BLSPrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
 	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, &priKeyWrapper); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
@@ -67,9 +67,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	message := "test string"
-	leaderKey := shard.BLSPublicKey{}
+	leaderKey := bls.SerializedPublicKey{}
 	leaderKey.FromLibBLSPublicKey(leaderPubKey)
-	validatorKey := shard.BLSPublicKey{}
+	validatorKey := bls.SerializedPublicKey{}
 	validatorKey.FromLibBLSPublicKey(validatorPubKey)
 	consensus.Decider.SubmitVote(
 		quorum.Prepare,
@@ -98,9 +98,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
 
-	pubKeyWrapper := shard.BLSPublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
+	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := shard.BLSPrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
 	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, &priKeyWrapper)
 	if err != nil {
 		test.Errorf("Error when creating prepared message")

@@ -8,15 +8,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -685,7 +686,7 @@ func TestRate(t *testing.T) {
 		expRate     numeric.Dec
 	}{
 		{
-			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
 				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
 				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
 				keyPairs[2].Pub(): numeric.NewDecWithPrec(3, 2),
@@ -698,7 +699,7 @@ func TestRate(t *testing.T) {
 			expRate: numeric.NewDecWithPrec(6, 2),
 		},
 		{
-			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
 				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
 			}),
 			records: Records{
@@ -707,12 +708,12 @@ func TestRate(t *testing.T) {
 			expRate: oneDoubleSignerRate,
 		},
 		{
-			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{}),
+			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{}),
 			records:     Records{},
 			expRate:     oneDoubleSignerRate,
 		},
 		{
-			votingPower: makeVotingPower(map[shard.BLSPublicKey]numeric.Dec{
+			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
 				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
 				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
 				keyPairs[3].Pub(): numeric.NewDecWithPrec(3, 2),
@@ -734,15 +735,15 @@ func TestRate(t *testing.T) {
 
 }
 
-func makeEmptyRecordWithSecondSignerKey(pub shard.BLSPublicKey) Record {
+func makeEmptyRecordWithSecondSignerKey(pub bls.SerializedPublicKey) Record {
 	var r Record
 	r.Evidence.SecondVote.SignerPubKey = pub
 	return r
 }
 
-func makeVotingPower(m map[shard.BLSPublicKey]numeric.Dec) *votepower.Roster {
+func makeVotingPower(m map[bls.SerializedPublicKey]numeric.Dec) *votepower.Roster {
 	r := &votepower.Roster{
-		Voters: make(map[shard.BLSPublicKey]*votepower.AccommodateHarmonyVote),
+		Voters: make(map[bls.SerializedPublicKey]*votepower.AccommodateHarmonyVote),
 	}
 	for pub, pct := range m {
 		r.Voters[pub] = &votepower.AccommodateHarmonyVote{
@@ -796,7 +797,7 @@ func makeBlockForTest(epoch int64, index int) *types.Block {
 }
 
 func defaultValidatorWrapper() *staking.ValidatorWrapper {
-	pubKeys := []shard.BLSPublicKey{offPub}
+	pubKeys := []bls.SerializedPublicKey{offPub}
 	v := defaultTestValidator(pubKeys)
 	ds := defaultTestDelegations()
 
@@ -811,7 +812,7 @@ func defaultSnapValidatorWrapper() *staking.ValidatorWrapper {
 }
 
 func defaultCurrentValidatorWrapper() *staking.ValidatorWrapper {
-	pubKeys := []shard.BLSPublicKey{offPub}
+	pubKeys := []bls.SerializedPublicKey{offPub}
 	v := defaultTestValidator(pubKeys)
 	ds := defaultDelegationsWithUndelegates()
 
@@ -822,7 +823,7 @@ func defaultCurrentValidatorWrapper() *staking.ValidatorWrapper {
 }
 
 // defaultTestValidator makes a valid Validator kps structure
-func defaultTestValidator(pubKeys []shard.BLSPublicKey) staking.Validator {
+func defaultTestValidator(pubKeys []bls.SerializedPublicKey) staking.Validator {
 	comm := staking.Commission{
 		CommissionRates: staking.CommissionRates{
 			Rate:          numeric.MustNewDecFromStr("0.167983520183826780"),
@@ -942,8 +943,8 @@ func (maker *shardSlotMaker) makeSlot() shard.Slot {
 }
 
 type blsKeyPair struct {
-	pri *bls.SecretKey
-	pub *bls.PublicKey
+	pri *bls_core.SecretKey
+	pub *bls_core.PublicKey
 }
 
 func genKeyPairs(size int) []blsKeyPair {
@@ -955,7 +956,7 @@ func genKeyPairs(size int) []blsKeyPair {
 }
 
 func genKeyPair() blsKeyPair {
-	pri := bls2.RandPrivateKey()
+	pri := bls.RandPrivateKey()
 	pub := pri.GetPublicKey()
 	return blsKeyPair{
 		pri: pri,
@@ -963,8 +964,8 @@ func genKeyPair() blsKeyPair {
 	}
 }
 
-func (kp blsKeyPair) Pub() shard.BLSPublicKey {
-	var pub shard.BLSPublicKey
+func (kp blsKeyPair) Pub() bls.SerializedPublicKey {
+	var pub bls.SerializedPublicKey
 	copy(pub[:], kp.pub.Serialize())
 	return pub
 }

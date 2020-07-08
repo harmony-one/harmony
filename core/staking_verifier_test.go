@@ -7,16 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	staketest "github.com/harmony-one/harmony/staking/types/test"
@@ -90,7 +90,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 		sdb       *state.DB
 		validator common.Address
 		identity  string
-		pubs      []shard.BLSPublicKey
+		pubs      []bls.SerializedPublicKey
 
 		expErr error
 	}{
@@ -100,7 +100,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
 
 			expErr: nil,
 		},
@@ -110,7 +110,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: makeTestAddr(0),
 			identity:  makeIdentityStr(0),
-			pubs:      []shard.BLSPublicKey{blsKeys[0].pub, blsKeys[1].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[0].pub, blsKeys[1].pub},
 
 			expErr: nil,
 		},
@@ -120,7 +120,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{},
+			pubs:      []bls.SerializedPublicKey{},
 
 			expErr: nil,
 		},
@@ -143,7 +143,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			}(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
 
 			expErr: nil,
 		},
@@ -153,7 +153,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
 
 			expErr: errors.New("error intended"),
 		},
@@ -169,7 +169,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
 
 			expErr: errors.New("address not present in state"),
 		},
@@ -179,7 +179,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr(0),
-			pubs:      []shard.BLSPublicKey{blsKeys[11].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[11].pub},
 
 			expErr: errDupIdentity,
 		},
@@ -189,7 +189,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			sdb:       makeStateDBForStake(t),
 			validator: createValidatorAddr,
 			identity:  makeIdentityStr("new validator"),
-			pubs:      []shard.BLSPublicKey{blsKeys[0].pub},
+			pubs:      []bls.SerializedPublicKey{blsKeys[0].pub},
 
 			expErr: errDupBlsKey,
 		},
@@ -299,7 +299,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
 				m := defaultMsgCreateValidator()
-				m.SlotPubKeys = []shard.BLSPublicKey{blsKeys[0].pub}
+				m.SlotPubKeys = []bls.SerializedPublicKey{blsKeys[0].pub}
 				return m
 			}(),
 
@@ -328,7 +328,7 @@ func TestVerifyAndCreateValidatorFromMsg(t *testing.T) {
 			blockNum: big.NewInt(defaultBlockNumber),
 			msg: func() staking.CreateValidator {
 				m := defaultMsgCreateValidator()
-				m.SlotKeySigs = []shard.BLSSignature{blsKeys[12].sig}
+				m.SlotKeySigs = []bls.SerializedSignature{blsKeys[12].sig}
 				return m
 			}(),
 
@@ -392,8 +392,8 @@ func defaultMsgCreateValidator() staking.CreateValidator {
 		CommissionRates:    defaultCommissionRates,
 		MinSelfDelegation:  staketest.DefaultMinSelfDel,
 		MaxTotalDelegation: staketest.DefaultMaxTotalDel,
-		SlotPubKeys:        []shard.BLSPublicKey{pub},
-		SlotKeySigs:        []shard.BLSSignature{sig},
+		SlotPubKeys:        []bls.SerializedPublicKey{pub},
+		SlotKeySigs:        []bls.SerializedSignature{sig},
 		Amount:             staketest.DefaultDelAmount,
 	}
 	return cv
@@ -403,7 +403,7 @@ func defaultExpWrapperCreateValidator() staking.ValidatorWrapper {
 	pub := blsKeys[11].pub
 	v := staking.Validator{
 		Address:              createValidatorAddr,
-		SlotPubKeys:          []shard.BLSPublicKey{pub},
+		SlotPubKeys:          []bls.SerializedPublicKey{pub},
 		LastEpochInCommittee: new(big.Int),
 		MinSelfDelegation:    staketest.DefaultMinSelfDel,
 		MaxTotalDelegation:   staketest.DefaultMaxTotalDel,
@@ -690,9 +690,9 @@ var (
 
 func defaultMsgEditValidator() staking.EditValidator {
 	var (
-		pub0Copy  shard.BLSPublicKey
-		pub12Copy shard.BLSPublicKey
-		sig12Copy shard.BLSSignature
+		pub0Copy  bls.SerializedPublicKey
+		pub12Copy bls.SerializedPublicKey
+		sig12Copy bls.SerializedSignature
 	)
 	copy(pub0Copy[:], blsKeys[0].pub[:])
 	copy(pub12Copy[:], blsKeys[12].pub[:])
@@ -1353,7 +1353,7 @@ func makeVWrappersForStake(num, numPubsPerVal int) []*staking.ValidatorWrapper {
 
 func makeStateVWrapperFromGetter(index int, numPubs int, pubGetter *BLSPubGetter) staking.ValidatorWrapper {
 	addr := makeTestAddr(index)
-	pubs := make([]shard.BLSPublicKey, 0, numPubs)
+	pubs := make([]bls.SerializedPublicKey, 0, numPubs)
 	for i := 0; i != numPubs; i++ {
 		pubs = append(pubs, pubGetter.getPub())
 	}
@@ -1375,7 +1375,7 @@ func newBLSPubGetter(keys []blsPubSigPair) *BLSPubGetter {
 	}
 }
 
-func (g *BLSPubGetter) getPub() shard.BLSPublicKey {
+func (g *BLSPubGetter) getPub() bls.SerializedPublicKey {
 	key := g.keys[g.index]
 	g.index++
 	return key.pub
@@ -1469,8 +1469,8 @@ func makeKeyPairs(size int) []blsPubSigPair {
 }
 
 type blsPubSigPair struct {
-	pub shard.BLSPublicKey
-	sig shard.BLSSignature
+	pub bls.SerializedPublicKey
+	sig bls.SerializedSignature
 }
 
 func makeBLSKeyPair() blsPubSigPair {
@@ -1479,10 +1479,10 @@ func makeBLSKeyPair() blsPubSigPair {
 	msgHash := hash.Keccak256([]byte(staking.BLSVerificationStr))
 	sig := blsPriv.SignHash(msgHash)
 
-	var shardPub shard.BLSPublicKey
+	var shardPub bls.SerializedPublicKey
 	copy(shardPub[:], blsPub.Serialize())
 
-	var shardSig shard.BLSSignature
+	var shardSig bls.SerializedSignature
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}

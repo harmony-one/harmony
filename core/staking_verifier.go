@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/vm"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -24,7 +25,7 @@ var (
 
 func checkDuplicateFields(
 	bc ChainContext, state vm.StateDB,
-	validator common.Address, identity string, blsKeys []shard.BLSPublicKey,
+	validator common.Address, identity string, blsKeys []bls.SerializedPublicKey,
 ) error {
 	addrs, err := bc.ReadValidatorList()
 	if err != nil {
@@ -34,7 +35,7 @@ func checkDuplicateFields(
 	checkIdentity := identity != ""
 	checkBlsKeys := len(blsKeys) != 0
 
-	blsKeyMap := map[shard.BLSPublicKey]struct{}{}
+	blsKeyMap := map[bls.SerializedPublicKey]struct{}{}
 	for _, key := range blsKeys {
 		blsKeyMap[key] = struct{}{}
 	}
@@ -140,7 +141,7 @@ func VerifyAndEditValidatorFromMsg(
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
 		return nil, errValidatorNotExist
 	}
-	newBlsKeys := []shard.BLSPublicKey{}
+	newBlsKeys := []bls.SerializedPublicKey{}
 	if msg.SlotKeyToAdd != nil {
 		newBlsKeys = append(newBlsKeys, *msg.SlotKeyToAdd)
 	}

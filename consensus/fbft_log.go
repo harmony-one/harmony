@@ -3,11 +3,11 @@ package consensus
 import (
 	"fmt"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -28,14 +28,14 @@ type FBFTMessage struct {
 	BlockNum      uint64
 	BlockHash     common.Hash
 	Block         []byte
-	SenderPubkey  *shard.BLSPublicKeyWrapper
-	LeaderPubkey  *shard.BLSPublicKeyWrapper
+	SenderPubkey  *bls.PublicKeyWrapper
+	LeaderPubkey  *bls.PublicKeyWrapper
 	Payload       []byte
-	ViewchangeSig *bls.Sign
-	ViewidSig     *bls.Sign
-	M2AggSig      *bls.Sign
+	ViewchangeSig *bls_core.Sign
+	ViewidSig     *bls_core.Sign
+	M2AggSig      *bls_core.Sign
 	M2Bitmap      *bls_cosi.Mask
-	M3AggSig      *bls.Sign
+	M3AggSig      *bls_core.Sign
 	M3Bitmap      *bls_cosi.Mask
 }
 
@@ -249,7 +249,7 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	pbftMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
 	copy(pbftMsg.SenderPubkey.Bytes[:], consensusMsg.SenderPubkey[:])
 
 	return &pbftMsg, nil
@@ -282,23 +282,23 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 		return nil, err
 	}
 
-	vcSig := bls.Sign{}
+	vcSig := bls_core.Sign{}
 	err = vcSig.Deserialize(vcMsg.ViewchangeSig)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the viewchange signature")
 		return nil, err
 	}
 
-	vcSig1 := bls.Sign{}
+	vcSig1 := bls_core.Sign{}
 	err = vcSig1.Deserialize(vcMsg.ViewidSig)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the viewid signature")
 		return nil, err
 	}
 
-	pbftMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
 	copy(pbftMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
-	pbftMsg.LeaderPubkey = &shard.BLSPublicKeyWrapper{Object: leaderKey}
+	pbftMsg.LeaderPubkey = &bls.PublicKeyWrapper{Object: leaderKey}
 	copy(pbftMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
 	pbftMsg.ViewchangeSig = &vcSig
 	pbftMsg.ViewidSig = &vcSig1
@@ -328,16 +328,16 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		return nil, err
 	}
 
-	FBFTMsg.SenderPubkey = &shard.BLSPublicKeyWrapper{Object: pubKey}
+	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
 	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
 
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls.PublicKey{}
+	publicKeys := []*bls_core.PublicKey{}
 	for _, key := range members {
 		publicKeys = append(publicKeys, key.Object)
 	}
 	if len(vcMsg.M3Aggsigs) > 0 {
-		m3Sig := bls.Sign{}
+		m3Sig := bls_core.Sign{}
 		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
@@ -354,7 +354,7 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 	}
 
 	if len(vcMsg.M2Aggsigs) > 0 {
-		m2Sig := bls.Sign{}
+		m2Sig := bls_core.Sign{}
 		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")

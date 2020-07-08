@@ -5,8 +5,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 
@@ -88,13 +89,13 @@ var (
 	}
 
 	nonZeroVote1 = slash.Vote{
-		SignerPubKey:    shard.BLSPublicKey{1},
+		SignerPubKey:    bls.SerializedPublicKey{1},
 		BlockHeaderHash: common.Hash{2},
 		Signature:       []byte{1, 2, 3},
 	}
 
 	nonZeroVote2 = slash.Vote{
-		SignerPubKey:    shard.BLSPublicKey{3},
+		SignerPubKey:    bls.SerializedPublicKey{3},
 		BlockHeaderHash: common.Hash{4},
 		Signature:       []byte{4, 5, 6},
 	}
