@@ -3,289 +3,134 @@ package blsloader
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/multibls"
 )
 
-type Loader struct {
-	BlsKeyFile *string
-	AwsBlsKey  *string
-	BlsDir     *string
-
-	PassSrcType       PassSrcType
-	PassFile          *string
-	PersistPassphrase bool
-
-	AwsCfgSrcType AwsCfgSrcType
-	AwsConfigFile *string
-}
-
-// LoadKeys load all keys from the input fields provided
-func (loader *Loader) LoadKeys() (multibls.PrivateKeys, error) {
-	helper, err := loader.getHelper()
-	if err != nil {
+func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
+	cfg.applyDefault()
+	if err := cfg.validate(); err != nil {
 		return multibls.PrivateKeys{}, err
+	}
+	helper, err := getHelper(cfg)
+	if err != nil {
+		return nil, err
 	}
 	return helper.loadKeys()
 }
 
-// getHelper parse the Loader structure to helper for further computation
-func (loader *Loader) getHelper() (loadHelper, error) {
+func getHelper(cfg Config) (loadHelper, error) {
 	switch {
-	case stringIsSet(loader.BlsKeyFile):
-		return &basicSingleBlsLoader{
-			blsKeyFile:        *loader.BlsKeyFile,
-			passFile:          loader.PassFile,
-			passSrcType:       loader.PassSrcType,
-			persistPassphrase: loader.PersistPassphrase,
-		}, nil
-	case stringIsSet(loader.AwsBlsKey):
-		return &kmsSingleBlsLoader{
-			awsBlsKey:     *loader.AwsBlsKey,
-			awsCfgSrcType: loader.AwsCfgSrcType,
-			awsConfigFile: loader.AwsConfigFile,
-		}, nil
-	case stringIsSet(loader.BlsDir):
+	case stringIsSet(cfg.BlsKeyFile):
+		switch filepath.Ext(*cfg.BlsKeyFile) {
+		case basicKeyExt:
+			return &basicSingleBlsLoader{
+				blsKeyFile:         *cfg.BlsKeyFile,
+				passProviderConfig: cfg.getPassProviderConfig(),
+			}, nil
+		case kmsKeyExt:
+			return &kmsSingleBlsLoader{
+				blsKeyFile:        *cfg.BlsKeyFile,
+				kmsProviderConfig: cfg.getKmsProviderConfig(),
+			}, nil
+		default:
+			return nil, errors.New("unknown extension")
+		}
+	case stringIsSet(cfg.BlsDir):
 		return &blsDirLoader{
-			dirPath:           *loader.BlsDir,
-			pst:               loader.PassSrcType,
-			passFile:          loader.PassFile,
-			persistPassphrase: loader.PersistPassphrase,
-			act:               loader.AwsCfgSrcType,
-			awsConfigFile:     loader.AwsConfigFile,
+			dirPath:            *cfg.BlsDir,
+			passProviderConfig: cfg.getPassProviderConfig(),
+			kmsProviderConfig:  cfg.getKmsProviderConfig(),
 		}, nil
 	default:
-		return nil, errors.New("empty bls key data source")
+		return nil, errors.New("either BlsKeyFile or BlsDir must be set")
 	}
 }
 
-// loadHelper defines the interface to help load bls keys
-type loadHelper interface {
-	loadKeys() (multibls.PrivateKeys, error)
+// Loader is the structure to load bls keys.
+type Config struct {
+	// source for bls key loading. At least one of the BlsKeyFile and BlsDir
+	// need to be provided.
+	//
+	// BlsKeyFile defines a single key file to load from. Based on the file
+	// extension, decryption with passphrase or aws kms will be used.
+	BlsKeyFile *string
+	// BlsDir defines a file directory to load keys from.
+	BlsDir *string
+
+	// Passphrase related settings. Used for passphrase encrypted key files.
+	//
+	// PassSrcType defines the source to get passphrase. Three source types are available
+	//   PassSrcFile   - get passphrase from a .pass file
+	//   PassSrcPrompt - get passphrase from prompt
+	//   PassSrcAuto   - try to unlock with .pass file. If not success, ask user with prompt
+	// Value is default to PassSrcAuto.
+	PassSrcType PassSrcType
+	// PassFile specifies the .pass file to be used when loading passphrase from file.
+	// If not set, default to the .pass file in the same directory as the key file.
+	PassFile *string
+	// PersistPassphrase set whether to persist the passphrase to a .pass file when
+	// prompt the user for password. Persisted pass file is a file with .pass extension
+	// under the same directory as the key file.
+	PersistPassphrase bool
+
+	// Aws configuration related settings, including AWS credentials and region info.
+	// Used for KMS encrypted passphrase files.
+	//
+	// AwsCfgSrcType defines the source to get aws config. Three types available:
+	//   AwsCfgSrcFile   - get AWS config through a json file. See AwsConfig for content fields.
+	//   AwsCfgSrcPrompt - get AWS config through prompt.
+	//   AwsCfgSrcShared - Use the default AWS config settings (from env and $HOME/.aws/config)
+	// Default to AwsCfgSrcShared.
+	AwsCfgSrcType AwsCfgSrcType
+	// AwsConfigFile set the json file to load aws config.
+	AwsConfigFile *string
 }
 
-// basicSingleBlsLoader loads a single bls key file with passphrase
-type basicSingleBlsLoader struct {
-	blsKeyFile        string
-	passSrcType       PassSrcType
-	passFile          *string
-	persistPassphrase bool
-}
-
-func (loader *basicSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
-	providers, err := loader.getPassProviders()
-	if err != nil {
-		return multibls.PrivateKeys{}, err
+func (cfg *Config) applyDefault() {
+	if cfg.PassSrcType == PassSrcNil {
+		cfg.PassSrcType = PassSrcAuto
 	}
-	secretKey, err := loadBasicKey(loader.blsKeyFile, providers)
-	if err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	return secretKeyToMultiPrivateKey(secretKey), nil
-}
-
-func (loader *basicSingleBlsLoader) getPassProviders() ([]passProvider, error) {
-	switch loader.passSrcType {
-	case PassSrcFile:
-		return []passProvider{loader.getFilePassProvider()}, nil
-	case PassSrcPrompt:
-		return []passProvider{loader.getPromptPassProvider()}, nil
-	case PassSrcAuto:
-		return []passProvider{
-			loader.getFilePassProvider(),
-			loader.getPromptPassProvider(),
-		}, nil
-	default:
-		return nil, errors.New("unknown passphrase source type")
+	if cfg.AwsCfgSrcType == AwsCfgSrcNil {
+		cfg.AwsCfgSrcType = AwsCfgSrcShared
 	}
 }
 
-func (loader *basicSingleBlsLoader) getFilePassProvider() passProvider {
-	if stringIsSet(loader.passFile) {
-		return newFilePassProvider(*loader.passFile)
-	}
-	passFile := keyFileToPassFileFull(loader.blsKeyFile)
-	return newFilePassProvider(passFile)
-}
-
-func (loader *basicSingleBlsLoader) getPromptPassProvider() passProvider {
-	provider := newPromptPassProvider()
-	if loader.persistPassphrase {
-		provider.setPersist(filepath.Dir(loader.blsKeyFile))
-	}
-	return provider
-}
-
-type kmsSingleBlsLoader struct {
-	awsBlsKey string
-
-	awsCfgSrcType AwsCfgSrcType
-	awsConfigFile *string
-}
-
-func (loader *kmsSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
-	provider, err := loader.getKmsClientProvider()
-	if err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	secretKey, err := loadKmsKeyFromFile(loader.awsBlsKey, provider)
-	if err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	return secretKeyToMultiPrivateKey(secretKey), nil
-}
-
-func (loader *kmsSingleBlsLoader) getKmsClientProvider() (kmsClientProvider, error) {
-	switch loader.awsCfgSrcType {
-	case AwsCfgSrcFile:
-		if stringIsSet(loader.awsConfigFile) {
-			return newFileKmsProvider(*loader.awsConfigFile), nil
+func (cfg *Config) validate() error {
+	if stringIsSet(cfg.BlsKeyFile) {
+		if !isFile(*cfg.BlsKeyFile) {
+			return fmt.Errorf("key file not exist %v", *cfg.BlsKeyFile)
 		}
-		return newSharedKmsProvider(), nil
-	case AwsCfgSrcPrompt:
-		return newPromptKmsProvider(defKmsPromptTimeout), nil
-	case AwsCfgSrcShared:
-		return newSharedKmsProvider(), nil
-	default:
-		return nil, errors.New("unknown aws config source type")
-	}
-}
-
-// blsDirLoader is the helper structure for loading bls keys in a directory
-type blsDirLoader struct {
-	// input fields
-	dirPath string
-	// pass provider fields
-	pst               PassSrcType
-	passFile          *string
-	persistPassphrase bool
-	// kms provider fields
-	act           AwsCfgSrcType
-	awsConfigFile *string
-
-	// providers in process
-	pps []passProvider
-	kcp kmsClientProvider
-	// result field
-	secretKeys []*bls.SecretKey
-}
-
-func (loader *blsDirLoader) loadKeys() (multibls.PrivateKeys, error) {
-	var err error
-	if loader.pps, err = loader.getPassProviders(); err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	if loader.kcp, err = loader.getKmsClientProvider(); err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	return loader.loadKeyFiles()
-}
-
-func (loader *blsDirLoader) getPassProviders() ([]passProvider, error) {
-	switch loader.pst {
-	case PassSrcFile:
-		return []passProvider{loader.getFilePassProvider()}, nil
-	case PassSrcPrompt:
-		return []passProvider{loader.getPromptPassProvider()}, nil
-	case PassSrcAuto:
-		return []passProvider{
-			loader.getFilePassProvider(),
-			loader.getPromptPassProvider(),
-		}, nil
-	default:
-		return nil, errors.New("unknown pass source type")
-	}
-}
-
-func (loader *blsDirLoader) getFilePassProvider() passProvider {
-	if stringIsSet(loader.passFile) {
-		return newFilePassProvider(*loader.passFile)
-	}
-	return newDirPassProvider(loader.dirPath)
-}
-
-func (loader *blsDirLoader) getPromptPassProvider() passProvider {
-	provider := newPromptPassProvider()
-	if loader.persistPassphrase {
-		provider.setPersist(loader.dirPath)
-	}
-	return provider
-}
-
-func (loader *blsDirLoader) getKmsClientProvider() (kmsClientProvider, error) {
-	switch loader.act {
-	case AwsCfgSrcFile:
-		if stringIsSet(loader.awsConfigFile) {
-			return newFileKmsProvider(*loader.awsConfigFile), nil
+		switch ext := filepath.Ext(*cfg.BlsKeyFile); ext {
+		case basicKeyExt, kmsKeyExt:
+		default:
+			return fmt.Errorf("unknown key file extension %v", ext)
 		}
-		return newSharedKmsProvider(), nil
-	case AwsCfgSrcPrompt:
-		return newPromptKmsProvider(defKmsPromptTimeout), nil
-	case AwsCfgSrcShared:
-		return newSharedKmsProvider(), nil
-	default:
-		return nil, errors.New("unknown aws config source type")
-	}
-}
-
-func (loader *blsDirLoader) loadKeyFiles() (multibls.PrivateKeys, error) {
-	err := filepath.Walk(loader.dirPath, loader.processFileWalk)
-	if err != nil {
-		return multibls.PrivateKeys{}, err
-	}
-	return secretKeyToMultiPrivateKey(loader.secretKeys...), nil
-}
-
-func (loader *blsDirLoader) processFileWalk(path string, info os.FileInfo, err error) error {
-	key, err := loader.loadKeyFromFile(path, info)
-	if err != nil {
-		if !errIsErrors(err, loader.skippingErrors()) {
-			// unexpected error, return the error and break the file walk loop
-			return err
+	} else if stringIsSet(cfg.BlsDir) {
+		if !isDir(*cfg.BlsDir) {
+			return fmt.Errorf("dir not exist %v", *cfg.BlsDir)
 		}
-		// expected error. Skipping these files
-		skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
-		console.println(skipStr)
-		return nil
+	} else {
+		return errors.New("either BlsKeyFile or BlsDir must be set")
 	}
-	loader.secretKeys = append(loader.secretKeys, key)
-	return nil
+	if err := cfg.getPassProviderConfig().validate(); err != nil {
+		return err
+	}
+	return cfg.getKmsProviderConfig().validate()
 }
 
-// errors to be neglected for directory bls loading
-func (loader *blsDirLoader) skippingErrors() []error {
-	return []error{
-		errUnknownExtension,
-		errNilPassProvider,
-		errNilKMSClientProvider,
+func (cfg *Config) getPassProviderConfig() passProviderConfig {
+	return passProviderConfig{
+		passSrcType:       cfg.PassSrcType,
+		passFile:          cfg.PassFile,
+		persistPassphrase: cfg.PersistPassphrase,
 	}
 }
 
-func (loader *blsDirLoader) loadKeyFromFile(path string, info os.FileInfo) (*bls.SecretKey, error) {
-	var (
-		key *bls.SecretKey
-		err error
-	)
-	switch {
-	case isBasicKeyFile(info):
-		key, err = loadBasicKey(path, loader.pps)
-	case isKMSKeyFile(info):
-		key, err = loadKmsKeyFromFile(path, loader.kcp)
-	default:
-		err = errUnknownExtension
+func (cfg *Config) getKmsProviderConfig() kmsProviderConfig {
+	return kmsProviderConfig{
+		awsCfgSrcType: cfg.AwsCfgSrcType,
+		awsConfigFile: cfg.AwsConfigFile,
 	}
-	return key, err
-}
-
-// errIsErrors return whether the err is one of the errs
-func errIsErrors(err error, errs []error) bool {
-	for _, targetErr := range errs {
-		if errors.Is(err, targetErr) {
-			return true
-		}
-	}
-	return false
 }

@@ -3,13 +3,13 @@ package blsloader
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/blsgen"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
+
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/internal/blsgen"
 )
 
 var (
@@ -62,34 +62,42 @@ func loadKmsKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*bls_core.Sec
 	return secretKey, nil
 }
 
-// isBasicKeyFile return whether the given file is a bls file
-func isBasicKeyFile(info os.FileInfo) bool {
-	if info.IsDir() {
+func isFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
 		return false
 	}
-	if !strings.HasSuffix(info.Name(), basicKeyExt) {
-		return false
-	}
-	return true
+	return !info.IsDir()
 }
 
-// isKMSKeyFile returns whether the given file is a kms key file
-func isKMSKeyFile(info os.FileInfo) bool {
-	if info.IsDir() {
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
 		return false
 	}
-	if !strings.HasSuffix(info.Name(), kmsKeyExt) {
-		return false
-	}
-	return true
+	return info.IsDir()
 }
 
-// keyFileToPassFileBase convert a key file base name to passphrase file base name
+func isBasicKeyFile(path string) bool {
+	exist := isFile(path)
+	if !exist {
+		return false
+	}
+	return filepath.Ext(path) == basicKeyExt
+}
+
+func isKMSKeyFile(path string) bool {
+	exist := isFile(path)
+	if !exist {
+		return false
+	}
+	return filepath.Ext(path) == kmsKeyExt
+}
+
 func keyFileToPassFileBase(keyFileBase string) string {
 	return strings.Trim(keyFileBase, basicKeyExt) + passExt
 }
 
-// keyFileToPassFileFull convert a key file full path to passphrase file full path
 func keyFileToPassFileFull(keyFile string) string {
 	return strings.Trim(keyFile, basicKeyExt) + passExt
 }
@@ -122,15 +130,6 @@ func promptYesNo(prompt string) (bool, error) {
 			return false, nil
 		}
 	}
-}
-
-func secretKeyToMultiPrivateKey(secretKeys ...*bls_core.SecretKey) multibls.PrivateKeys {
-	keys := make(multibls.PrivateKeys, 0, len(secretKeys))
-	for _, secretKey := range secretKeys {
-		key := bls.WrapperFromPrivateKey(secretKey)
-		keys = append(keys, key)
-	}
-	return keys
 }
 
 func stringIsSet(val *string) bool {

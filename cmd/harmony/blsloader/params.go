@@ -3,12 +3,15 @@ package blsloader
 import "time"
 
 const (
+	// Extensions for files.
 	passExt     = ".pass"
 	basicKeyExt = ".key"
 	kmsKeyExt   = ".bls"
 )
 
 const (
+	// The default timeout for kms config prompt. The timeout is introduced
+	// for security concern.
 	defKmsPromptTimeout = 1 * time.Second
 )
 
@@ -25,37 +28,18 @@ const (
 type PassSrcType uint8
 
 const (
-	PassSrcNil    PassSrcType = iota // nil place holder
+	PassSrcNil    PassSrcType = iota // place holder for nil src
+	PassSrcAuto                      // first try to unlock with pass from file, then look for prompt
 	PassSrcFile                      // provide the passphrase through a pass file
 	PassSrcPrompt                    // provide the passphrase through prompt
-	PassSrcAuto                      // first try to unlock with pass from file, then look for prompt
 )
 
-// String return the string presentation of PassSrcType
-func (srcType PassSrcType) String() string {
+func (srcType PassSrcType) isValid() bool {
 	switch srcType {
-	case PassSrcFile:
-		return "file"
-	case PassSrcPrompt:
-		return "prompt"
-	case PassSrcAuto:
-		return "auto"
+	case PassSrcAuto, PassSrcFile, PassSrcPrompt:
+		return true
 	default:
-		return "unknown"
-	}
-}
-
-// PassSrcTypeFromString parse PassSrcType from string specifier
-func PassSrcTypeFromString(str string) PassSrcType {
-	switch str {
-	case "file":
-		return PassSrcFile
-	case "prompt":
-		return PassSrcPrompt
-	case "auto":
-		return PassSrcAuto
-	default:
-		return PassSrcNil
+		return false
 	}
 }
 
@@ -72,28 +56,11 @@ const (
 	AwsCfgSrcShared                      // through shared aws config
 )
 
-func (srcType AwsCfgSrcType) String() string {
+func (srcType AwsCfgSrcType) isValid() bool {
 	switch srcType {
-	case AwsCfgSrcFile:
-		return "file"
-	case AwsCfgSrcPrompt:
-		return "prompt"
-	case AwsCfgSrcShared:
-		return "shared"
+	case AwsCfgSrcFile, AwsCfgSrcPrompt, AwsCfgSrcShared:
+		return true
 	default:
-		return "unknown"
-	}
-}
-
-func AwsCfgSrcTypeFromString(str string) AwsCfgSrcType {
-	switch str {
-	case "file":
-		return AwsCfgSrcFile
-	case "prompt":
-		return AwsCfgSrcPrompt
-	case "shared":
-		return AwsCfgSrcShared
-	default:
-		return AwsCfgSrcNil
+		return false
 	}
 }

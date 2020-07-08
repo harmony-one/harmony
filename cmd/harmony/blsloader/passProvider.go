@@ -1,11 +1,26 @@
 package blsloader
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 )
+
+// passProviderConfig is the data structure of passProviders config
+type passProviderConfig struct {
+	passSrcType       PassSrcType
+	passFile          *string
+	persistPassphrase bool
+}
+
+func (config passProviderConfig) validate() error {
+	if !config.passSrcType.isValid() {
+		return errors.New("unknown PassSrcType")
+	}
+	return nil
+}
 
 // passProvider is the interface to provide the passphrase of a bls keys.
 // Implemented by

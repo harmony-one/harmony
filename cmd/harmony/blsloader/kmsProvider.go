@@ -14,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// AwsConfig is the config data structure for credentials and region. Used for AWS KMS
+// decryption.
 type AwsConfig struct {
 	AccessKey string `json:"aws-access-key-id"`
 	SecretKey string `json:"aws-secret-access-key"`
@@ -21,12 +23,33 @@ type AwsConfig struct {
 	Token     string `json:"aws-token,omitempty"`
 }
 
-func (cfg *AwsConfig) toAws() *aws.Config {
+func (cfg AwsConfig) toAws() *aws.Config {
 	cred := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, cfg.Token)
 	return &aws.Config{
 		Region:      aws.String(cfg.Region),
 		Credentials: cred,
 	}
+}
+
+// kmsProviderConfig is the data structure of kmsClientProvider config
+type kmsProviderConfig struct {
+	awsCfgSrcType AwsCfgSrcType
+	awsConfigFile *string
+}
+
+func (cfg kmsProviderConfig) validate() error {
+	if !cfg.awsCfgSrcType.isValid() {
+		return errors.New("unknown AwsCfgSrcType")
+	}
+	if cfg.awsCfgSrcType == AwsCfgSrcFile {
+		if !stringIsSet(cfg.awsConfigFile) {
+			return errors.New("config field AwsConfig file must set for AwsCfgSrcFile")
+		}
+		if !isFile(*cfg.awsConfigFile) {
+			return fmt.Errorf("aws config file not exist %v", *cfg.awsConfigFile)
+		}
+	}
+	return nil
 }
 
 // kmsClientProvider provides the kms client. Implemented by
@@ -38,12 +61,11 @@ type kmsClientProvider interface {
 	// getKMSClient returns the KMSClient of the kmsClientProvider with lazy loading.
 	getKMSClient() (*kms.KMS, error)
 
-	// getAWSConfig returns the AwsConfig for different implementations
-	getAWSConfig() (*AwsConfig, error)
-
 	// toStr return the string presentation of kmsClientProvider
 	toStr() string
 }
+
+type getAwsCfgFunc func() (*AwsConfig, error)
 
 // baseKMSProvider provide the kms client with singleton initialization through
 // function getConfig for aws credential and regions loading.
@@ -51,6 +73,8 @@ type baseKMSProvider struct {
 	client *kms.KMS
 	err    error
 	once   sync.Once
+
+	getAWSConfig getAwsCfgFunc
 }
 
 func (provider *baseKMSProvider) getKMSClient() (*kms.KMS, error) {
@@ -68,10 +92,6 @@ func (provider *baseKMSProvider) getKMSClient() (*kms.KMS, error) {
 	return provider.client, nil
 }
 
-func (provider *baseKMSProvider) getAWSConfig() (*AwsConfig, error) {
-	return nil, errors.New("not implemented")
-}
-
 func (provider *baseKMSProvider) toStr() string {
 	return "not implemented"
 }
@@ -83,11 +103,12 @@ type sharedKMSProvider struct {
 }
 
 func newSharedKmsProvider() *sharedKMSProvider {
-	return &sharedKMSProvider{
-		baseKMSProvider{},
-	}
+	provider := &sharedKMSProvider{baseKMSProvider{}}
+	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
+	return provider
 }
 
+// TODO(Jacky): set getAwsConfig into a function, not bind with structure
 func (provider *sharedKMSProvider) getAWSConfig() (*AwsConfig, error) {
 	return nil, nil
 }
@@ -105,10 +126,12 @@ type fileKMSProvider struct {
 }
 
 func newFileKmsProvider(file string) *fileKMSProvider {
-	return &fileKMSProvider{
+	provider := &fileKMSProvider{
 		baseKMSProvider: baseKMSProvider{},
 		file:            file,
 	}
+	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
+	return provider
 }
 
 func (provider *fileKMSProvider) getAWSConfig() (*AwsConfig, error) {
@@ -138,10 +161,12 @@ type promptKMSProvider struct {
 }
 
 func newPromptKmsProvider(timeout time.Duration) *promptKMSProvider {
-	return &promptKMSProvider{
+	provider := &promptKMSProvider{
 		baseKMSProvider: baseKMSProvider{},
 		timeout:         timeout,
 	}
+	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
+	return provider
 }
 
 func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
@@ -204,7 +229,7 @@ func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
 	if config == nil {
 		return getSharedKMSClient()
 	}
-	return getKMSClientFromConfig(config)
+	return getKMSClientFromConfig(*config)
 }
 
 func getSharedKMSClient() (*kms.KMS, error) {
@@ -217,7 +242,7 @@ func getSharedKMSClient() (*kms.KMS, error) {
 	return kms.New(sess), err
 }
 
-func getKMSClientFromConfig(config *AwsConfig) (*kms.KMS, error) {
+func getKMSClientFromConfig(config AwsConfig) (*kms.KMS, error) {
 	sess, err := session.NewSession(config.toAws())
 	if err != nil {
 		return nil, err
