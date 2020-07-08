@@ -9,11 +9,9 @@ import (
 
 // passProvider is the interface to provide the passphrase of a bls keys.
 // Implemented by
-//    emptyPassProvider - provide empty passphrase
 // 	  promptPassProvider - provide passphrase through user-interactive prompt
 //    filePassProvider - provide passphrase from a .pass file
 //    dirPassProvider - provide passphrase from .pass files in a directory
-//    multiPassProvider - multiple passProviders that will provide the passphrase.
 type passProvider interface {
 	toStr() string
 	getPassphrase(keyFile string) (string, error)
@@ -30,7 +28,7 @@ type promptPassProvider struct {
 const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
 
 func newPromptPassProvider() *promptPassProvider {
-	return &promptPassProvider{}
+	return &promptPassProvider{q}
 }
 
 func (provider *promptPassProvider) toStr() string {

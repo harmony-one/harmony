@@ -23,7 +23,7 @@ type Loader struct {
 	AwsConfigFile *string
 }
 
-// LoadKeys load all keys for Loader
+// LoadKeys load all keys from the input fields provided
 func (loader *Loader) LoadKeys() (multibls.PrivateKey, error) {
 	helper, err := loader.getHelper()
 	if err != nil {
@@ -70,8 +70,8 @@ type loadHelper interface {
 // basicSingleBlsLoader loads a single bls key file with passphrase
 type basicSingleBlsLoader struct {
 	blsKeyFile        string
-	passFile          *string
 	passSrcType       PassSrcType
+	passFile          *string
 	persistPassphrase bool
 }
 

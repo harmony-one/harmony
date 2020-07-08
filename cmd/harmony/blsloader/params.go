@@ -31,6 +31,7 @@ const (
 	PassSrcAuto                      // first try to unlock with pass from file, then look for prompt
 )
 
+// String return the string presentation of PassSrcType
 func (srcType PassSrcType) String() string {
 	switch srcType {
 	case PassSrcFile:
@@ -59,8 +60,9 @@ func PassSrcTypeFromString(str string) PassSrcType {
 }
 
 // AwsConfigSrcType is the type of src to load aws config. Two options available
-//  AwsCfgSrcFile - Provide the aws config through a file (customized or shard .aws dir).
+//  AwsCfgSrcFile - Provide the aws config through a file (json).
 //  AwsCfgSrcPrompt - Provide the aws config though prompt.
+//  AwsCfgSrcShared - Use the shard aws config (env -> default .aws directory)
 type AwsCfgSrcType uint8
 
 const (
