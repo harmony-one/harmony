@@ -37,49 +37,61 @@ type kmsProviderConfig struct {
 	awsConfigFile *string
 }
 
-func (cfg kmsProviderConfig) validate() error {
-	if !cfg.awsCfgSrcType.isValid() {
+func (config kmsProviderConfig) validate() error {
+	if !config.awsCfgSrcType.isValid() {
 		return errors.New("unknown AwsCfgSrcType")
 	}
-	if cfg.awsCfgSrcType == AwsCfgSrcFile {
-		if !stringIsSet(cfg.awsConfigFile) {
+	if config.awsCfgSrcType == AwsCfgSrcFile {
+		if !stringIsSet(config.awsConfigFile) {
 			return errors.New("config field AwsConfig file must set for AwsCfgSrcFile")
 		}
-		if !isFile(*cfg.awsConfigFile) {
-			return fmt.Errorf("aws config file not exist %v", *cfg.awsConfigFile)
+		if !isFile(*config.awsConfigFile) {
+			return fmt.Errorf("aws config file not exist %v", *config.awsConfigFile)
 		}
 	}
 	return nil
 }
 
-// kmsClientProvider provides the kms client. Implemented by
-//   baseKMSProvider - abstract implementation
-//   sharedKMSProvider - provide the client with default .aws folder
-//   fileKMSProvider - provide the aws config with a json file
-//   promptKMSProvider - provide the config field from prompt with time out
-type kmsClientProvider interface {
-	// getKMSClient returns the KMSClient of the kmsClientProvider with lazy loading.
+// kmsProvider provide the aws kms client
+type kmsProvider interface {
 	getKMSClient() (*kms.KMS, error)
-
-	// toStr return the string presentation of kmsClientProvider
-	toStr() string
 }
 
-type getAwsCfgFunc func() (*AwsConfig, error)
+// lazyKmsProvider provide the kms client with singleton lazy initialization with config get
+// from awsConfigGetter for aws credential and regions loading.
+type lazyKmsProvider struct {
+	acGetter awsConfigGetter
 
-// baseKMSProvider provide the kms client with singleton initialization through
-// function getConfig for aws credential and regions loading.
-type baseKMSProvider struct {
 	client *kms.KMS
 	err    error
 	once   sync.Once
-
-	getAWSConfig getAwsCfgFunc
 }
 
-func (provider *baseKMSProvider) getKMSClient() (*kms.KMS, error) {
+// newLazyKmsProvider creates a kmsProvider with the given config
+func newLazyKmsProvider(config kmsProviderConfig) (*lazyKmsProvider, error) {
+	var acg awsConfigGetter
+	switch config.awsCfgSrcType {
+	case AwsCfgSrcFile:
+		if stringIsSet(config.awsConfigFile) {
+			acg = newFileACGetter(*config.awsConfigFile)
+		} else {
+			acg = newSharedAwsConfigGetter()
+		}
+	case AwsCfgSrcPrompt:
+		acg = newPromptACGetter(defKmsPromptTimeout)
+	case AwsCfgSrcShared:
+		acg = newSharedAwsConfigGetter()
+	default:
+		return nil, errors.New("unknown aws config source type")
+	}
+	return &lazyKmsProvider{
+		acGetter: acg,
+	}, nil
+}
+
+func (provider *lazyKmsProvider) getKMSClient() (*kms.KMS, error) {
 	provider.once.Do(func() {
-		cfg, err := provider.getAWSConfig()
+		cfg, err := provider.acGetter.getAwsConfig()
 		if err != nil {
 			provider.err = err
 			return
@@ -92,94 +104,80 @@ func (provider *baseKMSProvider) getKMSClient() (*kms.KMS, error) {
 	return provider.client, nil
 }
 
-func (provider *baseKMSProvider) toStr() string {
-	return "not implemented"
+// awsConfigGetter provides the aws config. Implemented by
+//   sharedACGetter - provide the nil to use shared AWS configuration
+//   fileACGetter   - provide the aws config with a json file
+//   promptACGetter - provide the config field from prompt with time out
+type awsConfigGetter interface {
+	getAwsConfig() (*AwsConfig, error)
+	String() string
 }
 
-// sharedKMSProvider provide the kms session with the default aws config
-// locates in directory $HOME/.aws/config
-type sharedKMSProvider struct {
-	baseKMSProvider
+// sharedACGetter returns nil for getAwsConfig to use shared aws configurations
+type sharedACGetter struct{}
+
+func newSharedAwsConfigGetter() *sharedACGetter {
+	return &sharedACGetter{}
 }
 
-func newSharedKmsProvider() *sharedKMSProvider {
-	provider := &sharedKMSProvider{baseKMSProvider{}}
-	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
-	return provider
-}
-
-// TODO(Jacky): set getAwsConfig into a function, not bind with structure
-func (provider *sharedKMSProvider) getAWSConfig() (*AwsConfig, error) {
+func (getter *sharedACGetter) getAwsConfig() (*AwsConfig, error) {
 	return nil, nil
 }
 
-func (provider *sharedKMSProvider) toStr() string {
+func (getter *sharedACGetter) String() string {
 	return "shared aws config"
 }
 
-// fileKMSProvider provide the kms session from a file with json data of structure
-// AwsConfig
-type fileKMSProvider struct {
-	baseKMSProvider
-
+// fileACGetter get aws config through a customized json file
+type fileACGetter struct {
 	file string
 }
 
-func newFileKmsProvider(file string) *fileKMSProvider {
-	provider := &fileKMSProvider{
-		baseKMSProvider: baseKMSProvider{},
-		file:            file,
-	}
-	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
-	return provider
+func newFileACGetter(file string) *fileACGetter {
+	return &fileACGetter{file}
 }
 
-func (provider *fileKMSProvider) getAWSConfig() (*AwsConfig, error) {
-	b, err := ioutil.ReadFile(provider.file)
+func (getter *fileACGetter) getAwsConfig() (*AwsConfig, error) {
+	b, err := ioutil.ReadFile(getter.file)
 	if err != nil {
 		return nil, err
 	}
-	var cfg *AwsConfig
-	if err := json.Unmarshal(b, cfg); err != nil {
+	var cfg AwsConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return &cfg, nil
 }
 
-func (provider *fileKMSProvider) toStr() string {
-	return fmt.Sprintf("file %v", provider.file)
+func (getter *fileACGetter) String() string {
+	return fmt.Sprintf("file %v", getter.file)
 }
 
-// promptKMSProvider provide a user interactive console for AWS config.
-// Three fields are asked:
+// promptACGetter provide a user interactive console for AWS config.
+// Four fields are asked:
 //    1. AccessKey  	2. SecretKey		3. Region
 // Each field is asked with a timeout mechanism.
-type promptKMSProvider struct {
-	baseKMSProvider
-
+type promptACGetter struct {
 	timeout time.Duration
 }
 
-func newPromptKmsProvider(timeout time.Duration) *promptKMSProvider {
-	provider := &promptKMSProvider{
-		baseKMSProvider: baseKMSProvider{},
-		timeout:         timeout,
+func newPromptACGetter(timeout time.Duration) *promptACGetter {
+	return &promptACGetter{
+		timeout: timeout,
 	}
-	provider.baseKMSProvider.getAWSConfig = provider.getAWSConfig
-	return provider
 }
 
-func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
+func (getter *promptACGetter) getAwsConfig() (*AwsConfig, error) {
 	console.println("Please provide AWS configurations for KMS encoded BLS keys:")
-	accessKey, err := provider.prompt("  AccessKey:")
+	accessKey, err := getter.prompt("  AccessKey:")
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws access key: %v", err)
 	}
-	secretKey, err := provider.prompt("  SecretKey:")
+	secretKey, err := getter.prompt("  SecretKey:")
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws secret key: %v", err)
 	}
-	region, err := provider.prompt("Region:")
+	region, err := getter.prompt("Region:")
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws region: %v", err)
 	}
@@ -192,17 +190,17 @@ func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
 }
 
 // prompt prompt the user to input a string for a certain field with timeout.
-func (provider *promptKMSProvider) prompt(hint string) (string, error) {
+func (getter *promptACGetter) prompt(hint string) (string, error) {
 	var (
 		res string
 		err error
 
 		finished = make(chan struct{})
-		timedOut = time.After(provider.timeout)
+		timedOut = time.After(getter.timeout)
 	)
 
 	go func() {
-		res, err = provider.threadedPrompt(hint)
+		res, err = getter.threadedPrompt(hint)
 		close(finished)
 	}()
 
@@ -216,12 +214,12 @@ func (provider *promptKMSProvider) prompt(hint string) (string, error) {
 	}
 }
 
-func (provider *promptKMSProvider) threadedPrompt(hint string) (string, error) {
+func (getter *promptACGetter) threadedPrompt(hint string) (string, error) {
 	console.print(hint)
 	return console.readPassword()
 }
 
-func (provider *promptKMSProvider) toStr() string {
+func (getter *promptACGetter) String() string {
 	return "prompt"
 }
 

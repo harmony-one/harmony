@@ -20,41 +20,13 @@ func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
 	return helper.loadKeys()
 }
 
-func getHelper(cfg Config) (loadHelper, error) {
-	switch {
-	case stringIsSet(cfg.BlsKeyFile):
-		switch filepath.Ext(*cfg.BlsKeyFile) {
-		case basicKeyExt:
-			return &basicSingleBlsLoader{
-				blsKeyFile:         *cfg.BlsKeyFile,
-				passProviderConfig: cfg.getPassProviderConfig(),
-			}, nil
-		case kmsKeyExt:
-			return &kmsSingleBlsLoader{
-				blsKeyFile:        *cfg.BlsKeyFile,
-				kmsProviderConfig: cfg.getKmsProviderConfig(),
-			}, nil
-		default:
-			return nil, errors.New("unknown extension")
-		}
-	case stringIsSet(cfg.BlsDir):
-		return &blsDirLoader{
-			dirPath:            *cfg.BlsDir,
-			passProviderConfig: cfg.getPassProviderConfig(),
-			kmsProviderConfig:  cfg.getKmsProviderConfig(),
-		}, nil
-	default:
-		return nil, errors.New("either BlsKeyFile or BlsDir must be set")
-	}
-}
-
 // Loader is the structure to load bls keys.
 type Config struct {
 	// source for bls key loading. At least one of the BlsKeyFile and BlsDir
 	// need to be provided.
 	//
 	// BlsKeyFile defines a single key file to load from. Based on the file
-	// extension, decryption with passphrase or aws kms will be used.
+	// extension, decryption with either passphrase or aws kms will be used.
 	BlsKeyFile *string
 	// BlsDir defines a file directory to load keys from.
 	BlsDir *string
@@ -132,5 +104,33 @@ func (cfg *Config) getKmsProviderConfig() kmsProviderConfig {
 	return kmsProviderConfig{
 		awsCfgSrcType: cfg.AwsCfgSrcType,
 		awsConfigFile: cfg.AwsConfigFile,
+	}
+}
+
+func getHelper(cfg Config) (loadHelper, error) {
+	switch {
+	case stringIsSet(cfg.BlsKeyFile):
+		switch filepath.Ext(*cfg.BlsKeyFile) {
+		case basicKeyExt:
+			return &basicSingleBlsLoader{
+				blsKeyFile:         *cfg.BlsKeyFile,
+				passProviderConfig: cfg.getPassProviderConfig(),
+			}, nil
+		case kmsKeyExt:
+			return &kmsSingleBlsLoader{
+				blsKeyFile:        *cfg.BlsKeyFile,
+				kmsProviderConfig: cfg.getKmsProviderConfig(),
+			}, nil
+		default:
+			return nil, errors.New("unknown extension")
+		}
+	case stringIsSet(cfg.BlsDir):
+		return &blsDirLoader{
+			dirPath:            *cfg.BlsDir,
+			passProviderConfig: cfg.getPassProviderConfig(),
+			kmsProviderConfig:  cfg.getKmsProviderConfig(),
+		}, nil
+	default:
+		return nil, errors.New("either BlsKeyFile or BlsDir must be set")
 	}
 }

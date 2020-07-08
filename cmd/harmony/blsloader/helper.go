@@ -86,20 +86,8 @@ func (loader *kmsSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
 	return multibls.GetPrivateKeys(secretKey), nil
 }
 
-func (loader *kmsSingleBlsLoader) getKmsClientProvider() (kmsClientProvider, error) {
-	switch loader.awsCfgSrcType {
-	case AwsCfgSrcFile:
-		if stringIsSet(loader.awsConfigFile) {
-			return newFileKmsProvider(*loader.awsConfigFile), nil
-		}
-		return newSharedKmsProvider(), nil
-	case AwsCfgSrcPrompt:
-		return newPromptKmsProvider(defKmsPromptTimeout), nil
-	case AwsCfgSrcShared:
-		return newSharedKmsProvider(), nil
-	default:
-		return nil, errors.New("unknown aws config source type")
-	}
+func (loader *kmsSingleBlsLoader) getKmsClientProvider() (kmsProvider, error) {
+	return newLazyKmsProvider(loader.kmsProviderConfig)
 }
 
 // blsDirLoader is the helper structure for loading bls keys in a directory
@@ -111,7 +99,7 @@ type blsDirLoader struct {
 
 	// providers in process
 	pps []passProvider
-	kcp kmsClientProvider
+	kcp kmsProvider
 	// result field
 	secretKeys []*bls_core.SecretKey
 }
@@ -159,20 +147,8 @@ func (loader *blsDirLoader) getPromptPassProvider() passProvider {
 	return provider
 }
 
-func (loader *blsDirLoader) getKmsClientProvider() (kmsClientProvider, error) {
-	switch loader.awsCfgSrcType {
-	case AwsCfgSrcFile:
-		if stringIsSet(loader.awsConfigFile) {
-			return newFileKmsProvider(*loader.awsConfigFile), nil
-		}
-		return newSharedKmsProvider(), nil
-	case AwsCfgSrcPrompt:
-		return newPromptKmsProvider(defKmsPromptTimeout), nil
-	case AwsCfgSrcShared:
-		return newSharedKmsProvider(), nil
-	default:
-		return nil, errors.New("unknown aws config source type")
-	}
+func (loader *blsDirLoader) getKmsClientProvider() (kmsProvider, error) {
+	return newLazyKmsProvider(loader.kmsProviderConfig)
 }
 
 func (loader *blsDirLoader) loadKeyFiles() (multibls.PrivateKeys, error) {
@@ -190,7 +166,7 @@ func (loader *blsDirLoader) processFileWalk(path string, info os.FileInfo, err e
 			// unexpected error, return the error and break the file walk loop
 			return err
 		}
-		// expected error. Skipping these files
+		// errors to be skipped. Skipping these files
 		skipStr := fmt.Sprintf("Skipping [%s]: %v\n", path, err)
 		console.println(skipStr)
 		return nil
