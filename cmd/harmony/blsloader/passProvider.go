@@ -25,7 +25,6 @@ type promptPassProvider struct {
 	// passphrase is also persisted into the persistDir
 	enablePersist bool
 	persistDir    string
-	mode          int
 }
 
 const pwdPromptStr = "Enter passphrase for the BLS key file %s:"
@@ -38,11 +37,10 @@ func (provider *promptPassProvider) toStr() string {
 	return "prompt"
 }
 
-func (provider *promptPassProvider) setPersist(dirPath string, mode int) *promptPassProvider {
+func (provider *promptPassProvider) setPersist(dirPath string) *promptPassProvider {
 	provider.enablePersist = true
 	os.MkdirAll(dirPath, defWritePassDirMode)
 	provider.persistDir = dirPath
-	provider.mode = mode
 
 	return provider
 }
@@ -127,7 +125,7 @@ func newDirPassProvider(dirPath string) *dirPassProvider {
 
 func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
 	baseName := filepath.Base(keyFile)
-	passKeyBase := keyFileToPassFile(baseName)
+	passKeyBase := keyFileToPassFileBase(baseName)
 	passFile := filepath.Join(provider.dirPath, passKeyBase)
 	return readPassFromFile(passFile)
 }
