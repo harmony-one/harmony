@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/pkg/errors"
 )
@@ -57,11 +58,11 @@ type CreateValidator struct {
 	ValidatorAddress   common.Address `json:"validator-address"`
 	Description        `json:"description"`
 	CommissionRates    `json:"commission"`
-	MinSelfDelegation  *big.Int             `json:"min-self-delegation"`
-	MaxTotalDelegation *big.Int             `json:"max-total-delegation"`
-	SlotPubKeys        []shard.BLSPublicKey `json:"slot-pub-keys"`
-	SlotKeySigs        []shard.BLSSignature `json:"slot-key-sigs"`
-	Amount             *big.Int             `json:"amount"`
+	MinSelfDelegation  *big.Int                  `json:"min-self-delegation"`
+	MaxTotalDelegation *big.Int                  `json:"max-total-delegation"`
+	SlotPubKeys        []bls.SerializedPublicKey `json:"slot-pub-keys"`
+	SlotKeySigs        []bls.SerializedSignature `json:"slot-key-sigs"`
+	Amount             *big.Int                  `json:"amount"`
 }
 
 // Type of CreateValidator
@@ -78,11 +79,11 @@ func (v CreateValidator) Copy() StakeMsg {
 	}
 
 	if v.SlotPubKeys != nil {
-		cp.SlotPubKeys = make([]shard.BLSPublicKey, len(v.SlotPubKeys))
+		cp.SlotPubKeys = make([]bls.SerializedPublicKey, len(v.SlotPubKeys))
 		copy(cp.SlotPubKeys, v.SlotPubKeys)
 	}
 	if v.SlotKeySigs != nil {
-		cp.SlotKeySigs = make([]shard.BLSSignature, len(v.SlotKeySigs))
+		cp.SlotKeySigs = make([]bls.SerializedSignature, len(v.SlotKeySigs))
 		copy(cp.SlotKeySigs, v.SlotKeySigs)
 	}
 	if v.MinSelfDelegation != nil {
@@ -101,13 +102,13 @@ func (v CreateValidator) Copy() StakeMsg {
 type EditValidator struct {
 	ValidatorAddress   common.Address `json:"validator-address"`
 	Description        `json:"description"`
-	CommissionRate     *numeric.Dec          `json:"commission-rate" rlp:"nil"`
-	MinSelfDelegation  *big.Int              `json:"min-self-delegation" rlp:"nil"`
-	MaxTotalDelegation *big.Int              `json:"max-total-delegation" rlp:"nil"`
-	SlotKeyToRemove    *shard.BLSPublicKey   `json:"slot-key-to_remove" rlp:"nil"`
-	SlotKeyToAdd       *shard.BLSPublicKey   `json:"slot-key-to_add" rlp:"nil"`
-	SlotKeyToAddSig    *shard.BLSSignature   `json:"slot-key-to-add-sig" rlp:"nil"`
-	EPOSStatus         effective.Eligibility `json:"epos-eligibility-status" rlp:"nil"`
+	CommissionRate     *numeric.Dec             `json:"commission-rate" rlp:"nil"`
+	MinSelfDelegation  *big.Int                 `json:"min-self-delegation" rlp:"nil"`
+	MaxTotalDelegation *big.Int                 `json:"max-total-delegation" rlp:"nil"`
+	SlotKeyToRemove    *bls.SerializedPublicKey `json:"slot-key-to_remove" rlp:"nil"`
+	SlotKeyToAdd       *bls.SerializedPublicKey `json:"slot-key-to_add" rlp:"nil"`
+	SlotKeyToAddSig    *bls.SerializedSignature `json:"slot-key-to-add-sig" rlp:"nil"`
+	EPOSStatus         effective.Eligibility    `json:"epos-eligibility-status" rlp:"nil"`
 }
 
 // Type of EditValidator

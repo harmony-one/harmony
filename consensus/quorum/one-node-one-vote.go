@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"math/big"
 
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -27,8 +29,8 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *uniformVoteWeight) AddNewVote(
-	p Phase, pubKeyBytes shard.BLSPublicKey,
-	sig *bls.Sign, headerHash common.Hash,
+	p Phase, pubKeyBytes bls.SerializedPublicKey,
+	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
 	return v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)

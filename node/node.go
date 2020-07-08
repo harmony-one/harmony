@@ -10,9 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/abool"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -685,7 +687,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 
 	for _, blskey := range node.Consensus.GetPublicKeys() {
 		blsStr := blskey.Bytes.Hex()
-		shardkey := shard.FromLibBLSPublicKeyUnsafe(blskey.Object)
+		shardkey := bls.FromLibBLSPublicKeyUnsafe(blskey.Object)
 		if shardkey == nil {
 			utils.Logger().Error().
 				Int64("epoch", epoch.Int64()).
@@ -714,7 +716,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 }
 
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
-func (node *Node) GetAddressForBLSKey(blskey *bls.PublicKey, epoch *big.Int) common.Address {
+func (node *Node) GetAddressForBLSKey(blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
 	// populate if first time setting or new epoch
 	node.keysToAddrsMutex.Lock()
 	defer node.keysToAddrsMutex.Unlock()

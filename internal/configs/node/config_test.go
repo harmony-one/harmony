@@ -3,11 +3,11 @@ package nodeconfig
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/multibls"
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/internal/blsgen"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/multibls"
 	"github.com/pkg/errors"
 )
 
@@ -72,12 +72,12 @@ func TestValidateConsensusKeysForSameShard(t *testing.T) {
 		t.Error(err)
 	}
 	keys := multibls.PublicKeys{}
-	dummyKey := shard.BLSPublicKey{}
+	dummyKey := bls.SerializedPublicKey{}
 	dummyKey.FromLibBLSPublicKey(pubKey1)
-	keys = append(keys, shard.BLSPublicKeyWrapper{Object: pubKey1, Bytes: dummyKey})
-	dummyKey = shard.BLSPublicKey{}
+	keys = append(keys, bls.PublicKeyWrapper{Object: pubKey1, Bytes: dummyKey})
+	dummyKey = bls.SerializedPublicKey{}
 	dummyKey.FromLibBLSPublicKey(pubKey2)
-	keys = append(keys, shard.BLSPublicKeyWrapper{Object: pubKey2, Bytes: dummyKey})
+	keys = append(keys, bls.PublicKeyWrapper{Object: pubKey2, Bytes: dummyKey})
 	if err := GetDefaultConfig().ValidateConsensusKeysForSameShard(keys, 0); err != nil {
 		t.Error("expected", nil, "got", err)
 	}
@@ -88,9 +88,9 @@ func TestValidateConsensusKeysForSameShard(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dummyKey = shard.BLSPublicKey{}
+	dummyKey = bls.SerializedPublicKey{}
 	dummyKey.FromLibBLSPublicKey(pubKey3)
-	keys = append(keys, shard.BLSPublicKeyWrapper{Object: pubKey3, Bytes: dummyKey})
+	keys = append(keys, bls.PublicKeyWrapper{Object: pubKey3, Bytes: dummyKey})
 	if err := GetDefaultConfig().ValidateConsensusKeysForSameShard(keys, 0); err == nil {
 		e := errors.New("bls keys do not belong to the same shard")
 		t.Error("expected", e, "got", nil)

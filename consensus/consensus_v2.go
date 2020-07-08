@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	protobuf "github.com/golang/protobuf/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
@@ -195,7 +197,7 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 	}
 	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
 	if err != nil ||
-		len(lastCommits) < shard.BLSSignatureSizeInBytes {
+		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, blockNum,
 		)
@@ -210,11 +212,11 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 		lastCommits = msgs[0].Payload
 	}
 	//#### Read payload data from committed msg
-	aggSig := make([]byte, shard.BLSSignatureSizeInBytes)
-	bitmap := make([]byte, len(lastCommits)-shard.BLSSignatureSizeInBytes)
+	aggSig := make([]byte, bls.BLSSignatureSizeInBytes)
+	bitmap := make([]byte, len(lastCommits)-bls.BLSSignatureSizeInBytes)
 	offset := 0
-	copy(aggSig[:], lastCommits[offset:offset+shard.BLSSignatureSizeInBytes])
-	offset += shard.BLSSignatureSizeInBytes
+	copy(aggSig[:], lastCommits[offset:offset+bls.BLSSignatureSizeInBytes])
+	offset += bls.BLSSignatureSizeInBytes
 	copy(bitmap[:], lastCommits[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil

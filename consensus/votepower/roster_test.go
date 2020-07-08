@@ -5,10 +5,12 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -45,9 +47,9 @@ func init() {
 func generateRandomSlot() shard.Slot {
 	addr := common.Address{}
 	addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
-	secretKey := bls.SecretKey{}
+	secretKey := bls_core.SecretKey{}
 	secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-	key := shard.BLSPublicKey{}
+	key := bls.SerializedPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 	return shard.Slot{addr, key, &stake}

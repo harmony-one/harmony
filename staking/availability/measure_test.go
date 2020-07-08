@@ -7,9 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -577,7 +578,7 @@ func newTestStateDBFromCommittee(cmt *shard.Committee) testStateDB {
 		}
 		var wrapper staking.ValidatorWrapper
 		wrapper.Address = slot.EcdsaAddress
-		wrapper.SlotPubKeys = []shard.BLSPublicKey{slot.BLSPublicKey}
+		wrapper.SlotPubKeys = []bls.SerializedPublicKey{slot.BLSPublicKey}
 		wrapper.Counters.NumBlocksSigned = new(big.Int).SetInt64(1)
 		wrapper.Counters.NumBlocksToSign = new(big.Int).SetInt64(1)
 
@@ -593,7 +594,7 @@ func (state testStateDB) snapshot() testStateDB {
 		wrapperCpy := staking.ValidatorWrapper{
 			Validator: staking.Validator{
 				Address:     addr,
-				SlotPubKeys: make([]shard.BLSPublicKey, 1),
+				SlotPubKeys: make([]bls.SerializedPublicKey, 1),
 			},
 		}
 		copy(wrapperCpy.SlotPubKeys, wrapper.SlotPubKeys)
@@ -674,7 +675,7 @@ func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 
 func makeHmySlot(seed int, shardID uint32) shard.Slot {
 	addr := common.BigToAddress(new(big.Int).SetInt64(int64(seed) + int64(shardID*1000000)))
-	var blsKey shard.BLSPublicKey
+	var blsKey bls.SerializedPublicKey
 	copy(blsKey[:], bls.RandPrivateKey().GetPublicKey().Serialize())
 
 	return shard.Slot{

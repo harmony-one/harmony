@@ -3,16 +3,16 @@ package multibls
 import (
 	"strings"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 )
 
 // PrivateKeys stores the bls secret keys that belongs to the node
-type PrivateKeys []shard.BLSPrivateKeyWrapper
+type PrivateKeys []bls.PrivateKeyWrapper
 
 // PublicKeys stores the bls public keys that belongs to the node
-type PublicKeys []shard.BLSPublicKeyWrapper
+type PublicKeys []bls.PublicKeyWrapper
 
 // SerializeToHexStr wrapper
 func (multiKey PublicKeys) SerializeToHexStr() string {
@@ -27,7 +27,7 @@ func (multiKey PublicKeys) SerializeToHexStr() string {
 }
 
 // Contains wrapper
-func (multiKey PublicKeys) Contains(pubKey *bls.PublicKey) bool {
+func (multiKey PublicKeys) Contains(pubKey *bls_core.PublicKey) bool {
 	for _, key := range multiKey {
 		if key.Object.IsEqual(pubKey) {
 			return true
@@ -38,7 +38,7 @@ func (multiKey PublicKeys) Contains(pubKey *bls.PublicKey) bool {
 
 // GetPublicKeys wrapper
 func (multiKey PrivateKeys) GetPublicKeys() PublicKeys {
-	pubKeys := make([]shard.BLSPublicKeyWrapper, len(multiKey))
+	pubKeys := make([]bls.PublicKeyWrapper, len(multiKey))
 	for i, key := range multiKey {
 		pubKeys[i] = *key.Pub
 	}
@@ -47,9 +47,9 @@ func (multiKey PrivateKeys) GetPublicKeys() PublicKeys {
 }
 
 // GetPrivateKeys creates a multibls PrivateKeys using bls.SecretKey
-func GetPrivateKeys(key *bls.SecretKey) PrivateKeys {
+func GetPrivateKeys(key *bls_core.SecretKey) PrivateKeys {
 	pub := key.GetPublicKey()
-	pubWrapper := shard.BLSPublicKeyWrapper{Object: pub}
+	pubWrapper := bls.PublicKeyWrapper{Object: pub}
 	pubWrapper.Bytes.FromLibBLSPublicKey(pub)
-	return PrivateKeys{shard.BLSPrivateKeyWrapper{Pri: key, Pub: &pubWrapper}}
+	return PrivateKeys{bls.PrivateKeyWrapper{Pri: key, Pub: &pubWrapper}}
 }

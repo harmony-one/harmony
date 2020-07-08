@@ -6,10 +6,11 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // medium.com/harmony-one/introducing-harmonys-effective-proof-of-stake-epos-2d39b4b8d58
@@ -29,7 +30,7 @@ func effectiveStake(median, actual numeric.Dec) numeric.Dec {
 // SlotPurchase ..
 type SlotPurchase struct {
 	Addr      common.Address
-	Key       shard.BLSPublicKey
+	Key       bls.SerializedPublicKey
 	RawStake  numeric.Dec
 	EPoSStake numeric.Dec
 }
@@ -51,9 +52,9 @@ func (p SlotPurchase) MarshalJSON() ([]byte, error) {
 
 // SlotOrder ..
 type SlotOrder struct {
-	Stake       *big.Int             `json:"stake"`
-	SpreadAmong []shard.BLSPublicKey `json:"keys-at-auction"`
-	Percentage  numeric.Dec          `json:"percentage-of-total-auction-stake"`
+	Stake       *big.Int                  `json:"stake"`
+	SpreadAmong []bls.SerializedPublicKey `json:"keys-at-auction"`
+	Percentage  numeric.Dec               `json:"percentage-of-total-auction-stake"`
 }
 
 // Median ..

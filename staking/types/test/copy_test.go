@@ -7,15 +7,16 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var (
-	testPub = shard.BLSPublicKey{1}
+	testPub = bls.SerializedPublicKey{1}
 )
 
 func TestCopyValidatorWrapper(t *testing.T) {
@@ -82,7 +83,7 @@ func makeNonZeroValidator() staking.Validator {
 	}
 	v := staking.Validator{
 		Address:              common.BigToAddress(common.Big0),
-		SlotPubKeys:          []shard.BLSPublicKey{testPub},
+		SlotPubKeys:          []bls.SerializedPublicKey{testPub},
 		LastEpochInCommittee: big.NewInt(20),
 		MinSelfDelegation:    common.Big1,
 		MaxTotalDelegation:   common.Big1,
@@ -96,7 +97,7 @@ func makeNonZeroValidator() staking.Validator {
 
 func makeZeroValidator() staking.Validator {
 	v := staking.Validator{
-		SlotPubKeys:          make([]shard.BLSPublicKey, 0),
+		SlotPubKeys:          make([]bls.SerializedPublicKey, 0),
 		LastEpochInCommittee: common.Big0,
 		MinSelfDelegation:    common.Big0,
 		MaxTotalDelegation:   common.Big0,

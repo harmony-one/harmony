@@ -9,10 +9,11 @@ import (
 	"sort"
 	"testing"
 
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 )
 
 const eposTestingFile = "epos.json"
@@ -57,9 +58,9 @@ func generateRandomSlots(num int) []SlotPurchase {
 	for i := 0; i < num; i++ {
 		addr := common.Address{}
 		addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
-		secretKey := bls.SecretKey{}
+		secretKey := bls_core.SecretKey{}
 		secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-		key := shard.BLSPublicKey{}
+		key := bls.SerializedPublicKey{}
 		key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 		stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 		randomSlots = append(randomSlots, SlotPurchase{addr, key, stake, stake})
@@ -99,8 +100,4 @@ func TestEffectiveStake(t *testing.T) {
 			)
 		}
 	}
-}
-
-func TestApply(t *testing.T) {
-	//
 }

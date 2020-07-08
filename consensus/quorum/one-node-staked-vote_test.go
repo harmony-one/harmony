@@ -6,10 +6,12 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -28,19 +30,19 @@ var (
 	stakeGen      = rand.New(rand.NewSource(541))
 )
 
-type secretKeyMap map[shard.BLSPublicKey]bls.SecretKey
+type secretKeyMap map[bls.SerializedPublicKey]bls_core.SecretKey
 
 func init() {
 	basicDecider = NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	shard.Schedule = shardingconfig.LocalnetSchedule
 }
 
-func generateRandomSlot() (shard.Slot, bls.SecretKey) {
+func generateRandomSlot() (shard.Slot, bls_core.SecretKey) {
 	addr := common.Address{}
 	addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
-	secretKey := bls.SecretKey{}
+	secretKey := bls_core.SecretKey{}
 	secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-	key := shard.BLSPublicKey{}
+	key := bls.SerializedPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
 	return shard.Slot{addr, key, &stake}, secretKey
@@ -52,7 +54,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	sKeys := map[string]secretKeyMap{}
 	sKeys[hmy] = secretKeyMap{}
 	sKeys[reg] = secretKeyMap{}
-	pubKeys := []*bls.PublicKey{}
+	pubKeys := []*bls_core.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
@@ -81,7 +83,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	slotList := shard.SlotList{}
 	sKeys := secretKeyMap{}
-	pubKeys := []*bls.PublicKey{}
+	pubKeys := []*bls_core.PublicKey{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()

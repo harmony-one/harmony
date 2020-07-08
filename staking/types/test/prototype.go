@@ -3,9 +3,10 @@ package staketest
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -47,7 +48,7 @@ var (
 
 	validatorPrototype = staking.Validator{
 		Address:              common.Address{},
-		SlotPubKeys:          []shard.BLSPublicKey{shard.BLSPublicKey{}},
+		SlotPubKeys:          []bls.SerializedPublicKey{bls.SerializedPublicKey{}},
 		LastEpochInCommittee: common.Big0,
 		MinSelfDelegation:    DefaultMinSelfDel,
 		MaxTotalDelegation:   DefaultMaxTotalDel,
@@ -84,11 +85,11 @@ func GetDefaultValidator() staking.Validator {
 
 // GetDefaultValidatorWithAddr return the default staking.Validator with the
 // given validator address and bls keys
-func GetDefaultValidatorWithAddr(addr common.Address, pubs []shard.BLSPublicKey) staking.Validator {
+func GetDefaultValidatorWithAddr(addr common.Address, pubs []bls.SerializedPublicKey) staking.Validator {
 	v := CopyValidator(validatorPrototype)
 	v.Address = addr
 	if pubs != nil {
-		v.SlotPubKeys = make([]shard.BLSPublicKey, len(pubs))
+		v.SlotPubKeys = make([]bls.SerializedPublicKey, len(pubs))
 		copy(v.SlotPubKeys, pubs)
 	} else {
 		v.SlotPubKeys = nil
@@ -103,11 +104,11 @@ func GetDefaultValidatorWrapper() staking.ValidatorWrapper {
 
 // GetDefaultValidatorWrapperWithAddr return the default staking.ValidatorWrapper
 // with the given validator address and bls keys.
-func GetDefaultValidatorWrapperWithAddr(addr common.Address, pubs []shard.BLSPublicKey) staking.ValidatorWrapper {
+func GetDefaultValidatorWrapperWithAddr(addr common.Address, pubs []bls.SerializedPublicKey) staking.ValidatorWrapper {
 	w := CopyValidatorWrapper(vWrapperPrototype)
 	w.Address = addr
 	if pubs != nil {
-		w.SlotPubKeys = make([]shard.BLSPublicKey, len(pubs))
+		w.SlotPubKeys = make([]bls.SerializedPublicKey, len(pubs))
 		copy(w.SlotPubKeys, pubs)
 	} else {
 		w.SlotPubKeys = nil

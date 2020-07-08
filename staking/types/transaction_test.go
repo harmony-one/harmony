@@ -6,11 +6,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	numeric "github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 )
 
 // for testing purpose
@@ -38,9 +39,9 @@ func CreateTestNewTransaction() (*StakingTransaction, error) {
 	dAddr, _ := common2.Bech32ToAddress(testAccount)
 
 	stakePayloadMaker := func() (Directive, interface{}) {
-		p := &bls.PublicKey{}
+		p := &bls_core.PublicKey{}
 		p.DeserializeHexStr(testBLSPubKey)
-		pub := shard.BLSPublicKey{}
+		pub := bls.SerializedPublicKey{}
 		pub.FromLibBLSPublicKey(p)
 
 		ra, _ := numeric.NewDecFromStr("0.7")
@@ -62,7 +63,7 @@ func CreateTestNewTransaction() (*StakingTransaction, error) {
 			MinSelfDelegation:  big.NewInt(10),
 			MaxTotalDelegation: big.NewInt(3000),
 			ValidatorAddress:   common.Address(dAddr),
-			SlotPubKeys:        []shard.BLSPublicKey{pub},
+			SlotPubKeys:        []bls.SerializedPublicKey{pub},
 			Amount:             big.NewInt(100),
 		}
 	}
@@ -86,9 +87,9 @@ func TestTransactionCopy(t *testing.T) {
 	newRate, _ := numeric.NewDecFromStr("0.5")
 	cv1.CommissionRates.Rate = newRate
 
-	p := &bls.PublicKey{}
+	p := &bls_core.PublicKey{}
 	p.DeserializeHexStr(testBLSPubKey2)
-	pub := shard.BLSPublicKey{}
+	pub := bls.SerializedPublicKey{}
 	pub.FromLibBLSPublicKey(p)
 	cv1.SlotPubKeys = append(cv1.SlotPubKeys, pub)
 

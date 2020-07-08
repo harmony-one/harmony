@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -128,7 +129,7 @@ func checkUndelegationEqual(ud1, ud2 staking.Undelegation) error {
 	return nil
 }
 
-func checkPubKeysEqual(pubs1, pubs2 []shard.BLSPublicKey) error {
+func checkPubKeysEqual(pubs1, pubs2 []bls.SerializedPublicKey) error {
 	if len(pubs1) != len(pubs2) {
 		return fmt.Errorf(".len not equal: %v / %v", len(pubs1), len(pubs2))
 	}

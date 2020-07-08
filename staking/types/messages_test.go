@@ -7,8 +7,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 )
 
@@ -260,7 +261,7 @@ func assertBigIntCopy(i1, i2 *big.Int) error {
 	return nil
 }
 
-func assertPubsCopy(s1, s2 []shard.BLSPublicKey) error {
+func assertPubsCopy(s1, s2 []bls.SerializedPublicKey) error {
 	if len(s1) != len(s2) {
 		return fmt.Errorf("size not equal")
 	}
@@ -272,7 +273,7 @@ func assertPubsCopy(s1, s2 []shard.BLSPublicKey) error {
 	return nil
 }
 
-func assertSigsCopy(s1, s2 []shard.BLSSignature) error {
+func assertSigsCopy(s1, s2 []bls.SerializedSignature) error {
 	if len(s1) != len(s2) {
 		return fmt.Errorf("size not equal")
 	}
@@ -302,8 +303,8 @@ func cpTestDataSetup() {
 		MaxRate:       zeroDec,
 		MaxChangeRate: zeroDec,
 	}
-	var zeroBLSPub shard.BLSPublicKey
-	var zeroBLSSig shard.BLSSignature
+	var zeroBLSPub bls.SerializedPublicKey
+	var zeroBLSSig bls.SerializedSignature
 
 	testCreateValidator = CreateValidator{
 		ValidatorAddress:   validatorAddr,
@@ -311,16 +312,16 @@ func cpTestDataSetup() {
 		CommissionRates:    cr,
 		MinSelfDelegation:  tenK,
 		MaxTotalDelegation: twelveK,
-		SlotPubKeys:        []shard.BLSPublicKey{blsPubSigPairs[0].pub},
-		SlotKeySigs:        []shard.BLSSignature{blsPubSigPairs[0].sig},
+		SlotPubKeys:        []bls.SerializedPublicKey{blsPubSigPairs[0].pub},
+		SlotKeySigs:        []bls.SerializedSignature{blsPubSigPairs[0].sig},
 		Amount:             twelveK,
 	}
 	zeroCreateValidator = CreateValidator{
 		CommissionRates:    zeroCr,
 		MinSelfDelegation:  common.Big0,
 		MaxTotalDelegation: common.Big0,
-		SlotPubKeys:        make([]shard.BLSPublicKey, 0),
-		SlotKeySigs:        make([]shard.BLSSignature, 0),
+		SlotPubKeys:        make([]bls.SerializedPublicKey, 0),
+		SlotKeySigs:        make([]bls.SerializedSignature, 0),
 		Amount:             common.Big0,
 	}
 
@@ -380,7 +381,7 @@ func cpTestDataSetup() {
 // 	maxRate := NewDecWithPrec(2, 2)        // 20%
 // 	maxChangeRate := NewDecWithPrec(1, 3)  // 1%
 
-// 	blsPublickey := shard.BLSPublicKey{}
+// 	blsPublickey := shard.SerializedPublicKey{}
 // 	blsPublickey.FromLibBLSPublicKey(blsPubKey)
 
 // 	msgCreateValidator := NewMsgCreateValidator(Description{
@@ -443,7 +444,7 @@ func cpTestDataSetup() {
 // func TestMsgEditValidatorRLP(t *testing.T) {
 // 	commissionRate := NewDecWithPrec(1, 2) // 10%
 
-// 	blsPublickey := shard.BLSPublicKey{}
+// 	blsPublickey := shard.SerializedPublicKey{}
 // 	blsPublickey.FromLibBLSPublicKey(blsPubKey)
 
 // 	msgEditValidator := NewMsgEditValidator(Description{

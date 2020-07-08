@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
@@ -40,7 +41,7 @@ func TestPopulateMessageFields(t *testing.T) {
 		},
 	}
 
-	keyBytes := shard.BLSPublicKey{}
+	keyBytes := bls.SerializedPublicKey{}
 	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
 	consensusMsg := consensus.populateMessageFields(msg.GetConsensus(), consensus.blockHash[:],
 		keyBytes)

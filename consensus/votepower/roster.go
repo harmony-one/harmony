@@ -6,12 +6,14 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -22,11 +24,11 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey    shard.BLSPublicKey `json:"bls-public-key"`
-	BlockHeaderHash common.Hash        `json:"block-header-hash"`
-	Signature       []byte             `json:"bls-signature"`
-	Height          uint64             `json:"block-height"`
-	ViewID          uint64             `json:"view-id"`
+	SignerPubKey    bls.SerializedPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash             `json:"block-header-hash"`
+	Signature       []byte                  `json:"bls-signature"`
+	Height          uint64                  `json:"block-height"`
+	ViewID          uint64                  `json:"view-id"`
 }
 
 // MarshalJSON ..
@@ -48,8 +50,8 @@ func (b Ballot) MarshalJSON() ([]byte, error) {
 
 // Round is a round of voting in any FBFT phase
 type Round struct {
-	AggregatedVote *bls.Sign
-	BallotBox      map[shard.BLSPublicKey]*Ballot
+	AggregatedVote *bls_core.Sign
+	BallotBox      map[bls.SerializedPublicKey]*Ballot
 }
 
 func (b Ballot) String() string {
@@ -60,18 +62,18 @@ func (b Ballot) String() string {
 // NewRound ..
 func NewRound() *Round {
 	return &Round{
-		AggregatedVote: &bls.Sign{},
-		BallotBox:      map[shard.BLSPublicKey]*Ballot{},
+		AggregatedVote: &bls_core.Sign{},
+		BallotBox:      map[bls.SerializedPublicKey]*Ballot{},
 	}
 }
 
 // PureStakedVote ..
 type PureStakedVote struct {
-	EarningAccount common.Address     `json:"earning-account"`
-	Identity       shard.BLSPublicKey `json:"bls-public-key"`
-	GroupPercent   numeric.Dec        `json:"group-percent"`
-	EffectiveStake numeric.Dec        `json:"effective-stake"`
-	RawStake       numeric.Dec        `json:"raw-stake"`
+	EarningAccount common.Address          `json:"earning-account"`
+	Identity       bls.SerializedPublicKey `json:"bls-public-key"`
+	GroupPercent   numeric.Dec             `json:"group-percent"`
+	EffectiveStake numeric.Dec             `json:"effective-stake"`
+	RawStake       numeric.Dec             `json:"raw-stake"`
 }
 
 // AccommodateHarmonyVote ..
@@ -96,7 +98,7 @@ type topLevelRegistry struct {
 
 // Roster ..
 type Roster struct {
-	Voters map[shard.BLSPublicKey]*AccommodateHarmonyVote
+	Voters map[bls.SerializedPublicKey]*AccommodateHarmonyVote
 	topLevelRegistry
 	ShardID uint32
 }
@@ -232,7 +234,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 // NewRoster ..
 func NewRoster(shardID uint32) *Roster {
-	m := map[shard.BLSPublicKey]*AccommodateHarmonyVote{}
+	m := map[bls.SerializedPublicKey]*AccommodateHarmonyVote{}
 	return &Roster{
 		Voters: m,
 		topLevelRegistry: topLevelRegistry{

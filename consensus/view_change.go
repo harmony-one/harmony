@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -84,7 +84,7 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
 }
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
-func (consensus *Consensus) GetNextLeaderKey() *shard.BLSPublicKeyWrapper {
+func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKeyWrapper {
 	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey)
 	if !wasFound {
 		consensus.getLogger().Warn().
@@ -101,9 +101,9 @@ func (consensus *Consensus) ResetViewChangeState() {
 		Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
 	consensus.m1Payload = []byte{}
-	consensus.bhpSigs = map[uint64]map[string]*bls.Sign{}
-	consensus.nilSigs = map[uint64]map[string]*bls.Sign{}
-	consensus.viewIDSigs = map[uint64]map[string]*bls.Sign{}
+	consensus.bhpSigs = map[uint64]map[string]*bls_core.Sign{}
+	consensus.nilSigs = map[uint64]map[string]*bls_core.Sign{}
+	consensus.viewIDSigs = map[uint64]map[string]*bls_core.Sign{}
 	consensus.bhpBitmap = map[uint64]*bls_cosi.Mask{}
 	consensus.nilBitmap = map[uint64]*bls_cosi.Mask{}
 	consensus.viewIDBitmap = map[uint64]*bls_cosi.Mask{}

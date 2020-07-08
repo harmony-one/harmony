@@ -13,8 +13,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/pkg/errors"
 )
@@ -28,7 +28,7 @@ type PrivKeyStore struct {
 }
 
 func init() {
-	bls.Init(bls.BLS12_381)
+	bls_core.Init(bls_core.BLS12_381)
 
 	for _, cidr := range []string{
 		"127.0.0.0/8",    // IPv4 loopback
@@ -68,7 +68,7 @@ func GetUniqueIDFromIPPort(ip, port string) uint32 {
 }
 
 // GetAddressFromBLSPubKey return the address object from bls pub key.
-func GetAddressFromBLSPubKey(pubKey *bls.PublicKey) common.Address {
+func GetAddressFromBLSPubKey(pubKey *bls_core.PublicKey) common.Address {
 	addr := common.Address{}
 	addrBytes := pubKey.GetAddress()
 	addr.SetBytes(addrBytes[:])
@@ -77,7 +77,7 @@ func GetAddressFromBLSPubKey(pubKey *bls.PublicKey) common.Address {
 
 // GetAddressFromBLSPubKeyBytes return the address object from bls pub key.
 func GetAddressFromBLSPubKeyBytes(pubKeyBytes []byte) common.Address {
-	pubKey, err := bls2.BytesToBLSPublicKey(pubKeyBytes[:])
+	pubKey, err := bls.BytesToBLSPublicKey(pubKeyBytes[:])
 	addr := common.Address{}
 	if err == nil {
 		addrBytes := pubKey.GetAddress()

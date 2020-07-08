@@ -3,14 +3,14 @@ package chain
 import (
 	"errors"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 
-	bls2 "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
-func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls.PublicKey) (*bls.Sign, *bls2.Mask, error) {
+func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls_core.PublicKey) (*bls_core.Sign, *bls.Mask, error) {
 	if len(recvPayload) < 96 {
 		return nil, nil, errors.New("payload not have enough length")
 	}
@@ -24,12 +24,12 @@ func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls.Publi
 	bitmap := payload[offset:]
 	//#### END Read payload data
 
-	aggSig := bls.Sign{}
+	aggSig := bls_core.Sign{}
 	err := aggSig.Deserialize(multiSig)
 	if err != nil {
 		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
 	}
-	mask, err := bls2.NewMask(publicKeys, nil)
+	mask, err := bls.NewMask(publicKeys, nil)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("onNewView unable to setup mask for prepared message")
 		return nil, nil, errors.New("unable to setup mask from payload")
