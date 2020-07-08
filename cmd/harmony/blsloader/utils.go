@@ -83,17 +83,6 @@ func isKMSKeyFile(info os.FileInfo) bool {
 	return true
 }
 
-// isPassphraseFile returns whether the given file is a pass file
-func isPassFile(info os.FileInfo) bool {
-	if info.IsDir() {
-		return false
-	}
-	if !strings.HasSuffix(info.Name(), passExt) {
-		return false
-	}
-	return true
-}
-
 // keyFileToPassFileBase convert a key file base name to passphrase file base name
 func keyFileToPassFileBase(keyFileBase string) string {
 	return strings.Trim(keyFileBase, basicKeyExt) + passExt
@@ -109,11 +98,7 @@ func promptGetPassword(prompt string) (string, error) {
 		prompt += ":"
 	}
 	console.print(prompt)
-	b, err := console.readPassword()
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return console.readPassword()
 }
 
 const yesNoPrompt = "[y/n]: "
