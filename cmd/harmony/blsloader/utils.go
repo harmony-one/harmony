@@ -47,7 +47,7 @@ func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.Sec
 }
 
 // loadKmsKeyFromFile loads a single KMS BLS key from file
-func loadKmsKeyFromFile(blsKeyFile string, kcp kmsClientProvider) (*bls_core.SecretKey, error) {
+func loadKmsKeyFromFile(blsKeyFile string, kcp kmsProvider) (*bls_core.SecretKey, error) {
 	if kcp == nil {
 		return nil, errNilKMSClientProvider
 	}

@@ -25,8 +25,8 @@ func (config passProviderConfig) validate() error {
 // passProvider is the interface to provide the passphrase of a bls keys.
 // Implemented by
 // 	  promptPassProvider - provide passphrase through user-interactive prompt
-//    filePassProvider - provide passphrase from a .pass file
-//    dirPassProvider - provide passphrase from .pass files in a directory
+//    filePassProvider   - provide passphrase from a .pass file
+//    dirPassProvider    - provide passphrase from .pass files in a directory
 type passProvider interface {
 	toStr() string
 	getPassphrase(keyFile string) (string, error)
