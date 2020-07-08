@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -13,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 type AwsConfig struct {
@@ -84,7 +82,7 @@ type sharedKMSProvider struct {
 	baseKMSProvider
 }
 
-func newSharedKMSProvider() *sharedKMSProvider {
+func newSharedKmsProvider() *sharedKMSProvider {
 	return &sharedKMSProvider{
 		baseKMSProvider{},
 	}
@@ -106,7 +104,7 @@ type fileKMSProvider struct {
 	file string
 }
 
-func newFileKMSProvider(file string) *fileKMSProvider {
+func newFileKmsProvider(file string) *fileKMSProvider {
 	return &fileKMSProvider{
 		baseKMSProvider: baseKMSProvider{},
 		file:            file,
@@ -139,7 +137,7 @@ type promptKMSProvider struct {
 	timeout time.Duration
 }
 
-func newPromptKMSProvider(timeout time.Duration) *promptKMSProvider {
+func newPromptKmsProvider(timeout time.Duration) *promptKMSProvider {
 	return &promptKMSProvider{
 		baseKMSProvider: baseKMSProvider{},
 		timeout:         timeout,
@@ -147,7 +145,7 @@ func newPromptKMSProvider(timeout time.Duration) *promptKMSProvider {
 }
 
 func (provider *promptKMSProvider) getAWSConfig() (*AwsConfig, error) {
-	fmt.Println("Please provide AWS configurations for KMS encoded BLS keys:")
+	console.println("Please provide AWS configurations for KMS encoded BLS keys:")
 	accessKey, err := provider.prompt("  AccessKey:")
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws access key: %v", err)
@@ -194,12 +192,8 @@ func (provider *promptKMSProvider) prompt(hint string) (string, error) {
 }
 
 func (provider *promptKMSProvider) threadedPrompt(hint string) (string, error) {
-	fmt.Print(hint)
-	b, err := terminal.ReadPassword(syscall.Stdin)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	console.print(hint)
+	return console.readPassword()
 }
 
 func (provider *promptKMSProvider) toStr() string {
