@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // passProviderConfig is the data structure of passProviders config
@@ -120,7 +121,7 @@ func readPassFromFile(file string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return strings.TrimSpace(string(b)), nil
 }
 
 // dirPassProvider provide the all bls password available in the directory.

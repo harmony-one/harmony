@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -27,12 +28,16 @@ func (console *stdConsole) readPassword() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return strings.TrimSpace(string(b)), nil
 }
 
 func (console *stdConsole) readln() (string, error) {
 	reader := bufio.NewReader(os.Stdin)
-	return reader.ReadString('\n')
+	raw, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
 }
 
 func (console *stdConsole) print(a ...interface{}) {
