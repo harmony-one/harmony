@@ -26,12 +26,15 @@ type basicSingleBlsLoader struct {
 func (loader *basicSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
 	providers, err := loader.getPassProviders()
 	if err != nil {
+		fmt.Println("not loaded 1")
 		return multibls.PrivateKeys{}, err
 	}
 	secretKey, err := loadBasicKey(loader.blsKeyFile, providers)
 	if err != nil {
+		fmt.Println("not loaded 2")
 		return multibls.PrivateKeys{}, err
 	}
+	fmt.Println("loaded secret key")
 	return multibls.GetPrivateKeys(secretKey), nil
 }
 

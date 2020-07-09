@@ -9,8 +9,10 @@ import (
 )
 
 func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
+	fmt.Println("start")
 	cfg.applyDefault()
 	if err := cfg.validate(); err != nil {
+		fmt.Println("validate")
 		return multibls.PrivateKeys{}, err
 	}
 	helper, err := getHelper(cfg)
@@ -108,15 +110,18 @@ func (cfg *Config) getKmsProviderConfig() kmsProviderConfig {
 }
 
 func getHelper(cfg Config) (loadHelper, error) {
+	fmt.Println("getting helper")
 	switch {
 	case stringIsSet(cfg.BlsKeyFile):
 		switch filepath.Ext(*cfg.BlsKeyFile) {
 		case basicKeyExt:
+			fmt.Println("basic")
 			return &basicSingleBlsLoader{
 				blsKeyFile:         *cfg.BlsKeyFile,
 				passProviderConfig: cfg.getPassProviderConfig(),
 			}, nil
 		case kmsKeyExt:
+			fmt.Println("kms")
 			return &kmsSingleBlsLoader{
 				blsKeyFile:        *cfg.BlsKeyFile,
 				kmsProviderConfig: cfg.getKmsProviderConfig(),

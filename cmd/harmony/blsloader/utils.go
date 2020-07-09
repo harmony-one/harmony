@@ -28,6 +28,7 @@ func loadBasicKey(blsKeyFile string, pps []passProvider) (*bls_core.SecretKey, e
 		secretKey, err := loadBasicKeyWithProvider(blsKeyFile, pp)
 		if err != nil {
 			console.println(err)
+			return nil, err
 		}
 		return secretKey, nil
 	}
@@ -39,6 +40,7 @@ func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.Sec
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get passphrase from %s", pp.toStr())
 	}
+	fmt.Printf("password: %s\n", pass)
 	secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to decrypt bls key with %s\n", pp.toStr())
