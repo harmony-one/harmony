@@ -89,15 +89,72 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 		expErr     error
 	}{
 		{
-			// load the default pass file
+			// load the default pass file with file
 			cfg: Config{
 				BlsKeyFile:  &validTestKeys[0].path,
 				PassSrcType: PassSrcFile,
 			},
 			inputs: []string{},
 
-			expOutputs: []string{},
+			expOutputs: []string{
+				fmt.Sprintf("loaded bls key %s\n", validTestKeys[0].publicKey),
+			},
 			expPubKeys: []string{validTestKeys[0].publicKey},
+		},
+		{
+			// load the default pass file with file
+			cfg: Config{
+				BlsKeyFile:  &validTestKeys[1].path,
+				PassSrcType: PassSrcFile,
+			},
+			inputs: []string{},
+
+			expOutputs: []string{
+				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
+			},
+			expPubKeys: []string{validTestKeys[1].publicKey},
+		},
+		{
+			// load key file with prompt
+			cfg: Config{
+				BlsKeyFile:  &validTestKeys[1].path,
+				PassSrcType: PassSrcPrompt,
+			},
+			inputs: []string{validTestKeys[1].passphrase},
+
+			expOutputs: []string{
+				fmt.Sprintf("Enter passphrase for the BLS key file %s:", validTestKeys[1].path),
+				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
+			},
+			expPubKeys: []string{validTestKeys[1].publicKey},
+		},
+		{
+			// Automatically use pass file
+			cfg: Config{
+				BlsKeyFile:  &validTestKeys[1].path,
+				PassSrcType: PassSrcAuto,
+			},
+			inputs: []string{},
+
+			expOutputs: []string{
+				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
+			},
+			expPubKeys: []string{validTestKeys[1].publicKey},
+		},
+		{
+			// Automatically use prompt
+			cfg: Config{
+				BlsKeyFile:  &emptyPassTestKeys[1].path,
+				PassSrcType: PassSrcAuto,
+			},
+			inputs: []string{emptyPassTestKeys[1].passphrase},
+
+			expOutputs: []string{
+				"unable to get passphrase from passphrase file testData/blskey_emptypass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass: cannot open passphrase file\n",
+				fmt.Sprintf("Enter passphrase for the BLS key file %s:", emptyPassTestKeys[1].path),
+				fmt.Sprintf("loaded bls key %s\n", emptyPassTestKeys[1].publicKey),
+			},
+			expPubKeys: []string{emptyPassTestKeys[1].publicKey},
 		},
 	}
 	for i, test := range tests {
@@ -174,6 +231,8 @@ func (ts *testSuite) checkResult() error {
 		return err
 	default:
 	}
+	fmt.Println("got outputs:", ts.gotOutputs)
+	fmt.Println("expect outputs:", ts.expOutputs)
 	if isClean, msg := ts.console.checkClean(); !isClean {
 		return fmt.Errorf("console not clean: %v", msg)
 	}
@@ -181,6 +240,9 @@ func (ts *testSuite) checkResult() error {
 		return nil
 	}
 	if err := ts.checkKeys(); err != nil {
+		return err
+	}
+	if err := ts.checkOutputs(); err != nil {
 		return err
 	}
 	return nil
