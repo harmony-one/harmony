@@ -28,7 +28,7 @@ func loadBasicKey(blsKeyFile string, pps []passProvider) (*bls_core.SecretKey, e
 		secretKey, err := loadBasicKeyWithProvider(blsKeyFile, pp)
 		if err != nil {
 			console.println(err)
-			return nil, err
+			continue
 		}
 		return secretKey, nil
 	}
@@ -108,7 +108,9 @@ func promptGetPassword(prompt string) (string, error) {
 	if !strings.HasSuffix(prompt, ":") {
 		prompt += ":"
 	}
+	fmt.Println("before print prompt", prompt)
 	console.print(prompt)
+	fmt.Println("after print prompt", prompt)
 	return console.readPassword()
 }
 

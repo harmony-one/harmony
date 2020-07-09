@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/multibls"
 )
@@ -24,17 +26,20 @@ type basicSingleBlsLoader struct {
 
 // loadKeys load bls keys from a single bls file
 func (loader *basicSingleBlsLoader) loadKeys() (multibls.PrivateKeys, error) {
+	fmt.Println("load keys")
 	providers, err := loader.getPassProviders()
 	if err != nil {
 		fmt.Println("not loaded 1")
 		return multibls.PrivateKeys{}, err
 	}
+	fmt.Println("provider got")
 	secretKey, err := loadBasicKey(loader.blsKeyFile, providers)
 	if err != nil {
 		fmt.Println("not loaded 2")
 		return multibls.PrivateKeys{}, err
 	}
 	fmt.Println("loaded secret key")
+	console.printf("loaded bls key %x\n", bls.WrapperFromPrivateKey(secretKey).Pub.Bytes)
 	return multibls.GetPrivateKeys(secretKey), nil
 }
 
