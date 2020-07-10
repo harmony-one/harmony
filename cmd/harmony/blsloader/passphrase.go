@@ -12,7 +12,8 @@ import (
 )
 
 // PassSrcType is the type of passphrase provider source.
-// Three options available:
+// Four options available:
+//  PassSrcNil    - Do not use passphrase decryption
 //  PassSrcFile   - Read the passphrase from files
 //  PassSrcPrompt - Read the passphrase from prompt
 //  PassSrcAuto   - First try to unlock with passphrase from file, then read passphrase from prompt
@@ -51,7 +52,7 @@ type passDecrypter struct {
 
 func newPassDecrypter(cfg passDecrypterConfig) (*passDecrypter, error) {
 	pd := &passDecrypter{config: cfg}
-	if err := pd.validate(); err != nil {
+	if err := pd.validateConfig(); err != nil {
 		return nil, err
 	}
 	pd.makePassProviders()
@@ -62,13 +63,13 @@ func (pd *passDecrypter) extension() string {
 	return basicKeyExt
 }
 
-func (pd *passDecrypter) validate() error {
+func (pd *passDecrypter) validateConfig() error {
 	config := pd.config
 	if !config.passSrcType.isValid() {
 		return errors.New("unknown PassSrcType")
 	}
 	if stringIsSet(config.passFile) {
-		if err := isPassFile(*config.passFile); err != nil {
+		if err := checkIsPassFile(*config.passFile); err != nil {
 			return fmt.Errorf("%v not a passphrase file: %v", *config.passFile, err)
 		}
 	}
@@ -102,7 +103,7 @@ func (pd *passDecrypter) getFilePassProvider() passProvider {
 	}
 }
 
-func (pd *passDecrypter) decrypt(keyFile string) (*bls_core.SecretKey, error) {
+func (pd *passDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
 	for _, pp := range pd.pps {
 		secretKey, err := loadBasicKeyWithProvider(keyFile, pp)
 		if err != nil {
