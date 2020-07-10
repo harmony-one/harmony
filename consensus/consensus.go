@@ -172,8 +172,6 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
-// TODO: put shardId into chain reader's chain config
-
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,

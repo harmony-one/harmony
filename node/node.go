@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/api/client"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
@@ -83,7 +82,6 @@ type Node struct {
 	pendingCXMutex        sync.Mutex
 	// Shard databases
 	shardChains shardchain.Collection
-	Client      *client.Client // The presence of a client object means this node will also act as a client
 	SelfPeer    p2p.Peer
 	// TODO: Neighbors should store only neighbor nodes in the same shard
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
@@ -479,14 +477,6 @@ func New(
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
-
-		// Add Faucet contract to all shards, so that on testnet, we can demo wallet in explorer
-		if networkType != nodeconfig.Mainnet {
-			if node.isFirstTime {
-				// Setup one time smart contracts
-				node.AddFaucetContractToPendingTransactions()
-			}
-		}
 	}
 
 	utils.Logger().Info().

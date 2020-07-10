@@ -70,10 +70,6 @@ type ChainReader interface {
 // Engine is an algorithm agnostic consensus engine.
 // Note this engine interface is still in process of being integrated with the BFT consensus.
 type Engine interface {
-	// Author retrieves the Harmony address of the account that validated the given
-	// block.
-	Author(header *block.Header) (common.Address, error)
-
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
@@ -104,10 +100,6 @@ type Engine interface {
 	// VerifyShardState verifies the shard state during epoch transition is valid
 	VerifyShardState(chain ChainReader, beacon ChainReader, header *block.Header) error
 
-	// Prepare initializes the consensus fields of a block header according to the
-	// rules of a particular engine. The changes are executed inline.
-	Prepare(chain ChainReader, header *block.Header) error
-
 	// Beaconchain provides the handle for Beaconchain
 	Beaconchain() ChainReader
 
@@ -125,17 +117,4 @@ type Engine interface {
 		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
 		doubleSigners slash.Records,
 	) (*types.Block, reward.Reader, error)
-
-	// Seal generates a new sealing request for the given input block and pushes
-	// the result into the given channel.
-	//
-	// Note, the method returns immediately and will send the result async. More
-	// than one result may also be returned depending on the consensus algorithm.
-	Seal(
-		chain ChainReader, block *types.Block,
-		results chan<- *types.Block, stop <-chan struct{},
-	) error
-
-	// SealHash returns the hash of a block prior to it being sealed.
-	SealHash(header *block.Header) common.Hash
 }

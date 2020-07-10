@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -22,6 +23,8 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
+
+	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/harmony/numeric"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
@@ -139,6 +142,110 @@ func main() {
 	statedb.AddReward(validator, big.NewInt(1000), shares)
 	endTime = time.Now()
 	fmt.Printf("Time required to reward a validator with %d delegations: %f seconds\n", len(validator.Delegations), endTime.Sub(startTime).Seconds())
+
+	message := &msg_pb.Message{
+		ServiceType: msg_pb.ServiceType_CONSENSUS,
+		Type:        msg_pb.MessageType_PREPARE,
+		Request: &msg_pb.Message_Consensus{
+			Consensus: &msg_pb.ConsensusRequest{},
+		},
+	}
+
+	blsPriKey := bls.RandPrivateKey()
+	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
+	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
+
+	request := message.GetConsensus()
+	request.ViewId = 5
+	request.BlockNum = 5
+	request.ShardId = 1
+	// 32 byte block hash
+	request.BlockHash = []byte("stasdlkfjsadlkjfkdsljflksadjf")
+	// sender address
+	request.SenderPubkey = pubKeyWrapper.Bytes[:]
+
+	message.Signature = nil
+	// TODO: use custom serialization method rather than protobuf
+	marshaledMessage, err := protobuf.Marshal(message)
+	// 64 byte of signature on previous data
+	hash1 := hash.Keccak256(marshaledMessage)
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		blsPriKey.SignHash(hash1[:])
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to sign: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	sig := blsPriKey.SignHash(hash1[:])
+	message.Signature = sig.Serialize()
+	marshaledMessage2, _ := protobuf.Marshal(message)
+
+	message = &msg_pb.Message{}
+	if err := protobuf.Unmarshal(marshaledMessage2, message); err != nil {
+		return
+	}
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		if err := protobuf.Unmarshal(marshaledMessage2, message); err != nil {
+			return
+		}
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to unmarshall: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	signature := message.Signature
+	message.Signature = nil
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		protobuf.Marshal(message)
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to marshal: %f seconds\n", endTime.Sub(startTime).Seconds())
+	messageBytes, err := protobuf.Marshal(message)
+	msgSig := bls_core.Sign{}
+	err = msgSig.Deserialize(signature)
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		msgSig.Deserialize(signature)
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to deserialize sig: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	msgHash := hash.Keccak256(messageBytes)
+	if !msgSig.VerifyHash(pubKeyWrapper.Object, msgHash[:]) {
+		return
+	}
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		hash.Keccak256(messageBytes)
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to hash message: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	startTime = time.Now()
+	for i := 0; i < 1000; i++ {
+		msgSig.VerifyHash(pubKeyWrapper.Object, msgHash[:])
+	}
+	endTime = time.Now()
+	fmt.Printf("Time required to verify sig: %f seconds\n", endTime.Sub(startTime).Seconds())
+
+	message.Signature = signature
+
+	// A example result of a single run:
+	//
+	//Time required to calc percentage 100001 delegations: 0.058205 seconds
+	//Time required to reward a validator with 100001 delegations: 0.015543 seconds
+	//Time required to sign: 0.479827 seconds
+	//Time required to unmarshall: 0.000662 seconds
+	//Time required to marshal: 0.000453 seconds
+	//Time required to deserialize sig: 0.517965 seconds
+	//Time required to hash message: 0.001191 seconds
+	//Time required to verify sig: 1.444604 seconds
 }
 
 func lookupDelegatorShares(

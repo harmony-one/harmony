@@ -324,7 +324,6 @@ func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKeys) error {
 		if err != nil {
 			return err
 		}
-		// TODO: assumes order between public/private key pairs
 
 		*consensusMultiBLSPriKey = append(*consensusMultiBLSPriKey, multibls.GetPrivateKeys(consensusPriKey)...)
 	}
@@ -421,7 +420,6 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
-	// TODO(minhdoan): During refactoring, found out that the peers list is actually empty. Need to clean up the logic of consensus later.
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(*shardID))
 
 	currentConsensus, err := consensus.New(

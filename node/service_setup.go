@@ -6,7 +6,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
-	"github.com/harmony-one/harmony/api/service/clientsupport"
 	"github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/api/service/networkinfo"
@@ -33,16 +32,6 @@ func (node *Node) setupForValidator() {
 		service.BlockProposal,
 		blockproposal.New(node.Consensus.ReadySignal, node.WaitForConsensusReadyV2),
 	)
-
-	if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
-		// Register client support service.
-		node.serviceManager.RegisterService(
-			service.ClientSupport,
-			clientsupport.New(
-				node.Blockchain().State, node.CallFaucetContract, node.SelfPeer.IP, node.SelfPeer.Port,
-			),
-		)
-	}
 }
 
 func (node *Node) setupForExplorerNode() {

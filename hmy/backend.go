@@ -41,8 +41,6 @@ type NodeAPI interface {
 	AddPendingTransaction(newTx *types.Transaction) error
 	Blockchain() *core.BlockChain
 	Beaconchain() *core.BlockChain
-	GetBalanceOfAddress(address common.Address) (*big.Int, error)
-	GetNonceOfAddress(address common.Address) uint64
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
