@@ -20,29 +20,6 @@ const (
 	defWritePassFileMode = 0600
 )
 
-// PassSrcType is the type of passphrase provider source.
-// Three options available:
-//  PassSrcFile - Read the passphrase from file
-//  PassSrcPrompt - Read the passphrase from prompt
-//  PassSrcPrompt - First try to unlock with passphrase from file, then read passphrase from prompt
-type PassSrcType uint8
-
-const (
-	PassSrcNil    PassSrcType = iota // place holder for nil src
-	PassSrcAuto                      // first try to unlock with pass from file, then look for prompt
-	PassSrcFile                      // provide the passphrase through a pass file
-	PassSrcPrompt                    // provide the passphrase through prompt
-)
-
-func (srcType PassSrcType) isValid() bool {
-	switch srcType {
-	case PassSrcAuto, PassSrcFile, PassSrcPrompt:
-		return true
-	default:
-		return false
-	}
-}
-
 // AwsConfigSrcType is the type of src to load aws config. Two options available
 //  AwsCfgSrcFile - Provide the aws config through a file (json).
 //  AwsCfgSrcPrompt - Provide the aws config though prompt.

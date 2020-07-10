@@ -4,7 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/pkg/errors"
 
@@ -14,6 +19,7 @@ import (
 
 var (
 	errUnknownExtension     = errors.New("unknown extension")
+	errUnableGetPubkey      = errors.New("unable to get public key")
 	errNilPassProvider      = errors.New("no source for password")
 	errNilKMSClientProvider = errors.New("no source for KMS provider")
 )
@@ -88,12 +94,39 @@ func isBasicKeyFile(path string) bool {
 	return filepath.Ext(path) == basicKeyExt
 }
 
+func isPassFile(path string) bool {
+	exist := isFile(path)
+	if !exist {
+		return false
+	}
+	return filepath.Ext(path) == passExt
+}
+
 func isKMSKeyFile(path string) bool {
 	exist := isFile(path)
 	if !exist {
 		return false
 	}
 	return filepath.Ext(path) == kmsKeyExt
+}
+
+var regexFmt = `^[\da-f]{96}%s$`
+
+func getPubKeyFromFilePath(path string, ext string) (bls.SerializedPublicKey, error) {
+	baseName := filepath.Base(path)
+	re, err := regexp.Compile(fmt.Sprintf(regexFmt, ext))
+	if err != nil {
+		return bls.SerializedPublicKey{}, err
+	}
+	res := re.FindAllStringSubmatch(baseName, 1)
+	if len(res) == 0 {
+		return bls.SerializedPublicKey{}, errUnableGetPubkey
+	}
+
+	b := common.Hex2Bytes(res[0][1])
+	var pubKey bls.SerializedPublicKey
+	copy(pubKey[:], b)
+	return pubKey, nil
 }
 
 func keyFileToPassFileBase(keyFileBase string) string {

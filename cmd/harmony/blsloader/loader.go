@@ -9,10 +9,8 @@ import (
 )
 
 func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
-	fmt.Println("start")
 	cfg.applyDefault()
 	if err := cfg.validate(); err != nil {
-		fmt.Println("validate")
 		return multibls.PrivateKeys{}, err
 	}
 	helper, err := getHelper(cfg)
@@ -94,8 +92,8 @@ func (cfg *Config) validate() error {
 	return cfg.getKmsProviderConfig().validate()
 }
 
-func (cfg *Config) getPassProviderConfig() passProviderConfig {
-	return passProviderConfig{
+func (cfg *Config) getPassProviderConfig() passDecrypterConfig {
+	return passDecrypterConfig{
 		passSrcType:       cfg.PassSrcType,
 		passFile:          cfg.PassFile,
 		persistPassphrase: cfg.PersistPassphrase,
@@ -117,8 +115,8 @@ func getHelper(cfg Config) (loadHelper, error) {
 		case basicKeyExt:
 			fmt.Println("basic")
 			return &basicSingleBlsLoader{
-				blsKeyFile:         *cfg.BlsKeyFile,
-				passProviderConfig: cfg.getPassProviderConfig(),
+				blsKeyFile:          *cfg.BlsKeyFile,
+				passDecrypterConfig: cfg.getPassProviderConfig(),
 			}, nil
 		case kmsKeyExt:
 			fmt.Println("kms")
@@ -131,9 +129,9 @@ func getHelper(cfg Config) (loadHelper, error) {
 		}
 	case stringIsSet(cfg.BlsDir):
 		return &blsDirLoader{
-			dirPath:            *cfg.BlsDir,
-			passProviderConfig: cfg.getPassProviderConfig(),
-			kmsProviderConfig:  cfg.getKmsProviderConfig(),
+			dirPath:             *cfg.BlsDir,
+			passDecrypterConfig: cfg.getPassProviderConfig(),
+			kmsProviderConfig:   cfg.getKmsProviderConfig(),
 		}, nil
 	default:
 		return nil, errors.New("either BlsKeyFile or BlsDir must be set")
