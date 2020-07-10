@@ -4,12 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-
-	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/pkg/errors"
 
@@ -70,67 +65,59 @@ func loadKmsKeyFromFile(blsKeyFile string, kcp kmsProvider) (*bls_core.SecretKey
 	return secretKey, nil
 }
 
-func isFile(path string) bool {
+func isFile(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return false
+		return err
 	}
-	return !info.IsDir()
+	if info.IsDir() {
+		return errors.New("is directory")
+	}
+	return nil
 }
 
-func isDir(path string) bool {
+func isDir(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		return false
+		return err
 	}
-	return info.IsDir()
+	if info.IsDir() {
+		return errors.New("is a file")
+	}
+	return nil
 }
 
-func isBasicKeyFile(path string) bool {
-	exist := isFile(path)
-	if !exist {
-		return false
-	}
-	return filepath.Ext(path) == basicKeyExt
-}
-
-func isPassFile(path string) bool {
-	exist := isFile(path)
-	if !exist {
-		return false
-	}
-	return filepath.Ext(path) == passExt
-}
-
-func isKMSKeyFile(path string) bool {
-	exist := isFile(path)
-	if !exist {
-		return false
-	}
-	return filepath.Ext(path) == kmsKeyExt
-}
-
-var regexFmt = `^[\da-f]{96}%s$`
-
-func getPubKeyFromFilePath(path string, ext string) (bls.SerializedPublicKey, error) {
-	baseName := filepath.Base(path)
-	re, err := regexp.Compile(fmt.Sprintf(regexFmt, ext))
+func isBasicKeyFile(path string) error {
+	err := isFile(path)
 	if err != nil {
-		return bls.SerializedPublicKey{}, err
+		return err
 	}
-	res := re.FindAllStringSubmatch(baseName, 1)
-	if len(res) == 0 {
-		return bls.SerializedPublicKey{}, errUnableGetPubkey
+	if filepath.Ext(path) != basicKeyExt {
+		return errors.New("should have extension .key")
 	}
-
-	b := common.Hex2Bytes(res[0][1])
-	var pubKey bls.SerializedPublicKey
-	copy(pubKey[:], b)
-	return pubKey, nil
+	return nil
 }
 
-func keyFileToPassFileBase(keyFileBase string) string {
-	return strings.Trim(keyFileBase, basicKeyExt) + passExt
+func isPassFile(path string) error {
+	err := isFile(path)
+	if err != nil {
+		return err
+	}
+	if filepath.Ext(path) != passExt {
+		return errors.New("should have extension .pass")
+	}
+	return nil
+}
+
+func isKMSKeyFile(path string) error {
+	err := isFile(path)
+	if err != nil {
+		return err
+	}
+	if filepath.Ext(path) != kmsKeyExt {
+		return errors.New("should have extension .bls")
+	}
+	return nil
 }
 
 func keyFileToPassFileFull(keyFile string) string {
