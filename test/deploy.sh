@@ -81,7 +81,7 @@ function launch_localnet(){
         i=$((i+1))
 
         # Read config for i-th node form config file
-        IFS=' ' read ip port mode bls_key account <<< $line
+        IFS=' ' read ip port mode bls_key account <<< ${line}
             args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "${ROOT}/db-${ip}-${port}" -broadcast_invalid_tx=true)
         if [[ -z "$ip" || -z "$port" ]]; then
             echo "skip empty node"
@@ -102,14 +102,17 @@ function launch_localnet(){
 
         # Setup flags for i-th node based on config
         case "${mode}" in
-        explorer*)
+        explorer)
             args=("${args[@]}" -node_type=explorer -shard_id=0)
             ;;
-        *archival|archival)
+        archival|archival)
             args=("${args[@]}" -is_archival)
             ;;
-        leader*)
+        leader)
             args=("${args[@]}" -is_leader)
+            ;;
+        external)
+            args=("${args[@]}" -staking=true)
             ;;
         client)
             continue
@@ -143,7 +146,6 @@ This script will build all the binaries and start harmony and based on the confi
 EXAMPLES:
 
    $ME local_config.txt
-   $ME -p local_config.txt
 "
    exit 0
 }

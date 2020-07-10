@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 ./test/kill_node.sh
 rm -rf tmp_log*
 rm *.rlp
