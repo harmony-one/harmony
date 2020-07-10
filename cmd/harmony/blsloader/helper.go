@@ -183,21 +183,21 @@ func (loader *blsDirLoader) skippingErrors() []error {
 	}
 }
 
-func (loader *blsDirLoader) loadKeyFromFile(path string) (*bls_core.SecretKey, error) {
-	var (
-		key *bls_core.SecretKey
-		err error
-	)
-	switch {
-	case isBasicKeyFile(path):
-		key, err = loadBasicKey(path, loader.pps)
-	case isKMSKeyFile(path):
-		key, err = loadKmsKeyFromFile(path, loader.kcp)
-	default:
-		err = errUnknownExtension
-	}
-	return key, err
-}
+//func (loader *blsDirLoader) loadKeyFromFile(path string) (*bls_core.SecretKey, error) {
+//	var (
+//		key *bls_core.SecretKey
+//		err error
+//	)
+//	switch {
+//	case isBasicKeyFile(path):
+//		key, err = loadBasicKey(path, loader.pps)
+//	case isKMSKeyFile(path):
+//		key, err = loadKmsKeyFromFile(path, loader.kcp)
+//	default:
+//		err = errUnknownExtension
+//	}
+//	return key, err
+//}
 
 // errIsErrors return whether the err is one of the errs
 func errIsErrors(err error, errs []error) bool {

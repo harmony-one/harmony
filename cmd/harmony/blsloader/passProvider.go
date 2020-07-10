@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 )
 
@@ -36,79 +34,84 @@ func (srcType PassSrcType) isValid() bool {
 	}
 }
 
-type passDecrypter struct {
-	pps []passProvider
-}
-
-func newPassDecrypter(cfg passDecrypterConfig) *passDecrypter {
-	pps := cfg.makePassProviders()
-	return &passDecrypter{pps}
-}
-
-func (pd *passDecrypter) decrypt(keyFile string) (*bls_core.SecretKey, error) {
-	for _, pp := range pd.pps {
-
-	}
-}
-
-func (pd *passDecrypter) checkDecryptResult(keyFile string, got *bls_core.SecretKey) error {
-	expPubKey, err := getPubKeyFromFilePath(keyFile, passExt)
-	if err != nil {
-		if err == errUnableGetPubkey {
-			// file name not bls pub key + .pass
-			return nil
-		}
-		return err
-	}
-	gotPubKey := *bls.FromLibBLSPublicKeyUnsafe(got.GetPublicKey())
-	if expPubKey != gotPubKey {
-		return errors.New("public key unexpected")
-	}
-	return nil
-}
-
 // passDecrypterConfig is the data structure of passProviders config
 type passDecrypterConfig struct {
 	passSrcType       PassSrcType
 	passFile          *string
-	passDir           *string
 	persistPassphrase bool
 }
 
-func (config passDecrypterConfig) validate() error {
+// passDecrypter decrypt the .key bls files with passphrase from a series
+// of passProvider as passphrase source
+type passDecrypter struct {
+	config passDecrypterConfig
+
+	pps []passProvider
+}
+
+func newPassDecrypter(cfg passDecrypterConfig) (*passDecrypter, error) {
+	pd := &passDecrypter{config: cfg}
+	if err := pd.validate(); err != nil {
+		return nil, err
+	}
+	pd.makePassProviders()
+	return pd, nil
+}
+
+func (pd *passDecrypter) extension() string {
+	return basicKeyExt
+}
+
+func (pd *passDecrypter) validate() error {
+	config := pd.config
 	if !config.passSrcType.isValid() {
 		return errors.New("unknown PassSrcType")
+	}
+	if stringIsSet(config.passFile) {
+		if err := isPassFile(*config.passFile); err != nil {
+			return fmt.Errorf("%v not a passphrase file: %v", *config.passFile, err)
+		}
 	}
 	return nil
 }
 
-func (config passDecrypterConfig) makePassProviders() []passProvider {
-	switch config.passSrcType {
+func (pd *passDecrypter) makePassProviders() {
+	switch pd.config.passSrcType {
 	case PassSrcFile:
-		return []passProvider{config.getFilePassProvider()}
+		pd.pps = []passProvider{pd.getFilePassProvider()}
 	case PassSrcPrompt:
-		return []passProvider{config.getPromptPassProvider()}
+		pd.pps = []passProvider{pd.getPromptPassProvider()}
 	case PassSrcAuto:
-		return []passProvider{
-			config.getFilePassProvider(),
-			config.getPromptPassProvider(),
+		pd.pps = []passProvider{
+			pd.getFilePassProvider(),
+			pd.getPromptPassProvider(),
 		}
 	}
 }
 
-func (config passDecrypterConfig) getFilePassProvider() passProvider {
+func (pd *passDecrypter) getPromptPassProvider() passProvider {
+	return newPromptPassProvider(pd.config.persistPassphrase)
+}
+
+func (pd *passDecrypter) getFilePassProvider() passProvider {
 	switch {
-	case stringIsSet(config.passFile):
-		return newStaticPassProvider(*config.passFile)
-	case stringIsSet(config.passDir):
-		return newDirPassProvider(*config.passDir)
+	case stringIsSet(pd.config.passFile):
+		return newStaticPassProvider(*pd.config.passFile)
 	default:
 		return newDynamicPassProvider()
 	}
 }
 
-func (config passDecrypterConfig) getPromptPassProvider() passProvider {
-	return newPromptPassProvider(config.persistPassphrase)
+func (pd *passDecrypter) decrypt(keyFile string) (*bls_core.SecretKey, error) {
+	for _, pp := range pd.pps {
+		secretKey, err := loadBasicKeyWithProvider(keyFile, pp)
+		if err != nil {
+			console.println(err)
+			continue
+		}
+		return secretKey, nil
+	}
+	return nil, fmt.Errorf("failed to load bls key %v", keyFile)
 }
 
 // passProvider is the interface to provide the passphrase of a bls keys.
@@ -200,30 +203,6 @@ func newDynamicPassProvider() passProvider {
 
 func (provider *dynamicPassProvider) getPassphrase(keyFile string) (string, error) {
 	passFile := keyFileToPassFileFull(keyFile)
-	if !isPassFile(passFile) {
-		return "", fmt.Errorf("pass file %v not exist", passFile)
-	}
-	return readPassFromFile(passFile)
-}
-
-// dirPassProvider provide the all bls password available in the directory.
-type dirPassProvider struct {
-	dirPath string
-}
-
-func (provider *dirPassProvider) toStr() string {
-	return "directory " + provider.dirPath
-}
-
-func newDirPassProvider(dirPath string) *dirPassProvider {
-	return &dirPassProvider{dirPath: dirPath}
-}
-
-func (provider *dirPassProvider) getPassphrase(keyFile string) (string, error) {
-	passFile := keyFileToPassFileFull(keyFile)
-	if !isPassFile(passFile) {
-		return "", fmt.Errorf("pass file %v not exist", passFile)
-	}
 	return readPassFromFile(passFile)
 }
 
