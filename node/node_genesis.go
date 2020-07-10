@@ -24,8 +24,6 @@ import (
 const (
 	// GenesisONEToken is the initial total number of ONE in the genesis block for mainnet.
 	GenesisONEToken = 12600000000
-	// TestAccountNumber is the number of test accounts for testnet/devnet/
-	TestAccountNumber = 100
 	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
 	ContractDeployerInitFund = 10000000000
 	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/

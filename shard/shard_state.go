@@ -179,15 +179,6 @@ func (c Committee) StakedValidators() *StakedSlots {
 	}
 }
 
-// TODO refactor with and update corresponding places
-// func (ss *State) StakedValidators() []*StakedSlots {
-// 	networkWide := make([]*StakedSlots, len(ss.Shards))
-// 	for i := range ss.Shards {
-// 		networkWide[i] = ss.Shards[i].StakedValidators()
-// 	}
-// 	return networkWide
-// }
-
 // StakedValidators here is supercommittee wide
 func (ss *State) StakedValidators() *StakedSlots {
 	countStakedValidator, countStakedBLSKey := 0, 0

@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -23,7 +22,6 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/sha3"
 )
 
 type engineImpl struct {
@@ -40,48 +38,6 @@ func (e *engineImpl) Beaconchain() engine.ChainReader {
 // SetBeaconchain assigns the beaconchain handle used
 func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 	e.beacon = beaconchain
-}
-
-// SealHash returns the hash of a block prior to it being sealed.
-func (e *engineImpl) SealHash(header *block.Header) (hash common.Hash) {
-	hasher := sha3.NewLegacyKeccak256()
-	// TODO: update with new fields
-	if err := rlp.Encode(hasher, []interface{}{
-		header.ParentHash(),
-		header.Coinbase(),
-		header.Root(),
-		header.TxHash(),
-		header.ReceiptHash(),
-		header.Bloom(),
-		header.Number(),
-		header.GasLimit(),
-		header.GasUsed(),
-		header.Time(),
-		header.Extra(),
-	}); err != nil {
-		utils.Logger().Warn().Err(err).Msg("rlp.Encode failed")
-	}
-	hasher.Sum(hash[:0])
-	return hash
-}
-
-// Seal is to seal final block.
-func (e *engineImpl) Seal(chain engine.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
-	// TODO: implement final block sealing
-	return nil
-}
-
-// Author returns the author of the block header.
-func (e *engineImpl) Author(header *block.Header) (common.Address, error) {
-	// TODO: implement this
-	return common.Address{}, nil
-}
-
-// Prepare is to prepare ...
-// TODO(RJ): fix it.
-func (e *engineImpl) Prepare(chain engine.ChainReader, header *block.Header) error {
-	// TODO: implement prepare method
-	return nil
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.

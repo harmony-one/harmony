@@ -38,7 +38,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	// TODO(audit): wrap bls private key with public key
 	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key)
 	if err != nil {
 		consensus.getLogger().Err(err).

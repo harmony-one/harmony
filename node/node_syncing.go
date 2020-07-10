@@ -2,6 +2,7 @@ package node
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -23,10 +24,23 @@ import (
 
 // Constants related to doing syncing.
 const (
-	lastMileThreshold = 4
-	inSyncThreshold   = 1 // unit in number of block
-	SyncFrequency     = 60
+	SyncFrequency = 60
 )
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+// GenerateRandomString generates a random string with given length
+func GenerateRandomString(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
 
 // getNeighborPeers is a helper function to return list of peers
 // based on different neightbor map

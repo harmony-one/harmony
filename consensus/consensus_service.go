@@ -117,7 +117,6 @@ func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretK
 func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 	priKey *bls_core.SecretKey) error {
 	message.Signature = nil
-	// TODO: use custom serialization method rather than protobuf
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
@@ -192,15 +191,11 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// IsValidatorInCommitteeBytes returns whether the given validator BLS address is part of my committee
-func (consensus *Consensus) IsValidatorInCommitteeBytes(pubKey bls.SerializedPublicKey) bool {
-	return consensus.Decider.IndexOf(pubKey) != -1
-}
-
 // Verify the signature of the message are valid from the signer's public key.
 func verifyMessageSig(signerPubKey *bls_core.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
+	// TODO(audit): do not marshal message again here.
 	messageBytes, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
@@ -224,7 +219,7 @@ func (consensus *Consensus) verifySenderKey(msg *msg_pb.Message) error {
 	senderKey := bls.SerializedPublicKey{}
 
 	copy(senderKey[:], msg.GetConsensus().SenderPubkey[:])
-	if !consensus.IsValidatorInCommitteeBytes(senderKey) {
+	if !consensus.IsValidatorInCommittee(senderKey) {
 		return shard.ErrValidNotInCommittee
 	}
 	return nil

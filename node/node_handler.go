@@ -136,10 +136,6 @@ func (node *Node) HandleMessage(content []byte, sender libp2p_peer.ID) {
 							}
 						}
 					}
-					if node.Client != nil && node.Client.UpdateBlocks != nil && blocks != nil {
-						utils.Logger().Info().Msg("Block being handled by client")
-						node.Client.UpdateBlocks(blocks)
-					}
 				}
 			case
 				proto_node.SlashCandidate,
