@@ -79,7 +79,7 @@ func promptYesNo(prompt string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		response = strings.ToLower(response)
+		response = strings.TrimSpace(strings.ToLower(response))
 
 		if response == "y" || response == "yes" {
 			return true, nil

@@ -24,12 +24,10 @@ type consoleItf interface {
 type stdConsole struct{}
 
 func (console *stdConsole) readPassword() (string, error) {
-	fmt.Println("trapped")
 	b, err := terminal.ReadPassword(syscall.Stdin)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("escaped")
 	return strings.TrimSpace(string(b)), nil
 }
 
