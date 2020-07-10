@@ -22,20 +22,17 @@ func newTestConsole() *testConsole {
 }
 
 func (tc *testConsole) readPassword() (string, error) {
-	fmt.Println("reading password")
 	return tc.readln()
 }
 
 func (tc *testConsole) readln() (string, error) {
 	select {
 	case <-time.After(2 * time.Second):
-		fmt.Println("timed out")
 		return "", errors.New("timed out")
 	case msg, ok := <-tc.In:
 		if !ok {
 			return "", errors.New("in channel closed")
 		}
-		fmt.Println("read in")
 		return msg, nil
 	}
 }
@@ -56,16 +53,12 @@ func (tc *testConsole) printf(format string, a ...interface{}) {
 }
 
 func (tc *testConsole) checkClean() (bool, string) {
-	fmt.Println("check clean")
 	select {
 	case msg := <-tc.In:
-		fmt.Println("not good")
 		return false, "extra in message: " + msg
 	case msg := <-tc.Out:
-		fmt.Println("not good")
 		return false, "extra out message: " + msg
 	default:
-		fmt.Println("good")
 		return true, ""
 	}
 }
