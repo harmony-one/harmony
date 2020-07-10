@@ -3,6 +3,8 @@ package blsloader
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -11,7 +13,27 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/multibls"
+	dircopy "github.com/otiai10/copy"
 )
+
+func init() {
+	// Move the test data to temp directory
+	os.RemoveAll(testDir)
+	if err := os.MkdirAll(testDir, 0777); err != nil {
+		fmt.Println("makedir error", err)
+	}
+	info, exist := os.Stat(testDir)
+	fmt.Println("testDir", info, exist)
+	testDataFolder := "testdata"
+	fmt.Println(testDir)
+	if err := dircopy.Copy(testDataFolder, testDir); err != nil {
+		panic(fmt.Sprintf("failed to copy dir: %v", err))
+	}
+
+	fmt.Println(testDir)
+}
+
+var testDir = filepath.Join(os.TempDir(), "harmony/BlsLoader")
 
 type testKey struct {
 	publicKey  string
@@ -28,16 +50,16 @@ var validTestKeys = []testKey{
 		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
 		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
 		passphrase: "",
-		passFile:   "testData/blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
-		path:       "testData/blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
+		passFile:   "blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
+		path:       "blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
 	},
 	{
 		// key with non empty passphrase
 		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
 		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
 		passphrase: "harmony",
-		passFile:   "testData/blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
-		path:       "testData/blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
+		passFile:   "blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
+		path:       "blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
 	},
 }
 
@@ -48,14 +70,14 @@ var emptyPassTestKeys = []testKey{
 		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
 		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
 		passphrase: "",
-		path:       "testData/blskey_emptypass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
+		path:       "blskey_emptypass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
 	},
 	{
 		// key with non empty passphrase
 		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
 		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
 		passphrase: "harmony",
-		path:       "testData/blskey_emptypass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
+		path:       "blskey_emptypass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
 	},
 }
 
@@ -66,16 +88,16 @@ var wrongPassTestKeys = []testKey{
 		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
 		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
 		passphrase: "evil harmony",
-		passFile:   "testData/blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
-		path:       "testData/blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
+		passFile:   "blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
+		path:       "blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
 	},
 	{
 		// key with non empty passphrase
 		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
 		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
 		passphrase: "harmony",
-		passFile:   "testData/blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
-		path:       "testData/blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
+		passFile:   "blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
+		path:       "blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
 	},
 }
 
@@ -84,7 +106,7 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 		cfg    Config
 		inputs []string
 
-		expOutputs []string
+		expOutSubs []string
 		expPubKeys []string
 		expErr     error
 	}{
@@ -96,9 +118,7 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 			},
 			inputs: []string{},
 
-			expOutputs: []string{
-				fmt.Sprintf("loaded bls key %s\n", validTestKeys[0].publicKey),
-			},
+			expOutSubs: []string{},
 			expPubKeys: []string{validTestKeys[0].publicKey},
 		},
 		{
@@ -109,9 +129,7 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 			},
 			inputs: []string{},
 
-			expOutputs: []string{
-				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
-			},
+			expOutSubs: []string{},
 			expPubKeys: []string{validTestKeys[1].publicKey},
 		},
 		{
@@ -122,9 +140,8 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 			},
 			inputs: []string{validTestKeys[1].passphrase},
 
-			expOutputs: []string{
+			expOutSubs: []string{
 				fmt.Sprintf("Enter passphrase for the BLS key file %s:", validTestKeys[1].path),
-				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
 			},
 			expPubKeys: []string{validTestKeys[1].publicKey},
 		},
@@ -136,9 +153,7 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 			},
 			inputs: []string{},
 
-			expOutputs: []string{
-				fmt.Sprintf("loaded bls key %s\n", validTestKeys[1].publicKey),
-			},
+			expOutSubs: []string{},
 			expPubKeys: []string{validTestKeys[1].publicKey},
 		},
 		{
@@ -149,10 +164,9 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 			},
 			inputs: []string{emptyPassTestKeys[1].passphrase},
 
-			expOutputs: []string{
-				"unable to get passphrase from passphrase file testData/blskey_emptypass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass: cannot open passphrase file\n",
+			expOutSubs: []string{
+				"unable to get passphrase",
 				fmt.Sprintf("Enter passphrase for the BLS key file %s:", emptyPassTestKeys[1].path),
-				fmt.Sprintf("loaded bls key %s\n", emptyPassTestKeys[1].publicKey),
 			},
 			expPubKeys: []string{emptyPassTestKeys[1].publicKey},
 		},
@@ -161,7 +175,7 @@ func TestLoadKeys_SingleBls_File(t *testing.T) {
 		ts := &testSuite{
 			cfg:        test.cfg,
 			inputs:     test.inputs,
-			expOutputs: test.expOutputs,
+			expOutSub:  test.expOutSubs,
 			expErr:     test.expErr,
 			expPubKeys: test.expPubKeys,
 		}
@@ -191,7 +205,7 @@ type testSuite struct {
 	cfg    Config
 	inputs []string
 
-	expOutputs []string
+	expOutSub  []string
 	expPubKeys []string
 	expErr     error
 
@@ -206,7 +220,7 @@ type testSuite struct {
 }
 
 func (ts *testSuite) init() {
-	ts.gotOutputs = make([]string, 0, len(ts.expOutputs))
+	ts.gotOutputs = make([]string, 0, len(ts.expOutSub))
 	ts.console = newTestConsole()
 	setTestConsole(ts.console)
 	ts.timeout = 1 * time.Second
@@ -232,7 +246,7 @@ func (ts *testSuite) checkResult() error {
 	default:
 	}
 	fmt.Println("got outputs:", ts.gotOutputs)
-	fmt.Println("expect outputs:", ts.expOutputs)
+	fmt.Println("expect outputs:", ts.expOutSub)
 	if isClean, msg := ts.console.checkClean(); !isClean {
 		return fmt.Errorf("console not clean: %v", msg)
 	}
@@ -249,12 +263,12 @@ func (ts *testSuite) checkResult() error {
 }
 
 func (ts *testSuite) checkOutputs() error {
-	if len(ts.gotOutputs) != len(ts.expOutputs) {
-		return fmt.Errorf("output size not expected: %v / %v", len(ts.gotOutputs), len(ts.expOutputs))
+	if len(ts.gotOutputs) != len(ts.expOutSub) {
+		return fmt.Errorf("output size not expected: %v / %v", len(ts.gotOutputs), len(ts.expOutSub))
 	}
 	for i, gotOutput := range ts.gotOutputs {
-		expOutput := ts.expOutputs[i]
-		if gotOutput != expOutput {
+		expOutput := ts.expOutSub[i]
+		if !strings.Contains(gotOutput, expOutput) {
 			return fmt.Errorf("%vth output unexpected: [%v] / [%v]", i, gotOutput, expOutput)
 		}
 	}
@@ -313,7 +327,7 @@ func (ts *testSuite) threadedLoadOutputs() {
 	var (
 		i = 0
 	)
-	for i < len(ts.expOutputs) {
+	for i < len(ts.expOutSub) {
 		select {
 		case got := <-ts.console.Out:
 			ts.gotOutputs = append(ts.gotOutputs, got)
