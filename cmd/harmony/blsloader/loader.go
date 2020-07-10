@@ -3,31 +3,72 @@ package blsloader
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/multibls"
 )
 
 func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
-	cfg.applyDefault()
-	if err := cfg.validate(); err != nil {
-		return multibls.PrivateKeys{}, err
+	decrypters, err := getKeyDecrypters(cfg)
+	if err != nil {
+		return nil, err
 	}
-	helper, err := getHelper(cfg)
+	helper, err := getHelper(cfg, decrypters)
 	if err != nil {
 		return nil, err
 	}
 	return helper.loadKeys()
 }
 
+// keyDecrypter is the interface to decrypt the bls key file. Currently, two
+// implementations are supported:
+//   passDecrypter - decrypt with passphrase
+//   kmsDecrypter  - decrypt with aws kms service
+type keyDecrypter interface {
+	extension() string
+	decryptFile(keyFile string) (*bls_core.SecretKey, error)
+}
+
+func getKeyDecrypters(cfg Config) ([]keyDecrypter, error) {
+	var decrypters []keyDecrypter
+	if cfg.PassSrcType != PassSrcNil {
+		pd, err := newPassDecrypter(cfg.getPassProviderConfig())
+		if err != nil {
+			return nil, err
+		}
+		decrypters = append(decrypters, pd)
+	}
+	if cfg.AwsCfgSrcType != AwsCfgSrcNil {
+		kd, err := newKmsDecrypter(cfg.getKmsProviderConfig())
+		if err != nil {
+			return nil, err
+		}
+		decrypters = append(decrypters, kd)
+	}
+	if len(decrypters) == 0 {
+		return nil, fmt.Errorf("must provide at least one bls key decryption")
+	}
+	return decrypters, nil
+}
+
+func getHelper(cfg Config, decrypters []keyDecrypter) (loadHelper, error) {
+	switch {
+	case len(cfg.multiBlsKeys) != 0:
+		return newMultiKeyLoader(cfg.multiBlsKeys, decrypters)
+	case stringIsSet(cfg.BlsDir):
+		return newBlsDirLoader(*cfg.BlsDir, decrypters)
+	default:
+		return nil, errors.New("either multiBlsKeys or BlsDir must be set")
+	}
+}
+
 // Loader is the structure to load bls keys.
 type Config struct {
-	// source for bls key loading. At least one of the BlsKeyFile and BlsDir
+	// source for bls key loading. At least one of the multiBlsKeys and BlsDir
 	// need to be provided.
 	//
-	// BlsKeyFile defines a single key file to load from. Based on the file
-	// extension, decryption with either passphrase or aws kms will be used.
-	BlsKeyFile *string
+	// multiBlsKeys defines a slice of key files to load from.
+	multiBlsKeys []string
 	// BlsDir defines a file directory to load keys from.
 	BlsDir *string
 
@@ -47,7 +88,7 @@ type Config struct {
 	// under the same directory as the key file.
 	PersistPassphrase bool
 
-	// Aws configuration related settings, including AWS credentials and region info.
+	// KMS related settings, including AWS credentials and region info.
 	// Used for KMS encrypted passphrase files.
 	//
 	// AwsCfgSrcType defines the source to get aws config. Three types available:
@@ -60,38 +101,6 @@ type Config struct {
 	AwsConfigFile *string
 }
 
-func (cfg *Config) applyDefault() {
-	if cfg.PassSrcType == PassSrcNil {
-		cfg.PassSrcType = PassSrcAuto
-	}
-	if cfg.AwsCfgSrcType == AwsCfgSrcNil {
-		cfg.AwsCfgSrcType = AwsCfgSrcShared
-	}
-}
-
-func (cfg *Config) validate() error {
-	if stringIsSet(cfg.BlsKeyFile) {
-		if !isFile(*cfg.BlsKeyFile) {
-			return fmt.Errorf("key file not exist %v", *cfg.BlsKeyFile)
-		}
-		switch ext := filepath.Ext(*cfg.BlsKeyFile); ext {
-		case basicKeyExt, kmsKeyExt:
-		default:
-			return fmt.Errorf("unknown key file extension %v", ext)
-		}
-	} else if stringIsSet(cfg.BlsDir) {
-		if !isDir(*cfg.BlsDir) {
-			return fmt.Errorf("dir not exist %v", *cfg.BlsDir)
-		}
-	} else {
-		return errors.New("either BlsKeyFile or BlsDir must be set")
-	}
-	if err := cfg.getPassProviderConfig().validate(); err != nil {
-		return err
-	}
-	return cfg.getKmsProviderConfig().validate()
-}
-
 func (cfg *Config) getPassProviderConfig() passDecrypterConfig {
 	return passDecrypterConfig{
 		passSrcType:       cfg.PassSrcType,
@@ -100,40 +109,9 @@ func (cfg *Config) getPassProviderConfig() passDecrypterConfig {
 	}
 }
 
-func (cfg *Config) getKmsProviderConfig() kmsProviderConfig {
-	return kmsProviderConfig{
+func (cfg *Config) getKmsProviderConfig() kmsDecrypterConfig {
+	return kmsDecrypterConfig{
 		awsCfgSrcType: cfg.AwsCfgSrcType,
 		awsConfigFile: cfg.AwsConfigFile,
-	}
-}
-
-func getHelper(cfg Config) (loadHelper, error) {
-	fmt.Println("getting helper")
-	switch {
-	case stringIsSet(cfg.BlsKeyFile):
-		switch filepath.Ext(*cfg.BlsKeyFile) {
-		case basicKeyExt:
-			fmt.Println("basic")
-			return &basicSingleBlsLoader{
-				blsKeyFile:          *cfg.BlsKeyFile,
-				passDecrypterConfig: cfg.getPassProviderConfig(),
-			}, nil
-		case kmsKeyExt:
-			fmt.Println("kms")
-			return &kmsSingleBlsLoader{
-				blsKeyFile:        *cfg.BlsKeyFile,
-				kmsProviderConfig: cfg.getKmsProviderConfig(),
-			}, nil
-		default:
-			return nil, errors.New("unknown extension")
-		}
-	case stringIsSet(cfg.BlsDir):
-		return &blsDirLoader{
-			dirPath:             *cfg.BlsDir,
-			passDecrypterConfig: cfg.getPassProviderConfig(),
-			kmsProviderConfig:   cfg.getKmsProviderConfig(),
-		}, nil
-	default:
-		return nil, errors.New("either BlsKeyFile or BlsDir must be set")
 	}
 }
