@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/blsgen"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/pkg/errors"
 )
 
@@ -91,7 +90,7 @@ func (kd *kmsDecrypter) validateConfig() error {
 			return errors.New("config field AwsConfig file must set for AwsCfgSrcFile")
 		}
 		if err := checkIsFile(*config.awsConfigFile); err != nil {
-			return fmt.Errorf("aws config file %v: %v", *config.awsConfigFile, err)
+			return err
 		}
 	}
 	return nil

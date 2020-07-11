@@ -63,6 +63,18 @@ func (pd *passDecrypter) extension() string {
 	return basicKeyExt
 }
 
+func (pd *passDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
+	for _, pp := range pd.pps {
+		secretKey, err := loadBasicKeyWithProvider(keyFile, pp)
+		if err != nil {
+			console.println(err)
+			continue
+		}
+		return secretKey, nil
+	}
+	return nil, fmt.Errorf("failed to load bls key %v", keyFile)
+}
+
 func (pd *passDecrypter) validateConfig() error {
 	config := pd.config
 	if !config.passSrcType.isValid() {
@@ -70,7 +82,7 @@ func (pd *passDecrypter) validateConfig() error {
 	}
 	if stringIsSet(config.passFile) {
 		if err := checkIsPassFile(*config.passFile); err != nil {
-			return fmt.Errorf("%v not a passphrase file: %v", *config.passFile, err)
+			return err
 		}
 	}
 	return nil
@@ -103,29 +115,17 @@ func (pd *passDecrypter) getFilePassProvider() passProvider {
 	}
 }
 
-func (pd *passDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
-	for _, pp := range pd.pps {
-		secretKey, err := loadBasicKeyWithProvider(keyFile, pp)
-		if err != nil {
-			console.println(err)
-			continue
-		}
-		return secretKey, nil
-	}
-	return nil, fmt.Errorf("failed to load bls key %v", keyFile)
-}
-
 // passProvider is the interface to provide the passphrase of a bls keys.
 // Implemented by
 // 	  promptPassProvider  - provide passphrase through user-interactive prompt
 //    staticPassProvider  - provide passphrase from a static .pass file
-//    dynamicPassProvider - provide the passphrase based on the given key file path
+//    dynamicPassProvider - provide the passphrase based on the given key file keyFile
 //    dirPassProvider     - provide passphrase from .pass files in a directory
 type passProvider interface {
 	getPassphrase(keyFile string) (string, error)
 }
 
-// promptPassProvider provides the bls password through console prompt.
+// promptPassProvider provides the bls passphrase through console prompt.
 type promptPassProvider struct {
 	// if enablePersist is true, after user enter the passphrase, the
 	// passphrase is also persisted into .pass file under the same directory
@@ -169,10 +169,11 @@ func (provider *promptPassProvider) persistPassphrase(keyFile string, passPhrase
 		// Unknown error. Directly return
 		return err
 	}
+
 	return ioutil.WriteFile(passFile, []byte(passPhrase), defWritePassFileMode)
 }
 
-// staticPassProvider provide the bls password from a static .pass file
+// staticPassProvider provide the bls passphrase from a static .pass file
 type staticPassProvider struct {
 	fileName string
 
@@ -194,7 +195,7 @@ func (provider *staticPassProvider) getPassphrase(keyFile string) (string, error
 }
 
 // dynamicPassProvider provide the passphrase based on .pass file with the given
-// key file path. For example, looking for key file xxx.key will provide the
+// key file keyFile. For example, looking for key file xxx.key will provide the
 // passphrase from xxx.pass
 type dynamicPassProvider struct{}
 

@@ -1,98 +1,5 @@
 package blsloader
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-
-	dircopy "github.com/otiai10/copy"
-)
-
-func init() {
-	// Move the test data to temp directory
-	os.RemoveAll(testDir)
-	if err := os.MkdirAll(testDir, 0777); err != nil {
-		fmt.Println("makedir error", err)
-	}
-	info, exist := os.Stat(testDir)
-	fmt.Println("testDir", info, exist)
-	testDataFolder := "testdata"
-	fmt.Println(testDir)
-	if err := dircopy.Copy(testDataFolder, testDir); err != nil {
-		panic(fmt.Sprintf("failed to copy dir: %v", err))
-	}
-
-	fmt.Println(testDir)
-}
-
-var testDir = filepath.Join(os.TempDir(), "harmony/BlsLoader")
-
-type testKey struct {
-	publicKey  string
-	privateKey string
-	passphrase string
-	passFile   string
-	path       string
-}
-
-// validTestKeys are keys with valid password and valid .pass file
-var validTestKeys = []testKey{
-	{
-		// key with empty passphrase
-		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
-		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
-		passphrase: "",
-		passFile:   "blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
-		path:       "blskey_passphrase/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
-	},
-	{
-		// key with non empty passphrase
-		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
-		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
-		passphrase: "harmony",
-		passFile:   "blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
-		path:       "blskey_passphrase/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
-	},
-}
-
-// emptyPassTestKeys are keys with valid password but empty .pass file
-var emptyPassTestKeys = []testKey{
-	{
-		// key with empty passphrase
-		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
-		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
-		passphrase: "",
-		path:       "blskey_emptypass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
-	},
-	{
-		// key with non empty passphrase
-		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
-		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
-		passphrase: "harmony",
-		path:       "blskey_emptypass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
-	},
-}
-
-// wrongPassTestKeys are keys with wrong pass file and wrong passphrase
-var wrongPassTestKeys = []testKey{
-	{
-		// key with empty passphrase
-		publicKey:  "0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500",
-		privateKey: "78c88c331195591b396e3205830071901a7a79e14fd0ede7f06bfb4c5e9f3473",
-		passphrase: "evil harmony",
-		passFile:   "blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.pass",
-		path:       "blskey_wrongpass/0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500.key",
-	},
-	{
-		// key with non empty passphrase
-		publicKey:  "152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083",
-		privateKey: "c20fa8de733d08e27e3101436d41f6a3207b8bedad7525c6e91a77ae2a49cf56",
-		passphrase: "harmony",
-		passFile:   "blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.pass",
-		path:       "blskey_wrongpass/152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083.key",
-	},
-}
-
 //func TestLoadKeys_SingleBls_File(t *testing.T) {
 //	tests := []struct {
 //		cfg    Config
@@ -105,7 +12,7 @@ var wrongPassTestKeys = []testKey{
 //		{
 //			// load the default pass file with file
 //			cfg: Config{
-//				BlsKeyFile:  &validTestKeys[0].path,
+//				BlsKeyFile:  &validTestKeys[0].keyFile,
 //				PassSrcType: PassSrcFile,
 //			},
 //			inputs: []string{},
@@ -116,7 +23,7 @@ var wrongPassTestKeys = []testKey{
 //		{
 //			// load the default pass file with file
 //			cfg: Config{
-//				BlsKeyFile:  &validTestKeys[1].path,
+//				BlsKeyFile:  &validTestKeys[1].keyFile,
 //				PassSrcType: PassSrcFile,
 //			},
 //			inputs: []string{},
@@ -127,20 +34,20 @@ var wrongPassTestKeys = []testKey{
 //		{
 //			// load key file with prompt
 //			cfg: Config{
-//				BlsKeyFile:  &validTestKeys[1].path,
+//				BlsKeyFile:  &validTestKeys[1].keyFile,
 //				PassSrcType: PassSrcPrompt,
 //			},
 //			inputs: []string{validTestKeys[1].passphrase},
 //
 //			expOutSubs: []string{
-//				fmt.Sprintf("Enter passphrase for the BLS key file %s:", validTestKeys[1].path),
+//				fmt.Sprintf("Enter passphrase for the BLS key file %s:", validTestKeys[1].keyFile),
 //			},
 //			expPubKeys: []string{validTestKeys[1].publicKey},
 //		},
 //		{
 //			// Automatically use pass file
 //			cfg: Config{
-//				BlsKeyFile:  &validTestKeys[1].path,
+//				BlsKeyFile:  &validTestKeys[1].keyFile,
 //				PassSrcType: PassSrcAuto,
 //			},
 //			inputs: []string{},
@@ -151,14 +58,14 @@ var wrongPassTestKeys = []testKey{
 //		{
 //			// Automatically use prompt
 //			cfg: Config{
-//				BlsKeyFile:  &emptyPassTestKeys[1].path,
+//				BlsKeyFile:  &emptyPassTestKeys[1].keyFile,
 //				PassSrcType: PassSrcAuto,
 //			},
 //			inputs: []string{emptyPassTestKeys[1].passphrase},
 //
 //			expOutSubs: []string{
 //				"unable to get passphrase",
-//				fmt.Sprintf("Enter passphrase for the BLS key file %s:", emptyPassTestKeys[1].path),
+//				fmt.Sprintf("Enter passphrase for the BLS key file %s:", emptyPassTestKeys[1].keyFile),
 //			},
 //			expPubKeys: []string{emptyPassTestKeys[1].publicKey},
 //		},
