@@ -495,7 +495,7 @@ func (node *Node) validateShardBoundMessage(
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumSlotMessages, 1)
-		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+		return nil, nil, true, shard.ErrValidNotInCommittee
 	}
 
 	// ignore mesage not intended for validator
@@ -685,6 +685,9 @@ func (node *Node) Start() error {
 				default:
 					// ignore garbled messages
 					atomic.AddUint32(&node.NumIgnoredMessages, 1)
+					// block the peer sending garbled messages
+					node.host.PubSub().BlacklistPeer(msg.GetFrom())
+					utils.Logger().Info().Str("peer", msg.GetFrom().String()).Msg("BlacklistPeer")
 					return libp2p_pubsub.ValidationReject
 				}
 
