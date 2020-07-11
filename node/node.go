@@ -420,7 +420,7 @@ func (node *Node) validateShardBoundMessage(
 
 	if !node.Consensus.IsValidatorInCommittee(senderKey) {
 		atomic.AddUint32(&node.NumSlotMessages, 1)
-		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+		return nil, nil, true, shard.ErrValidNotInCommittee
 	}
 
 	// ignore mesage not intended for validator
@@ -561,7 +561,15 @@ func (node *Node) Start() error {
 					)
 
 					if err != nil {
-						errChan <- withError{err, msg.GetFrom()}
+						// block the peer if it is not in the current committee
+						// FIXME: this is for testing only, will need to enable it after we increase the slot to 640
+						// as the internal nodes may contain invalid keys and we don't want to block internal nodes
+						if err == shard.ErrValidNotInCommittee {
+							node.host.PubSub().BlacklistPeer(msg.GetFrom())
+							utils.Logger().Info().Str("peer", msg.GetFrom().String()).Msg("BlacklistPeer")
+						} else {
+							errChan <- withError{err, msg.GetFrom()}
+						}
 						return libp2p_pubsub.ValidationReject
 					}
 

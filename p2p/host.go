@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -58,6 +59,8 @@ const (
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
 	// MaxMessageSize is 2Mb
 	MaxMessageSize = 1 << 21
+	// BlocklistExpiry is 120 seconds
+	BlocklistExpiry = 120 * time.Second
 )
 
 // NewHost ..
@@ -79,6 +82,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
+	blocklist, _ := libp2p_pubsub.NewTimeCachedBlacklist(BlocklistExpiry)
 	options := []libp2p_pubsub.Option{
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
 		libp2p_pubsub.WithValidateQueueSize(512),
@@ -89,6 +93,8 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
 		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
 		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
+		// WithBlacklist provides an implementation of the blacklist; the default is a MapBlacklist
+		libp2p_pubsub.WithBlacklist(blocklist),
 	}
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
