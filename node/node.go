@@ -63,6 +63,10 @@ const (
 	GlobalRxWorkers = 32
 	// MsgChanBuffer is the buffer of consensus message handlers.
 	MsgChanBuffer = 1024
+	// WeightConsensus is the weight of semaphore for consensus messages
+	WeightConsensus = 1
+	// WeightNode is the weight of semaphore for node messages (tx)
+	WeightNode = 64
 )
 
 const (
@@ -511,6 +515,7 @@ func (node *Node) Start() error {
 		handleE        p2pHandlerElse
 		handleEArg     []byte
 		senderPubKey   *bls.SerializedPublicKey
+		msgWeight      int64
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
@@ -575,6 +580,7 @@ func (node *Node) Start() error {
 						handleC:        node.Consensus.HandleMessageUpdate,
 						handleCArg:     validMsg,
 						senderPubKey:   senderPubKey,
+						msgWeight:      int64(WeightConsensus),
 					}
 					return libp2p_pubsub.ValidationAccept
 
@@ -584,6 +590,7 @@ func (node *Node) Start() error {
 						consensusBound: false,
 						handleE:        node.HandleNodeMessage,
 						handleEArg:     openBox,
+						msgWeight:      int64(WeightNode),
 					}
 				default:
 					return libp2p_pubsub.ValidationIgnore
@@ -625,8 +632,8 @@ func (node *Node) Start() error {
 				go func() {
 					defer cancel()
 
-					if sem.TryAcquire(1) {
-						defer sem.Release(1)
+					if sem.TryAcquire(msg.msgWeight) {
+						defer sem.Release(msg.msgWeight)
 
 						if msg.consensusBound {
 							if isThisNodeAnExplorerNode {
