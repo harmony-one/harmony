@@ -67,7 +67,7 @@ func newBlsDirLoader(keyDir string, decrypters []keyDecrypter) (*blsDirLoader, e
 		dm[decrypter.extension()] = decrypter
 	}
 	if err := checkIsDir(keyDir); err != nil {
-		return nil, fmt.Errorf("bls dir %v: %v", keyDir, err)
+		return nil, err
 	}
 	return &blsDirLoader{
 		keyDir:     keyDir,

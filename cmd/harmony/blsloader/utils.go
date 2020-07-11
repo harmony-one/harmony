@@ -1,13 +1,13 @@
 package blsloader
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/internal/blsgen"
-	"github.com/pkg/errors"
 )
 
 func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.SecretKey, error) {
@@ -28,7 +28,7 @@ func checkIsFile(path string) error {
 		return err
 	}
 	if info.IsDir() {
-		return errors.New("is directory")
+		return fmt.Errorf("%v is directory", path)
 	}
 	return nil
 }
@@ -39,18 +39,17 @@ func checkIsDir(path string) error {
 		return err
 	}
 	if info.IsDir() {
-		return errors.New("is a file")
+		return fmt.Errorf("%v is a file", path)
 	}
 	return nil
 }
 
 func checkIsPassFile(path string) error {
-	err := checkIsFile(path)
-	if err != nil {
+	if err := checkIsFile(path); err != nil {
 		return err
 	}
 	if filepath.Ext(path) != passExt {
-		return errors.New("should have extension .pass")
+		return fmt.Errorf("pass file %v should have extension .pass", path)
 	}
 	return nil
 }

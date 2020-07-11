@@ -84,7 +84,7 @@ type Config struct {
 	// If not set, default to the .pass file in the same directory as the key file.
 	PassFile *string
 	// PersistPassphrase set whether to persist the passphrase to a .pass file when
-	// prompt the user for password. Persisted pass file is a file with .pass extension
+	// prompt the user for passphrase. Persisted pass file is a file with .pass extension
 	// under the same directory as the key file.
 	PersistPassphrase bool
 
