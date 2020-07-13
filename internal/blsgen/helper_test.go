@@ -1,4 +1,4 @@
-package blsloader
+package blsgen
 
 import (
 	"bytes"

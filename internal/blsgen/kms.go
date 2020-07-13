@@ -1,4 +1,4 @@
-package blsloader
+package blsgen
 
 import (
 	"encoding/json"
@@ -12,7 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/pkg/errors"
 )
 
@@ -77,7 +76,7 @@ func (kd *kmsDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error)
 	if err != nil {
 		return nil, err
 	}
-	return blsgen.LoadAwsCMKEncryptedBLSKey(keyFile, kms)
+	return LoadAwsCMKEncryptedBLSKey(keyFile, kms)
 }
 
 func (kd *kmsDecrypter) validateConfig() error {
