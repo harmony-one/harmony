@@ -18,15 +18,11 @@ import (
 func TestNewPassDecrypter(t *testing.T) {
 	// setup
 	var (
-		testDir            = filepath.Join(baseTestDir, t.Name())
-		existPassFile      = filepath.Join(testDir, testKeys[0].publicKey+passExt)
-		emptyPassFile      = filepath.Join(testDir, testKeys[1].publicKey+passExt)
-		invalidExtPassFile = filepath.Join(testDir, testKeys[1].publicKey+".invalid")
+		testDir       = filepath.Join(baseTestDir, t.Name())
+		existPassFile = filepath.Join(testDir, testKeys[0].publicKey+passExt)
+		emptyPassFile = filepath.Join(testDir, testKeys[1].publicKey+passExt)
 	)
 	if err := writeFile(existPassFile, testKeys[0].passphrase); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeFile(invalidExtPassFile, testKeys[1].passphrase); err != nil {
 		t.Fatal(err)
 	}
 
@@ -55,13 +51,6 @@ func TestNewPassDecrypter(t *testing.T) {
 			providerTypes: []passProvider{
 				&staticPassProvider{},
 			},
-		},
-		{
-			config: passDecrypterConfig{
-				passSrcType: PassSrcFile,
-				passFile:    &invalidExtPassFile,
-			},
-			expErr: errors.New("should have extension .pass"),
 		},
 		{
 			config: passDecrypterConfig{passSrcType: PassSrcPrompt},

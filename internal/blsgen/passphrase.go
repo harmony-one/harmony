@@ -81,7 +81,7 @@ func (pd *passDecrypter) validateConfig() error {
 		return errors.New("unknown PassSrcType")
 	}
 	if stringIsSet(config.passFile) {
-		if err := checkIsPassFile(*config.passFile); err != nil {
+		if err := checkIsFile(*config.passFile); err != nil {
 			return err
 		}
 	}
