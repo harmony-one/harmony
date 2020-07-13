@@ -226,8 +226,9 @@ func (provider *promptACProvider) prompt(hint string) (string, error) {
 		timedOut = time.After(provider.timeout)
 	)
 
+	cs := console
 	go func() {
-		res, err = provider.threadedPrompt(hint)
+		res, err = provider.threadedPrompt(cs, hint)
 		close(finished)
 	}()
 
@@ -241,9 +242,9 @@ func (provider *promptACProvider) prompt(hint string) (string, error) {
 	}
 }
 
-func (provider *promptACProvider) threadedPrompt(hint string) (string, error) {
-	console.print(hint)
-	return console.readPassword()
+func (provider *promptACProvider) threadedPrompt(cs consoleItf, hint string) (string, error) {
+	cs.print(hint)
+	return cs.readPassword()
 }
 
 func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
