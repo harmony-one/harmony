@@ -16,6 +16,5 @@ const (
 )
 
 const (
-	defWritePassDirMode  = 0700
 	defWritePassFileMode = 0600
 )
