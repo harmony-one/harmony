@@ -216,14 +216,13 @@ func TestFileACProvider_getAwsConfig(t *testing.T) {
 
 		provider := newFileACProvider(filepath.Join(tcDir, test.jsonFile))
 		got, err := provider.getAwsConfig()
+
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
 			continue
 		}
-		if err != nil {
-			continue
-		}
-
 		if got == nil || !reflect.DeepEqual(*got, test.expConfig) {
 			t.Errorf("Test %v: unexpected AwsConfig: %+v / %+v", i,
 				got, test.expConfig)
