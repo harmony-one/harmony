@@ -1,13 +1,18 @@
 package blsloader
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 func TestNewPassDecrypter(t *testing.T) {
@@ -122,6 +127,97 @@ func TestNewPassDecrypter(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestPassDecrypter_decryptFile(t *testing.T) {
+	setTestConsole(newTestConsole())
+	unitTestDir := filepath.Join(baseTestDir, t.Name())
+	tests := []struct {
+		setupFunc func(rootDir string) error
+		providers []passProvider
+		keyFile   string
+
+		expPublicKey string
+		expErr       error
+	}{
+		{
+			// 1. Two providers, one return err and one return the correct passphrase.
+			setupFunc: func(rootDir string) error {
+				keyFile := filepath.Join(rootDir, testKeys[1].publicKey+basicKeyExt)
+				return writeFile(keyFile, testKeys[1].keyFileData)
+			},
+			providers: []passProvider{
+				&errPassProvider{},
+				makeTestPassProvider(),
+			},
+			keyFile:      testKeys[1].publicKey + basicKeyExt,
+			expPublicKey: testKeys[1].publicKey,
+		},
+		{
+			// 2. Only error provider. Return the decryption error
+			setupFunc: func(rootDir string) error {
+				keyFile := filepath.Join(rootDir, testKeys[1].publicKey+basicKeyExt)
+				return writeFile(keyFile, testKeys[1].keyFileData)
+			},
+			providers: []passProvider{&errPassProvider{}},
+			keyFile:   testKeys[1].publicKey + basicKeyExt,
+			expErr:    errors.New("failed to load bls key"),
+		},
+	}
+	for i, test := range tests {
+		tcDir := filepath.Join(unitTestDir, fmt.Sprintf("%v", i))
+		os.RemoveAll(tcDir)
+		os.MkdirAll(tcDir, 0700)
+		if test.setupFunc != nil {
+			if err := test.setupFunc(tcDir); err != nil {
+				t.Fatal(err)
+			}
+		}
+		keyFile := filepath.Join(tcDir, test.keyFile)
+
+		decrypter := &passDecrypter{pps: test.providers}
+		secret, err := decrypter.decryptFile(keyFile)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		gotPub := bls.FromLibBLSPublicKeyUnsafe(secret.GetPublicKey())[:]
+		if expPub := common.Hex2Bytes(test.expPublicKey); !bytes.Equal(gotPub, expPub) {
+			t.Errorf("Test %v: unexpected public key %v / %v", i, gotPub, expPub)
+		}
+	}
+}
+
+type testPassProvider struct {
+	m map[string]string
+}
+
+func makeTestPassProvider() *testPassProvider {
+	return &testPassProvider{
+		m: map[string]string{
+			testKeys[0].publicKey: testKeys[0].passphrase,
+			testKeys[1].publicKey: testKeys[1].passphrase,
+		},
+	}
+}
+
+func (provider *testPassProvider) getPassphrase(keyFile string) (string, error) {
+	basename := filepath.Base(keyFile)
+	publicKey := strings.TrimSuffix(basename, basicKeyExt)
+	pass, exist := provider.m[publicKey]
+	if !exist {
+		return "", errors.New("passphrase not exist")
+	}
+	return pass, nil
+}
+
+type errPassProvider struct{}
+
+func (provider *errPassProvider) getPassphrase(keyFile string) (string, error) {
+	return "", errors.New("error intended")
 }
 
 func TestPromptPassProvider_getPassphrase(t *testing.T) {
