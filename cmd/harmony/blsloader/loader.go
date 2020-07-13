@@ -20,6 +20,60 @@ func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
 	return helper.loadKeys()
 }
 
+// Loader is the structure to load bls keys.
+type Config struct {
+	// source for bls key loading. At least one of the multiBlsKeys and BlsDir
+	// need to be provided.
+	//
+	// multiBlsKeys defines a slice of key files to load from.
+	multiBlsKeys []string
+	// BlsDir defines a file directory to load keys from.
+	BlsDir *string
+
+	// Passphrase related settings. Used for passphrase encrypted key files.
+	//
+	// PassSrcType defines the source to get passphrase. Three source types are available
+	//   PassSrcNil    - do not use passphrase decryption
+	//   PassSrcFile   - get passphrase from a .pass file
+	//   PassSrcPrompt - get passphrase from prompt
+	//   PassSrcAuto   - try to unlock with .pass file. If not success, ask user with prompt
+	PassSrcType PassSrcType
+	// PassFile specifies the .pass file to be used when loading passphrase from file.
+	// If not set, default to the .pass file in the same directory as the key file.
+	PassFile *string
+	// PersistPassphrase set whether to persist the passphrase to a .pass file when
+	// prompt the user for passphrase. Persisted pass file is a file with .pass extension
+	// under the same directory as the key file.
+	PersistPassphrase bool
+
+	// KMS related settings, including AWS credentials and region info.
+	// Used for KMS encrypted passphrase files.
+	//
+	// AwsCfgSrcType defines the source to get aws config. Three types available:
+	//   AwsCfgSrcNil    - do not use Aws KMS decryption service.
+	//   AwsCfgSrcFile   - get AWS config through a json file. See AwsConfig for content fields.
+	//   AwsCfgSrcPrompt - get AWS config through prompt.
+	//   AwsCfgSrcShared - Use the default AWS config settings (from env and $HOME/.aws/config)
+	AwsCfgSrcType AwsCfgSrcType
+	// AwsConfigFile set the json file to load aws config.
+	AwsConfigFile *string
+}
+
+func (cfg *Config) getPassProviderConfig() passDecrypterConfig {
+	return passDecrypterConfig{
+		passSrcType:       cfg.PassSrcType,
+		passFile:          cfg.PassFile,
+		persistPassphrase: cfg.PersistPassphrase,
+	}
+}
+
+func (cfg *Config) getKmsProviderConfig() kmsDecrypterConfig {
+	return kmsDecrypterConfig{
+		awsCfgSrcType: cfg.AwsCfgSrcType,
+		awsConfigFile: cfg.AwsConfigFile,
+	}
+}
+
 // keyDecrypter is the interface to decrypt the bls key file. Currently, two
 // implementations are supported:
 //   passDecrypter - decrypt with passphrase
@@ -59,59 +113,5 @@ func getHelper(cfg Config, decrypters []keyDecrypter) (loadHelper, error) {
 		return newBlsDirLoader(*cfg.BlsDir, decrypters)
 	default:
 		return nil, errors.New("either multiBlsKeys or BlsDir must be set")
-	}
-}
-
-// Loader is the structure to load bls keys.
-type Config struct {
-	// source for bls key loading. At least one of the multiBlsKeys and BlsDir
-	// need to be provided.
-	//
-	// multiBlsKeys defines a slice of key files to load from.
-	multiBlsKeys []string
-	// BlsDir defines a file directory to load keys from.
-	BlsDir *string
-
-	// Passphrase related settings. Used for passphrase encrypted key files.
-	//
-	// PassSrcType defines the source to get passphrase. Three source types are available
-	//   PassSrcFile   - get passphrase from a .pass file
-	//   PassSrcPrompt - get passphrase from prompt
-	//   PassSrcAuto   - try to unlock with .pass file. If not success, ask user with prompt
-	// Value is default to PassSrcAuto.
-	PassSrcType PassSrcType
-	// PassFile specifies the .pass file to be used when loading passphrase from file.
-	// If not set, default to the .pass file in the same directory as the key file.
-	PassFile *string
-	// PersistPassphrase set whether to persist the passphrase to a .pass file when
-	// prompt the user for passphrase. Persisted pass file is a file with .pass extension
-	// under the same directory as the key file.
-	PersistPassphrase bool
-
-	// KMS related settings, including AWS credentials and region info.
-	// Used for KMS encrypted passphrase files.
-	//
-	// AwsCfgSrcType defines the source to get aws config. Three types available:
-	//   AwsCfgSrcFile   - get AWS config through a json file. See AwsConfig for content fields.
-	//   AwsCfgSrcPrompt - get AWS config through prompt.
-	//   AwsCfgSrcShared - Use the default AWS config settings (from env and $HOME/.aws/config)
-	// Default to AwsCfgSrcShared.
-	AwsCfgSrcType AwsCfgSrcType
-	// AwsConfigFile set the json file to load aws config.
-	AwsConfigFile *string
-}
-
-func (cfg *Config) getPassProviderConfig() passDecrypterConfig {
-	return passDecrypterConfig{
-		passSrcType:       cfg.PassSrcType,
-		passFile:          cfg.PassFile,
-		persistPassphrase: cfg.PersistPassphrase,
-	}
-}
-
-func (cfg *Config) getKmsProviderConfig() kmsDecrypterConfig {
-	return kmsDecrypterConfig{
-		awsCfgSrcType: cfg.AwsCfgSrcType,
-		awsConfigFile: cfg.AwsConfigFile,
 	}
 }

@@ -211,7 +211,7 @@ func (provider *dynamicPassProvider) getPassphrase(keyFile string) (string, erro
 func readPassFromFile(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return "", fmt.Errorf("cannot open passphrase file: %v", err)
+		return "", err
 	}
 	defer f.Close()
 

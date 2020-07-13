@@ -160,7 +160,7 @@ func TestPromptPassProvider_getPassphrase(t *testing.T) {
 			newPassFileContent: true,
 		},
 		{
-			// exist pass file, not overwrite
+			// exist pass file, do not overwrite
 			setupFunc: func(rootDir string) error {
 				passFile := filepath.Join(rootDir, testKeys[1].publicKey+passExt)
 				return writeFile(passFile, "old key")
@@ -242,6 +242,55 @@ func TestPromptPassProvider_getPassphrase(t *testing.T) {
 			if !test.newPassFileContent && string(b) == test.passphrase {
 				t.Errorf("Test %v: passphrase content has changed", i)
 			}
+		}
+	}
+}
+
+func TestDynamicPassProvider_getPassPhrase(t *testing.T) {
+	unitTestDir := filepath.Join(baseTestDir, t.Name())
+
+	tests := []struct {
+		setupFunc func(rootDir string) error
+		keyFile   string
+		expPass   string
+		expErr    error
+	}{
+		{
+			setupFunc: func(rootDir string) error {
+				passFile := filepath.Join(rootDir, testKeys[1].publicKey+passExt)
+				return writeFile(passFile, "passphrase\n")
+			},
+			keyFile: testKeys[1].publicKey + basicKeyExt,
+			expPass: "passphrase",
+		},
+		{
+			keyFile: testKeys[1].publicKey + basicKeyExt,
+			expErr:  errors.New("no such file"),
+		},
+	}
+	for i, test := range tests {
+		tcDir := filepath.Join(unitTestDir, fmt.Sprintf("%v", i))
+		os.RemoveAll(tcDir)
+		os.MkdirAll(tcDir, 0700)
+
+		if test.setupFunc != nil {
+			if err := test.setupFunc(tcDir); err != nil {
+				t.Fatal(err)
+			}
+		}
+		provider := &dynamicPassProvider{}
+		keyFile := filepath.Join(tcDir, test.keyFile)
+		got, err := provider.getPassphrase(keyFile)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if err != nil {
+			continue
+		}
+		if got != test.expPass {
+			t.Errorf("Test %v: unexpected passphrase: %v / %v", i, got, test.expPass)
 		}
 	}
 }

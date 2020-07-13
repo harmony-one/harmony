@@ -146,7 +146,6 @@ func (cfg AwsConfig) toAws() *aws.Config {
 //   promptACProvider - provide the config field from prompt with time out
 type awsConfigProvider interface {
 	getAwsConfig() (*AwsConfig, error)
-	String() string
 }
 
 // sharedACProvider returns nil for getAwsConfig to use shared aws configurations
@@ -158,10 +157,6 @@ func newSharedAwsConfigProvider() *sharedACProvider {
 
 func (provider *sharedACProvider) getAwsConfig() (*AwsConfig, error) {
 	return nil, nil
-}
-
-func (provider *sharedACProvider) String() string {
-	return "shared aws config"
 }
 
 // fileACProvider get aws config through a customized json file
@@ -183,10 +178,6 @@ func (provider *fileACProvider) getAwsConfig() (*AwsConfig, error) {
 		return nil, err
 	}
 	return &cfg, nil
-}
-
-func (provider *fileACProvider) String() string {
-	return fmt.Sprintf("file %v", provider.file)
 }
 
 // promptACProvider provide a user interactive console for AWS config.
@@ -253,10 +244,6 @@ func (provider *promptACProvider) prompt(hint string) (string, error) {
 func (provider *promptACProvider) threadedPrompt(hint string) (string, error) {
 	console.print(hint)
 	return console.readPassword()
-}
-
-func (provider *promptACProvider) String() string {
-	return "prompt"
 }
 
 func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
