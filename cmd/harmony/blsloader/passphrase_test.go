@@ -206,7 +206,7 @@ func makeTestPassProvider() *testPassProvider {
 
 func (provider *testPassProvider) getPassphrase(keyFile string) (string, error) {
 	basename := filepath.Base(keyFile)
-	publicKey := strings.TrimSuffix(basename, basicKeyExt)
+	publicKey := strings.TrimSuffix(basename, filepath.Ext(basename))
 	pass, exist := provider.m[publicKey]
 	if !exist {
 		return "", errors.New("passphrase not exist")

@@ -38,7 +38,7 @@ func checkIsDir(path string) error {
 	if err != nil {
 		return err
 	}
-	if info.IsDir() {
+	if !info.IsDir() {
 		return fmt.Errorf("%v is a file", path)
 	}
 	return nil

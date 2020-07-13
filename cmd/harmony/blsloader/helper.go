@@ -80,7 +80,10 @@ func (loader *blsDirLoader) loadKeys() (multibls.PrivateKeys, error) {
 		if err != nil {
 			return err
 		}
-		decrypter := loader.decrypters[filepath.Ext(path)]
+		decrypter, exist := loader.decrypters[filepath.Ext(path)]
+		if !exist {
+			return nil
+		}
 		secret, err := decrypter.decryptFile(path)
 		if err != nil {
 			return err
