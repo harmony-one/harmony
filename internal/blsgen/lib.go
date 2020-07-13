@@ -41,25 +41,6 @@ func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, err
 	return privateKey, fileName, err
 }
 
-// WritePriKeyWithPassPhrase writes encrypted key with passphrase.
-func WritePriKeyWithPassPhrase(
-	privateKey *ffi_bls.SecretKey, passphrase string,
-) (string, error) {
-	publickKey := privateKey.GetPublicKey()
-	fileName := publickKey.SerializeToHexStr() + ".key"
-	privateKeyHex := privateKey.SerializeToHexStr()
-	// Encrypt with passphrase
-	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
-	if err != nil {
-		return "", err
-	}
-	// Write to file.
-	if err := WriteToFile(fileName, encryptedPrivateKeyStr); err != nil {
-		return fileName, err
-	}
-	return fileName, nil
-}
-
 // WriteToFile will print any string of text to a file safely by
 // checking for errors and syncing at the end.
 func WriteToFile(filename string, data string) error {
@@ -204,51 +185,4 @@ func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	return plaintext, err
-}
-
-func decryptNonHumanReadable(data []byte, passphrase string) ([]byte, error) {
-	var err error
-	key := []byte(createHash(passphrase))
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	nonceSize := gcm.NonceSize()
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
-
-// LoadNonHumanReadableBLSKeyWithPassPhrase loads bls key with passphrase.
-func LoadNonHumanReadableBLSKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(passFile)
-	if err != nil {
-		return nil, err
-	}
-	passphrase := string(data)
-	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
-		passphrase = passphrase[:len(passphrase)-1]
-	}
-	decryptedBytes, err := decryptNonHumanReadable(encryptedPrivateKeyBytes, passphrase)
-	if err != nil {
-		return nil, err
-	}
-
-	priKey := &ffi_bls.SecretKey{}
-	if err := priKey.DeserializeHexStr(string(decryptedBytes)); err != nil {
-		return nil, err
-	}
-	return priKey, nil
 }
