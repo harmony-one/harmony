@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,11 +18,91 @@ var TestAwsConfig = AwsConfig{
 	Region:    "region",
 }
 
-//func TestNewKmsDecrypter(t *testing.T) {
-//	tests := []struct {
-//
-//	}
-//}
+func TestNewKmsDecrypter(t *testing.T) {
+	unitTestDir := filepath.Join(baseTestDir, t.Name())
+	testFile := filepath.Join(unitTestDir, "test.json")
+	if err := writeAwsConfigFile(testFile, TestAwsConfig); err != nil {
+		t.Fatal(err)
+	}
+	emptyFile := filepath.Join(unitTestDir, "empty.json")
+
+	tests := []struct {
+		config      kmsDecrypterConfig
+		expProvider awsConfigProvider
+		expErr      error
+	}{
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcNil,
+			},
+			expErr: errors.New("unknown AwsCfgSrcType"),
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcShared,
+			},
+			expProvider: &sharedACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcPrompt,
+			},
+			expProvider: &promptACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+				awsConfigFile: &testFile,
+			},
+			expProvider: &fileACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+			},
+			expErr: errors.New("config field AwsConfig file must set for AwsCfgSrcFile"),
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+				awsConfigFile: &emptyFile,
+			},
+			expErr: errors.New("no such file"),
+		},
+	}
+	for i, test := range tests {
+		kd, err := newKmsDecrypter(test.config)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		gotType := reflect.TypeOf(kd.provider).Elem()
+		expType := reflect.TypeOf(test.expProvider).Elem()
+		if gotType != expType {
+			t.Errorf("Test %v: unexpected aws config provider type: %v / %v",
+				i, gotType, expType)
+		}
+	}
+}
+
+func writeAwsConfigFile(file string, config AwsConfig) error {
+	b, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Dir(file)); err != nil {
+		if os.IsNotExist(err) {
+			os.MkdirAll(filepath.Dir(file), 0700)
+		} else {
+			return err
+		}
+	}
+	return ioutil.WriteFile(file, b, 0700)
+}
 
 func TestPromptACProvider_getAwsConfig(t *testing.T) {
 	tc := newTestConsole()
