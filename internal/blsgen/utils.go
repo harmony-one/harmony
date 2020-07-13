@@ -1,4 +1,4 @@
-package blsloader
+package blsgen
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/internal/blsgen"
 )
 
 func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.SecretKey, error) {
@@ -15,7 +14,7 @@ func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.Sec
 	if err != nil {
 		return nil, err
 	}
-	secretKey, err := blsgen.LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
+	secretKey, err := LoadBLSKeyWithPassPhrase(blsKeyFile, pass)
 	if err != nil {
 		return nil, err
 	}
