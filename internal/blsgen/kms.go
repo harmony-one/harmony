@@ -124,6 +124,7 @@ func (kd *kmsDecrypter) getKMSClient() (*kms.KMS, error) {
 
 // AwsConfig is the config data structure for credentials and region. Used for AWS KMS
 // decryption.
+// TODO(jacky): change the format to aws default config format
 type AwsConfig struct {
 	AccessKey string `json:"aws-access-key-id"`
 	SecretKey string `json:"aws-secret-access-key"`
