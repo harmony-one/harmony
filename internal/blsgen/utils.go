@@ -54,7 +54,7 @@ func checkIsPassFile(path string) error {
 }
 
 func keyFileToPassFileFull(keyFile string) string {
-	return strings.Trim(keyFile, basicKeyExt) + passExt
+	return strings.TrimSuffix(keyFile, basicKeyExt) + passExt
 }
 
 func promptGetPassword(prompt string) (string, error) {

@@ -22,11 +22,11 @@ func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
 
 // Loader is the structure to load bls keys.
 type Config struct {
-	// source for bls key loading. At least one of the multiBlsKeys and BlsDir
+	// source for bls key loading. At least one of the MultiBlsKeys and BlsDir
 	// need to be provided.
 	//
-	// multiBlsKeys defines a slice of key files to load from.
-	multiBlsKeys []string
+	// MultiBlsKeys defines a slice of key files to load from.
+	MultiBlsKeys []string
 	// BlsDir defines a file directory to load keys from.
 	BlsDir *string
 
@@ -107,11 +107,11 @@ func getKeyDecrypters(cfg Config) ([]keyDecrypter, error) {
 
 func getHelper(cfg Config, decrypters []keyDecrypter) (loadHelper, error) {
 	switch {
-	case len(cfg.multiBlsKeys) != 0:
-		return newMultiKeyLoader(cfg.multiBlsKeys, decrypters)
+	case len(cfg.MultiBlsKeys) != 0:
+		return newMultiKeyLoader(cfg.MultiBlsKeys, decrypters)
 	case stringIsSet(cfg.BlsDir):
 		return newBlsDirLoader(*cfg.BlsDir, decrypters)
 	default:
-		return nil, errors.New("either multiBlsKeys or BlsDir must be set")
+		return nil, errors.New("either MultiBlsKeys or BlsDir must be set")
 	}
 }
