@@ -350,14 +350,14 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
 			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == header.Coinbase() {
-				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
 					return nil, err
 				}
 				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
-				if err := member.BLSPublicKey.ToLibBLSPublicKey(committerKey); err != nil {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
 					return nil, err
 				}
 				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil

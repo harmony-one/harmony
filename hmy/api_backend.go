@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -874,10 +875,11 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 	if err != nil {
 		return nil, nil, err
 	}
-	pubkeys := make([]*bls.PublicKey, len(committee.Slots))
+	pubkeys := make([]*bls_core.PublicKey, len(committee.Slots))
 	for i, validator := range committee.Slots {
-		pubkeys[i] = new(bls.PublicKey)
-		validator.BLSPublicKey.ToLibBLSPublicKey(pubkeys[i])
+		if pubkeys[i], err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
+			return nil, nil, err
+		}
 	}
 	mask, err := internal_bls.NewMask(pubkeys, nil)
 	if err != nil {
