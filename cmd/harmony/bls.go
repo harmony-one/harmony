@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -15,20 +16,30 @@ import (
 var (
 	blsKeyFile        = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
 	blsFolder         = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
-	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 4, "maximum number of bls keys allowed per node (default 4)")
+	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 4, "Maximum number of bls keys allowed per node (default 4)")
 
 	// TODO(jacky): rename it to a better name with cobra alias
 	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$CONFIG_FILE, none)")
-	awsConfigSource = flag.String("aws-config-source", "default", "the source for aws config. (default, prompt, none, file:$CONFIG_FILE)")
+	persistPass     = flag.Bool("save-passphrase", false, "Whether the prompt passphrase is saved after prompt.")
+	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, none, file:$CONFIG_FILE)")
+)
+
+var (
+	multiBLSPriKey multibls.PrivateKeys
+	blsKeyLoadErr  error
+	onceLoadBLSKey sync.Once
 )
 
 // setupConsensusKeys load bls keys and add the keys to nodeConfig. Return the loaded public keys.
 func setupConsensusKeys(config *nodeconfig.ConfigType) multibls.PublicKeys {
-	multiBLSPriKey, err := loadBLSKeys()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
-		os.Exit(100)
-	}
+	onceLoadBLSKey.Do(func() {
+		multiBLSPriKey, blsKeyLoadErr = loadBLSKeys()
+		if blsKeyLoadErr != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", blsKeyLoadErr)
+			os.Exit(100)
+		}
+		fmt.Printf("Successfully loaded %v keys\n", len(multiBLSPriKey))
+	})
 	config.ConsensusPriKey = multiBLSPriKey
 	return multiBLSPriKey.GetPublicKeys()
 }
@@ -53,6 +64,10 @@ func parseBLSLoadingConfig() (blsgen.Config, error) {
 		config blsgen.Config
 		err    error
 	)
+	if len(*blsKeyFile) != 0 {
+		config.MultiBlsKeys = strings.Split(*blsKeyFile, ",")
+	}
+	config.BlsDir = blsFolder
 
 	config, err = parseBLSPass(config, *blsPass)
 	if err != nil {
@@ -68,8 +83,9 @@ func parseBLSLoadingConfig() (blsgen.Config, error) {
 func parseBLSPass(config blsgen.Config, src string) (blsgen.Config, error) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
+
 	switch method {
-	case "default":
+	case "default", "stdin":
 		config.PassSrcType = blsgen.PassSrcAuto
 	case "file":
 		config.PassSrcType = blsgen.PassSrcFile
@@ -81,6 +97,7 @@ func parseBLSPass(config blsgen.Config, src string) (blsgen.Config, error) {
 		config.PassSrcType = blsgen.PassSrcFile
 	case "prompt":
 		config.PassSrcType = blsgen.PassSrcPrompt
+		config.PersistPassphrase = *persistPass
 	case "none":
 		config.PassSrcType = blsgen.PassSrcNil
 	}
