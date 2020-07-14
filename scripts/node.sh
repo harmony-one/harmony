@@ -251,7 +251,7 @@ OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id broadcast_invalid_tx
 unset upgrade_rel public_rpc staking_mode pub_port blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node log_level
-unset bls_pass_prompt
+unset no_bls_pass_prompt
 start_clean=false
 loop=true
 run_as_root=true
@@ -272,7 +272,7 @@ minpeers=6
 max_bls_keys_per_node=10
 broadcast_invalid_tx=true
 log_level=3
-bls_pass_prompt=true
+no_bls_pass_prompt=false
 
 ${BLSKEYFILES=}
 ${TRACEFILE=}
@@ -285,7 +285,7 @@ do
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
    c) start_clean=true;;
-   C) bls_pass_prompt=false
+   C) no_bls_pass_prompt=true;;
    1) loop=false;;
    h) print_usage; exit 0;;
    k) BLSKEYFILES="${OPTARG}";;
@@ -320,7 +320,7 @@ do
    l) broadcast_invalid_tx=false;;
    L) log_level="${OPTARG}";;
 
-   M) msg "Legacy flag -M"
+   M) msg "Legacy flag -M";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -755,25 +755,25 @@ do
    args+=(
       -is_archival="${archival}"
    )
-   if [ -z "$BLSKEYFILES" ]; then
+   if [ ! -z "$BLSKEYFILES" ]; then
       args+=(
          -blskey_file "${BLSKEYFILES}"
       )
    fi
-   if [ -z "$blsfolder" ]; then
+   if [ ! -z "$blsfolder" ]; then
       args+=(
          -blsfolder "${blsfolder}"
       )
    fi
-   if [ -z "$blspass" ]; then
+   if [ ! -z "$blspass" ]; then
       args+=(
          -blspass "file:${blspass}"
       )
    else
-      if $bls_pass_prompt; then
+      if $no_bls_pass_prompt; then
          args+=(
-         -blspass no-prompt
-      )
+            -blspass no-prompt
+         )
       fi
    fi
    if ${public_rpc}; then
@@ -819,7 +819,7 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
 
-   env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}" 
+   env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    msg "node process finished with status $?"
 
    ${loop} || break

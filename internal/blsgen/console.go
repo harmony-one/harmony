@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var console consoleItf = &stdConsole{}
@@ -21,7 +24,12 @@ type consoleItf interface {
 type stdConsole struct{}
 
 func (console *stdConsole) readPassword() (string, error) {
-	return console.readln()
+	b, err := terminal.ReadPassword(syscall.Stdin)
+	if err != nil {
+		return "", err
+	}
+	console.println()
+	return strings.TrimSpace(string(b)), nil
 }
 
 func (console *stdConsole) readln() (string, error) {
