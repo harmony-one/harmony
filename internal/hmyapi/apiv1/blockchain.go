@@ -85,7 +85,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		response, err := RPCMarshalBlock(block, blockArgs)
+		response, err := RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
@@ -103,7 +103,7 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		return RPCMarshalBlock(block, blockArgs)
+		return RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 	}
 	return nil, err
 }
@@ -124,7 +124,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr r
 		}
 	}
 	if block != nil {
-		response, err := RPCMarshalBlock(block, blockArgs)
+		response, err := RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
@@ -149,7 +149,7 @@ func (s *PublicBlockChainAPI) GetBlockByHashNew(ctx context.Context, blockHash c
 		}
 	}
 	if block != nil {
-		return RPCMarshalBlock(block, blockArgs)
+		return RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 	}
 	return nil, err
 }
@@ -167,7 +167,7 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.Bloc
 			}
 		}
 		if block != nil {
-			rpcBlock, err := RPCMarshalBlock(block, blockArgs)
+			rpcBlock, err := RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 			if err == nil && i == rpc.PendingBlockNumber {
 				// Pending blocks need to nil out a few fields
 				for _, field := range []string{"hash", "nonce", "miner"} {
