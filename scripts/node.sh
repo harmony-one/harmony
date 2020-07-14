@@ -172,9 +172,10 @@ usage: ${progname} [options]
 options:
    -c             back up database/logs and start clean (not for mainnet)
                   (use only when directed by Harmony)
+   -C             disable interactive console for bls passphrase (default: enabled)
    -1             do not loop; run once and exit
    -h             print this help and exit
-   -k KEYFILE     use the given BLS key file (default: autodetect)
+   -k KEYFILE     use the given BLS key files
    -s             run setup env only (must run as root)
    -S             run the ${progname} as non-root user (default: run as root)
    -p passfile    use the given BLS passphrase file
@@ -193,7 +194,6 @@ options:
    -y             run in legacy, foundational-node mode (default)
    -Y             verify the signature of the downloaded binaries (default: off)
    -m minpeer     specify minpeers for bootstrap (default: 6)
-   -M             support multi-key mode (default: off)
    -f blsfolder   folder that stores the bls keys and corresponding passphrases (default: ./.hmy/blskeys)
    -A             enable archival node mode (default: off)
    -B blacklist   specify file containing blacklisted accounts as a newline delimited file (default: ./.hmy/blacklist.txt)
@@ -205,8 +205,12 @@ options:
 
 examples:
 
-# start node program w/o root account
-   ${progname} -S -k mybls.key
+# start node program with all key/passphrase under .hmy/blskeys
+# first try to unlock account with .pass file. If pass file not exist or cannot decrypt, prompt to get passphrase.
+   ${progname} -S 
+
+# start node program w/o accounts
+   ${progname} -S -k mybls1.key,mybls2.key
 
 # download beacon chain (shard0) db snapshot
    ${progname} -i 0 -b
@@ -224,20 +228,13 @@ examples:
 # start the node in a different port 9010
    ${progname} -n 9010
 
-# multi-bls: place all keys/passphrases under .hmy/blskeys
-# e.g. <blskey>.key and <blskey>.pass
-   ${progname} -S -M 
-
 # multi-bls: specify folder that contains bls keys
-   ${progname} -S -M -f /home/xyz/myfolder
+   ${progname} -S -f /home/xyz/myfolder
 
 # multi-bls using default passphrase: place all keys under .hmy/blskeys
 # supply passphrase file using -p option (single passphrase will be used for all bls keys)
-   ${progname} -S -M -p blspass.txt
+   ${progname} -S -p blspass.txt
 
-# multi-bls using user input passphrase: place all keys under .hmy/blskeys
-# supply passphrase for each of the bls key file when prompted
-   ${progname} -S -M
 
 ENDEND
 }
@@ -254,6 +251,7 @@ OS=$(uname -s)
 
 unset start_clean loop run_as_root blspass do_not_download download_only network node_type shard_id broadcast_invalid_tx
 unset upgrade_rel public_rpc staking_mode pub_port blsfolder blacklist verify TRACEFILE minpeers max_bls_keys_per_node log_level
+unset bls_pass_prompt
 start_clean=false
 loop=true
 run_as_root=true
@@ -274,6 +272,8 @@ minpeers=6
 max_bls_keys_per_node=10
 broadcast_invalid_tx=true
 log_level=3
+bls_pass_prompt=true
+
 ${BLSKEYFILES=}
 ${TRACEFILE=}
 
@@ -285,6 +285,7 @@ do
    '?') usage "unrecognized option -${OPTARG}";;
    ':') usage "missing argument for -${OPTARG}";;
    c) start_clean=true;;
+   C) bls_pass_prompt=false
    1) loop=false;;
    h) print_usage; exit 0;;
    k) BLSKEYFILES="${OPTARG}";;
@@ -318,6 +319,8 @@ do
    R) TRACEFILE="${OPTARG}";;
    l) broadcast_invalid_tx=false;;
    L) log_level="${OPTARG}";;
+
+   M) msg "Legacy flag -M"
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -754,7 +757,7 @@ do
    )
    if [ -z "$BLSKEYFILES" ]; then
       args+=(
-      -blskey_file "${BLSKEYFILES}"
+         -blskey_file "${BLSKEYFILES}"
       )
    fi
    if [ -z "$blsfolder" ]; then
@@ -762,9 +765,20 @@ do
          -blsfolder "${blsfolder}"
       )
    fi
+   if [ -z "$blspass" ]; then
+      args+=(
+         -blspass "file:${blspass}"
+      )
+   else
+      if $bls_pass_prompt; then
+         args+=(
+         -blspass no-prompt
+      )
+      fi
+   fi
    if ${public_rpc}; then
       args+=(
-      -public_rpc
+         -public_rpc
       )
    fi
    if [ ! -z "${pprof}" ]; then
@@ -772,11 +786,7 @@ do
       -pprof "${pprof}"
       )
    fi
-   if [ -z "$blspass" ]; then
-      args+=(
-      -blspass "${blspass}"
-      )
-   fi
+
 # backward compatible with older harmony node software
    case "${node_type}" in
    validator)
@@ -808,11 +818,10 @@ do
    Darwin) ld_path_var=DYLD_FALLBACK_LIBRARY_PATH;;
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
-   run() {
-      (sleep 60)&
-      env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
-   }
-   esac || msg "node process finished with status $?"
+
+   env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}" 
+   msg "node process finished with status $?"
+
    ${loop} || break
    msg "restarting in 10s..."
    sleep 10
