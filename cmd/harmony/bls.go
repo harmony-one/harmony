@@ -53,8 +53,11 @@ func loadBLSKeys() (multibls.PrivateKeys, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("0 bls keys loaded")
+	}
 	if len(keys) >= *maxBLSKeysPerNode {
-		return nil, fmt.Errorf("keys exceed maximum count %v", *maxBLSKeysPerNode)
+		return nil, fmt.Errorf("bls keys exceed maximum count %v", *maxBLSKeysPerNode)
 	}
 	return keys, err
 }

@@ -145,6 +145,7 @@ func (provider *promptPassProvider) getPassphrase(keyFile string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("unable to read from prompt: %v", err)
 	}
+	pass = strings.TrimSpace(pass)
 	// If user set to persist the pass file, persist to .pass file
 	if provider.enablePersist {
 		if err := provider.persistPassphrase(keyFile, pass); err != nil {
