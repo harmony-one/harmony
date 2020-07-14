@@ -26,16 +26,16 @@ var (
 
 var (
 	multiBLSPriKey multibls.PrivateKeys
-	blsKeyLoadErr  error
 	onceLoadBLSKey sync.Once
 )
 
-// setupConsensusKeys load bls keys and add the keys to nodeConfig. Return the loaded public keys.
+// setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
 func setupConsensusKeys(config *nodeconfig.ConfigType) multibls.PublicKeys {
 	onceLoadBLSKey.Do(func() {
-		multiBLSPriKey, blsKeyLoadErr = loadBLSKeys()
-		if blsKeyLoadErr != nil {
-			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", blsKeyLoadErr)
+		var err error
+		multiBLSPriKey, err = loadBLSKeys()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
 			os.Exit(100)
 		}
 		fmt.Printf("Successfully loaded %v keys\n", len(multiBLSPriKey))
