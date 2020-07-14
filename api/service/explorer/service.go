@@ -175,7 +175,7 @@ func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	sync := s.inSync.IsSet()
 	if !sync {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusTeapot)
 	}
 	if err := json.NewEncoder(w).Encode(sync); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
