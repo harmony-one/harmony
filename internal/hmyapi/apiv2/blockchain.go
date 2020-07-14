@@ -86,7 +86,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr uint
 				return nil, err
 			}
 		}
-		response, err := RPCMarshalBlock(block, blockArgs)
+		response, err := RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 		if err == nil && rpc.BlockNumber(blockNr) == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
@@ -111,7 +111,7 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 				return nil, err
 			}
 		}
-		return RPCMarshalBlock(block, blockArgs)
+		return RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 	}
 	return nil, err
 }
@@ -129,7 +129,7 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEn
 			}
 		}
 		if block != nil {
-			rpcBlock, err := RPCMarshalBlock(block, blockArgs)
+			rpcBlock, err := RPCMarshalBlock(block, blockArgs, s.b.IsStakingEpoch(block.Header().Epoch()))
 			if err == nil && rpc.BlockNumber(i) == rpc.PendingBlockNumber {
 				// Pending blocks need to nil out a few fields
 				for _, field := range []string{"hash", "nonce", "miner"} {
