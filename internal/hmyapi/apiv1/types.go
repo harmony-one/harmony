@@ -2,21 +2,48 @@ package apiv1
 
 import (
 	"encoding/hex"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/numeric"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
+
+// RPCBlock represents a block that will serialize to the RPC representation of a block
+type RPCBlock struct {
+	Number           *hexutil.Big     `json:"number"`
+	ViewID           *hexutil.Big     `json:"viewID"`
+	Epoch            *hexutil.Big     `json:"epoch"`
+	Hash             common.Hash      `json:"hash"`
+	ParentHash       common.Hash      `json:"parentHash"`
+	Nonce            types.BlockNonce `json:"nonce"`
+	MixHash          common.Hash      `json:"mixHash"`
+	LogsBloom        ethtypes.Bloom   `json:"logsBloom"`
+	StateRoot        common.Hash      `json:"stateRoot"`
+	Miner            common.Address   `json:"miner"`
+	Difficulty       *hexutil.Big     `json:"difficulty"`
+	ExtraData        []byte           `json:"extraData"`
+	Size             hexutil.Uint64   `json:"size"`
+	GasLimit         hexutil.Uint64   `json:"gasLimit"`
+	GasUsed          hexutil.Uint64   `json:"gasUsed"`
+	Timestamp        *big.Int         `json:"timestamp"`
+	TransactionsRoot common.Hash      `json:"transactionsRoot"`
+	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
+	Transactions     []interface{}    `json:"transactions"`
+	StakingTxs       []interface{}    `json:"stakingTxs"`
+	Uncles           []common.Hash    `json:"uncles"`
+	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
+	Signers          []string         `json:"signers"`
+}
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
 type RPCTransaction struct {
@@ -97,6 +124,25 @@ type RPCDelegation struct {
 type RPCUndelegation struct {
 	Amount *big.Int
 	Epoch  *big.Int
+}
+
+// CallArgs represents the arguments for a call.
+type CallArgs struct {
+	From     *common.Address `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      *hexutil.Uint64 `json:"gas"`
+	GasPrice *hexutil.Big    `json:"gasPrice"`
+	Value    *hexutil.Big    `json:"value"`
+	Data     *hexutil.Bytes  `json:"data"`
+}
+
+// StakingNetworkInfo returns global staking info.
+type StakingNetworkInfo struct {
+	TotalSupply       numeric.Dec `json:"total-supply"`
+	CirculatingSupply numeric.Dec `json:"circulating-supply"`
+	EpochLastBlock    uint64      `json:"epoch-last-block"`
+	TotalStaking      *big.Int    `json:"total-staking"`
+	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
 
 func newHeaderInformation(header *block.Header, isStaking bool) *HeaderInformation {
@@ -377,33 +423,6 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 	return result
 }
 
-// RPCBlock represents a block that will serialize to the RPC representation of a block
-type RPCBlock struct {
-	Number           *hexutil.Big     `json:"number"`
-	ViewID           *hexutil.Big     `json:"viewID"`
-	Epoch            *hexutil.Big     `json:"epoch"`
-	Hash             common.Hash      `json:"hash"`
-	ParentHash       common.Hash      `json:"parentHash"`
-	Nonce            types.BlockNonce `json:"nonce"`
-	MixHash          common.Hash      `json:"mixHash"`
-	LogsBloom        ethtypes.Bloom   `json:"logsBloom"`
-	StateRoot        common.Hash      `json:"stateRoot"`
-	Miner            common.Address   `json:"miner"`
-	Difficulty       *hexutil.Big     `json:"difficulty"`
-	ExtraData        []byte           `json:"extraData"`
-	Size             hexutil.Uint64   `json:"size"`
-	GasLimit         hexutil.Uint64   `json:"gasLimit"`
-	GasUsed          hexutil.Uint64   `json:"gasUsed"`
-	Timestamp        *big.Int         `json:"timestamp"`
-	TransactionsRoot common.Hash      `json:"transactionsRoot"`
-	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
-	Transactions     []interface{}    `json:"transactions"`
-	StakingTxs       []interface{}    `json:"stakingTxs"`
-	Uncles           []common.Hash    `json:"uncles"`
-	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
-	Signers          []string         `json:"signers"`
-}
-
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
@@ -518,25 +537,6 @@ func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCSt
 		return nil
 	}
 	return newRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
-}
-
-// CallArgs represents the arguments for a call.
-type CallArgs struct {
-	From     *common.Address `json:"from"`
-	To       *common.Address `json:"to"`
-	Gas      *hexutil.Uint64 `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     *hexutil.Bytes  `json:"data"`
-}
-
-// StakingNetworkInfo returns global staking info.
-type StakingNetworkInfo struct {
-	TotalSupply       numeric.Dec `json:"total-supply"`
-	CirculatingSupply numeric.Dec `json:"circulating-supply"`
-	EpochLastBlock    uint64      `json:"epoch-last-block"`
-	TotalStaking      *big.Int    `json:"total-staking"`
-	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
 
 // getRPCLeader returns either the leader one address (before staking)
