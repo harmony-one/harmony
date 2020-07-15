@@ -8,6 +8,8 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 )
 
+// LoadKeys load all BLS keys with the given config. If loading keys from files, the
+// file extension will decide which decryption algorithm to use.
 func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
 	decrypters, err := getKeyDecrypters(cfg)
 	if err != nil {
@@ -20,7 +22,7 @@ func LoadKeys(cfg Config) (multibls.PrivateKeys, error) {
 	return helper.loadKeys()
 }
 
-// Loader is the structure to load bls keys.
+// Config is the config structure for LoadKeys.
 type Config struct {
 	// source for bls key loading. At least one of the MultiBlsKeys and BlsDir
 	// need to be provided.
@@ -76,8 +78,8 @@ func (cfg *Config) getKmsProviderConfig() kmsDecrypterConfig {
 
 // keyDecrypter is the interface to decrypt the bls key file. Currently, two
 // implementations are supported:
-//   passDecrypter - decrypt with passphrase
-//   kmsDecrypter  - decrypt with aws kms service
+//   passDecrypter - decrypt with passphrase for file name with extension .key
+//   kmsDecrypter  - decrypt with aws kms service for file name with extension .bls
 type keyDecrypter interface {
 	extension() string
 	decryptFile(keyFile string) (*bls_core.SecretKey, error)

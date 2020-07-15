@@ -19,12 +19,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type AwsConfiguration struct {
-	AccessKey string `json:"aws-access-key-id"`
-	SecretKey string `json:"aws-secret-access-key"`
-	Region    string `json:"aws-region"`
-}
-
 // GenBLSKeyWithPassPhrase generates bls key with passphrase and write into disk.
 func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
 	privateKey := bls.RandPrivateKey()

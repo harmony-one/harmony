@@ -19,9 +19,9 @@ var (
 	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 10, "Maximum number of bls keys allowed per node (default 4)")
 
 	// TODO(jacky): rename it to a better name with cobra alias
-	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$CONFIG_FILE, none)")
+	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$PASS_FILE, none)")
 	persistPass     = flag.Bool("save-passphrase", false, "Whether the prompt passphrase is saved after prompt.")
-	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, none, file:$CONFIG_FILE)")
+	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, file:$CONFIG_FILE, none)")
 )
 
 var (

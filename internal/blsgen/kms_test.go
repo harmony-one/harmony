@@ -246,10 +246,10 @@ func TestKMSEncryption(t *testing.T) {
 		t.Fatal(err)
 	}
 	privHex := testKeys[0].privateKey
-	keyId := "26adbb7b-6c46-4763-a7b3-de7ee768890a" // Replace your key ID here
+	keyID := "26adbb7b-6c46-4763-a7b3-de7ee768890a" // Replace your key ID here
 
 	output, err := client.Encrypt(&kms.EncryptInput{
-		KeyId:     &keyId,
+		KeyId:     &keyID,
 		Plaintext: common.Hex2Bytes(privHex),
 	})
 	if err != nil {

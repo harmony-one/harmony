@@ -322,7 +322,7 @@ do
    l) broadcast_invalid_tx=false;;
    L) log_level="${OPTARG}";;
 
-   M) msg "WARNING: Legacy flag -M";;
+   M) msg "WARNING: deprecated flag -M: Multi BLS is always enabled, and it's safe to remove this flag.";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
