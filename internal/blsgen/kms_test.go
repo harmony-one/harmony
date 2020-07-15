@@ -240,7 +240,7 @@ func TestFileACProvider_getAwsConfig(t *testing.T) {
 // To successfully run this test, need to set the AWS default configuration and set up kms
 // key and replace keyId field.
 func TestKMSEncryption(t *testing.T) {
-	//t.SkipNow()
+	t.SkipNow()
 	client, err := getSharedKMSClient()
 	if err != nil {
 		t.Fatal(err)
