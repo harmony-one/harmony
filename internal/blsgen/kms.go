@@ -1,7 +1,9 @@
 package blsgen
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"time"
 
@@ -47,7 +49,7 @@ type kmsDecrypterConfig struct {
 type kmsDecrypter struct {
 	config kmsDecrypterConfig
 
-	provider awsOptProvider
+	provider awsConfigProvider
 	client   *kms.KMS
 	err      error
 	once     sync.Once
@@ -97,22 +99,22 @@ func (kd *kmsDecrypter) makeACProvider() {
 	config := kd.config
 	switch config.awsCfgSrcType {
 	case AwsCfgSrcFile:
-		kd.provider = newFileAOProvider(*config.awsConfigFile)
+		kd.provider = newFileACProvider(*config.awsConfigFile)
 	case AwsCfgSrcPrompt:
-		kd.provider = newPromptAOProvider(defKmsPromptTimeout)
+		kd.provider = newPromptACProvider(defKmsPromptTimeout)
 	case AwsCfgSrcShared:
-		kd.provider = newSharedAOProvider()
+		kd.provider = newSharedAwsConfigProvider()
 	}
 }
 
 func (kd *kmsDecrypter) getKMSClient() (*kms.KMS, error) {
 	kd.once.Do(func() {
-		opt, err := kd.provider.getAwsOpt()
+		cfg, err := kd.provider.getAwsConfig()
 		if err != nil {
 			kd.err = err
 			return
 		}
-		kd.client, kd.err = kmsClientWithOpt(opt)
+		kd.client, kd.err = kmsClientWithConfig(cfg)
 	})
 	if kd.err != nil {
 		return nil, kd.err
@@ -120,82 +122,102 @@ func (kd *kmsDecrypter) getKMSClient() (*kms.KMS, error) {
 	return kd.client, nil
 }
 
-// awsOptProvider provides the aws session option. Implemented by
-//   sharedAOProvider - provide the nil to use shared AWS configuration
-//   fileAOProvider   - provide the aws config with a json file
-//   promptAOProvider - provide the config field from prompt with time out
-type awsOptProvider interface {
-	getAwsOpt() (session.Options, error)
+// AwsConfig is the config data structure for credentials and region. Used for AWS KMS
+// decryption.
+// TODO(jacky): change the format to aws default config format
+type AwsConfig struct {
+	AccessKey string `json:"aws-access-key-id"`
+	SecretKey string `json:"aws-secret-access-key"`
+	Region    string `json:"aws-region"`
+	Token     string `json:"aws-token,omitempty"`
 }
 
-// sharedAOProvider returns the shared aws config
-type sharedAOProvider struct{}
-
-func newSharedAOProvider() *sharedAOProvider {
-	return &sharedAOProvider{}
+func (cfg AwsConfig) toAws() *aws.Config {
+	cred := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, cfg.Token)
+	return &aws.Config{
+		Region:      aws.String(cfg.Region),
+		Credentials: cred,
+	}
 }
 
-func (provider *sharedAOProvider) getAwsOpt() (session.Options, error) {
-	return session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}, nil
+// awsConfigProvider provides the aws config. Implemented by
+//   sharedACProvider - provide the nil to use shared AWS configuration
+//   fileACProvider   - provide the aws config with a json file
+//   promptACProvider - provide the config field from prompt with time out
+type awsConfigProvider interface {
+	getAwsConfig() (*AwsConfig, error)
 }
 
-// fileAOProvider get aws config through a customized json file
-type fileAOProvider struct {
+// sharedACProvider returns nil for getAwsConfig to use shared aws configurations
+type sharedACProvider struct{}
+
+func newSharedAwsConfigProvider() *sharedACProvider {
+	return &sharedACProvider{}
+}
+
+func (provider *sharedACProvider) getAwsConfig() (*AwsConfig, error) {
+	return nil, nil
+}
+
+// fileACProvider get aws config through a customized json file
+type fileACProvider struct {
 	file string
 }
 
-func newFileAOProvider(file string) *fileAOProvider {
-	return &fileAOProvider{file}
+func newFileACProvider(file string) *fileACProvider {
+	return &fileACProvider{file}
 }
 
-func (provider *fileAOProvider) getAwsOpt() (session.Options, error) {
-	return session.Options{
-		SharedConfigFiles: []string{provider.file},
-		SharedConfigState: session.SharedConfigEnable,
-	}, nil
+func (provider *fileACProvider) getAwsConfig() (*AwsConfig, error) {
+	b, err := ioutil.ReadFile(provider.file)
+	if err != nil {
+		return nil, err
+	}
+	var cfg AwsConfig
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
 }
 
-// promptAOProvider provide a user interactive console for AWS config.
+// promptACProvider provide a user interactive console for AWS config.
 // Four fields are asked:
 //    1. AccessKey  	2. SecretKey		3. Region
 // Each field is asked with a timeout mechanism.
-type promptAOProvider struct {
+type promptACProvider struct {
 	timeout time.Duration
 }
 
-func newPromptAOProvider(timeout time.Duration) *promptAOProvider {
-	return &promptAOProvider{
+func newPromptACProvider(timeout time.Duration) *promptACProvider {
+	return &promptACProvider{
 		timeout: timeout,
 	}
 }
 
-func (provider *promptAOProvider) getAwsOpt() (session.Options, error) {
+func (provider *promptACProvider) getAwsConfig() (*AwsConfig, error) {
 	console.println("Please provide AWS configurations for KMS encoded BLS keys:")
 	accessKey, err := provider.prompt("  AccessKey:")
 	if err != nil {
-		return session.Options{}, fmt.Errorf("cannot get aws access key: %v", err)
+		return nil, fmt.Errorf("cannot get aws access key: %v", err)
 	}
 	secretKey, err := provider.prompt("  SecretKey:")
 	if err != nil {
-		return session.Options{}, fmt.Errorf("cannot get aws secret key: %v", err)
+		return nil, fmt.Errorf("cannot get aws secret key: %v", err)
 	}
 	region, err := provider.prompt("Region:")
 	if err != nil {
-		return session.Options{}, fmt.Errorf("cannot get aws region: %v", err)
+		return nil, fmt.Errorf("cannot get aws region: %v", err)
 	}
-	return session.Options{
-		Config: aws.Config{
-			Region:      aws.String(region),
-			Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
-		},
-		SharedConfigState: session.SharedConfigEnable,
+	return &AwsConfig{
+		AccessKey: accessKey,
+		SecretKey: secretKey,
+		Region:    region,
+		Token:     "",
 	}, nil
 }
 
 // prompt prompt the user to input a string for a certain field with timeout.
-func (provider *promptAOProvider) prompt(hint string) (string, error) {
+func (provider *promptACProvider) prompt(hint string) (string, error) {
 	var (
 		res string
 		err error
@@ -220,15 +242,32 @@ func (provider *promptAOProvider) prompt(hint string) (string, error) {
 	}
 }
 
-func (provider *promptAOProvider) threadedPrompt(cs consoleItf, hint string) (string, error) {
+func (provider *promptACProvider) threadedPrompt(cs consoleItf, hint string) (string, error) {
 	cs.print(hint)
 	return cs.readPassword()
 }
 
-func kmsClientWithOpt(opt session.Options) (*kms.KMS, error) {
-	sess, err := session.NewSessionWithOptions(opt)
+func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
+	if config == nil {
+		return getSharedKMSClient()
+	}
+	return getKMSClientFromConfig(*config)
+}
+
+func getSharedKMSClient() (*kms.KMS, error) {
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create aws session")
 	}
 	return kms.New(sess), err
+}
+
+func getKMSClientFromConfig(config AwsConfig) (*kms.KMS, error) {
+	sess, err := session.NewSession(config.toAws())
+	if err != nil {
+		return nil, err
+	}
+	return kms.New(sess), nil
 }
