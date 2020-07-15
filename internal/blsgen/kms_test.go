@@ -1,6 +1,7 @@
 package blsgen
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,11 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/ethereum/go-ethereum/common"
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 var TestAwsConfig = AwsConfig{
@@ -227,5 +233,39 @@ func TestFileACProvider_getAwsConfig(t *testing.T) {
 			t.Errorf("Test %v: unexpected AwsConfig: %+v / %+v", i,
 				got, test.expConfig)
 		}
+	}
+}
+
+// This is the learning test for kms encryption and decryption. This is just to illustrate
+// To successfully run this test, need to set the AWS default configuration and set up kms
+// key and replace keyId field.
+func TestKMSEncryption(t *testing.T) {
+	//t.SkipNow()
+	client, err := getSharedKMSClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	privHex := testKeys[0].privateKey
+	keyId := "26adbb7b-6c46-4763-a7b3-de7ee768890a" // Replace your key ID here
+
+	output, err := client.Encrypt(&kms.EncryptInput{
+		KeyId:     &keyId,
+		Plaintext: common.Hex2Bytes(privHex),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("encrypted: [%x]\n", output.CiphertextBlob)
+	decryted, err := client.Decrypt(&kms.DecryptInput{CiphertextBlob: output.CiphertextBlob})
+	if err != nil {
+		t.Fatal(err)
+	}
+	priKey := &ffi_bls.SecretKey{}
+	if err = priKey.DeserializeHexStr(hex.EncodeToString(decryted.Plaintext)); err != nil {
+		t.Fatal(err)
+	}
+	pubKey := bls.FromLibBLSPublicKeyUnsafe(priKey.GetPublicKey())
+	if hex.EncodeToString(pubKey[:]) != testKeys[0].publicKey {
+		t.Errorf("unexpected public key")
 	}
 }
