@@ -745,6 +745,8 @@ func main() {
 		).
 		Msg(startMsg)
 
+	nodeconfig.SetPeerID(myHost.GetID().Pretty())
+
 	go currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()

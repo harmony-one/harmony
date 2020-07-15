@@ -63,6 +63,7 @@ const (
 
 var version string
 var publicRPC bool // enable public RPC access
+var peerID string  // PeerID of the node
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
@@ -220,6 +221,16 @@ func SetVersion(ver string) {
 // GetVersion return the version of the node binary
 func GetVersion() string {
 	return version
+}
+
+// SetPeerID set the peer ID of the node
+func SetPeerID(pid string) {
+	peerID = pid
+}
+
+// GetPeerID returns the peer ID of the node
+func GetPeerID() string {
+	return peerID
 }
 
 // SetPublicRPC set the boolean value of public RPC access

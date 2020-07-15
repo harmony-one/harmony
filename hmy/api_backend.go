@@ -857,6 +857,7 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.DNSZone,
 		cfg.GetArchival(),
 		b.hmy.nodeAPI.GetNodeBootTime(),
+		nodeconfig.GetPeerID(),
 		c,
 	}
 }
