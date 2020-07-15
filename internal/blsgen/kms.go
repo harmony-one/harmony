@@ -237,6 +237,7 @@ func (provider *promptACProvider) prompt(hint string) (string, error) {
 		case <-finished:
 			return res, err
 		case <-timedOut:
+			console.println("ERROR input time out")
 			return "", errors.New("timed out")
 		}
 	}
