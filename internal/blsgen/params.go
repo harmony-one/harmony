@@ -12,7 +12,7 @@ const (
 const (
 	// The default timeout for kms config prompt. The timeout is introduced
 	// for security concern.
-	defKmsPromptTimeout = 1 * time.Second
+	defKmsPromptTimeout = 10 * time.Second
 )
 
 const (

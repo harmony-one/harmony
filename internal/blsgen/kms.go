@@ -204,7 +204,7 @@ func (provider *promptACProvider) getAwsConfig() (*AwsConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws secret key: %v", err)
 	}
-	region, err := provider.prompt("Region:")
+	region, err := provider.prompt("  Region:")
 	if err != nil {
 		return nil, fmt.Errorf("cannot get aws region: %v", err)
 	}
