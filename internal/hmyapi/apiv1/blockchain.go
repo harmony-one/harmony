@@ -87,7 +87,8 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		response, err := RPCMarshalBlock(block, blockArgs)
+		leader := s.b.GetLeaderAddress(block.Header().Coinbase(), block.Header().Epoch())
+		response, err := RPCMarshalBlock(block, blockArgs, leader)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
@@ -105,7 +106,8 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		return RPCMarshalBlock(block, blockArgs)
+		leader := s.b.GetLeaderAddress(block.Header().Coinbase(), block.Header().Epoch())
+		return RPCMarshalBlock(block, blockArgs, leader)
 	}
 	return nil, err
 }
@@ -126,7 +128,8 @@ func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr r
 		}
 	}
 	if block != nil {
-		response, err := RPCMarshalBlock(block, blockArgs)
+		leader := s.b.GetLeaderAddress(block.Header().Coinbase(), block.Header().Epoch())
+		response, err := RPCMarshalBlock(block, blockArgs, leader)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
@@ -151,7 +154,8 @@ func (s *PublicBlockChainAPI) GetBlockByHashNew(ctx context.Context, blockHash c
 		}
 	}
 	if block != nil {
-		return RPCMarshalBlock(block, blockArgs)
+		leader := s.b.GetLeaderAddress(block.Header().Coinbase(), block.Header().Epoch())
+		return RPCMarshalBlock(block, blockArgs, leader)
 	}
 	return nil, err
 }
@@ -169,7 +173,8 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart rpc.Bloc
 			}
 		}
 		if block != nil {
-			rpcBlock, err := RPCMarshalBlock(block, blockArgs)
+			leader := s.b.GetLeaderAddress(block.Header().Coinbase(), block.Header().Epoch())
+			rpcBlock, err := RPCMarshalBlock(block, blockArgs, leader)
 			if err == nil && i == rpc.PendingBlockNumber {
 				// Pending blocks need to nil out a few fields
 				for _, field := range []string{"hash", "nonce", "miner"} {
@@ -574,7 +579,8 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 // LatestHeader returns the latest header information
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
-	return newHeaderInformation(header, s.b.IsStakingEpoch(header.Epoch()))
+	leader := s.b.GetLeaderAddress(header.Coinbase(), header.Epoch())
+	return newHeaderInformation(header, leader)
 }
 
 // GetHeaderByNumber returns block header at given number
@@ -586,7 +592,8 @@ func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, blockNum rp
 	if err != nil {
 		return nil, err
 	}
-	return newHeaderInformation(header, s.b.IsStakingEpoch(header.Epoch())), nil
+	leader := s.b.GetLeaderAddress(header.Coinbase(), header.Epoch())
+	return newHeaderInformation(header, leader), nil
 }
 
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
@@ -619,10 +626,11 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-	addresses := []string{}
-	for _, addr := range s.b.GetAllValidatorAddresses() {
+	validatorAddresses := s.b.GetAllValidatorAddresses()
+	addresses := make([]string, len(validatorAddresses))
+	for i, addr := range validatorAddresses {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
-		addresses = append(addresses, oneAddr)
+		addresses[i] = oneAddr
 	}
 	return addresses, nil
 }
@@ -632,10 +640,11 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-	addresses := []string{}
-	for _, addr := range s.b.GetElectedValidatorAddresses() {
+	electedAddresses := s.b.GetElectedValidatorAddresses()
+	addresses := make([]string, len(electedAddresses))
+	for i, addr := range electedAddresses {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
-		addresses = append(addresses, oneAddr)
+		addresses[i] = oneAddr
 	}
 	return addresses, nil
 }
