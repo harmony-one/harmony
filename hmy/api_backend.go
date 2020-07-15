@@ -3,7 +3,6 @@ package hmy
 import (
 	"context"
 	"fmt"
-	"github.com/harmony-one/harmony/internal/utils"
 	"math/big"
 	"sync"
 
@@ -27,6 +26,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
