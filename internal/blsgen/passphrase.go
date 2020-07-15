@@ -20,10 +20,14 @@ import (
 type PassSrcType uint8
 
 const (
-	PassSrcNil    PassSrcType = iota // place holder for nil src
-	PassSrcFile                      // provide the passphrase through pass files
-	PassSrcPrompt                    // provide the passphrase through prompt
-	PassSrcAuto                      // first try to unlock with pass from file, then look for prompt
+	// PassSrcNil is place holder for nil src
+	PassSrcNil PassSrcType = iota
+	// PassSrcFile provide the passphrase through pass files
+	PassSrcFile
+	// PassSrcPrompt provide the passphrase through prompt
+	PassSrcPrompt
+	// PassSrcAuto first try to unlock with pass from file, then look for prompt
+	PassSrcAuto
 )
 
 func (srcType PassSrcType) isValid() bool {

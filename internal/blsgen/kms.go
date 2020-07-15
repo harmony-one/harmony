@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AwsConfigSrcType is the type of src to load aws config. Four options available:
+// AwsCfgSrcType is the type of src to load aws config. Four options available:
 //  AwsCfgSrcNil    - Disable kms decryption
 //  AwsCfgSrcFile   - Provide the aws config through a file (json).
 //  AwsCfgSrcPrompt - Provide the aws config though prompt.
@@ -23,10 +23,14 @@ import (
 type AwsCfgSrcType uint8
 
 const (
-	AwsCfgSrcNil    AwsCfgSrcType = iota // nil place holder.
-	AwsCfgSrcFile                        // through a config file (json)
-	AwsCfgSrcPrompt                      // through console prompt.
-	AwsCfgSrcShared                      // through shared aws config
+	// AwsCfgSrcNil is the nil place holder for AwsCfgSrcType.
+	AwsCfgSrcNil AwsCfgSrcType = iota
+	// AwsCfgSrcFile instruct reading aws config through a json file.
+	AwsCfgSrcFile
+	// AwsCfgSrcPrompt use a user interactive prompt to ge aws config.
+	AwsCfgSrcPrompt
+	// AwsCfgSrcShared use shared AWS config and credentials from env and ~/.aws files.
+	AwsCfgSrcShared
 )
 
 func (srcType AwsCfgSrcType) isValid() bool {
@@ -124,7 +128,6 @@ func (kd *kmsDecrypter) getKMSClient() (*kms.KMS, error) {
 
 // AwsConfig is the config data structure for credentials and region. Used for AWS KMS
 // decryption.
-// TODO(jacky): change the format to aws default config format
 type AwsConfig struct {
 	AccessKey string `json:"aws-access-key-id"`
 	SecretKey string `json:"aws-secret-access-key"`
@@ -144,6 +147,8 @@ func (cfg AwsConfig) toAws() *aws.Config {
 //   sharedACProvider - provide the nil to use shared AWS configuration
 //   fileACProvider   - provide the aws config with a json file
 //   promptACProvider - provide the config field from prompt with time out
+// TODO: load aws session set up in a more official way. E.g. session.Opt.SharedConfigFiles,
+//   profile, env, e.t.c.
 type awsConfigProvider interface {
 	getAwsConfig() (*AwsConfig, error)
 }
