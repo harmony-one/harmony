@@ -235,6 +235,9 @@ examples:
 # supply passphrase file using -p option (single passphrase will be used for all bls keys)
    ${progname} -S -p blspass.txt
 
+# disable interactive console for passphrase (prepare .pass file before running command)
+   ${progname} -S -C
+
 
 ENDEND
 }
@@ -262,7 +265,6 @@ node_type=validator
 shard_id=-1
 public_rpc=false
 staking_mode=false
-blsfolder=./.hmy/blskeys
 archival=false
 blacklist=./.hmy/blacklist.txt
 pprof=""
@@ -279,7 +281,7 @@ ${TRACEFILE=}
 
 unset OPTIND OPTARG opt
 OPTIND=1
-while getopts :1chk:sSp:dDN:T:i:U:PvVyzn:MAIB:r:Y:f:R:m:L:l opt
+while getopts :1cChk:sSp:dDN:T:i:U:PvVyzn:MAIB:r:Y:f:R:m:L:l opt
 do
    case "${opt}" in
    '?') usage "unrecognized option -${OPTARG}";;
@@ -320,7 +322,7 @@ do
    l) broadcast_invalid_tx=false;;
    L) log_level="${OPTARG}";;
 
-   M) msg "Legacy flag -M";;
+   M) msg "WARNING: Legacy flag -M";;
    *) err 70 "unhandled option -${OPTARG}";;  # EX_SOFTWARE
    esac
 done
@@ -819,6 +821,7 @@ do
    *) ld_path_var=LD_LIBRARY_PATH;;
    esac
 
+   echo "${args[@]}" "${@}"
    env "${ld_path_var}=$(pwd)" ./harmony "${args[@]}" "${@}"
    msg "node process finished with status $?"
 
