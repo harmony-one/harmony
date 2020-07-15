@@ -1,34 +1,30 @@
 package blsgen
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 )
 
-var TestAwsConfig = AwsConfig{
-	AccessKey: "access key",
-	SecretKey: "secret key",
-	Region:    "region",
-}
+var (
+	AccessKey = "access key"
+	SecretKey = "secret key"
+	Region    = "region"
+)
 
 func TestNewKmsDecrypter(t *testing.T) {
 	unitTestDir := filepath.Join(baseTestDir, t.Name())
 	testFile := filepath.Join(unitTestDir, "test.json")
-	if err := writeAwsConfigFile(testFile, TestAwsConfig); err != nil {
+	if err := writeFile(testFile, "random string"); err != nil {
 		t.Fatal(err)
 	}
 	emptyFile := filepath.Join(unitTestDir, "empty.json")
 
 	tests := []struct {
 		config      kmsDecrypterConfig
-		expProvider awsConfigProvider
+		expProvider awsOptProvider
 		expErr      error
 	}{
 		{
@@ -41,20 +37,20 @@ func TestNewKmsDecrypter(t *testing.T) {
 			config: kmsDecrypterConfig{
 				awsCfgSrcType: AwsCfgSrcShared,
 			},
-			expProvider: &sharedACProvider{},
+			expProvider: &sharedAOProvider{},
 		},
 		{
 			config: kmsDecrypterConfig{
 				awsCfgSrcType: AwsCfgSrcPrompt,
 			},
-			expProvider: &promptACProvider{},
+			expProvider: &promptAOProvider{},
 		},
 		{
 			config: kmsDecrypterConfig{
 				awsCfgSrcType: AwsCfgSrcFile,
 				awsConfigFile: &testFile,
 			},
-			expProvider: &fileACProvider{},
+			expProvider: &fileAOProvider{},
 		},
 		{
 			config: kmsDecrypterConfig{
@@ -89,43 +85,28 @@ func TestNewKmsDecrypter(t *testing.T) {
 	}
 }
 
-func writeAwsConfigFile(file string, config AwsConfig) error {
-	b, err := json.Marshal(config)
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stat(filepath.Dir(file)); err != nil {
-		if os.IsNotExist(err) {
-			os.MkdirAll(filepath.Dir(file), 0700)
-		} else {
-			return err
-		}
-	}
-	return ioutil.WriteFile(file, b, 0700)
-}
-
 func TestPromptACProvider_getAwsConfig(t *testing.T) {
 	tc := newTestConsole()
 	setTestConsole(tc)
 
 	for _, input := range []string{
-		TestAwsConfig.AccessKey,
-		TestAwsConfig.SecretKey,
-		TestAwsConfig.Region,
+		AccessKey,
+		SecretKey,
+		Region,
 	} {
 		tc.In <- input
 	}
-	provider := newPromptACProvider(1 * time.Second)
-	got, err := provider.getAwsConfig()
+	provider := newPromptAOProvider(1 * time.Second)
+	got, err := provider.getAwsOpt()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(*got, TestAwsConfig) {
-		t.Errorf("unexpected result %+v / %+v", got, TestAwsConfig)
+	if *got.Config.Region != Region {
+		t.Errorf("unexpected region: %v / %v", got.Config.Region, Region)
 	}
 }
 
-func TestPromptACProvider_prompt(t *testing.T) {
+func TestPromptAOProvider_prompt(t *testing.T) {
 	tests := []struct {
 		delay, timeout time.Duration
 		expErr         error
@@ -150,7 +131,7 @@ func TestPromptACProvider_prompt(t *testing.T) {
 			<-time.After(test.delay)
 			tc.In <- testInput
 		}()
-		provider := newPromptACProvider(test.timeout)
+		provider := newPromptAOProvider(test.timeout)
 		got, err := provider.prompt("test ask string")
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
@@ -162,70 +143,6 @@ func TestPromptACProvider_prompt(t *testing.T) {
 		}
 		if got != testInput {
 			t.Errorf("Test %v: unexpected prompt result: %v / %v", i, got, testInput)
-		}
-	}
-}
-
-func TestFileACProvider_getAwsConfig(t *testing.T) {
-	jsonBytes, err := json.Marshal(TestAwsConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	unitTestDir := filepath.Join(baseTestDir, t.Name())
-
-	tests := []struct {
-		setupFunc func(rootDir string) error
-		expConfig AwsConfig
-		jsonFile  string
-		expErr    error
-	}{
-		{
-			// positive
-			setupFunc: func(rootDir string) error {
-				jsonFile := filepath.Join(rootDir, "valid.json")
-				return writeFile(jsonFile, string(jsonBytes))
-			},
-			jsonFile:  "valid.json",
-			expConfig: TestAwsConfig,
-		},
-		{
-			// no such file
-			setupFunc: nil,
-			jsonFile:  "empty.json",
-			expErr:    errors.New("no such file"),
-		},
-		{
-			// invalid json string
-			setupFunc: func(rootDir string) error {
-				jsonFile := filepath.Join(rootDir, "invalid.json")
-				return writeFile(jsonFile, string(jsonBytes[:len(jsonBytes)-2]))
-			},
-			jsonFile: "invalid.json",
-			expErr:   errors.New("unexpected end of JSON input"),
-		},
-	}
-	for i, test := range tests {
-		tcDir := filepath.Join(unitTestDir, fmt.Sprintf("%v", i))
-		os.RemoveAll(tcDir)
-		os.MkdirAll(tcDir, 0700)
-		if test.setupFunc != nil {
-			if err := test.setupFunc(tcDir); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		provider := newFileACProvider(filepath.Join(tcDir, test.jsonFile))
-		got, err := provider.getAwsConfig()
-
-		if assErr := assertError(err, test.expErr); assErr != nil {
-			t.Errorf("Test %v: %v", i, assErr)
-		}
-		if err != nil || test.expErr != nil {
-			continue
-		}
-		if got == nil || !reflect.DeepEqual(*got, test.expConfig) {
-			t.Errorf("Test %v: unexpected AwsConfig: %+v / %+v", i,
-				got, test.expConfig)
 		}
 	}
 }
