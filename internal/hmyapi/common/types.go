@@ -23,5 +23,6 @@ type NodeMetadata struct {
 	DNSZone        string             `json:"dns-zone"`
 	Archival       bool               `json:"is-archival"`
 	NodeBootTime   int64              `json:"node-unix-start-time"`
+	PeerID         string             `json:"peerid"`
 	C              C                  `json:"p2p-connectivity"`
 }
