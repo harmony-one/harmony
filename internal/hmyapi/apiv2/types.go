@@ -39,7 +39,7 @@ type RPCBlock struct {
 	TransactionsRoot common.Hash      `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
 	Transactions     []interface{}    `json:"transactions"`
-	StakingTxs       []interface{}    `json:"stakingTxs`
+	StakingTxs       []interface{}    `json:"stakingTxs"`
 	Uncles           []common.Hash    `json:"uncles"`
 	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
 	Signers          []string         `json:"signers"`
@@ -145,7 +145,7 @@ type StakingNetworkInfo struct {
 	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
 
-func newHeaderInformation(header *block.Header, isStaking bool) *HeaderInformation {
+func newHeaderInformation(header *block.Header, leader string) *HeaderInformation {
 	if header == nil {
 		return nil
 	}
@@ -154,6 +154,7 @@ func newHeaderInformation(header *block.Header, isStaking bool) *HeaderInformati
 		BlockHash:        header.Hash(),
 		BlockNumber:      header.Number().Uint64(),
 		ShardID:          header.ShardID(),
+		Leader:           leader,
 		ViewID:           header.ViewID().Uint64(),
 		Epoch:            header.Epoch().Uint64(),
 		UnixTime:         header.Time().Uint64(),
@@ -163,8 +164,6 @@ func newHeaderInformation(header *block.Header, isStaking bool) *HeaderInformati
 
 	sig := header.LastCommitSignature()
 	result.LastCommitSig = hex.EncodeToString(sig[:])
-
-	result.Leader = getRPCLeader(header, isStaking)
 
 	if header.ShardID() == shard.BeaconChainShardID {
 		decodedCrossLinks := &types.CrossLinks{}
@@ -427,7 +426,7 @@ func newRPCStakingTransaction(
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs, isStaking bool) (map[string]interface{}, error) {
+func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs, leader string) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*big.Int)(head.Number()),
@@ -439,6 +438,7 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs, isStaking bool) (map[s
 		"mixHash":          head.MixDigest(),
 		"logsBloom":        head.Bloom(),
 		"stateRoot":        head.Root(),
+		"miner":            leader,
 		"difficulty":       0, // Remove this because we don't have it in our header
 		"extraData":        hexutil.Bytes(head.Extra()),
 		"size":             uint64(b.Size()),
@@ -448,8 +448,6 @@ func RPCMarshalBlock(b *types.Block, blockArgs BlockArgs, isStaking bool) (map[s
 		"transactionsRoot": head.TxHash(),
 		"receiptsRoot":     head.ReceiptHash(),
 	}
-
-	fields["miner"] = getRPCLeader(head, isStaking)
 
 	if blockArgs.InclTx {
 		formatTx := func(tx *types.Transaction) (interface{}, error) {
@@ -538,18 +536,4 @@ func newRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) *RPCSt
 		return nil
 	}
 	return newRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
-}
-
-// getRPCLeader returns either the leader one address (before staking)
-// or the first 20 bytes of the leader bls public key (after staking)
-func getRPCLeader(h *block.Header, isStaking bool) string {
-	if isStaking {
-		return strings.ToLower(h.Coinbase().Hex())
-	} else {
-		addr, err := internal_common.AddressToBech32(h.Coinbase())
-		if err != nil {
-			addr = h.Coinbase().Hex()
-		}
-		return addr
-	}
 }

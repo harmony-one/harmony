@@ -3,6 +3,7 @@ package hmy
 import (
 	"context"
 	"fmt"
+	"github.com/harmony-one/harmony/internal/utils"
 	"math/big"
 	"sync"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 )
@@ -50,7 +52,8 @@ type APIBackend struct {
 		BlockHeight  int64
 		TotalStaking *big.Int
 	}
-	apiCache singleflight.Group
+	apiCache    singleflight.Group
+	LeaderCache *lru.Cache
 }
 
 // SingleFlightRequest ...
@@ -893,4 +896,30 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 // IsStakingEpoch ...
 func (b *APIBackend) IsStakingEpoch(epoch *big.Int) bool {
 	return b.hmy.BlockChain().Config().IsStaking(epoch)
+}
+
+// GetLeaderAddress returns the one address of the leader
+func (b *APIBackend) GetLeaderAddress(a common.Address, e *big.Int) string {
+	if b.IsStakingEpoch(e) {
+		if leader, exists := b.LeaderCache.Get(a); exists {
+			bech32, _ := internal_common.AddressToBech32(leader.(common.Address))
+			return bech32
+		}
+		committee, err := b.GetValidators(e)
+		if err != nil {
+			return ""
+		}
+		for _, v := range committee.Slots {
+			addr := utils.GetAddressFromBLSPubKeyBytes(v.BLSPublicKey[:])
+			b.LeaderCache.Add(addr, v.EcdsaAddress)
+			if addr == a {
+				bech32, _ := internal_common.AddressToBech32(v.EcdsaAddress)
+				return bech32
+			}
+		}
+		// Did not find matching address
+		return "missing" // FIXME: Change this to empty string
+	}
+	bech32, _ := internal_common.AddressToBech32(a)
+	return bech32
 }

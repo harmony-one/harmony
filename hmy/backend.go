@@ -11,6 +11,11 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
+	lru "github.com/hashicorp/golang-lru"
+)
+
+const (
+	leaderCacheSize = 250 // Approx number of BLS keys in committee
 )
 
 // Harmony implements the Harmony full node service.
@@ -73,7 +78,9 @@ func New(
 		networkID:     1, // TODO(ricl): this should be from config
 		shardID:       shardID,
 	}
-	hmy.APIBackend = &APIBackend{hmy: hmy,
+	cache, _ := lru.New(leaderCacheSize)
+	hmy.APIBackend = &APIBackend{
+		hmy: hmy,
 		TotalStakingCache: struct {
 			sync.Mutex
 			BlockHeight  int64
@@ -82,6 +89,7 @@ func New(
 			BlockHeight:  -1,
 			TotalStaking: big.NewInt(0),
 		},
+		LeaderCache: cache,
 	}
 	return hmy, nil
 }
