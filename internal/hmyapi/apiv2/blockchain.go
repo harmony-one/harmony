@@ -563,10 +563,11 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-	addresses := []string{}
-	for _, addr := range s.b.GetAllValidatorAddresses() {
+	validatorAddresses := s.b.GetAllValidatorAddresses()
+	addresses := make([]string, len(validatorAddresses))
+	for i, addr := range validatorAddresses {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
-		addresses = append(addresses, oneAddr)
+		addresses[i] = oneAddr
 	}
 	return addresses, nil
 }
@@ -576,10 +577,11 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-	addresses := []string{}
-	for _, addr := range s.b.GetElectedValidatorAddresses() {
+	electedAddresses := s.b.GetElectedValidatorAddresses()
+	addresses := make([]string, len(electedAddresses))
+	for i, addr := range electedAddresses {
 		oneAddr, _ := internal_common.AddressToBech32(addr)
-		addresses = append(addresses, oneAddr)
+		addresses[i] = oneAddr
 	}
 	return addresses, nil
 }
