@@ -2,272 +2,230 @@ package blsgen
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"sync"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/kms"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/pkg/errors"
 )
 
-// AwsConfigSrcType is the type of src to load aws config. Four options available:
-//  AwsCfgSrcNil    - Disable kms decryption
-//  AwsCfgSrcFile   - Provide the aws config through a file (json).
-//  AwsCfgSrcPrompt - Provide the aws config though prompt.
-//  AwsCfgSrcShared - Use the shard aws config (env -> default .aws directory)
-type AwsCfgSrcType uint8
+var TestAwsConfig = AwsConfig{
+	AccessKey: "access key",
+	SecretKey: "secret key",
+	Region:    "region",
+}
 
-const (
-	AwsCfgSrcNil    AwsCfgSrcType = iota // nil place holder.
-	AwsCfgSrcFile                        // through a config file (json)
-	AwsCfgSrcPrompt                      // through console prompt.
-	AwsCfgSrcShared                      // through shared aws config
-)
-
-func (srcType AwsCfgSrcType) isValid() bool {
-	switch srcType {
-	case AwsCfgSrcFile, AwsCfgSrcPrompt, AwsCfgSrcShared:
-		return true
-	default:
-		return false
+func TestNewKmsDecrypter(t *testing.T) {
+	unitTestDir := filepath.Join(baseTestDir, t.Name())
+	testFile := filepath.Join(unitTestDir, "test.json")
+	if err := writeAwsConfigFile(testFile, TestAwsConfig); err != nil {
+		t.Fatal(err)
 	}
-}
+	emptyFile := filepath.Join(unitTestDir, "empty.json")
 
-// kmsDecrypterConfig is the data structure of kmsClientProvider config
-type kmsDecrypterConfig struct {
-	awsCfgSrcType AwsCfgSrcType
-	awsConfigFile *string
-}
-
-// kmsDecrypter provide the kms client with singleton lazy initialization with config get
-// from awsConfigProvider for aws credential and regions loading.
-type kmsDecrypter struct {
-	config kmsDecrypterConfig
-
-	provider awsConfigProvider
-	client   *kms.KMS
-	err      error
-	once     sync.Once
-}
-
-// newKmsDecrypter creates a kmsDecrypter with the given config
-func newKmsDecrypter(config kmsDecrypterConfig) (*kmsDecrypter, error) {
-	kd := &kmsDecrypter{config: config}
-	if err := kd.validateConfig(); err != nil {
-		return nil, err
+	tests := []struct {
+		config      kmsDecrypterConfig
+		expProvider awsConfigProvider
+		expErr      error
+	}{
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcNil,
+			},
+			expErr: errors.New("unknown AwsCfgSrcType"),
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcShared,
+			},
+			expProvider: &sharedACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcPrompt,
+			},
+			expProvider: &promptACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+				awsConfigFile: &testFile,
+			},
+			expProvider: &fileACProvider{},
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+			},
+			expErr: errors.New("config field AwsConfig file must set for AwsCfgSrcFile"),
+		},
+		{
+			config: kmsDecrypterConfig{
+				awsCfgSrcType: AwsCfgSrcFile,
+				awsConfigFile: &emptyFile,
+			},
+			expErr: errors.New("no such file"),
+		},
 	}
-	kd.makeACProvider()
-	return kd, nil
-}
+	for i, test := range tests {
+		kd, err := newKmsDecrypter(test.config)
 
-// extension returns the kms key file extension
-func (kd *kmsDecrypter) extension() string {
-	return kmsKeyExt
-}
-
-// decryptFile decrypt a kms key file to a secret key
-func (kd *kmsDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
-	kms, err := kd.getKMSClient()
-	if err != nil {
-		return nil, err
-	}
-	return LoadAwsCMKEncryptedBLSKey(keyFile, kms)
-}
-
-func (kd *kmsDecrypter) validateConfig() error {
-	config := kd.config
-	if !config.awsCfgSrcType.isValid() {
-		return errors.New("unknown AwsCfgSrcType")
-	}
-	if config.awsCfgSrcType == AwsCfgSrcFile {
-		if !stringIsSet(config.awsConfigFile) {
-			return errors.New("config field AwsConfig file must set for AwsCfgSrcFile")
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
 		}
-		if err := checkIsFile(*config.awsConfigFile); err != nil {
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		gotType := reflect.TypeOf(kd.provider).Elem()
+		expType := reflect.TypeOf(test.expProvider).Elem()
+		if gotType != expType {
+			t.Errorf("Test %v: unexpected aws config provider type: %v / %v",
+				i, gotType, expType)
+		}
+	}
+}
+
+func writeAwsConfigFile(file string, config AwsConfig) error {
+	b, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Dir(file)); err != nil {
+		if os.IsNotExist(err) {
+			os.MkdirAll(filepath.Dir(file), 0700)
+		} else {
 			return err
 		}
 	}
-	return nil
+	return ioutil.WriteFile(file, b, 0700)
 }
 
-func (kd *kmsDecrypter) makeACProvider() {
-	config := kd.config
-	switch config.awsCfgSrcType {
-	case AwsCfgSrcFile:
-		kd.provider = newFileACProvider(*config.awsConfigFile)
-	case AwsCfgSrcPrompt:
-		kd.provider = newPromptACProvider(defKmsPromptTimeout)
-	case AwsCfgSrcShared:
-		kd.provider = newSharedAwsConfigProvider()
+func TestPromptACProvider_getAwsConfig(t *testing.T) {
+	tc := newTestConsole()
+	setTestConsole(tc)
+
+	for _, input := range []string{
+		TestAwsConfig.AccessKey,
+		TestAwsConfig.SecretKey,
+		TestAwsConfig.Region,
+	} {
+		tc.In <- input
+	}
+	provider := newPromptACProvider(1 * time.Second)
+	got, err := provider.getAwsConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(*got, TestAwsConfig) {
+		t.Errorf("unexpected result %+v / %+v", got, TestAwsConfig)
 	}
 }
 
-func (kd *kmsDecrypter) getKMSClient() (*kms.KMS, error) {
-	kd.once.Do(func() {
-		cfg, err := kd.provider.getAwsConfig()
+func TestPromptACProvider_prompt(t *testing.T) {
+	tests := []struct {
+		delay, timeout time.Duration
+		expErr         error
+	}{
+		{
+			delay:   100 * time.Microsecond,
+			timeout: 1000 * time.Microsecond,
+			expErr:  nil,
+		},
+		{
+			delay:   2000 * time.Microsecond,
+			timeout: 1000 * time.Microsecond,
+			expErr:  errors.New("timed out"),
+		},
+	}
+	for i, test := range tests {
+		tc := newTestConsole()
+		setTestConsole(tc)
+
+		testInput := "test"
+		go func() {
+			<-time.After(test.delay)
+			tc.In <- testInput
+		}()
+		provider := newPromptACProvider(test.timeout)
+		got, err := provider.prompt("test ask string")
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+			continue
+		}
 		if err != nil {
-			kd.err = err
-			return
+			continue
 		}
-		kd.client, kd.err = kmsClientWithConfig(cfg)
-	})
-	if kd.err != nil {
-		return nil, kd.err
-	}
-	return kd.client, nil
-}
-
-// AwsConfig is the config data structure for credentials and region. Used for AWS KMS
-// decryption.
-// TODO(jacky): change the format to aws default config format
-type AwsConfig struct {
-	AccessKey string `json:"aws-access-key-id"`
-	SecretKey string `json:"aws-secret-access-key"`
-	Region    string `json:"aws-region"`
-	Token     string `json:"aws-token,omitempty"`
-}
-
-func (cfg AwsConfig) toAws() *aws.Config {
-	cred := credentials.NewStaticCredentials(cfg.AccessKey, cfg.SecretKey, cfg.Token)
-	return &aws.Config{
-		Region:      aws.String(cfg.Region),
-		Credentials: cred,
-	}
-}
-
-// awsConfigProvider provides the aws config. Implemented by
-//   sharedACProvider - provide the nil to use shared AWS configuration
-//   fileACProvider   - provide the aws config with a json file
-//   promptACProvider - provide the config field from prompt with time out
-type awsConfigProvider interface {
-	getAwsConfig() (*AwsConfig, error)
-}
-
-// sharedACProvider returns nil for getAwsConfig to use shared aws configurations
-type sharedACProvider struct{}
-
-func newSharedAwsConfigProvider() *sharedACProvider {
-	return &sharedACProvider{}
-}
-
-func (provider *sharedACProvider) getAwsConfig() (*AwsConfig, error) {
-	return nil, nil
-}
-
-// fileACProvider get aws config through a customized json file
-type fileACProvider struct {
-	file string
-}
-
-func newFileACProvider(file string) *fileACProvider {
-	return &fileACProvider{file}
-}
-
-func (provider *fileACProvider) getAwsConfig() (*AwsConfig, error) {
-	b, err := ioutil.ReadFile(provider.file)
-	if err != nil {
-		return nil, err
-	}
-	var cfg AwsConfig
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
-// promptACProvider provide a user interactive console for AWS config.
-// Four fields are asked:
-//    1. AccessKey  	2. SecretKey		3. Region
-// Each field is asked with a timeout mechanism.
-type promptACProvider struct {
-	timeout time.Duration
-}
-
-func newPromptACProvider(timeout time.Duration) *promptACProvider {
-	return &promptACProvider{
-		timeout: timeout,
-	}
-}
-
-func (provider *promptACProvider) getAwsConfig() (*AwsConfig, error) {
-	console.println("Please provide AWS configurations for KMS encoded BLS keys:")
-	accessKey, err := provider.prompt("  AccessKey:")
-	if err != nil {
-		return nil, fmt.Errorf("cannot get aws access key: %v", err)
-	}
-	secretKey, err := provider.prompt("  SecretKey:")
-	if err != nil {
-		return nil, fmt.Errorf("cannot get aws secret key: %v", err)
-	}
-	region, err := provider.prompt("Region:")
-	if err != nil {
-		return nil, fmt.Errorf("cannot get aws region: %v", err)
-	}
-	return &AwsConfig{
-		AccessKey: accessKey,
-		SecretKey: secretKey,
-		Region:    region,
-		Token:     "",
-	}, nil
-}
-
-// prompt prompt the user to input a string for a certain field with timeout.
-func (provider *promptACProvider) prompt(hint string) (string, error) {
-	var (
-		res string
-		err error
-
-		finished = make(chan struct{})
-		timedOut = time.After(provider.timeout)
-	)
-
-	cs := console
-	go func() {
-		res, err = provider.threadedPrompt(cs, hint)
-		close(finished)
-	}()
-
-	for {
-		select {
-		case <-finished:
-			return res, err
-		case <-timedOut:
-			return "", errors.New("timed out")
+		if got != testInput {
+			t.Errorf("Test %v: unexpected prompt result: %v / %v", i, got, testInput)
 		}
 	}
 }
 
-func (provider *promptACProvider) threadedPrompt(cs consoleItf, hint string) (string, error) {
-	cs.print(hint)
-	return cs.readPassword()
-}
-
-func kmsClientWithConfig(config *AwsConfig) (*kms.KMS, error) {
-	if config == nil {
-		return getSharedKMSClient()
-	}
-	return getKMSClientFromConfig(*config)
-}
-
-func getSharedKMSClient() (*kms.KMS, error) {
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
+func TestFileACProvider_getAwsConfig(t *testing.T) {
+	jsonBytes, err := json.Marshal(TestAwsConfig)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create aws session")
+		t.Fatal(err)
 	}
-	return kms.New(sess), err
-}
+	unitTestDir := filepath.Join(baseTestDir, t.Name())
 
-func getKMSClientFromConfig(config AwsConfig) (*kms.KMS, error) {
-	sess, err := session.NewSession(config.toAws())
-	if err != nil {
-		return nil, err
+	tests := []struct {
+		setupFunc func(rootDir string) error
+		expConfig AwsConfig
+		jsonFile  string
+		expErr    error
+	}{
+		{
+			// positive
+			setupFunc: func(rootDir string) error {
+				jsonFile := filepath.Join(rootDir, "valid.json")
+				return writeFile(jsonFile, string(jsonBytes))
+			},
+			jsonFile:  "valid.json",
+			expConfig: TestAwsConfig,
+		},
+		{
+			// no such file
+			setupFunc: nil,
+			jsonFile:  "empty.json",
+			expErr:    errors.New("no such file"),
+		},
+		{
+			// invalid json string
+			setupFunc: func(rootDir string) error {
+				jsonFile := filepath.Join(rootDir, "invalid.json")
+				return writeFile(jsonFile, string(jsonBytes[:len(jsonBytes)-2]))
+			},
+			jsonFile: "invalid.json",
+			expErr:   errors.New("unexpected end of JSON input"),
+		},
 	}
-	return kms.New(sess), nil
+	for i, test := range tests {
+		tcDir := filepath.Join(unitTestDir, fmt.Sprintf("%v", i))
+		os.RemoveAll(tcDir)
+		os.MkdirAll(tcDir, 0700)
+		if test.setupFunc != nil {
+			if err := test.setupFunc(tcDir); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		provider := newFileACProvider(filepath.Join(tcDir, test.jsonFile))
+		got, err := provider.getAwsConfig()
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if got == nil || !reflect.DeepEqual(*got, test.expConfig) {
+			t.Errorf("Test %v: unexpected AwsConfig: %+v / %+v", i,
+				got, test.expConfig)
+		}
+	}
 }
