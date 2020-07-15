@@ -41,14 +41,22 @@ type FBFTMessage struct {
 
 // String ..
 func (m *FBFTMessage) String() string {
+	sender := ""
+	if m.SenderPubkey != nil {
+		sender = m.SenderPubkey.Bytes.Hex()
+	}
+	leader := ""
+	if m.LeaderPubkey != nil {
+		leader = m.LeaderPubkey.Bytes.Hex()
+	}
 	return fmt.Sprintf(
 		"[Type:%s ViewID:%d Num:%d BlockHash:%s Sender:%s Leader:%s]",
 		m.MessageType.String(),
 		m.ViewID,
 		m.BlockNum,
 		m.BlockHash.Hex(),
-		m.SenderPubkey.Bytes.Hex(),
-		m.LeaderPubkey.Bytes.Hex(),
+		sender,
+		leader,
 	)
 }
 
