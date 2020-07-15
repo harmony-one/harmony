@@ -245,10 +245,10 @@ func Verify(
 		if err := signature.Deserialize(ballot.Signature); err != nil {
 			return err
 		}
-		if err := ballot.SignerPubKey.ToLibBLSPublicKey(publicKey); err != nil {
+
+		if publicKey, err = bls.BytesToBLSPublicKey(ballot.SignerPubKey[:]); err != nil {
 			return err
 		}
-
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
 			candidate.Evidence.Epoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)

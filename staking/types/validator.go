@@ -474,8 +474,8 @@ func VerifyBLSKey(pubKey *bls.SerializedPublicKey, pubKeySig *bls.SerializedSign
 		return errBLSKeysNotMatchSigs
 	}
 
-	blsPubKey := new(bls_core.PublicKey)
-	if err := pubKey.ToLibBLSPublicKey(blsPubKey); err != nil {
+	blsPubKey, err := bls.BytesToBLSPublicKey(pubKey[:])
+	if err != nil {
 		return errBLSKeysNotMatchSigs
 	}
 

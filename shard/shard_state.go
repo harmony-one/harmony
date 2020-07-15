@@ -341,13 +341,12 @@ func lookupBLSPublicKeys(
 		key, func() (interface{}, error) {
 			slice := make([]*bls_core.PublicKey, len(c.Slots))
 			for j := range c.Slots {
-				committerKey := &bls_core.PublicKey{}
-				if err := c.Slots[j].BLSPublicKey.ToLibBLSPublicKey(
-					committerKey,
-				); err != nil {
+				pubKey, err := bls.BytesToBLSPublicKey(c.Slots[j].BLSPublicKey[:])
+				if err != nil {
 					return nil, err
 				}
-				slice[j] = committerKey
+
+				slice[j] = pubKey
 			}
 			// Only made once
 			go func() {

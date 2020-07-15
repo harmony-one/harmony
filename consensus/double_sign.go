@@ -2,8 +2,9 @@ package consensus
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 
@@ -14,9 +15,11 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 		if alreadyCastBallot := consensus.Decider.ReadBallot(
 			quorum.Commit, recvMsg.SenderPubkey.Bytes,
 		); alreadyCastBallot != nil {
-			firstPubKey := bls.PublicKey{}
-			alreadyCastBallot.SignerPubKey.ToLibBLSPublicKey(&firstPubKey)
-			if recvMsg.SenderPubkey.Object.IsEqual(&firstPubKey) {
+			firstPubKey, err := bls.BytesToBLSPublicKey(alreadyCastBallot.SignerPubKey[:])
+			if err != nil {
+				return false
+			}
+			if recvMsg.SenderPubkey.Object.IsEqual(firstPubKey) {
 				for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
 					firstSignedBlock := blk.Header()
 					areHeightsEqual := firstSignedBlock.Number().Uint64() == recvMsg.BlockNum
@@ -28,7 +31,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 					// hash, and if block hash is different, then that is a clear
 					// case of double signing
 					if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
-						var doubleSign bls.Sign
+						var doubleSign bls_core.Sign
 						if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
 							consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 								Msg("could not deserialize potential double signer")

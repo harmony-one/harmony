@@ -82,8 +82,3 @@ func (pk *SerializedPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
 	copy(pk[:], bytes)
 	return nil
 }
-
-// ToLibBLSPublicKey copies the key contents into the given key.
-func (pk *SerializedPublicKey) ToLibBLSPublicKey(key *bls.PublicKey) error {
-	return key.Deserialize(pk[:])
-}
