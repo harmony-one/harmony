@@ -36,34 +36,6 @@ random() {
    echo $(( b + rand ))
 }
 
-# https://www.linuxjournal.com/content/validating-ip-address-bash-script
-function valid_ip()
-{
-    local  ip=$1
-    local  stat=1
-
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        OIFS=$IFS
-        IFS='.'
-        ip=($ip)
-        IFS=$OIFS
-        [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 \
-            && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
-        stat=$?
-    fi
-    return $stat
-}
-
-function myip() {
-# get ipv4 address only, right now only support ipv4 addresses
-   PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
-   if valid_ip $PUB_IP; then
-      msg "public IP address autodetected: $PUB_IP"
-   else
-      err 1 "NO valid public IP found: $PUB_IP"
-   fi
-}
-
 function check_root
 {
    if [[ $EUID -ne 0 ]]; then
@@ -596,7 +568,6 @@ else
 fi
 
 NODE_PORT=${pub_port:-9000}
-PUB_IP=
 
 if [ "$OS" == "Linux" ]; then
    if ${run_as_root}; then
@@ -605,7 +576,6 @@ if [ "$OS" == "Linux" ]; then
 fi
 
 # find my public ip address
-myip
 check_pkg_management
 
 unset -v BN_MA bn
@@ -830,7 +800,6 @@ do
    msg "############### Running Harmony Process ###############"
    args=(
       -bootnodes "${BN_MA}"
-      -ip "${PUB_IP}"
       -port "${NODE_PORT}"
       -network_type="${network_type}"
       -dns_zone="${dns_zone}"
