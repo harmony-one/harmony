@@ -787,6 +787,9 @@ func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) 
 
 // IsOutOfSync checks whether the node is out of sync from other peers
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
+	if ss.syncConfig == nil {
+		return true // If syncConfig is not instantiated, return not in sync
+	}
 	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	utils.Logger().Debug().
