@@ -79,14 +79,8 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE && intendedForLeader:
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
 		consensus.onPrepare(msg)
 	case t == msg_pb.MessageType_COMMIT && intendedForLeader:
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
 		consensus.onCommit(msg)
 
 		// Handle view change messages
