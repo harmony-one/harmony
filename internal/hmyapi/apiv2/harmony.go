@@ -62,3 +62,8 @@ type NodeMetadata struct {
 func (s *PublicHarmonyAPI) GetNodeMetadata() commonRPC.NodeMetadata {
 	return s.b.GetNodeMetadata()
 }
+
+// GetPeerInfo produces a NodePeerInfo record, containing peer info of the node
+func (s *PublicHarmonyAPI) GetPeerInfo() commonRPC.NodePeerInfo {
+	return s.b.GetPeerInfo()
+}

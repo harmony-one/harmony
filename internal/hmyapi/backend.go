@@ -85,6 +85,7 @@ type Backend interface {
 	GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
 	IsStakingEpoch(epoch *big.Int) bool
 	GetLeaderAddress(a common.Address, e *big.Int) string
+	GetPeerInfo() commonRPC.NodePeerInfo
 }
 
 // GetAPIs returns all the APIs.

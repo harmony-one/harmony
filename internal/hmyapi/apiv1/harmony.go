@@ -47,3 +47,8 @@ func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
 func (s *PublicHarmonyAPI) GetNodeMetadata() commonRPC.NodeMetadata {
 	return s.b.GetNodeMetadata()
 }
+
+// GetPeerInfo produces a NodePeerInfo record
+func (s *PublicHarmonyAPI) GetPeerInfo() commonRPC.NodePeerInfo {
+	return s.b.GetPeerInfo()
+}

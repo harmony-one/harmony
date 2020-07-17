@@ -38,6 +38,9 @@ type Host interface {
 	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
+	ListPeer(topic string) []libp2p_peer.ID
+	ListTopic() []string
+	ListBlockedPeer() []libp2p_peer.ID
 }
 
 // Peer is the object for a p2p peer (node)
@@ -144,13 +147,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h      libp2p_host.Host
-	pubsub *libp2p_pubsub.PubSub
-	joined map[string]*libp2p_pubsub.Topic
-	self   Peer
-	priKey libp2p_crypto.PrivKey
-	lock   sync.Mutex
-	logger *zerolog.Logger
+	h         libp2p_host.Host
+	pubsub    *libp2p_pubsub.PubSub
+	joined    map[string]*libp2p_pubsub.Topic
+	self      Peer
+	priKey    libp2p_crypto.PrivKey
+	lock      sync.Mutex
+	logger    *zerolog.Logger
+	blocklist libp2p_pubsub.Blacklist
 }
 
 // PubSub ..
@@ -258,6 +262,31 @@ func (host *HostV2) GetSelfPeer() Peer {
 // GetP2PHost returns the p2p.Host
 func (host *HostV2) GetP2PHost() libp2p_host.Host {
 	return host.h
+}
+
+// ListTopic returns the list of topic the node subscribed
+func (host *HostV2) ListTopic() []string {
+	host.lock.Lock()
+	defer host.lock.Unlock()
+	topics := make([]string, 0)
+	for t := range host.joined {
+		topics = append(topics, t)
+	}
+	return topics
+}
+
+// ListPeer returns list of peers in a topic
+func (host *HostV2) ListPeer(topic string) []libp2p_peer.ID {
+	host.lock.Lock()
+	defer host.lock.Unlock()
+	return host.joined[topic].ListPeers()
+}
+
+// ListBlockedPeer returns list of blocked peer
+func (host *HostV2) ListBlockedPeer() []libp2p_peer.ID {
+	// TODO: this is a place holder for now
+	peers := make([]libp2p_peer.ID, 0)
+	return peers
 }
 
 // GetPeerCount ...

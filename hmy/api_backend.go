@@ -36,6 +36,7 @@ import (
 	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 )
@@ -862,6 +863,26 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		b.hmy.nodeAPI.GetNodeBootTime(),
 		nodeconfig.GetPeerID(),
 		c,
+	}
+}
+
+// GetPeerInfo returns the peer info to the node, including blocked peer, connected peer, number of peers
+func (b *APIBackend) GetPeerInfo() commonRPC.NodePeerInfo {
+
+	topics := b.hmy.nodeAPI.ListTopic()
+	p := make([]commonRPC.P, len(topics))
+
+	for i, t := range topics {
+		topicPeer := b.hmy.nodeAPI.ListPeer(t)
+		p[i].Topic = t
+		p[i].Peers = make([]peer.ID, len(topicPeer))
+		copy(p[i].Peers, topicPeer)
+	}
+
+	return commonRPC.NodePeerInfo{
+		PeerID:       nodeconfig.GetPeerID(),
+		BlockedPeers: b.hmy.nodeAPI.ListBlockedPeer(),
+		P:            p,
 	}
 }
 
