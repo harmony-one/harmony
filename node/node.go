@@ -26,7 +26,6 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
