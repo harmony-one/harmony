@@ -53,7 +53,7 @@ const (
 	// SetAsideForConsensus set the number of active validation goroutines for the consensus topic
 	SetAsideForConsensus = 1 << 13
 	// SetAsideOtherwise set the number of active validation goroutines for other topic
-	SetAsideOtherwise = 1 << 13
+	SetAsideOtherwise = 1 << 11
 	// MaxMessageHandlers ..
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
 	// MaxMessageSize is 2Mb

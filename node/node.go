@@ -618,48 +618,76 @@ func (node *Node) Start() error {
 			return err
 		}
 
-		sem := semaphore.NewWeighted(p2p.MaxMessageHandlers)
-		msgChan := make(chan validated, MsgChanBuffer)
+		semConsensus := semaphore.NewWeighted(p2p.SetAsideForConsensus)
+		msgChanConsensus := make(chan validated, MsgChanBuffer)
 
+		// goroutine to handle consensus messages
 		go func() {
-			for m := range msgChan {
+			for m := range msgChanConsensus {
 				// should not take more than 10 seconds to process one message
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				msg := m
 				go func() {
 					defer cancel()
 
-					if sem.TryAcquire(1) {
-						defer sem.Release(1)
+					if semConsensus.TryAcquire(1) {
+						defer semConsensus.Release(1)
 
-						if msg.consensusBound {
-							if isThisNodeAnExplorerNode {
-								if err := node.explorerMessageHandler(
-									ctx, msg.handleCArg,
-								); err != nil {
-									errChan <- withError{err, nil}
-								}
-							} else {
-								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-									errChan <- withError{err, nil}
-								}
+						if isThisNodeAnExplorerNode {
+							if err := node.explorerMessageHandler(
+								ctx, msg.handleCArg,
+							); err != nil {
+								errChan <- withError{err, nil}
 							}
 						} else {
-							if err := msg.handleE(ctx, msg.handleEArg); err != nil {
+							if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
 								errChan <- withError{err, nil}
 							}
 						}
+					}
 
-						select {
-						case <-ctx.Done():
-							if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-								utils.Logger().Warn().
-									Str("topic", topicNamed).Msg("[context] exceeded handler deadline")
-							}
-							errChan <- withError{errors.WithStack(ctx.Err()), nil}
-						default:
-							return
+					select {
+					case <-ctx.Done():
+						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+							utils.Logger().Warn().
+								Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
 						}
+						errChan <- withError{errors.WithStack(ctx.Err()), nil}
+					default:
+						return
+					}
+				}()
+			}
+		}()
+
+		semNode := semaphore.NewWeighted(p2p.SetAsideOtherwise)
+		msgChanNode := make(chan validated, MsgChanBuffer)
+
+		// goroutine to handle node messages
+		go func() {
+			for m := range msgChanNode {
+				// should not take more than 10 seconds to process one message
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				msg := m
+				go func() {
+					defer cancel()
+					if semNode.TryAcquire(1) {
+						defer semNode.Release(1)
+
+						if err := msg.handleE(ctx, msg.handleEArg); err != nil {
+							errChan <- withError{err, nil}
+						}
+					}
+
+					select {
+					case <-ctx.Done():
+						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+							utils.Logger().Warn().
+								Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+						}
+						errChan <- withError{errors.WithStack(ctx.Err()), nil}
+					default:
+						return
 					}
 				}()
 			}
@@ -679,7 +707,11 @@ func (node *Node) Start() error {
 				}
 
 				if validatedMessage, ok := nextMsg.ValidatorData.(validated); ok {
-					msgChan <- validatedMessage
+					if validatedMessage.consensusBound {
+						msgChanConsensus <- validatedMessage
+					} else {
+						msgChanNode <- validatedMessage
+					}
 				} else {
 					// continue if ValidatorData is nil
 					if nextMsg.ValidatorData == nil {
