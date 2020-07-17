@@ -3,7 +3,6 @@ package node
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -15,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/verify"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -25,8 +23,6 @@ const (
 
 var (
 	errAlreadyExist = errors.New("crosslink already exist")
-	deciderCache    singleflight.Group
-	committeeCache  singleflight.Group
 )
 
 // VerifyBlockCrossLinks verifies the cross links of the block
@@ -172,68 +168,59 @@ func (node *Node) lookupDecider(
 	epoch *big.Int, shardID uint32,
 ) (quorum.Decider, error) {
 
+	// Look up
 	key := fmt.Sprintf("decider-%d-%d", epoch.Uint64(), shardID)
-	result, err, _ := deciderCache.Do(
-		key, func() (interface{}, error) {
+	if b, ok := node.deciderCache.Get(key); ok {
+		return b.(quorum.Decider), nil
+	}
 
-			committee, err := node.lookupCommittee(epoch, shardID)
-			if err != nil {
-				return nil, err
-			}
-
-			decider := quorum.NewDecider(
-				quorum.SuperMajorityStake, committee.ShardID,
-			)
-
-			decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
-				return nil, nil
-			})
-
-			if _, err := decider.SetVoters(committee, epoch); err != nil {
-				return nil, err
-			}
-
-			go func() {
-				time.Sleep(120 * time.Minute)
-				deciderCache.Forget(key)
-			}()
-			return decider, nil
-		},
-	)
+	// If not found, construct
+	committee, err := node.lookupCommittee(epoch, shardID)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.(quorum.Decider), nil
+	decider := quorum.NewDecider(
+		quorum.SuperMajorityStake, committee.ShardID,
+	)
+
+	decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
+		return nil, nil
+	})
+
+	if _, err := decider.SetVoters(committee, epoch); err != nil {
+		return nil, err
+	}
+
+	// Put in cache
+	node.deciderCache.Add(key, decider)
+
+	return decider, nil
 }
 
 func (node *Node) lookupCommittee(
 	epoch *big.Int, shardID uint32,
 ) (*shard.Committee, error) {
 
+	// Look up
 	key := fmt.Sprintf("committee-%d-%d", epoch.Uint64(), shardID)
-	result, err, _ := committeeCache.Do(
-		key, func() (interface{}, error) {
-			shardState, err := node.Blockchain().ReadShardState(epoch)
-			if err != nil {
-				return nil, err
-			}
+	if b, ok := node.committeeCache.Get(key); ok {
+		return b.(*shard.Committee), nil
+	}
 
-			committee, err := shardState.FindCommitteeByID(shardID)
-			if err != nil {
-				return nil, err
-			}
-
-			go func() {
-				time.Sleep(120 * time.Minute)
-				committeeCache.Forget(key)
-			}()
-			return committee, nil
-		},
-	)
+	// If not found, construct
+	shardState, err := node.Blockchain().ReadShardState(epoch)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.(*shard.Committee), nil
+	committee, err := shardState.FindCommitteeByID(shardID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Put in cache
+	node.committeeCache.Add(key, committee)
+
+	return committee, nil
 }
