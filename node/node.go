@@ -51,18 +51,6 @@ import (
 const (
 	// NumTryBroadCast is the number of times trying to broadcast
 	NumTryBroadCast = 3
-	// ClientRxQueueSize is the number of client messages to queue before tail-dropping.
-	ClientRxQueueSize = 16384
-	// ShardRxQueueSize is the number of shard messages to queue before tail-dropping.
-	ShardRxQueueSize = 16384
-	// GlobalRxQueueSize is the number of global messages to queue before tail-dropping.
-	GlobalRxQueueSize = 16384
-	// ClientRxWorkers is the number of concurrent client message handlers.
-	ClientRxWorkers = 8
-	// ShardRxWorkers is the number of concurrent shard message handlers.
-	ShardRxWorkers = 32
-	// GlobalRxWorkers is the number of concurrent global message handlers.
-	GlobalRxWorkers = 32
 	// MsgChanBuffer is the buffer of consensus message handlers.
 	MsgChanBuffer = 1024
 )
