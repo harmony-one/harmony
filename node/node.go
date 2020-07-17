@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -131,6 +133,8 @@ type Node struct {
 	// InSync flag indicates the node is in-sync or not
 	IsInSync *abool.AtomicBool
 
+	deciderCache   *lru.Cache
+	committeeCache *lru.Cache
 	// metrics of p2p messages
 	NumP2PMessages     uint32
 	NumTotalMessages   uint32
@@ -767,6 +771,9 @@ func New(
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
+
+		node.deciderCache, _ = lru.New(16)
+		node.committeeCache, _ = lru.New(16)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(

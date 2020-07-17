@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"math/big"
 	"sort"
-	"time"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -18,7 +17,6 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/sha3"
-	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -329,46 +327,23 @@ func (c *Committee) Hash() common.Hash {
 	return hash.FromRLPNew256(c)
 }
 
-var (
-	blsKeyCache singleflight.Group
-)
-
-func lookupBLSPublicKeys(
-	c *Committee,
-) ([]*bls_core.PublicKey, error) {
-	key := c.Hash().Hex()
-	results, err, _ := blsKeyCache.Do(
-		key, func() (interface{}, error) {
-			slice := make([]*bls_core.PublicKey, len(c.Slots))
-			for j := range c.Slots {
-				pubKey, err := bls.BytesToBLSPublicKey(c.Slots[j].BLSPublicKey[:])
-				if err != nil {
-					return nil, err
-				}
-
-				slice[j] = pubKey
-			}
-			// Only made once
-			go func() {
-				time.Sleep(25 * time.Minute)
-				blsKeyCache.Forget(key)
-			}()
-			return slice, nil
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return results.([]*bls_core.PublicKey), nil
-}
-
 // BLSPublicKeys ..
 func (c *Committee) BLSPublicKeys() ([]*bls_core.PublicKey, error) {
 	if c == nil {
 		return nil, ErrSubCommitteeNil
 	}
-	return lookupBLSPublicKeys(c)
+
+	slice := make([]*bls_core.PublicKey, len(c.Slots))
+	for j := range c.Slots {
+		pubKey, err := bls.BytesToBLSPublicKey(c.Slots[j].BLSPublicKey[:])
+		if err != nil {
+			return nil, err
+		}
+
+		slice[j] = pubKey
+	}
+
+	return slice, nil
 }
 
 var (

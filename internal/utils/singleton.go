@@ -13,7 +13,6 @@ import (
 	"github.com/natefinch/lumberjack"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/diode"
-	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -119,34 +118,12 @@ const (
 	dataScienceTopic = "ds"
 )
 
-var (
-	loggersByTopic singleflight.Group
-)
-
-func lookupLogger(key string) (*zerolog.Logger, error) {
-	results, err, _ := loggersByTopic.Do(
-		key, func() (interface{}, error) {
-			log := Logger().With().
-				Str("log-topic", dataScienceTopic).
-				Timestamp().
-				Logger()
-			return &log, nil
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return results.(*zerolog.Logger), nil
-}
-
 func ds() *zerolog.Logger {
-	logger, err := lookupLogger(dataScienceTopic)
-	if err != nil {
-		return Logger()
-	}
-	return logger
+	logger := Logger().With().
+		Str("log-topic", dataScienceTopic).
+		Timestamp().
+		Logger()
+	return &logger
 }
 
 // AnalysisStart ..

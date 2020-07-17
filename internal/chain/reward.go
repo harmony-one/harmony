@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/harmony-one/harmony/numeric"
 	types2 "github.com/harmony-one/harmony/staking/types"
 
@@ -21,58 +23,53 @@ import (
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/network"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/singleflight"
 )
 
 func ballotResultBeaconchain(
 	bc engine.ChainReader, header *block.Header,
-) (shard.SlotList, shard.SlotList, shard.SlotList, error) {
+) (*big.Int, shard.SlotList, shard.SlotList, shard.SlotList, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	if parentHeader == nil {
-		return nil, nil, nil, errors.Errorf(
+		return nil, nil, nil, nil, errors.Errorf(
 			"cannot find parent block header in DB %s",
 			header.ParentHash().Hex(),
 		)
 	}
 	parentShardState, err := bc.ReadShardState(parentHeader.Epoch())
 	if err != nil {
-		return nil, nil, nil, errors.Errorf(
+		return nil, nil, nil, nil, errors.Errorf(
 			"cannot read shard state %v", parentHeader.Epoch(),
 		)
 	}
 
-	return availability.BallotResult(parentHeader, header, parentShardState, shard.BeaconChainShardID)
+	members, payable, missing, err :=
+		availability.BallotResult(parentHeader, header, parentShardState, shard.BeaconChainShardID)
+	return parentHeader.Epoch(), members, payable, missing, err
 }
 
 var (
-	votingPowerCache   singleflight.Group
-	delegateShareCache singleflight.Group
+	votingPowerCache, _   = lru.New(16)
+	delegateShareCache, _ = lru.New(1024)
 )
 
 func lookupVotingPower(
 	epoch *big.Int, subComm *shard.Committee,
 ) (*votepower.Roster, error) {
+	// Look up
 	key := fmt.Sprintf("%s-%d", epoch.String(), subComm.ShardID)
-	results, err, _ := votingPowerCache.Do(
-		key, func() (interface{}, error) {
-			votingPower, err := votepower.Compute(subComm, epoch)
-			if err != nil {
-				return nil, err
-			}
+	if b, ok := votingPowerCache.Get(key); ok {
+		return b.(*votepower.Roster), nil
+	}
 
-			// For new calc, remove old data from 3 epochs ago
-			deleteEpoch := big.NewInt(0).Sub(epoch, big.NewInt(3))
-			deleteKey := fmt.Sprintf("%s-%d", deleteEpoch.String(), subComm.ShardID)
-			votingPowerCache.Forget(deleteKey)
-
-			return votingPower, nil
-		},
-	)
+	// If not found, construct
+	votingPower, err := votepower.Compute(subComm, epoch)
 	if err != nil {
 		return nil, err
 	}
 
-	return results.(*votepower.Roster), nil
+	// Put in cache
+	votingPowerCache.Add(key, votingPower)
+	return votingPower, nil
 }
 
 // Lookup or compute the shares of stake for all delegators in a validator
@@ -81,40 +78,35 @@ func lookupDelegatorShares(
 ) (map[common.Address]numeric.Dec, error) {
 	epoch := snapshot.Epoch
 	validatorSnapshot := snapshot.Validator
+
+	// Look up
 	key := fmt.Sprintf("%s-%s", epoch.String(), validatorSnapshot.Address.Hex())
 
-	shares, err, _ := delegateShareCache.Do(
-		key, func() (interface{}, error) {
-			result := map[common.Address]numeric.Dec{}
-
-			totalDelegationDec := numeric.NewDecFromBigInt(validatorSnapshot.TotalDelegation())
-			if totalDelegationDec.IsZero() {
-				utils.Logger().Info().
-					RawJSON("validator-snapshot", []byte(validatorSnapshot.String())).
-					Msg("zero total delegation during AddReward delegation payout")
-				return result, nil
-			}
-
-			for i := range validatorSnapshot.Delegations {
-				delegation := validatorSnapshot.Delegations[i]
-				// NOTE percentage = <this_delegator_amount>/<total_delegation>
-				percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
-				result[delegation.DelegatorAddress] = percentage
-			}
-
-			// For new calc, remove old data from 3 epochs ago
-			deleteEpoch := big.NewInt(0).Sub(epoch, big.NewInt(3))
-			deleteKey := fmt.Sprintf("%s-%s", deleteEpoch.String(), validatorSnapshot.Address.Hex())
-			votingPowerCache.Forget(deleteKey)
-
-			return result, nil
-		},
-	)
-	if err != nil {
-		return nil, err
+	if b, ok := delegateShareCache.Get(key); ok {
+		return b.(map[common.Address]numeric.Dec), nil
 	}
 
-	return shares.(map[common.Address]numeric.Dec), nil
+	// If not found, construct
+	result := map[common.Address]numeric.Dec{}
+
+	totalDelegationDec := numeric.NewDecFromBigInt(validatorSnapshot.TotalDelegation())
+	if totalDelegationDec.IsZero() {
+		utils.Logger().Info().
+			RawJSON("validator-snapshot", []byte(validatorSnapshot.String())).
+			Msg("zero total delegation during AddReward delegation payout")
+		return result, nil
+	}
+
+	for i := range validatorSnapshot.Delegations {
+		delegation := validatorSnapshot.Delegations[i]
+		// NOTE percentage = <this_delegator_amount>/<total_delegation>
+		percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
+		result[delegation.DelegatorAddress] = percentage
+	}
+
+	// Put in cache
+	delegateShareCache.Add(key, result)
+	return result, nil
 }
 
 // AccumulateRewardsAndCountSigs credits the coinbase of the given block with the mining
@@ -173,7 +165,7 @@ func AccumulateRewardsAndCountSigs(
 			big.NewInt(0), []reward.Payout{}, []reward.Payout{}
 
 		// Take care of my own beacon chain committee, _ is missing, for slashing
-		members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
+		parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
 			return network.EmptyPayout, err
 		}
@@ -189,7 +181,7 @@ func AccumulateRewardsAndCountSigs(
 			return network.EmptyPayout, err
 		}
 		votingPower, err := lookupVotingPower(
-			headerE, &subComm,
+			parentE, &subComm,
 		)
 		if err != nil {
 			return network.EmptyPayout, err
