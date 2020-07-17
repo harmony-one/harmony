@@ -1,6 +1,9 @@
 package common
 
-import "github.com/harmony-one/harmony/internal/params"
+import (
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/libp2p/go-libp2p-core/peer"
+)
 
 // C ..
 type C struct {
@@ -23,6 +26,19 @@ type NodeMetadata struct {
 	DNSZone        string             `json:"dns-zone"`
 	Archival       bool               `json:"is-archival"`
 	NodeBootTime   int64              `json:"node-unix-start-time"`
-	PeerID         string             `json:"peerid"`
+	PeerID         peer.ID            `json:"peerid"`
 	C              C                  `json:"p2p-connectivity"`
+}
+
+// P captures the connected peers per topic
+type P struct {
+	Topic string    `json:"topic"`
+	Peers []peer.ID `json:"peers"`
+}
+
+// NodePeerInfo captures the peer connectivity info of the node
+type NodePeerInfo struct {
+	PeerID       peer.ID   `json:"peerid"`
+	BlockedPeers []peer.ID `json:"blocked-peers"`
+	P            []P       `json:"connected-peers"`
 }

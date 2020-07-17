@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 const (
@@ -56,6 +57,9 @@ type NodeAPI interface {
 	PendingCXReceipts() []*types.CXReceiptsProof
 	GetNodeBootTime() int64
 	PeerConnectivity() (int, int, int)
+	ListPeer(topic string) []peer.ID
+	ListTopic() []string
+	ListBlockedPeer() []peer.ID
 }
 
 // New creates a new Harmony object (including the

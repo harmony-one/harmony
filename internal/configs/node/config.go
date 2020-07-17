@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/webhooks"
 	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 )
 
@@ -63,7 +64,7 @@ const (
 
 var version string
 var publicRPC bool // enable public RPC access
-var peerID string  // PeerID of the node
+var peerID peer.ID // PeerID of the node
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
@@ -214,12 +215,12 @@ func GetVersion() string {
 }
 
 // SetPeerID set the peer ID of the node
-func SetPeerID(pid string) {
+func SetPeerID(pid peer.ID) {
 	peerID = pid
 }
 
 // GetPeerID returns the peer ID of the node
-func GetPeerID() string {
+func GetPeerID() peer.ID {
 	return peerID
 }
 
