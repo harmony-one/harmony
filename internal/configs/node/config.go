@@ -144,11 +144,6 @@ func (conf *ConfigType) SetClientGroupID(g GroupID) {
 	conf.client = g
 }
 
-// SetIsClient set the isClient configuration
-func (conf *ConfigType) SetIsClient(b bool) {
-	conf.isClient = b
-}
-
 // SetShardID set the ShardID
 func (conf *ConfigType) SetShardID(s uint32) {
 	conf.ShardID = s
@@ -182,11 +177,6 @@ func (conf *ConfigType) GetClientGroupID() GroupID {
 // GetArchival returns archival mode
 func (conf *ConfigType) GetArchival() bool {
 	return conf.isArchival
-}
-
-// IsClient returns the isClient configuration
-func (conf *ConfigType) IsClient() bool {
-	return conf.isClient
 }
 
 // Role returns the role

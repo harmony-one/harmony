@@ -458,7 +458,6 @@ func (node *Node) Start() error {
 	// three topic subscribed by each validator
 	for _, t := range []t{
 		{node.NodeConfig.GetShardGroupID(), true},
-		{nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID), false},
 		{node.NodeConfig.GetClientGroupID(), false},
 	} {
 		if _, ok := groups[t.tp]; !ok {
@@ -974,22 +973,13 @@ func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {
 	chanPeer := make(chan p2p.Peer)
 	nodeConfig := service.NodeConfig{
-		IsClient:     node.NodeConfig.IsClient(),
 		Beacon:       nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 		ShardGroupID: node.NodeConfig.GetShardGroupID(),
 		Actions:      map[nodeconfig.GroupID]nodeconfig.ActionType{},
 	}
 
-	if nodeConfig.IsClient {
-		nodeConfig.Actions[nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID)] =
-			nodeconfig.ActionStart
-	} else {
-		nodeConfig.Actions[node.NodeConfig.GetShardGroupID()] = nodeconfig.ActionStart
-	}
-
 	groups := []nodeconfig.GroupID{
 		node.NodeConfig.GetShardGroupID(),
-		nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID),
 		node.NodeConfig.GetClientGroupID(),
 	}
 
