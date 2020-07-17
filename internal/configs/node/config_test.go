@@ -43,11 +43,6 @@ func TestNodeConfigMultiple(t *testing.T) {
 	if e.GetClientGroupID() != "client" {
 		t.Errorf("expecting client, got: %v", d.GetClientGroupID())
 	}
-
-	e.SetIsClient(false)
-	if e.IsClient() != false {
-		t.Errorf("expecting false, got: %v", e.IsClient())
-	}
 }
 
 func TestValidateConsensusKeysForSameShard(t *testing.T) {

@@ -497,11 +497,10 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 		if nodeConfig.ShardID == shard.BeaconChainShardID {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 		} else {
 			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
-			currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 		}
+		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	}
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
