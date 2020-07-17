@@ -128,6 +128,17 @@ type Node struct {
 	NumInvalidMessages uint32
 	NumSlotMessages    uint32
 	NumIgnoredMessages uint32
+
+	// metrics of node messages
+	NumTotalNodeMsg   uint32
+	NumInvalidNodeMsg uint32
+	NumOversizedMsg   uint32
+	NumTransactionMsg uint32
+	NumStakingMsg     uint32
+	NumBlockSyncMsg   uint32
+	NumSlashMsg       uint32
+	NumReceiptMsg     uint32
+	NumCrossLinkMsg   uint32
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -344,7 +355,71 @@ var (
 	errNotRightKeySize = errors.New("key received over wire is wrong size")
 	errNoSenderPubKey  = errors.New("no sender public BLS key in message")
 	errWrongShardID    = errors.New("wrong shard id")
+	errInvalidNodeMsg  = errors.New("invalid node message")
+	errIgnoreBeaconMsg = errors.New("ignore beacon sync block")
 )
+
+// validateNodeMessage validate node message
+func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
+	[]byte, proto_node.MessageType, error) {
+	atomic.AddUint32(&node.NumTotalNodeMsg, 1)
+
+	// length of payload must > p2pNodeMsgPrefixSize
+
+	// reject huge node messages
+	if len(payload) >= types.MaxEncodedPoolTransactionSize {
+		atomic.AddUint32(&node.NumOversizedMsg, 1)
+		return nil, 0, core.ErrOversizedData
+	}
+
+	// just ignore payload[0], which is MsgCategoryType (consensus/node)
+	msgType := proto_node.MessageType(payload[proto.MessageCategoryBytes])
+
+	switch msgType {
+	case proto_node.Transaction:
+		// nothing much to validate transaction message unless decode the RLP
+		atomic.AddUint32(&node.NumTransactionMsg, 1)
+	case proto_node.Staking:
+		// nothing much to validate staking message unless decode the RLP
+		atomic.AddUint32(&node.NumStakingMsg, 1)
+	case proto_node.Block:
+		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
+		case proto_node.Sync:
+			// only non-beacon nodes process the beacon block sync messages
+			if node.Blockchain().ShardID() == shard.BeaconChainShardID ||
+				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+				return nil, 0, errIgnoreBeaconMsg
+			}
+			atomic.AddUint32(&node.NumBlockSyncMsg, 1)
+		case proto_node.SlashCandidate:
+			// only beacon chain node process slash candidate messages
+			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+				return nil, 0, errIgnoreBeaconMsg
+			}
+			atomic.AddUint32(&node.NumSlashMsg, 1)
+		case proto_node.Receipt:
+			atomic.AddUint32(&node.NumReceiptMsg, 1)
+		case proto_node.CrossLink:
+			// only beacon chain node process crosslink messages
+			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
+				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+				return nil, 0, errIgnoreBeaconMsg
+			}
+			atomic.AddUint32(&node.NumCrossLinkMsg, 1)
+		default:
+			atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+			return nil, 0, errInvalidNodeMsg
+		}
+	default:
+		atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+		return nil, 0, errInvalidNodeMsg
+	}
+
+	return payload[p2pNodeMsgPrefixSize:], msgType, nil
+}
 
 // validateShardBoundMessage validate consensus message
 // validate shardID
@@ -504,6 +579,7 @@ func (node *Node) Start() error {
 	type p2pHandlerElse func(
 		ctx context.Context,
 		rlpPayload []byte,
+		actionType proto_node.MessageType,
 	) error
 
 	// interface pass to p2p message validator
@@ -514,6 +590,7 @@ func (node *Node) Start() error {
 		handleE        p2pHandlerElse
 		handleEArg     []byte
 		senderPubKey   *bls.SerializedPublicKey
+		actionType     proto_node.MessageType
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
@@ -541,6 +618,7 @@ func (node *Node) Start() error {
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
+					// TODO (lc): block peers sending empty messages
 					return libp2p_pubsub.ValidationReject
 				}
 
@@ -582,14 +660,29 @@ func (node *Node) Start() error {
 					return libp2p_pubsub.ValidationAccept
 
 				case proto.Node:
-					// TODO push the message parsing here, so can ban
+					// node message is almost empty
+					if len(openBox) <= p2pNodeMsgPrefixSize {
+						return libp2p_pubsub.ValidationReject
+					}
+					validMsg, actionType, err := node.validateNodeMessage(
+						context.TODO(), openBox,
+					)
+					if err != nil {
+						// TODO (lc): block peers sending error messages
+						errChan <- withError{err, msg.GetFrom()}
+						return libp2p_pubsub.ValidationReject
+					}
 					msg.ValidatorData = validated{
 						consensusBound: false,
 						handleE:        node.HandleNodeMessage,
-						handleEArg:     openBox,
+						handleEArg:     validMsg,
+						actionType:     actionType,
 					}
+					return libp2p_pubsub.ValidationAccept
 				default:
-					return libp2p_pubsub.ValidationIgnore
+					// ignore garbled messages
+					atomic.AddUint32(&node.NumIgnoredMessages, 1)
+					return libp2p_pubsub.ValidationReject
 				}
 
 				select {
@@ -673,7 +766,7 @@ func (node *Node) Start() error {
 					if semNode.TryAcquire(1) {
 						defer semNode.Release(1)
 
-						if err := msg.handleE(ctx, msg.handleEArg); err != nil {
+						if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
 							errChan <- withError{err, nil}
 						}
 					}
@@ -878,6 +971,29 @@ func New(
 				atomic.StoreUint32(&node.NumValidMessages, 0)
 				atomic.StoreUint32(&node.NumTotalMessages, 0)
 				atomic.StoreUint32(&node.NumP2PMessages, 0)
+
+				utils.Logger().Info().
+					Uint32("TotalNodeMsg", node.NumTotalNodeMsg).
+					Uint32("InvalidNodeMsg", node.NumInvalidNodeMsg).
+					Uint32("OversizedMsg", node.NumOversizedMsg).
+					Uint32("TransactionMsg", node.NumTransactionMsg).
+					Uint32("StakingMsg", node.NumStakingMsg).
+					Uint32("BlockSyncMsg", node.NumBlockSyncMsg).
+					Uint32("SlashMsg", node.NumSlashMsg).
+					Uint32("ReceiptMsg", node.NumReceiptMsg).
+					Uint32("CrossLinkMsg", node.NumCrossLinkMsg).
+					Msg("NodeMessageValidator")
+
+				atomic.StoreUint32(&node.NumTotalNodeMsg, 0)
+				atomic.StoreUint32(&node.NumInvalidNodeMsg, 0)
+				atomic.StoreUint32(&node.NumOversizedMsg, 0)
+				atomic.StoreUint32(&node.NumTransactionMsg, 0)
+				atomic.StoreUint32(&node.NumStakingMsg, 0)
+				atomic.StoreUint32(&node.NumBlockSyncMsg, 0)
+				atomic.StoreUint32(&node.NumSlashMsg, 0)
+				atomic.StoreUint32(&node.NumReceiptMsg, 0)
+				atomic.StoreUint32(&node.NumCrossLinkMsg, 0)
+
 			}
 		}
 	}()

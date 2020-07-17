@@ -11,7 +11,6 @@ import (
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -26,6 +25,7 @@ import (
 )
 
 const p2pMsgPrefixSize = 5
+const p2pNodeMsgPrefixSize = proto.MessageTypeBytes + proto.MessageCategoryBytes
 
 // some messages have uninteresting fields in header, slash, receipt and crosslink are
 // such messages. This function assumes that input bytes are a slice which already
@@ -37,16 +37,8 @@ func (node *Node) processSkippedMsgTypeByteValue(
 	case proto_node.SlashCandidate:
 		node.processSlashCandidateMessage(content)
 	case proto_node.Receipt:
-		utils.Logger().Debug().Msg("NET: received message: Node/Receipt")
 		node.ProcessReceiptMessage(content)
 	case proto_node.CrossLink:
-		// only beacon chain will accept the header from other shards
-		utils.Logger().Debug().
-			Uint32("shardID", node.NodeConfig.ShardID).
-			Msg("NET: received message: Node/CrossLink")
-		if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-			return
-		}
 		node.ProcessCrossLinkMessage(content)
 	default:
 		utils.Logger().Error().
@@ -63,34 +55,17 @@ var (
 // HandleNodeMessage parses the message and dispatch the actions.
 func (node *Node) HandleNodeMessage(
 	ctx context.Context,
-	payload []byte,
+	msgPayload []byte,
+	actionType proto_node.MessageType,
 ) error {
-
-	// Prevent OOB crash
-	if len(payload) < (proto.MessageTypeBytes + proto.MessageCategoryBytes) {
-		return errors.WithStack(errInvalidPayloadSize)
-	}
-	msgPayload := payload[proto.MessageCategoryBytes+proto.MessageTypeBytes:]
-	msgType := byte(payload[proto.MessageCategoryBytes+proto.MessageTypeBytes-1])
-	actionType := proto_node.MessageType(msgType)
-
 	switch actionType {
 	case proto_node.Transaction:
-		utils.Logger().Debug().Msg("NET: received message: Node/Transaction")
 		node.transactionMessageHandler(msgPayload)
 	case proto_node.Staking:
-		utils.Logger().Debug().Msg("NET: received message: Node/Staking")
 		node.stakingMessageHandler(msgPayload)
 	case proto_node.Block:
-		utils.Logger().Debug().Msg("NET: received message: Node/Block")
-		if len(msgPayload) < 1 {
-			utils.Logger().Debug().Msgf("Invalid block message size")
-			return errors.WithStack(errWrongBlockMsgSize)
-		}
-
 		switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 		case proto_node.Sync:
-			utils.Logger().Debug().Msg("NET: received message: Node/Sync")
 			blocks := []*types.Block{}
 			if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
 				utils.Logger().Error().
@@ -126,14 +101,6 @@ func (node *Node) HandleNodeMessage(
 }
 
 func (node *Node) transactionMessageHandler(msgPayload []byte) {
-	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
-		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
-		return
-	}
-	if len(msgPayload) < 1 {
-		utils.Logger().Debug().Msgf("Invalid transaction message size")
-		return
-	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
@@ -151,14 +118,6 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 }
 
 func (node *Node) stakingMessageHandler(msgPayload []byte) {
-	if len(msgPayload) >= types.MaxEncodedPoolTransactionSize {
-		utils.Logger().Warn().Err(core.ErrOversizedData).Msgf("encoded tx size: %d", len(msgPayload))
-		return
-	}
-	if len(msgPayload) < 1 {
-		utils.Logger().Debug().Msgf("Invalid staking transaction message size")
-		return
-	}
 	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
 
 	switch txMessageType {
