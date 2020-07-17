@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -60,54 +62,154 @@ func printVersion() {
 }
 
 var (
-	ip          = flag.String("ip", "127.0.0.1", "ip of the node")
-	port        = flag.String("port", "9000", "port of the node.")
-	logFolder   = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
-	logMaxSize  = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
-	freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
-	pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
-	versionFlag = flag.Bool("version", false, "Output version info")
-	dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
-	dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
-	dnsPort     = flag.String("dns_port", "9000", "port of dns node")
-	//Leader needs to have a minimal number of peers to start consensus
-	minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
-	// Key file to store the private key
-	keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
-	// isArchival indicates this node is an archival node that will save and archive current blockchain
-	isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
-	// delayCommit is the commit-delay timer, used by Harmony nodes
-	delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
-	// nodeType indicates the type of the node: validator, explorer
-	nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
-	// networkType indicates the type of the network
-	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
-	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod = flag.Int("block_period", 5, "how long in second the leader waits to propose a new block.")
-	// staking indicates whether the node is operating in staking mode.
-	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
-	// shardID indicates the shard ID of this node
-	shardID = flag.Int("shard_id", -1, "the shard ID of this node")
-	// Sharding configuration parameters for devnet
-	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
-	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
-	devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
-	// logging verbosity
-	verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
-	// dbDir is the database directory.
-	dbDir     = flag.String("db_dir", "", "blockchain database directory")
-	publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
-	// Bad block revert
-	doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
-	revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
-	revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
-	// Blacklist of addresses
-	blacklistPath      = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
-	broadcastInvalidTx = flag.Bool("broadcast_invalid_tx", false, "Broadcast invalid transactions to sync pool state (default: false)")
-	webHookYamlPath    = flag.String(
-		"webhook_yaml", "", "path for yaml config reporting double signing",
-	)
+	// config file
+	configFile string
+	// run config
+	nodeType  string
+	noStaking bool
+	// network config
+	networkType string
+	ip          string
+	port        int
+	p2pKeyFile  string
+	publicRPC   bool
+	bootNodes   []string
+	dnsZone     string
+	dnsPort     int
+	// consensus config
+	delayCommit string
+	blockTime   string
+	// bls config
+	keyDir           string
+	keyFiles         []string
+	maxBLSKeys       int
+	passSrcType      string
+	passFile         string
+	savePassphrase   bool
+	kmsConfigSrcType string
+	kmsConfigFile    string
+	// transaction pool config
+	blacklistFile      string
+	broadcastInvalidTx bool
+	// storage config
+	isArchival  bool
+	databaseDir string
+	// pprof config
+	pprofListenAddr string
+	// log config
+	logFolder  string
+	logMaxSize int
+	// devnet config
+	devnetNumShards uint
+	devnetShardSize int
+	hmyNodeSize     int
 )
+
+// legacy fields
+var (
+	isStaking      bool
+	legacyNodeType string
+	shardID        int
+
+	legacyNetworkType string
+	legacyMinPeers int
+)
+
+var rootCmd = &cobra.Command{
+	// TODO: elaborate the usage
+	Use:   "harmony",
+	Short: "",
+	Long:  "",
+	Run:   runHarmonyNode,
+}
+
+func init() {
+}
+
+func setupRootFlags(cmd *cobra.Command) error {
+	flags := cmd.Flags()
+	flags.StringVarP(&configFile, "config", "c", "", "config toml file to load from")
+	flags.StringVarP(&nodeType, "node-type", "", "validator", "node type to run (validator, explorer)")
+	flags.BoolVarP(&noStaking, "no-staking", "", false, "run node in legacy mode")
+
+	flags.StringVarP(&networkType, "network", "n", "mainnet", "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet")
+	flags.StringVarP(&ip, "ip", "", "127.0.0.1", "ip address to listen")
+	flags.IntVarP(&port, "port", "", 9000, "port to listen")
+}
+
+// TODO: When fully get rid of node.sh, change MarkHidden to MarkDeprecated
+func setupRootLegacyFlags(cmd *cobra.Command) error {
+	flags := cmd.Flags()
+	flags.BoolVarP(&isStaking, "staking", "", false, "[deprecated] run node in staking mode")
+	if err := flags.MarkDeprecated("staking", "Staking mode is enabled by default. Use --no-staking to run in legacy mode"); err != nil {
+		return err
+	}
+	flags.StringVarP(&legacyNodeType, "node_type", "", "[deprecated] validator", "node type to run (validator, explorer)")
+	if err := flags.MarkHidden("node_type"); err != nil {
+		return err
+	}
+	flags.IntVarP(&shardID, "shard_id", "", -1, "[deprecated] the shard ID of this node")
+	if err := flags.MarkHidden("shard_id"); err != nil {
+		return err
+	}
+	flags.StringVarP(&legacyNetworkType, "network_type", "", "mainnet", "[deprecated] network to join")
+	if err := flags.MarkHidden("network_type"); err != nil {
+		return err
+	}
+	flags.IntVarP(&legacyMinPeers, "min_peers", "", 32, "minimal number of peers in shard")
+	if err := flags.MarkDeprecated()
+}
+
+//ip         = flag.String("ip", "127.0.0.1", "ip of the node")
+//port       = flag.String("port", "9000", "port of the node.")
+//logFolder  = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
+//logMaxSize = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
+//// Remove this flag
+//freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+//pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
+//versionFlag = flag.Bool("version", false, "Output version info")
+//dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
+//dnsFlag     = flag.Bool("dns", true, "[deprecated] equivalent to -dns_zone t.hmny.io")
+//dnsPort     = flag.String("dns_port", "9000", "port of dns node")
+////Leader needs to have a minimal number of peers to start consensus
+//minPeers = flag.Int("min_peers", 32, "Minimal number of Peers in shard")
+//// Key file to store the private key
+//keyFile = flag.String("key", "./.hmykey", "the p2p key file of the harmony node")
+//// isArchival indicates this node is an archival node that will save and archive current blockchain
+//isArchival = flag.Bool("is_archival", false, "false will enable cached state pruning")
+//// delayCommit is the commit-delay timer, used by Harmony nodes
+//// TODO: check whether this field can be removed
+//delayCommit = flag.String("delay_commit", "0ms", "how long to delay sending commit messages in consensus, ex: 500ms, 1s")
+//// nodeType indicates the type of the node: validator, explorer
+//nodeType = flag.String("node_type", "validator", "node type: validator, explorer")
+//// networkType indicates the type of the network
+//networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
+//// blockPeriod indicates the how long the leader waits to propose a new block.
+//blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
+//// staking indicates whether the node is operating in staking mode.
+//stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
+//// shardID indicates the shard ID of this node
+//shardID = flag.Int("shard_id", -1, "the shard ID of this node")
+//// Sharding configuration parameters for devnet
+//devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
+//devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
+//devnetHarmonySize = flag.Int("dn_hmy_size", -1, "number of Harmony-operated nodes per shard for -network_type=devnet; negative (default) means equal to -dn_shard_size")
+//// logging verbosity
+//verbosity = flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
+//// dbDir is the database directory.
+//dbDir     = flag.String("db_dir", "", "blockchain database directory")
+//publicRPC = flag.Bool("public_rpc", false, "Enable Public RPC Access (default: false)")
+//// Bad block revert
+//// TODO: Seperate revert to a different command
+//doRevertBefore = flag.Int("do_revert_before", 0, "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block")
+//revertTo       = flag.Int("revert_to", 0, "The revert will rollback all blocks until and including block number revert_to")
+//revertBeacon   = flag.Bool("revert_beacon", false, "Whether to revert beacon chain or the chain this node is assigned to")
+//// Blacklist of addresses
+//blacklistPath      = flag.String("blacklist", "./.hmy/blacklist.txt", "Path to newline delimited file of blacklisted wallet addresses")
+//broadcastInvalidTx = flag.Bool("broadcast_invalid_tx", false, "Broadcast invalid transactions to sync pool state (default: false)")
+//webHookYamlPath    = flag.String(
+//	"webhook_yaml", "", "path for yaml config reporting double signing",
+//)
 
 func initSetup() {
 
@@ -142,6 +244,10 @@ func initSetup() {
 		}
 		p2p.BootNodes = bootNodeAddrs
 	}
+}
+
+func runHarmonyNode(cmd *cobra.Command, args []string) {
+
 }
 
 func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.PublicKeys) {
