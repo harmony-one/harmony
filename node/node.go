@@ -542,7 +542,7 @@ func (node *Node) Start() error {
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
-					return libp2p_pubsub.ValidationAccept
+					return libp2p_pubsub.ValidationReject
 				}
 
 				openBox := hmyMsg[p2pMsgPrefixSize:]
