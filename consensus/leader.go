@@ -7,7 +7,6 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -232,15 +231,13 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			Msg("[OnCommit] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
-	logger = logger.With().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Logger()
+	logger = logger.With().Uint64("MsgViewID", recvMsg.ViewID).Uint64("MsgBlockNum", recvMsg.BlockNum).Logger()
 
-	if !sign.VerifyHash(recvMsg.SenderPubkey.Object, commitPayload) {
-		logger.Error().Msg("[OnCommit] Cannot verify commit message")
+	if !consensus.verifyRecvMsg(recvMsg, blockObj) {
+		logger.Error().Uint64("BlockViewID", blockObj.Header().ViewID().Uint64()).
+			Uint64("BlockkNum", blockObj.Header().Number().Uint64()).
+			Str("BlockHash", blockObj.Header().Hash().Hex()).
+			Msg("[OnCommit] Tampered p2p message")
 		return
 	}
 

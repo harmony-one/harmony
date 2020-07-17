@@ -204,3 +204,15 @@ func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 	return true
 }
+
+func (consensus *Consensus) verifyRecvMsg(recvMsg *FBFTMessage, block *types.Block) bool {
+
+	validBlock := block.Header()
+
+	if validBlock.Number().Uint64() != recvMsg.BlockNum ||
+		validBlock.ViewID().Uint64() != recvMsg.ViewID ||
+		validBlock.Hash() != recvMsg.BlockHash {
+		return false
+	}
+	return true
+}
