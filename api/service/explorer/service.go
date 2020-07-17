@@ -109,7 +109,7 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/node-sync").HandlerFunc(s.GetNodeSync)
 
 	// Do serving now.
-	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
+	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("[Explorer] Server started.")
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      s.router,
@@ -118,8 +118,9 @@ func (s *Service) Run() *http.Server {
 		IdleTimeout:  120 * time.Second,
 	}
 	go func() {
+		defer func() { utils.Logger().Debug().Msg("[Explorer] Server closed.") }()
 		if err := server.ListenAndServe(); err != nil {
-			utils.Logger().Warn().Err(err).Msg("server.ListenAndServe()")
+			utils.Logger().Warn().Err(err).Msg("[Explorer] Server error.")
 		}
 	}()
 	return server
