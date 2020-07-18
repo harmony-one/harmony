@@ -74,7 +74,7 @@ WORKDIR ${HMY_PATH}/harmony
 
 RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/install_build_tools.sh
 
-RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh
+RUN eval "$(~/bin/gimme ${GIMME_GO_VERSION})" ; scripts/go_executable_build.sh -S
 
 RUN cd ${HMY_PATH}/go-sdk && make -j8 && cp hmy /root/bin
 
