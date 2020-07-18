@@ -6,7 +6,7 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 
-.PHONY: all libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
