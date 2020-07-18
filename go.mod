@@ -57,6 +57,8 @@ require (
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/zerolog v1.18.0
 	github.com/shirou/gopsutil v2.18.12+incompatible // indirect
+	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
