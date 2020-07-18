@@ -18,16 +18,18 @@ function cleanup() {
 }
 
 function build() {
-  pushd ${ROOT}
-  export GO111MODULE=on
-  if [[ "$OS" == "Darwin" ]]; then
-    # MacOS doesn't support static build
-    scripts/go_executable_build.sh -S
-  else
-    # Static build on Linux platform
-    scripts/go_executable_build.sh -s
+  if [[ "${NOBUILD}" != "true" ]]; then
+    pushd ${ROOT}
+    export GO111MODULE=on
+    if [[ "$OS" == "Darwin" ]]; then
+      # MacOS doesn't support static build
+      scripts/go_executable_build.sh -S
+    else
+      # Static build on Linux platform
+      scripts/go_executable_build.sh -s
+    fi
+    popd
   fi
-  popd
 }
 
 function setup() {
@@ -41,9 +43,7 @@ function setup() {
   cleanup
 
   # Note that the binarys only works on MacOS & Linux
-  if [[ "${NOBUILD}" != "true" ]]; then
-    build
-  fi
+  build
 
   # Create a tmp folder for logs
   t=$(date +"%Y%m%d-%H%M%S")
@@ -156,6 +156,7 @@ SHARDS=2
 DRYRUN=
 NETWORK=localnet
 VERBOSE=false
+NOBUILD=false
 
 while getopts "hD:m:s:nBN:v" option; do
   case ${option} in
