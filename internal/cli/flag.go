@@ -81,7 +81,8 @@ func (f StringSliceFlag) RegisterTo(fs *pflag.FlagSet) error {
 
 func markHiddenOrDeprecated(fs *pflag.FlagSet, name string, deprecated string, hidden bool) error {
 	if len(deprecated) != 0 {
-		if err := fs.MarkDeprecated(name, deprecated); err != nil {
+		// TODO: after totally removed node.sh, change MarkHidden to MarkDeprecated
+		if err := fs.MarkHidden(name); err != nil {
 			return err
 		}
 	} else if hidden {
