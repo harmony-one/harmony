@@ -7,9 +7,13 @@ import (
 	"github.com/pelletier/go-toml"
 )
 
-type hmyConfig struct {
+var globalConfig *parsedConfig
+
+type parsedConfig struct {
 	Run       runConfig
 	Network   networkConfig
+	P2P       p2pConfig
+	RPC       rpcConfig
 	Consensus consensusConfig
 	BLSKey    blsConfig
 	TxPool    txPoolConfig
@@ -22,20 +26,19 @@ type hmyConfig struct {
 type runConfig struct {
 	NodeType  string
 	IsStaking bool
-	ShardID   int
 }
 
 type networkConfig struct {
-	Network    string
-	IP         string
-	Port       int
-	MinPeers   int
-	P2PKeyFile string
-	PublicRPC  bool
+	NetworkType string
+	BootNodes   []string
+	DNSZone     string
+	DNSPort     int
+}
 
-	BootNodes []string
-	DNSZone   string
-	DNSPort   int
+type p2pConfig struct {
+	IP      string
+	Port    int
+	KeyFile string
 }
 
 type consensusConfig struct {
@@ -75,26 +78,32 @@ type logConfig struct {
 	LogMaxSize int
 }
 
+type rpcConfig struct {
+	Enabled bool
+	IP      string
+	Port    int
+}
+
 type devnetConfig struct {
 	NumShards   uint
 	ShardSize   int
 	HmyNodeSize int
 }
 
-func loadConfig(file string) (hmyConfig, error) {
+func loadConfig(file string) (persistConfig, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return hmyConfig{}, err
+		return persistConfig{}, err
 	}
 
-	var config hmyConfig
+	var config persistConfig
 	if err := toml.Unmarshal(b, &config); err != nil {
-		return hmyConfig{}, err
+		return persistConfig{}, err
 	}
 	return config, nil
 }
 
-func writeConfigToFile(config hmyConfig, file string) error {
+func writeConfigToFile(config persistConfig, file string) error {
 	b, err := toml.Marshal(config)
 	if err != nil {
 		return err
