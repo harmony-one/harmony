@@ -48,7 +48,6 @@ type Service struct {
 
 // New returns explorer service.
 func New(selfPeer *p2p.Peer, ss *syncing.StateSync, bc *core.BlockChain) *Service {
-	fmt.Printf("%+v\n", ss)
 	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
 }
 
