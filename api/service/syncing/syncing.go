@@ -144,7 +144,7 @@ func (ss *StateSync) purgeOldBlocksFromCache() {
 	})
 }
 
-// AddLastMileBlock add the lastest a few block into queue for syncing
+// AddLastMileBlock add the latest a few block into queue for syncing
 // only keep the latest blocks with size capped by LastMileBlocksSize
 func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	ss.lastMileMux.Lock()
@@ -157,7 +157,7 @@ func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	}
 }
 
-// CloseConnections close grpc  connections for state sync clients
+// CloseConnections close grpc connections for state sync clients
 func (sc *SyncConfig) CloseConnections() {
 	sc.mtx.RLock()
 	defer sc.mtx.RUnlock()
@@ -401,7 +401,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) {
 				utils.Logger().Warn().
 					Uint32("requestSize", size).
 					Int("respondSize", len(response.Payload)).
-					Msg("[SYNC] getConsensusHashes: receive more blockHahses than request!")
+					Msg("[SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
 			} else {
 				peerConfig.blockHashes = response.Payload
@@ -787,6 +787,9 @@ func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) 
 
 // IsOutOfSync checks whether the node is out of sync from other peers
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
+	if ss.syncConfig == nil {
+		return true // If syncConfig is not instantiated, return not in sync
+	}
 	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	utils.Logger().Debug().

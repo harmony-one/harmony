@@ -75,7 +75,7 @@ func (node *Node) PendingCXReceipts() []*types.CXReceiptsProof {
 	return cxReceipts
 }
 
-// ReportStakingErrorSink is the report of failed staking transactions this node has (held inmemory only)
+// ReportStakingErrorSink is the report of failed staking transactions this node has (held in memory only)
 func (node *Node) ReportStakingErrorSink() types.TransactionErrorReports {
 	return node.TransactionErrorSink.StakingReport()
 }
@@ -85,7 +85,7 @@ func (node *Node) GetNodeBootTime() int64 {
 	return node.unixTimeAtNodeStart
 }
 
-// ReportPlainErrorSink is the report of failed transactions this node has (held inmemory only)
+// ReportPlainErrorSink is the report of failed transactions this node has (held in memory only)
 func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 	return node.TransactionErrorSink.PlainReport()
 }

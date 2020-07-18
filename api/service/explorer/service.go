@@ -11,9 +11,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
@@ -41,11 +42,13 @@ type Service struct {
 	Storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
+	stateSync   *syncing.StateSync
+	blockchain  *core.BlockChain
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer) *Service {
-	return &Service{IP: selfPeer.IP, Port: selfPeer.Port}
+func New(selfPeer *p2p.Peer, ss *syncing.StateSync, bc *core.BlockChain) *Service {
+	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
 }
 
 // StartService starts explorer service.
@@ -61,7 +64,7 @@ func (s *Service) StopService() {
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when shutting down explorer server")
 	} else {
-		utils.Logger().Info().Msg("Shutting down explorer server successufully")
+		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
 }
 
@@ -100,8 +103,12 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/total-supply").Queries().HandlerFunc(s.GetTotalSupply).Methods("GET")
 	s.router.Path("/total-supply").HandlerFunc(s.GetTotalSupply)
 
+	// Set up router for node health check.
+	s.router.Path("/node-sync").Queries().HandlerFunc(s.GetNodeSync).Methods("GET")
+	s.router.Path("/node-sync").HandlerFunc(s.GetNodeSync)
+
 	// Do serving now.
-	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("Listening")
+	utils.Logger().Info().Str("port", GetExplorerPort(s.Port)).Msg("[Explorer] Server started.")
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      s.router,
@@ -110,8 +117,9 @@ func (s *Service) Run() *http.Server {
 		IdleTimeout:  120 * time.Second,
 	}
 	go func() {
+		defer func() { utils.Logger().Debug().Msg("[Explorer] Server closed.") }()
 		if err := server.ListenAndServe(); err != nil {
-			utils.Logger().Warn().Err(err).Msg("server.ListenAndServe()")
+			utils.Logger().Warn().Err(err).Msg("[Explorer] Server error.")
 		}
 	}()
 	return server
@@ -160,6 +168,19 @@ func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(totalSupply); err != nil {
+		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// GetNodeSync returns status code 500 if node is not in sync
+func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	sync := !s.stateSync.IsOutOfSync(s.blockchain)
+	if !sync {
+		w.WriteHeader(http.StatusTeapot)
+	}
+	if err := json.NewEncoder(w).Encode(sync); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}

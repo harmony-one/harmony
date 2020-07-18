@@ -746,10 +746,10 @@ func main() {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
-	go currentNode.SupportSyncing()
+	currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
-	// RPC for SDK not supported for mainnet.
+
 	if err := currentNode.StartRPC(*port); err != nil {
 		utils.Logger().Warn().
 			Err(err).

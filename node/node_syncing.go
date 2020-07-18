@@ -232,10 +232,6 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
-		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
-	}
 	if node.stateSync.GetActivePeerNumber() < syncing.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
@@ -291,6 +287,11 @@ func (node *Node) SupportSyncing() {
 	// TODO: leo this pushing logic has to be removed
 	if joinConsensus {
 		go node.SendNewBlockToUnsync()
+	}
+
+	if node.stateSync == nil {
+		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 
 	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)

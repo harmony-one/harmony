@@ -45,7 +45,7 @@ func (node *Node) setupForExplorerNode() {
 	)
 	// Register explorer service.
 	node.serviceManager.RegisterService(
-		service.SupportExplorer, explorer.New(&node.SelfPeer),
+		service.SupportExplorer, explorer.New(&node.SelfPeer, node.stateSync, node.Blockchain()),
 	)
 }
 
