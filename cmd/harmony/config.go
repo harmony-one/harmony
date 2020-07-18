@@ -31,8 +31,10 @@ type runConfig struct {
 type networkConfig struct {
 	NetworkType string
 	BootNodes   []string
-	DNSZone     string
-	DNSPort     int
+
+	LegacySyncing bool // if true, use LegacySyncingPeerProvider
+	DNSZone       string
+	DNSPort       int
 }
 
 type p2pConfig struct {
