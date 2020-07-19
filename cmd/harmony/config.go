@@ -10,7 +10,7 @@ import (
 var globalConfig *parsedConfig
 
 type parsedConfig struct {
-	Run       runConfig
+	General   generalConfig
 	Network   networkConfig
 	P2P       p2pConfig
 	RPC       rpcConfig
@@ -23,18 +23,9 @@ type parsedConfig struct {
 	Devnet    *devnetConfig `toml:",omitempty"`
 }
 
-type runConfig struct {
+type generalConfig struct {
 	NodeType  string
 	IsStaking bool
-}
-
-type networkConfig struct {
-	NetworkType string
-	BootNodes   []string
-
-	LegacySyncing bool // if true, use LegacySyncingPeerProvider
-	DNSZone       string
-	DNSPort       int
 }
 
 type p2pConfig struct {
@@ -92,20 +83,20 @@ type devnetConfig struct {
 	HmyNodeSize int
 }
 
-func loadConfig(file string) (persistConfig, error) {
+func loadConfig(file string) (parsedConfig, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return persistConfig{}, err
+		return parsedConfig{}, err
 	}
 
-	var config persistConfig
+	var config parsedConfig
 	if err := toml.Unmarshal(b, &config); err != nil {
-		return persistConfig{}, err
+		return parsedConfig{}, err
 	}
 	return config, nil
 }
 
-func writeConfigToFile(config persistConfig, file string) error {
+func writeConfigToFile(config parsedConfig, file string) error {
 	b, err := toml.Marshal(config)
 	if err != nil {
 		return err

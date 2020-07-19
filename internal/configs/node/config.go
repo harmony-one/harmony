@@ -46,6 +46,7 @@ func (role Role) String() string {
 type NetworkType string
 
 // Constants for NetworkType
+// TODO: replace this with iota. Leave the string parsing in command line
 const (
 	Mainnet   = "mainnet"
 	Testnet   = "testnet"
