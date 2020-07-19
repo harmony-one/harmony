@@ -43,6 +43,9 @@ const (
 	// very bad design. Will refactor later
 	// TODO: refactor all 9000-3000 = 6000 stuff
 	DefaultDNSPort = 9000
+	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500, which is a terrible
+	// design.
+	DefaultRPCPort = 9000
 )
 
 // GetDefaultBootNodes get the default bootnode with the given network type

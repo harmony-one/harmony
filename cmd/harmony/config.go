@@ -4,12 +4,24 @@ import (
 	"io/ioutil"
 	"time"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
 )
 
-var globalConfig *parsedConfig
+var defaultConfig = hmyConfig{
+	Network: getDefaultNetworkConfig(nodeconfig.Mainnet),
+	P2P: p2pConfig{
+		Port:    nodeconfig.DefaultP2PPort,
+		KeyFile: "./.hmykey",
+	},
+	RPC: rpcConfig{
+		Enabled: false,
+		IP:      "127.0.0.1",
+		Port:    nodeconfig.DefaultRPCPort,
+	},
+}
 
-type parsedConfig struct {
+type hmyConfig struct {
 	General   generalConfig
 	Network   networkConfig
 	P2P       p2pConfig
@@ -23,15 +35,23 @@ type parsedConfig struct {
 	Devnet    *devnetConfig `toml:",omitempty"`
 }
 
-type generalConfig struct {
-	NodeType  string
-	IsStaking bool
+type networkConfig struct {
+	NetworkType string
+	BootNodes   []string
+
+	LegacySyncing bool // if true, use LegacySyncingPeerProvider
+	DNSZone       string
+	DNSPort       int
 }
 
 type p2pConfig struct {
-	IP      string
 	Port    int
 	KeyFile string
+}
+
+type generalConfig struct {
+	NodeType  string
+	IsStaking bool
 }
 
 type consensusConfig struct {
@@ -83,20 +103,20 @@ type devnetConfig struct {
 	HmyNodeSize int
 }
 
-func loadConfig(file string) (parsedConfig, error) {
+func loadConfig(file string) (hmyConfig, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return parsedConfig{}, err
+		return hmyConfig{}, err
 	}
 
-	var config parsedConfig
+	var config hmyConfig
 	if err := toml.Unmarshal(b, &config); err != nil {
-		return parsedConfig{}, err
+		return hmyConfig{}, err
 	}
 	return config, nil
 }
 
-func writeConfigToFile(config parsedConfig, file string) error {
+func writeConfigToFile(config hmyConfig, file string) error {
 	b, err := toml.Marshal(config)
 	if err != nil {
 		return err
