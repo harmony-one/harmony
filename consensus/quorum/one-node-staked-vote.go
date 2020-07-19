@@ -61,6 +61,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
+	// TODO(audit): pass in sig as byte[] too, so no need to serialize
 	ballet, err := v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)
 
 	if err != nil {

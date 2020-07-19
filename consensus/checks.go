@@ -63,7 +63,7 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Str("ValidatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
-			Msg("[OnCommit] BlockNum/viewID not match")
+			Msg("BlockNum/viewID not match")
 		return false
 	}
 	return true

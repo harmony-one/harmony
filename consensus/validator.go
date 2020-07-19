@@ -34,8 +34,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.prepareMutex.Lock()
+	defer consensus.prepareMutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -71,7 +71,7 @@ func (consensus *Consensus) prepare() {
 			return
 		}
 
-		// TODO: this will not return immediatey, may block
+		// TODO: this will not return immediately, may block
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
@@ -148,8 +148,8 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.prepareMutex.Lock()
+	defer consensus.prepareMutex.Unlock()
 
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
@@ -164,7 +164,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
 
+	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
+	consensus.commitMutex.Lock()
 	consensus.tryCatchup()
+	consensus.commitMutex.Unlock()
+
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
 		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
@@ -286,8 +290,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.FBFTLog.AddMessage(recvMsg)
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.commitMutex.Lock()
+	defer consensus.commitMutex.Unlock()
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask

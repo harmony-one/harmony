@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -20,8 +19,6 @@ import (
 func TestConsensusInitialization(t *testing.T) {
 	host, multiBLSPrivateKey, consensus, decider, err := GenerateConsensusForTesting()
 	assert.NoError(t, err)
-
-	peer := host.GetSelfPeer()
 
 	messageSender := &MessageSender{host: host, retryTimes: int(phaseDuration.Seconds()) / RetryIntervalInSec}
 	fbtLog := NewFBFTLog()
@@ -55,21 +52,6 @@ func TestConsensusInitialization(t *testing.T) {
 		assert.Equal(t, timeouts[timeoutType].Duration().Nanoseconds(), duration.Nanoseconds())
 		assert.Equal(t, timeout.Nanoseconds(), duration.Nanoseconds())
 	}
-
-	// Validators sync.Map
-	assert.IsType(t, sync.Map{}, consensus.validators)
-	assert.NotEmpty(t, consensus.validators)
-
-	validatorLength := 0
-	consensus.validators.Range(func(_, _ interface{}) bool {
-		validatorLength++
-		return true
-	})
-
-	assert.Equal(t, 1, validatorLength)
-	retrievedPeer, loadedOk := consensus.validators.Load(peer.ConsensusPubKey.SerializeToHexStr())
-	assert.Equal(t, true, loadedOk)
-	assert.Equal(t, retrievedPeer, peer)
 
 	// MultiBLS
 	assert.Equal(t, multiBLSPrivateKey, consensus.priKey)

@@ -17,7 +17,6 @@ import (
 
 // Constants of proposing a new block
 const (
-	SleepPeriod           = 20 * time.Millisecond
 	IncomingReceiptsLimit = 6000 // 2000 * (numShards - 1)
 )
 
@@ -42,8 +41,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 				return
 			case <-readySignal:
 				for node.Consensus != nil && node.Consensus.IsLeader() {
-					time.Sleep(SleepPeriod)
-
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
