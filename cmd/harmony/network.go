@@ -41,12 +41,12 @@ var (
 	}
 	dnsZoneFlag = cli.StringSliceFlag{
 		Name:  "dns.zone",
-		Usage: "use peers from the zone for state syncing",
+		Usage: "use customized peers from the zone for state syncing",
 	}
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: defDNSPort,
-		Usage:    "port of dns node",
+		Usage:    "port of customized dns node",
 	}
 	legacyDNSZoneFlag = cli.StringFlag{
 		Name:       "dns_zone",
@@ -62,7 +62,7 @@ var (
 		Name:       "dns",
 		DefValue:   true,
 		Usage:      "use dns for syncing",
-		Deprecated: "equivalent to --dns.zone t.hmny.io",
+		Deprecated: "set to false only used for self discovery peers for syncing",
 	}
 	legacyNetworkTypeFlag = cli.StringFlag{
 		Name:       "network_type",

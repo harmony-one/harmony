@@ -37,7 +37,12 @@ const (
 )
 
 const (
-	defaultDNSPort = 9000
+	// DefaultP2PPort is the key to be used for p2p communication
+	DefaultP2PPort = 9000
+	// DefaultDNSPort is the default DNS port. The actual port used is DNSPort - 3000. This is a
+	// very bad design. Will refactor later
+	// TODO: refactor all 9000-3000 = 6000 stuff
+	DefaultDNSPort = 9000
 )
 
 // GetDefaultBootNodes get the default bootnode with the given network type
@@ -75,5 +80,5 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 
 // GetDefaultDNSPort get the default DNS port for the given network type
 func GetDefaultDNSPort(NetworkType) int {
-	return defaultDNSPort
+	return DefaultDNSPort
 }
