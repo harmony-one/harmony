@@ -8,6 +8,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type networkConfig struct {
+	NetworkType string
+	BootNodes   []string
+
+	LegacySyncing bool // if true, use LegacySyncingPeerProvider
+	DNSZone       string
+	DNSPort       int
+}
+
 var networkFlags = []cli.Flag{
 	networkTypeFlag,
 	bootNodeFlag,
@@ -62,25 +71,45 @@ var (
 	}
 )
 
-func getNetworkType(cmd *cobra.Command) (string, error) {
+func getNetworkType(cmd *cobra.Command) (nodeconfig.NetworkType, error) {
 	var (
-		nt  string
+		raw string
 		err error
 	)
 	if cmd.Flags().Changed(legacyNetworkTypeFlag.Name) {
-		nt, err = cmd.Flags().GetString(legacyNetworkTypeFlag.Name)
+		raw, err = cmd.Flags().GetString(legacyNetworkTypeFlag.Name)
 	} else {
-		nt, err = cmd.Flags().GetString(networkTypeFlag.Name)
+		raw, err = cmd.Flags().GetString(networkTypeFlag.Name)
 	}
 	if err != nil {
 		return "", err
 	}
-	switch nt {
-	case nodeconfig.Mainnet, nodeconfig.Testnet, nodeconfig.Pangaea, nodeconfig.Localnet,
-		nodeconfig.Partner, nodeconfig.Stressnet, nodeconfig.Devnet:
-		return nt, nil
-	default:
+
+	nt := parseNetworkType(raw)
+	if len(nt) == 0 {
 		return "", fmt.Errorf("unrecognized network type: %v", nt)
+	}
+	return nt, nil
+}
+
+func parseNetworkType(nt string) nodeconfig.NetworkType {
+	switch nt {
+	case "mainnet":
+		return nodeconfig.Mainnet
+	case "testnet":
+		return nodeconfig.Testnet
+	case "pangaea", "staking", "stk":
+		return nodeconfig.Pangaea
+	case "partner":
+		return nodeconfig.Partner
+	case "stressnet", "stress", "stn":
+		return nodeconfig.Stressnet
+	case "localnet":
+		return nodeconfig.Localnet
+	case "devnet", "dev":
+		return nodeconfig.Devnet
+	default:
+		return ""
 	}
 }
 
@@ -111,4 +140,14 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *parsedConfig) {
 	}
 }
 
-func getDefaultConfig
+func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
+	bn := nodeconfig.GetDefaultBootNodes(nt)
+	zone := nodeconfig.GetDefaultDNSZone(nt)
+	port := nodeconfig.GetDefaultDNSPort(nt)
+	return networkConfig{
+		NetworkType: string(nt),
+		BootNodes:   bn,
+		DNSZone:     zone,
+		DNSPort:     port,
+	}
+}
