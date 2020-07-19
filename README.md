@@ -16,7 +16,8 @@ http://api.hmny.io/
 
 ## Requirements
 
-1. **GMP and OpenSSL**
+### **Go 1.14.1**
+### **GMP and OpenSSL**
 
 On macOS:
 ```bash
@@ -31,7 +32,7 @@ On Linux (Cent OS / Amazon Linux 2)
 ```bash
 sudo yum install glibc-static gmp-devel gmp-static openssl-libs openssl-static gcc-c++
 ```
-2. **Docker** (for testing)
+### **Docker** (for testing)
 
 On macOS: 
 ```bash
@@ -39,8 +40,7 @@ brew cask install docker
 open /Applications/Docker.app
 ```
 On Linux, reference official documentation [here](https://docs.docker.com/engine/install/).
-3. **Go 1.14.1**
-4. **Bash 4+** 
+### **Bash 4+** 
 
 For macOS, you can reference this [guide](http://tldrdevnotes.com/bash-upgrade-3-4-macos). For Linux, you can reference this [guide](https://fossbytes.com/installing-gnu-bash-4-4-linux-distros/).
 
