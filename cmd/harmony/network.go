@@ -8,15 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type networkConfig struct {
-	NetworkType string
-	BootNodes   []string
-
-	LegacySyncing bool // if true, use LegacySyncingPeerProvider
-	DNSZone       string
-	DNSPort       int
-}
-
 var networkFlags = []cli.Flag{
 	networkTypeFlag,
 	bootNodeFlag,
@@ -45,7 +36,7 @@ var (
 	}
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
-		DefValue: defDNSPort,
+		DefValue: nodeconfig.DefaultDNSPort,
 		Usage:    "port of customized dns node",
 	}
 	legacyDNSZoneFlag = cli.StringFlag{
@@ -92,28 +83,7 @@ func getNetworkType(cmd *cobra.Command) (nodeconfig.NetworkType, error) {
 	return nt, nil
 }
 
-func parseNetworkType(nt string) nodeconfig.NetworkType {
-	switch nt {
-	case "mainnet":
-		return nodeconfig.Mainnet
-	case "testnet":
-		return nodeconfig.Testnet
-	case "pangaea", "staking", "stk":
-		return nodeconfig.Pangaea
-	case "partner":
-		return nodeconfig.Partner
-	case "stressnet", "stress", "stn":
-		return nodeconfig.Stressnet
-	case "localnet":
-		return nodeconfig.Localnet
-	case "devnet", "dev":
-		return nodeconfig.Devnet
-	default:
-		return ""
-	}
-}
-
-func applyNetworkFlags(cmd *cobra.Command, cfg *parsedConfig) {
+func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
 	fs := cmd.Flags()
 
 	if fs.Changed(bootNodeFlag.Name) {
@@ -140,6 +110,27 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *parsedConfig) {
 	}
 }
 
+func parseNetworkType(nt string) nodeconfig.NetworkType {
+	switch nt {
+	case "mainnet":
+		return nodeconfig.Mainnet
+	case "testnet":
+		return nodeconfig.Testnet
+	case "pangaea", "staking", "stk":
+		return nodeconfig.Pangaea
+	case "partner":
+		return nodeconfig.Partner
+	case "stressnet", "stress", "stn":
+		return nodeconfig.Stressnet
+	case "localnet":
+		return nodeconfig.Localnet
+	case "devnet", "dev":
+		return nodeconfig.Devnet
+	default:
+		return ""
+	}
+}
+
 func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 	bn := nodeconfig.GetDefaultBootNodes(nt)
 	zone := nodeconfig.GetDefaultDNSZone(nt)
@@ -149,5 +140,107 @@ func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 		BootNodes:   bn,
 		DNSZone:     zone,
 		DNSPort:     port,
+	}
+}
+
+var p2pFlags = []cli.Flag{
+	p2pPortFlag,
+	p2pKeyFileFlag,
+	legacyKeyFileFlag,
+}
+
+var (
+	p2pPortFlag = &cli.IntFlag{
+		Name:     "p2p.port",
+		Usage:    "port to listen for p2p communication",
+		DefValue: defaultConfig.P2P.Port,
+	}
+	p2pKeyFileFlag = &cli.StringFlag{
+		Name:     "p2p.keyfile",
+		Usage:    "the p2p key file of the harmony node",
+		DefValue: defaultConfig.P2P.KeyFile,
+	}
+	legacyKeyFileFlag = &cli.StringFlag{
+		Name:       "key",
+		Usage:      "the p2p key file of the harmony node",
+		DefValue:   defaultConfig.P2P.KeyFile,
+		Deprecated: "use --p2p.keyfile",
+	}
+)
+
+func parseP2PFlags(cmd *cobra.Command, config *hmyConfig) {
+	fs := cmd.Flags()
+
+	if fs.Changed(p2pPortFlag.Name) {
+		config.P2P.Port, _ = fs.GetInt(p2pPortFlag.Name)
+	}
+
+	if fs.Changed(p2pKeyFileFlag.Name) {
+		config.P2P.KeyFile, _ = fs.GetString(p2pKeyFileFlag.Name)
+	} else if fs.Changed(legacyKeyFileFlag.Name) {
+		config.P2P.KeyFile, _ = fs.GetString(legacyKeyFileFlag.Name)
+	}
+}
+
+var rpcFlags = []cli.Flag{
+	rpcEnabledFlag,
+	rpcIPFlag,
+	rpcPortFlag,
+	legacyRPCIPFlag,
+	legacyPublicRPCFlag
+}
+
+var (
+	rpcEnabledFlag = cli.BoolFlag{
+		Name:     "http",
+		Usage:    "enable HTTP / RPC requests",
+		DefValue: defaultConfig.RPC.Enabled,
+	}
+	rpcIPFlag = cli.StringFlag{
+		Name:     "http.ip",
+		Usage:    "ip address to listen for RPC calls",
+		DefValue: defaultConfig.RPC.IP,
+	}
+	rpcPortFlag = cli.IntFlag{
+		Name:     "http.port",
+		Usage:    "rpc port to listen for RPC calls",
+		DefValue: defaultConfig.RPC.Port,
+	}
+	legacyRPCIPFlag = cli.StringFlag{
+		Name:       "ip",
+		Usage:      "ip of the node",
+		DefValue:   defaultConfig.RPC.IP,
+		Deprecated: "use --http.ip",
+	}
+	legacyPublicRPCFlag = cli.BoolFlag{
+		Name:       "public_rpc",
+		Usage:      "Enable Public RPC Access (default: false)",
+		DefValue:   defaultConfig.RPC.Enabled,
+		Deprecated: "please use --http.ip to specify the ip address to listen",
+	}
+)
+
+func applyRPCFlags(cmd *cobra.Command, config *hmyConfig) {
+	fs := cmd.Flags()
+
+	var isRPCSpecified bool
+
+	if fs.Changed(rpcIPFlag.Name) {
+		config.RPC.IP, _ = fs.GetString(rpcIPFlag.Name)
+		isRPCSpecified = true
+	} else if fs.Changed(legacyRPCIPFlag.Name) {
+		config.RPC.IP, _ = fs.GetString(legacyRPCIPFlag.Name)
+		isRPCSpecified = true
+	}
+
+	if fs.Changed(rpcPortFlag.Name) {
+		config.RPC.Port, _ = fs.GetInt(rpcPortFlag.Name)
+		isRPCSpecified = true
+	}
+
+	if fs.Changed(rpcEnabledFlag.Name) {
+		config.RPC.Enabled, _ = fs.GetBool(rpcEnabledFlag.Name)
+	} else if isRPCSpecified {
+		config.RPC.Enabled = true
 	}
 }
