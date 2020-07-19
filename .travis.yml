@@ -1,7 +1,14 @@
+sudo: required
+services:
+  - docker
 language: go
 go:
   - 1.14
 go_import_path: github.com/harmony-one/harmony
+env:
+  - TEST="go build -v ./..."
+  - TEST="./scripts/travis_checker.sh"
+  - TEST="./scripts/travis_node_checker.sh"
 install:
   - export GO111MODULE=on
   - export GOPATH=$HOME/gopath
@@ -21,11 +28,10 @@ install:
   - cd ../harmony
   - go get -v ./...
   - scripts/install_build_tools.sh
+  - chmod +x scripts/travis_checker.sh
+  - chmod +x scripts/travis_node_checker.sh
 script:
-  - go build -v ./...
-  - ./scripts/travis_checker.sh
-notifications:
-  slack: harmonyone:gggCd1QQopsQAW8JYgBWiH7M
+  - ${TEST}
 after_success:
   - wget https://raw.githubusercontent.com/DiscordHooks/travis-ci-discord-webhook/master/send.sh
   - chmod +x send.sh

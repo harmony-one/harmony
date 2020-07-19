@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 unset -v ok tmpdir gomod_diff_output goimports_output golint_output progdir
 ok=true

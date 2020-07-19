@@ -1,74 +1,135 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -eo pipefail
 
 unset -v progdir
 case "${0}" in
 */*) progdir="${0%/*}" ;;
-*) progdir=.  ;;
+*) progdir=. ;;
 esac
 
 ROOT="${progdir}/.."
 USER=$(whoami)
+OS=$(uname -s)
 
 . "${ROOT}/scripts/setup_bls_build_flags.sh"
 
-# set -x
-set -eo pipefail
-
-export GO111MODULE=on
-OS=$(uname -s)
-
-mkdir -p .hmy
-if [ -f ".hmy/blspass.txt" ]
-then
-   echo ".hmy/blspass.txt already in local."
-else
-   touch .hmy/blspass.txt
-fi
-
 function cleanup() {
-   "${progdir}/kill_node.sh"
+  "${progdir}/kill_node.sh"
 }
 
-function cleanup_and_result() {
-   "${ROOT}/test/kill_node.sh" 2> /dev/null || true
+function build() {
+  if [[ "${NOBUILD}" != "true" ]]; then
+    pushd ${ROOT}
+    export GO111MODULE=on
+    if [[ "$OS" == "Darwin" ]]; then
+      # MacOS doesn't support static build
+      scripts/go_executable_build.sh -S
+    else
+      # Static build on Linux platform
+      scripts/go_executable_build.sh -s
+    fi
+    popd
+  fi
 }
 
-function debug_staking() {
-   source "$(go env GOPATH)/src/github.com/harmony-one/harmony/scripts/setup_bls_build_flags.sh"
-   hmy_gosdk="$(go env GOPATH)/src/github.com/harmony-one/go-sdk"
-   hmy_bin="${hmy_gosdk}/hmy"
-   hmy_ops="/tmp/harmony-ops"
-   keystore="${hmy_ops}/test-automation/api-tests/LocalnetValidatorKeys"
+function setup() {
+  # Setup blspass file
+  mkdir -p ${ROOT}/.hmy
+  if [[ ! -f "${ROOT}/.hmy/blspass.txt" ]]; then
+    touch "${ROOT}/.hmy/blspass.txt"
+  fi
 
-   rm -rf $hmy_ops
-   git clone https://github.com/harmony-one/harmony-ops.git $hmy_ops
+  # Kill nodes if any
+  cleanup
 
-   if [ ! -d "${hmy_gosdk}" ]; then
-     git clone https://github.com/harmony-one/go-sdk.git $hmy_gosdk
-   fi
-   if [ ! -f "${hmy_bin}" ]; then
-     make -C $hmy_gosdk
-   fi
+  # Note that the binarys only works on MacOS & Linux
+  build
 
-   hmy_version=$($hmy_bin version 2>&1 >/dev/null)
-   if [[ "${hmy_version:32:3}" -lt "135" ]]; then
-     echo "Aborting staking tests since CLI version is out of date."
-     return
-   fi
-
-   python3 -m pip install pyhmy
-   python3 -m pip install requests
-   python3 "${hmy_ops}/test-automation/api-tests/test.py" --keystore $keystore \
-            --cli_path $hmy_bin --test_dir "${hmy_ops}/test-automation/api-tests/tests/"  \
-            --rpc_endpoint_src="http://localhost:9500/" --rpc_endpoint_dst="http://localhost:9501/" --ignore_regression_test
+  # Create a tmp folder for logs
+  t=$(date +"%Y%m%d-%H%M%S")
+  log_folder="${ROOT}/tmp_log/log-$t"
+  mkdir -p "${log_folder}"
+  LOG_FILE=${log_folder}/r.log
 }
 
-trap cleanup_and_result SIGINT SIGTERM
+function launch_bootnode() {
+  echo "launching boot node ..."
+  ${DRYRUN} ${ROOT}/bin/bootnode -port 19876 >"${log_folder}"/bootnode.log 2>&1 | tee -a "${LOG_FILE}" &
+  sleep 1
+  BN_MA=$(grep "BN_MA" "${log_folder}"/bootnode.log | awk -F\= ' { print $2 } ')
+  echo "bootnode launched." + " $BN_MA"
+}
 
-function usage {
-   local ME=$(basename $0)
+function launch_localnet() {
+  launch_bootnode
 
-   cat<<EOU
+  unset -v base_args
+  declare -a base_args args
+
+  if ${VERBOSE}; then
+    verbosity=5
+  else
+    verbosity=3
+  fi
+
+  base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" "-network_type=$NETWORK" -blspass file:"${ROOT}/.hmy/blspass.txt" "-dns=false" "-verbosity=${verbosity}")
+  sleep 2
+
+  # Start nodes
+  i=-1
+  while IFS='' read -r line || [[ -n "$line" ]]; do
+    i=$((i + 1))
+
+    # Read config for i-th node form config file
+    IFS=' ' read -r ip port mode bls_key shard <<<"${line}"
+    args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "${ROOT}/db-${ip}-${port}" "-broadcast_invalid_tx=true")
+    if [[ -z "$ip" || -z "$port" ]]; then
+      echo "skip empty node"
+      continue
+    fi
+
+    # Setup BLS key for i-th localnet node
+    if [[ ! -e "$bls_key" ]]; then
+      args=("${args[@]}" -blskey_file "BLSKEY")
+    elif [[ -f "$bls_key" ]]; then
+      args=("${args[@]}" -blskey_file "${ROOT}/${bls_key}")
+    elif [[ -d "$bls_key" ]]; then
+      args=("${args[@]}" -blsfolder "${ROOT}/${bls_key}")
+    else
+      echo "skipping unknown node"
+      continue
+    fi
+
+    # Setup flags for i-th node based on config
+    case "${mode}" in
+    explorer)
+      args=("${args[@]}" "-node_type=explorer" "-shard_id=${shard}")
+      ;;
+    archival)
+      args=("${args[@]}" -is_archival)
+      ;;
+    leader)
+      args=("${args[@]}" -is_leader)
+      ;;
+    external)
+      args=("${args[@]}" "-staking=true")
+      ;;
+    client)
+      continue
+      ;;
+    esac
+
+    # Start the node
+    ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+  done <"${config}"
+}
+
+trap cleanup SIGINT SIGTERM
+
+function usage() {
+  local ME=$(basename $0)
+
+  echo "
 USAGE: $ME [OPTIONS] config_file_name [extra args to node]
 
    -h             print this help message
@@ -85,34 +146,33 @@ This script will build all the binaries and start harmony and based on the confi
 EXAMPLES:
 
    $ME local_config.txt
-   $ME -p local_config.txt
-
-EOU
-   exit 0
+"
+  exit 0
 }
 
 DURATION=60000
 MIN=3
 SHARDS=2
 DRYRUN=
-SYNC=true
 NETWORK=localnet
 VERBOSE=false
+NOBUILD=false
 
 while getopts "hD:m:s:nBN:v" option; do
-   case $option in
-      h) usage ;;
-      D) DURATION=$OPTARG ;;
-      m) MIN=$OPTARG ;;
-      s) SHARDS=$OPTARG ;;
-      n) DRYRUN=echo ;;
-      B) NOBUILD=true ;;
-      N) NETWORK=$OPTARG ;;
-      v) VERBOSE=true ;;
-   esac
+  case ${option} in
+  h) usage ;;
+  D) DURATION=$OPTARG ;;
+  m) MIN=$OPTARG ;;
+  s) SHARDS=$OPTARG ;;
+  n) DRYRUN=echo ;;
+  B) NOBUILD=true ;;
+  N) NETWORK=$OPTARG ;;
+  v) VERBOSE=true ;;
+  *) usage ;;
+  esac
 done
 
-shift $((OPTIND-1))
+shift $((OPTIND - 1))
 
 config=$1
 shift 1 || usage
@@ -120,77 +180,7 @@ unset -v extra_args
 declare -a extra_args
 extra_args=("$@")
 
-# Kill nodes if any
-cleanup
-
-# Since `go run` will generate a temporary exe every time,
-# On windows, your system will pop up a network security dialog for each instance
-# and you won't be able to turn it off. With `go build` generating one
-# exe, the dialog will only pop up once at the very first time.
-# Also it's recommended to use `go build` for testing the whole exe. 
-if [ "${NOBUILD}" != "true" ]; then
-   pushd $ROOT
-   if [ "$OS" = "Darwin" ]; then
-   # MacOS doesn't support static build
-      scripts/go_executable_build.sh -S
-   else
-   # Static build on Linux platform
-      scripts/go_executable_build.sh -s
-   fi
-   popd
-fi
-
-# Create a tmp folder for logs
-t=`date +"%Y%m%d-%H%M%S"`
-log_folder="tmp_log/log-$t"
-
-mkdir -p $log_folder
-LOG_FILE=$log_folder/r.log
-
-echo "launching boot node ..."
-$DRYRUN $ROOT/bin/bootnode -port 19876 > $log_folder/bootnode.log 2>&1 | tee -a $LOG_FILE &
-sleep 1
-BN_MA=$(grep "BN_MA" $log_folder/bootnode.log | awk -F\= ' { print $2 } ')
-echo "bootnode launched." + " $BN_MA"
-
-unset -v base_args
-declare -a base_args args
-
-if $VERBOSE; then
-   verbosity=5
-else
-   verbosity=3
-fi
-
-base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" -network_type="$NETWORK" -blspass file:.hmy/blspass.txt -dns=false -verbosity="${verbosity}")
-sleep 2
-
-# Start nodes
-i=0
-while IFS='' read -r line || [[ -n "$line" ]]; do
-  IFS=' ' read ip port mode account blspub <<< $line
-  args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "db-${ip}-${port}")
-  if [[ -z "$ip" || -z "$port" ]]; then
-     echo "skip empty node"
-     continue
-  fi
-
-  if [ ! -e .hmy/${blspub}.key ]; then
-    args=("${args[@]}" -blskey_file "BLSKEY")
-  else
-    args=("${args[@]}" -blskey_file ".hmy/${blspub}.key")
-  fi
-
-  case "${mode}" in leader*) args=("${args[@]}" -is_leader);; esac
-  case "${mode}" in *archival|archival) args=("${args[@]}" -is_archival);; esac
-  case "${mode}" in explorer*) args=("${args[@]}" -node_type=explorer -shard_id=0);; esac
-  case "${mode}" in
-  client) ;;
-  *) $DRYRUN "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &;;
-  esac
-  i=$((i+1))
-done < $config
-
-sleep $DURATION
-
-cleanup_and_result
+setup
+launch_localnet
+sleep "${DURATION}"
+cleanup || true
