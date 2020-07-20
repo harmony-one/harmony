@@ -63,9 +63,9 @@ var (
 
 func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
 	var raw string
-	if cmd.Flags().Changed(legacyNetworkTypeFlag.Name) {
+	if cli.HasFlagChanged(cmd, networkTypeFlag) {
 		raw = cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
-	} else {
+	} else if cli.HasFlagChanged(cmd, legacyNetworkTypeFlag) {
 		raw = cli.GetStringFlagValue(cmd, networkTypeFlag)
 	}
 	nt := parseNetworkType(raw)
@@ -73,17 +73,15 @@ func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
 }
 
 func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
-	fs := cmd.Flags()
-
-	if fs.Changed(bootNodeFlag.Name) {
+	if cli.HasFlagChanged(cmd, bootNodeFlag) {
 		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
 	}
 
-	if fs.Changed(dnsZoneFlag.Name) {
+	if cli.HasFlagChanged(cmd, dnsZoneFlag) {
 		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, dnsZoneFlag)
-	} else if fs.Changed(legacyDNSZoneFlag.Name) {
+	} else if cli.HasFlagChanged(cmd, legacyDNSZoneFlag) {
 		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
-	} else if fs.Changed(legacyDNSFlag.Name) {
+	} else if cli.HasFlagChanged(cmd, legacyDNSFlag) {
 		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
 		if val {
 			cfg.Network.DNSZone = mainnetDnsZone
@@ -92,9 +90,9 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
 		}
 	}
 
-	if fs.Changed(dnsPortFlag.Name) {
+	if cli.HasFlagChanged(cmd, dnsPortFlag) {
 		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
-	} else if fs.Changed(legacyDNSPortFlag.Name) {
+	} else if cli.HasFlagChanged(cmd, legacyDNSPortFlag) {
 		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
 	}
 }
@@ -158,15 +156,13 @@ var (
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *hmyConfig) {
-	fs := cmd.Flags()
-
-	if fs.Changed(p2pPortFlag.Name) {
+	if cli.HasFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
 
-	if fs.Changed(p2pKeyFileFlag.Name) {
+	if cli.HasFlagChanged(cmd, p2pKeyFileFlag) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, p2pKeyFileFlag)
-	} else if fs.Changed(legacyKeyFileFlag.Name) {
+	} else if cli.HasFlagChanged(cmd, legacyKeyFileFlag) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, legacyKeyFileFlag)
 	}
 }
@@ -210,24 +206,22 @@ var (
 )
 
 func applyRPCFlags(cmd *cobra.Command, config *hmyConfig) {
-	fs := cmd.Flags()
-
 	var isRPCSpecified bool
 
-	if fs.Changed(rpcIPFlag.Name) {
+	if cli.HasFlagChanged(cmd, rpcIPFlag) {
 		config.RPC.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
 		isRPCSpecified = true
-	} else if fs.Changed(legacyRPCIPFlag.Name) {
+	} else if cli.HasFlagChanged(cmd, legacyRPCIPFlag) {
 		config.RPC.IP = cli.GetStringFlagValue(cmd, legacyRPCIPFlag)
 		isRPCSpecified = true
 	}
 
-	if fs.Changed(rpcPortFlag.Name) {
+	if cli.HasFlagChanged(cmd, rpcPortFlag) {
 		config.RPC.Port = cli.GetIntFlagValue(cmd, rpcPortFlag)
 		isRPCSpecified = true
 	}
 
-	if fs.Changed(rpcEnabledFlag.Name) {
+	if cli.HasFlagChanged(cmd, rpcEnabledFlag) {
 		config.RPC.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
 	} else if isRPCSpecified {
 		config.RPC.Enabled = true
