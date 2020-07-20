@@ -139,8 +139,8 @@ func initSetup() {
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
 	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
 
-	// Add GOMAXPROCS to achieve max performance.
-	runtime.GOMAXPROCS(runtime.NumCPU() * 4)
+	// Don't set higher than num of CPU. It will make go scheduler slower.
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// Set port and ip to global config.
 	nodeconfig.GetDefaultConfig().Port = *port
