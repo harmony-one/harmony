@@ -25,14 +25,36 @@ var defaultConfig = hmyConfig{
 		MaxKeys:  10,
 
 		PassEnabled:      true,
-		PassSrcType:      "auto",
+		PassSrcType:      blsPassTypeAuto,
 		PassFile:         "",
 		SavePassphrase:   false,
-		KMSEnabled:       false,
-		KMSConfigSrcType: "shared",
+		KMSEnabled:       true,
+		KMSConfigSrcType: kmsConfigTypeShared,
 		KMSConfigFile:    "",
 	},
 }
+
+const (
+	blsPassTypeAuto   = "auto"
+	blsPassTypeFile   = "file"
+	blsPassTypePrompt = "prompt"
+
+	kmsConfigTypeShared = "shared"
+	kmsConfigTypePrompt = "prompt"
+	kmsConfigTypeFile   = "file"
+
+	legacyBLSPassTypeDefault = "default"
+	legacyBLSPassTypeStdin   = "stdin"
+	legacyBLSPassTypeDynamic = "no-prompt"
+	legacyBLSPassTypePrompt  = "prompt"
+	legacyBLSPassTypeStatic  = "file"
+	legacyBLSPassTypeNone    = "none"
+
+	legacyBLSKmsTypeDefault = "default"
+	legacyBLSKmsTypePrompt  = "prompt"
+	legacyBLSKmsTypeFile    = "file"
+	legacyBLSKmsTypeNone    = "none"
+)
 
 type hmyConfig struct {
 	General   generalConfig
