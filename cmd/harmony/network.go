@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/spf13/cobra"
@@ -30,7 +28,7 @@ var (
 		Name:  "bootnodes",
 		Usage: "a list of bootnode multiaddress (delimited by ,)",
 	}
-	dnsZoneFlag = cli.StringSliceFlag{
+	dnsZoneFlag = cli.StringFlag{
 		Name:  "dns.zone",
 		Usage: "use customized peers from the zone for state syncing",
 	}
@@ -54,7 +52,7 @@ var (
 		Name:       "dns",
 		DefValue:   true,
 		Usage:      "use dns for syncing",
-		Deprecated: "set to false only used for self discovery peers for syncing",
+		Deprecated: "set to false only to use self discovery peers for syncing",
 	}
 	legacyNetworkTypeFlag = cli.StringFlag{
 		Name:       "network_type",
@@ -63,40 +61,30 @@ var (
 	}
 )
 
-func getNetworkType(cmd *cobra.Command) (nodeconfig.NetworkType, error) {
-	var (
-		raw string
-		err error
-	)
+func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
+	var raw string
 	if cmd.Flags().Changed(legacyNetworkTypeFlag.Name) {
-		raw, err = cmd.Flags().GetString(legacyNetworkTypeFlag.Name)
+		raw = cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
 	} else {
-		raw, err = cmd.Flags().GetString(networkTypeFlag.Name)
+		raw = cli.GetStringFlagValue(cmd, networkTypeFlag)
 	}
-	if err != nil {
-		return "", err
-	}
-
 	nt := parseNetworkType(raw)
-	if len(nt) == 0 {
-		return "", fmt.Errorf("unrecognized network type: %v", nt)
-	}
-	return nt, nil
+	return nt
 }
 
 func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
 	fs := cmd.Flags()
 
 	if fs.Changed(bootNodeFlag.Name) {
-		cfg.Network.BootNodes, _ = fs.GetStringSlice(bootNodeFlag.Name)
+		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
 	}
 
 	if fs.Changed(dnsZoneFlag.Name) {
-		cfg.Network.DNSZone, _ = fs.GetString(dnsZoneFlag.Name)
+		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, dnsZoneFlag)
 	} else if fs.Changed(legacyDNSZoneFlag.Name) {
-		cfg.Network.DNSZone, _ = fs.GetString(legacyDNSZoneFlag.Name)
+		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
 	} else if fs.Changed(legacyDNSFlag.Name) {
-		val, _ := fs.GetBool(legacyDNSFlag.Name)
+		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
 		if val {
 			cfg.Network.DNSZone = mainnetDnsZone
 		} else {
@@ -105,9 +93,9 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
 	}
 
 	if fs.Changed(dnsPortFlag.Name) {
-		cfg.Network.DNSPort, _ = fs.GetInt(dnsZoneFlag.Name)
+		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
 	} else if fs.Changed(legacyDNSPortFlag.Name) {
-		cfg.Network.DNSPort, _ = fs.GetInt(legacyDNSPortFlag.Name)
+		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
 	}
 }
 
@@ -151,17 +139,17 @@ var p2pFlags = []cli.Flag{
 }
 
 var (
-	p2pPortFlag = &cli.IntFlag{
+	p2pPortFlag = cli.IntFlag{
 		Name:     "p2p.port",
 		Usage:    "port to listen for p2p communication",
 		DefValue: defaultConfig.P2P.Port,
 	}
-	p2pKeyFileFlag = &cli.StringFlag{
+	p2pKeyFileFlag = cli.StringFlag{
 		Name:     "p2p.keyfile",
 		Usage:    "the p2p key file of the harmony node",
 		DefValue: defaultConfig.P2P.KeyFile,
 	}
-	legacyKeyFileFlag = &cli.StringFlag{
+	legacyKeyFileFlag = cli.StringFlag{
 		Name:       "key",
 		Usage:      "the p2p key file of the harmony node",
 		DefValue:   defaultConfig.P2P.KeyFile,
@@ -169,17 +157,17 @@ var (
 	}
 )
 
-func parseP2PFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyP2PFlags(cmd *cobra.Command, config *hmyConfig) {
 	fs := cmd.Flags()
 
 	if fs.Changed(p2pPortFlag.Name) {
-		config.P2P.Port, _ = fs.GetInt(p2pPortFlag.Name)
+		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
 
 	if fs.Changed(p2pKeyFileFlag.Name) {
-		config.P2P.KeyFile, _ = fs.GetString(p2pKeyFileFlag.Name)
+		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, p2pKeyFileFlag)
 	} else if fs.Changed(legacyKeyFileFlag.Name) {
-		config.P2P.KeyFile, _ = fs.GetString(legacyKeyFileFlag.Name)
+		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, legacyKeyFileFlag)
 	}
 }
 
@@ -227,20 +215,20 @@ func applyRPCFlags(cmd *cobra.Command, config *hmyConfig) {
 	var isRPCSpecified bool
 
 	if fs.Changed(rpcIPFlag.Name) {
-		config.RPC.IP, _ = fs.GetString(rpcIPFlag.Name)
+		config.RPC.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
 		isRPCSpecified = true
 	} else if fs.Changed(legacyRPCIPFlag.Name) {
-		config.RPC.IP, _ = fs.GetString(legacyRPCIPFlag.Name)
+		config.RPC.IP = cli.GetStringFlagValue(cmd, legacyRPCIPFlag)
 		isRPCSpecified = true
 	}
 
 	if fs.Changed(rpcPortFlag.Name) {
-		config.RPC.Port, _ = fs.GetInt(rpcPortFlag.Name)
+		config.RPC.Port = cli.GetIntFlagValue(cmd, rpcPortFlag)
 		isRPCSpecified = true
 	}
 
 	if fs.Changed(rpcEnabledFlag.Name) {
-		config.RPC.Enabled, _ = fs.GetBool(rpcEnabledFlag.Name)
+		config.RPC.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
 	} else if isRPCSpecified {
 		config.RPC.Enabled = true
 	}
