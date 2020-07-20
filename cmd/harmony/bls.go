@@ -1,27 +1,12 @@
 package main
 
 import (
-	"errors"
-	"flag"
-	"fmt"
 	"strings"
 	"sync"
 
-	"github.com/spf13/cobra"
-
-	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/multibls"
-)
-
-var (
-	blsKeyFile        = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
-	blsFolder         = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
-	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 10, "Maximum number of bls keys allowed per node (default 4)")
-
-	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$PASS_FILE, none)")
-	persistPass     = flag.Bool("save-passphrase", false, "Whether the prompt passphrase is saved after prompt.")
-	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, file:$CONFIG_FILE, none)")
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -170,101 +155,130 @@ func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
 }
 
 func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
-
+	if cli.HasFlagChanged(cmd, passEnabledFlag) {
+		config.BLSKeys.PassEnabled = cli.GetBoolFlagValue(cmd, passEnabledFlag)
+	}
+	if cli.HasFlagChanged(cmd, passSrcTypeFlag) {
+		config.BLSKeys.PassSrcType = cli.GetStringFlagValue(cmd, passSrcTypeFlag)
+	}
+	if cli.HasFlagChanged(cmd, passSrcFileFlag) {
+		config.BLSKeys.PassFile = cli.GetStringFlagValue(cmd, passSrcFileFlag)
+	}
+	if cli.HasFlagChanged(cmd, passSaveFlag) {
+		config.BLSKeys.SavePassphrase = cli.GetBoolFlagValue(cmd, passSaveFlag)
+	}
 }
 
 func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
+	var fileSpecified bool
 
+	if cli.HasFlagChanged(cmd, kmsEnabledFlag) {
+		config.BLSKeys.KMSEnabled = cli.GetBoolFlagValue(cmd, kmsEnabledFlag)
+	}
+	if cli.HasFlagChanged(cmd, kmsConfigFileFlag) {
+		config.BLSKeys.KMSConfigFile = cli.GetStringFlagValue(cmd, kmsConfigFileFlag)
+		fileSpecified = true
+	}
+	if cli.HasFlagChanged(cmd, kmsConfigSrcTypeFlag) {
+		config.BLSKeys.KMSConfigSrcType = cli.GetStringFlagValue(cmd, kmsConfigSrcTypeFlag)
+	} else if fileSpecified {
+		config.BLSKeys.KMSConfigSrcType = blsPassTypeFile
+	}
 }
 
 func applyLegacyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
-
+	if cli.HasFlagChanged(cmd, legacyBLSPassFlag) {
+		val := cli.GetStringFlagValue(cmd, legacyBLSPassFlag)
+		legacyApplyBLSPassVal(val, config)
+	}
+	if cli.HasFlagChanged(cmd, legacyBLSPersistPassFlag) {
+		config.BLSKeys.SavePassphrase = cli.GetBoolFlagValue(cmd, legacyBLSPersistPassFlag)
+	}
 }
 
 func applyLegacyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
-
+	if cli.HasFlagChanged(cmd, legacyKMSConfigSourceFlag) {
+		val := cli.GetStringFlagValue(cmd, legacyKMSConfigSourceFlag)
+		legacyApplyKMSSourceVal(val, config)
+	}
 }
 
-func loadBLSKeys() (multibls.PrivateKeys, error) {
-	config, err := parseBLSLoadingConfig()
-	if err != nil {
-		return nil, err
-	}
-	keys, err := blsgen.LoadKeys(config)
-	if err != nil {
-		return nil, err
-	}
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("0 bls keys loaded")
-	}
-	if len(keys) > *maxBLSKeysPerNode {
-		return nil, fmt.Errorf("bls keys exceed maximum count %v", *maxBLSKeysPerNode)
-	}
-	return keys, err
-}
-
-func parseBLSLoadingConfig() (blsgen.Config, error) {
-	var (
-		config blsgen.Config
-		err    error
-	)
-	if len(*blsKeyFile) != 0 {
-		config.MultiBlsKeys = strings.Split(*blsKeyFile, ",")
-	}
-	config.BlsDir = blsFolder
-
-	config, err = parseBLSPass(config, *blsPass)
-	if err != nil {
-		return blsgen.Config{}, err
-	}
-	config, err = parseAwsConfigSrc(config, *awsConfigSource)
-	if err != nil {
-		return blsgen.Config{}, err
-	}
-	return config, nil
-}
-
-func parseBLSPass(config blsgen.Config, src string) (blsgen.Config, error) {
+func legacyApplyBLSPassVal(src string, config *hmyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
 	switch method {
-	case "default", "stdin":
-		config.PassSrcType = blsgen.PassSrcAuto
-	case "file":
-		config.PassSrcType = blsgen.PassSrcFile
-		if len(methodArgs) < 2 {
-			return blsgen.Config{}, errors.New("must specify passphrase file")
+	case legacyBLSPassTypeDefault, legacyBLSPassTypeStdin:
+		config.BLSKeys.PassSrcType = blsPassTypeAuto
+	case legacyBLSPassTypeStatic:
+		config.BLSKeys.PassSrcType = blsPassTypeFile
+		if len(methodArgs) >= 2 {
+			config.BLSKeys.PassFile = methodArgs[1]
 		}
-		config.PassFile = &methodArgs[1]
-	case "no-prompt":
-		config.PassSrcType = blsgen.PassSrcFile
-	case "prompt":
-		config.PassSrcType = blsgen.PassSrcPrompt
-		config.PersistPassphrase = *persistPass
-	case "none":
-		config.PassSrcType = blsgen.PassSrcNil
+	case legacyBLSPassTypeDynamic:
+		config.BLSKeys.PassSrcType = blsPassTypePrompt
+	case legacyBLSPassTypePrompt:
+		config.BLSKeys.PassSrcType = blsPassTypePrompt
+	case legacyBLSPassTypeNone:
+		config.BLSKeys.PassEnabled = false
 	}
-	config.PersistPassphrase = *persistPass
-	return config, nil
 }
 
-func parseAwsConfigSrc(config blsgen.Config, src string) (blsgen.Config, error) {
+func legacyApplyKMSSourceVal(src string, config *hmyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
+
 	switch method {
-	case "default":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcShared
-	case "file":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcFile
-		if len(methodArgs) < 2 {
-			return blsgen.Config{}, errors.New("must specify aws config file")
+	case legacyBLSKmsTypeDefault:
+		config.BLSKeys.KMSConfigSrcType = kmsConfigTypeShared
+	case legacyBLSKmsTypePrompt:
+		config.BLSKeys.KMSConfigSrcType = kmsConfigTypePrompt
+	case legacyBLSKmsTypeFile:
+		config.BLSKeys.KMSConfigSrcType = kmsConfigTypeFile
+		if len(methodArgs) >= 2 {
+			config.BLSKeys.KMSConfigFile = methodArgs[1]
 		}
-		config.AwsConfigFile = &methodArgs[1]
-	case "prompt":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcPrompt
-	case "none":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcNil
+	case legacyBLSKmsTypeNone:
+		config.BLSKeys.KMSEnabled = false
 	}
-	return config, nil
 }
+
+//// TODO: refactor this
+//func loadBLSKeys() (multibls.PrivateKeys, error) {
+//	config, err := parseBLSLoadingConfig()
+//	if err != nil {
+//		return nil, err
+//	}
+//	keys, err := blsgen.LoadKeys(config)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if len(keys) == 0 {
+//		return nil, fmt.Errorf("0 bls keys loaded")
+//	}
+//	if len(keys) >= *maxBLSKeysPerNode {
+//		return nil, fmt.Errorf("bls keys exceed maximum count %v", *maxBLSKeysPerNode)
+//	}
+//	return keys, err
+//}
+//
+//func parseBLSLoadingConfig() (blsgen.Config, error) {
+//	var (
+//		config blsgen.Config
+//		err    error
+//	)
+//	if len(*blsKeyFile) != 0 {
+//		config.MultiBlsKeys = strings.Split(*blsKeyFile, ",")
+//	}
+//	config.BlsDir = blsFolder
+//
+//	config, err = parseBLSPass(config, *blsPass)
+//	if err != nil {
+//		return blsgen.Config{}, err
+//	}
+//	config, err = parseAwsConfigSrc(config, *awsConfigSource)
+//	if err != nil {
+//		return blsgen.Config{}, err
+//	}
+//	return config, nil
+//}
