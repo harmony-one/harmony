@@ -4,14 +4,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
-	"github.com/harmony-one/harmony/internal/cli"
-
 	"github.com/harmony-one/harmony/internal/blsgen"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/multibls"
 )
 
@@ -115,7 +112,7 @@ var (
 	}
 	legacyBLSKeysPerNodeFlag = cli.IntFlag{
 		Name:       "max_bls_keys_per_node",
-		Usage:      "Maximum number of bls keys allowed per node (default 4)",
+		Usage:      "Maximum number of bls keys allowed per node",
 		DefValue:   defaultConfig.BLSKeys.MaxKeys,
 		Deprecated: "use --bls.maxkeys",
 	}
@@ -138,21 +135,6 @@ var (
 		Deprecated: "use --bls.kms, --bls.kms.src, --bls.kms.config",
 	}
 )
-
-// setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
-func setupConsensusKeys(config *nodeconfig.ConfigType) multibls.PublicKeys {
-	onceLoadBLSKey.Do(func() {
-		var err error
-		multiBLSPriKey, err = loadBLSKeys()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
-			os.Exit(100)
-		}
-		fmt.Printf("Successfully loaded %v BLS keys\n", len(multiBLSPriKey))
-	})
-	config.ConsensusPriKey = multiBLSPriKey
-	return multiBLSPriKey.GetPublicKeys()
-}
 
 func loadBLSKeys() (multibls.PrivateKeys, error) {
 	config, err := parseBLSLoadingConfig()
