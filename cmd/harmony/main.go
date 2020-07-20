@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/harmony-one/harmony/internal/cli"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -76,6 +77,12 @@ var rootCmd = &cobra.Command{
 	Short: "",
 	Long:  "",
 	Run:   runHarmonyNode,
+}
+
+func init() {
+	cli.SetParseErrorHandle(func(err error) {
+		os.Exit(101)
+	})
 }
 
 func setupRootFlags(cmd *cobra.Command) error {

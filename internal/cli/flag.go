@@ -92,3 +92,17 @@ func markHiddenOrDeprecated(fs *pflag.FlagSet, name string, deprecated string, h
 	}
 	return nil
 }
+
+func getFlagName(flag Flag) string {
+	switch f := flag.(type) {
+	case StringFlag:
+		return f.Name
+	case IntFlag:
+		return f.Name
+	case BoolFlag:
+		return f.Name
+	case StringSliceFlag:
+		return f.Name
+	}
+	return ""
+}
