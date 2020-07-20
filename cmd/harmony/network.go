@@ -34,6 +34,7 @@ var (
 		Name:  "dns.zone",
 		Usage: "use customized peers from the zone for state syncing",
 	}
+	// TODO: 9500 as default
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
@@ -187,7 +188,7 @@ var rpcFlags = []cli.Flag{
 	rpcIPFlag,
 	rpcPortFlag,
 	legacyRPCIPFlag,
-	legacyPublicRPCFlag
+	legacyPublicRPCFlag,
 }
 
 var (

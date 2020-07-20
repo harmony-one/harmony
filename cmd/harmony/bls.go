@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/harmony-one/harmony/internal/cli"
+
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/multibls"
@@ -18,7 +20,6 @@ var (
 	blsFolder         = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
 	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 10, "Maximum number of bls keys allowed per node (default 4)")
 
-	// TODO(jacky): rename it to a better name with cobra alias
 	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$PASS_FILE, none)")
 	persistPass     = flag.Bool("save-passphrase", false, "Whether the prompt passphrase is saved after prompt.")
 	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, file:$CONFIG_FILE, none)")
@@ -27,6 +28,115 @@ var (
 var (
 	multiBLSPriKey multibls.PrivateKeys
 	onceLoadBLSKey sync.Once
+)
+
+var blsFlags = []cli.Flag{
+	blsDirFlag,
+	blsKeyFilesFlag,
+	maxBLSKeyFilesFlag,
+	passEnabledFlag,
+	passSrcTypeFlag,
+	passSrcFileFlag,
+	passSaveFlag,
+	kmsEnabledFlag,
+	kmsConfigSrcTypeFlag,
+	kmsConfigFileFlag,
+	legacyBLSKeyFileFlag,
+	legacyBLSFolderFlag,
+	legacyBLSKeysPerNodeFlag,
+	legacyBLSPassFlag,
+	legacyBLSPersistPassFlag,
+	legacyKMSConfigSourceFlag,
+}
+
+var (
+	blsDirFlag = cli.StringFlag{
+		Name:     "bls.dir",
+		Usage:    "directory for BLS keys",
+		DefValue: defaultConfig.BLSKeys.KeyDir,
+	}
+	blsKeyFilesFlag = cli.StringSliceFlag{
+		Name:     "bls.keys",
+		Usage:    "a list of BLS key files (separated by ,)",
+		DefValue: defaultConfig.BLSKeys.KeyFiles,
+	}
+	// TODO: shall we move this to a hard coded parameter?
+	maxBLSKeyFilesFlag = cli.IntFlag{
+		Name:     "bls.maxkeys",
+		Usage:    "maximum number of BLS keys for a node",
+		DefValue: defaultConfig.BLSKeys.MaxKeys,
+	}
+	passEnabledFlag = cli.BoolFlag{
+		Name:     "bls.pass",
+		Usage:    "whether BLS key decryption with passphrase is enabled",
+		DefValue: defaultConfig.BLSKeys.PassEnabled,
+	}
+	passSrcTypeFlag = cli.StringFlag{
+		Name:     "bls.pass.src",
+		Usage:    "source for BLS passphrase (auto, file, prompt)",
+		DefValue: defaultConfig.BLSKeys.PassSrcType,
+	}
+	passSrcFileFlag = cli.StringFlag{
+		Name:     "bls.pass.file",
+		Usage:    "the pass file used for BLS decryption. If specified, this pass file will be used for all BLS keys",
+		DefValue: defaultConfig.BLSKeys.PassFile,
+	}
+	passSaveFlag = cli.BoolFlag{
+		Name:     "bls.pass.save",
+		Usage:    "after input the BLS passphrase from console, whether to persist the input passphrases in .pass file",
+		DefValue: defaultConfig.BLSKeys.SavePassphrase,
+	}
+	kmsEnabledFlag = cli.BoolFlag{
+		Name:     "bls.kms",
+		Usage:    "whether BLS key decryption with AWS KMS service is enabled",
+		DefValue: defaultConfig.BLSKeys.KMSEnabled,
+	}
+	kmsConfigSrcTypeFlag = cli.StringFlag{
+		Name:     "bls.kms.src",
+		Usage:    "the AWS config source (region and credentials) for KMS service (shared, prompt, file)",
+		DefValue: defaultConfig.BLSKeys.KMSConfigSrcType,
+	}
+	kmsConfigFileFlag = cli.StringFlag{
+		Name:     "bls.kms.config",
+		Usage:    "json config file for KMS service (region and credentials)",
+		DefValue: defaultConfig.BLSKeys.KMSConfigFile,
+	}
+	legacyBLSKeyFileFlag = cli.StringSliceFlag{
+		Name:       "blskey_file",
+		Usage:      "The encrypted file of bls serialized private key by passphrase.",
+		DefValue:   defaultConfig.BLSKeys.KeyFiles,
+		Deprecated: "use --bls.keys",
+	}
+	legacyBLSFolderFlag = cli.StringFlag{
+		Name:       "blsfolder",
+		Usage:      "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard",
+		DefValue:   defaultConfig.BLSKeys.KeyDir,
+		Deprecated: "use --bls.dir",
+	}
+	legacyBLSKeysPerNodeFlag = cli.IntFlag{
+		Name:       "max_bls_keys_per_node",
+		Usage:      "Maximum number of bls keys allowed per node (default 4)",
+		DefValue:   defaultConfig.BLSKeys.MaxKeys,
+		Deprecated: "use --bls.maxkeys",
+	}
+	legacyBLSPassFlag = cli.StringFlag{
+		Name:       "blspass",
+		Usage:      "The source for bls passphrases. (default, stdin, no-prompt, prompt, file:$PASS_FILE, none)",
+		DefValue:   "default",
+		Deprecated: "use --bls.pass, --bls.pass.src, --bls.pass.file",
+	}
+	legacyBLSPersistPassFlag = cli.BoolFlag{
+		Name:       "save-passphrase",
+		Usage:      "Whether the prompt passphrase is saved after prompt.",
+		DefValue:   defaultConfig.BLSKeys.SavePassphrase,
+		Deprecated: "use --bls.pass.save",
+	}
+	legacyKMSConfigSourceFlag = cli.StringFlag{
+		Name:       "aws-config-source",
+		Usage:      "The source for aws config. (default, prompt, file:$CONFIG_FILE, none)",
+		DefValue:   "default",
+		Deprecated: "use --bls.kms, --bls.kms.src, --bls.kms.config",
+	}
 )
 
 // setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.

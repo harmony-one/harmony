@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// miscFlags are legacy flags that have different usage.
+// miscFlags are legacy flags that have multiple usage.
 var miscFlags = []cli.Flag{
 	legacyPortFlag,
 }
@@ -19,7 +19,7 @@ var (
 	}
 )
 
-// TODO: move all port manipulation +500 -1000 logic here
+// TODO: move all port manipulation +500 -3000 logic here
 func applyMiscFlags(cmd *cobra.Command, config *hmyConfig) {
 	fs := cmd.Flags()
 
