@@ -19,6 +19,19 @@ var defaultConfig = hmyConfig{
 		IP:      "127.0.0.1",
 		Port:    nodeconfig.DefaultRPCPort,
 	},
+	BLSKeys: blsConfig{
+		KeyDir:   "./hmy/blskeys",
+		KeyFiles: nil,
+		MaxKeys:  10,
+
+		PassEnabled:      true,
+		PassSrcType:      "auto",
+		PassFile:         "",
+		SavePassphrase:   false,
+		KMSEnabled:       false,
+		KMSConfigSrcType: "shared",
+		KMSConfigFile:    "",
+	},
 }
 
 type hmyConfig struct {
@@ -27,7 +40,7 @@ type hmyConfig struct {
 	P2P       p2pConfig
 	RPC       rpcConfig
 	Consensus consensusConfig
-	BLSKey    blsConfig
+	BLSKeys   blsConfig
 	TxPool    txPoolConfig
 	Storage   storageConfig
 	Pprof     pprofConfig
@@ -60,15 +73,18 @@ type consensusConfig struct {
 }
 
 type blsConfig struct {
-	KeyDir     string
-	KeyFiles   []string
-	maxBLSKeys int
+	KeyDir   string
+	KeyFiles []string
+	MaxKeys  int
 
-	PassSrcType      string
-	PassFile         string
-	SavePassphrase   bool
-	KmsConfigSrcType string
-	KmsConfigFile    string
+	PassEnabled    bool
+	PassSrcType    string
+	PassFile       string
+	SavePassphrase bool
+
+	KMSEnabled       bool
+	KMSConfigSrcType string
+	KMSConfigFile    string
 }
 
 type txPoolConfig struct {

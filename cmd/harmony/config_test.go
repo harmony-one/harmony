@@ -41,8 +41,8 @@
 //		PassSrcType:      "auto",
 //		PassFile:         "pass.file",
 //		SavePassphrase:   true,
-//		KmsConfigSrcType: "shared",
-//		KmsConfigFile:    "config.json",
+//		KMSConfigSrcType: "shared",
+//		KMSConfigFile:    "config.json",
 //	},
 //	TxPool: txPoolConfig{
 //		BlacklistFile:      ".hmy/blacklist.txt",
