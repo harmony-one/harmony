@@ -60,50 +60,6 @@ func printVersion() {
 	os.Exit(0)
 }
 
-var (
-	// config file
-	configFile string
-	// run config
-	nodeType  string
-	noStaking bool
-	// network config
-	networkType string
-	ip          string
-	port        int
-	p2pKeyFile  string
-	publicRPC   bool
-	bootNodes   []string
-	dnsZone     string
-	dnsPort     int
-	// consensus config
-	delayCommit string
-	blockTime   string
-	// bls config
-	keyDir           string
-	keyFiles         []string
-	maxBLSKeys       int
-	passSrcType      string
-	passFile         string
-	savePassphrase   bool
-	kmsConfigSrcType string
-	kmsConfigFile    string
-	// transaction pool config
-	blacklistFile      string
-	broadcastInvalidTx bool
-	// storage config
-	isArchival  bool
-	databaseDir string
-	// pprof config
-	pprofListenAddr string
-	// log config
-	logFolder  string
-	logMaxSize int
-	// devnet config
-	devnetNumShards uint
-	devnetShardSize int
-	hmyNodeSize     int
-)
-
 // legacy fields
 var (
 	isStaking      bool
@@ -120,9 +76,6 @@ var rootCmd = &cobra.Command{
 	Short: "",
 	Long:  "",
 	Run:   runHarmonyNode,
-}
-
-func init() {
 }
 
 func setupRootFlags(cmd *cobra.Command) error {
@@ -310,6 +263,21 @@ func setupStakingNodeAccount() error {
 		initialAccounts = append(initialAccounts, initialAccount)
 	}
 	return nil
+}
+
+// setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
+func setupConsensusKeys(config *nodeconfig.ConfigType) multibls.PublicKeys {
+	onceLoadBLSKey.Do(func() {
+		var err error
+		multiBLSPriKey, err = loadBLSKeys()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
+			os.Exit(100)
+		}
+		fmt.Printf("Successfully loaded %v BLS keys\n", len(multiBLSPriKey))
+	})
+	config.ConsensusPriKey = multiBLSPriKey
+	return multiBLSPriKey.GetPublicKeys()
 }
 
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {

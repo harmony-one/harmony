@@ -24,7 +24,7 @@ func applyMiscFlags(cmd *cobra.Command, config *hmyConfig) {
 	fs := cmd.Flags()
 
 	if fs.Changed(legacyPortFlag.Name) {
-		legacyPort, _ := fs.GetInt(legacyPortFlag.Name)
+		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
 		config.RPC.Port = legacyPort
 	}
