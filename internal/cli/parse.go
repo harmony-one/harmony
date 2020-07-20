@@ -63,7 +63,7 @@ func getBoolFlagValue(fs *pflag.FlagSet, flag BoolFlag) bool {
 	return val
 }
 
-// GetBoolFlagValue get the int value for the given IntFlag from the local flags of the
+// GetIntFlagValue get the int value for the given IntFlag from the local flags of the
 // cobra command.
 func GetIntFlagValue(cmd *cobra.Command, flag IntFlag) int {
 	return getIntFlagValue(cmd.Flags(), flag)

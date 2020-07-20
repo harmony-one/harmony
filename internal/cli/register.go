@@ -16,7 +16,7 @@ func RegisterFlags(cmd *cobra.Command, flags []Flag) error {
 	return nil
 }
 
-// RegisterFlags register the flags to command's persistent flag
+// RegisterPFlags register the flags to command's persistent flag
 func RegisterPFlags(cmd *cobra.Command, flags []Flag) error {
 	fs := cmd.PersistentFlags()
 
