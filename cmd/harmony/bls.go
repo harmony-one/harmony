@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/multibls"
@@ -38,6 +40,9 @@ var blsFlags = []cli.Flag{
 	kmsEnabledFlag,
 	kmsConfigSrcTypeFlag,
 	kmsConfigFileFlag,
+}
+
+var legacyBLSFlags = []cli.Flag{
 	legacyBLSKeyFileFlag,
 	legacyBLSFolderFlag,
 	legacyBLSKeysPerNodeFlag,
@@ -135,6 +140,50 @@ var (
 		Deprecated: "use --bls.kms, --bls.kms.src, --bls.kms.config",
 	}
 )
+
+func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
+	if cli.HasFlagChanged(cmd, blsDirFlag) {
+		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, blsDirFlag)
+	} else if cli.HasFlagChanged(cmd, legacyBLSFolderFlag) {
+		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, legacyBLSFolderFlag)
+	}
+
+	if cli.HasFlagChanged(cmd, blsKeyFilesFlag) {
+		config.BLSKeys.KeyFiles = cli.GetStringSliceFlagValue(cmd, blsKeyFilesFlag)
+	} else if cli.HasFlagChanged(cmd, legacyBLSKeyFileFlag) {
+		config.BLSKeys.KeyFiles = cli.GetStringSliceFlagValue(cmd, legacyBLSKeyFileFlag)
+	}
+
+	if cli.HasFlagChanged(cmd, maxBLSKeyFilesFlag) {
+		config.BLSKeys.MaxKeys = cli.GetIntFlagValue(cmd, maxBLSKeyFilesFlag)
+	} else if cli.HasFlagChanged(cmd, legacyBLSKeysPerNodeFlag) {
+		config.BLSKeys.MaxKeys = cli.GetIntFlagValue(cmd, legacyBLSKeysPerNodeFlag)
+	}
+
+	if cli.HasFlagsChanged(cmd, blsFlags) {
+		applyBLSPassFlags(cmd, config)
+		applyKMSFlags(cmd, config)
+	} else if cli.HasFlagsChanged(cmd, legacyBLSFlags) {
+		applyLegacyBLSPassFlags(cmd, config)
+		applyLegacyKMSFlags(cmd, config)
+	}
+}
+
+func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
+
+}
+
+func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
+
+}
+
+func applyLegacyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
+
+}
+
+func applyLegacyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
+
+}
 
 func loadBLSKeys() (multibls.PrivateKeys, error) {
 	config, err := parseBLSLoadingConfig()
