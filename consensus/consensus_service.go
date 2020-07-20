@@ -77,6 +77,7 @@ func (consensus *Consensus) GetViewID() uint64 {
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls_core.PublicKey) int64 {
+	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
@@ -168,7 +169,6 @@ func (consensus *Consensus) ResetState() {
 		Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(FBFTAnnounce, true)
 	consensus.blockHash = [32]byte{}
-	consensus.blockHeader = []byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
 	if consensus.prepareBitmap != nil {

@@ -1,21 +1,22 @@
 package consensus
 
 import (
+	"bytes"
 	"time"
+
+	"github.com/harmony-one/harmony/consensus/signature"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) announce(block *types.Block) {
 	blockHash := block.Hash()
-	copy(consensus.blockHash[:], blockHash[:])
 
 	// prepare message and broadcast to validators
 	encodedBlock, err := rlp.EncodeToBytes(block)
@@ -23,14 +24,15 @@ func (consensus *Consensus) announce(block *types.Block) {
 		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block")
 		return
 	}
-	encodedBlockHeader, err := rlp.EncodeToBytes(block.Header())
-	if err != nil {
-		consensus.getLogger().Debug().Msg("[Announce] Failed encoding block header")
-		return
-	}
 
+	//// Lock Write - Start
+	consensus.prepareMutex.Lock()
+	consensus.commitMutex.Lock()
+	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = encodedBlock
-	consensus.blockHeader = encodedBlockHeader
+	consensus.commitMutex.Unlock()
+	consensus.prepareMutex.Unlock()
+	//// Lock Write - End
 
 	key, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -107,15 +109,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[OnPrepare] Message ViewId or BlockNum not match")
-		return
-	}
-
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
 		consensus.blockNum, consensus.viewID, recvMsg.BlockHash,
@@ -127,14 +120,20 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Msg("[OnPrepare] No Matching Announce message")
 	}
 
-	prepareSig := recvMsg.Payload
-	prepareBitmap := consensus.prepareBitmap
+	//// Lock Read - Start
+	consensus.prepareMutex.RLock()
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	if !consensus.isRightBlockNumAndViewID(recvMsg) {
+		consensus.prepareMutex.RUnlock()
+		return
+	}
+
+	blockHash := consensus.blockHash[:]
+	prepareBitmap := consensus.prepareBitmap
 	// proceed only when the message is not received before
 	signed := consensus.Decider.ReadBallot(quorum.Prepare, recvMsg.SenderPubkey.Bytes)
 	if signed != nil {
+		consensus.prepareMutex.RUnlock()
 		consensus.getLogger().Debug().
 			Str("validatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
 			Msg("[OnPrepare] Already Received prepare message from the validator")
@@ -142,14 +141,19 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	}
 
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
+		consensus.prepareMutex.RUnlock()
 		// already have enough signatures
 		consensus.getLogger().Debug().
 			Str("validatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
 			Msg("[OnPrepare] Received Additional Prepare Message")
 		return
 	}
+	signerCount := consensus.Decider.SignersCount(quorum.Prepare)
+	consensus.prepareMutex.RUnlock()
+	//// Lock Read - End
 
 	// Check BLS signature for the multi-sig
+	prepareSig := recvMsg.Payload
 	var sign bls.Sign
 	err = sign.Deserialize(prepareSig)
 	if err != nil {
@@ -157,36 +161,56 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 			Msg("[OnPrepare] Failed to deserialize bls signature")
 		return
 	}
-	if !sign.VerifyHash(recvMsg.SenderPubkey.Object, consensus.blockHash[:]) {
+	if !sign.VerifyHash(recvMsg.SenderPubkey.Object, blockHash) {
 		consensus.getLogger().Error().Msg("[OnPrepare] Received invalid BLS signature")
 		return
 	}
 
 	consensus.getLogger().Debug().
-		Int64("NumReceivedSoFar", consensus.Decider.SignersCount(quorum.Prepare)).
+		Int64("NumReceivedSoFar", signerCount).
 		Int64("PublicKeys", consensus.Decider.ParticipantsCount()).
 		Msg("[OnPrepare] Received New Prepare Signature")
+
+	//// Lock Write - Start
+	consensus.prepareMutex.Lock()
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
+		consensus.prepareMutex.Unlock()
+		consensus.getLogger().Warn().
+			Hex("oldHash", blockHash).
+			Hex("newHash", consensus.blockHash[:]).
+			Msg("[OnPrepare] block hash is already changed between read and write lock")
+		return
+	}
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Prepare, recvMsg.SenderPubkey.Bytes,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
+		consensus.prepareMutex.Unlock()
 		consensus.getLogger().Warn().Err(err).Msg("submit vote prepare failed")
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
 	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey.Object, true); err != nil {
+		consensus.prepareMutex.Unlock()
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
 		return
 	}
+	consensus.prepareMutex.Unlock()
+	//// Lock Write - End
 
+	//// Lock Read - Start
+	consensus.prepareMutex.RLock()
 	if consensus.Decider.IsQuorumAchieved(quorum.Prepare) {
 		// NOTE Let it handle its own logs
 		if err := consensus.didReachPrepareQuorum(); err != nil {
+			consensus.prepareMutex.RUnlock()
 			return
 		}
 		consensus.switchPhase(FBFTCommit, true)
 	}
+	consensus.prepareMutex.RUnlock()
+	//// Lock Read - End
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
@@ -196,28 +220,36 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// NOTE let it handle its own log
+	//// Lock Read - Start
+	consensus.commitMutex.RLock()
+	blockHash := consensus.blockHash[:]
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
+		consensus.commitMutex.RUnlock()
 		return
 	}
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
-	validatorPubKey, commitSig, commitBitmap :=
-		recvMsg.SenderPubkey, recvMsg.Payload, consensus.commitBitmap
-	logger := consensus.getLogger().With().
-		Str("validatorPubKey", validatorPubKey.Bytes.Hex()).Logger()
+	commitBitmap := consensus.commitBitmap
 
 	// has to be called before verifying signature
 	quorumWasMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
+
+	signerCount := consensus.Decider.SignersCount(quorum.Commit)
+	consensus.commitMutex.RUnlock()
+	//// Lock Read - End
+
 	// Verify the signature on commitPayload is correct
+	validatorPubKey, commitSig := recvMsg.SenderPubkey, recvMsg.Payload
+	logger := consensus.getLogger().With().
+		Str("validatorPubKey", validatorPubKey.Bytes.Hex()).
+		Int64("numReceivedSoFar", signerCount).Logger()
+
+	logger.Debug().Msg("[OnCommit] Received new commit message")
 	var sign bls.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
 	}
-	// Must have the corresponding block to verify committed message.
+
+	// Must have the corresponding block to verify commit signature.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
 		consensus.getLogger().Info().
@@ -239,33 +271,45 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 
-	// Check for potential double signing
-	if consensus.checkDoubleSign(recvMsg) {
+	//// Lock Write - Start
+	consensus.commitMutex.Lock()
+	if !bytes.Equal(blockHash, consensus.blockHash[:]) {
+		consensus.commitMutex.Unlock()
+		consensus.getLogger().Warn().
+			Hex("oldHash", blockHash).
+			Hex("newHash", consensus.blockHash[:]).
+			Msg("[OnCommit] block hash is already changed between read and write lock")
 		return
 	}
-
-	logger = logger.With().
-		Int64("numReceivedSoFar", consensus.Decider.SignersCount(quorum.Commit)).
-		Logger()
-	logger.Debug().Msg("[OnCommit] Received new commit message")
-
+	// Check for potential double signing
+	if consensus.checkDoubleSign(recvMsg) {
+		consensus.commitMutex.Unlock()
+		return
+	}
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkey.Bytes,
 		&sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
+		consensus.commitMutex.Unlock()
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
 	if err := commitBitmap.SetKey(recvMsg.SenderPubkey.Object, true); err != nil {
+		consensus.commitMutex.Unlock()
 		consensus.getLogger().Warn().Err(err).
 			Msg("[OnCommit] commitBitmap.SetKey failed")
 		return
 	}
+	consensus.commitMutex.Unlock()
+	//// Lock Write - End
 
+	//// Lock Read - Start
+	consensus.commitMutex.RLock()
 	viewID := consensus.viewID
 
 	if consensus.Decider.IsAllSigsCollected() {
+		consensus.commitMutex.RUnlock()
 		go func(viewID uint64) {
 			logger.Info().Msg("[OnCommit] 100% Enough commits received")
 			consensus.commitFinishChan <- viewID
@@ -276,6 +320,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	}
 
 	quorumIsMet := consensus.Decider.IsQuorumAchieved(quorum.Commit)
+	consensus.commitMutex.RUnlock()
+	//// Lock Read - End
+
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 
@@ -288,5 +335,4 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
-
 }

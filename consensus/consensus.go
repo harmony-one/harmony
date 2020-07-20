@@ -36,9 +36,6 @@ type Consensus struct {
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-	// blockNum: the next blockNumber that FBFT is going to agree on,
-	// should be equal to the blockNumber of next block
-	blockNum uint64
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
 	// Consensus rounds whose commit phase finished
@@ -64,12 +61,9 @@ type Consensus struct {
 	bhpBitmap    map[uint64]*bls_cosi.Mask
 	nilBitmap    map[uint64]*bls_cosi.Mask
 	viewIDBitmap map[uint64]*bls_cosi.Mask
-	m1Payload    []byte     // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
-	vcLock       sync.Mutex // mutex for view change
+	m1Payload    []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
-	// map of nodeID to validator Peer object
-	validators sync.Map // key is the hex string of the blsKey, value is p2p.Peer
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
@@ -78,20 +72,23 @@ type Consensus struct {
 	priKey multibls.PrivateKeys
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKeyWrapper
-	viewID       uint64
+	// blockNum: the next blockNumber that FBFT is going to agree on,
+	// should be equal to the blockNumber of next block
+	blockNum uint64
+	viewID   uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
 	block []byte
-	// BlockHeader to run consensus on
-	blockHeader []byte
 	// Shard Id which this node belongs to
 	ShardID uint32
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
-	// global consensus mutex
-	// TODO(optimization): Avoid mutex and use more efficient locking primitives
-	mutex sync.Mutex
+	// consensus mutex
+	prepareMutex sync.RWMutex
+	commitMutex  sync.RWMutex
+	// mutex for view change
+	vcLock sync.Mutex
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -187,7 +184,6 @@ func New(
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
-	consensus.validators.Store(leader.ConsensusPubKey.SerializeToHexStr(), leader)
 
 	if multiBLSPriKey != nil {
 		consensus.priKey = multiBLSPriKey

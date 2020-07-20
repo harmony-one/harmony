@@ -283,10 +283,8 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		consensus.getLogger().Info().Msg("[TryCatchup] prepared message found to commit")
 
-		// TODO(Chao): Explain the reasoning for these code
-		consensus.blockHash = [32]byte{}
 		atomic.AddUint64(&consensus.blockNum, 1)
-		consensus.viewID = committedMsg.ViewID + 1
+		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
 		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
@@ -493,8 +491,8 @@ func (consensus *Consensus) Start(
 
 				// Only Leader execute this condition
 				func() {
-					consensus.mutex.Lock()
-					defer consensus.mutex.Unlock()
+					consensus.commitMutex.Lock()
+					defer consensus.commitMutex.Unlock()
 					if viewID == consensus.viewID {
 						consensus.finalizeCommits()
 					}
