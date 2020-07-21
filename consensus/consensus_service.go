@@ -98,7 +98,10 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls_core.PublicKey) int6
 	// reset states after update public keys
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
+
+	consensus.vcLock.Lock()
 	consensus.ResetViewChangeState()
+	consensus.vcLock.Unlock()
 	return consensus.Decider.ParticipantsCount()
 }
 
