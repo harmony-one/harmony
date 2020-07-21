@@ -50,7 +50,7 @@
 //	},
 //	Storage: storageConfig{
 //		IsArchival:  false,
-//		DatabaseDir: "./",
+//		DataDir: "./",
 //	},
 //	Pprof: pprofConfig{
 //		Enabled:    true,
@@ -58,7 +58,7 @@
 //	},
 //	Log: logConfig{
 //		LogFolder:  "latest",
-//		LogMaxSize: 100,
+//		LogRotateSize: 100,
 //	},
 //	Devnet: nil,
 //}
