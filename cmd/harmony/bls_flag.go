@@ -52,6 +52,7 @@ var (
 		Name:     "bls.maxkeys",
 		Usage:    "maximum number of BLS keys for a node",
 		DefValue: defaultConfig.BLSKeys.MaxKeys,
+		Hidden:   true,
 	}
 	passEnabledFlag = cli.BoolFlag{
 		Name:     "bls.pass",
@@ -127,21 +128,21 @@ var (
 )
 
 func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
-	if cli.HasFlagChanged(cmd, blsDirFlag) {
+	if cli.IsFlagChanged(cmd, blsDirFlag) {
 		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, blsDirFlag)
-	} else if cli.HasFlagChanged(cmd, legacyBLSFolderFlag) {
+	} else if cli.IsFlagChanged(cmd, legacyBLSFolderFlag) {
 		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, legacyBLSFolderFlag)
 	}
 
-	if cli.HasFlagChanged(cmd, blsKeyFilesFlag) {
+	if cli.IsFlagChanged(cmd, blsKeyFilesFlag) {
 		config.BLSKeys.KeyFiles = cli.GetStringSliceFlagValue(cmd, blsKeyFilesFlag)
-	} else if cli.HasFlagChanged(cmd, legacyBLSKeyFileFlag) {
+	} else if cli.IsFlagChanged(cmd, legacyBLSKeyFileFlag) {
 		config.BLSKeys.KeyFiles = cli.GetStringSliceFlagValue(cmd, legacyBLSKeyFileFlag)
 	}
 
-	if cli.HasFlagChanged(cmd, maxBLSKeyFilesFlag) {
+	if cli.IsFlagChanged(cmd, maxBLSKeyFilesFlag) {
 		config.BLSKeys.MaxKeys = cli.GetIntFlagValue(cmd, maxBLSKeyFilesFlag)
-	} else if cli.HasFlagChanged(cmd, legacyBLSKeysPerNodeFlag) {
+	} else if cli.IsFlagChanged(cmd, legacyBLSKeysPerNodeFlag) {
 		config.BLSKeys.MaxKeys = cli.GetIntFlagValue(cmd, legacyBLSKeysPerNodeFlag)
 	}
 
@@ -155,16 +156,16 @@ func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
 }
 
 func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
-	if cli.HasFlagChanged(cmd, passEnabledFlag) {
+	if cli.IsFlagChanged(cmd, passEnabledFlag) {
 		config.BLSKeys.PassEnabled = cli.GetBoolFlagValue(cmd, passEnabledFlag)
 	}
-	if cli.HasFlagChanged(cmd, passSrcTypeFlag) {
+	if cli.IsFlagChanged(cmd, passSrcTypeFlag) {
 		config.BLSKeys.PassSrcType = cli.GetStringFlagValue(cmd, passSrcTypeFlag)
 	}
-	if cli.HasFlagChanged(cmd, passSrcFileFlag) {
+	if cli.IsFlagChanged(cmd, passSrcFileFlag) {
 		config.BLSKeys.PassFile = cli.GetStringFlagValue(cmd, passSrcFileFlag)
 	}
-	if cli.HasFlagChanged(cmd, passSaveFlag) {
+	if cli.IsFlagChanged(cmd, passSaveFlag) {
 		config.BLSKeys.SavePassphrase = cli.GetBoolFlagValue(cmd, passSaveFlag)
 	}
 }
@@ -172,14 +173,14 @@ func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
 func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
 	var fileSpecified bool
 
-	if cli.HasFlagChanged(cmd, kmsEnabledFlag) {
+	if cli.IsFlagChanged(cmd, kmsEnabledFlag) {
 		config.BLSKeys.KMSEnabled = cli.GetBoolFlagValue(cmd, kmsEnabledFlag)
 	}
-	if cli.HasFlagChanged(cmd, kmsConfigFileFlag) {
+	if cli.IsFlagChanged(cmd, kmsConfigFileFlag) {
 		config.BLSKeys.KMSConfigFile = cli.GetStringFlagValue(cmd, kmsConfigFileFlag)
 		fileSpecified = true
 	}
-	if cli.HasFlagChanged(cmd, kmsConfigSrcTypeFlag) {
+	if cli.IsFlagChanged(cmd, kmsConfigSrcTypeFlag) {
 		config.BLSKeys.KMSConfigSrcType = cli.GetStringFlagValue(cmd, kmsConfigSrcTypeFlag)
 	} else if fileSpecified {
 		config.BLSKeys.KMSConfigSrcType = blsPassTypeFile
@@ -187,17 +188,17 @@ func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
 }
 
 func applyLegacyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
-	if cli.HasFlagChanged(cmd, legacyBLSPassFlag) {
+	if cli.IsFlagChanged(cmd, legacyBLSPassFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyBLSPassFlag)
 		legacyApplyBLSPassVal(val, config)
 	}
-	if cli.HasFlagChanged(cmd, legacyBLSPersistPassFlag) {
+	if cli.IsFlagChanged(cmd, legacyBLSPersistPassFlag) {
 		config.BLSKeys.SavePassphrase = cli.GetBoolFlagValue(cmd, legacyBLSPersistPassFlag)
 	}
 }
 
 func applyLegacyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
-	if cli.HasFlagChanged(cmd, legacyKMSConfigSourceFlag) {
+	if cli.IsFlagChanged(cmd, legacyKMSConfigSourceFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyKMSConfigSourceFlag)
 		legacyApplyKMSSourceVal(val, config)
 	}

@@ -105,8 +105,8 @@ func getStringSliceFlagValue(fs *pflag.FlagSet, flag StringSliceFlag) []string {
 	return val
 }
 
-// HasFlagChanged returns whether the flag has been changed in command
-func HasFlagChanged(cmd *cobra.Command, flag Flag) bool {
+// IsFlagChanged returns whether the flag has been changed in command
+func IsFlagChanged(cmd *cobra.Command, flag Flag) bool {
 	name := getFlagName(flag)
 	return cmd.Flags().Changed(name)
 }
