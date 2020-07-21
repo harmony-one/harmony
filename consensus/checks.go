@@ -190,7 +190,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 }
 
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.ViewID <= consensus.viewID {
+	if recvMsg.ViewID < consensus.viewID {
 		consensus.getLogger().Warn().
 			Uint64("LastSuccessfulConsensusViewID", consensus.viewID).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
