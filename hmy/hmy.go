@@ -1,6 +1,7 @@
 package hmy
 
 import (
+	"golang.org/x/sync/singleflight"
 	"math/big"
 	"sync"
 
@@ -16,29 +17,40 @@ import (
 )
 
 const (
-	leaderCacheSize = 250 // Approx number of BLS keys in committee
+	leaderCacheSize         = 250 // Approx number of BLS keys in committee
+	totalStakeCacheDuration = 20  // number of blocks where the returned total stake will remain the same
 )
 
+// TODO: fuse api_backend into Harmony.
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
-	shutdownChan  chan bool                      // Channel for shutting down the Harmony
-	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	blockchain    *core.BlockChain
-	beaconchain   *core.BlockChain
-	txPool        *core.TxPool
-	cxPool        *core.CxPool
-	eventMux      *event.TypeMux
+	ShutdownChan  chan bool                      // Channel for shutting down the Harmony
+	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
+	BlockChain    *core.BlockChain
+	BeaconChain   *core.BlockChain
+	TxPool        *core.TxPool
+	// CxPool is used to store the blockHashes, where the corresponding block contains the cx receipts to be sent
+	CxPool   *core.CxPool
+	EventMux *event.TypeMux
 	// DB interfaces
-	chainDb      ethdb.Database     // Block chain database
-	bloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
+	ChainDb      ethdb.Database     // Block chain database
+	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	APIBackend   *APIBackend
-	nodeAPI      NodeAPI
-	// aka network version, which is used to identify which network we are using
-	networkID uint64
+	NodeAPI      NodeAPI
+	// NetVersion is used to identify which network we are using
+	NetVersion uint64
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
-	shardID   uint32
+	ShardID   uint32
+
+	// Internals
+	// group for units of work which can be executed with duplicate suppression.
+	group singleflight.Group
+	// leaderCache to save on recomputation every epoch.
+	leaderCache *lru.Cache
+	// totalStakeCache to save on recomputation for `totalStakeCacheDuration` blocks.
+	totalStakeCache *totalStakeCache
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
@@ -69,20 +81,23 @@ func New(
 	cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32,
 ) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
+	leaderCache, _ := lru.New(leaderCacheSize)
+	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
 	hmy := &Harmony{
-		shutdownChan:  make(chan bool),
-		bloomRequests: make(chan chan *bloombits.Retrieval),
-		blockchain:    nodeAPI.Blockchain(),
-		beaconchain:   nodeAPI.Beaconchain(),
-		txPool:        txPool,
-		cxPool:        cxPool,
-		eventMux:      eventMux,
-		chainDb:       chainDb,
-		nodeAPI:       nodeAPI,
-		networkID:     1, // TODO(ricl): this should be from config
-		shardID:       shardID,
+		ShutdownChan:    make(chan bool),
+		BloomRequests:   make(chan chan *bloombits.Retrieval),
+		BlockChain:      nodeAPI.Blockchain(),
+		BeaconChain:     nodeAPI.Beaconchain(),
+		TxPool:          txPool,
+		CxPool:          cxPool,
+		EventMux:        eventMux,
+		ChainDb:         chainDb,
+		NodeAPI:         nodeAPI,
+		NetVersion:      1, // TODO(ricl): this should be from config
+		ShardID:         shardID,
+		leaderCache:     leaderCache,
+		totalStakeCache: totalStakeCache,
 	}
-	cache, _ := lru.New(leaderCacheSize)
 	hmy.APIBackend = &APIBackend{
 		hmy: hmy,
 		TotalStakingCache: struct {
@@ -93,22 +108,7 @@ func New(
 			BlockHeight:  -1,
 			TotalStaking: big.NewInt(0),
 		},
-		LeaderCache: cache,
+		LeaderCache: leaderCache,
 	}
 	return hmy, nil
 }
-
-// TxPool ...
-func (s *Harmony) TxPool() *core.TxPool { return s.txPool }
-
-// CxPool is used to store the blockHashes, where the corresponding block contains the cross shard receipts to be sent
-func (s *Harmony) CxPool() *core.CxPool { return s.cxPool }
-
-// BlockChain ...
-func (s *Harmony) BlockChain() *core.BlockChain { return s.blockchain }
-
-//BeaconChain ...
-func (s *Harmony) BeaconChain() *core.BlockChain { return s.beaconchain }
-
-// NetVersion returns the network version, i.e. network ID identifying which network we are using
-func (s *Harmony) NetVersion() uint64 { return s.networkID }

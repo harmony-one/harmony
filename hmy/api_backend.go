@@ -74,17 +74,17 @@ func (b *APIBackend) SingleFlightForgetKey(key string) {
 
 // ChainDb ...
 func (b *APIBackend) ChainDb() ethdb.Database {
-	return b.hmy.chainDb
+	return b.hmy.ChainDb
 }
 
 // GetBlock ...
 func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return b.hmy.blockchain.GetBlockByHash(hash), nil
+	return b.hmy.BlockChain.GetBlockByHash(hash), nil
 }
 
 // GetPoolTransaction ...
 func (b *APIBackend) GetPoolTransaction(hash common.Hash) types.PoolTransaction {
-	return b.hmy.txPool.Get(hash)
+	return b.hmy.TxPool.Get(hash)
 }
 
 // BlockByNumber ...
@@ -95,9 +95,9 @@ func (b *APIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber)
 	}
 	// Otherwise resolve and return the block
 	if blockNr == rpc.LatestBlockNumber {
-		return b.hmy.blockchain.CurrentBlock(), nil
+		return b.hmy.BlockChain.CurrentBlock(), nil
 	}
-	return b.hmy.blockchain.GetBlockByNumber(uint64(blockNr)), nil
+	return b.hmy.BlockChain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
 // StateAndHeaderByNumber ...
@@ -111,7 +111,7 @@ func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Blo
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
-	stateDb, err := b.hmy.blockchain.StateAt(header.Root())
+	stateDb, err := b.hmy.BlockChain.StateAt(header.Root())
 	return stateDb, header, err
 }
 
@@ -123,43 +123,43 @@ func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber
 	}
 	// Otherwise resolve and return the block
 	if blockNr == rpc.LatestBlockNumber {
-		return b.hmy.blockchain.CurrentBlock().Header(), nil
+		return b.hmy.BlockChain.CurrentBlock().Header(), nil
 	}
-	return b.hmy.blockchain.GetHeaderByNumber(uint64(blockNr)), nil
+	return b.hmy.BlockChain.GetHeaderByNumber(uint64(blockNr)), nil
 }
 
 // GetPoolNonce ...
 func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
-	return b.hmy.txPool.State().GetNonce(addr), nil
+	return b.hmy.TxPool.State().GetNonce(addr), nil
 }
 
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	tx, _, _, _ := rawdb.ReadTransaction(b.ChainDb(), signedTx.Hash())
 	if tx == nil {
-		return b.hmy.nodeAPI.AddPendingTransaction(signedTx)
+		return b.hmy.NodeAPI.AddPendingTransaction(signedTx)
 	}
 	return ErrFinalizedTransaction
 }
 
 // ChainConfig ...
 func (b *APIBackend) ChainConfig() *params.ChainConfig {
-	return b.hmy.blockchain.Config()
+	return b.hmy.BlockChain.Config()
 }
 
 // CurrentBlock ...
 func (b *APIBackend) CurrentBlock() *types.Block {
-	return types.NewBlockWithHeader(b.hmy.blockchain.CurrentHeader())
+	return types.NewBlockWithHeader(b.hmy.BlockChain.CurrentHeader())
 }
 
 // GetReceipts ...
 func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	return b.hmy.blockchain.GetReceiptsByHash(hash), nil
+	return b.hmy.BlockChain.GetReceiptsByHash(hash), nil
 }
 
 // EventMux ...
 // TODO: this is not implemented or verified yet for harmony.
-func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.eventMux }
+func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.EventMux }
 
 const (
 	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
@@ -170,7 +170,7 @@ const (
 // BloomStatus ...
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) BloomStatus() (uint64, uint64) {
-	sections, _, _ := b.hmy.bloomIndexer.Sections()
+	sections, _, _ := b.hmy.BloomIndexer.Sections()
 	return BloomBitsBlocks, sections
 }
 
@@ -183,7 +183,7 @@ func (b *APIBackend) ProtocolVersion() int {
 
 // GetLogs ...
 func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
-	receipts := b.hmy.blockchain.GetReceiptsByHash(blockHash)
+	receipts := b.hmy.BlockChain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
 		return nil, errors.New("Missing receipts")
 	}
@@ -196,7 +196,7 @@ func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*t
 
 // HeaderByHash ...
 func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
-	header := b.hmy.blockchain.GetHeaderByHash(blockHash)
+	header := b.hmy.BlockChain.GetHeaderByHash(blockHash)
 	if header == nil {
 		return nil, errors.New("Header is not found")
 	}
@@ -211,46 +211,46 @@ func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.Match
 // SubscribeNewTxsEvent subcribes new tx event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return b.hmy.TxPool().SubscribeNewTxsEvent(ch)
+	return b.hmy.TxPool.SubscribeNewTxsEvent(ch)
 }
 
 // SubscribeChainEvent subcribes chain event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return b.hmy.BlockChain().SubscribeChainEvent(ch)
+	return b.hmy.BlockChain.SubscribeChainEvent(ch)
 }
 
 // SubscribeChainHeadEvent subcribes chain head event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return b.hmy.BlockChain().SubscribeChainHeadEvent(ch)
+	return b.hmy.BlockChain.SubscribeChainHeadEvent(ch)
 }
 
 // SubscribeChainSideEvent subcribes chain side event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return b.hmy.BlockChain().SubscribeChainSideEvent(ch)
+	return b.hmy.BlockChain.SubscribeChainSideEvent(ch)
 }
 
 // SubscribeRemovedLogsEvent subcribes removed logs event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return b.hmy.BlockChain().SubscribeRemovedLogsEvent(ch)
+	return b.hmy.BlockChain.SubscribeRemovedLogsEvent(ch)
 }
 
 // SubscribeLogsEvent subcribes log event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return b.hmy.BlockChain().SubscribeLogsEvent(ch)
+	return b.hmy.BlockChain.SubscribeLogsEvent(ch)
 }
 
 // GetPoolTransactions returns pool transactions.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
-	pending, err := b.hmy.txPool.Pending()
+	pending, err := b.hmy.TxPool.Pending()
 	if err != nil {
 		return nil, err
 	}
-	queued, err := b.hmy.txPool.Queued()
+	queued, err := b.hmy.TxPool.Queued()
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 
 // GetPoolStats returns the number of pending and queued transactions
 func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
-	return b.hmy.txPool.Stats()
+	return b.hmy.TxPool.Stats()
 }
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
@@ -290,27 +290,27 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	return b.hmy.nodeAPI.GetTransactionsHistory(address, txType, order)
+	return b.hmy.NodeAPI.GetTransactionsHistory(address, txType, order)
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	return b.hmy.nodeAPI.GetStakingTransactionsHistory(address, txType, order)
+	return b.hmy.NodeAPI.GetStakingTransactionsHistory(address, txType, order)
 }
 
 // GetTransactionsCount returns the number of regular transactions of address.
 func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
-	return b.hmy.nodeAPI.GetTransactionsCount(address, txType)
+	return b.hmy.NodeAPI.GetTransactionsCount(address, txType)
 }
 
 // GetStakingTransactionsCount returns the number of staking transactions of address.
 func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
-	return b.hmy.nodeAPI.GetStakingTransactionsCount(address, txType)
+	return b.hmy.NodeAPI.GetStakingTransactionsCount(address, txType)
 }
 
 // NetVersion returns net version
 func (b *APIBackend) NetVersion() uint64 {
-	return b.hmy.NetVersion()
+	return b.hmy.NetVersion
 }
 
 // GetEVM returns a new EVM entity
@@ -321,8 +321,8 @@ func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.
 	state.SetBalance(msg.From(), math.MaxBig256)
 	vmError := func() error { return nil }
 
-	context := core.NewEVMContext(msg, header, b.hmy.BlockChain(), nil)
-	return vm.NewEVM(context, state, b.hmy.blockchain.Config(), *b.hmy.blockchain.GetVMConfig()), vmError, nil
+	context := core.NewEVMContext(msg, header, b.hmy.BlockChain, nil)
+	return vm.NewEVM(context, state, b.hmy.BlockChain.Config(), *b.hmy.BlockChain.GetVMConfig()), vmError, nil
 }
 
 // RPCGasCap returns the gas cap of rpc
@@ -330,14 +330,14 @@ func (b *APIBackend) RPCGasCap() *big.Int {
 	return b.hmy.RPCGasCap // TODO(ricl): should be hmy.config.RPCGasCap
 }
 
-// GetShardID returns shardID of this node
+// GetShardID returns ShardID of this node
 func (b *APIBackend) GetShardID() uint32 {
-	return b.hmy.shardID
+	return b.hmy.ShardID
 }
 
 // GetValidators returns validators for a particular epoch.
 func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
-	state, err := b.hmy.BlockChain().ReadShardState(epoch)
+	state, err := b.hmy.BlockChain.ReadShardState(epoch)
 	if err != nil {
 		return nil, err
 	}
@@ -353,12 +353,12 @@ func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 // Note that cross shard txn is only for regular txns, not for staking txns, so the input txn hash
 // is expected to be regular txn hash
 func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bool) {
-	blockHash, blockNum, index := b.hmy.BlockChain().ReadTxLookupEntry(txID)
+	blockHash, blockNum, index := b.hmy.BlockChain.ReadTxLookupEntry(txID)
 	if blockHash == (common.Hash{}) {
 		return 0, false
 	}
 
-	blk := b.hmy.BlockChain().GetBlockByHash(blockHash)
+	blk := b.hmy.BlockChain.GetBlockByHash(blockHash)
 	if blk == nil {
 		return 0, false
 	}
@@ -375,33 +375,33 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 		return 0, false
 	}
 	entry := core.CxEntry{blockHash, tx.ToShardID()}
-	success := b.hmy.CxPool().Add(entry)
+	success := b.hmy.CxPool.Add(entry)
 	return blockNum, success
 }
 
 // IsLeader exposes if node is currently leader
 func (b *APIBackend) IsLeader() bool {
-	return b.hmy.nodeAPI.IsCurrentlyLeader()
+	return b.hmy.NodeAPI.IsCurrentlyLeader()
 }
 
 // SendStakingTx adds a staking transaction
 func (b *APIBackend) SendStakingTx(ctx context.Context, signedStakingTx *staking.StakingTransaction) error {
 	stx, _, _, _ := rawdb.ReadStakingTransaction(b.ChainDb(), signedStakingTx.Hash())
 	if stx == nil {
-		return b.hmy.nodeAPI.AddPendingStakingTransaction(signedStakingTx)
+		return b.hmy.NodeAPI.AddPendingStakingTransaction(signedStakingTx)
 	}
 	return ErrFinalizedTransaction
 }
 
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
 func (b *APIBackend) GetElectedValidatorAddresses() []common.Address {
-	list, _ := b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentBlock().Epoch())
+	list, _ := b.hmy.BlockChain.ReadShardState(b.hmy.BlockChain.CurrentBlock().Epoch())
 	return list.StakedValidators().Addrs
 }
 
 // GetAllValidatorAddresses returns the up to date validator candidates for next epoch
 func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
-	return b.hmy.BlockChain().ValidatorCandidates()
+	return b.hmy.BlockChain.ValidatorCandidates()
 }
 
 var (
@@ -412,7 +412,7 @@ var (
 func (b *APIBackend) GetValidatorInformation(
 	addr common.Address, block *types.Block,
 ) (*staking.ValidatorRPCEnhanced, error) {
-	bc := b.hmy.BlockChain()
+	bc := b.hmy.BlockChain
 	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
 		s, _ := internal_common.AddressToBech32(addr)
@@ -455,7 +455,7 @@ func (b *APIBackend) GetValidatorInformation(
 		snapshot.Validator, wrapper,
 	)
 	beaconChainBlocks := uint64(
-		b.hmy.BeaconChain().CurrentBlock().Header().Number().Int64(),
+		b.hmy.BeaconChain.CurrentBlock().Header().Number().Int64(),
 	) % shard.Schedule.BlocksPerEpoch()
 	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
 
@@ -559,7 +559,7 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (
 		func() (interface{}, error) {
 			// Compute for next epoch
 			epoch := big.NewInt(0).Add(b.CurrentBlock().Epoch(), big.NewInt(1))
-			return committee.NewEPoSRound(epoch, b.hmy.BlockChain())
+			return committee.NewEPoSRound(epoch, b.hmy.BlockChain)
 		},
 	)
 	if err != nil {
@@ -571,8 +571,8 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (
 // GetLatestChainHeaders ..
 func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
 	return &block.HeaderPair{
-		BeaconHeader: b.hmy.BeaconChain().CurrentHeader(),
-		ShardHeader:  b.hmy.BlockChain().CurrentHeader(),
+		BeaconHeader: b.hmy.BeaconChain.CurrentHeader(),
+		ShardHeader:  b.hmy.BlockChain.CurrentHeader(),
 	}
 }
 
@@ -585,15 +585,15 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 		return b.TotalStakingCache.TotalStaking
 	}
 	b.TotalStakingCache.BlockHeight = int64(rpc.LatestBlockNumber)
-	candidates := b.hmy.BlockChain().ValidatorCandidates()
+	candidates := b.hmy.BlockChain.ValidatorCandidates()
 	if len(candidates) == 0 {
 		b.TotalStakingCache.TotalStaking = big.NewInt(0)
 		return b.TotalStakingCache.TotalStaking
 	}
 	stakes := big.NewInt(0)
 	for i := range candidates {
-		snapshot, _ := b.hmy.BlockChain().ReadValidatorSnapshot(candidates[i])
-		validator, _ := b.hmy.BlockChain().ReadValidatorInformation(candidates[i])
+		snapshot, _ := b.hmy.BlockChain.ReadValidatorSnapshot(candidates[i])
+		validator, _ := b.hmy.BlockChain.ReadValidatorInformation(candidates[i])
 		if !committee.IsEligibleForEPoSAuction(
 			snapshot, validator,
 		) {
@@ -609,7 +609,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 
 // GetDelegationsByValidator returns all delegation information of a validator
 func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
-	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(validator)
+	wrapper, err := b.hmy.BlockChain.ReadValidatorInformation(validator)
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -626,14 +626,14 @@ func (b *APIBackend) GetDelegationsByDelegatorByBlock(
 ) ([]common.Address, []*staking.Delegation) {
 	addresses := []common.Address{}
 	delegations := []*staking.Delegation{}
-	delegationIndexes, err := b.hmy.BlockChain().
+	delegationIndexes, err := b.hmy.BlockChain.
 		ReadDelegationsByDelegatorAt(delegator, block.Number())
 	if err != nil {
 		return nil, nil
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := b.hmy.BlockChain().ReadValidatorInformationAt(
+		wrapper, err := b.hmy.BlockChain.ReadValidatorInformationAt(
 			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
@@ -654,13 +654,13 @@ func (b *APIBackend) GetDelegationsByDelegatorByBlock(
 func (b *APIBackend) GetDelegationsByDelegator(
 	delegator common.Address,
 ) ([]common.Address, []*staking.Delegation) {
-	block := b.hmy.BlockChain().CurrentBlock()
+	block := b.hmy.BlockChain.CurrentBlock()
 	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
 func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
-	wrapper, err := b.hmy.BlockChain().ReadValidatorInformation(addr)
+	wrapper, err := b.hmy.BlockChain.ReadValidatorInformation(addr)
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -672,27 +672,27 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 
 // GetShardState ...
 func (b *APIBackend) GetShardState() (*shard.State, error) {
-	return b.hmy.BlockChain().ReadShardState(b.hmy.BlockChain().CurrentHeader().Epoch())
+	return b.hmy.BlockChain.ReadShardState(b.hmy.BlockChain.CurrentHeader().Epoch())
 }
 
 // GetCurrentStakingErrorSink ..
 func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
-	return b.hmy.nodeAPI.ReportStakingErrorSink()
+	return b.hmy.NodeAPI.ReportStakingErrorSink()
 }
 
 // GetCurrentTransactionErrorSink ..
 func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
-	return b.hmy.nodeAPI.ReportPlainErrorSink()
+	return b.hmy.NodeAPI.ReportPlainErrorSink()
 }
 
 // GetPendingCXReceipts ..
 func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
-	return b.hmy.nodeAPI.PendingCXReceipts()
+	return b.hmy.NodeAPI.PendingCXReceipts()
 }
 
 // GetCurrentUtilityMetrics ..
 func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
-	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain())
+	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain)
 }
 
 func (b *APIBackend) readAndUpdateRawStakes(
@@ -708,7 +708,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 		slotKey := slot.BLSPublicKey
 		spread, ok := validatorSpreads[slotAddr]
 		if !ok {
-			snapshot, err := b.hmy.BlockChain().ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
+			snapshot, err := b.hmy.BlockChain.ReadValidatorSnapshotAtEpoch(epoch, slotAddr)
 			if err != nil {
 				continue
 			}
@@ -731,18 +731,18 @@ func (b *APIBackend) readAndUpdateRawStakes(
 }
 
 func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
-	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	nowE := b.hmy.BlockChain.CurrentHeader().Epoch()
 	thenE := new(big.Int).Sub(nowE, common.Big1)
 
 	var (
 		nowCommittee, prevCommittee *shard.State
 		err                         error
 	)
-	nowCommittee, err = b.hmy.BlockChain().ReadShardState(nowE)
+	nowCommittee, err = b.hmy.BlockChain.ReadShardState(nowE)
 	if err != nil {
 		return nil, err
 	}
-	prevCommittee, err = b.hmy.BlockChain().ReadShardState(thenE)
+	prevCommittee, err = b.hmy.BlockChain.ReadShardState(thenE)
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	for _, comm := range prevCommittee.Shards {
 		decider := quorum.NewDecider(quorum.SuperMajorityStake, comm.ShardID)
 		// before staking skip computing
-		if b.hmy.BlockChain().Config().IsStaking(prevCommittee.Epoch) {
+		if b.hmy.BlockChain.Config().IsStaking(prevCommittee.Epoch) {
 			if _, err := decider.SetVoters(&comm, prevCommittee.Epoch); err != nil {
 				return nil, err
 			}
@@ -778,8 +778,8 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 			return nil, errors.Wrapf(
 				err,
 				"committee is only available from staking epoch: %v, current epoch: %v",
-				b.hmy.BlockChain().Config().StakingEpoch,
-				b.hmy.BlockChain().CurrentHeader().Epoch(),
+				b.hmy.BlockChain.Config().StakingEpoch,
+				b.hmy.BlockChain.CurrentHeader().Epoch(),
 			)
 		}
 		rawStakes = b.readAndUpdateRawStakes(nowE, decider, comm, rawStakes, validatorSpreads)
@@ -792,7 +792,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 
 // GetSuperCommittees ..
 func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
-	nowE := b.hmy.BlockChain().CurrentHeader().Epoch()
+	nowE := b.hmy.BlockChain.CurrentHeader().Epoch()
 	key := fmt.Sprintf("sc-%s", nowE.String())
 
 	res, err := b.SingleFlightRequest(
@@ -810,14 +810,14 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 
 // GetCurrentBadBlocks ..
 func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
-	return b.hmy.BlockChain().BadBlocks()
+	return b.hmy.BlockChain.BadBlocks()
 }
 
 // GetLastCrossLinks ..
 func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	crossLinks := []*types.CrossLink{}
 	for i := uint32(1); i < shard.Schedule.InstanceForEpoch(b.CurrentBlock().Epoch()).NumShards(); i++ {
-		link, err := b.hmy.BlockChain().ReadShardLastCrossLink(i)
+		link, err := b.hmy.BlockChain.ReadShardLastCrossLink(i)
 		if err != nil {
 			return nil, err
 		}
@@ -846,7 +846,7 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		}
 	}
 	c := commonRPC.C{}
-	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.nodeAPI.PeerConnectivity()
+	c.TotalKnownPeers, c.Connected, c.NotConnected = b.hmy.NodeAPI.PeerConnectivity()
 
 	return commonRPC.NodeMetadata{
 		blsKeys,
@@ -860,7 +860,7 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 		cfg.Role().String(),
 		cfg.DNSZone,
 		cfg.GetArchival(),
-		b.hmy.nodeAPI.GetNodeBootTime(),
+		b.hmy.NodeAPI.GetNodeBootTime(),
 		nodeconfig.GetPeerID(),
 		c,
 	}
@@ -869,11 +869,11 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 // GetPeerInfo returns the peer info to the node, including blocked peer, connected peer, number of peers
 func (b *APIBackend) GetPeerInfo() commonRPC.NodePeerInfo {
 
-	topics := b.hmy.nodeAPI.ListTopic()
+	topics := b.hmy.NodeAPI.ListTopic()
 	p := make([]commonRPC.P, len(topics))
 
 	for i, t := range topics {
-		topicPeer := b.hmy.nodeAPI.ListPeer(t)
+		topicPeer := b.hmy.NodeAPI.ListPeer(t)
 		p[i].Topic = t
 		p[i].Peers = make([]peer.ID, len(topicPeer))
 		copy(p[i].Peers, topicPeer)
@@ -881,7 +881,7 @@ func (b *APIBackend) GetPeerInfo() commonRPC.NodePeerInfo {
 
 	return commonRPC.NodePeerInfo{
 		PeerID:       nodeconfig.GetPeerID(),
-		BlockedPeers: b.hmy.nodeAPI.ListBlockedPeer(),
+		BlockedPeers: b.hmy.NodeAPI.ListBlockedPeer(),
 		P:            p,
 	}
 }
@@ -919,7 +919,7 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 
 // IsStakingEpoch ...
 func (b *APIBackend) IsStakingEpoch(epoch *big.Int) bool {
-	return b.hmy.BlockChain().Config().IsStaking(epoch)
+	return b.hmy.BlockChain.Config().IsStaking(epoch)
 }
 
 // GetLeaderAddress returns the one address of the leader
