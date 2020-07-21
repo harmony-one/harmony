@@ -72,13 +72,13 @@ make
 ```
 > Run `bash scripts/install_build_tools.sh` to ensure build tools are of correct versions.
 
-## Dev Docker Container
+## Dev Docker Image
 
 Included in this repo is a Dockerfile that has a full harmony development environment and 
 comes with emacs, vim, ag, tig and other creature comforts. Most importantly, it already has the go environment 
 with our C/C++ based library dependencies (`libbls` and `mcl`) set up correctly for you. 
 
-You can build the docker container for yourself with the following commands:
+You can build the docker image for yourself with the following commands:
 ```bash
 cd $(go env GOPATH)/src/github.com/harmony-one/harmony
 make clean

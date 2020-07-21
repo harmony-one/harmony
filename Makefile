@@ -49,6 +49,7 @@ clean:
 	rm -rf ./tmp_log*
 	rm -rf ./.dht*
 	rm -rf ./db-*
+	rm -rf ./latest
 	rm -f ./*.rlp
 
 test:
