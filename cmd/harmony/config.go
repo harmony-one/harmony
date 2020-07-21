@@ -93,8 +93,9 @@ type devnetConfig struct {
 	HmyNodeSize int
 }
 
-// TODO: make this revert a seperate command
+// TODO: make this revert to a seperate command
 type revertConfig struct {
+	RevertBeacon bool
 	RevertTo     int
 	RevertBefore int
 }
@@ -153,6 +154,20 @@ var defaultDevnetConfig = devnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: -1,
+}
+
+var defaultRevertConfig = revertConfig{
+	RevertBeacon: false,
+	RevertBefore: -1,
+	RevertTo:     -1,
+}
+
+func getDefaultDevnetConfigCopy() devnetConfig {
+	return defaultDevnetConfig
+}
+
+func getDefaultRevertConfigCopy() revertConfig {
+	return defaultRevertConfig
 }
 
 const (
