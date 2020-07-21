@@ -342,7 +342,8 @@ var (
 
 func applyDevnetFlags(cmd *cobra.Command, config *hmyConfig) {
 	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet != nil {
-		config.Devnet = &defaultDevnetConfig
+		devnet := getDefaultDevnetConfigCopy()
+		config.Devnet = &devnet
 	}
 
 	if cli.HasFlagsChanged(cmd, newDevnetFlags) {
@@ -365,6 +366,90 @@ func applyDevnetFlags(cmd *cobra.Command, config *hmyConfig) {
 		}
 		if cli.IsFlagChanged(cmd, legacyDevnetHmyNodeSizeFlag) {
 			config.Devnet.HmyNodeSize = cli.GetIntFlagValue(cmd, legacyDevnetHmyNodeSizeFlag)
+		}
+	}
+}
+
+var revertFlags = append(newRevertFlags, legacyRevertFlags...)
+
+var newRevertFlags = []cli.Flag{
+	revertBeaconFlag,
+	revertToFlag,
+	revertBeforeFlag,
+}
+
+var legacyRevertFlags = []cli.Flag{
+	legacyRevertBeaconFlag,
+	legacyRevertBeforeFlag,
+	legacyRevertToFlag,
+}
+
+var (
+	revertBeaconFlag = cli.BoolFlag{
+		Name:     "revert.beacon",
+		Usage:    "revert the beacon chain",
+		DefValue: defaultRevertConfig.RevertBeacon,
+		Hidden:   true,
+	}
+	revertToFlag = cli.IntFlag{
+		Name:     "revert.to",
+		Usage:    "rollback all blocks until and including block number revert_to",
+		DefValue: defaultRevertConfig.RevertTo,
+		Hidden:   true,
+	}
+	revertBeforeFlag = cli.IntFlag{
+		Name:     "revert.do-before",
+		Usage:    "if the current block is less than do_revert_before, revert all blocks until (including) revert_to block",
+		DefValue: defaultRevertConfig.RevertBefore,
+		Hidden:   true,
+	}
+	legacyRevertBeaconFlag = cli.BoolFlag{
+		Name:       "revert_beacon",
+		Usage:      "whether to revert beacon chain or the chain this node is assigned to",
+		DefValue:   defaultRevertConfig.RevertBeacon,
+		Deprecated: "use --revert.beacon",
+	}
+	legacyRevertBeforeFlag = cli.IntFlag{
+		Name:       "do_revert_before",
+		Usage:      "If the current block is less than do_revert_before, revert all blocks until (including) revert_to block",
+		DefValue:   defaultRevertConfig.RevertBefore,
+		Deprecated: "use --revert.do-before",
+	}
+	legacyRevertToFlag = cli.IntFlag{
+		Name:       "revert_to",
+		Usage:      "The revert will rollback all blocks until and including block number revert_to",
+		DefValue:   defaultRevertConfig.RevertTo,
+		Deprecated: "use --revert.to",
+	}
+)
+
+func applyRevertFlags(cmd *cobra.Command, config *hmyConfig) {
+	if cli.HasFlagsChanged(cmd, revertFlags) {
+		revert := getDefaultRevertConfigCopy()
+		config.Revert = &revert
+	}
+
+	if cli.HasFlagsChanged(cmd, newRevertFlags) {
+		if cli.IsFlagChanged(cmd, revertBeaconFlag) {
+			config.Revert.RevertBeacon = cli.GetBoolFlagValue(cmd, revertBeaconFlag)
+		}
+		if cli.IsFlagChanged(cmd, revertBeforeFlag) {
+			config.Revert.RevertBefore = cli.GetIntFlagValue(cmd, revertBeforeFlag)
+		}
+		if cli.IsFlagChanged(cmd, revertToFlag) {
+			config.Revert.RevertTo = cli.GetIntFlagValue(cmd, revertToFlag)
+		}
+	}
+
+	if cli.HasFlagsChanged(cmd, legacyRevertFlags) {
+		if cli.IsFlagChanged(cmd, legacyRevertBeaconFlag) {
+			config.Revert.RevertBeacon = cli.GetBoolFlagValue(cmd, legacyRevertBeaconFlag)
+		}
+		if cli.IsFlagChanged(cmd, legacyRevertBeforeFlag) {
+			config.Revert.RevertBefore = cli.GetIntFlagValue(cmd, legacyRevertBeforeFlag)
+		}
+		if cli.IsFlagChanged(cmd, legacyRevertToFlag) {
+			config.Revert.RevertTo = cli.GetIntFlagValue(cmd, legacyRevertToFlag)
 		}
 	}
 }
