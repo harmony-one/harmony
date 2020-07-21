@@ -410,6 +410,35 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	return addresses, delegations
 }
 
+// GetTotalStakingSnapshot ..
+func (hmy *Harmony) GetTotalStakingSnapshot() *big.Int {
+	if stake := hmy.totalStakeCache.pop(hmy.CurrentBlock().NumberU64()); stake != nil {
+		return stake
+	}
+	currHeight := hmy.CurrentBlock().NumberU64()
+	candidates := hmy.BlockChain.ValidatorCandidates()
+	if len(candidates) == 0 {
+		stake := big.NewInt(0)
+		hmy.totalStakeCache.push(currHeight, stake)
+		return stake
+	}
+	stakes := big.NewInt(0)
+	for i := range candidates {
+		snapshot, _ := hmy.BlockChain.ReadValidatorSnapshot(candidates[i])
+		validator, _ := hmy.BlockChain.ReadValidatorInformation(candidates[i])
+		if !committee.IsEligibleForEPoSAuction(
+			snapshot, validator,
+		) {
+			continue
+		}
+		for i := range validator.Delegations {
+			stakes.Add(stakes, validator.Delegations[i].Amount)
+		}
+	}
+	hmy.totalStakeCache.push(currHeight, stakes)
+	return stakes
+}
+
 // GetCurrentStakingErrorSink ..
 func (hmy *Harmony) GetCurrentStakingErrorSink() types.TransactionErrorReports {
 	return hmy.NodeAPI.ReportStakingErrorSink()
@@ -417,20 +446,32 @@ func (hmy *Harmony) GetCurrentStakingErrorSink() types.TransactionErrorReports {
 
 // totalStakeCache ..
 type totalStakeCache struct {
-	mutex       sync.Mutex
-	blockHeight int64
-	stake       *big.Int
+	sync.Mutex
+	cachedBlockHeight uint64
+	stake             *big.Int
 	// duration is in blocks
 	duration uint64
 }
 
-// TODO: better implementation of GetTotalStakingSnapshot()...
 // newTotalStakeCache ..
 func newTotalStakeCache(duration uint64) *totalStakeCache {
 	return &totalStakeCache{
-		mutex:       sync.Mutex{},
-		blockHeight: -1,
-		stake:       nil,
-		duration:    duration,
+		cachedBlockHeight: 0,
+		stake:             nil,
+		duration:          duration,
 	}
+}
+
+func (c *totalStakeCache) push(currBlockHeight uint64, stake *big.Int) {
+	c.Lock()
+	defer c.Unlock()
+	c.cachedBlockHeight = currBlockHeight
+	c.stake = stake
+}
+
+func (c *totalStakeCache) pop(currBlockHeight uint64) *big.Int {
+	if currBlockHeight > c.cachedBlockHeight+c.duration {
+		return nil
+	}
+	return c.stake
 }

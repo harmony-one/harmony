@@ -608,7 +608,7 @@ func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
 	}
 }
 
-// TODO: better implementation of GetTotalStakingSnapshot()...
+// FIXME:done
 // GetTotalStakingSnapshot ..
 func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	b.TotalStakingCache.Lock()
