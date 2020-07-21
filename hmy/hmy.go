@@ -1,27 +1,38 @@
 package hmy
 
 import (
-	"golang.org/x/sync/singleflight"
+	"context"
 	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
-	leaderCacheSize         = 250 // Approx number of BLS keys in committee
-	totalStakeCacheDuration = 20  // number of blocks where the returned total stake will remain the same
+	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
+	// contains on the server side.
+	BloomBitsBlocks         uint64 = 4096
+	leaderCacheSize                = 250 // Approx number of BLS keys in committee
+	totalStakeCacheDuration        = 20  // number of blocks where the returned total stake will remain the same
 )
 
-// TODO: fuse api_backend into Harmony.
 // Harmony implements the Harmony full node service.
 type Harmony struct {
 	// Channel for shutting down the service
@@ -93,7 +104,7 @@ func New(
 		EventMux:        eventMux,
 		ChainDb:         chainDb,
 		NodeAPI:         nodeAPI,
-		NetVersion:      1, // TODO(ricl): this should be from config
+		NetVersion:      1, // TODO(dm): this should be from config
 		ShardID:         shardID,
 		leaderCache:     leaderCache,
 		totalStakeCache: totalStakeCache,
@@ -111,4 +122,87 @@ func New(
 		LeaderCache: leaderCache,
 	}
 	return hmy, nil
+}
+
+// SingleFlightRequest ..
+func (hmy *Harmony) SingleFlightRequest(
+	key string,
+	fn func() (interface{}, error),
+) (interface{}, error) {
+	res, err, _ := hmy.group.Do(key, fn)
+	return res, err
+}
+
+// SingleFlightForgetKey ...
+func (hmy *Harmony) SingleFlightForgetKey(key string) {
+	hmy.group.Forget(key)
+}
+
+// ProtocolVersion ...
+func (hmy *Harmony) ProtocolVersion() int {
+	return proto.ProtocolVersion
+}
+
+// IsLeader exposes if node is currently leader
+func (hmy *Harmony) IsLeader() bool {
+	return hmy.NodeAPI.IsCurrentlyLeader()
+}
+
+// GetNodeMetadata ..
+func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
+	cfg := nodeconfig.GetDefaultConfig()
+	header := hmy.CurrentBlock().Header()
+	var blockEpoch *uint64
+
+	if header.ShardID() == shard.BeaconChainShardID {
+		sched := shard.Schedule.InstanceForEpoch(header.Epoch())
+		b := sched.BlocksPerEpoch()
+		blockEpoch = &b
+	}
+
+	blsKeys := []string{}
+	if cfg.ConsensusPriKey != nil {
+		for _, key := range cfg.ConsensusPriKey {
+			blsKeys = append(blsKeys, key.Pub.Bytes.Hex())
+		}
+	}
+	c := commonRPC.C{}
+	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
+
+	return commonRPC.NodeMetadata{
+		BLSPublicKey:   blsKeys,
+		Version:        nodeconfig.GetVersion(),
+		NetworkType:    string(cfg.GetNetworkType()),
+		ChainConfig:    *hmy.ChainConfig(),
+		IsLeader:       hmy.IsLeader(),
+		ShardID:        hmy.ShardID,
+		CurrentEpoch:   header.Epoch().Uint64(),
+		BlocksPerEpoch: blockEpoch,
+		Role:           cfg.Role().String(),
+		DNSZone:        cfg.DNSZone,
+		Archival:       cfg.GetArchival(),
+		NodeBootTime:   hmy.NodeAPI.GetNodeBootTime(),
+		PeerID:         nodeconfig.GetPeerID(),
+		C:              c,
+	}
+}
+
+// GetEVM returns a new EVM entity
+func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error) {
+	state.SetBalance(msg.From(), math.MaxBig256)
+	vmError := func() error { return nil }
+	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain, nil)
+	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), vmError, nil
+}
+
+// GetRPCGasCap returns the gas cap of rpc
+func (hmy *Harmony) GetRPCGasCap() *big.Int {
+	return hmy.RPCGasCap // TODO(dm): should be hmy.config.RPCGasCap
+}
+
+// BloomStatus ...
+// TODO: this is not implemented or verified yet for harmony.
+func (hmy *Harmony) BloomStatus() (uint64, uint64) {
+	sections, _, _ := hmy.BloomIndexer.Sections()
+	return BloomBitsBlocks, sections
 }

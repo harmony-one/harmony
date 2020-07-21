@@ -58,6 +58,7 @@ type APIBackend struct {
 	LeaderCache *lru.Cache
 }
 
+// FIXME: done
 // SingleFlightRequest ...
 func (b *APIBackend) SingleFlightRequest(
 	key string,
@@ -67,6 +68,7 @@ func (b *APIBackend) SingleFlightRequest(
 	return res, err
 }
 
+// FIXME: done
 // SingleFlightForgetKey ...
 func (b *APIBackend) SingleFlightForgetKey(key string) {
 	b.apiCache.Forget(key)
@@ -77,16 +79,19 @@ func (b *APIBackend) ChainDb() ethdb.Database {
 	return b.hmy.ChainDb
 }
 
+// FIXME: done
 // GetBlock ...
 func (b *APIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return b.hmy.BlockChain.GetBlockByHash(hash), nil
 }
 
+// FIXME: done
 // GetPoolTransaction ...
 func (b *APIBackend) GetPoolTransaction(hash common.Hash) types.PoolTransaction {
 	return b.hmy.TxPool.Get(hash)
 }
 
+// FIXME: done
 // BlockByNumber ...
 func (b *APIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
 	// Pending block is only known by the miner
@@ -100,6 +105,7 @@ func (b *APIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber)
 	return b.hmy.BlockChain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
+// FIXME: done
 // StateAndHeaderByNumber ...
 func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error) {
 	// Pending state is only known by the miner
@@ -115,6 +121,7 @@ func (b *APIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Blo
 	return stateDb, header, err
 }
 
+// FIXME: done
 // HeaderByNumber ...
 func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error) {
 	// Pending block is only known by the miner
@@ -128,11 +135,13 @@ func (b *APIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber
 	return b.hmy.BlockChain.GetHeaderByNumber(uint64(blockNr)), nil
 }
 
+// FIXME: done
 // GetPoolNonce ...
 func (b *APIBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
 	return b.hmy.TxPool.State().GetNonce(addr), nil
 }
 
+// FIXME: done
 // SendTx ...
 func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	tx, _, _, _ := rawdb.ReadTransaction(b.ChainDb(), signedTx.Hash())
@@ -142,16 +151,19 @@ func (b *APIBackend) SendTx(ctx context.Context, signedTx *types.Transaction) er
 	return ErrFinalizedTransaction
 }
 
+// FIXME: done
 // ChainConfig ...
 func (b *APIBackend) ChainConfig() *params.ChainConfig {
 	return b.hmy.BlockChain.Config()
 }
 
+// FIXME: done
 // CurrentBlock ...
 func (b *APIBackend) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(b.hmy.BlockChain.CurrentHeader())
 }
 
+// FIXME: done
 // GetReceipts ...
 func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
 	return b.hmy.BlockChain.GetReceiptsByHash(hash), nil
@@ -161,12 +173,7 @@ func (b *APIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.R
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) EventMux() *event.TypeMux { return b.hmy.EventMux }
 
-const (
-	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
-	// contains on the server side.
-	BloomBitsBlocks uint64 = 4096
-)
-
+// FIXME: done
 // BloomStatus ...
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) BloomStatus() (uint64, uint64) {
@@ -174,6 +181,7 @@ func (b *APIBackend) BloomStatus() (uint64, uint64) {
 	return BloomBitsBlocks, sections
 }
 
+// FIXME:done
 // ProtocolVersion ...
 func (b *APIBackend) ProtocolVersion() int {
 	return proto.ProtocolVersion
@@ -181,6 +189,7 @@ func (b *APIBackend) ProtocolVersion() int {
 
 // Filter related APIs
 
+// FIXME:done
 // GetLogs ...
 func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
 	receipts := b.hmy.BlockChain.GetReceiptsByHash(blockHash)
@@ -194,6 +203,7 @@ func (b *APIBackend) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*t
 	return logs, nil
 }
 
+// FIXME:done
 // HeaderByHash ...
 func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error) {
 	header := b.hmy.BlockChain.GetHeaderByHash(blockHash)
@@ -203,47 +213,55 @@ func (b *APIBackend) HeaderByHash(ctx context.Context, blockHash common.Hash) (*
 	return header, nil
 }
 
+// FIXME:done
 // ServiceFilter ...
 func (b *APIBackend) ServiceFilter(ctx context.Context, session *bloombits.MatcherSession) {
 	// TODO(ricl): implement
 }
 
+// FIXME:done
 // SubscribeNewTxsEvent subcribes new tx event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return b.hmy.TxPool.SubscribeNewTxsEvent(ch)
 }
 
+// FIXME:done
 // SubscribeChainEvent subcribes chain event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
 	return b.hmy.BlockChain.SubscribeChainEvent(ch)
 }
 
+// FIXME:done
 // SubscribeChainHeadEvent subcribes chain head event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
 	return b.hmy.BlockChain.SubscribeChainHeadEvent(ch)
 }
 
+// FIXME:done
 // SubscribeChainSideEvent subcribes chain side event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
 	return b.hmy.BlockChain.SubscribeChainSideEvent(ch)
 }
 
+// FIXME:done
 // SubscribeRemovedLogsEvent subcribes removed logs event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
 	return b.hmy.BlockChain.SubscribeRemovedLogsEvent(ch)
 }
 
+// FIXME:done
 // SubscribeLogsEvent subcribes log event.
 // TODO: this is not implemented or verified yet for harmony.
 func (b *APIBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return b.hmy.BlockChain.SubscribeLogsEvent(ch)
 }
 
+// FIXME:done
 // GetPoolTransactions returns pool transactions.
 func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	pending, err := b.hmy.TxPool.Pending()
@@ -264,11 +282,13 @@ func (b *APIBackend) GetPoolTransactions() (types.PoolTransactions, error) {
 	return txs, nil
 }
 
+// FIXME:done
 // GetPoolStats returns the number of pending and queued transactions
 func (b *APIBackend) GetPoolStats() (pendingCount, queuedCount int) {
 	return b.hmy.TxPool.Stats()
 }
 
+// FIXME:done
 // GetAccountNonce returns the nonce value of the given address for the given block number
 func (b *APIBackend) GetAccountNonce(
 	ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error) {
@@ -279,6 +299,7 @@ func (b *APIBackend) GetAccountNonce(
 	return state.GetNonce(address), state.Error()
 }
 
+// FIXME:done
 // GetBalance returns balance of an given address.
 func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
 	state, _, err := b.StateAndHeaderByNumber(ctx, blockNr)
@@ -288,21 +309,25 @@ func (b *APIBackend) GetBalance(ctx context.Context, address common.Address, blo
 	return state.GetBalance(address), state.Error()
 }
 
+// FIXME:done
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (b *APIBackend) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	return b.hmy.NodeAPI.GetTransactionsHistory(address, txType, order)
 }
 
+// FIXME:done
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (b *APIBackend) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
 	return b.hmy.NodeAPI.GetStakingTransactionsHistory(address, txType, order)
 }
 
+// FIXME:done
 // GetTransactionsCount returns the number of regular transactions of address.
 func (b *APIBackend) GetTransactionsCount(address, txType string) (uint64, error) {
 	return b.hmy.NodeAPI.GetTransactionsCount(address, txType)
 }
 
+// FIXME:done
 // GetStakingTransactionsCount returns the number of staking transactions of address.
 func (b *APIBackend) GetStakingTransactionsCount(address, txType string) (uint64, error) {
 	return b.hmy.NodeAPI.GetStakingTransactionsCount(address, txType)
@@ -313,6 +338,7 @@ func (b *APIBackend) NetVersion() uint64 {
 	return b.hmy.NetVersion
 }
 
+// FIXME: done
 // GetEVM returns a new EVM entity
 func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error) {
 	// TODO(ricl): The code is borrowed from [go-ethereum](https://github.com/ethereum/go-ethereum/blob/40cdcf8c47ff094775aca08fd5d94051f9cf1dbb/les/api_backend.go#L114)
@@ -325,6 +351,7 @@ func (b *APIBackend) GetEVM(ctx context.Context, msg core.Message, state *state.
 	return vm.NewEVM(context, state, b.hmy.BlockChain.Config(), *b.hmy.BlockChain.GetVMConfig()), vmError, nil
 }
 
+// FIXME: done
 // RPCGasCap returns the gas cap of rpc
 func (b *APIBackend) RPCGasCap() *big.Int {
 	return b.hmy.RPCGasCap // TODO(ricl): should be hmy.config.RPCGasCap
@@ -335,6 +362,7 @@ func (b *APIBackend) GetShardID() uint32 {
 	return b.hmy.ShardID
 }
 
+// FIXME: done
 // GetValidators returns validators for a particular epoch.
 func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 	state, err := b.hmy.BlockChain.ReadShardState(epoch)
@@ -349,6 +377,7 @@ func (b *APIBackend) GetValidators(epoch *big.Int) (*shard.Committee, error) {
 	return nil, nil
 }
 
+// FIXME: done
 // ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending
 // Note that cross shard txn is only for regular txns, not for staking txns, so the input txn hash
 // is expected to be regular txn hash
@@ -379,11 +408,13 @@ func (b *APIBackend) ResendCx(ctx context.Context, txID common.Hash) (uint64, bo
 	return blockNum, success
 }
 
+// FIXME: done
 // IsLeader exposes if node is currently leader
 func (b *APIBackend) IsLeader() bool {
 	return b.hmy.NodeAPI.IsCurrentlyLeader()
 }
 
+// FIXME:done
 // SendStakingTx adds a staking transaction
 func (b *APIBackend) SendStakingTx(ctx context.Context, signedStakingTx *staking.StakingTransaction) error {
 	stx, _, _, _ := rawdb.ReadStakingTransaction(b.ChainDb(), signedStakingTx.Hash())
@@ -393,21 +424,20 @@ func (b *APIBackend) SendStakingTx(ctx context.Context, signedStakingTx *staking
 	return ErrFinalizedTransaction
 }
 
+// FIXME:done
 // GetElectedValidatorAddresses returns the address of elected validators for current epoch
 func (b *APIBackend) GetElectedValidatorAddresses() []common.Address {
 	list, _ := b.hmy.BlockChain.ReadShardState(b.hmy.BlockChain.CurrentBlock().Epoch())
 	return list.StakedValidators().Addrs
 }
 
+// FIXME:done
 // GetAllValidatorAddresses returns the up to date validator candidates for next epoch
 func (b *APIBackend) GetAllValidatorAddresses() []common.Address {
 	return b.hmy.BlockChain.ValidatorCandidates()
 }
 
-var (
-	zero = numeric.ZeroDec()
-)
-
+// FIXME:done
 // GetValidatorInformation returns the information of validator
 func (b *APIBackend) GetValidatorInformation(
 	addr common.Address, block *types.Block,
@@ -543,6 +573,7 @@ func (b *APIBackend) GetValidatorInformation(
 	return defaultReply, nil
 }
 
+// FIXME:done
 // GetMedianRawStakeSnapshot ..
 func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
@@ -568,6 +599,7 @@ func (b *APIBackend) GetMedianRawStakeSnapshot() (
 	return res.(*committee.CompletedEPoSRound), nil
 }
 
+// FIXME:done
 // GetLatestChainHeaders ..
 func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
 	return &block.HeaderPair{
@@ -576,6 +608,7 @@ func (b *APIBackend) GetLatestChainHeaders() *block.HeaderPair {
 	}
 }
 
+// TODO: better implementation of GetTotalStakingSnapshot()...
 // GetTotalStakingSnapshot ..
 func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	b.TotalStakingCache.Lock()
@@ -607,6 +640,7 @@ func (b *APIBackend) GetTotalStakingSnapshot() *big.Int {
 	return b.TotalStakingCache.TotalStaking
 }
 
+// FIXME:done
 // GetDelegationsByValidator returns all delegation information of a validator
 func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*staking.Delegation {
 	wrapper, err := b.hmy.BlockChain.ReadValidatorInformation(validator)
@@ -620,6 +654,7 @@ func (b *APIBackend) GetDelegationsByValidator(validator common.Address) []*stak
 	return delegations
 }
 
+// FIXME:done
 // GetDelegationsByDelegatorByBlock returns all delegation information of a delegator
 func (b *APIBackend) GetDelegationsByDelegatorByBlock(
 	delegator common.Address, block *types.Block,
@@ -650,6 +685,7 @@ func (b *APIBackend) GetDelegationsByDelegatorByBlock(
 	return addresses, delegations
 }
 
+// FIXME:done
 // GetDelegationsByDelegator returns all delegation information of a delegator
 func (b *APIBackend) GetDelegationsByDelegator(
 	delegator common.Address,
@@ -658,6 +694,7 @@ func (b *APIBackend) GetDelegationsByDelegator(
 	return b.GetDelegationsByDelegatorByBlock(delegator, block)
 }
 
+// FIXME:done
 // GetValidatorSelfDelegation returns the amount of staking after applying all delegated stakes
 func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 	wrapper, err := b.hmy.BlockChain.ReadValidatorInformation(addr)
@@ -670,31 +707,37 @@ func (b *APIBackend) GetValidatorSelfDelegation(addr common.Address) *big.Int {
 	return wrapper.Delegations[0].Amount
 }
 
+// FIXME:done
 // GetShardState ...
 func (b *APIBackend) GetShardState() (*shard.State, error) {
 	return b.hmy.BlockChain.ReadShardState(b.hmy.BlockChain.CurrentHeader().Epoch())
 }
 
+// FIXME:done
 // GetCurrentStakingErrorSink ..
 func (b *APIBackend) GetCurrentStakingErrorSink() types.TransactionErrorReports {
 	return b.hmy.NodeAPI.ReportStakingErrorSink()
 }
 
+// FIXME:done
 // GetCurrentTransactionErrorSink ..
 func (b *APIBackend) GetCurrentTransactionErrorSink() types.TransactionErrorReports {
 	return b.hmy.NodeAPI.ReportPlainErrorSink()
 }
 
+// FIXME:done
 // GetPendingCXReceipts ..
 func (b *APIBackend) GetPendingCXReceipts() []*types.CXReceiptsProof {
 	return b.hmy.NodeAPI.PendingCXReceipts()
 }
 
+// FIXME: done
 // GetCurrentUtilityMetrics ..
 func (b *APIBackend) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	return network.NewUtilityMetricSnapshot(b.hmy.BlockChain)
 }
 
+// FIXME: done
 func (b *APIBackend) readAndUpdateRawStakes(
 	epoch *big.Int,
 	decider quorum.Decider,
@@ -730,6 +773,7 @@ func (b *APIBackend) readAndUpdateRawStakes(
 	return rawStakes
 }
 
+// FIXME:done
 func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain.CurrentHeader().Epoch()
 	thenE := new(big.Int).Sub(nowE, common.Big1)
@@ -790,6 +834,7 @@ func (b *APIBackend) getSuperCommittees() (*quorum.Transition, error) {
 	return &quorum.Transition{then, now}, nil
 }
 
+// FIXME:done
 // GetSuperCommittees ..
 func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	nowE := b.hmy.BlockChain.CurrentHeader().Epoch()
@@ -808,11 +853,13 @@ func (b *APIBackend) GetSuperCommittees() (*quorum.Transition, error) {
 	return res.(*quorum.Transition), err
 }
 
+// FIXME:done
 // GetCurrentBadBlocks ..
 func (b *APIBackend) GetCurrentBadBlocks() []core.BadBlock {
 	return b.hmy.BlockChain.BadBlocks()
 }
 
+// FIXME:done
 // GetLastCrossLinks ..
 func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	crossLinks := []*types.CrossLink{}
@@ -827,6 +874,7 @@ func (b *APIBackend) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	return crossLinks, nil
 }
 
+// FIXME:done
 // GetNodeMetadata ..
 func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 	cfg := nodeconfig.GetDefaultConfig()
@@ -866,6 +914,7 @@ func (b *APIBackend) GetNodeMetadata() commonRPC.NodeMetadata {
 	}
 }
 
+// FIXME:done
 // GetPeerInfo returns the peer info to the node, including blocked peer, connected peer, number of peers
 func (b *APIBackend) GetPeerInfo() commonRPC.NodePeerInfo {
 
@@ -886,6 +935,7 @@ func (b *APIBackend) GetPeerInfo() commonRPC.NodePeerInfo {
 	}
 }
 
+// FIXME:done
 // GetBlockSigners ..
 func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *internal_bls.Mask, error) {
 	block, err := b.BlockByNumber(ctx, blockNr)
@@ -917,11 +967,13 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 	return committee.Slots, mask, nil
 }
 
+// FIXME:done
 // IsStakingEpoch ...
 func (b *APIBackend) IsStakingEpoch(epoch *big.Int) bool {
 	return b.hmy.BlockChain.Config().IsStaking(epoch)
 }
 
+// FIXME:done
 // GetLeaderAddress returns the one address of the leader
 func (b *APIBackend) GetLeaderAddress(a common.Address, e *big.Int) string {
 	if b.IsStakingEpoch(e) {
