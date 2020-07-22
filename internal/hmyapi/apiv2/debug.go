@@ -4,17 +4,18 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // DebugAPI Internal JSON RPC for debugging purpose
 type DebugAPI struct {
-	b Backend
+	hmy *hmy.Harmony
 }
 
 // NewDebugAPI Creates a new DebugAPI instance
-func NewDebugAPI(b Backend) *DebugAPI {
-	return &DebugAPI{b}
+func NewDebugAPI(hmy *hmy.Harmony) *DebugAPI {
+	return &DebugAPI{hmy}
 }
 
 // SetLogVerbosity Sets log verbosity on runtime
