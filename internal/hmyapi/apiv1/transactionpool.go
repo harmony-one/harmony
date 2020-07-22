@@ -105,7 +105,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 // GetTransactionByHash returns the plain transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) *RPCTransaction {
 	// Try to return an already finalized transaction
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.hmy.ChainDb, hash)
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	block, _ := s.hmy.GetBlock(ctx, blockHash)
 	if block == nil {
 		return nil
@@ -120,7 +120,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 // GetStakingTransactionByHash returns the staking transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetStakingTransactionByHash(ctx context.Context, hash common.Hash) *RPCStakingTransaction {
 	// Try to return an already finalized transaction
-	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.hmy.ChainDb, hash)
+	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
 	block, _ := s.hmy.GetBlock(ctx, blockHash)
 	if block == nil {
 		return nil
@@ -282,9 +282,9 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	var stx *staking.StakingTransaction
 	var blockHash common.Hash
 	var blockNumber, index uint64
-	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(s.hmy.ChainDb, hash)
+	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	if tx == nil {
-		stx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb, hash)
+		stx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
 		if stx == nil {
 			return nil, nil
 		}
@@ -398,7 +398,7 @@ func (s *PublicTransactionPoolAPI) GetCurrentStakingErrorSink() types.Transactio
 func (s *PublicTransactionPoolAPI) GetCXReceiptByHash(
 	ctx context.Context, hash common.Hash,
 ) *RPCCXReceipt {
-	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb, hash); cx != nil {
+	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), hash); cx != nil {
 		return newRPCCXReceipt(cx, blockHash, blockNumber)
 	}
 	return nil

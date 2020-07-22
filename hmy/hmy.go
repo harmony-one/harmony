@@ -46,8 +46,7 @@ type Harmony struct {
 	BlockChain    *core.BlockChain
 	BeaconChain   *core.BlockChain
 	TxPool        *core.TxPool
-	// CxPool is used to store the blockHashes, where the corresponding block contains the cx receipts to be sent
-	CxPool *core.CxPool
+	CxPool        *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
 	// DB interfaces
 	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	NodeAPI      NodeAPI

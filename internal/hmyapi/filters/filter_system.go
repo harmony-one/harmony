@@ -115,7 +115,7 @@ type EventSystem struct {
 // or by stopping the given mux.
 func NewEventSystem(hmy *hmy.Harmony, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		mux:       hmy.EventMux,
+		mux:       hmy.EventMux(),
 		hmy:       hmy,
 		lightMode: lightMode,
 		install:   make(chan *subscription),
@@ -380,11 +380,11 @@ func (es *EventSystem) lightFilterNewHead(newHeader *block.Header, callBack func
 	for oldh.Hash() != newh.Hash() {
 		if oldh.Number().Uint64() >= newh.Number().Uint64() {
 			oldHeaders = append(oldHeaders, oldh)
-			oldh = rawdb.ReadHeader(es.hmy.ChainDb, oldh.ParentHash(), oldh.Number().Uint64()-1)
+			oldh = rawdb.ReadHeader(es.hmy.ChainDb(), oldh.ParentHash(), oldh.Number().Uint64()-1)
 		}
 		if oldh.Number().Uint64() < newh.Number().Uint64() {
 			newHeaders = append(newHeaders, newh)
-			newh = rawdb.ReadHeader(es.hmy.ChainDb, newh.ParentHash(), newh.Number().Uint64()-1)
+			newh = rawdb.ReadHeader(es.hmy.ChainDb(), newh.ParentHash(), newh.Number().Uint64()-1)
 			if newh == nil {
 				// happens when CHT syncing, nothing to do
 				newh = oldh

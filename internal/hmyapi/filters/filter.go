@@ -30,7 +30,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
 )
 
 // Backend provides the APIs needed for filter
@@ -53,7 +52,7 @@ type Backend interface {
 
 // Filter can be used to retrieve and filter logs.
 type Filter struct {
-	hmy *hmy.Harmony
+	backend Backend
 
 	db        ethdb.Database
 	addresses []common.Address
@@ -67,7 +66,7 @@ type Filter struct {
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(hmy *hmy.Harmony, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -86,10 +85,10 @@ func NewRangeFilter(hmy *hmy.Harmony, begin, end int64, addresses []common.Addre
 		}
 		filters = append(filters, filter)
 	}
-	size, _ := hmy.BloomStatus()
+	size, _ := backend.BloomStatus()
 
 	// Create a generic filter and convert it into a range filter
-	filter := newFilter(hmy, addresses, topics)
+	filter := newFilter(backend, addresses, topics)
 
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
@@ -100,18 +99,18 @@ func NewRangeFilter(hmy *hmy.Harmony, begin, end int64, addresses []common.Addre
 
 // NewBlockFilter creates a new filter which directly inspects the contents of
 // a block to figure out whether it is interesting or not.
-func NewBlockFilter(hmy *hmy.Harmony, block common.Hash, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewBlockFilter(backend Backend, block common.Hash, addresses []common.Address, topics [][]common.Hash) *Filter {
 	// Create a generic filter and convert it into a block filter
-	filter := newFilter(hmy, addresses, topics)
+	filter := newFilter(backend, addresses, topics)
 	filter.block = block
 	return filter
 }
 
 // newFilter creates a generic filter that can either filter based on a block hash,
 // or based on range queries. The search criteria needs to be explicitly set.
-func newFilter(hmy *hmy.Harmony, addresses []common.Address, topics [][]common.Hash) *Filter {
+func newFilter(hmy Backend, addresses []common.Address, topics [][]common.Hash) *Filter {
 	return &Filter{
-		hmy:       hmy,
+		backend:   hmy,
 		addresses: addresses,
 		topics:    topics,
 	}
@@ -122,7 +121,7 @@ func newFilter(hmy *hmy.Harmony, addresses []common.Address, topics [][]common.H
 func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	// If we're doing singleton block filtering, execute and return
 	if f.block != (common.Hash{}) {
-		header, err := f.hmy.HeaderByHash(ctx, f.block)
+		header, err := f.backend.HeaderByHash(ctx, f.block)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +131,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 	// Figure out the limits of the filter range
-	header, _ := f.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if header == nil {
 		return nil, nil
 	}
@@ -150,7 +149,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		logs []*types.Log
 		err  error
 	)
-	size, sections := f.hmy.BloomStatus()
+	size, sections := f.backend.BloomStatus()
 	if indexed := sections * size; indexed > uint64(f.begin) {
 		if indexed > end {
 			logs, err = f.indexedLogs(ctx, end)
@@ -178,7 +177,7 @@ func (f *Filter) indexedLogs(ctx context.Context, end uint64) ([]*types.Log, err
 	}
 	defer session.Close()
 
-	f.hmy.ServiceFilter(ctx, session)
+	f.backend.ServiceFilter(ctx, session)
 
 	// Iterate over the matches until exhausted or context closed
 	var logs []*types.Log
@@ -197,7 +196,7 @@ func (f *Filter) indexedLogs(ctx context.Context, end uint64) ([]*types.Log, err
 			f.begin = int64(number) + 1
 
 			// Retrieve the suggested block and pull any truly matching logs
-			header, err := f.hmy.HeaderByNumber(ctx, rpc.BlockNumber(number))
+			header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(number))
 			if header == nil || err != nil {
 				return logs, err
 			}
@@ -219,7 +218,7 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 	var logs []*types.Log
 
 	for ; f.begin <= int64(end); f.begin++ {
-		header, err := f.hmy.HeaderByNumber(ctx, rpc.BlockNumber(f.begin))
+		header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(f.begin))
 		if header == nil || err != nil {
 			return logs, err
 		}
@@ -248,7 +247,7 @@ func (f *Filter) blockLogs(ctx context.Context, header *block.Header) (logs []*t
 // match the filter criteria. This function is called when the bloom filter signals a potential match.
 func (f *Filter) checkMatches(ctx context.Context, header *block.Header) (logs []*types.Log, err error) {
 	// Get the logs of the block
-	logsList, err := f.hmy.GetLogs(ctx, header.Hash())
+	logsList, err := f.backend.GetLogs(ctx, header.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +259,7 @@ func (f *Filter) checkMatches(ctx context.Context, header *block.Header) (logs [
 	if len(logs) > 0 {
 		// We have matching logs, check if we need to resolve full logs via the light client
 		if logs[0].TxHash == (common.Hash{}) {
-			receipts, err := f.hmy.GetReceipts(ctx, header.Hash())
+			receipts, err := f.backend.GetReceipts(ctx, header.Hash())
 			if err != nil {
 				return nil, err
 			}
