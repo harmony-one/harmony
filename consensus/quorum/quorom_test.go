@@ -3,7 +3,6 @@ package quorum
 import (
 	"testing"
 
-	"github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
@@ -48,11 +47,13 @@ func TestAddingQuoromParticipants(t *testing.T) {
 
 	assert.Equal(t, int64(0), decider.ParticipantsCount())
 
-	blsKeys := []*bls.PublicKey{}
+	blsKeys := []harmony_bls.PublicKeyWrapper{}
 	keyCount := int64(5)
 	for i := int64(0); i < keyCount; i++ {
 		blsKey := harmony_bls.RandPrivateKey()
-		blsKeys = append(blsKeys, blsKey.GetPublicKey())
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		blsKeys = append(blsKeys, wrapper)
 	}
 
 	decider.UpdateParticipants(blsKeys)

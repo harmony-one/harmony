@@ -144,17 +144,12 @@ func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
-	pubKeys := mask.Publics
-	w := bls.SerializedPublicKey{}
 	currentTotal := numeric.ZeroDec()
 
-	for i := range pubKeys {
-		if err := w.FromLibBLSPublicKey(pubKeys[i]); err != nil {
-			return nil
-		}
-		if enabled, err := mask.KeyEnabled(pubKeys[i]); err == nil && enabled {
+	for key, i := range mask.PublicsIndex {
+		if enabled, err := mask.IndexEnabled(i); err == nil && enabled {
 			currentTotal = currentTotal.Add(
-				v.roster.Voters[w].OverallPercent,
+				v.roster.Voters[key].OverallPercent,
 			)
 		}
 	}

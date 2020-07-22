@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -900,9 +899,10 @@ func (b *APIBackend) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumbe
 	if err != nil {
 		return nil, nil, err
 	}
-	pubkeys := make([]*bls_core.PublicKey, len(committee.Slots))
-	for i, validator := range committee.Slots {
-		if pubkeys[i], err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
+	pubkeys := make([]internal_bls.PublicKeyWrapper, len(committee.Slots))
+	for _, validator := range committee.Slots {
+		wrapper := internal_bls.PublicKeyWrapper{Bytes: validator.BLSPublicKey}
+		if wrapper.Object, err = bls.BytesToBLSPublicKey(wrapper.Bytes[:]); err != nil {
 			return nil, nil, err
 		}
 	}

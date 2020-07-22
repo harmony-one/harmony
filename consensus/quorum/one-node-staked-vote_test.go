@@ -54,7 +54,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	sKeys := map[string]secretKeyMap{}
 	sKeys[hmy] = secretKeyMap{}
 	sKeys[reg] = secretKeyMap{}
-	pubKeys := []*bls_core.PublicKey{}
+	pubKeys := []bls.PublicKeyWrapper{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
@@ -65,7 +65,9 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 			sKeys[reg][newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
-		pubKeys = append(pubKeys, sKey.GetPublicKey())
+		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		pubKeys = append(pubKeys, wrapper)
 	}
 
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
@@ -83,7 +85,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	slotList := shard.SlotList{}
 	sKeys := secretKeyMap{}
-	pubKeys := []*bls_core.PublicKey{}
+	pubKeys := []bls.PublicKeyWrapper{}
 
 	for i := 0; i < quorumNodes; i++ {
 		newSlot, sKey := generateRandomSlot()
@@ -92,7 +94,9 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 			sKeys[newSlot.BLSPublicKey] = sKey
 		}
 		slotList = append(slotList, newSlot)
-		pubKeys = append(pubKeys, sKey.GetPublicKey())
+		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		pubKeys = append(pubKeys, wrapper)
 	}
 
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)

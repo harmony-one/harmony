@@ -67,6 +67,7 @@ func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 type Mask struct {
 	Bitmap          []byte
 	Publics         []*bls.PublicKey
+	PublicsIndex    map[SerializedPublicKey]int
 	AggregatePublic *bls.PublicKey
 }
 
@@ -74,20 +75,24 @@ type Mask struct {
 // cosigners are disabled by default. If a public key is given it verifies that
 // it is present in the list of keys and sets the corresponding index in the
 // bitmask to 1 (enabled).
-func NewMask(publics []*bls.PublicKey, myKey *bls.PublicKey) (*Mask, error) {
+func NewMask(publics []PublicKeyWrapper, myKey *PublicKeyWrapper) (*Mask, error) {
+	index := map[SerializedPublicKey]int{}
+	publicKeys := make([]*bls.PublicKey, len(publics))
+	for i, key := range publics {
+		publicKeys[i] = key.Object
+		index[key.Bytes] = i
+	}
 	m := &Mask{
-		Publics: publics,
+		Publics:      publicKeys,
+		PublicsIndex: index,
 	}
 	m.Bitmap = make([]byte, m.Len())
 	m.AggregatePublic = &bls.PublicKey{}
 	if myKey != nil {
-		found := false
-		for i, key := range publics {
-			if key.IsEqual(myKey) {
-				m.SetBit(i, true)
-				found = true
-				break
-			}
+		i, found := m.PublicsIndex[myKey.Bytes]
+		if found {
+			m.SetBit(i, true)
+			found = true
 		}
 		if !found {
 			return nil, errors.New("key not found")
@@ -191,21 +196,19 @@ func (m *Mask) IndexEnabled(i int) (bool, error) {
 
 // KeyEnabled checks whether the index, corresponding to the given key, is
 // enabled in the Bitmap or not.
-func (m *Mask) KeyEnabled(public *bls.PublicKey) (bool, error) {
-	for i, key := range m.Publics {
-		if key.IsEqual(public) {
-			return m.IndexEnabled(i)
-		}
+func (m *Mask) KeyEnabled(public SerializedPublicKey) (bool, error) {
+	i, found := m.PublicsIndex[public]
+	if found {
+		return m.IndexEnabled(i)
 	}
 	return false, errors.New("key not found")
 }
 
 // SetKey set the bit in the Bitmap for the given cosigner
-func (m *Mask) SetKey(public *bls.PublicKey, enable bool) error {
-	for i, key := range m.Publics {
-		if key.IsEqual(public) {
-			return m.SetBit(i, enable)
-		}
+func (m *Mask) SetKey(public SerializedPublicKey, enable bool) error {
+	i, found := m.PublicsIndex[public]
+	if found {
+		return m.SetBit(i, enable)
 	}
 	return errors.New("key not found")
 }
