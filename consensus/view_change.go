@@ -216,7 +216,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M1 type messaage")
 			msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 			for i, key := range consensus.priKey {
-				if err := consensus.bhpBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
+				if err := consensus.bhpBitmap[recvMsg.ViewID].SetKey(key.Pub.Bytes, true); err != nil {
 					consensus.getLogger().Warn().Msgf("[onViewChange] bhpBitmap setkey failed for key at index %d", i)
 					continue
 				}
@@ -229,7 +229,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		} else {
 			consensus.getLogger().Debug().Msg("[onViewChange] add my M2(NIL) type messaage")
 			for i, key := range consensus.priKey {
-				if err := consensus.nilBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
+				if err := consensus.nilBitmap[recvMsg.ViewID].SetKey(key.Pub.Bytes, true); err != nil {
 					consensus.getLogger().Warn().Msgf("[onViewChange] nilBitmap setkey failed for key at index %d", i)
 					continue
 				}
@@ -243,7 +243,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 		for i, key := range consensus.priKey {
-			if err := consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key.Pub.Object, true); err != nil {
+			if err := consensus.viewIDBitmap[recvMsg.ViewID].SetKey(key.Pub.Bytes, true); err != nil {
 				consensus.getLogger().Warn().Msgf("[onViewChange] viewIDBitmap setkey failed for key at index %d", i)
 				continue
 			}
@@ -283,7 +283,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Str("validatorPubKey", senderKey.Bytes.Hex()).
 			Msg("[onViewChange] Add M2 (NIL) type message")
 		consensus.nilSigs[recvMsg.ViewID][senderKey.Bytes.Hex()] = recvMsg.ViewchangeSig
-		consensus.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Object, true) // Set the bitmap indicating that this validator signed.
+		consensus.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Bytes, true) // Set the bitmap indicating that this validator signed.
 	} else { // m1 type message
 		if consensus.BlockVerifier(preparedBlock); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] Prepared block verification failed")
@@ -354,7 +354,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Str("validatorPubKey", senderKey.Bytes.Hex()).
 			Msg("[onViewChange] Add M1 (prepared) type message")
 		consensus.bhpSigs[recvMsg.ViewID][senderKey.Bytes.Hex()] = recvMsg.ViewchangeSig
-		consensus.bhpBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Object, true) // Set the bitmap indicating that this validator signed.
+		consensus.bhpBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Bytes, true) // Set the bitmap indicating that this validator signed.
 	}
 
 	// check and add viewID (m3 type) message signature
@@ -378,7 +378,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	consensus.viewIDSigs[recvMsg.ViewID][senderKey.Bytes.Hex()] = recvMsg.ViewidSig
 	// Set the bitmap indicating that this validator signed.
-	consensus.viewIDBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Object, true)
+	consensus.viewIDBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Bytes, true)
 	consensus.getLogger().Debug().
 		Int("have", len(consensus.viewIDSigs[recvMsg.ViewID])).
 		Int64("total", consensus.Decider.ParticipantsCount()).
@@ -422,7 +422,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 			for i, key := range consensus.priKey {
-				if err := consensus.commitBitmap.SetKey(key.Pub.Object, true); err != nil {
+				if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
 					consensus.getLogger().Warn().
 						Msgf("[OnViewChange] New Leader commit bitmap set failed for key at index %d", i)
 					continue

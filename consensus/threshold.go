@@ -51,7 +51,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	// so by this point, everyone has committed to the blockhash of this block
 	// in prepare and so this is the actual block.
 	for i, key := range consensus.priKey {
-		if err := consensus.commitBitmap.SetKey(key.Pub.Object, true); err != nil {
+		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
 			consensus.getLogger().Warn().Msgf("[OnPrepare] Leader commit bitmap set failed for key at index %d", i)
 			continue
 		}

@@ -9,11 +9,14 @@ import (
 
 // Test the basic functionality of a BLS multi-sig mask.
 func TestNewMask(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
-	pubKey3 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
 
 	if err != nil {
 		test.Errorf("Failed to create a new Mask: %s", err)
@@ -23,7 +26,7 @@ func TestNewMask(test *testing.T) {
 		test.Errorf("Mask created with wrong size: %d", mask.Len())
 	}
 
-	enabled, err := mask.KeyEnabled(pubKey1)
+	enabled, err := mask.KeyEnabled(pubKey1.Bytes)
 	if !enabled || err != nil {
 		test.Errorf("My key pubKey1 should have been enabled: %s", err)
 	}
@@ -38,12 +41,17 @@ func TestNewMask(test *testing.T) {
 }
 
 func TestNewMaskWithAbsentPublicKey(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
-	pubKey3 := RandPrivateKey().GetPublicKey()
-	pubKey4 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey4 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey4)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	pubKey4.Bytes.FromLibBLSPublicKey(pubKey4.Object)
+
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey4)
 
 	if err == nil {
 		test.Errorf("Failed to create a new Mask: %s", err)
@@ -56,11 +64,14 @@ func TestNewMaskWithAbsentPublicKey(test *testing.T) {
 }
 
 func TestThreshHoldPolicy(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
-	pubKey3 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
 
 	if err != nil {
 		test.Errorf("Failed to create a new Mask: %s", err)
@@ -72,8 +83,8 @@ func TestThreshHoldPolicy(test *testing.T) {
 
 	threshHoldPolicy := *NewThresholdPolicy(1)
 
-	mask.SetKey(pubKey1, true)
-	mask.SetKey(pubKey2, true)
+	mask.SetKey(pubKey1.Bytes, true)
+	mask.SetKey(pubKey2.Bytes, true)
 
 	if mask.CountEnabled() != 2 {
 		test.Errorf("Number of enabled nodes: %d , expected count = 2 ", mask.CountEnabled())
@@ -83,8 +94,8 @@ func TestThreshHoldPolicy(test *testing.T) {
 		test.Error("Number of enabled nodes less than threshold")
 	}
 
-	mask.SetKey(pubKey1, false)
-	mask.SetKey(pubKey2, false)
+	mask.SetKey(pubKey1.Bytes, false)
+	mask.SetKey(pubKey2.Bytes, false)
 
 	if threshHoldPolicy.Check(mask) {
 		test.Error("Number of enabled nodes more than equal to threshold")
@@ -92,11 +103,14 @@ func TestThreshHoldPolicy(test *testing.T) {
 }
 
 func TestCompletePolicy(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
-	pubKey3 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
 
 	if err != nil {
 		test.Errorf("Failed to create a new Mask: %s", err)
@@ -108,9 +122,9 @@ func TestCompletePolicy(test *testing.T) {
 
 	completePolicy := CompletePolicy{}
 
-	mask.SetKey(pubKey1, true)
-	mask.SetKey(pubKey2, true)
-	mask.SetKey(pubKey3, true)
+	mask.SetKey(pubKey1.Bytes, true)
+	mask.SetKey(pubKey2.Bytes, true)
+	mask.SetKey(pubKey3.Bytes, true)
 
 	if mask.CountEnabled() != 3 {
 		test.Errorf("Number of enabled nodes: %d , expected count = 3 ", mask.CountEnabled())
@@ -120,7 +134,7 @@ func TestCompletePolicy(test *testing.T) {
 		test.Error("Number of enabled nodes not equal to total count")
 	}
 
-	mask.SetKey(pubKey1, false)
+	mask.SetKey(pubKey1.Bytes, false)
 
 	if completePolicy.Check(mask) {
 		test.Error("Number of enabled nodes equal to total count")
@@ -161,12 +175,16 @@ func TestAggregateMasks(test *testing.T) {
 }
 
 func TestEnableKeyFunctions(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
-	pubKey3 := RandPrivateKey().GetPublicKey()
-	pubKey4 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey4 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, err := NewMask([]*bls.PublicKey{pubKey1, pubKey2, pubKey3}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	pubKey4.Bytes.FromLibBLSPublicKey(pubKey4.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
 
 	if err != nil {
 		test.Errorf("Failed to create a new Mask: %s", err)
@@ -197,7 +215,7 @@ func TestEnableKeyFunctions(test *testing.T) {
 		test.Error("Count of disabled keys don't match")
 	}
 
-	if _, error := mask.KeyEnabled(pubKey4); error == nil {
+	if _, error := mask.KeyEnabled(pubKey4.Bytes); error == nil {
 		test.Error("Expected key not found error")
 	}
 
@@ -205,16 +223,18 @@ func TestEnableKeyFunctions(test *testing.T) {
 		test.Error("Expected index out of range error")
 	}
 
-	if err := mask.SetKey(pubKey4, true); err == nil {
+	if err := mask.SetKey(pubKey4.Bytes, true); err == nil {
 		test.Error("Expected key nout found error")
 	}
 }
 
 func TestCopyParticipatingMask(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, _ := NewMask([]*bls.PublicKey{pubKey1, pubKey2}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	mask, _ := NewMask([]PublicKeyWrapper{pubKey1, pubKey2}, &pubKey1)
 
 	clonedMask := mask.Mask()
 
@@ -225,10 +245,12 @@ func TestCopyParticipatingMask(test *testing.T) {
 }
 
 func TestSetMask(test *testing.T) {
-	pubKey1 := RandPrivateKey().GetPublicKey()
-	pubKey2 := RandPrivateKey().GetPublicKey()
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
 
-	mask, _ := NewMask([]*bls.PublicKey{pubKey1, pubKey2}, pubKey1)
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	mask, _ := NewMask([]PublicKeyWrapper{pubKey1, pubKey2}, &pubKey1)
 
 	_ = mask
 	maskBytes := []byte{3}

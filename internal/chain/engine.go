@@ -5,8 +5,9 @@ import (
 	"math/big"
 	"sort"
 
+	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -79,7 +80,7 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 // ReadPublicKeysFromLastBlock finds the public keys of last block's committee
 func ReadPublicKeysFromLastBlock(
 	bc engine.ChainReader, header *block.Header,
-) ([]*bls.PublicKey, error) {
+) ([]harmony_bls.PublicKeyWrapper, error) {
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
 	return GetPublicKeys(bc, parentHeader, false)
 }
@@ -516,7 +517,7 @@ func (e *engineImpl) VerifyHeaderWithSignature(chain engine.ChainReader, header 
 // GetPublicKeys finds the public keys of the committee that signed the block header
 func GetPublicKeys(
 	chain engine.ChainReader, header *block.Header, reCalculate bool,
-) ([]*bls.PublicKey, error) {
+) ([]harmony_bls.PublicKeyWrapper, error) {
 	if header == nil {
 		return nil, errors.New("nil header provided")
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -268,11 +267,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNum rpc.
 		if err != nil {
 			return nil, err
 		}
-		blsPublicKey := new(bls_core.PublicKey)
-		if blsPublicKey, err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
-			return nil, err
-		}
-		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
 			signers = append(signers, oneAddress)
 		}
 	}
@@ -293,11 +288,7 @@ func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNum r
 	}
 	signers := []string{}
 	for _, validator := range slots {
-		blsPublicKey := new(bls_core.PublicKey)
-		if blsPublicKey, err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
-			return nil, err
-		}
-		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
 			signers = append(signers, validator.BLSPublicKey.Hex())
 		}
 	}
@@ -324,11 +315,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNum rpc.Bl
 		if oneAddress != address {
 			continue
 		}
-		blsPublicKey := new(bls_core.PublicKey)
-		if blsPublicKey, err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
-			return false, err
-		}
-		if ok, err := mask.KeyEnabled(blsPublicKey); err == nil && ok {
+		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
 			return true, nil
 		}
 	}

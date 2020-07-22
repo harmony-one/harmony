@@ -10,7 +10,7 @@ import (
 )
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
-func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []*bls_core.PublicKey) (*bls_core.Sign, *bls.Mask, error) {
+func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
 	if len(recvPayload) < 96 {
 		return nil, nil, errors.New("payload not have enough length")
 	}

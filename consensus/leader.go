@@ -60,7 +60,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	for i, key := range consensus.priKey {
-		if err := consensus.prepareBitmap.SetKey(key.Pub.Object, true); err != nil {
+		if err := consensus.prepareBitmap.SetKey(key.Pub.Bytes, true); err != nil {
 			consensus.getLogger().Warn().Err(err).Msgf(
 				"[Announce] Leader prepareBitmap SetKey failed for key at index %d", i,
 			)
@@ -191,7 +191,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
-	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey.Object, true); err != nil {
+	if err := prepareBitmap.SetKey(recvMsg.SenderPubkey.Bytes, true); err != nil {
 		consensus.prepareMutex.Unlock()
 		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
 		return
@@ -295,7 +295,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
-	if err := commitBitmap.SetKey(recvMsg.SenderPubkey.Object, true); err != nil {
+	if err := commitBitmap.SetKey(recvMsg.SenderPubkey.Bytes, true); err != nil {
 		consensus.commitMutex.Unlock()
 		consensus.getLogger().Warn().Err(err).
 			Msg("[OnCommit] commitBitmap.SetKey failed")

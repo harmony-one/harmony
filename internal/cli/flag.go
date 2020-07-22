@@ -1,0 +1,93 @@
+// cli is the module for customized cli structures for cobra command.
+// The module is a wrapper over spf13/pflag, and serve to clean the code structure.
+
+package cli
+
+import "github.com/spf13/pflag"
+
+// Flag is the interface for cli flags.
+// To get the value after cli parsing, use fs.GetString(flag.Name)
+type Flag interface {
+	RegisterTo(fs *pflag.FlagSet) error
+}
+
+// StringFlag is the flag with string value
+type StringFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue string
+}
+
+// RegisterTo register the string flag to FlagSet
+func (f StringFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.StringP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
+// BoolFlag is the flag with boolean value
+type BoolFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue bool
+}
+
+// RegisterTo register the boolean flag to FlagSet
+func (f BoolFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.BoolP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
+// IntFlag is the flag with int value
+type IntFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue int
+}
+
+// RegisterTo register the int flag to FlagSet
+func (f IntFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.IntP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
+// StringSliceFlag is the flag with string slice value
+type StringSliceFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue []string
+}
+
+// RegisterTo register the string slice flag to FlagSet
+func (f StringSliceFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.StringSliceP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
+func markHiddenOrDeprecated(fs *pflag.FlagSet, name string, deprecated string, hidden bool) error {
+	if len(deprecated) != 0 {
+		if err := fs.MarkDeprecated(name, deprecated); err != nil {
+			return err
+		}
+	} else if hidden {
+		if err := fs.MarkHidden(name); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -91,10 +91,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 
 	// According to RJ these failures are benign.
-	if err := consensus.prepareBitmap.SetKey(leaderPubKey, true); err != nil {
+	if err := consensus.prepareBitmap.SetKey(leaderKey, true); err != nil {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
-	if err := consensus.prepareBitmap.SetKey(validatorPubKey, true); err != nil {
+	if err := consensus.prepareBitmap.SetKey(validatorKey, true); err != nil {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
 
