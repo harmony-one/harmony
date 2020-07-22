@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
 	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
@@ -89,57 +90,57 @@ type Backend interface {
 }
 
 // GetAPIs returns all the APIs.
-func GetAPIs(b Backend) []rpc.API {
+func GetAPIs(hmy *hmy.Harmony) []rpc.API {
 	nonceLock := new(apiv1.AddrLocker)
 	nonceLockV2 := new(apiv2.AddrLocker)
 	return []rpc.API{
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicHarmonyAPI(b),
+			Service:   apiv1.NewPublicHarmonyAPI(hmy),
 			Public:    true,
 		},
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicBlockChainAPI(b),
+			Service:   apiv1.NewPublicBlockChainAPI(hmy),
 			Public:    true,
 		},
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicTransactionPoolAPI(b, nonceLock),
+			Service:   apiv1.NewPublicTransactionPoolAPI(hmy, nonceLock),
 			Public:    true,
 		},
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   apiv1.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
+			Service:   apiv1.NewDebugAPI(hmy),
+			Public:    false,
 		},
 		{
 			Namespace: "hmyv2",
 			Version:   "1.0",
-			Service:   apiv2.NewPublicHarmonyAPI(b),
+			Service:   apiv2.NewPublicHarmonyAPI(hmy),
 			Public:    true,
 		},
 		{
 			Namespace: "hmyv2",
 			Version:   "1.0",
-			Service:   apiv2.NewPublicBlockChainAPI(b),
+			Service:   apiv2.NewPublicBlockChainAPI(hmy),
 			Public:    true,
 		},
 		{
 			Namespace: "hmyv2",
 			Version:   "1.0",
-			Service:   apiv2.NewPublicTransactionPoolAPI(b, nonceLockV2),
+			Service:   apiv2.NewPublicTransactionPoolAPI(hmy, nonceLockV2),
 			Public:    true,
 		},
 		{
 			Namespace: "hmyv2",
 			Version:   "1.0",
-			Service:   apiv2.NewDebugAPI(b),
-			Public:    true, // FIXME: change to false once IPC implemented
+			Service:   apiv2.NewDebugAPI(hmy),
+			Public:    false,
 		},
 	}
 }
