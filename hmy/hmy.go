@@ -47,10 +47,8 @@ type Harmony struct {
 	BeaconChain   *core.BlockChain
 	TxPool        *core.TxPool
 	// CxPool is used to store the blockHashes, where the corresponding block contains the cx receipts to be sent
-	CxPool   *core.CxPool
-	EventMux *event.TypeMux
+	CxPool *core.CxPool
 	// DB interfaces
-	ChainDb      ethdb.Database     // Block chain database
 	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	NodeAPI      NodeAPI
 	// ChainID is used to identify which network we are using
@@ -60,6 +58,8 @@ type Harmony struct {
 	ShardID   uint32
 
 	// Internals
+	eventMux *event.TypeMux
+	chainDb  ethdb.Database // Block chain database
 	// group for units of work which can be executed with duplicate suppression.
 	group singleflight.Group
 	// leaderCache to save on recomputation every epoch.
@@ -104,8 +104,8 @@ func New(
 		BeaconChain:     nodeAPI.Beaconchain(),
 		TxPool:          txPool,
 		CxPool:          cxPool,
-		EventMux:        new(event.TypeMux),
-		ChainDb:         chainDb,
+		eventMux:        new(event.TypeMux),
+		chainDb:         chainDb,
 		NodeAPI:         nodeAPI,
 		ChainID:         nodeAPI.Blockchain().Config().ChainID.Uint64(),
 		ShardID:         shardID,
@@ -183,6 +183,16 @@ func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.D
 	vmError := func() error { return nil }
 	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain, nil)
 	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), vmError, nil
+}
+
+// ChainDb ..
+func (hmy *Harmony) ChainDb() ethdb.Database {
+	return hmy.chainDb
+}
+
+// EventMux ..
+func (hmy *Harmony) EventMux() *event.TypeMux {
+	return hmy.eventMux
 }
 
 // BloomStatus ...

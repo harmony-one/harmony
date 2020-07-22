@@ -12,7 +12,7 @@ import (
 
 // SendTx ...
 func (hmy *Harmony) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	tx, _, _, _ := rawdb.ReadTransaction(hmy.ChainDb, signedTx.Hash())
+	tx, _, _, _ := rawdb.ReadTransaction(hmy.chainDb, signedTx.Hash())
 	if tx == nil {
 		return hmy.NodeAPI.AddPendingTransaction(signedTx)
 	}

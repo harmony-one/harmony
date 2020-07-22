@@ -127,7 +127,7 @@ func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
 
 // SendStakingTx adds a staking transaction
 func (hmy *Harmony) SendStakingTx(ctx context.Context, signedStakingTx *staking.StakingTransaction) error {
-	stx, _, _, _ := rawdb.ReadStakingTransaction(hmy.ChainDb, signedStakingTx.Hash())
+	stx, _, _, _ := rawdb.ReadStakingTransaction(hmy.chainDb, signedStakingTx.Hash())
 	if stx == nil {
 		return hmy.NodeAPI.AddPendingStakingTransaction(signedStakingTx)
 	}
