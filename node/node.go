@@ -919,7 +919,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if node.Consensus.GetPublicKeys().Contains(key) {
+		if node.Consensus.GetPublicKeys().Contains(key.Object) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).

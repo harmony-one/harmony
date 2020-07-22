@@ -73,7 +73,7 @@ type ParticipantTracker interface {
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
 	NextAfter(*bls.PublicKeyWrapper) (bool, *bls.PublicKeyWrapper)
-	UpdateParticipants(pubKeys []*bls_core.PublicKey)
+	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
 }
 
 // SignatoryTracker ..
@@ -202,17 +202,12 @@ func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) UpdateParticipants(pubKeys []*bls_core.PublicKey) {
-	keys := make([]bls.PublicKeyWrapper, len(pubKeys))
+func (s *cIdentities) UpdateParticipants(pubKeys []bls.PublicKeyWrapper) {
 	keyIndexMap := map[bls.SerializedPublicKey]int{}
 	for i := range pubKeys {
-		kBytes := bls.SerializedPublicKey{}
-		kBytes.FromLibBLSPublicKey(pubKeys[i])
-
-		keys[i] = bls.PublicKeyWrapper{Object: pubKeys[i], Bytes: kBytes}
-		keyIndexMap[kBytes] = i
+		keyIndexMap[pubKeys[i].Bytes] = i
 	}
-	s.publicKeys = keys
+	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
 }
 

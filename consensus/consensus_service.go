@@ -76,7 +76,7 @@ func (consensus *Consensus) GetViewID() uint64 {
 
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls_core.PublicKey) int64 {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper) int64 {
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
@@ -84,7 +84,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []*bls_core.PublicKey) int6
 	for i := range pubKeys {
 		utils.Logger().Debug().
 			Int("index", i).
-			Str("BLSPubKey", pubKeys[i].SerializeToHexStr()).
+			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
 			Msg("Member")
 	}
 
@@ -155,12 +155,8 @@ func (consensus *Consensus) UpdateBitmaps() {
 		Str("Phase", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls_core.PublicKey{}
-	for _, key := range members {
-		publicKeys = append(publicKeys, key.Object)
-	}
-	prepareBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
-	commitBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
+	commitBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 }
@@ -265,12 +261,8 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 
 	// TODO(audit): keep a Mask in the Decider so it won't be reconstructed on the fly.
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls_core.PublicKey{}
-	for _, key := range members {
-		publicKeys = append(publicKeys, key.Object)
-	}
 	return chain.ReadSignatureBitmapByPublicKeys(
-		sigAndBitmapPayload, publicKeys,
+		sigAndBitmapPayload, members,
 	)
 }
 
@@ -474,7 +466,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	for _, key := range pubKeys {
 		// in committee
 		myPubKeys := consensus.GetPublicKeys()
-		if myPubKeys.Contains(key) {
+		if myPubKeys.Contains(key.Object) {
 			if hasError {
 				return Syncing
 			}
@@ -520,10 +512,6 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 
 func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 	members := consensus.Decider.Participants()
-	publicKeys := []*bls_core.PublicKey{}
-	for _, key := range members {
-		publicKeys = append(publicKeys, key.Object)
-	}
 	if _, ok := consensus.bhpSigs[viewID]; !ok {
 		consensus.bhpSigs[viewID] = map[string]*bls_core.Sign{}
 	}
@@ -534,15 +522,15 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 		consensus.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
 	}
 	if _, ok := consensus.bhpBitmap[viewID]; !ok {
-		bhpBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
 		consensus.bhpBitmap[viewID] = bhpBitmap
 	}
 	if _, ok := consensus.nilBitmap[viewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+		nilBitmap, _ := bls_cosi.NewMask(members, nil)
 		consensus.nilBitmap[viewID] = nilBitmap
 	}
 	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(publicKeys, nil)
+		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
 		consensus.viewIDBitmap[viewID] = viewIDBitmap
 	}
 }
