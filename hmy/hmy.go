@@ -22,6 +22,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -31,6 +32,11 @@ const (
 	BloomBitsBlocks         uint64 = 4096
 	leaderCacheSize                = 250 // Approx number of BLS keys in committee
 	totalStakeCacheDuration        = 20  // number of blocks where the returned total stake will remain the same
+)
+
+var (
+	// ErrFinalizedTransaction is returned if the transaction to be submitted is already on-chain
+	ErrFinalizedTransaction = errors.New("transaction already finalized")
 )
 
 // Harmony implements the Harmony full node service.
