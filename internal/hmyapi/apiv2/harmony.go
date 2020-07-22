@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/harmony-one/harmony/api/proto"
+	"github.com/harmony-one/harmony/hmy"
 	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -12,17 +12,17 @@ import (
 // PublicHarmonyAPI provides an API to access Harmony related information.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicHarmonyAPI struct {
-	b Backend
+	hmy *hmy.Harmony
 }
 
 // NewPublicHarmonyAPI ...
-func NewPublicHarmonyAPI(b Backend) *PublicHarmonyAPI {
-	return &PublicHarmonyAPI{b}
+func NewPublicHarmonyAPI(hmy *hmy.Harmony) *PublicHarmonyAPI {
+	return &PublicHarmonyAPI{hmy}
 }
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
 func (s *PublicHarmonyAPI) ProtocolVersion() int {
-	return proto.ProtocolVersion
+	return s.hmy.ProtocolVersion()
 }
 
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
@@ -33,7 +33,7 @@ func (s *PublicHarmonyAPI) ProtocolVersion() int {
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
 func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
-	// TODO(ricl): find our Downloader module for syncing blocks
+	// TODO(dm): find our Downloader module for syncing blocks
 	return false, nil
 }
 
@@ -60,10 +60,10 @@ type NodeMetadata struct {
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
 func (s *PublicHarmonyAPI) GetNodeMetadata() commonRPC.NodeMetadata {
-	return s.b.GetNodeMetadata()
+	return s.hmy.GetNodeMetadata()
 }
 
 // GetPeerInfo produces a NodePeerInfo record, containing peer info of the node
 func (s *PublicHarmonyAPI) GetPeerInfo() commonRPC.NodePeerInfo {
-	return s.b.GetPeerInfo()
+	return s.hmy.GetPeerInfo()
 }
