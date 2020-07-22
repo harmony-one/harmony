@@ -55,8 +55,8 @@ type Harmony struct {
 	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
 	APIBackend   *APIBackend
 	NodeAPI      NodeAPI
-	// NetVersion is used to identify which network we are using
-	NetVersion uint64
+	// ChainID is used to identify which network we are using
+	ChainID uint64
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	ShardID   uint32
@@ -94,8 +94,7 @@ type NodeAPI interface {
 // New creates a new Harmony object (including the
 // initialisation of the common Harmony object)
 func New(
-	nodeAPI NodeAPI, txPool *core.TxPool,
-	cxPool *core.CxPool, eventMux *event.TypeMux, shardID uint32,
+	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, shardID uint32,
 ) (*Harmony, error) {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	leaderCache, _ := lru.New(leaderCacheSize)
@@ -107,10 +106,10 @@ func New(
 		BeaconChain:     nodeAPI.Beaconchain(),
 		TxPool:          txPool,
 		CxPool:          cxPool,
-		EventMux:        eventMux,
+		EventMux:        new(event.TypeMux),
 		ChainDb:         chainDb,
 		NodeAPI:         nodeAPI,
-		NetVersion:      1, // TODO(dm): this should be from config
+		ChainID:         nodeAPI.Blockchain().Config().ChainID.Uint64(),
 		ShardID:         shardID,
 		leaderCache:     leaderCache,
 		totalStakeCache: totalStakeCache,
