@@ -57,8 +57,8 @@
 //		ListenAddr: "localhost:6060",
 //	},
 //	Log: logConfig{
-//		LogFolder:  "latest",
-//		LogRotateSize: 100,
+//		Folder:  "latest",
+//		RotateSize: 100,
 //	},
 //	Devnet: nil,
 //}
