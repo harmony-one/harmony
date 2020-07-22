@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
@@ -33,12 +32,14 @@ func (hmy *Harmony) GetShardState() (*shard.State, error) {
 }
 
 // GetBlockSigners ..
-func (hmy *Harmony) GetBlockSigners(ctx context.Context, blockNum rpc.BlockNumber) (shard.SlotList, *internal_bls.Mask, error) {
-	blk, err := hmy.BlockByNumber(ctx, blockNum)
+func (hmy *Harmony) GetBlockSigners(
+	ctx context.Context, blockNr rpc.BlockNumber,
+) (shard.SlotList, *internal_bls.Mask, error) {
+	blk, err := hmy.BlockByNumber(ctx, blockNr)
 	if err != nil {
 		return nil, nil, err
 	}
-	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNum+1)
+	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNr+1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -46,9 +47,10 @@ func (hmy *Harmony) GetBlockSigners(ctx context.Context, blockNum rpc.BlockNumbe
 	if err != nil {
 		return nil, nil, err
 	}
-	pubKeys := make([]*bls_core.PublicKey, len(committee.Slots))
-	for i, validator := range committee.Slots {
-		if pubKeys[i], err = bls.BytesToBLSPublicKey(validator.BLSPublicKey[:]); err != nil {
+	pubKeys := make([]internal_bls.PublicKeyWrapper, len(committee.Slots))
+	for _, validator := range committee.Slots {
+		wrapper := internal_bls.PublicKeyWrapper{Bytes: validator.BLSPublicKey}
+		if wrapper.Object, err = bls.BytesToBLSPublicKey(wrapper.Bytes[:]); err != nil {
 			return nil, nil, err
 		}
 	}
