@@ -33,12 +33,12 @@ func (hmy *Harmony) GetShardState() (*shard.State, error) {
 }
 
 // GetBlockSigners ..
-func (hmy *Harmony) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *internal_bls.Mask, error) {
-	blk, err := hmy.BlockByNumber(ctx, blockNr)
+func (hmy *Harmony) GetBlockSigners(ctx context.Context, blockNum rpc.BlockNumber) (shard.SlotList, *internal_bls.Mask, error) {
+	blk, err := hmy.BlockByNumber(ctx, blockNum)
 	if err != nil {
 		return nil, nil, err
 	}
-	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNr+1)
+	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNum+1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -101,8 +101,8 @@ func (hmy *Harmony) GetCurrentBadBlocks() []core.BadBlock {
 }
 
 // GetBalance returns balance of an given address.
-func (hmy *Harmony) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
-	s, _, err := hmy.StateAndHeaderByNumber(ctx, blockNr)
+func (hmy *Harmony) GetBalance(ctx context.Context, address common.Address, blockNum rpc.BlockNumber) (*big.Int, error) {
+	s, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if s == nil || err != nil {
 		return nil, err
 	}
@@ -110,29 +110,29 @@ func (hmy *Harmony) GetBalance(ctx context.Context, address common.Address, bloc
 }
 
 // BlockByNumber ...
-func (hmy *Harmony) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+func (hmy *Harmony) BlockByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*types.Block, error) {
 	// Pending block is only known by the miner
-	if blockNr == rpc.PendingBlockNumber {
+	if blockNum == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
 	}
 	// Otherwise resolve and return the block
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNum == rpc.LatestBlockNumber {
 		return hmy.BlockChain.CurrentBlock(), nil
 	}
-	return hmy.BlockChain.GetBlockByNumber(uint64(blockNr)), nil
+	return hmy.BlockChain.GetBlockByNumber(uint64(blockNum)), nil
 }
 
 // HeaderByNumber ...
-func (hmy *Harmony) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error) {
+func (hmy *Harmony) HeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*block.Header, error) {
 	// Pending block is only known by the miner
-	if blockNr == rpc.PendingBlockNumber {
+	if blockNum == rpc.PendingBlockNumber {
 		return nil, errors.New("not implemented")
 	}
 	// Otherwise resolve and return the block
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNum == rpc.LatestBlockNumber {
 		return hmy.BlockChain.CurrentBlock().Header(), nil
 	}
-	return hmy.BlockChain.GetHeaderByNumber(uint64(blockNr)), nil
+	return hmy.BlockChain.GetHeaderByNumber(uint64(blockNum)), nil
 }
 
 // HeaderByHash ...
@@ -145,13 +145,13 @@ func (hmy *Harmony) HeaderByHash(ctx context.Context, blockHash common.Hash) (*b
 }
 
 // StateAndHeaderByNumber ...
-func (hmy *Harmony) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error) {
+func (hmy *Harmony) StateAndHeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*state.DB, *block.Header, error) {
 	// Pending state is only known by the miner
-	if blockNr == rpc.PendingBlockNumber {
+	if blockNum == rpc.PendingBlockNumber {
 		return nil, nil, errors.New("not implemented")
 	}
 	// Otherwise resolve the block number and return its state
-	header, err := hmy.HeaderByNumber(ctx, blockNr)
+	header, err := hmy.HeaderByNumber(ctx, blockNum)
 	if header == nil || err != nil {
 		return nil, nil, err
 	}
@@ -159,28 +159,29 @@ func (hmy *Harmony) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.Bloc
 	return stateDb, header, err
 }
 
-// GetLeaderAddress returns the one address of the leader
-func (hmy *Harmony) GetLeaderAddress(a common.Address, e *big.Int) string {
-	if hmy.IsStakingEpoch(e) {
-		if leader, exists := hmy.leaderCache.Get(a); exists {
+// GetLeaderAddress returns the one address of the leader, given the coinbaseAddr.
+// Note that the coinbaseAddr is overloaded with the BLS pub key hash in staking era.
+func (hmy *Harmony) GetLeaderAddress(coinbaseAddr common.Address, epoch *big.Int) string {
+	if hmy.IsStakingEpoch(epoch) {
+		if leader, exists := hmy.leaderCache.Get(coinbaseAddr); exists {
 			bech32, _ := internal_common.AddressToBech32(leader.(common.Address))
 			return bech32
 		}
-		committee, err := hmy.GetValidators(e)
+		committee, err := hmy.GetValidators(epoch)
 		if err != nil {
 			return ""
 		}
-		for _, v := range committee.Slots {
-			addr := utils.GetAddressFromBLSPubKeyBytes(v.BLSPublicKey[:])
-			hmy.leaderCache.Add(addr, v.EcdsaAddress)
-			if addr == a {
-				bech32, _ := internal_common.AddressToBech32(v.EcdsaAddress)
+		for _, val := range committee.Slots {
+			addr := utils.GetAddressFromBLSPubKeyBytes(val.BLSPublicKey[:])
+			hmy.leaderCache.Add(addr, val.EcdsaAddress)
+			if addr == coinbaseAddr {
+				bech32, _ := internal_common.AddressToBech32(val.EcdsaAddress)
 				return bech32
 			}
 		}
 		return "" // Did not find matching address
 	}
-	bech32, _ := internal_common.AddressToBech32(a)
+	bech32, _ := internal_common.AddressToBech32(coinbaseAddr)
 	return bech32
 }
 

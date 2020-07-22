@@ -185,11 +185,6 @@ func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.D
 	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), vmError, nil
 }
 
-// GetRPCGasCap returns the gas cap of rpc
-func (hmy *Harmony) GetRPCGasCap() *big.Int {
-	return hmy.RPCGasCap // TODO(dm): should be hmy.config.RPCGasCap
-}
-
 // BloomStatus ...
 // TODO: this is not implemented or verified yet for harmony.
 func (hmy *Harmony) BloomStatus() (uint64, uint64) {

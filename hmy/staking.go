@@ -51,10 +51,10 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 		commonRPC.SetRawStake(decider, slotKey, spread)
 		// add entry to array for median calculation
 		rawStakes = append(rawStakes, effective.SlotPurchase{
-			slotAddr,
-			slotKey,
-			spread,
-			spread,
+			Addr:      slotAddr,
+			Key:       slotKey,
+			RawStake:  spread,
+			EPoSStake: spread,
 		})
 	}
 	return rawStakes
@@ -117,7 +117,7 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	}
 	now.MedianStake = effective.Median(rawStakes)
 
-	return &quorum.Transition{then, now}, nil
+	return &quorum.Transition{Previous: then, Current: now}, nil
 }
 
 // IsStakingEpoch ...
@@ -227,10 +227,9 @@ func (hmy *Harmony) GetValidatorInformation(
 		BootedStatus:     nil,
 		ActiveStatus:     wrapper.Validator.Status.String(),
 		Lifetime: &staking.AccumulatedOverLifetime{
-			wrapper.BlockReward,
-			wrapper.Counters,
-			zero,
-			nil,
+			BlockReward: wrapper.BlockReward,
+			Signing:     wrapper.Counters,
+			APR:         zero,
 		},
 	}
 
@@ -338,11 +337,11 @@ func (hmy *Harmony) GetValidatorInformation(
 func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 	*committee.CompletedEPoSRound, error,
 ) {
-	blockNr := hmy.CurrentBlock().NumberU64()
-	key := fmt.Sprintf("median-%d", blockNr)
+	blockNum := hmy.CurrentBlock().NumberU64()
+	key := fmt.Sprintf("median-%d", blockNum)
 
 	// delete cache for previous block
-	prevKey := fmt.Sprintf("median-%d", blockNr-1)
+	prevKey := fmt.Sprintf("median-%d", blockNum-1)
 	hmy.group.Forget(prevKey)
 
 	res, err := hmy.SingleFlightRequest(

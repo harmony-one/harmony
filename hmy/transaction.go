@@ -61,8 +61,8 @@ func (hmy *Harmony) GetTransactionsHistory(address, txType, order string) ([]com
 
 // GetAccountNonce returns the nonce value of the given address for the given block number
 func (hmy *Harmony) GetAccountNonce(
-	ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error) {
-	state, _, err := hmy.StateAndHeaderByNumber(ctx, blockNr)
+	ctx context.Context, address common.Address, blockNum rpc.BlockNumber) (uint64, error) {
+	state, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
 		return 0, err
 	}
