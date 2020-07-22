@@ -35,9 +35,9 @@ type Backend interface {
 	SingleFlightForgetKey(key string)
 	EventMux() *event.TypeMux
 	RPCGasCap() *big.Int // global gas cap for hmy_call over rpc: DoS protection
-	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
-	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
-	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.DB, *block.Header, error)
+	HeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*block.Header, error)
+	BlockByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*types.Block, error)
+	StateAndHeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*state.DB, *block.Header, error)
 	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error)
@@ -50,11 +50,11 @@ type Backend interface {
 	GetPoolTransaction(txHash common.Hash) types.PoolTransaction
 	GetPoolStats() (pendingCount, queuedCount int)
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
-	GetAccountNonce(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (uint64, error)
+	GetAccountNonce(ctx context.Context, address common.Address, blockNum rpc.BlockNumber) (uint64, error)
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
-	GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error)
+	GetBalance(ctx context.Context, address common.Address, blockNum rpc.BlockNumber) (*big.Int, error)
 	GetValidators(epoch *big.Int) (*shard.Committee, error)
 	GetShardID() uint32
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
@@ -83,7 +83,7 @@ type Backend interface {
 	GetLastCrossLinks() ([]*types.CrossLink, error)
 	GetLatestChainHeaders() *block.HeaderPair
 	GetNodeMetadata() commonRPC.NodeMetadata
-	GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
+	GetBlockSigners(ctx context.Context, blockNum rpc.BlockNumber) (shard.SlotList, *bls.Mask, error)
 	IsStakingEpoch(epoch *big.Int) bool
 	GetLeaderAddress(a common.Address, e *big.Int) string
 	GetPeerInfo() commonRPC.NodePeerInfo

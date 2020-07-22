@@ -78,18 +78,18 @@ func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum rpc.BlockNumber)
 	return nil
 }
 
-// GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
+// GetBlockByNumber returns the requested block. When blockNum is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNum rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
-	blk, err := s.hmy.BlockByNumber(ctx, blockNr)
+	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
 	if blk != nil {
 		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
 		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 		response, err := RPCMarshalBlock(blk, blockArgs, leader)
-		if err == nil && blockNr == rpc.PendingBlockNumber {
+		if err == nil && blockNum == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
 				response[field] = nil
@@ -112,17 +112,17 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
-// GetBlockByNumberNew returns the requested block. When blockNr is -1 the chain head is returned. When fullTx in blockArgs is true all
+// GetBlockByNumberNew returns the requested block. When blockNum is -1 the chain head is returned. When fullTx in blockArgs is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
-func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNum rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
-	blk, err := s.hmy.BlockByNumber(ctx, blockNr)
+	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
 	blockArgs.InclTx = true
 	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNr)
+		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNum)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumberNew(ctx context.Context, blockNr r
 	if blk != nil {
 		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 		response, err := RPCMarshalBlock(blk, blockArgs, leader)
-		if err == nil && blockNr == rpc.PendingBlockNumber {
+		if err == nil && blockNum == rpc.PendingBlockNumber {
 			// Pending blocks need to nil out a few fields
 			for _, field := range []string{"hash", "nonce", "miner"} {
 				response[field] = nil
@@ -251,14 +251,14 @@ func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 }
 
 // GetBlockSigners returns signers for a particular block.
-func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	if uint64(blockNr) == 0 {
+func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNum rpc.BlockNumber) ([]string, error) {
+	if uint64(blockNum) == 0 {
 		return []string{}, nil
 	}
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNr)
+	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -280,14 +280,14 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNr rpc.B
 }
 
 // GetBlockSignerKeys returns bls public keys that signed the block.
-func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNr rpc.BlockNumber) ([]string, error) {
-	if uint64(blockNr) == 0 {
+func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNum rpc.BlockNumber) ([]string, error) {
+	if uint64(blockNum) == 0 {
 		return []string{}, nil
 	}
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNr)
+	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
 	if err != nil {
 		return nil, err
 	}
@@ -304,15 +304,15 @@ func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNr rp
 	return signers, nil
 }
 
-// IsBlockSigner returns true if validator with address signed blockNr block.
-func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNr rpc.BlockNumber, address string) (bool, error) {
-	if uint64(blockNr) == 0 {
+// IsBlockSigner returns true if validator with address signed blockNum block.
+func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNum rpc.BlockNumber, address string) (bool, error) {
+	if uint64(blockNum) == 0 {
 		return false, nil
 	}
-	if err := s.isBlockGreaterThanLatest(blockNr); err != nil {
+	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return false, err
 	}
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNr)
+	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
 	if err != nil {
 		return false, err
 	}

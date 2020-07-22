@@ -71,8 +71,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionsHistory(ctx context.Context, a
 }
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
-func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr uint64) int {
-	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
+func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNum uint64) int {
+	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum)); block != nil {
 		return len(block.Transactions())
 	}
 	return 0
@@ -87,8 +87,8 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Co
 }
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr uint64, index uint64) *RPCTransaction {
-	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
+func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNum uint64, index uint64) *RPCTransaction {
+	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum)); block != nil {
 		return newRPCTransactionFromBlockIndex(block, index)
 	}
 	return nil
@@ -150,8 +150,8 @@ func (s *PublicTransactionPoolAPI) GetStakingTransactionsHistory(ctx context.Con
 }
 
 // GetBlockStakingTransactionCountByNumber returns the number of staking transactions in the block with the given block number.
-func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByNumber(ctx context.Context, blockNr uint64) int {
-	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
+func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByNumber(ctx context.Context, blockNum uint64) int {
+	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum)); block != nil {
 		return len(block.StakingTransactions())
 	}
 	return 0
@@ -166,8 +166,8 @@ func (s *PublicTransactionPoolAPI) GetBlockStakingTransactionCountByHash(ctx con
 }
 
 // GetStakingTransactionByBlockNumberAndIndex returns the staking transaction for the given block number and index.
-func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockNumberAndIndex(ctx context.Context, blockNr uint64, index uint64) *RPCStakingTransaction {
-	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNr)); block != nil {
+func (s *PublicTransactionPoolAPI) GetStakingTransactionByBlockNumberAndIndex(ctx context.Context, blockNum uint64, index uint64) *RPCStakingTransaction {
+	if block, _ := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum)); block != nil {
 		return newRPCStakingTransactionFromBlockIndex(block, index)
 	}
 	return nil
