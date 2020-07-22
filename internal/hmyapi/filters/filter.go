@@ -108,9 +108,9 @@ func NewBlockFilter(backend Backend, block common.Hash, addresses []common.Addre
 
 // newFilter creates a generic filter that can either filter based on a block hash,
 // or based on range queries. The search criteria needs to be explicitly set.
-func newFilter(hmy Backend, addresses []common.Address, topics [][]common.Hash) *Filter {
+func newFilter(backend Backend, addresses []common.Address, topics [][]common.Hash) *Filter {
 	return &Filter{
-		backend:   hmy,
+		backend:   backend,
 		addresses: addresses,
 		topics:    topics,
 	}

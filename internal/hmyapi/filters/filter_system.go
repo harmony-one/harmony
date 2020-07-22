@@ -33,7 +33,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
 )
 
 // Type determines the kind of filter and is used to put the filter in to
@@ -87,7 +86,7 @@ type subscription struct {
 // subscription which match the subscription criteria.
 type EventSystem struct {
 	mux       *event.TypeMux
-	hmy       *hmy.Harmony
+	backend   Backend
 	lightMode bool
 	lastHead  *block.Header
 
@@ -113,10 +112,10 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(hmy *hmy.Harmony, lightMode bool) *EventSystem {
+func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		mux:       hmy.EventMux(),
-		hmy:       hmy,
+		mux:       backend.EventMux(),
+		backend:   backend,
 		lightMode: lightMode,
 		install:   make(chan *subscription),
 		uninstall: make(chan *subscription),
@@ -127,10 +126,10 @@ func NewEventSystem(hmy *hmy.Harmony, lightMode bool) *EventSystem {
 	}
 
 	// Subscribe events
-	m.txsSub = m.hmy.SubscribeNewTxsEvent(m.txsCh)
-	m.logsSub = m.hmy.SubscribeLogsEvent(m.logsCh)
-	m.rmLogsSub = m.hmy.SubscribeRemovedLogsEvent(m.rmLogsCh)
-	m.chainSub = m.hmy.SubscribeChainEvent(m.chainCh)
+	m.txsSub = m.backend.SubscribeNewTxsEvent(m.txsCh)
+	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
+	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
+	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
 	// TODO(dm): use feed to subscribe pending log event
 	m.pendingLogSub = m.mux.Subscribe(core.PendingLogsEvent{})
 
@@ -380,11 +379,11 @@ func (es *EventSystem) lightFilterNewHead(newHeader *block.Header, callBack func
 	for oldh.Hash() != newh.Hash() {
 		if oldh.Number().Uint64() >= newh.Number().Uint64() {
 			oldHeaders = append(oldHeaders, oldh)
-			oldh = rawdb.ReadHeader(es.hmy.ChainDb(), oldh.ParentHash(), oldh.Number().Uint64()-1)
+			oldh = rawdb.ReadHeader(es.backend.ChainDb(), oldh.ParentHash(), oldh.Number().Uint64()-1)
 		}
 		if oldh.Number().Uint64() < newh.Number().Uint64() {
 			newHeaders = append(newHeaders, newh)
-			newh = rawdb.ReadHeader(es.hmy.ChainDb(), newh.ParentHash(), newh.Number().Uint64()-1)
+			newh = rawdb.ReadHeader(es.backend.ChainDb(), newh.ParentHash(), newh.Number().Uint64()-1)
 			if newh == nil {
 				// happens when CHT syncing, nothing to do
 				newh = oldh
@@ -407,7 +406,7 @@ func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		logsList, err := es.hmy.GetLogs(ctx, header.Hash())
+		logsList, err := es.backend.GetLogs(ctx, header.Hash())
 		if err != nil {
 			return nil
 		}
@@ -422,7 +421,7 @@ func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.
 		logs := filterLogs(unfiltered, nil, nil, addresses, topics)
 		if len(logs) > 0 && logs[0].TxHash == (common.Hash{}) {
 			// We have matching but non-derived logs
-			receipts, err := es.hmy.GetReceipts(ctx, header.Hash())
+			receipts, err := es.backend.GetReceipts(ctx, header.Hash())
 			if err != nil {
 				return nil
 			}
