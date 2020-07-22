@@ -24,12 +24,11 @@ import (
 	"sync"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -113,9 +112,9 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventSystem {
+func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		mux:       mux,
+		mux:       backend.EventMux(),
 		backend:   backend,
 		lightMode: lightMode,
 		install:   make(chan *subscription),
@@ -131,7 +130,7 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
 	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
-	// TODO(rjl493456442): use feed to subscribe pending log event
+	// TODO(dm): use feed to subscribe pending log event
 	m.pendingLogSub = m.mux.Subscribe(core.PendingLogsEvent{})
 
 	// Make sure none of the subscriptions are empty
@@ -413,10 +412,10 @@ func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.
 		}
 		var unfiltered []*types.Log
 		for _, logs := range logsList {
-			for _, log := range logs {
-				logcopy := *log
-				logcopy.Removed = remove
-				unfiltered = append(unfiltered, &logcopy)
+			for _, lg := range logs {
+				logCopy := *lg
+				logCopy.Removed = remove
+				unfiltered = append(unfiltered, &logCopy)
 			}
 		}
 		logs := filterLogs(unfiltered, nil, nil, addresses, topics)
@@ -428,10 +427,10 @@ func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.
 			}
 			unfiltered = unfiltered[:0]
 			for _, receipt := range receipts {
-				for _, log := range receipt.Logs {
-					logcopy := *log
-					logcopy.Removed = remove
-					unfiltered = append(unfiltered, &logcopy)
+				for _, lg := range receipt.Logs {
+					logCopy := *lg
+					logCopy.Removed = remove
+					unfiltered = append(unfiltered, &logCopy)
 				}
 			}
 			logs = filterLogs(unfiltered, nil, nil, addresses, topics)

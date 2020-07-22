@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -33,14 +34,14 @@ func ReturnWithPagination(hashes []common.Hash, pageIndex uint32, pageSize uint3
 
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(
-	ctx context.Context, b Backend, tx *types.Transaction,
+	ctx context.Context, hmy *hmy.Harmony, tx *types.Transaction,
 ) (common.Hash, error) {
-	if err := b.SendTx(ctx, tx); err != nil {
+	if err := hmy.SendTx(ctx, tx); err != nil {
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
 		return tx.Hash(), err
 	}
 	if tx.To() == nil {
-		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Epoch())
+		signer := types.MakeSigner(hmy.ChainConfig(), hmy.CurrentBlock().Epoch())
 		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err
@@ -61,9 +62,9 @@ func SubmitTransaction(
 
 // SubmitStakingTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitStakingTransaction(
-	ctx context.Context, b Backend, tx *staking.StakingTransaction,
+	ctx context.Context, hmy *hmy.Harmony, tx *staking.StakingTransaction,
 ) (common.Hash, error) {
-	if err := b.SendStakingTx(ctx, tx); err != nil {
+	if err := hmy.SendStakingTx(ctx, tx); err != nil {
 		// legacy behavior is to never return error and always return tx hash
 		utils.Logger().Warn().Err(err).Msg("Could not submit staking transaction")
 		return tx.Hash(), nil

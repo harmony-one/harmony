@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
@@ -93,10 +92,6 @@ func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	// Gather all the possible APIs to surface
-	harmony, _ = hmy.New(
-		node, node.TxPool, node.CxPool, new(event.TypeMux), node.Consensus.ShardID,
-	)
-
 	apis := node.APIs()
 
 	for _, service := range node.serviceManager.GetServices() {
@@ -180,26 +175,29 @@ func (node *Node) startWS(
 // APIs return the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs() []rpc.API {
+	if harmony == nil {
+		harmony = hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+	}
 	// Gather all the possible APIs to surface
-	apis := hmyapi.GetAPIs(harmony.APIBackend)
+	apis := hmyapi.GetAPIs(harmony)
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(harmony.APIBackend, false),
+			Service:   filters.NewPublicFilterAPI(harmony, false),
 			Public:    true,
 		},
 		{
 			Namespace: "net",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv1.NewPublicNetAPI(node.host, harmony.ChainID),
 			Public:    true,
 		},
 		{
 			Namespace: "netv2",
 			Version:   "1.0",
-			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv2.NewPublicNetAPI(node.host, harmony.ChainID),
 			Public:    true,
 		},
 	}...)

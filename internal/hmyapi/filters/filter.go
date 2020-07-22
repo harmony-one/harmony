@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -37,7 +36,7 @@ import (
 type Backend interface {
 	ChainDb() ethdb.Database
 	EventMux() *event.TypeMux
-	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*block.Header, error)
+	HeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*block.Header, error)
 	HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
@@ -114,7 +113,6 @@ func newFilter(backend Backend, addresses []common.Address, topics [][]common.Ha
 		backend:   backend,
 		addresses: addresses,
 		topics:    topics,
-		db:        backend.ChainDb(),
 	}
 }
 
