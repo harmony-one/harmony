@@ -29,6 +29,7 @@ var (
 		bootNodeFlag,
 		dnsZoneFlag,
 		dnsPortFlag,
+
 		legacyDNSZoneFlag,
 		legacyDNSPortFlag,
 		legacyDNSFlag,
@@ -38,6 +39,7 @@ var (
 	p2pFlags = []cli.Flag{
 		p2pPortFlag,
 		p2pKeyFileFlag,
+
 		legacyKeyFileFlag,
 	}
 
@@ -45,7 +47,7 @@ var (
 		rpcEnabledFlag,
 		rpcIPFlag,
 		rpcPortFlag,
-		legacyRPCIPFlag,
+
 		legacyPublicRPCFlag,
 	}
 
@@ -97,6 +99,10 @@ var (
 	logFlags = []cli.Flag{
 		logFolderFlag,
 		logRotateSizeFlag,
+		logContextIPFlag,
+		logContextPortFlag,
+		logVerbosityFlag,
+		legacyVerbosityFlag,
 
 		legacyLogFolderFlag,
 		legacyLogRotateSizeFlag,
@@ -133,7 +139,7 @@ var (
 	// legacyMiscFlags are legacy flags that cannot be categorized to a single category.
 	legacyMiscFlags = []cli.Flag{
 		legacyPortFlag,
-		legacyFreshDB,
+		legacyIPFlag,
 	}
 )
 
@@ -195,7 +201,7 @@ var (
 	}
 )
 
-func applyGeneralFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, nodeTypeFlag) {
 		config.General.NodeType = cli.GetStringFlagValue(cmd, nodeTypeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyNodeTypeFlag) {
@@ -239,6 +245,8 @@ var (
 		Name:  "bootnodes",
 		Usage: "a list of bootnode multiaddress (delimited by ,)",
 	}
+	// TODO: separate dns.client from dns.host. Add --dns.host to determine whether start
+	//   dns host, --dns.port / --dns.ip for serving endpoint
 	dnsZoneFlag = cli.StringFlag{
 		Name:  "dns.zone",
 		Usage: "use customized peers from the zone for state syncing",
@@ -272,18 +280,16 @@ var (
 	}
 )
 
-func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
-	var raw string
+func getNetworkType(cmd *cobra.Command) string {
 	if cli.IsFlagChanged(cmd, networkTypeFlag) {
-		raw = cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
+		return cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyNetworkTypeFlag) {
-		raw = cli.GetStringFlagValue(cmd, networkTypeFlag)
+		return cli.GetStringFlagValue(cmd, networkTypeFlag)
 	}
-	nt := parseNetworkType(raw)
-	return nt
+	return defaultConfig.Network.NetworkType
 }
 
-func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
+func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, bootNodeFlag) {
 		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
 	}
@@ -308,40 +314,6 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *hmyConfig) {
 	}
 }
 
-func parseNetworkType(nt string) nodeconfig.NetworkType {
-	switch nt {
-	case "mainnet":
-		return nodeconfig.Mainnet
-	case "testnet":
-		return nodeconfig.Testnet
-	case "pangaea", "staking", "stk":
-		return nodeconfig.Pangaea
-	case "partner":
-		return nodeconfig.Partner
-	case "stressnet", "stress", "stn":
-		return nodeconfig.Stressnet
-	case "localnet":
-		return nodeconfig.Localnet
-	case "devnet", "dev":
-		return nodeconfig.Devnet
-	default:
-		return ""
-	}
-}
-
-func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
-	bn := nodeconfig.GetDefaultBootNodes(nt)
-	zone := nodeconfig.GetDefaultDNSZone(nt)
-	port := nodeconfig.GetDefaultDNSPort(nt)
-	return networkConfig{
-		NetworkType:   string(nt),
-		BootNodes:     bn,
-		LegacySyncing: false,
-		DNSZone:       zone,
-		DNSPort:       port,
-	}
-}
-
 // p2p flags
 var (
 	p2pPortFlag = cli.IntFlag{
@@ -362,7 +334,7 @@ var (
 	}
 )
 
-func applyP2PFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
@@ -391,12 +363,6 @@ var (
 		Usage:    "rpc port to listen for RPC calls",
 		DefValue: defaultConfig.RPC.Port,
 	}
-	legacyRPCIPFlag = cli.StringFlag{
-		Name:       "ip",
-		Usage:      "ip of the node",
-		DefValue:   defaultConfig.RPC.IP,
-		Deprecated: "use --http.ip",
-	}
 	legacyPublicRPCFlag = cli.BoolFlag{
 		Name:       "public_rpc",
 		Usage:      "Enable Public RPC Access (default: false)",
@@ -405,14 +371,11 @@ var (
 	}
 )
 
-func applyRPCFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyRPCFlags(cmd *cobra.Command, config *harmonyConfig) {
 	var isRPCSpecified bool
 
 	if cli.IsFlagChanged(cmd, rpcIPFlag) {
 		config.RPC.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
-		isRPCSpecified = true
-	} else if cli.IsFlagChanged(cmd, legacyRPCIPFlag) {
-		config.RPC.IP = cli.GetStringFlagValue(cmd, legacyRPCIPFlag)
 		isRPCSpecified = true
 	}
 
@@ -520,7 +483,7 @@ var (
 	}
 )
 
-func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, blsDirFlag) {
 		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, blsDirFlag)
 	} else if cli.IsFlagChanged(cmd, legacyBLSFolderFlag) {
@@ -548,7 +511,7 @@ func applyBLSFlags(cmd *cobra.Command, config *hmyConfig) {
 	}
 }
 
-func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, passEnabledFlag) {
 		config.BLSKeys.PassEnabled = cli.GetBoolFlagValue(cmd, passEnabledFlag)
 	}
@@ -563,7 +526,7 @@ func applyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
 	}
 }
 
-func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	var fileSpecified bool
 
 	if cli.IsFlagChanged(cmd, kmsEnabledFlag) {
@@ -580,7 +543,7 @@ func applyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
 	}
 }
 
-func applyLegacyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyBLSPassFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyBLSPassFlag)
 		legacyApplyBLSPassVal(val, config)
@@ -590,14 +553,14 @@ func applyLegacyBLSPassFlags(cmd *cobra.Command, config *hmyConfig) {
 	}
 }
 
-func applyLegacyKMSFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyLegacyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyKMSConfigSourceFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyKMSConfigSourceFlag)
 		legacyApplyKMSSourceVal(val, config)
 	}
 }
 
-func legacyApplyBLSPassVal(src string, config *hmyConfig) {
+func legacyApplyBLSPassVal(src string, config *harmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -618,7 +581,7 @@ func legacyApplyBLSPassVal(src string, config *hmyConfig) {
 	}
 }
 
-func legacyApplyKMSSourceVal(src string, config *hmyConfig) {
+func legacyApplyKMSSourceVal(src string, config *harmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -667,7 +630,7 @@ var (
 	}
 )
 
-func applyConsensusFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, consensusDelayCommitFlag) {
 		config.Consensus.DelayCommit = cli.GetStringFlagValue(cmd, consensusDelayCommitFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDelayCommitFlag) {
@@ -710,7 +673,7 @@ var (
 	}
 )
 
-func applyTxPoolFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyTxPoolFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
@@ -738,7 +701,7 @@ var (
 	}
 )
 
-func applyPprofFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyPprofFlags(cmd *cobra.Command, config *harmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
@@ -754,40 +717,92 @@ func applyPprofFlags(cmd *cobra.Command, config *hmyConfig) {
 // log flags
 var (
 	logFolderFlag = cli.StringFlag{
-		Name:     "log.path",
+		Name:     "log.dir",
 		Usage:    "directory path to put rotation logs",
-		DefValue: defaultConfig.Log.LogFolder,
+		DefValue: defaultConfig.Log.Folder,
 	}
 	logRotateSizeFlag = cli.IntFlag{
 		Name:     "log.max-size",
 		Usage:    "rotation log size in megabytes",
-		DefValue: defaultConfig.Log.LogRotateSize,
+		DefValue: defaultConfig.Log.RotateSize,
+	}
+	logFileNameFlag = cli.StringFlag{
+		Name:     "log.name",
+		Usage:    "log file name (e.g. harmony.log)",
+		DefValue: defaultConfig.Log.FileName,
+	}
+	logVerbosityFlag = cli.IntFlag{
+		Name:      "log.verb",
+		Shorthand: "v",
+		Usage:     "logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail",
+		DefValue:  defaultConfig.Log.Verbosity,
+	}
+	// TODO: remove context (this shall not be in the log)
+	logContextIPFlag = cli.StringFlag{
+		Name:     "log.ctx.ip",
+		Usage:    "log context ip",
+		DefValue: defaultLogContext.IP,
+		Hidden:   true,
+	}
+	logContextPortFlag = cli.IntFlag{
+		Name:     "log.ctx.port",
+		Usage:    "log context port",
+		DefValue: defaultLogContext.Port,
+		Hidden:   true,
 	}
 	legacyLogFolderFlag = cli.StringFlag{
 		Name:       "log_folder",
 		Usage:      "the folder collecting the logs of this execution",
-		DefValue:   defaultConfig.Log.LogFolder,
+		DefValue:   defaultConfig.Log.Folder,
 		Deprecated: "use --log.path",
 	}
 	legacyLogRotateSizeFlag = cli.IntFlag{
 		Name:       "log_max_size",
 		Usage:      "the max size in megabytes of the log file before it gets rotated",
-		DefValue:   defaultConfig.Log.LogRotateSize,
+		DefValue:   defaultConfig.Log.RotateSize,
 		Deprecated: "use --log.max-size",
+	}
+	legacyVerbosityFlag = cli.IntFlag{
+		Name:       "verbosity",
+		Usage:      "logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail",
+		DefValue:   defaultConfig.Log.Verbosity,
+		Deprecated: "use --log.verbosity",
 	}
 )
 
-func applyLogFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, logFolderFlag) {
-		config.Log.LogFolder = cli.GetStringFlagValue(cmd, logFolderFlag)
+		config.Log.Folder = cli.GetStringFlagValue(cmd, logFolderFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogFolderFlag) {
-		config.Log.LogFolder = cli.GetStringFlagValue(cmd, legacyLogFolderFlag)
+		config.Log.Folder = cli.GetStringFlagValue(cmd, legacyLogFolderFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, logRotateSizeFlag) {
-		config.Log.LogRotateSize = cli.GetIntFlagValue(cmd, logRotateSizeFlag)
+		config.Log.RotateSize = cli.GetIntFlagValue(cmd, logRotateSizeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogRotateSizeFlag) {
-		config.Log.LogRotateSize = cli.GetIntFlagValue(cmd, legacyLogRotateSizeFlag)
+		config.Log.RotateSize = cli.GetIntFlagValue(cmd, legacyLogRotateSizeFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logFileNameFlag) {
+		config.Log.FileName = cli.GetStringFlagValue(cmd, logFileNameFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logVerbosityFlag) {
+		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
+	} else if cli.IsFlagChanged(cmd, legacyVerbosityFlag) {
+		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
+	}
+
+	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {
+		ctx := getDefaultLogContextCopy()
+		config.Log.Context = &ctx
+
+		if cli.IsFlagChanged(cmd, logContextIPFlag) {
+			config.Log.Context.IP = cli.GetStringFlagValue(cmd, logContextIPFlag)
+		}
+		if cli.IsFlagChanged(cmd, logContextPortFlag) {
+			config.Log.Context.Port = cli.GetIntFlagValue(cmd, logContextPortFlag)
+		}
 	}
 }
 
@@ -827,10 +842,10 @@ var (
 	}
 )
 
-func applyDevnetFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyDevnetFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet != nil {
-		devnet := getDefaultDevnetConfigCopy()
-		config.Devnet = &devnet
+		cfg := getDefaultDevnetConfigCopy()
+		config.Devnet = &cfg
 	}
 
 	if cli.HasFlagsChanged(cmd, newDevnetFlags) {
@@ -855,6 +870,12 @@ func applyDevnetFlags(cmd *cobra.Command, config *hmyConfig) {
 			config.Devnet.HmyNodeSize = cli.GetIntFlagValue(cmd, legacyDevnetHmyNodeSizeFlag)
 		}
 	}
+
+	if config.Devnet != nil {
+		if config.Devnet.HmyNodeSize < 0 || config.Devnet.HmyNodeSize > config.Devnet.ShardSize {
+			config.Devnet.HmyNodeSize = config.Devnet.ShardSize
+		}
+	}
 }
 
 var (
@@ -866,13 +887,13 @@ var (
 	}
 	revertToFlag = cli.IntFlag{
 		Name:     "revert.to",
-		Usage:    "rollback all blocks until and including block number revert_to",
+		Usage:    "rollback all blocks until and including block number revert.to",
 		DefValue: defaultRevertConfig.RevertTo,
 		Hidden:   true,
 	}
 	revertBeforeFlag = cli.IntFlag{
 		Name:     "revert.do-before",
-		Usage:    "if the current block is less than do_revert_before, revert all blocks until (including) revert_to block",
+		Usage:    "if the current block is less than revert.do-before, revert all blocks until (including) revert_to block",
 		DefValue: defaultRevertConfig.RevertBefore,
 		Hidden:   true,
 	}
@@ -896,10 +917,10 @@ var (
 	}
 )
 
-func applyRevertFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyRevertFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.HasFlagsChanged(cmd, revertFlags) {
-		revert := getDefaultRevertConfigCopy()
-		config.Revert = &revert
+		cfg := getDefaultRevertConfigCopy()
+		config.Revert = &cfg
 	}
 
 	if cli.HasFlagsChanged(cmd, newRevertFlags) {
@@ -934,22 +955,37 @@ var (
 		DefValue:   defaultConfig.P2P.Port,
 		Deprecated: "Use --p2p.port, --http.port instead",
 	}
-	// This flag is very special: it is out of the scope of the hmyConfig. Need to
-	// execute remove db in prepare.
-	legacyFreshDB = cli.BoolFlag{
-		Name:       "fresh_db",
-		Usage:      "true means the existing disk based db will be removed",
-		DefValue:   false,
-		Deprecated: "will be removed in future version",
+	legacyIPFlag = cli.StringFlag{
+		Name:       "ip",
+		Usage:      "ip of the node",
+		DefValue:   defaultConfig.RPC.IP,
+		Deprecated: "use --http.ip",
 	}
 )
 
 // Note: this function need to be called before parse other flags
-func applyMiscFlags(cmd *cobra.Command, config *hmyConfig) {
+func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	// TODO: move all port manipulation +500 -3000 logic here
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
 		config.RPC.Port = legacyPort
+	}
+
+	if cli.IsFlagChanged(cmd, legacyIPFlag) {
+		config.RPC.IP = cli.GetStringFlagValue(cmd, legacyIPFlag)
+		config.RPC.Enabled = true
+	}
+
+	if cli.HasFlagsChanged(cmd, legacyMiscFlags) {
+		logIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
+		logPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
+		config.Log.FileName = fmt.Sprintf("validator-%v-%v.log", logIP, logPort)
+
+		logCtx := &logContext{
+			IP:   logIP,
+			Port: logPort,
+		}
+		config.Log.Context = logCtx
 	}
 }
