@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/harmony-one/harmony/internal/cli"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -18,7 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
+	"github.com/harmony-one/harmony/internal/cli"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -42,14 +42,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Version string variables
-var (
-	version string
-	builtBy string
-	builtAt string
-	commit  string
-)
-
 // Host
 var (
 	myHost          p2p.Host
@@ -57,66 +49,8 @@ var (
 )
 
 func printVersion() {
-	fmt.Fprintln(os.Stderr, nodeconfig.GetVersion())
+	fmt.Fprintln(os.Stdout, nodeconfig.GetVersion())
 	os.Exit(0)
-}
-
-// legacy fields
-var (
-	isStaking      bool
-	legacyNodeType string
-	shardID        int
-
-	legacyNetworkType string
-	legacyMinPeers int
-)
-
-var rootCmd = &cobra.Command{
-	// TODO: elaborate the usage
-	Use:   "harmony",
-	Short: "",
-	Long:  "",
-	Run:   runHarmonyNode,
-}
-
-func init() {
-	cli.SetParseErrorHandle(func(err error) {
-		os.Exit(101)
-	})
-}
-
-func setupRootFlags(cmd *cobra.Command) error {
-	flags := cmd.Flags()
-	flags.StringVarP(&configFile, "config", "c", "", "config toml file to load from")
-	flags.StringVarP(&nodeType, "node-type", "", "validator", "node type to run (validator, explorer)")
-	flags.BoolVarP(&noStaking, "no-staking", "", false, "run node in legacy mode")
-
-	flags.StringVarP(&networkType, "network", "n", "mainnet", "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet")
-	flags.StringVarP(&ip, "ip", "", "127.0.0.1", "ip address to listen")
-	flags.IntVarP(&port, "port", "", 9000, "port to listen")
-}
-
-// TODO: When fully get rid of node.sh, change MarkHidden to MarkDeprecated
-func setupRootLegacyFlags(cmd *cobra.Command) error {
-	flags := cmd.Flags()
-	flags.BoolVarP(&isStaking, "staking", "", false, "[deprecated] run node in staking mode")
-	if err := flags.MarkDeprecated("staking", "Staking mode is enabled by default. Use --no-staking to run in legacy mode"); err != nil {
-		return err
-	}
-	flags.StringVarP(&legacyNodeType, "node_type", "", "[deprecated] validator", "node type to run (validator, explorer)")
-	if err := flags.MarkHidden("node_type"); err != nil {
-		return err
-	}
-	flags.IntVarP(&shardID, "shard_id", "", -1, "[deprecated] the shard ID of this node")
-	if err := flags.MarkHidden("shard_id"); err != nil {
-		return err
-	}
-	flags.StringVarP(&legacyNetworkType, "network_type", "", "mainnet", "[deprecated] network to join")
-	if err := flags.MarkHidden("network_type"); err != nil {
-		return err
-	}
-	flags.IntVarP(&legacyMinPeers, "min_peers", "", 32, "minimal number of peers in shard")
-	if err := flags.MarkDeprecated()
 }
 
 //ip         = flag.String("ip", "127.0.0.1", "ip of the node")
@@ -124,7 +58,7 @@ func setupRootLegacyFlags(cmd *cobra.Command) error {
 //logFolder  = flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 //logMaxSize = flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 //// Remove this flag
-//freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
+freshDB     = flag.Bool("fresh_db", false, "true means the existing disk based db will be removed")
 //pprof       = flag.String("pprof", "", "what address and port the pprof profiling server should listen on")
 //versionFlag = flag.Bool("version", false, "Output version info")
 //dnsZone     = flag.String("dns_zone", "", "if given and not empty, use peers from the zone (default: use libp2p peer discovery instead)")
@@ -170,42 +104,14 @@ func setupRootLegacyFlags(cmd *cobra.Command) error {
 //	"webhook_yaml", "", "path for yaml config reporting double signing",
 //)
 
-func initSetup() {
-
-	// Setup pprof
-	if addr := *pprof; addr != "" {
-		go func() { http.ListenAndServe(addr, nil) }()
+func init() {
+	if err := registerRootCmdFlags(); err != nil {
+		// Only happens when code is wrong
+		panic(err)
 	}
-
-	// Configure log parameters
-	utils.SetLogContext(*port, *ip)
-	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	utils.AddLogFile(fmt.Sprintf("%v/validator-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
-
-	// Don't set higher than num of CPU. It will make go scheduler slower.
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	// Set port and ip to global config.
-	nodeconfig.GetDefaultConfig().Port = *port
-	nodeconfig.GetDefaultConfig().IP = *ip
-
-	// Set sharding schedule
-	nodeconfig.SetShardingSchedule(shard.Schedule)
-
-	// Set up randomization seed.
-	rand.Seed(int64(time.Now().Nanosecond()))
-
-	if len(p2p.BootNodes) == 0 {
-		bootNodeAddrs, err := p2p.StringsToAddrs(p2p.DefaultBootNodeAddrStrings)
-		if err != nil {
-			utils.FatalErrMsg(err, "cannot parse default bootnode list %#v",
-				p2p.DefaultBootNodeAddrStrings)
-		}
-		p2p.BootNodes = bootNodeAddrs
-	}
-}
-
-func runHarmonyNode(cmd *cobra.Command, args []string) {
+	cli.SetParseErrorHandle(func(err error) {
+		os.Exit(128) // 128 - invalid command line arguments
+	})
 
 }
 
@@ -464,107 +370,7 @@ func setupBlacklist() (map[ethCommon.Address]struct{}, error) {
 	return addrMap, nil
 }
 
-func setupViperConfig() {
-	// read from environment
-	envViper := viperconfig.CreateEnvViper()
-	//read from config file
-	configFileViper := viperconfig.CreateConfFileViper("./.hmy", "nodeconfig", "json")
-	viperconfig.ResetConfString(ip, envViper, configFileViper, "", "ip")
-	viperconfig.ResetConfString(port, envViper, configFileViper, "", "port")
-	viperconfig.ResetConfString(logFolder, envViper, configFileViper, "", "log_folder")
-	viperconfig.ResetConfInt(logMaxSize, envViper, configFileViper, "", "log_max_size")
-	viperconfig.ResetConfBool(freshDB, envViper, configFileViper, "", "fresh_db")
-	viperconfig.ResetConfString(pprof, envViper, configFileViper, "", "pprof")
-	viperconfig.ResetConfBool(versionFlag, envViper, configFileViper, "", "version")
-	viperconfig.ResetConfString(dnsZone, envViper, configFileViper, "", "dns_zone")
-	viperconfig.ResetConfBool(dnsFlag, envViper, configFileViper, "", "dns")
-	viperconfig.ResetConfInt(minPeers, envViper, configFileViper, "", "min_peers")
-	viperconfig.ResetConfString(keyFile, envViper, configFileViper, "", "key")
-	viperconfig.ResetConfBool(isArchival, envViper, configFileViper, "", "is_archival")
-	viperconfig.ResetConfString(delayCommit, envViper, configFileViper, "", "delay_commit")
-	viperconfig.ResetConfString(nodeType, envViper, configFileViper, "", "node_type")
-	viperconfig.ResetConfString(networkType, envViper, configFileViper, "", "network_type")
-	viperconfig.ResetConfInt(blockPeriod, envViper, configFileViper, "", "block_period")
-	viperconfig.ResetConfBool(stakingFlag, envViper, configFileViper, "", "staking")
-	viperconfig.ResetConfInt(shardID, envViper, configFileViper, "", "shard_id")
-	viperconfig.ResetConfString(blsKeyFile, envViper, configFileViper, "", "blskey_file")
-	viperconfig.ResetConfString(blsFolder, envViper, configFileViper, "", "blsfolder")
-	viperconfig.ResetConfString(blsPass, envViper, configFileViper, "", "blsPass")
-	viperconfig.ResetConfUInt(devnetNumShards, envViper, configFileViper, "", "dn_num_shards")
-	viperconfig.ResetConfInt(devnetShardSize, envViper, configFileViper, "", "dn_shard_size")
-	viperconfig.ResetConfInt(devnetHarmonySize, envViper, configFileViper, "", "dn_hmy_size")
-	viperconfig.ResetConfInt(verbosity, envViper, configFileViper, "", "verbosity")
-	viperconfig.ResetConfString(dbDir, envViper, configFileViper, "", "db_dir")
-	viperconfig.ResetConfBool(publicRPC, envViper, configFileViper, "", "public_rpc")
-	viperconfig.ResetConfInt(doRevertBefore, envViper, configFileViper, "", "do_revert_before")
-	viperconfig.ResetConfInt(revertTo, envViper, configFileViper, "", "revert_to")
-	viperconfig.ResetConfBool(revertBeacon, envViper, configFileViper, "", "revert_beacon")
-	viperconfig.ResetConfString(blacklistPath, envViper, configFileViper, "", "blacklist")
-	viperconfig.ResetConfString(webHookYamlPath, envViper, configFileViper, "", "webhook_yaml")
-}
-
 func main() {
-	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
-	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
-	// build time.
-	os.Setenv("GODEBUG", "netdns=go")
-
-	flag.Var(&p2p.BootNodes, "bootnodes", "a list of bootnode multiaddress (delimited by ,)")
-	flag.Parse()
-
-	switch *nodeType {
-	case "validator":
-	case "explorer":
-		break
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown node type: %s\n", *nodeType)
-		os.Exit(1)
-	}
-
-	nodeconfig.SetPublicRPC(*publicRPC)
-	nodeconfig.SetVersion(
-		fmt.Sprintf("Harmony (C) 2020. %v, version %v-%v (%v %v)",
-			path.Base(os.Args[0]), version, commit, builtBy, builtAt),
-	)
-	if *versionFlag {
-		printVersion()
-	}
-
-	switch *networkType {
-	case nodeconfig.Mainnet:
-		shard.Schedule = shardingconfig.MainnetSchedule
-	case nodeconfig.Testnet:
-		shard.Schedule = shardingconfig.TestnetSchedule
-	case nodeconfig.Pangaea:
-		shard.Schedule = shardingconfig.PangaeaSchedule
-	case nodeconfig.Localnet:
-		shard.Schedule = shardingconfig.LocalnetSchedule
-	case nodeconfig.Partner:
-		shard.Schedule = shardingconfig.PartnerSchedule
-	case nodeconfig.Stressnet:
-		shard.Schedule = shardingconfig.StressNetSchedule
-	case nodeconfig.Devnet:
-		if *devnetHarmonySize < 0 {
-			*devnetHarmonySize = *devnetShardSize
-		}
-		// TODO (leo): use a passing list of accounts here
-		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(*devnetNumShards), *devnetShardSize, *devnetHarmonySize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
-				err)
-			os.Exit(1)
-		}
-		shard.Schedule = shardingconfig.NewFixedSchedule(devnetConfig)
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "invalid network type: %#v\n", *networkType)
-		os.Exit(2)
-	}
-
-	setupViperConfig()
-
-	initSetup()
-
 	if *nodeType == "validator" {
 		var err error
 		if *stakingFlag {
