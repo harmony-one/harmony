@@ -3,7 +3,6 @@ package hmy
 import (
 	"context"
 	"math/big"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -53,7 +52,6 @@ type Harmony struct {
 	// DB interfaces
 	ChainDb      ethdb.Database     // Block chain database
 	BloomIndexer *core.ChainIndexer // Bloom indexer operating during block imports
-	APIBackend   *APIBackend
 	NodeAPI      NodeAPI
 	// ChainID is used to identify which network we are using
 	ChainID uint64
@@ -95,11 +93,11 @@ type NodeAPI interface {
 // initialisation of the common Harmony object)
 func New(
 	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, shardID uint32,
-) (*Harmony, error) {
+) *Harmony {
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
-	hmy := &Harmony{
+	return &Harmony{
 		ShutdownChan:    make(chan bool),
 		BloomRequests:   make(chan chan *bloombits.Retrieval),
 		BlockChain:      nodeAPI.Blockchain(),
@@ -114,19 +112,6 @@ func New(
 		leaderCache:     leaderCache,
 		totalStakeCache: totalStakeCache,
 	}
-	hmy.APIBackend = &APIBackend{
-		hmy: hmy,
-		TotalStakingCache: struct {
-			sync.Mutex
-			BlockHeight  int64
-			TotalStaking *big.Int
-		}{
-			BlockHeight:  -1,
-			TotalStaking: big.NewInt(0),
-		},
-		LeaderCache: leaderCache,
-	}
-	return hmy, nil
 }
 
 // SingleFlightRequest ..

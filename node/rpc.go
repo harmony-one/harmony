@@ -176,7 +176,7 @@ func (node *Node) startWS(
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs() []rpc.API {
 	if harmony == nil {
-		harmony, _ = hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+		harmony = hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
 	}
 	// Gather all the possible APIs to surface
 	apis := hmyapi.GetAPIs(harmony)
@@ -191,13 +191,13 @@ func (node *Node) APIs() []rpc.API {
 		{
 			Namespace: "net",
 			Version:   "1.0",
-			Service:   apiv1.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv1.NewPublicNetAPI(node.host, harmony.ChainID),
 			Public:    true,
 		},
 		{
 			Namespace: "netv2",
 			Version:   "1.0",
-			Service:   apiv2.NewPublicNetAPI(node.host, harmony.APIBackend.NetVersion()),
+			Service:   apiv2.NewPublicNetAPI(node.host, harmony.ChainID),
 			Public:    true,
 		},
 	}...)
