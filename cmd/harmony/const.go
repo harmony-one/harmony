@@ -2,12 +2,10 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const (
-	defNetworkType = nodeconfig.Mainnet
-)
+const tomlConfigVersion = "1.0.0"
 
 const (
-	mainnetDnsZone = "t.hmny.io"
+	defNetworkType = nodeconfig.Mainnet
 )
 
 var defaultConfig = harmonyConfig{

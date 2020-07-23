@@ -265,7 +265,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		currentNode.SupportBeaconSyncing()
 	}
 
-	if hc.Revert != nil && hc.Revert.RevertBefore != -1 && hc.Revert.RevertTo != -1 {
+	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
 			chain = currentNode.Beaconchain()
