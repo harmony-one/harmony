@@ -1,4 +1,4 @@
-package apiv1
+package rpc
 
 import (
 	"encoding/hex"

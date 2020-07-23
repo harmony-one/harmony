@@ -12,8 +12,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
-	"github.com/harmony-one/harmony/rpc/apiv1"
-	"github.com/harmony-one/harmony/rpc/apiv2"
 	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -182,22 +180,12 @@ func (node *Node) APIs() []rpc.API {
 	apis := hmy_rpc.GetAPIs(harmony)
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
+		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V1),
+		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V2),
 		{
 			Namespace: "hmy",
 			Version:   "1.0",
 			Service:   filters.NewPublicFilterAPI(harmony, false),
-			Public:    true,
-		},
-		{
-			Namespace: "net",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicNetAPI(node.host, harmony.ChainID),
-			Public:    true,
-		},
-		{
-			Namespace: "netv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicNetAPI(node.host, harmony.ChainID),
 			Public:    true,
 		},
 	}...)

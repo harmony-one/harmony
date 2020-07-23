@@ -1,27 +1,34 @@
-package apiv1
+package rpc
 
 import (
 	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rpc/common"
 )
 
-// PublicHarmonyAPI provides an API to access Harmony related information.
+// PublicHarmonyService provides an API to access Harmony related information.
 // It offers only methods that operate on public data that is freely available to anyone.
-type PublicHarmonyAPI struct {
-	hmy *hmy.Harmony
+type PublicHarmonyService struct {
+	hmy     *hmy.Harmony
+	version Version
 }
 
-// NewPublicHarmonyAPI ...
-func NewPublicHarmonyAPI(hmy *hmy.Harmony) *PublicHarmonyAPI {
-	return &PublicHarmonyAPI{hmy}
+// NewPublicHarmonyAPI creates a new API for the RPC interface
+func NewPublicHarmonyAPI(hmy *hmy.Harmony, version Version) rpc.API {
+	return rpc.API{
+		Namespace: version.Namespace(),
+		Version:   APIVersion,
+		Service:   &PublicHarmonyService{hmy, version},
+		Public:    true,
+	}
 }
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
-func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
+func (s *PublicHarmonyService) ProtocolVersion() hexutil.Uint {
 	return hexutil.Uint(s.hmy.ProtocolVersion())
 }
 
@@ -32,23 +39,23 @@ func (s *PublicHarmonyAPI) ProtocolVersion() hexutil.Uint {
 // - highestBlock:  block number of the highest block header this node has received from peers
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
-func (s *PublicHarmonyAPI) Syncing() (interface{}, error) {
+func (s *PublicHarmonyService) Syncing() (interface{}, error) {
 	// TODO(dm): find our Downloader module for syncing blocks
 	return false, nil
 }
 
 // GasPrice returns a suggestion for a gas price.
-func (s *PublicHarmonyAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
+func (s *PublicHarmonyService) GasPrice(ctx context.Context) (*hexutil.Big, error) {
 	// TODO(ricl): add SuggestPrice API
 	return (*hexutil.Big)(big.NewInt(1)), nil
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
-func (s *PublicHarmonyAPI) GetNodeMetadata() common.NodeMetadata {
+func (s *PublicHarmonyService) GetNodeMetadata() common.NodeMetadata {
 	return s.hmy.GetNodeMetadata()
 }
 
 // GetPeerInfo produces a NodePeerInfo record
-func (s *PublicHarmonyAPI) GetPeerInfo() common.NodePeerInfo {
+func (s *PublicHarmonyService) GetPeerInfo() common.NodePeerInfo {
 	return s.hmy.GetPeerInfo()
 }
