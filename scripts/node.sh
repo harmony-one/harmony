@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200606.0"
+version="v1 20200723.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -308,7 +308,10 @@ do
    r) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
-   V) LD_LIBRARY_PATH=. ./harmony -version
+   V) INSTALLED_VERSION=$(LD_LIBRARY_PATH=. ./harmony -version 2>&1)
+      RUNNING_VERSION=$(curl -s --request POST 'http://127.0.0.1:9500/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc": "2.0", "method": "hmyv2_getNodeMetadata", "params": [], "id": 1}' | grep -Eo '"version":"[^"]*"' | cut -c11- | tr -d \")
+      echo "Binary  Version: $INSTALLED_VERSION"
+      echo "Running Version: $RUNNING_VERSION"
       exit 0 ;;
    Y) verify=true;;
    z) staking_mode=true;;
