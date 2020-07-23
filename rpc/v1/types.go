@@ -1,4 +1,4 @@
-package rpc
+package v1
 
 import (
 	"encoding/hex"

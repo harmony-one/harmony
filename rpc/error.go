@@ -15,4 +15,6 @@ var (
 	ErrNotBeaconShard = errors.New("cannot call this rpc on non beaconchain node")
 	// ErrRequestedBlockTooHigh when given block is greater than latest block number
 	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")
+	// ErrUnknownRpcVersion when rpc method has an unknown or unhandled version
+	ErrUnknownRpcVersion = errors.New("API service has an unknown version")
 )

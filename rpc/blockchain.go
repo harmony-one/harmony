@@ -22,6 +22,9 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
+	"github.com/harmony-one/harmony/rpc/v1"
+	"github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/network"
@@ -54,15 +57,6 @@ func NewPublicBlockChainAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	}
 }
 
-// BlockArgs is struct to include optional block formatting params.
-type BlockArgs struct {
-	WithSigners bool     `json:"withSigners"`
-	InclTx      bool     `json:"inclTx"`
-	FullTx      bool     `json:"fullTx"`
-	Signers     []string `json:"signers"`
-	InclStaking bool     `json:"inclStaking"`
-}
-
 func (s *PublicBlockchainService) isBeaconShard() error {
 	if s.hmy.ShardID != shard.BeaconChainShardID {
 		return ErrNotBeaconShard
@@ -84,107 +78,171 @@ func (s *PublicBlockchainService) isBlockGreaterThanLatest(blockNum rpc.BlockNum
 
 // GetBlockByNumber returns the requested block. When blockNum is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockchainService) GetBlockByNumber(ctx context.Context, blockNum rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
-	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
-		return nil, err
-	}
-	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if blk != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-		response, err := RPCMarshalBlock(blk, blockArgs, leader)
-		if err == nil && blockNum == rpc.PendingBlockNumber {
-			// Pending blocks need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
+// When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
+func (s *PublicBlockchainService) GetBlockByNumber(
+	ctx context.Context, blockNumber BlockNumber, opts interface{},
+) (response rpc_common.Response, err error) {
+	// Process arguments based on version
+	blockNum := blockNumber.EthBlockNumber()
+	var blockArgs rpc_common.BlockArgs
+	switch s.version {
+	case V1:
+		// Handle GetBlockByNumberNew alias
+		testBlockArgs, ok := opts.(rpc_common.BlockArgs)
+		if ok {
+			blockArgs = testBlockArgs
+			break
 		}
-		return response, err
+		fullTx, ok := opts.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for second argument")
+		}
+		blockArgs = rpc_common.BlockArgs{
+			WithSigners: false,
+			FullTx:      fullTx,
+			InclStaking: true,
+		}
+	case V2:
+		parsedBlockArgs := rpc_common.BlockArgs{}
+		if err := parsedBlockArgs.UnmarshalFromInterface(opts); err != nil {
+			return nil, err
+		}
+		blockArgs = parsedBlockArgs
+	default:
+		return nil, ErrUnknownRpcVersion
 	}
-	return nil, err
-}
+	blockArgs.InclTx = true
 
-// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
-// detail, otherwise only the transaction hash is returned.
-func (s *PublicBlockchainService) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
-	blk, err := s.hmy.GetBlock(ctx, blockHash)
-	if blk != nil {
-		blockArgs := BlockArgs{WithSigners: false, InclTx: true, FullTx: fullTx, InclStaking: true}
-		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-		return RPCMarshalBlock(blk, blockArgs, leader)
-	}
-	return nil, err
-}
-
-// GetBlockByNumberNew returns the requested block. When blockNum is -1 the chain head is returned. When fullTx in blockArgs is true all
-// transactions in the block are returned in full detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
-// it shows block signers for this block in list of one addresses.
-func (s *PublicBlockchainService) GetBlockByNumberNew(ctx context.Context, blockNum rpc.BlockNumber, blockArgs BlockArgs) (map[string]interface{}, error) {
+	// Fetch the block
 	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
 		return nil, err
 	}
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	blockArgs.InclTx = true
+	if err != nil {
+		return nil, err
+	}
 	if blockArgs.WithSigners {
 		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNum)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if blk != nil {
-		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-		response, err := RPCMarshalBlock(blk, blockArgs, leader)
-		if err == nil && blockNum == rpc.PendingBlockNumber {
-			// Pending blocks need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
-		return response, err
+
+	// Format the response according to version
+	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+	switch s.version {
+	case V1:
+		response, err = v1.RPCMarshalBlock(blk, blockArgs, leader)
+	case V2:
+		response, err = v2.RPCMarshalBlock(blk, blockArgs, leader)
+	default:
+		return nil, ErrUnknownRpcVersion
 	}
-	return nil, err
+
+	// Pending blocks need to nil out a few fields
+	if err == nil && blockNum == rpc.PendingBlockNumber {
+		for _, field := range []string{"hash", "nonce", "miner"} {
+			response[field] = nil
+		}
+	}
+	return response, err
 }
 
-// GetBlockByHashNew returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
+// GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
-func (s *PublicBlockchainService) GetBlockByHashNew(ctx context.Context, blockHash common.Hash, blockArgs BlockArgs) (map[string]interface{}, error) {
+func (s *PublicBlockchainService) GetBlockByHash(
+	ctx context.Context, blockHash common.Hash, opts interface{},
+) (response rpc_common.Response, err error) {
+	// Process arguments based on version
+	var blockArgs rpc_common.BlockArgs
+	switch s.version {
+	case V1:
+		// Handle GetBlockByHashNew alias
+		testBlockArgs, ok := opts.(rpc_common.BlockArgs)
+		if ok {
+			blockArgs = testBlockArgs
+			break
+		}
+		fullTx, ok := opts.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for second argument")
+		}
+		blockArgs = rpc_common.BlockArgs{
+			WithSigners: false,
+			FullTx:      fullTx,
+			InclStaking: true,
+		}
+	case V2:
+		parsedBlockArgs := rpc_common.BlockArgs{}
+		if err := parsedBlockArgs.UnmarshalFromInterface(opts); err != nil {
+			return nil, err
+		}
+		blockArgs = parsedBlockArgs
+	default:
+		return nil, ErrUnknownRpcVersion
+	}
+	blockArgs.InclTx = true
+
+	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
 		return nil, err
 	}
-	blockArgs.InclTx = true
 	if blockArgs.WithSigners {
 		blockArgs.Signers, err = s.GetBlockSigners(ctx, rpc.BlockNumber(blk.NumberU64()))
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	// Format the response according to version
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	return RPCMarshalBlock(blk, blockArgs, leader)
+	switch s.version {
+	case V1:
+		return v1.RPCMarshalBlock(blk, blockArgs, leader)
+	case V2:
+		return v1.RPCMarshalBlock(blk, blockArgs, leader)
+	default:
+		return nil, ErrUnknownRpcVersion
+	}
+}
+
+// GetBlockByNumberNew is an alias for GetBlockByNumber using BlockArgs
+func (s *PublicBlockchainService) GetBlockByNumberNew(
+	ctx context.Context, blockNum BlockNumber, blockArgs rpc_common.BlockArgs,
+) (rpc_common.Response, error) {
+	return s.GetBlockByNumber(ctx, blockNum, blockArgs)
+}
+
+// GetBlockByHashNew is an alias for GetBlocksByHash using BlockArgs
+func (s *PublicBlockchainService) GetBlockByHashNew(
+	ctx context.Context, blockHash common.Hash, blockArgs rpc_common.BlockArgs,
+) (rpc_common.Response, error) {
+	return s.GetBlockByHash(ctx, blockHash, blockArgs)
 }
 
 // GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
-func (s *PublicBlockchainService) GetBlocks(ctx context.Context, blockStart rpc.BlockNumber, blockEnd rpc.BlockNumber, blockArgs BlockArgs) ([]map[string]interface{}, error) {
-	result := make([]map[string]interface{}, 0)
+func (s *PublicBlockchainService) GetBlocks(
+	ctx context.Context, blockNumberStart BlockNumber,
+	blockNumberEnd BlockNumber, blockArgs rpc_common.BlockArgs,
+) ([]rpc_common.Response, error) {
+	// Process arguments for both versions
+	blockStart := blockNumberStart.Int64()
+	blockEnd := blockNumberEnd.Int64()
+
+	// Fetch blocks within given range
+	result := []rpc_common.Response{}
 	for i := blockStart; i <= blockEnd; i++ {
-		blk, err := s.hmy.BlockByNumber(ctx, i)
-		blockArgs.InclTx = true
-		if blockArgs.WithSigners {
-			blockArgs.Signers, err = s.GetBlockSigners(ctx, rpc.BlockNumber(i))
-			if err != nil {
-				return nil, err
-			}
+		blockNum := BlockNumber(i)
+		if blockNum.Int64() >= s.hmy.CurrentBlock().Number().Int64() {
+			break
 		}
-		if blk != nil {
-			leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-			rpcBlock, err := RPCMarshalBlock(blk, blockArgs, leader)
-			if err == nil && i == rpc.PendingBlockNumber {
-				// Pending blocks need to nil out a few fields
-				for _, field := range []string{"hash", "nonce", "miner"} {
-					rpcBlock[field] = nil
-				}
-			}
+		rpcBlock, err := s.GetBlockByNumber(ctx, blockNum, blockArgs)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("RPC Error")
+		}
+		if rpcBlock != nil {
 			result = append(result, rpcBlock)
 		}
 	}

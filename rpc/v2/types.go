@@ -1,9 +1,8 @@
-package rpc
+package v2
 
 import (
 	"encoding/hex"
 	"math/big"
-	"strconv"
 	"strings"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -21,53 +19,23 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-type BlockNumber rpc.BlockNumber
-
-func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
-	baseBn := rpc.BlockNumber(0)
-	baseErr := baseBn.UnmarshalJSON(data)
-	if baseErr != nil {
-		input := strings.TrimSpace(string(data))
-		if len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"' {
-			input = input[1 : len(input)-1]
-		}
-		input = strings.TrimPrefix(input, "0x")
-		num, err := strconv.ParseInt(input, 10, 64)
-		if err != nil {
-			return err
-		}
-		*bn = BlockNumber(num)
-		return nil
-	}
-	*bn = BlockNumber(baseBn)
-	return nil
-}
-
-func (bn BlockNumber) Int64() int64 {
-	return (int64)(bn)
-}
-
-func (bn BlockNumber) EthBlockNumber() rpc.BlockNumber {
-	return (rpc.BlockNumber)(bn)
-}
-
 // RPCBlock represents a block that will serialize to the RPC representation of a block
 type RPCBlock struct {
-	Number           *hexutil.Big     `json:"number"`
-	ViewID           *hexutil.Big     `json:"viewID"`
-	Epoch            *hexutil.Big     `json:"epoch"`
+	Number           *big.Int         `json:"number"`
+	ViewID           *big.Int         `json:"viewID"`
+	Epoch            *big.Int         `json:"epoch"`
 	Hash             common.Hash      `json:"hash"`
 	ParentHash       common.Hash      `json:"parentHash"`
 	Nonce            types.BlockNonce `json:"nonce"`
 	MixHash          common.Hash      `json:"mixHash"`
 	LogsBloom        ethtypes.Bloom   `json:"logsBloom"`
 	StateRoot        common.Hash      `json:"stateRoot"`
-	Miner            common.Address   `json:"miner"`
-	Difficulty       *hexutil.Big     `json:"difficulty"`
+	Miner            string           `json:"miner"`
+	Difficulty       *big.Int         `json:"difficulty"`
 	ExtraData        []byte           `json:"extraData"`
-	Size             hexutil.Uint64   `json:"size"`
-	GasLimit         hexutil.Uint64   `json:"gasLimit"`
-	GasUsed          hexutil.Uint64   `json:"gasUsed"`
+	Size             uint64           `json:"size"`
+	GasLimit         uint64           `json:"gasLimit"`
+	GasUsed          uint64           `json:"gasUsed"`
 	Timestamp        *big.Int         `json:"timestamp"`
 	TransactionsRoot common.Hash      `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash      `json:"receiptsRoot"`
@@ -80,36 +48,36 @@ type RPCBlock struct {
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
 type RPCTransaction struct {
-	BlockHash        common.Hash    `json:"blockHash"`
-	BlockNumber      *hexutil.Big   `json:"blockNumber"`
-	From             string         `json:"from"`
-	Timestamp        hexutil.Uint64 `json:"timestamp"`
-	Gas              hexutil.Uint64 `json:"gas"`
-	GasPrice         *hexutil.Big   `json:"gasPrice"`
-	Hash             common.Hash    `json:"hash"`
-	Input            hexutil.Bytes  `json:"input"`
-	Nonce            hexutil.Uint64 `json:"nonce"`
-	To               string         `json:"to"`
-	TransactionIndex hexutil.Uint   `json:"transactionIndex"`
-	Value            *hexutil.Big   `json:"value"`
-	ShardID          uint32         `json:"shardID"`
-	ToShardID        uint32         `json:"toShardID"`
-	V                *hexutil.Big   `json:"v"`
-	R                *hexutil.Big   `json:"r"`
-	S                *hexutil.Big   `json:"s"`
+	BlockHash        common.Hash   `json:"blockHash"`
+	BlockNumber      *big.Int      `json:"blockNumber"`
+	From             string        `json:"from"`
+	Timestamp        uint64        `json:"timestamp"`
+	Gas              uint64        `json:"gas"`
+	GasPrice         *big.Int      `json:"gasPrice"`
+	Hash             common.Hash   `json:"hash"`
+	Input            hexutil.Bytes `json:"input"`
+	Nonce            uint64        `json:"nonce"`
+	To               string        `json:"to"`
+	TransactionIndex uint64        `json:"transactionIndex"`
+	Value            *big.Int      `json:"value"`
+	ShardID          uint32        `json:"shardID"`
+	ToShardID        uint32        `json:"toShardID"`
+	V                *hexutil.Big  `json:"v"`
+	R                *hexutil.Big  `json:"r"`
+	S                *hexutil.Big  `json:"s"`
 }
 
 // RPCStakingTransaction represents a transaction that will serialize to the RPC representation of a staking transaction
 type RPCStakingTransaction struct {
 	BlockHash        common.Hash            `json:"blockHash"`
-	BlockNumber      *hexutil.Big           `json:"blockNumber"`
+	BlockNumber      *big.Int               `json:"blockNumber"`
 	From             string                 `json:"from"`
-	Timestamp        hexutil.Uint64         `json:"timestamp"`
-	Gas              hexutil.Uint64         `json:"gas"`
-	GasPrice         *hexutil.Big           `json:"gasPrice"`
+	Timestamp        uint64                 `json:"timestamp"`
+	Gas              uint64                 `json:"gas"`
+	GasPrice         *big.Int               `json:"gasPrice"`
 	Hash             common.Hash            `json:"hash"`
-	Nonce            hexutil.Uint64         `json:"nonce"`
-	TransactionIndex hexutil.Uint           `json:"transactionIndex"`
+	Nonce            uint64                 `json:"nonce"`
+	TransactionIndex uint64                 `json:"transactionIndex"`
 	V                *hexutil.Big           `json:"v"`
 	R                *hexutil.Big           `json:"r"`
 	S                *hexutil.Big           `json:"s"`
@@ -119,14 +87,14 @@ type RPCStakingTransaction struct {
 
 // RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
 type RPCCXReceipt struct {
-	BlockHash   common.Hash  `json:"blockHash"`
-	BlockNumber *hexutil.Big `json:"blockNumber"`
-	TxHash      common.Hash  `json:"hash"`
-	From        string       `json:"from"`
-	To          string       `json:"to"`
-	ShardID     uint32       `json:"shardID"`
-	ToShardID   uint32       `json:"toShardID"`
-	Amount      *hexutil.Big `json:"value"`
+	BlockHash   common.Hash `json:"blockHash"`
+	BlockNumber *big.Int    `json:"blockNumber"`
+	TxHash      common.Hash `json:"hash"`
+	From        string      `json:"from"`
+	To          string      `json:"to"`
+	ShardID     uint32      `json:"shardID"`
+	ToShardID   uint32      `json:"toShardID"`
+	Amount      *big.Int    `json:"value"`
 }
 
 // HeaderInformation represents the latest consensus information
@@ -216,13 +184,13 @@ func newRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	result := &RPCCXReceipt{
 		BlockHash: blockHash,
 		TxHash:    cx.TxHash,
-		Amount:    (*hexutil.Big)(cx.Amount),
+		Amount:    cx.Amount,
 		ShardID:   cx.ShardID,
 		ToShardID: cx.ToShardID,
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = blockHash
-		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
+		result.BlockNumber = (*big.Int)(new(big.Int).SetUint64(blockNumber))
 	}
 
 	fromAddr, err := internal_common.AddressToBech32(cx.From)
@@ -255,23 +223,23 @@ func newRPCTransaction(
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
-		Gas:       hexutil.Uint64(tx.Gas()),
-		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
+		Gas:       tx.Gas(),
+		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
-		Nonce:     hexutil.Uint64(tx.Nonce()),
-		Value:     (*hexutil.Big)(tx.Value()),
+		Nonce:     tx.Nonce(),
+		Value:     tx.Value(),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
-		Timestamp: hexutil.Uint64(timestamp),
+		Timestamp: timestamp,
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
 		S:         (*hexutil.Big)(s),
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = blockHash
-		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
-		result.TransactionIndex = hexutil.Uint(index)
+		result.BlockNumber = (*big.Int)(new(big.Int).SetUint64(blockNumber))
+		result.TransactionIndex = index
 	}
 
 	fromAddr, err := internal_common.AddressToBech32(from)
@@ -295,7 +263,8 @@ func newRPCTransaction(
 
 // newRPCStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash,
+func newRPCStakingTransaction(
+	tx *staking.StakingTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) *RPCStakingTransaction {
 	from, err := tx.SenderAddress()
@@ -304,7 +273,7 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 	}
 	v, r, s := tx.RawSignatureValues()
 
-	fields := map[string]interface{}{}
+	fields := make(map[string]interface{})
 
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
@@ -322,13 +291,13 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		}
 		fields = map[string]interface{}{
 			"validatorAddress":   validatorAddress,
-			"commissionRate":     (*hexutil.Big)(msg.CommissionRates.Rate.Int),
-			"maxCommissionRate":  (*hexutil.Big)(msg.CommissionRates.MaxRate.Int),
-			"maxChangeRate":      (*hexutil.Big)(msg.CommissionRates.MaxChangeRate.Int),
-			"minSelfDelegation":  (*hexutil.Big)(msg.MinSelfDelegation),
-			"maxTotalDelegation": (*hexutil.Big)(msg.MaxTotalDelegation),
-			"amount":             (*hexutil.Big)(msg.Amount),
 			"name":               msg.Description.Name,
+			"commissionRate":     msg.CommissionRates.Rate.Int,
+			"maxCommissionRate":  msg.CommissionRates.MaxRate.Int,
+			"maxChangeRate":      msg.CommissionRates.MaxChangeRate.Int,
+			"minSelfDelegation":  msg.MinSelfDelegation,
+			"maxTotalDelegation": msg.MaxTotalDelegation,
+			"amount":             msg.Amount,
 			"website":            msg.Description.Website,
 			"identity":           msg.Description.Identity,
 			"securityContact":    msg.Description.SecurityContact,
@@ -349,16 +318,16 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 			return nil
 		}
 		// Edit validators txs need not have commission rates to edit
-		commissionRate := &hexutil.Big{}
+		commissionRate := &big.Int{}
 		if msg.CommissionRate != nil {
-			commissionRate = (*hexutil.Big)(msg.CommissionRate.Int)
+			commissionRate = msg.CommissionRate.Int
 		}
 		fields = map[string]interface{}{
 			"validatorAddress":   validatorAddress,
 			"commisionRate":      commissionRate,
-			"minSelfDelegation":  (*hexutil.Big)(msg.MinSelfDelegation),
-			"maxTotalDelegation": (*hexutil.Big)(msg.MaxTotalDelegation),
 			"name":               msg.Description.Name,
+			"minSelfDelegation":  msg.MinSelfDelegation,
+			"maxTotalDelegation": msg.MaxTotalDelegation,
 			"website":            msg.Description.Website,
 			"identity":           msg.Description.Identity,
 			"securityContact":    msg.Description.SecurityContact,
@@ -402,7 +371,7 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 			"validatorAddress": validatorAddress,
-			"amount":           (*hexutil.Big)(msg.Amount),
+			"amount":           msg.Amount,
 		}
 	case staking.DirectiveUndelegate:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
@@ -424,16 +393,16 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		fields = map[string]interface{}{
 			"delegatorAddress": delegatorAddress,
 			"validatorAddress": validatorAddress,
-			"amount":           (*hexutil.Big)(msg.Amount),
+			"amount":           msg.Amount,
 		}
 	}
 
 	result := &RPCStakingTransaction{
-		Gas:       hexutil.Uint64(tx.Gas()),
-		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
+		Gas:       tx.Gas(),
+		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
-		Nonce:     hexutil.Uint64(tx.Nonce()),
-		Timestamp: hexutil.Uint64(timestamp),
+		Nonce:     tx.Nonce(),
+		Timestamp: timestamp,
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
 		S:         (*hexutil.Big)(s),
@@ -442,8 +411,8 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 	}
 	if blockHash != (common.Hash{}) {
 		result.BlockHash = blockHash
-		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
-		result.TransactionIndex = hexutil.Uint(index)
+		result.BlockNumber = new(big.Int).SetUint64(blockNumber)
+		result.TransactionIndex = index
 	}
 
 	fromAddr, err := internal_common.AddressToBech32(from)
@@ -461,9 +430,9 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 func RPCMarshalBlock(b *types.Block, blockArgs rpc_common.BlockArgs, leader string) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
-		"number":           (*hexutil.Big)(head.Number()),
-		"viewID":           (*hexutil.Big)(head.ViewID()),
-		"epoch":            (*hexutil.Big)(head.Epoch()),
+		"number":           (*big.Int)(head.Number()),
+		"viewID":           (*big.Int)(head.ViewID()),
+		"epoch":            (*big.Int)(head.Epoch()),
 		"hash":             b.Hash(),
 		"parentHash":       head.ParentHash(),
 		"nonce":            0, // Remove this because we don't have it in our header
@@ -473,10 +442,10 @@ func RPCMarshalBlock(b *types.Block, blockArgs rpc_common.BlockArgs, leader stri
 		"miner":            leader,
 		"difficulty":       0, // Remove this because we don't have it in our header
 		"extraData":        hexutil.Bytes(head.Extra()),
-		"size":             hexutil.Uint64(b.Size()),
-		"gasLimit":         hexutil.Uint64(head.GasLimit()),
-		"gasUsed":          hexutil.Uint64(head.GasUsed()),
-		"timestamp":        hexutil.Uint64(head.Time().Uint64()),
+		"size":             uint64(b.Size()),
+		"gasLimit":         head.GasLimit(),
+		"gasUsed":          head.GasUsed(),
+		"timestamp":        head.Time().Uint64(),
 		"transactionsRoot": head.TxHash(),
 		"receiptsRoot":     head.ReceiptHash(),
 	}
