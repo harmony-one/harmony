@@ -5,9 +5,8 @@ import (
 	"os"
 	"sync"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/harmony-one/harmony/internal/blsgen"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/multibls"
 )
 
