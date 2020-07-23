@@ -10,11 +10,11 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/hmyapi"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
-	"github.com/harmony-one/harmony/internal/hmyapi/filters"
 	"github.com/harmony-one/harmony/internal/utils"
+	hmy_rpc "github.com/harmony-one/harmony/rpc"
+	"github.com/harmony-one/harmony/rpc/apiv1"
+	"github.com/harmony-one/harmony/rpc/apiv2"
+	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
@@ -179,7 +179,7 @@ func (node *Node) APIs() []rpc.API {
 		harmony = hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
 	}
 	// Gather all the possible APIs to surface
-	apis := hmyapi.GetAPIs(harmony)
+	apis := hmy_rpc.GetAPIs(harmony)
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{

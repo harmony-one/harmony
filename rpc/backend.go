@@ -1,10 +1,10 @@
-package hmyapi
+package rpc
 
 import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
+	"github.com/harmony-one/harmony/rpc/apiv1"
+	"github.com/harmony-one/harmony/rpc/apiv2"
 )
 
 // GetAPIs returns all the APIs.
