@@ -7,15 +7,14 @@ import (
 	"strings"
 
 	"github.com/harmony-one/harmony/internal/cli"
-
-	"github.com/spf13/cobra"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
+	"github.com/spf13/cobra"
 )
 
-const tomlConfigVersion = "1.0.0"
-
+// harmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
+// from user set flags to internal node configs. Also user can persist this structure to a toml file
+// to avoid inputting all arguments.
 type harmonyConfig struct {
 	Version   string
 	General   generalConfig
@@ -118,7 +117,7 @@ type devnetConfig struct {
 	HmyNodeSize int
 }
 
-// TODO: make this revert to a separate command
+// TODO: make `revert` to a separate command
 type revertConfig struct {
 	RevertBeacon bool
 	RevertTo     int
