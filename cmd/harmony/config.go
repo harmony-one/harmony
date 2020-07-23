@@ -3,7 +3,12 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
+
+	"github.com/harmony-one/harmony/internal/cli"
+
+	"github.com/spf13/cobra"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
@@ -17,6 +22,7 @@ type harmonyConfig struct {
 	Network   networkConfig
 	P2P       p2pConfig
 	RPC       rpcConfig
+	WS        wsConfig
 	Consensus consensusConfig
 	BLSKeys   blsConfig
 	TxPool    txPoolConfig
@@ -24,6 +30,7 @@ type harmonyConfig struct {
 	Log       logConfig
 	Devnet    *devnetConfig `toml:",omitempty"`
 	Revert    *revertConfig `toml:",omitempty"`
+	Legacy    *legacyConfig `toml:",omitempty"`
 }
 
 type networkConfig struct {
@@ -36,6 +43,7 @@ type networkConfig struct {
 }
 
 type p2pConfig struct {
+	IP      string
 	Port    int
 	KeyFile string
 }
@@ -51,6 +59,7 @@ type generalConfig struct {
 type consensusConfig struct {
 	DelayCommit string
 	BlockTime   string
+	MinPeers    int
 }
 
 type blsConfig struct {
@@ -97,134 +106,28 @@ type rpcConfig struct {
 	Port    int
 }
 
+type wsConfig struct {
+	Enabled bool
+	IP      string
+	Port    int
+}
+
 type devnetConfig struct {
 	NumShards   int
 	ShardSize   int
 	HmyNodeSize int
 }
 
-// TODO: make this revert to a seperate command
+// TODO: make this revert to a separate command
 type revertConfig struct {
 	RevertBeacon bool
 	RevertTo     int
 	RevertBefore int
 }
 
-var defaultConfig = harmonyConfig{
-	Version: tomlConfigVersion,
-	General: generalConfig{
-		NodeType:   "validator",
-		IsStaking:  true,
-		ShardID:    -1,
-		IsArchival: false,
-		DataDir:    "./",
-	},
-	Network: getDefaultNetworkConfig(nodeconfig.Mainnet),
-	P2P: p2pConfig{
-		Port:    nodeconfig.DefaultP2PPort,
-		KeyFile: "./.hmykey",
-	},
-	RPC: rpcConfig{
-		Enabled: false,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultRPCPort,
-	},
-	BLSKeys: blsConfig{
-		KeyDir:   "./hmy/blskeys",
-		KeyFiles: nil,
-		MaxKeys:  10,
-
-		PassEnabled:      true,
-		PassSrcType:      blsPassTypeAuto,
-		PassFile:         "",
-		SavePassphrase:   false,
-		KMSEnabled:       true,
-		KMSConfigSrcType: kmsConfigTypeShared,
-		KMSConfigFile:    "",
-	},
-	Consensus: consensusConfig{
-		DelayCommit: "0ms",
-		BlockTime:   "8s",
-	},
-	TxPool: txPoolConfig{
-		BlacklistFile:      "./.hmy/blacklist.txt",
-		BroadcastInvalidTx: false,
-	},
-	Pprof: pprofConfig{
-		Enabled:    false,
-		ListenAddr: "127.0.0.1:6060",
-	},
-	Log: logConfig{
-		Folder:     "./latest",
-		FileName:   "harmony.log",
-		RotateSize: 100,
-		Verbosity:  3,
-	},
+type legacyConfig struct {
+	WebHookConfig string
 }
-
-var defaultDevnetConfig = devnetConfig{
-	NumShards:   2,
-	ShardSize:   10,
-	HmyNodeSize: 10,
-}
-
-var defaultRevertConfig = revertConfig{
-	RevertBeacon: false,
-	RevertBefore: -1,
-	RevertTo:     -1,
-}
-
-var defaultLogContext = logContext{
-	IP:   "127.0.0.1",
-	Port: 9000,
-}
-
-func getDefaultHmyConfigCopy() harmonyConfig {
-	config := defaultConfig
-	return config
-}
-
-func getDefaultDevnetConfigCopy() devnetConfig {
-	config := defaultDevnetConfig
-	return config
-}
-
-func getDefaultRevertConfigCopy() revertConfig {
-	config := defaultRevertConfig
-	return config
-}
-
-func getDefaultLogContextCopy() logContext {
-	config := defaultLogContext
-	return config
-}
-
-const (
-	nodeTypeValidator = "validator"
-	nodeTypeExplorer  = "explorer"
-)
-
-const (
-	blsPassTypeAuto   = "auto"
-	blsPassTypeFile   = "file"
-	blsPassTypePrompt = "prompt"
-
-	kmsConfigTypeShared = "shared"
-	kmsConfigTypePrompt = "prompt"
-	kmsConfigTypeFile   = "file"
-
-	legacyBLSPassTypeDefault = "default"
-	legacyBLSPassTypeStdin   = "stdin"
-	legacyBLSPassTypeDynamic = "no-prompt"
-	legacyBLSPassTypePrompt  = "prompt"
-	legacyBLSPassTypeStatic  = "file"
-	legacyBLSPassTypeNone    = "none"
-
-	legacyBLSKmsTypeDefault = "default"
-	legacyBLSKmsTypePrompt  = "prompt"
-	legacyBLSKmsTypeFile    = "file"
-	legacyBLSKmsTypeNone    = "none"
-)
 
 // TODO: use specific type wise validation instead of general string types assertion.
 func validateHarmonyConfig(config harmonyConfig) error {
@@ -303,6 +206,28 @@ func parseNetworkType(nt string) nodeconfig.NetworkType {
 	}
 }
 
+var dumpConfigCmd = &cobra.Command{
+	Use:   "dumpconfig [config_file]",
+	Short: "dump the config file for harmony binary configurations",
+	Long:  "dump the config file for harmony binary configurations",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		config := getDefaultHmyConfigCopy()
+		nt := getNetworkType(cmd)
+		config.Network = getDefaultNetworkConfig(nt)
+		fmt.Println(args[0])
+
+		if err := writeHarmonyConfigToFile(config, args[0]); err != nil {
+			fmt.Println(err)
+			os.Exit(128)
+		}
+	},
+}
+
+func registerDumpConfigFlags() error {
+	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
+}
+
 func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -316,7 +241,7 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	return config, nil
 }
 
-func writeHarmonyConfigToFile(config *harmonyConfig, file string) error {
+func writeHarmonyConfigToFile(config harmonyConfig, file string) error {
 	b, err := toml.Marshal(config)
 	if err != nil {
 		return err
