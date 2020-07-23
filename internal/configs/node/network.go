@@ -43,9 +43,12 @@ const (
 	// very bad design. Will refactor later
 	// TODO: refactor all 9000-3000 = 6000 stuff
 	DefaultDNSPort = 9000
-	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500, which is a terrible
-	// design.
+	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
+	// TODO: modify this
 	DefaultRPCPort = 9000
+	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
+	// TODO: modify this
+	DefaultWSPort = 9000
 )
 
 // GetDefaultBootNodes get the default bootnode with the given network type
@@ -79,6 +82,7 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 	case Stressnet:
 		return stressnetDNSZone
 	}
+	return ""
 }
 
 // GetDefaultDNSPort get the default DNS port for the given network type

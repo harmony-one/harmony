@@ -37,6 +37,7 @@ var (
 	}
 
 	p2pFlags = []cli.Flag{
+		p2pIPFlag,
 		p2pPortFlag,
 		p2pKeyFileFlag,
 
@@ -49,6 +50,12 @@ var (
 		rpcPortFlag,
 
 		legacyPublicRPCFlag,
+	}
+
+	wsFlags = []cli.Flag{
+		wsEnabledFlag,
+		wsIPFlag,
+		wsPortFlag,
 	}
 
 	blsFlags = append(newBLSFlags, legacyBLSFlags...)
@@ -78,9 +85,11 @@ var (
 	consensusFlags = []cli.Flag{
 		consensusDelayCommitFlag,
 		consensusBlockTimeFlag,
+		consensusMinPeersFlag,
 
 		legacyDelayCommitFlag,
 		legacyBlockTimeFlag,
+		legacyConsensusMinPeersFlag,
 	}
 
 	txPoolFlags = []cli.Flag{
@@ -140,6 +149,7 @@ var (
 	legacyMiscFlags = []cli.Flag{
 		legacyPortFlag,
 		legacyIPFlag,
+		legacyWebHookConfigFlag,
 	}
 )
 
@@ -271,7 +281,7 @@ var (
 		Name:       "dns",
 		DefValue:   true,
 		Usage:      "use dns for syncing",
-		Deprecated: "set to false only to use self discovery peers for syncing",
+		Deprecated: "only set to false to use self discovered peers for syncing",
 	}
 	legacyNetworkTypeFlag = cli.StringFlag{
 		Name:       "network_type",
@@ -301,7 +311,7 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
 		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
 		if val {
-			cfg.Network.DNSZone = mainnetDnsZone
+			cfg.Network.DNSZone = nodeconfig.GetDefaultDNSZone(defNetworkType)
 		} else {
 			cfg.Network.LegacySyncing = true
 		}
@@ -316,9 +326,14 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 
 // p2p flags
 var (
+	p2pIPFlag = cli.StringFlag{
+		Name:     "p2p.ip",
+		Usage:    "ip to listen for p2p protocols",
+		DefValue: defaultConfig.P2P.IP,
+	}
 	p2pPortFlag = cli.IntFlag{
 		Name:     "p2p.port",
-		Usage:    "port to listen for p2p communication",
+		Usage:    "port to listen for p2p protocols",
 		DefValue: defaultConfig.P2P.Port,
 	}
 	p2pKeyFileFlag = cli.StringFlag{
@@ -335,6 +350,10 @@ var (
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if cli.IsFlagChanged(cmd, p2pIPFlag) {
+		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIPFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
@@ -388,6 +407,37 @@ func applyRPCFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.RPC.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
 	} else if isRPCSpecified {
 		config.RPC.Enabled = true
+	}
+}
+
+// ws flags
+var (
+	wsEnabledFlag = cli.BoolFlag{
+		Name:     "ws",
+		Usage:    "enable websocket endpoint",
+		DefValue: defaultConfig.WS.Enabled,
+	}
+	wsIPFlag = cli.StringFlag{
+		Name:     "ws.ip",
+		Usage:    "ip endpoint for websocket",
+		DefValue: defaultConfig.WS.IP,
+	}
+	wsPortFlag = cli.IntFlag{
+		Name:     "ws.port",
+		Usage:    "port for websocket endpoint",
+		DefValue: defaultConfig.WS.Port,
+	}
+)
+
+func applyWSFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if cli.IsFlagChanged(cmd, wsEnabledFlag) {
+		config.WS.Enabled = cli.GetBoolFlagValue(cmd, wsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, wsIPFlag) {
+		config.WS.IP = cli.GetStringFlagValue(cmd, wsIPFlag)
+	}
+	if cli.IsFlagChanged(cmd, wsPortFlag) {
+		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
 	}
 }
 
@@ -616,6 +666,13 @@ var (
 		DefValue: defaultConfig.Consensus.BlockTime,
 		Hidden:   true,
 	}
+	// TODO: hard code value?
+	consensusMinPeersFlag = cli.IntFlag{
+		Name:     "consensus.min-peers",
+		Usage:    "minimal number of peers in shard",
+		DefValue: defaultConfig.Consensus.MinPeers,
+		Hidden:   true,
+	}
 	legacyDelayCommitFlag = cli.StringFlag{
 		Name:       "delay_commit",
 		Usage:      "how long to delay sending commit messages in consensus, ex: 500ms, 1s",
@@ -627,6 +684,12 @@ var (
 		Usage:      "how long in second the leader waits to propose a new block",
 		DefValue:   8,
 		Deprecated: "use --consensus.block-time",
+	}
+	legacyConsensusMinPeersFlag = cli.IntFlag{
+		Name:     "min_peers",
+		Usage:    "Minimal number of Peers in shard",
+		DefValue: defaultConfig.Consensus.MinPeers,
+		Hidden:   true,
 	}
 )
 
@@ -642,6 +705,12 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyBlockTimeFlag) {
 		sec := cli.GetIntFlagValue(cmd, legacyBlockTimeFlag)
 		config.Consensus.BlockTime = fmt.Sprintf("%ds", sec)
+	}
+
+	if cli.IsFlagChanged(cmd, consensusMinPeersFlag) {
+		config.Consensus.MinPeers = cli.GetIntFlagValue(cmd, consensusMinPeersFlag)
+	} else if cli.IsFlagChanged(cmd, legacyConsensusMinPeersFlag) {
+		config.Consensus.MinPeers = cli.GetIntFlagValue(cmd, legacyConsensusMinPeersFlag)
 	}
 }
 
@@ -961,6 +1030,12 @@ var (
 		DefValue:   defaultConfig.RPC.IP,
 		Deprecated: "use --http.ip",
 	}
+	legacyWebHookConfigFlag = cli.StringFlag{
+		Name:     "webhook_yaml",
+		Usage:    "path for yaml config reporting double signing",
+		DefValue: "",
+		Hidden:   true,
+	}
 )
 
 // Note: this function need to be called before parse other flags
@@ -970,14 +1045,18 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
 		config.RPC.Port = legacyPort
+		config.WS.Port = legacyPort
 	}
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
-		config.RPC.IP = cli.GetStringFlagValue(cmd, legacyIPFlag)
+		legacyIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
+		config.RPC.IP = legacyIP
 		config.RPC.Enabled = true
+		config.P2P.IP = legacyIP
+		config.WS.IP = legacyIP
 	}
 
-	if cli.HasFlagsChanged(cmd, legacyMiscFlags) {
+	if cli.HasFlagsChanged(cmd, []cli.Flag{legacyPortFlag, legacyIPFlag}) {
 		logIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
 		logPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.Log.FileName = fmt.Sprintf("validator-%v-%v.log", logIP, logPort)
@@ -987,5 +1066,11 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 			Port: logPort,
 		}
 		config.Log.Context = logCtx
+	}
+
+	if cli.IsFlagChanged(cmd, legacyWebHookConfigFlag) {
+		config.Legacy = &legacyConfig{
+			WebHookConfig: cli.GetStringFlagValue(cmd, legacyWebHookConfigFlag),
+		}
 	}
 }
