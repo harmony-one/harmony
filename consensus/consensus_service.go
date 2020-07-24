@@ -3,6 +3,7 @@ package consensus
 import (
 	"math/big"
 	"sync/atomic"
+	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -344,6 +345,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		if nextShardState.Epoch != nil {
 			nextEpoch = nextShardState.Epoch
 		}
+	}
+
+	if consensus.ChainReader.Config().IsFiveSeconds(nextEpoch) {
+		consensus.BlockPeriod = time.Duration(5 * time.Second)
 	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&

@@ -137,6 +137,11 @@ func AccumulateRewardsAndCountSigs(
 		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
 		defaultReward := network.BaseStakedReward
 
+		// After block time is reduced to 5 seconds, the block reward is adjusted accordingly
+		if bc.Config().IsFiveSeconds(header.Epoch()) {
+			defaultReward = network.FiveSecondsBaseStakedReward
+		}
+
 		// Following is commented because the new econ-model has a flat-rate block reward
 		// of 28 ONE per block assuming 4 shards and 8s block time:
 		//// TODO Use cached result in off-chain db instead of full computation

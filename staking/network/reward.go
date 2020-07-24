@@ -16,8 +16,14 @@ var (
 	// BlockReward is the block reward, to be split evenly among block signers.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 	// BaseStakedReward is the flat-rate block reward for epos staking launch.
+	// 28 ONE per block
 	BaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(28), big.NewInt(denominations.One),
+	))
+	// FiveSecondsBaseStakedReward is the flat-rate block reward after epoch 230.
+	// 17.5 ONE per block
+	FiveSecondsBaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(17.5*denominations.Nano), big.NewInt(denominations.Nano),
 	))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
 	totalTokens = numeric.NewDecFromBigInt(
