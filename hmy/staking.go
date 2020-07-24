@@ -199,6 +199,33 @@ func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
 	return hmy.BlockChain.ValidatorCandidates()
 }
 
+var (
+	epochBlocksMap = map[uint64]staking.EpochSigningEntry{}
+)
+
+func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (staking.EpochSigningEntry, error) {
+	entry := staking.EpochSigningEntry{}
+	if val, ok := epochBlocksMap[epoch.Uint64()]; ok {
+		return val, nil
+	}
+
+	snapshot, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(epoch, addr)
+	if err != nil {
+		return entry, err
+	}
+
+	// the signing information is for the previous epoch
+	entry.Epoch = big.NewInt(0).Sub(epoch, common.Big1)
+	entry.Blocks = snapshot.Validator.Counters
+
+	// update map when adding new entry, also remove an entry beyond last 30
+	epochBlocksMap[epoch.Uint64()] = entry
+	epochMinus30 := big.NewInt(0).Sub(epoch, big.NewInt(staking.SigningHistoryLength))
+	delete(epochBlocksMap, epochMinus30.Uint64())
+
+	return entry, nil
+}
+
 // GetValidatorInformation returns the information of validator
 func (hmy *Harmony) GetValidatorInformation(
 	addr common.Address, block *types.Block,
@@ -319,6 +346,22 @@ func (hmy *Harmony) GetValidatorInformation(
 	// } else {
 	// 	defaultReply.Lifetime.APR = avgAPR.(numeric.Dec)
 	// }
+
+	epochBlocks := []staking.EpochSigningEntry{}
+	epochFrom := bc.Config().StakingEpoch
+	nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.SigningHistoryLength))
+	if nowMinus.Cmp(epochFrom) > 0 {
+		epochFrom = nowMinus
+	}
+	for i := now.Int64(); i > epochFrom.Int64(); i-- {
+		epoch := big.NewInt(i)
+		entry, err := hmy.getEpochSigning(epoch, addr)
+		if err != nil {
+			break
+		}
+		epochBlocks = append(epochBlocks, entry)
+	}
+	defaultReply.Lifetime.EpochBlocks = epochBlocks
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.ComputedMetrics = stats

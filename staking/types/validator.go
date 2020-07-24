@@ -30,6 +30,7 @@ const (
 	BLSVerificationStr       = "harmony-one"
 	TenThousand              = 10000
 	APRHistoryLength         = 30
+	SigningHistoryLength     = 30
 )
 
 var (
@@ -156,10 +157,11 @@ type ValidatorRPCEnhanced struct {
 
 // AccumulatedOverLifetime ..
 type AccumulatedOverLifetime struct {
-	BlockReward *big.Int    `json:"reward-accumulated"`
-	Signing     counters    `json:"blocks"`
-	APR         numeric.Dec `json:"apr"`
-	EpochAPRs   []APREntry  `json:"epoch-apr"`
+	BlockReward *big.Int            `json:"reward-accumulated"`
+	Signing     counters            `json:"blocks"`
+	APR         numeric.Dec         `json:"apr"`
+	EpochAPRs   []APREntry          `json:"epoch-apr"`
+	EpochBlocks []EpochSigningEntry `json:"epoch-blocks"`
 }
 
 func (w ValidatorWrapper) String() string {
@@ -188,8 +190,14 @@ type VoteWithCurrentEpochEarning struct {
 
 // APREntry ..
 type APREntry struct {
-	Epoch *big.Int
-	Value numeric.Dec
+	Epoch *big.Int    `json:"epoch"`
+	Value numeric.Dec `json:"apr"`
+}
+
+// EpochSigningEntry ..
+type EpochSigningEntry struct {
+	Epoch  *big.Int `json:"epoch"`
+	Blocks counters `json:"blocks"`
 }
 
 // ValidatorStats to record validator's performance and history records
