@@ -411,7 +411,8 @@ func (node *Node) PostConsensusProcessing(
 		Str("hash", newBlock.Header().Hash().Hex()).
 		Msg("Added New Block to Blockchain!!!")
 
-	if node.Consensus.IsLeader() {
+	nextLeader := node.Consensus.GetNextLeaderKey()
+	if node.Consensus.LeaderPubKey.Object.IsEqual(nextLeader.Object) {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
 		}
