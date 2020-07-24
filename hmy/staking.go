@@ -215,8 +215,22 @@ func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (stakin
 	}
 
 	// the signing information is for the previous epoch
-	entry.Epoch = big.NewInt(0).Sub(epoch, common.Big1)
+	prevEpoch := big.NewInt(0).Sub(epoch, common.Big1)
+	entry.Epoch = prevEpoch
 	entry.Blocks = snapshot.Validator.Counters
+
+	// subtract previous epoch counters if exists
+	prevEpochSnap, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(prevEpoch, addr)
+	if err == nil {
+		entry.Blocks.NumBlocksSigned.Sub(
+			entry.Blocks.NumBlocksSigned,
+			prevEpochSnap.Validator.Counters.NumBlocksSigned,
+		)
+		entry.Blocks.NumBlocksToSign.Sub(
+			entry.Blocks.NumBlocksToSign,
+			prevEpochSnap.Validator.Counters.NumBlocksToSign,
+		)
+	}
 
 	// update map when adding new entry, also remove an entry beyond last 30
 	epochBlocksMap[epoch.Uint64()] = entry
