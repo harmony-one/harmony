@@ -363,6 +363,20 @@ func (node *Node) validateShardBoundMessage(
 		return nil, nil, true, errors.WithStack(err)
 	}
 
+	// ignore messages not intended for explorer
+	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		switch m.Type {
+		case
+			msg_pb.MessageType_ANNOUNCE,
+			msg_pb.MessageType_PREPARE,
+			msg_pb.MessageType_COMMIT,
+			msg_pb.MessageType_VIEWCHANGE,
+			msg_pb.MessageType_NEWVIEW:
+			atomic.AddUint32(&node.NumIgnoredMessages, 1)
+			return nil, nil, true, nil
+		}
+	}
+
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
