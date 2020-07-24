@@ -31,6 +31,7 @@ var (
 		StakingEpoch:     big.NewInt(186),
 		PreStakingEpoch:  big.NewInt(185),
 		QuickUnlockEpoch: big.NewInt(191),
+		FiveSecondsEpoch: big.NewInt(230),
 		EIP155Epoch:      big.NewInt(28),
 		S3Epoch:          big.NewInt(28),
 		ReceiptLogEpoch:  big.NewInt(101),
@@ -44,6 +45,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(1),
 		QuickUnlockEpoch: big.NewInt(0),
+		FiveSecondsEpoch: big.NewInt(16500),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
@@ -58,6 +60,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(1),
 		QuickUnlockEpoch: big.NewInt(0),
+		FiveSecondsEpoch: big.NewInt(0),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
@@ -72,6 +75,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(1),
 		QuickUnlockEpoch: big.NewInt(0),
+		FiveSecondsEpoch: big.NewInt(0),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
@@ -86,6 +90,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(1),
 		QuickUnlockEpoch: big.NewInt(0),
+		FiveSecondsEpoch: big.NewInt(0),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
@@ -99,6 +104,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(0),
 		QuickUnlockEpoch: big.NewInt(0),
+		FiveSecondsEpoch: big.NewInt(0),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
@@ -114,6 +120,7 @@ var (
 		big.NewInt(0),             // StakingEpoch
 		big.NewInt(0),             // PreStakingEpoch
 		big.NewInt(0),             // QuickUnlockEpoch
+		big.NewInt(0),             // FiveSecondsEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
 		big.NewInt(0),             // ReceiptLogEpoch
@@ -129,6 +136,7 @@ var (
 		big.NewInt(0), // StakingEpoch
 		big.NewInt(0), // PreStakingEpoch
 		big.NewInt(0), // QuickUnlockEpoch
+		big.NewInt(0), // FiveSecondsEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
 		big.NewInt(0), // ReceiptLogEpoch
@@ -175,6 +183,10 @@ type ChainConfig struct {
 
 	// QuickUnlockEpoch is the epoch when undelegation will be unlocked at the current epoch
 	QuickUnlockEpoch *big.Int `json:"quick-unlock-epoch,omitempty"`
+
+	// FiveSecondsEpoch is the epoch when block time is reduced to 5 seconds
+	// and block rewards adjusted to 17.5 ONE/block
+	FiveSecondsEpoch *big.Int `json:"five-seconds-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -226,6 +238,11 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 	return isForked(c.StakingEpoch, epoch)
+}
+
+// IsFiveSeconds determines whether it is the epoch to change to 5 seconds block time
+func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
+	return isForked(c.FiveSecondsEpoch, epoch)
 }
 
 // IsPreStaking determines whether staking transactions are allowed
