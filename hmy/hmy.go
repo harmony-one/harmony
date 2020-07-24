@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
@@ -96,9 +97,12 @@ func New(
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
+	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
+	bloomIndexer.Start(nodeAPI.Blockchain())
 	return &Harmony{
 		ShutdownChan:    make(chan bool),
 		BloomRequests:   make(chan chan *bloombits.Retrieval),
+		BloomIndexer:    bloomIndexer,
 		BlockChain:      nodeAPI.Blockchain(),
 		BeaconChain:     nodeAPI.Beaconchain(),
 		TxPool:          txPool,
