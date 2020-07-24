@@ -7,8 +7,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-// Response type of RPCs
-type Response = map[string]interface{}
+// StructuredResponse type of RPCs
+type StructuredResponse = map[string]interface{}
 
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {

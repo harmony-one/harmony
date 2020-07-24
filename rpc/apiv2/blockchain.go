@@ -29,6 +29,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FIXME: verified
 const (
 	defaultGasPrice     = denominations.Nano
 	defaultFromAddress  = "0x0000000000000000000000000000000000000000"
@@ -37,17 +38,20 @@ const (
 	initSupply          = int64(12600000000)
 )
 
+// FIXME: verified
 // PublicBlockChainAPI provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockChainAPI struct {
 	hmy *hmy.Harmony
 }
 
+// FIXME: verified
 // NewPublicBlockChainAPI creates a new Harmony blockchain API.
 func NewPublicBlockChainAPI(hmy *hmy.Harmony) *PublicBlockChainAPI {
 	return &PublicBlockChainAPI{hmy}
 }
 
+// FIXME: verified
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
@@ -57,6 +61,7 @@ type BlockArgs struct {
 	InclStaking bool     `json:"inclStaking"`
 }
 
+// FIXME: verified
 func (s *PublicBlockChainAPI) isBeaconShard() error {
 	if s.hmy.ShardID != shard.BeaconChainShardID {
 		return ErrNotBeaconShard
@@ -64,6 +69,7 @@ func (s *PublicBlockChainAPI) isBeaconShard() error {
 	return nil
 }
 
+// FIXME: verified
 func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum uint64) error {
 	if blockNum > s.hmy.CurrentBlock().NumberU64() {
 		return ErrRequestedBlockTooHigh
@@ -71,6 +77,7 @@ func (s *PublicBlockChainAPI) isBlockGreaterThanLatest(blockNum uint64) error {
 	return nil
 }
 
+// FIXME: verified
 // GetBlockByNumber returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full detail,
 // otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNum uint64, blockArgs BlockArgs) (map[string]interface{}, error) {
@@ -99,6 +106,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNum uin
 	return nil, err
 }
 
+// FIXME: verified
 // GetBlockByHash returns the requested block. When fullTx in blockArgs is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned. When withSigners in BlocksArgs is true
 // it shows block signers for this block in list of one addresses.
@@ -118,6 +126,7 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 	return nil, err
 }
 
+// FIXME: verified
 // GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
 func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEnd uint64, blockArgs BlockArgs) ([]map[string]interface{}, error) {
 	result := make([]map[string]interface{}, 0)
@@ -145,6 +154,7 @@ func (s *PublicBlockChainAPI) GetBlocks(ctx context.Context, blockStart, blockEn
 	return result, nil
 }
 
+// FIXME: verified
 // GetValidators returns validators list for a particular epoch.
 func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (map[string]interface{}, error) {
 	cmt, err := s.hmy.GetValidators(big.NewInt(epoch))
@@ -179,6 +189,7 @@ func (s *PublicBlockChainAPI) GetValidators(ctx context.Context, epoch int64) (m
 	return result, nil
 }
 
+// FIXME: verified
 // GetValidatorKeys returns list of bls public keys in the committee for a particular epoch.
 func (s *PublicBlockChainAPI) GetValidatorKeys(ctx context.Context, epoch int64) ([]string, error) {
 	cmt, err := s.hmy.GetValidators(big.NewInt(epoch))
@@ -193,6 +204,7 @@ func (s *PublicBlockChainAPI) GetValidatorKeys(ctx context.Context, epoch int64)
 	return validators, nil
 }
 
+// FIXME: verified
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -201,6 +213,7 @@ func (s *PublicBlockChainAPI) IsLastBlock(blockNum uint64) (bool, error) {
 	return shard.Schedule.IsLastBlock(blockNum), nil
 }
 
+// FIXME: verified
 // EpochLastBlock returns epoch last block.
 func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -209,6 +222,7 @@ func (s *PublicBlockChainAPI) EpochLastBlock(epoch uint64) (uint64, error) {
 	return shard.Schedule.EpochLastBlock(epoch), nil
 }
 
+// FIXME: verified
 // GetBlockSigners returns signers for a particular block.
 func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNum uint64) ([]string, error) {
 	if blockNum == 0 || blockNum >= uint64(s.BlockNumber()) {
@@ -234,6 +248,7 @@ func (s *PublicBlockChainAPI) GetBlockSigners(ctx context.Context, blockNum uint
 	return signers, nil
 }
 
+// FIXME: verified
 // GetBlockSignerKeys returns bls public keys that signed the block.
 func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNum uint64) ([]string, error) {
 	if blockNum == 0 || blockNum >= uint64(s.BlockNumber()) {
@@ -255,6 +270,7 @@ func (s *PublicBlockChainAPI) GetBlockSignerKeys(ctx context.Context, blockNum u
 	return signers, nil
 }
 
+// FIXME: verified
 // IsBlockSigner returns true if validator with address signed blockNum block.
 func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNum uint64, address string) (bool, error) {
 	if blockNum == 0 {
@@ -282,6 +298,7 @@ func (s *PublicBlockChainAPI) IsBlockSigner(ctx context.Context, blockNum uint64
 	return false, nil
 }
 
+// FIXME: verified
 // GetSignedBlocks returns how many blocks a particular validator signed for last defaultBlocksPeriod (3 hours ~ 1500 blocks).
 func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address string) uint64 {
 	totalSigned := uint64(0)
@@ -299,16 +316,19 @@ func (s *PublicBlockChainAPI) GetSignedBlocks(ctx context.Context, address strin
 	return totalSigned
 }
 
+// FIXME: verified
 // GetEpoch returns current epoch.
 func (s *PublicBlockChainAPI) GetEpoch(ctx context.Context) uint64 {
 	return s.LatestHeader(ctx).Epoch
 }
 
+// FIXME: verified
 // GetLeader returns current shard leader.
 func (s *PublicBlockChainAPI) GetLeader(ctx context.Context) string {
 	return s.LatestHeader(ctx).Leader
 }
 
+// FIXME: verified
 // GetValidatorSelfDelegation returns validator stake.
 func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, address string) (*big.Int, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -317,6 +337,7 @@ func (s *PublicBlockChainAPI) GetValidatorSelfDelegation(ctx context.Context, ad
 	return s.hmy.GetValidatorSelfDelegation(internal_common.ParseAddr(address)), nil
 }
 
+// FIXME: verified
 // GetValidatorTotalDelegation returns total balace stacking for validator with delegation.
 func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, address string) (*big.Int, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -330,6 +351,7 @@ func (s *PublicBlockChainAPI) GetValidatorTotalDelegation(ctx context.Context, a
 	return totalStake, nil
 }
 
+// FIXME: verified
 // GetShardingStructure returns an array of sharding structures.
 func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[string]interface{}, error) {
 	// Get header and number of shards.
@@ -340,11 +362,13 @@ func (s *PublicBlockChainAPI) GetShardingStructure(ctx context.Context) ([]map[s
 	return shard.Schedule.GetShardingStructure(int(numShard), int(s.hmy.ShardID)), nil
 }
 
+// FIXME: verified
 // GetShardID returns shard ID of the requested node.
 func (s *PublicBlockChainAPI) GetShardID(ctx context.Context) (int, error) {
 	return int(s.hmy.ShardID), nil
 }
 
+// FIXME: verified
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNum uint64) (hexutil.Bytes, error) {
 	address := internal_common.ParseAddr(addr)
@@ -356,6 +380,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, addr string, blockNum
 	return code, state.Error()
 }
 
+// FIXME: verified
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
@@ -369,6 +394,7 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, addr string, key
 	return res[:], state.Error()
 }
 
+// Fixme: verified
 // GetBalanceByBlockNumber returns balance by block number.
 func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, address string, blockNum uint64) (*big.Int, error) {
 	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
@@ -378,12 +404,14 @@ func (s *PublicBlockChainAPI) GetBalanceByBlockNumber(ctx context.Context, addre
 	return s.hmy.GetBalance(ctx, addr, rpc.BlockNumber(blockNum))
 }
 
+// Fixme: verified
 // GetAccountNonce returns the nonce value of the given address for the given block number
 func (s *PublicBlockChainAPI) GetAccountNonce(ctx context.Context, address string, blockNr rpc.BlockNumber) (uint64, error) {
 	addr := internal_common.ParseAddr(address)
 	return s.hmy.GetAccountNonce(ctx, addr, blockNr)
 }
 
+// Fixme: verified(legacy)
 // GetBalance returns the amount of Atto for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
@@ -392,12 +420,14 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address string) (*
 	return s.hmy.GetBalance(ctx, addr, rpc.BlockNumber(-1))
 }
 
+// Fixme: verified
 // BlockNumber returns the block number of the chain head.
 func (s *PublicBlockChainAPI) BlockNumber() uint64 {
 	header, _ := s.hmy.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return header.Number().Uint64()
 }
 
+// Fixme: verified
 // ResendCx requests that the egress receipt for the given cross-shard
 // transaction be sent to the destination shard for credit.  This is used for
 // unblocking a half-complete cross-shard transaction whose fund has been
@@ -408,6 +438,7 @@ func (s *PublicBlockChainAPI) ResendCx(ctx context.Context, txID common.Hash) (b
 	return success, nil
 }
 
+// Fixme: verified
 // Call executes the given transaction on the state for the given block number.
 // It doesn't make and changes in the state/blockchain and is useful to execute and retrieve values.
 func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr uint64) (hexutil.Bytes, error) {
@@ -415,6 +446,7 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNr u
 	return (hexutil.Bytes)(result), err
 }
 
+// Fixme: verified
 // LatestHeader returns the latest header information
 func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformation {
 	header, _ := s.hmy.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
@@ -422,6 +454,7 @@ func (s *PublicBlockChainAPI) LatestHeader(ctx context.Context) *HeaderInformati
 	return newHeaderInformation(header, leader)
 }
 
+// Fixme: verified
 // GetHeaderByNumber returns block header at given number
 func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, blockNum uint64) (*HeaderInformation, error) {
 	if err := s.isBlockGreaterThanLatest(blockNum); err != nil {
@@ -435,6 +468,7 @@ func (s *PublicBlockChainAPI) GetHeaderByNumber(ctx context.Context, blockNum ui
 	return newHeaderInformation(header, leader), nil
 }
 
+// Fixme: verified
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
@@ -444,6 +478,7 @@ func (s *PublicBlockChainAPI) GetTotalStaking() (*big.Int, error) {
 	return s.hmy.GetTotalStakingSnapshot(), nil
 }
 
+// Fixme: verified
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
@@ -455,6 +490,7 @@ func (s *PublicBlockChainAPI) GetMedianRawStakeSnapshot() (
 	return s.hmy.GetMedianRawStakeSnapshot()
 }
 
+// Fixme: verified
 // GetAllValidatorAddresses returns all validator addresses.
 func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -469,6 +505,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
+// Fixme: verified
 // GetElectedValidatorAddresses returns elected validator addresses.
 func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -483,6 +520,7 @@ func (s *PublicBlockChainAPI) GetElectedValidatorAddresses() ([]string, error) {
 	return addresses, nil
 }
 
+// Fixme: verified
 // GetValidatorInformation ..
 func (s *PublicBlockChainAPI) GetValidatorInformation(
 	ctx context.Context, address string,
@@ -499,6 +537,7 @@ func (s *PublicBlockChainAPI) GetValidatorInformation(
 	)
 }
 
+// Fixme: verified
 // GetValidatorInformationByBlockNumber ..
 func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
 	ctx context.Context, address string, blockNr uint64,
@@ -518,6 +557,7 @@ func (s *PublicBlockChainAPI) GetValidatorInformationByBlockNumber(
 	)
 }
 
+// Fixme: verified
 func (s *PublicBlockChainAPI) getAllValidatorInformation(
 	ctx context.Context, page int, blockNr rpc.BlockNumber,
 ) ([]*staking.ValidatorRPCEnhanced, error) {
@@ -551,6 +591,7 @@ func (s *PublicBlockChainAPI) getAllValidatorInformation(
 	return validators, nil
 }
 
+// Fixme: verified
 // GetAllValidatorInformation returns information about all validators.
 // If page is -1, return all else return the pagination.
 func (s *PublicBlockChainAPI) GetAllValidatorInformation(
@@ -580,6 +621,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformation(
 
 }
 
+// Fixme: verified
 // GetAllValidatorInformationByBlockNumber returns information about all validators.
 // If page is -1, return all else return the pagination.
 func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
@@ -594,6 +636,7 @@ func (s *PublicBlockChainAPI) GetAllValidatorInformationByBlockNumber(
 	return s.getAllValidatorInformation(ctx, page, rpc.BlockNumber(blockNr))
 }
 
+// Fixme: verified
 // GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
 // starting at `page*validatorsPageSize`.
 // If page is -1, return all instead of `validatorsPageSize` elements.
@@ -629,6 +672,7 @@ func (s *PublicBlockChainAPI) GetAllDelegationInformation(ctx context.Context, p
 	return validators, nil
 }
 
+// Fixme: verified
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
 func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, address string) ([]*RPCDelegation, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -661,6 +705,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegator(ctx context.Context, add
 	return result, nil
 }
 
+// Fixme: verified
 // GetDelegationsByDelegatorByBlockNumber returns list of delegations for a delegator address at given block number
 func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 	ctx context.Context, address string, blockNum uint64,
@@ -702,6 +747,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByDelegatorByBlockNumber(
 	return result, nil
 }
 
+// Fixme: verified
 // GetDelegationsByValidator returns list of delegations for a validator address.
 func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, address string) ([]*RPCDelegation, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -733,6 +779,7 @@ func (s *PublicBlockChainAPI) GetDelegationsByValidator(ctx context.Context, add
 	return result, nil
 }
 
+// Fixme: verified
 // GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
 func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.Context, address string, validator string) (*RPCDelegation, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -768,12 +815,14 @@ func (s *PublicBlockChainAPI) GetDelegationByDelegatorAndValidator(ctx context.C
 	return nil, nil
 }
 
+// Fixme: verified
 // EstimateGas returns an estimate of the amount of gas needed to execute the
 // given transaction against the current pending block.
 func (s *PublicBlockChainAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
 	return doEstimateGas(ctx, s.hmy, args, nil)
 }
 
+// Fixme: verified
 // GetCurrentUtilityMetrics ..
 func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -782,6 +831,7 @@ func (s *PublicBlockChainAPI) GetCurrentUtilityMetrics() (*network.UtilityMetric
 	return s.hmy.GetCurrentUtilityMetrics()
 }
 
+// Fixme: verified
 // GetSuperCommittees ..
 func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -790,22 +840,26 @@ func (s *PublicBlockChainAPI) GetSuperCommittees() (*quorum.Transition, error) {
 	return s.hmy.GetSuperCommittees()
 }
 
+// Fixme: verified
 // GetCurrentBadBlocks ..
 func (s *PublicBlockChainAPI) GetCurrentBadBlocks() []core.BadBlock {
 	return s.hmy.GetCurrentBadBlocks()
 }
 
+// Fixme: verified
 // GetTotalSupply ..
 func (s *PublicBlockChainAPI) GetTotalSupply() (numeric.Dec, error) {
 	return numeric.NewDec(initSupply), nil
 }
 
+// Fixme: verified
 // GetCirculatingSupply ..
 func (s *PublicBlockChainAPI) GetCirculatingSupply() (numeric.Dec, error) {
 	timestamp := time.Now()
 	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
 }
 
+// Fixme: verified
 // GetStakingNetworkInfo ..
 func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
 	ctx context.Context,
@@ -828,6 +882,7 @@ func (s *PublicBlockChainAPI) GetStakingNetworkInfo(
 	}, nil
 }
 
+// Fixme: verified
 // GetLastCrossLinks ..
 func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	if err := s.isBeaconShard(); err != nil {
@@ -836,11 +891,13 @@ func (s *PublicBlockChainAPI) GetLastCrossLinks() ([]*types.CrossLink, error) {
 	return s.hmy.GetLastCrossLinks()
 }
 
+// FIXME: verified
 // GetLatestChainHeaders ..
 func (s *PublicBlockChainAPI) GetLatestChainHeaders() *block.HeaderPair {
 	return s.hmy.GetLatestChainHeaders()
 }
 
+// FIXME: verified
 // docall executes an EVM call
 func doCall(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNr rpc.BlockNumber, vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int) ([]byte, uint64, bool, error) {
 	defer func(start time.Time) {
@@ -929,6 +986,7 @@ func doCall(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNr rpc.Bl
 	return res, gas, failed, err
 }
 
+// FIXME: verified
 // doEstimateGas ..
 func doEstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int) (hexutil.Uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used

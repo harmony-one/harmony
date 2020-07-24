@@ -1,8 +1,12 @@
 package rpc
 
 import (
+	"time"
+
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/rpc/v1"
+	"github.com/harmony-one/harmony/rpc/v2"
 )
 
 // Version enum
@@ -12,7 +16,8 @@ const (
 )
 const (
 	// APIVersion used for DApp's, bumped after RPC refactor (7/2020)
-	APIVersion = "1.1"
+	APIVersion  = "1.1"
+	CallTimeout = 5 * time.Second
 )
 
 // Version ..
@@ -36,5 +41,8 @@ func GetAPIs(hmy *hmy.Harmony) []rpc.API {
 		// Private methods
 		NewPrivateDebugAPI(hmy, V1),
 		NewPrivateDebugAPI(hmy, V2),
+		// Legacy methods (subject to removal)
+		v1.NewPublicLegacyAPI(hmy),
+		v2.NewPublicLegacyAPI(hmy),
 	}
 }

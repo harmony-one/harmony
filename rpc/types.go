@@ -21,8 +21,10 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// BlockNumber ..
 type BlockNumber rpc.BlockNumber
 
+// UnmarshalJSON converts a hex string or integer to a block number
 func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	baseBn := rpc.BlockNumber(0)
 	baseErr := baseBn.UnmarshalJSON(data)
@@ -43,10 +45,12 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Int64 ..
 func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
 }
 
+// EthBlockNumber ..
 func (bn BlockNumber) EthBlockNumber() rpc.BlockNumber {
 	return (rpc.BlockNumber)(bn)
 }

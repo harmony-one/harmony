@@ -46,7 +46,7 @@ func (s *PublicHarmonyService) Syncing() (interface{}, error) {
 
 // GasPrice returns a suggestion for a gas price.
 func (s *PublicHarmonyService) GasPrice(ctx context.Context) (*hexutil.Big, error) {
-	// TODO(ricl): add SuggestPrice API
+	// TODO(dm): add SuggestPrice API
 	return (*hexutil.Big)(big.NewInt(1)), nil
 }
 

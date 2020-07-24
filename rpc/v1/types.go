@@ -458,7 +458,7 @@ func newRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 // RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, blockArgs rpc_common.BlockArgs, leader string) (map[string]interface{}, error) {
+func RPCMarshalBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (map[string]interface{}, error) {
 	head := b.Header() // copies the header once
 	fields := map[string]interface{}{
 		"number":           (*hexutil.Big)(head.Number()),
