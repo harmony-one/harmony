@@ -200,13 +200,15 @@ func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
 }
 
 var (
-	epochBlocksMap = map[uint64]staking.EpochSigningEntry{}
+	epochBlocksMap = map[common.Address]map[uint64]staking.EpochSigningEntry{}
 )
 
 func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (staking.EpochSigningEntry, error) {
 	entry := staking.EpochSigningEntry{}
-	if val, ok := epochBlocksMap[epoch.Uint64()]; ok {
-		return val, nil
+	if validatorMap, ok := epochBlocksMap[addr]; ok {
+		if val, ok := validatorMap[epoch.Uint64()]; ok {
+			return val, nil
+		}
 	}
 
 	snapshot, err := hmy.BlockChain.ReadValidatorSnapshotAtEpoch(epoch, addr)
@@ -233,9 +235,12 @@ func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (stakin
 	}
 
 	// update map when adding new entry, also remove an entry beyond last 30
-	epochBlocksMap[epoch.Uint64()] = entry
+	if _, ok := epochBlocksMap[addr]; !ok {
+		epochBlocksMap[addr] = map[uint64]staking.EpochSigningEntry{}
+	}
+	epochBlocksMap[addr][epoch.Uint64()] = entry
 	epochMinus30 := big.NewInt(0).Sub(epoch, big.NewInt(staking.SigningHistoryLength))
-	delete(epochBlocksMap, epochMinus30.Uint64())
+	delete(epochBlocksMap[addr], epochMinus30.Uint64())
 
 	return entry, nil
 }
