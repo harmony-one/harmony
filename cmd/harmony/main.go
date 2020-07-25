@@ -486,22 +486,12 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	case "explorer":
 		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
 		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetShardGroupID(
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(*shardID)),
-		)
-		currentNode.NodeConfig.SetClientGroupID(
-			nodeconfig.NewClientGroupIDByShardID(nodeconfig.ShardID(*shardID)),
-		)
 	case "validator":
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-		if nodeConfig.ShardID == shard.BeaconChainShardID {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID))
-		} else {
-			currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
-		}
-		currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	}
+	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
+	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
 
 	// This needs to be executed after consensus setup
