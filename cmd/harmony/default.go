@@ -34,7 +34,7 @@ var defaultConfig = harmonyConfig{
 		Port:    nodeconfig.DefaultWSPort,
 	},
 	BLSKeys: blsConfig{
-		KeyDir:   "./hmy/blskeys",
+		KeyDir:   "./.hmy/blskeys",
 		KeyFiles: nil,
 		MaxKeys:  10,
 
