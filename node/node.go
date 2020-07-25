@@ -755,7 +755,8 @@ func (node *Node) Start() error {
 			}
 		}()
 
-		semNode := semaphore.NewWeighted(p2p.SetAsideOtherwise)
+		// max 512 node messages being handled at the same time
+		semNode := semaphore.NewWeighted(p2p.SetAsideOtherwise >> 2)
 		msgChanNode := make(chan validated, MsgChanBuffer)
 
 		// goroutine to handle node messages
