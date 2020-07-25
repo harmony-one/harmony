@@ -81,22 +81,7 @@ func main() {
 }
 
 func registerRootCmdFlags() error {
-	var flags []cli.Flag
-
-	flags = append(flags, configFlag)
-	flags = append(flags, generalFlags...)
-	flags = append(flags, networkFlags...)
-	flags = append(flags, p2pFlags...)
-	flags = append(flags, rpcFlags...)
-	flags = append(flags, wsFlags...)
-	flags = append(flags, blsFlags...)
-	flags = append(flags, consensusFlags...)
-	flags = append(flags, txPoolFlags...)
-	flags = append(flags, pprofFlags...)
-	flags = append(flags, logFlags...)
-	flags = append(flags, devnetFlags...)
-	flags = append(flags, revertFlags...)
-	flags = append(flags, legacyMiscFlags...)
+	flags := getRootFlags()
 
 	return cli.RegisterFlags(rootCmd, flags)
 }
@@ -142,27 +127,32 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	if err != nil {
 		return harmonyConfig{}, err
 	}
-	// Misc flags shall be applied first since legacy ip / port is overwritten
-	// by new ip / port flags
-	applyLegacyMiscFlags(cmd, &config)
-	applyGeneralFlags(cmd, &config)
-	applyNetworkFlags(cmd, &config)
-	applyP2PFlags(cmd, &config)
-	applyRPCFlags(cmd, &config)
-	applyWSFlags(cmd, &config)
-	applyBLSFlags(cmd, &config)
-	applyConsensusFlags(cmd, &config)
-	applyTxPoolFlags(cmd, &config)
-	applyPprofFlags(cmd, &config)
-	applyLogFlags(cmd, &config)
-	applyDevnetFlags(cmd, &config)
-	applyRevertFlags(cmd, &config)
+
+	applyRootFlags(cmd, &config)
 
 	if err := validateHarmonyConfig(config); err != nil {
 		return harmonyConfig{}, err
 	}
 
 	return config, nil
+}
+
+func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
+	// Misc flags shall be applied first since legacy ip / port is overwritten
+	// by new ip / port flags
+	applyLegacyMiscFlags(cmd, config)
+	applyGeneralFlags(cmd, config)
+	applyNetworkFlags(cmd, config)
+	applyP2PFlags(cmd, config)
+	applyRPCFlags(cmd, config)
+	applyWSFlags(cmd, config)
+	applyBLSFlags(cmd, config)
+	applyConsensusFlags(cmd, config)
+	applyTxPoolFlags(cmd, config)
+	applyPprofFlags(cmd, config)
+	applyLogFlags(cmd, config)
+	applyDevnetFlags(cmd, config)
+	applyRevertFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyConfig) {

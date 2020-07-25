@@ -213,6 +213,27 @@ var (
 	}
 )
 
+func getRootFlags() []cli.Flag {
+	var flags []cli.Flag
+
+	flags = append(flags, configFlag)
+	flags = append(flags, generalFlags...)
+	flags = append(flags, networkFlags...)
+	flags = append(flags, p2pFlags...)
+	flags = append(flags, rpcFlags...)
+	flags = append(flags, wsFlags...)
+	flags = append(flags, blsFlags...)
+	flags = append(flags, consensusFlags...)
+	flags = append(flags, txPoolFlags...)
+	flags = append(flags, pprofFlags...)
+	flags = append(flags, logFlags...)
+	flags = append(flags, devnetFlags...)
+	flags = append(flags, revertFlags...)
+	flags = append(flags, legacyMiscFlags...)
+
+	return flags
+}
+
 func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, nodeTypeFlag) {
 		config.General.NodeType = cli.GetStringFlagValue(cmd, nodeTypeFlag)

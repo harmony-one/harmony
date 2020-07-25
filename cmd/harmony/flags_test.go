@@ -11,6 +11,106 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func TestHarmonyFlags(t *testing.T) {
+	tests := []struct {
+		argStr    string
+		expConfig harmonyConfig
+	}{
+		{
+			// running staking command from legacy node.sh
+			argStr: "--bootnodes /ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv," +
+				"/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/13.113.101." +
+				"219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p" +
+				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
+				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
+				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
+				"-aws-config-source file:config.json",
+			expConfig: harmonyConfig{
+				Version: tomlConfigVersion,
+				General: generalConfig{
+					NodeType:   "validator",
+					NoStaking:  false,
+					ShardID:    -1,
+					IsArchival: false,
+					DataDir:    "./",
+				},
+				Network: networkConfig{
+					NetworkType: "mainnet",
+					BootNodes: []string{
+						"/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
+						"/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9",
+						"/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX",
+						"/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj",
+					},
+					DNSZone: "t.hmny.io",
+					DNSPort: 9000,
+				},
+				P2P: p2pConfig{
+					IP:      "8.8.8.8",
+					Port:    9000,
+					KeyFile: defaultConfig.P2P.KeyFile,
+				},
+				RPC: rpcConfig{
+					Enabled: true,
+					IP:      "8.8.8.8",
+					Port:    9000,
+				},
+				WS: wsConfig{
+					Enabled: true,
+					IP:      "8.8.8.8",
+					Port:    9000,
+				},
+				Consensus: consensusConfig{
+					DelayCommit: "0ms",
+					BlockTime:   "8s",
+					MinPeers:    6,
+				},
+				BLSKeys: blsConfig{
+					KeyDir:           "./.hmy/blskeys",
+					KeyFiles:         nil,
+					MaxKeys:          10,
+					PassEnabled:      true,
+					PassSrcType:      "auto",
+					PassFile:         "",
+					SavePassphrase:   false,
+					KMSEnabled:       true,
+					KMSConfigSrcType: "file",
+					KMSConfigFile:    "config.json",
+				},
+				TxPool: txPoolConfig{
+					BlacklistFile:      "./.hmy/blacklist.txt",
+					BroadcastInvalidTx: true,
+				},
+				Pprof: pprofConfig{
+					Enabled:    false,
+					ListenAddr: "127.0.0.1:6060",
+				},
+				Log: logConfig{
+					Folder:     "./latest",
+					FileName:   "validator-8.8.8.8-9000.log",
+					RotateSize: 100,
+					Verbosity:  3,
+					Context: &logContext{
+						IP:   "8.8.8.8",
+						Port: 9000,
+					},
+				},
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, getRootFlags(), applyRootFlags)
+		hc, err := ts.run(strings.Split(test.argStr, " "))
+		if err != nil {
+			t.Fatalf("Test %v: %v", i, err)
+		}
+		if !reflect.DeepEqual(hc, test.expConfig) {
+			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, hc, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
 func TestGeneralFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
