@@ -16,11 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/numeric"
-	"github.com/spf13/cobra"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/consensus"
@@ -35,10 +32,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/node"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // Host
@@ -104,15 +103,16 @@ func registerRootCmdFlags() error {
 
 func runHarmonyNode(cmd *cobra.Command, args []string) {
 	prepareRootCmd(cmd)
+
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
 		fmt.Println(err)
 		cmd.Help()
 		os.Exit(128)
 	}
+
 	setupNodeLog(cfg)
 	setupPprof(cfg)
-
 	setupNodeAndRun(cfg)
 }
 
@@ -136,9 +136,8 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 		configFile := cli.GetStringFlagValue(cmd, configFlag)
 		config, err = loadHarmonyConfig(configFile)
 	} else {
-		config = getDefaultHmyConfigCopy()
 		nt := getNetworkType(cmd)
-		config.Network = getDefaultNetworkConfig(nt)
+		config = getDefaultHmyConfigCopy(nt)
 	}
 	if err != nil {
 		return harmonyConfig{}, err
@@ -210,10 +209,10 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	if hc.General.NodeType == "validator" {
 		var err error
-		if hc.General.IsStaking {
-			err = setupStakingNodeAccount(hc)
-		} else {
+		if hc.General.NoStaking {
 			err = setupLegacyNodeAccount(hc)
+		} else {
+			err = setupStakingNodeAccount(hc)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cannot set up node account: %s\n", err)
@@ -222,7 +221,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	}
 	if hc.General.NodeType == "validator" {
 		fmt.Printf("%s mode; node key %s -> shard %d\n",
-			map[bool]string{false: "Legacy", true: "Staking"}[hc.General.IsStaking],
+			map[bool]string{false: "Legacy", true: "Staking"}[!hc.General.NoStaking],
 			nodeconfig.GetDefaultConfig().ConsensusPriKey.GetPublicKeys().SerializeToHexStr(),
 			initialAccounts[0].ShardID)
 	}
@@ -297,7 +296,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", hc.RPC.IP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.RPC.IP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
 

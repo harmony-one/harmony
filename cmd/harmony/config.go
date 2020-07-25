@@ -49,7 +49,7 @@ type p2pConfig struct {
 
 type generalConfig struct {
 	NodeType   string
-	IsStaking  bool
+	NoStaking  bool
 	ShardID    int
 	IsArchival bool
 	DataDir    string
@@ -169,9 +169,7 @@ func checkStringAccepted(flag string, val string, accepts []string) error {
 	return fmt.Errorf("unknown arg for %s: %s (%v)", flag, val, acceptsStr)
 }
 
-func getDefaultNetworkConfig(raw string) networkConfig {
-	nt := parseNetworkType(raw)
-
+func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 	bn := nodeconfig.GetDefaultBootNodes(nt)
 	zone := nodeconfig.GetDefaultDNSZone(nt)
 	port := nodeconfig.GetDefaultDNSPort(nt)
@@ -211,10 +209,8 @@ var dumpConfigCmd = &cobra.Command{
 	Long:  "dump the config file for harmony binary configurations",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		config := getDefaultHmyConfigCopy()
 		nt := getNetworkType(cmd)
-		config.Network = getDefaultNetworkConfig(nt)
-		fmt.Println(args[0])
+		config := getDefaultHmyConfigCopy(nt)
 
 		if err := writeHarmonyConfigToFile(config, args[0]); err != nil {
 			fmt.Println(err)
