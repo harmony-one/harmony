@@ -73,8 +73,7 @@ func (node *Node) HandleNodeMessage(
 					Msg("block sync")
 			} else {
 				// for non-beaconchain node, subscribe to beacon block broadcast
-				if node.Blockchain().ShardID() != shard.BeaconChainShardID &&
-					node.NodeConfig.Role() != nodeconfig.ExplorerNode {
+				if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 					for _, block := range blocks {
 						if block.ShardID() == 0 {
 							utils.Logger().Info().
