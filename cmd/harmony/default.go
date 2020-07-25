@@ -12,7 +12,7 @@ var defaultConfig = harmonyConfig{
 	Version: tomlConfigVersion,
 	General: generalConfig{
 		NodeType:   "validator",
-		IsStaking:  true,
+		NoStaking:  false,
 		ShardID:    -1,
 		IsArchival: false,
 		DataDir:    "./",
@@ -84,8 +84,14 @@ var defaultLogContext = logContext{
 	Port: 9000,
 }
 
-func getDefaultHmyConfigCopy() harmonyConfig {
+func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 	config := defaultConfig
+
+	config.Network = getDefaultNetworkConfig(nt)
+	if nt == nodeconfig.Devnet {
+		devnet := getDefaultDevnetConfigCopy()
+		config.Devnet = &devnet
+	}
 	return config
 }
 

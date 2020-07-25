@@ -12,7 +12,7 @@ import (
 var (
 	generalFlags = []cli.Flag{
 		nodeTypeFlag,
-		isStakingFlag,
+		noStakingFlag,
 		shardIDFlag,
 		isArchiveFlag,
 		dataDirFlag,
@@ -108,6 +108,7 @@ var (
 	logFlags = []cli.Flag{
 		logFolderFlag,
 		logRotateSizeFlag,
+		logFileNameFlag,
 		logContextIPFlag,
 		logContextPortFlag,
 		logVerbosityFlag,
@@ -159,10 +160,11 @@ var (
 		Usage:    "run node type (validator, explorer)",
 		DefValue: defaultConfig.General.NodeType,
 	}
-	isStakingFlag = cli.BoolFlag{
-		Name:     "run.staking",
-		Usage:    "whether to run node in staking mode",
-		DefValue: defaultConfig.General.IsStaking,
+	// TODO: Can we rename the legacy to internal?
+	noStakingFlag = cli.BoolFlag{
+		Name:     "run.legacy",
+		Usage:    "whether to run node in legacy mode",
+		DefValue: defaultConfig.General.NoStaking,
 	}
 	shardIDFlag = cli.IntFlag{
 		Name:     "run.shard",
@@ -188,8 +190,8 @@ var (
 	legacyIsStakingFlag = cli.BoolFlag{
 		Name:       "staking",
 		Usage:      "whether to run node in staking mode",
-		DefValue:   defaultConfig.General.IsStaking,
-		Deprecated: "use --run.staking",
+		DefValue:   !defaultConfig.General.NoStaking,
+		Deprecated: "use --run.legacy to run in legacy mode",
 	}
 	legacyShardIDFlag = cli.IntFlag{
 		Name:       "shard_id",
@@ -224,10 +226,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.General.ShardID = cli.GetIntFlagValue(cmd, legacyShardIDFlag)
 	}
 
-	if cli.IsFlagChanged(cmd, isStakingFlag) {
-		config.General.IsStaking = cli.GetBoolFlagValue(cmd, isStakingFlag)
+	if cli.IsFlagChanged(cmd, noStakingFlag) {
+		config.General.NoStaking = cli.GetBoolFlagValue(cmd, noStakingFlag)
 	} else if cli.IsFlagChanged(cmd, legacyIsStakingFlag) {
-		config.General.IsStaking = cli.GetBoolFlagValue(cmd, legacyIsStakingFlag)
+		config.General.NoStaking = !cli.GetBoolFlagValue(cmd, legacyIsStakingFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isArchiveFlag) {
@@ -290,13 +292,17 @@ var (
 	}
 )
 
-func getNetworkType(cmd *cobra.Command) string {
+func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
+	var raw string
+
 	if cli.IsFlagChanged(cmd, networkTypeFlag) {
-		return cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
+		raw = cli.GetStringFlagValue(cmd, networkTypeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyNetworkTypeFlag) {
-		return cli.GetStringFlagValue(cmd, networkTypeFlag)
+		raw = cli.GetStringFlagValue(cmd, legacyNetworkTypeFlag)
+	} else {
+		raw = defaultConfig.Network.NetworkType
 	}
-	return defaultConfig.Network.NetworkType
+	return parseNetworkType(raw)
 }
 
 func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
@@ -310,9 +316,7 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
 		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
-		if val {
-			cfg.Network.DNSZone = nodeconfig.GetDefaultDNSZone(defNetworkType)
-		} else {
+		if !val {
 			cfg.Network.LegacySyncing = true
 		}
 	}
@@ -462,7 +466,7 @@ var (
 	}
 	passEnabledFlag = cli.BoolFlag{
 		Name:     "bls.pass",
-		Usage:    "whether BLS key decryption with passphrase is enabled",
+		Usage:    "enable BLS key decryption with passphrase",
 		DefValue: defaultConfig.BLSKeys.PassEnabled,
 	}
 	passSrcTypeFlag = cli.StringFlag{
@@ -482,7 +486,7 @@ var (
 	}
 	kmsEnabledFlag = cli.BoolFlag{
 		Name:     "bls.kms",
-		Usage:    "whether BLS key decryption with AWS KMS service is enabled",
+		Usage:    "enable BLS key decryption with AWS KMS service",
 		DefValue: defaultConfig.BLSKeys.KMSEnabled,
 	}
 	kmsConfigSrcTypeFlag = cli.StringFlag{
@@ -562,17 +566,22 @@ func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
 }
 
 func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
+	var passFileSpecified bool
+
 	if cli.IsFlagChanged(cmd, passEnabledFlag) {
 		config.BLSKeys.PassEnabled = cli.GetBoolFlagValue(cmd, passEnabledFlag)
 	}
-	if cli.IsFlagChanged(cmd, passSrcTypeFlag) {
-		config.BLSKeys.PassSrcType = cli.GetStringFlagValue(cmd, passSrcTypeFlag)
-	}
 	if cli.IsFlagChanged(cmd, passSrcFileFlag) {
 		config.BLSKeys.PassFile = cli.GetStringFlagValue(cmd, passSrcFileFlag)
+		passFileSpecified = true
 	}
 	if cli.IsFlagChanged(cmd, passSaveFlag) {
 		config.BLSKeys.SavePassphrase = cli.GetBoolFlagValue(cmd, passSaveFlag)
+	}
+	if cli.IsFlagChanged(cmd, passSrcTypeFlag) {
+		config.BLSKeys.PassSrcType = cli.GetStringFlagValue(cmd, passSrcTypeFlag)
+	} else if passFileSpecified {
+		config.BLSKeys.PassSrcType = blsPassTypeFile
 	}
 }
 
@@ -859,7 +868,7 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, logVerbosityFlag) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
 	} else if cli.IsFlagChanged(cmd, legacyVerbosityFlag) {
-		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
+		config.Log.Verbosity = cli.GetIntFlagValue(cmd, legacyVerbosityFlag)
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {
@@ -912,7 +921,7 @@ var (
 )
 
 func applyDevnetFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet != nil {
+	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet == nil {
 		cfg := getDefaultDevnetConfigCopy()
 		config.Devnet = &cfg
 	}
