@@ -743,50 +743,49 @@ while :
 do
    msg "############### Running Harmony Process ###############"
    args=(
-      -bootnodes "${BN_MA}"
-      -ip "${PUB_IP}"
-      -port "${NODE_PORT}"
-      -network_type="${network_type}"
-      -dns_zone="${dns_zone}"
-      -blacklist="${blacklist}"
-      -min_peers="${minpeers}"
-      -max_bls_keys_per_node="${max_bls_keys_per_node}"
-      -broadcast_invalid_tx="${broadcast_invalid_tx}"
-      -verbosity="${log_level}"
-      -block_period="5"
+      --bootnodes "${BN_MA}"
+      --ip "${PUB_IP}"
+      --port "${NODE_PORT}"
+      --network_type="${network_type}"
+      --dns_zone="${dns_zone}"
+      --blacklist="${blacklist}"
+      --min_peers="${minpeers}"
+      --max_bls_keys_per_node="${max_bls_keys_per_node}"
+      --broadcast_invalid_tx="${broadcast_invalid_tx}"
+      --verbosity="${log_level}"
    )
    args+=(
-      -is_archival="${archival}"
+      --is_archival="${archival}"
    )
    if [ ! -z "$BLSKEYFILES" ]; then
       args+=(
-         -blskey_file "${BLSKEYFILES}"
+         --blskey_file "${BLSKEYFILES}"
       )
    fi
    if [ ! -z "$blsfolder" ]; then
       args+=(
-         -blsfolder "${blsfolder}"
+         --blsfolder "${blsfolder}"
       )
    fi
    if [ ! -z "$blspass" ]; then
       args+=(
-         -blspass "file:${blspass}"
+         --blspass "file:${blspass}"
       )
    else
       if $no_bls_pass_prompt; then
          args+=(
-            -blspass no-prompt
+            --blspass no-prompt
          )
       fi
    fi
    if ${public_rpc}; then
       args+=(
-         -public_rpc
+         --public_rpc
       )
    fi
    if [ ! -z "${pprof}" ]; then
       args+=(
-      -pprof "${pprof}"
+      --pprof "${pprof}"
       )
    fi
 
@@ -796,19 +795,19 @@ do
       case "${shard_id}" in
       ?*)
          args+=(
-            -shard_id="${shard_id}"
+            --shard_id="${shard_id}"
          )
          if ${staking_mode}
          then
-            args+=(-staking="${staking_mode}")
+            args+=(--staking="${staking_mode}")
          fi
          ;;
       esac
       ;;
    explorer)
       args+=(
-      -node_type="${node_type}"
-      -shard_id="${shard_id}"
+      --node_type="${node_type}"
+      --shard_id="${shard_id}"
       )
       ;;
    esac
