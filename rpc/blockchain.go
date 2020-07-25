@@ -10,9 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/common/denominations"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -26,9 +24,6 @@ import (
 	"github.com/harmony-one/harmony/rpc/v1"
 	"github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/shard/committee"
-	"github.com/harmony-one/harmony/staking/network"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -135,17 +130,25 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 
 	// Format the response according to version
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+	var rpcBlock interface{}
 	switch s.version {
 	case V1:
-		response, err = v1.RPCMarshalBlock(blk, blockArgs, leader)
+		rpcBlock, err = v1.NewRPCBlock(blk, blockArgs, leader)
 	case V2:
-		response, err = v2.RPCMarshalBlock(blk, blockArgs, leader)
+		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRpcVersion
 	}
+	if err != nil {
+		return nil, err
+	}
+	response, err = rpc_common.NewStructuredResponse(rpcBlock)
+	if err != nil {
+		return nil, err
+	}
 
 	// Pending blocks need to nil out a few fields
-	if err == nil && blockNum == rpc.PendingBlockNumber {
+	if blockNum == rpc.PendingBlockNumber {
 		for _, field := range []string{"hash", "nonce", "miner"} {
 			response[field] = nil
 		}
@@ -184,14 +187,19 @@ func (s *PublicBlockchainService) GetBlockByHash(
 
 	// Format the response according to version
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+	var rpcBlock interface{}
 	switch s.version {
 	case V1:
-		return v1.RPCMarshalBlock(blk, blockArgs, leader)
+		rpcBlock, err = v1.NewRPCBlock(blk, blockArgs, leader)
 	case V2:
-		return v2.RPCMarshalBlock(blk, blockArgs, leader)
+		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRpcVersion
 	}
+	if err != nil {
+		return nil, err
+	}
+	return rpc_common.NewStructuredResponse(rpcBlock)
 }
 
 // GetBlockByNumberNew is an alias for GetBlockByNumber using BlockArgs
@@ -454,12 +462,12 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 
 // GetEpoch returns current epoch.
 func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, error) {
-	// Fetch epoch
-	header, err := s.LatestHeader(ctx)
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	epoch := header.Epoch
+	epoch := header.Epoch().Uint64()
 
 	// Format the response according to the version
 	switch s.version {
@@ -474,14 +482,14 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 
 // GetLeader returns current shard leader.
 func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error) {
-	// Fetch leader
-	header, err := s.LatestHeader(ctx)
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
 	if err != nil {
 		return "", err
 	}
-	leader := header.Leader
 
-	// Response is the same for all versions
+	// Response output is the same for all versions
+	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
 	return leader, nil
 }
 
@@ -691,7 +699,7 @@ func (s *PublicBlockchainService) Call(
 }
 
 // LatestHeader returns the latest header information
-func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (*HeaderInformation, error) {
+func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (rpc_common.StructuredResponse, error) {
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
 	if err != nil {
@@ -700,27 +708,43 @@ func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (*HeaderInfo
 
 	// Response output is the same for all versions
 	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
-	return newHeaderInformation(header, leader), nil
+	return rpc_common.NewStructuredResponse(newHeaderInformation(header, leader))
 }
 
 // GetLatestChainHeaders ..
-func (s *PublicBlockchainService) GetLatestChainHeaders() (*block.HeaderPair, error) {
+func (s *PublicBlockchainService) GetLatestChainHeaders() (rpc_common.StructuredResponse, error) {
 	// Response output is the same for all versions
-	return s.hmy.GetLatestChainHeaders(), nil
+	return rpc_common.NewStructuredResponse(s.hmy.GetLatestChainHeaders())
 }
 
 // GetLastCrossLinks ..
-func (s *PublicBlockchainService) GetLastCrossLinks() ([]*types.CrossLink, error) {
+func (s *PublicBlockchainService) GetLastCrossLinks() ([]rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
-	return s.hmy.GetLastCrossLinks()
+
+	// Fetch crosslinks
+	crossLinks, err := s.hmy.GetLastCrossLinks()
+	if err != nil {
+		return nil, err
+	}
+
+	// Format response, all output is the same for all versions
+	responseSlice := []rpc_common.StructuredResponse{}
+	for _, el := range crossLinks {
+		response, err := rpc_common.NewStructuredResponse(el)
+		if err != nil {
+			return nil, err
+		}
+		responseSlice = append(responseSlice, response)
+	}
+	return responseSlice, nil
 }
 
 // GetHeaderByNumber returns block header at given number
 func (s *PublicBlockchainService) GetHeaderByNumber(
 	ctx context.Context, blockNumber BlockNumber,
-) (*HeaderInformation, error) {
+) (rpc_common.StructuredResponse, error) {
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -737,7 +761,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 
 	// Response output is the same for all versions
 	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
-	return newHeaderInformation(header, leader), nil
+	return rpc_common.NewStructuredResponse(newHeaderInformation(header, leader))
 }
 
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
@@ -754,14 +778,20 @@ func (s *PublicBlockchainService) GetTotalStaking() (*big.Int, error) {
 // GetMedianRawStakeSnapshot returns the raw median stake, only meant to be called on beaconchain
 // explorer node
 func (s *PublicBlockchainService) GetMedianRawStakeSnapshot() (
-	*committee.CompletedEPoSRound, error,
+	rpc_common.StructuredResponse, error,
 ) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
 
+	// Fetch snapshot
+	snapshot, err := s.hmy.GetMedianRawStakeSnapshot()
+	if err != nil {
+		return nil, err
+	}
+
 	// Response output is the same for all versions
-	return s.hmy.GetMedianRawStakeSnapshot()
+	return rpc_common.NewStructuredResponse(snapshot)
 }
 
 // GetAllValidatorAddresses returns all validator addresses.
@@ -801,7 +831,7 @@ func (s *PublicBlockchainService) GetElectedValidatorAddresses() ([]string, erro
 // GetValidatorInformation returns information about a validator.
 func (s *PublicBlockchainService) GetValidatorInformation(
 	ctx context.Context, address string,
-) (*staking.ValidatorRPCEnhanced, error) {
+) (rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -812,16 +842,20 @@ func (s *PublicBlockchainService) GetValidatorInformation(
 		return nil, errors.Wrapf(err, "could not retrieve the latest blk information")
 	}
 
+	// Fetch validator information
+	validatorInfo, err := s.hmy.GetValidatorInformation(internal_common.ParseAddr(address), blk)
+	if err != nil {
+		return nil, err
+	}
+
 	// Response output is the same for all versions
-	return s.hmy.GetValidatorInformation(
-		internal_common.ParseAddr(address), blk,
-	)
+	return rpc_common.NewStructuredResponse(validatorInfo)
 }
 
 // GetValidatorInformationByBlockNumber returns information about a validator.
 func (s *PublicBlockchainService) GetValidatorInformationByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
-) (*staking.ValidatorRPCEnhanced, error) {
+) (rpc_common.StructuredResponse, error) {
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -837,16 +871,20 @@ func (s *PublicBlockchainService) GetValidatorInformationByBlockNumber(
 		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
 	}
 
+	// Fetch validator info
+	validatorInfo, err := s.hmy.GetValidatorInformation(internal_common.ParseAddr(address), blk)
+	if err != nil {
+		return nil, err
+	}
+
 	// Response output is the same for all versions
-	return s.hmy.GetValidatorInformation(
-		internal_common.ParseAddr(address), blk,
-	)
+	return rpc_common.NewStructuredResponse(validatorInfo)
 }
 
 // getAllValidatorInformation helper function to get all validator information for a given eth block number
 func (s *PublicBlockchainService) getAllValidatorInformation(
 	ctx context.Context, page int, blockNum rpc.BlockNumber,
-) ([]*staking.ValidatorRPCEnhanced, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	if page < -1 {
 		return nil, errors.Errorf("page given %d cannot be less than -1", page)
 	}
@@ -854,7 +892,7 @@ func (s *PublicBlockchainService) getAllValidatorInformation(
 	// Get all validators
 	addresses := s.hmy.GetAllValidatorAddresses()
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([]*staking.ValidatorRPCEnhanced, 0), nil
+		return make([]rpc_common.StructuredResponse, 0), nil
 	}
 
 	// Set page start
@@ -875,11 +913,15 @@ func (s *PublicBlockchainService) getAllValidatorInformation(
 	}
 
 	// Fetch validator information for block
-	validators := []*staking.ValidatorRPCEnhanced{}
+	validators := []rpc_common.StructuredResponse{}
 	for i := start; i < start+validatorsNum; i++ {
-		information, err := s.hmy.GetValidatorInformation(addresses[i], blk)
+		validatorInfo, err := s.hmy.GetValidatorInformation(addresses[i], blk)
 		if err == nil {
 			// Response output is the same for all versions
+			information, err := rpc_common.NewStructuredResponse(validatorInfo)
+			if err != nil {
+				return nil, err
+			}
 			validators = append(validators, information)
 		}
 	}
@@ -890,7 +932,7 @@ func (s *PublicBlockchainService) getAllValidatorInformation(
 // If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicBlockchainService) GetAllValidatorInformation(
 	ctx context.Context, page int,
-) ([]*staking.ValidatorRPCEnhanced, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -915,14 +957,14 @@ func (s *PublicBlockchainService) GetAllValidatorInformation(
 	}
 
 	// Response output is the same for all versions
-	return res.([]*staking.ValidatorRPCEnhanced), nil
+	return res.([]rpc_common.StructuredResponse), nil
 }
 
 // GetAllValidatorInformationByBlockNumber returns information about all validators.
 // If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicBlockchainService) GetAllValidatorInformationByBlockNumber(
 	ctx context.Context, page int, blockNumber BlockNumber,
-) ([]*staking.ValidatorRPCEnhanced, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -943,12 +985,12 @@ func (s *PublicBlockchainService) GetAllValidatorInformationByBlockNumber(
 // TODO(dm): optimize with single flight
 func (s *PublicBlockchainService) GetAllDelegationInformation(
 	ctx context.Context, page int,
-) ([][]*RPCDelegation, error) {
+) ([][]rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
 	if page < -1 {
-		return make([][]*RPCDelegation, 0), nil
+		return make([][]rpc_common.StructuredResponse, 0), nil
 	}
 
 	// Get all validators
@@ -956,7 +998,7 @@ func (s *PublicBlockchainService) GetAllDelegationInformation(
 
 	// Return nothing if no delegation on page
 	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return make([][]*RPCDelegation, 0), nil
+		return make([][]rpc_common.StructuredResponse, 0), nil
 	}
 
 	// Set page start
@@ -971,7 +1013,7 @@ func (s *PublicBlockchainService) GetAllDelegationInformation(
 	}
 
 	// Fetch all delegations
-	validators := make([][]*RPCDelegation, validatorsNum)
+	validators := make([][]rpc_common.StructuredResponse, validatorsNum)
 	var err error
 	for i := start; i < start+validatorsNum; i++ {
 		validators[i-start], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
@@ -987,7 +1029,7 @@ func (s *PublicBlockchainService) GetAllDelegationInformation(
 // GetDelegationsByDelegator returns list of delegations for a delegator address.
 func (s *PublicBlockchainService) GetDelegationsByDelegator(
 	ctx context.Context, address string,
-) ([]*RPCDelegation, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -997,10 +1039,9 @@ func (s *PublicBlockchainService) GetDelegationsByDelegator(
 	validators, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddress)
 
 	// Format response
-	result := []*RPCDelegation{}
+	result := []rpc_common.StructuredResponse{}
 	for i := range delegations {
 		delegation := delegations[i]
-
 		undelegations := make([]RPCUndelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
@@ -1011,23 +1052,27 @@ func (s *PublicBlockchainService) GetDelegationsByDelegator(
 		}
 		valAddr, _ := internal_common.AddressToBech32(validators[i])
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
-		result = append(result, &RPCDelegation{
+
+		// Response output is the same for all versions
+		del, err := rpc_common.NewStructuredResponse(RPCDelegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
 		})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, del)
 	}
-
-	// Response output is the same for all versions
 	return result, nil
 }
 
 // GetDelegationsByDelegatorByBlockNumber returns list of delegations for a delegator address at given block number
 func (s *PublicBlockchainService) GetDelegationsByDelegatorByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
-) ([]*RPCDelegation, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -1040,17 +1085,16 @@ func (s *PublicBlockchainService) GetDelegationsByDelegatorByBlockNumber(
 
 	// Fetch delegation for block number
 	delegatorAddress := internal_common.ParseAddr(address)
-	blk, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
+	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
 	}
 	validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(delegatorAddress, blk)
 
 	// Format response
-	result := make([]*RPCDelegation, len(delegations))
+	result := make([]rpc_common.StructuredResponse, len(delegations))
 	for i := range delegations {
 		delegation := delegations[i]
-
 		undelegations := make([]RPCUndelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
@@ -1061,23 +1105,27 @@ func (s *PublicBlockchainService) GetDelegationsByDelegatorByBlockNumber(
 		}
 		valAddr, _ := internal_common.AddressToBech32(validators[i])
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
-		result[i] = &RPCDelegation{
+
+		// Response output is the same for all versions
+		del, err := rpc_common.NewStructuredResponse(RPCDelegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
+		})
+		if err != nil {
+			return nil, err
 		}
+		result = append(result, del)
 	}
-
-	// Response output is the same for all versions
 	return result, nil
 }
 
 // GetDelegationsByValidator returns list of delegations for a validator address.
 func (s *PublicBlockchainService) GetDelegationsByValidator(
 	ctx context.Context, address string,
-) ([]*RPCDelegation, error) {
+) ([]rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -1087,9 +1135,9 @@ func (s *PublicBlockchainService) GetDelegationsByValidator(
 	delegations := s.hmy.GetDelegationsByValidator(validatorAddress)
 
 	// Format response
-	result := make([]*RPCDelegation, 0)
-	for _, delegation := range delegations {
-
+	result := make([]rpc_common.StructuredResponse, 0)
+	for i := range delegations {
+		delegation := delegations[i]
 		undelegations := []RPCUndelegation{}
 
 		for j := range delegation.Undelegations {
@@ -1100,23 +1148,27 @@ func (s *PublicBlockchainService) GetDelegationsByValidator(
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
-		result = append(result, &RPCDelegation{
+
+		// Response output is the same for all versions
+		del, err := rpc_common.NewStructuredResponse(RPCDelegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
 		})
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, del)
 	}
-
-	// Response output is the same for all versions
 	return result, nil
 }
 
 // GetDelegationByDelegatorAndValidator returns a delegation for delegator and validator.
 func (s *PublicBlockchainService) GetDelegationByDelegatorAndValidator(
 	ctx context.Context, address string, validator string,
-) (*RPCDelegation, error) {
+) (rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -1145,13 +1197,13 @@ func (s *PublicBlockchainService) GetDelegationByDelegatorAndValidator(
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
 
 		// Response output is the same for all versions
-		return &RPCDelegation{
+		return rpc_common.NewStructuredResponse(RPCDelegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
-		}, nil
+		})
 	}
 	return nil, nil
 }
@@ -1171,27 +1223,51 @@ func (s *PublicBlockchainService) EstimateGas(
 }
 
 // GetCurrentUtilityMetrics ..
-func (s *PublicBlockchainService) GetCurrentUtilityMetrics() (*network.UtilityMetric, error) {
+func (s *PublicBlockchainService) GetCurrentUtilityMetrics() (rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
+
+	// Fetch metrics
+	metrics, err := s.hmy.GetCurrentUtilityMetrics()
+	if err != nil {
+		return nil, err
+	}
+
 	// Response output is the same for all versions
-	return s.hmy.GetCurrentUtilityMetrics()
+	return rpc_common.NewStructuredResponse(metrics)
 }
 
 // GetSuperCommittees ..
-func (s *PublicBlockchainService) GetSuperCommittees() (*quorum.Transition, error) {
+func (s *PublicBlockchainService) GetSuperCommittees() (rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
+
+	// Fetch super committees
+	cmt, err := s.hmy.GetSuperCommittees()
+	if err != nil {
+		return nil, err
+	}
+
 	// Response output is the same for all versions
-	return s.hmy.GetSuperCommittees()
+	return rpc_common.NewStructuredResponse(cmt)
 }
 
 // GetCurrentBadBlocks ..
-func (s *PublicBlockchainService) GetCurrentBadBlocks() ([]core.BadBlock, error) {
-	// Response output is the same for all versions
-	return s.hmy.GetCurrentBadBlocks(), nil
+func (s *PublicBlockchainService) GetCurrentBadBlocks() ([]rpc_common.StructuredResponse, error) {
+	// Fetch bad blocks and format
+	badBlocks := []rpc_common.StructuredResponse{}
+	for _, blk := range s.hmy.GetCurrentBadBlocks() {
+		// Response output is the same for all versions
+		fmtBadBlock, err := rpc_common.NewStructuredResponse(blk)
+		if err != nil {
+			return nil, err
+		}
+		badBlocks = append(badBlocks, fmtBadBlock)
+	}
+
+	return badBlocks, nil
 }
 
 // GetTotalSupply ..
@@ -1211,7 +1287,7 @@ func (s *PublicBlockchainService) GetCirculatingSupply() (numeric.Dec, error) {
 // GetStakingNetworkInfo ..
 func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	ctx context.Context,
-) (*StakingNetworkInfo, error) {
+) (rpc_common.StructuredResponse, error) {
 	if err := s.isBeaconShard(); err != nil {
 		return nil, err
 	}
@@ -1223,7 +1299,7 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	if err != nil {
 		return nil, err
 	}
-	round, err := s.GetMedianRawStakeSnapshot()
+	medianSnapshot, err := s.hmy.GetMedianRawStakeSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -1241,13 +1317,13 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	}
 
 	// Response output is the same for all versions
-	return &StakingNetworkInfo{
+	return rpc_common.NewStructuredResponse(StakingNetworkInfo{
 		TotalSupply:       totalSupply,
 		CirculatingSupply: circulatingSupply,
 		EpochLastBlock:    epochLastBlock,
 		TotalStaking:      totalStaking,
-		MedianRawStake:    round.MedianStake,
-	}, nil
+		MedianRawStake:    medianSnapshot.MedianStake,
+	})
 }
 
 // docall executes an EVM call

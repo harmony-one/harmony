@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/rpc/common"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
 )
 
 // PublicHarmonyService provides an API to access Harmony related information.
@@ -51,11 +51,13 @@ func (s *PublicHarmonyService) GasPrice(ctx context.Context) (*hexutil.Big, erro
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
-func (s *PublicHarmonyService) GetNodeMetadata() common.NodeMetadata {
-	return s.hmy.GetNodeMetadata()
+func (s *PublicHarmonyService) GetNodeMetadata() (rpc_common.StructuredResponse, error) {
+	// Response output is the same for all versions
+	return rpc_common.NewStructuredResponse(s.hmy.GetNodeMetadata())
 }
 
 // GetPeerInfo produces a NodePeerInfo record
-func (s *PublicHarmonyService) GetPeerInfo() common.NodePeerInfo {
-	return s.hmy.GetPeerInfo()
+func (s *PublicHarmonyService) GetPeerInfo() (rpc_common.StructuredResponse, error) {
+	// Response output is the same for all versions
+	return rpc_common.NewStructuredResponse(s.hmy.GetPeerInfo())
 }

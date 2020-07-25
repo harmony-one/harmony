@@ -2,6 +2,7 @@ package v2
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -44,6 +45,60 @@ type RPCBlock struct {
 	Uncles           []common.Hash    `json:"uncles"`
 	TotalDifficulty  *big.Int         `json:"totalDifficulty"`
 	Signers          []string         `json:"signers"`
+}
+
+// RPCBlockWithTxHash represents a block that will serialize to the RPC representation of a block
+// having ONLY transaction hashes in the Transaction & Staking transaction fields.
+type RPCBlockWithTxHash struct {
+	Number           *big.Int       `json:"number"`
+	ViewID           *big.Int       `json:"viewID"`
+	Epoch            *big.Int       `json:"epoch"`
+	Hash             common.Hash    `json:"hash"`
+	ParentHash       common.Hash    `json:"parentHash"`
+	Nonce            uint64         `json:"nonce"`
+	MixHash          common.Hash    `json:"mixHash"`
+	LogsBloom        ethtypes.Bloom `json:"logsBloom"`
+	StateRoot        common.Hash    `json:"stateRoot"`
+	Miner            string         `json:"miner"`
+	Difficulty       uint64         `json:"difficulty"`
+	ExtraData        hexutil.Bytes  `json:"extraData"`
+	Size             uint64         `json:"size"`
+	GasLimit         uint64         `json:"gasLimit"`
+	GasUsed          uint64         `json:"gasUsed"`
+	Timestamp        *big.Int       `json:"timestamp"`
+	TransactionsRoot common.Hash    `json:"transactionsRoot"`
+	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
+	Uncles           []common.Hash  `json:"uncles"`
+	Transactions     []common.Hash  `json:"transactions"`
+	StakingTxs       []common.Hash  `json:"stakingTransactions"`
+	Signers          []string       `json:"signers,omitempty"`
+}
+
+// RPCBlockWithFullTx represents a block that will serialize to the RPC representation of a block
+// having FULL transactions in the Transaction & Staking transaction fields.
+type RPCBlockWithFullTx struct {
+	Number           *big.Int                 `json:"number"`
+	ViewID           *big.Int                 `json:"viewID"`
+	Epoch            *big.Int                 `json:"epoch"`
+	Hash             common.Hash              `json:"hash"`
+	ParentHash       common.Hash              `json:"parentHash"`
+	Nonce            uint64                   `json:"nonce"`
+	MixHash          common.Hash              `json:"mixHash"`
+	LogsBloom        ethtypes.Bloom           `json:"logsBloom"`
+	StateRoot        common.Hash              `json:"stateRoot"`
+	Miner            string                   `json:"miner"`
+	Difficulty       uint64                   `json:"difficulty"`
+	ExtraData        hexutil.Bytes            `json:"extraData"`
+	Size             uint64                   `json:"size"`
+	GasLimit         uint64                   `json:"gasLimit"`
+	GasUsed          uint64                   `json:"gasUsed"`
+	Timestamp        *big.Int                 `json:"timestamp"`
+	TransactionsRoot common.Hash              `json:"transactionsRoot"`
+	ReceiptsRoot     common.Hash              `json:"receiptsRoot"`
+	Uncles           []common.Hash            `json:"uncles"`
+	Transactions     []*RPCTransaction        `json:"transactions"`
+	StakingTxs       []*RPCStakingTransaction `json:"stakingTransactions"`
+	Signers          []string                 `json:"signers,omitempty"`
 }
 
 // RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
@@ -424,81 +479,112 @@ func newRPCStakingTransaction(
 	return result
 }
 
-// RPCMarshalBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
+// NewRPCBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func RPCMarshalBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (map[string]interface{}, error) {
-	head := b.Header() // copies the header once
-	fields := map[string]interface{}{
-		"number":           (*big.Int)(head.Number()),
-		"viewID":           (*big.Int)(head.ViewID()),
-		"epoch":            (*big.Int)(head.Epoch()),
-		"hash":             b.Hash(),
-		"parentHash":       head.ParentHash(),
-		"nonce":            0, // Remove this because we don't have it in our header
-		"mixHash":          head.MixDigest(),
-		"logsBloom":        head.Bloom(),
-		"stateRoot":        head.Root(),
-		"miner":            leader,
-		"difficulty":       0, // Remove this because we don't have it in our header
-		"extraData":        hexutil.Bytes(head.Extra()),
-		"size":             uint64(b.Size()),
-		"gasLimit":         head.GasLimit(),
-		"gasUsed":          head.GasUsed(),
-		"timestamp":        head.Time().Uint64(),
-		"transactionsRoot": head.TxHash(),
-		"receiptsRoot":     head.ReceiptHash(),
+func NewRPCBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (interface{}, error) {
+	if blockArgs.FullTx {
+		return NewRPCBlockWithFullTx(b, blockArgs, leader)
+	}
+	return NewRPCBlockWithTxHash(b, blockArgs, leader)
+}
+
+// NewRPCBlockWithTxHash ..
+func NewRPCBlockWithTxHash(
+	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
+) (*RPCBlockWithTxHash, error) {
+	if blockArgs.FullTx {
+		return nil, fmt.Errorf("block args specifies full tx, but requested RPC block with only tx hash")
 	}
 
-	if blockArgs.InclTx {
-		formatTx := func(tx *types.Transaction) (interface{}, error) {
-			return tx.Hash(), nil
-		}
-		if blockArgs.FullTx {
-			formatTx = func(tx *types.Transaction) (interface{}, error) {
-				return newRPCTransactionFromBlockHash(b, tx.Hash()), nil
-			}
-		}
-		txs := b.Transactions()
-		transactions := make([]interface{}, len(txs))
-		var err error
-		for i, tx := range txs {
-			if transactions[i], err = formatTx(tx); err != nil {
-				return nil, err
-			}
-		}
-		fields["transactions"] = transactions
+	head := b.Header()
+	blk := &RPCBlockWithTxHash{
+		Number:           head.Number(),
+		ViewID:           head.ViewID(),
+		Epoch:            head.Epoch(),
+		Hash:             b.Hash(),
+		ParentHash:       head.ParentHash(),
+		Nonce:            0, // Remove this because we don't have it in our header
+		MixHash:          head.MixDigest(),
+		LogsBloom:        head.Bloom(),
+		StateRoot:        head.Root(),
+		Miner:            leader,
+		Difficulty:       0, // Remove this because we don't have it in our header
+		ExtraData:        hexutil.Bytes(head.Extra()),
+		Size:             uint64(b.Size()),
+		GasLimit:         head.GasLimit(),
+		GasUsed:          head.GasUsed(),
+		Timestamp:        head.Time(),
+		TransactionsRoot: head.TxHash(),
+		ReceiptsRoot:     head.ReceiptHash(),
+		Uncles:           []common.Hash{},
+		Transactions:     []common.Hash{},
+		StakingTxs:       []common.Hash{},
+	}
 
-		if blockArgs.InclStaking {
-			formatStakingTx := func(tx *staking.StakingTransaction) (interface{}, error) {
-				return tx.Hash(), nil
-			}
-			if blockArgs.FullTx {
-				formatStakingTx = func(tx *staking.StakingTransaction) (interface{}, error) {
-					return newRPCStakingTransactionFromBlockHash(b, tx.Hash()), nil
-				}
-			}
-			stakingTxs := b.StakingTransactions()
-			stakingTransactions := make([]interface{}, len(stakingTxs))
-			for i, tx := range stakingTxs {
-				if stakingTransactions[i], err = formatStakingTx(tx); err != nil {
-					return nil, err
-				}
-			}
-			fields["stakingTransactions"] = stakingTransactions
+	for _, tx := range b.Transactions() {
+		blk.Transactions = append(blk.Transactions, tx.Hash())
+	}
+
+	if blockArgs.InclStaking {
+		for _, stx := range b.StakingTransactions() {
+			blk.StakingTxs = append(blk.StakingTxs, stx.Hash())
 		}
 	}
 
-	uncles := b.Uncles()
-	uncleHashes := make([]common.Hash, len(uncles))
-	for i, uncle := range uncles {
-		uncleHashes[i] = uncle.Hash()
-	}
-	fields["uncles"] = uncleHashes
 	if blockArgs.WithSigners {
-		fields["signers"] = blockArgs.Signers
+		blk.Signers = blockArgs.Signers
 	}
-	return fields, nil
+	return blk, nil
+}
+
+// NewRPCBlockWithFullTx ..
+func NewRPCBlockWithFullTx(
+	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
+) (*RPCBlockWithFullTx, error) {
+	if !blockArgs.FullTx {
+		return nil, fmt.Errorf("block args specifies NO full tx, but requested RPC block with full tx")
+	}
+
+	head := b.Header()
+	blk := &RPCBlockWithFullTx{
+		Number:           head.Number(),
+		ViewID:           head.ViewID(),
+		Epoch:            head.Epoch(),
+		Hash:             b.Hash(),
+		ParentHash:       head.ParentHash(),
+		Nonce:            0, // Remove this because we don't have it in our header
+		MixHash:          head.MixDigest(),
+		LogsBloom:        head.Bloom(),
+		StateRoot:        head.Root(),
+		Miner:            leader,
+		Difficulty:       0, // Remove this because we don't have it in our header
+		ExtraData:        hexutil.Bytes(head.Extra()),
+		Size:             uint64(b.Size()),
+		GasLimit:         head.GasLimit(),
+		GasUsed:          head.GasUsed(),
+		Timestamp:        head.Time(),
+		TransactionsRoot: head.TxHash(),
+		ReceiptsRoot:     head.ReceiptHash(),
+		Uncles:           []common.Hash{},
+		Transactions:     []*RPCTransaction{},
+		StakingTxs:       []*RPCStakingTransaction{},
+	}
+
+	for _, tx := range b.Transactions() {
+		blk.Transactions = append(blk.Transactions, newRPCTransactionFromBlockHash(b, tx.Hash()))
+	}
+
+	if blockArgs.InclStaking {
+		for _, stx := range b.StakingTransactions() {
+			blk.StakingTxs = append(blk.StakingTxs, newRPCStakingTransactionFromBlockHash(b, stx.Hash()))
+		}
+	}
+
+	if blockArgs.WithSigners {
+		blk.Signers = blockArgs.Signers
+	}
+	return blk, nil
 }
 
 // newRPCTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.

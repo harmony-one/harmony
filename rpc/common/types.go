@@ -10,6 +10,19 @@ import (
 // StructuredResponse type of RPCs
 type StructuredResponse = map[string]interface{}
 
+// NewStructuredResponse creates a structured response from the given input
+func NewStructuredResponse(input interface{}) (StructuredResponse, error) {
+	var objMap StructuredResponse
+	dat, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(dat, &objMap); err != nil {
+		return nil, err
+	}
+	return objMap, nil
+}
+
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
