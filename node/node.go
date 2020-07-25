@@ -386,8 +386,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
 			// only non-beacon nodes process the beacon block sync messages
-			if node.Blockchain().ShardID() == shard.BeaconChainShardID ||
-				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
 				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
 				return nil, 0, errIgnoreBeaconMsg
 			}
