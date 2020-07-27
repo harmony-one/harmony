@@ -327,7 +327,7 @@ func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 		} else {
 			curCount++
 		}
-		if curCount > maxCount {
+		if curCount >= maxCount {
 			maxCount = curCount
 			maxFirstID = curFirstID
 		}
