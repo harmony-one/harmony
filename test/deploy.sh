@@ -100,22 +100,27 @@ function launch_localnet() {
       continue
     fi
 
+    echo mode ${mode}
+
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
       args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}")
       ;;
     archival)
-      args=("${args[@]}" --is_archival "--run.legacy")
+      args=("${args[@]}" --is_archival --run.legacy)
       ;;
     leader)
-      args=("${args[@]}" --is_leader "--run.legacy")
+      args=("${args[@]}" --is_leader --run.legacy)
       ;;
     external)
       continue
       ;;
     client)
-      args=("${args[@]}" "--run.legacy")
+      args=("${args[@]}" --run.legacy)
+      ;;
+    validator)
+      args=("${args[@]}" --run.legacy)
       ;;
     esac
 

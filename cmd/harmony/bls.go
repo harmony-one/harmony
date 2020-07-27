@@ -24,7 +24,6 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
 			os.Exit(100)
 		}
-		fmt.Printf("Successfully loaded %v BLS keys\n", len(multiBLSPriKey))
 	})
 	config.ConsensusPriKey = multiBLSPriKey
 	return multiBLSPriKey.GetPublicKeys()
