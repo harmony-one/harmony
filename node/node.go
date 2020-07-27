@@ -385,29 +385,26 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	case proto_node.Block:
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
+			atomic.AddUint32(&node.NumBlockSyncMsg, 1)
 			// only non-beacon nodes process the beacon block sync messages
 			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
-				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
 				return nil, 0, errIgnoreBeaconMsg
 			}
-			atomic.AddUint32(&node.NumBlockSyncMsg, 1)
 		case proto_node.SlashCandidate:
+			atomic.AddUint32(&node.NumSlashMsg, 1)
 			// only beacon chain node process slash candidate messages
 			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
-				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
 				return nil, 0, errIgnoreBeaconMsg
 			}
-			atomic.AddUint32(&node.NumSlashMsg, 1)
 		case proto_node.Receipt:
 			atomic.AddUint32(&node.NumReceiptMsg, 1)
 		case proto_node.CrossLink:
+			atomic.AddUint32(&node.NumCrossLinkMsg, 1)
 			// only beacon chain node process crosslink messages
 			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
-				atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
 				return nil, 0, errIgnoreBeaconMsg
 			}
-			atomic.AddUint32(&node.NumCrossLinkMsg, 1)
 		default:
 			atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
 			return nil, 0, errInvalidNodeMsg
@@ -667,9 +664,16 @@ func (node *Node) Start() error {
 						context.TODO(), openBox,
 					)
 					if err != nil {
-						// TODO (lc): block peers sending error messages
-						errChan <- withError{err, msg.GetFrom()}
-						return libp2p_pubsub.ValidationReject
+						switch err {
+						case errIgnoreBeaconMsg:
+							// ignore the further processing of the ignored messages as it is not intended for this node
+							// but propogate the messages to other nodes
+							return libp2p_pubsub.ValidationAccept
+						default:
+							// TODO (lc): block peers sending error messages
+							errChan <- withError{err, msg.GetFrom()}
+							return libp2p_pubsub.ValidationReject
+						}
 					}
 					msg.ValidatorData = validated{
 						consensusBound: false,
