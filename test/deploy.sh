@@ -106,16 +106,16 @@ function launch_localnet() {
       args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}")
       ;;
     archival)
-      args=("${args[@]}" --is_archival "--staking=false")
+      args=("${args[@]}" --is_archival "--run.legacy")
       ;;
     leader)
-      args=("${args[@]}" --is_leader "--staking=false")
+      args=("${args[@]}" --is_leader "--run.legacy")
       ;;
     external)
-      args=("${args[@]}" "--staking=true")
+      continue
       ;;
     client)
-      continue
+      args=("${args[@]}" "--run.legacy")
       ;;
     esac
 
