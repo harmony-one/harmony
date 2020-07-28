@@ -2,50 +2,18 @@ package v1
 
 import (
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"math/big"
-	"strconv"
-	"strings"
 )
-
-type BlockNumber rpc.BlockNumber
-
-func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
-	baseBn := rpc.BlockNumber(0)
-	baseErr := baseBn.UnmarshalJSON(data)
-	if baseErr != nil {
-		input := strings.TrimSpace(string(data))
-		if len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"' {
-			input = input[1 : len(input)-1]
-		}
-		input = strings.TrimPrefix(input, "0x")
-		num, err := strconv.ParseInt(input, 10, 64)
-		if err != nil {
-			return err
-		}
-		*bn = BlockNumber(num)
-		return nil
-	}
-	*bn = BlockNumber(baseBn)
-	return nil
-}
-
-func (bn BlockNumber) Int64() int64 {
-	return (int64)(bn)
-}
-
-func (bn BlockNumber) EthBlockNumber() rpc.BlockNumber {
-	return (rpc.BlockNumber)(bn)
-}
 
 // RPCBlockWithTxHash represents a block that will serialize to the RPC representation of a block
 // having ONLY transaction hashes in the Transaction & Staking transaction fields.
@@ -242,25 +210,6 @@ type RPCCXReceipt struct {
 	ShardID     uint32       `json:"shardID"`
 	ToShardID   uint32       `json:"toShardID"`
 	Amount      *hexutil.Big `json:"value"`
-}
-
-// CallArgs represents the arguments for a call.
-type CallArgs struct {
-	From     *common.Address `json:"from"`
-	To       *common.Address `json:"to"`
-	Gas      *hexutil.Uint64 `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     *hexutil.Bytes  `json:"data"`
-}
-
-// StakingNetworkInfo returns global staking info.
-type StakingNetworkInfo struct {
-	TotalSupply       numeric.Dec `json:"total-supply"`
-	CirculatingSupply numeric.Dec `json:"circulating-supply"`
-	EpochLastBlock    uint64      `json:"epoch-last-block"`
-	TotalStaking      *big.Int    `json:"total-staking"`
-	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
 
 // NewRPCCXReceipt returns a CXReceipt that will serialize to the RPC representation

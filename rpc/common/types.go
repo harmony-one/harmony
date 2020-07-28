@@ -7,22 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-// StructuredResponse type of RPCs
-type StructuredResponse = map[string]interface{}
-
-// NewStructuredResponse creates a structured response from the given input
-func NewStructuredResponse(input interface{}) (StructuredResponse, error) {
-	var objMap StructuredResponse
-	dat, err := json.Marshal(input)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(dat, &objMap); err != nil {
-		return nil, err
-	}
-	return objMap, nil
-}
-
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
@@ -43,30 +27,6 @@ func (ba *BlockArgs) UnmarshalFromInterface(blockArgs interface{}) error {
 		return err
 	}
 	*ba = args
-	return nil
-}
-
-// TxHistoryArgs is struct to include optional transaction formatting params.
-type TxHistoryArgs struct {
-	Address   string `json:"address"`
-	PageIndex uint32 `json:"pageIndex"`
-	PageSize  uint32 `json:"pageSize"`
-	FullTx    bool   `json:"fullTx"`
-	TxType    string `json:"txType"`
-	Order     string `json:"order"`
-}
-
-// UnmarshalFromInterface ..
-func (ta *TxHistoryArgs) UnmarshalFromInterface(blockArgs interface{}) error {
-	var args TxHistoryArgs
-	dat, err := json.Marshal(blockArgs)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(dat, &args); err != nil {
-		return err
-	}
-	*ta = args
 	return nil
 }
 

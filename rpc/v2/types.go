@@ -2,17 +2,17 @@ package v2
 
 import (
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"math/big"
-	"strings"
 )
 
 // RPCBlock represents a block that will serialize to the RPC representation of a block
@@ -249,25 +249,6 @@ type RPCDelegation struct {
 type RPCUndelegation struct {
 	Amount *big.Int
 	Epoch  *big.Int
-}
-
-// CallArgs represents the arguments for a call.
-type CallArgs struct {
-	From     *common.Address `json:"from"`
-	To       *common.Address `json:"to"`
-	Gas      *hexutil.Uint64 `json:"gas"`
-	GasPrice *hexutil.Big    `json:"gasPrice"`
-	Value    *hexutil.Big    `json:"value"`
-	Data     *hexutil.Bytes  `json:"data"`
-}
-
-// StakingNetworkInfo returns global staking info.
-type StakingNetworkInfo struct {
-	TotalSupply       numeric.Dec `json:"total-supply"`
-	CirculatingSupply numeric.Dec `json:"circulating-supply"`
-	EpochLastBlock    uint64      `json:"epoch-last-block"`
-	TotalStaking      *big.Int    `json:"total-staking"`
-	MedianRawStake    numeric.Dec `json:"median-raw-stake"`
 }
 
 // NewRPCCXReceipt returns a CXReceipt that will serialize to the RPC representation

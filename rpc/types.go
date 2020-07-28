@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"strconv"
 	"strings"
@@ -49,6 +50,22 @@ type Delegation struct {
 type Undelegation struct {
 	Amount *big.Int
 	Epoch  *big.Int
+}
+
+// StructuredResponse type of RPCs
+type StructuredResponse = map[string]interface{}
+
+// NewStructuredResponse creates a structured response from the given input
+func NewStructuredResponse(input interface{}) (StructuredResponse, error) {
+	var objMap StructuredResponse
+	dat, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(dat, &objMap); err != nil {
+		return nil, err
+	}
+	return objMap, nil
 }
 
 // BlockNumber ..
@@ -106,6 +123,30 @@ func (i *TransactionIndex) UnmarshalJSON(data []byte) (err error) {
 	}
 
 	*i = TransactionIndex(num)
+	return nil
+}
+
+// TxHistoryArgs is struct to include optional transaction formatting params.
+type TxHistoryArgs struct {
+	Address   string `json:"address"`
+	PageIndex uint32 `json:"pageIndex"`
+	PageSize  uint32 `json:"pageSize"`
+	FullTx    bool   `json:"fullTx"`
+	TxType    string `json:"txType"`
+	Order     string `json:"order"`
+}
+
+// UnmarshalFromInterface ..
+func (ta *TxHistoryArgs) UnmarshalFromInterface(blockArgs interface{}) error {
+	var args TxHistoryArgs
+	dat, err := json.Marshal(blockArgs)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &args); err != nil {
+		return err
+	}
+	*ta = args
 	return nil
 }
 
