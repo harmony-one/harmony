@@ -100,8 +100,6 @@ function launch_localnet() {
       continue
     fi
 
-    echo mode ${mode}
-
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
@@ -114,7 +112,6 @@ function launch_localnet() {
       args=("${args[@]}" --is_leader --run.legacy)
       ;;
     external)
-      continue
       ;;
     client)
       args=("${args[@]}" --run.legacy)
@@ -125,7 +122,6 @@ function launch_localnet() {
     esac
 
     # Start the node
-    echo "${args[@]}" "${extra_args[@]}"
     ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"
 }
