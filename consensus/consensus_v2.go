@@ -491,8 +491,8 @@ func (consensus *Consensus) Start(
 
 				// Only Leader execute this condition
 				func() {
-					consensus.commitMutex.Lock()
-					defer consensus.commitMutex.Unlock()
+					consensus.mutex.Lock()
+					defer consensus.mutex.Unlock()
 					if viewID == consensus.viewID {
 						consensus.finalizeCommits()
 					}
