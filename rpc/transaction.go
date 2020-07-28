@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
@@ -580,17 +581,14 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
 	// Fetch receipt for plain & staking transaction
-	var tx types.PoolTransaction
+	var tx *types.Transaction
+	var stx *staking.StakingTransaction
 	var blockHash common.Hash
 	var blockNumber, index uint64
 	tx, blockHash, blockNumber, index = rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	if tx == nil {
-		tx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
-		if tx == nil {
-			// Legacy behavior is to not return error if transaction is not found
-			utils.Logger().Debug().
-				Err(fmt.Errorf("unable to find plain tx or staking tx with hash %v", hash.String())).
-				Msgf("%v error at %v", LogTag, "GetTransactionReceipt")
+		stx, blockHash, blockNumber, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
+		if stx == nil {
 			return nil, nil
 		}
 	}
@@ -599,20 +597,29 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 		return nil, err
 	}
 	if len(receipts) <= int(index) {
-		return nil, fmt.Errorf("index of transaction greater than number of receipts")
+		return nil, nil
 	}
 	receipt := receipts[index]
 
 	// Format response according to version
+	var RPCReceipt interface{}
 	switch s.version {
 	case V1:
-		RPCReceipt, err := v1.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		if tx == nil {
+			RPCReceipt, err = v1.NewRPCReceipt(stx, blockHash, blockNumber, index, receipt)
+		} else {
+			RPCReceipt, err = v1.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		}
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(RPCReceipt)
 	case V2:
-		RPCReceipt, err := v2.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		if tx == nil {
+			RPCReceipt, err = v2.NewRPCReceipt(stx, blockHash, blockNumber, index, receipt)
+		} else {
+			RPCReceipt, err = v2.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		}
 		if err != nil {
 			return nil, err
 		}
