@@ -16,6 +16,7 @@ type PrivateDebugService struct {
 }
 
 // NewPrivateDebugAPI creates a new API for the RPC interface
+// TODO(dm): expose public via config
 func NewPrivateDebugAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
