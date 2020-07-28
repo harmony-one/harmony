@@ -347,7 +347,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	if consensus.ChainReader.Config().IsFiveSeconds(nextEpoch) {
+	if consensus.ChainReader.Config().IsFiveSeconds(curEpoch) {
 		consensus.BlockPeriod = time.Duration(5 * time.Second)
 	}
 
