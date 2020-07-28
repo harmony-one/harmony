@@ -80,3 +80,6 @@ db-127.0.0.1-*
 .dht
 .dht-*
 .tern-port
+
+# testdata
+*/.testdata
