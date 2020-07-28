@@ -3,8 +3,9 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -184,7 +185,7 @@ func (s *PublicStakingService) GetValidators(
 				"balance": validatorBalance,
 			}
 		default:
-			return nil, ErrUnknownRpcVersion
+			return nil, ErrUnknownRPCVersion
 		}
 		validators = append(validators, validatorsFields)
 	}
@@ -355,7 +356,7 @@ func (s *PublicStakingService) GetValidatorSelfDelegation(
 	case V2:
 		return selfDelegation, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -382,7 +383,7 @@ func (s *PublicStakingService) GetValidatorTotalDelegation(
 	case V2:
 		return totalStake, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 

@@ -49,7 +49,7 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 	case V2:
 		return s.net.GetPeerCount(), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 

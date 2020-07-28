@@ -15,8 +15,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
-	"github.com/harmony-one/harmony/rpc/v1"
-	"github.com/harmony-one/harmony/rpc/v2"
+	v1 "github.com/harmony-one/harmony/rpc/v1"
+	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -62,7 +62,7 @@ func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common
 		}
 		return &parsedBlockArgs, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -93,7 +93,7 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 	case V2:
 		return header.Number().Uint64(), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -139,7 +139,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	case V2:
 		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	case V2:
 		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 	if err != nil {
 		return nil, err
@@ -389,7 +389,7 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 	case V2:
 		return totalSigned, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -409,7 +409,7 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 	case V2:
 		return epoch, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -467,7 +467,7 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 	case V2:
 		return balance, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 

@@ -15,8 +15,8 @@ var (
 	ErrNotBeaconShard = errors.New("cannot call this rpc on non beaconchain node")
 	// ErrRequestedBlockTooHigh when given block is greater than latest block number
 	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")
-	// ErrUnknownRpcVersion when rpc method has an unknown or unhandled version
-	ErrUnknownRpcVersion = errors.New("API service has an unknown version")
+	// ErrUnknownRPCVersion when rpc method has an unknown or unhandled version
+	ErrUnknownRPCVersion = errors.New("API service has an unknown version")
 	// ErrTransactionNotFound when attempting to get a transaction that does exist or has not been finalized
 	ErrTransactionNotFound = errors.New("transaction not found")
 )

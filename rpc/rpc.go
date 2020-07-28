@@ -10,8 +10,8 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/rpc/v1"
-	"github.com/harmony-one/harmony/rpc/v2"
+	v1 "github.com/harmony-one/harmony/rpc/v1"
+	v2 "github.com/harmony-one/harmony/rpc/v2"
 )
 
 // Version enum
@@ -37,10 +37,10 @@ const (
 )
 
 var (
-	// HttpModules ..
-	HttpModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "explorer"}
-	// WsModules ..
-	WsModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "web3"}
+	// HTTPModules ..
+	HTTPModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "explorer"}
+	// WSModules ..
+	WSModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -59,7 +59,7 @@ type Version int
 
 // Namespace ..
 func (n Version) Namespace() string {
-	return HttpModules[n]
+	return HTTPModules[n]
 }
 
 // StartServers starts the http & ws servers
@@ -72,11 +72,11 @@ func StartServers(hmy *hmy.Harmony, port int, apis []rpc.API) error {
 	apis = append(apis, getAPIs(hmy)...)
 
 	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+HTTPPortOffset)
-	if err := startHttp(apis); err != nil {
+	if err := startHTTP(apis); err != nil {
 		return err
 	}
 	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+WSPortOffset)
-	if err := startWs(apis); err != nil {
+	if err := startWS(apis); err != nil {
 		return err
 	}
 	return nil
@@ -138,9 +138,9 @@ func getAPIs(hmy *hmy.Harmony) []rpc.API {
 	}
 }
 
-func startHttp(apis []rpc.API) (err error) {
+func startHTTP(apis []rpc.API) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
-		httpEndpoint, apis, HttpModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+		httpEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
 	if err != nil {
 		return err
@@ -155,8 +155,8 @@ func startHttp(apis []rpc.API) (err error) {
 	return nil
 }
 
-func startWs(apis []rpc.API) (err error) {
-	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WsModules, wsOrigins, true)
+func startWS(apis []rpc.API) (err error) {
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, wsOrigins, true)
 	if err != nil {
 		return err
 	}

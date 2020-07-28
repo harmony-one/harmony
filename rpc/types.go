@@ -165,6 +165,7 @@ type HeaderInformation struct {
 	CrossLinks       *types.CrossLinks `json:"crossLinks,omitempty"`
 }
 
+// NewHeaderInformation returns the header information that will serialize to the RPC representation.
 func NewHeaderInformation(header *block.Header, leader string) *HeaderInformation {
 	if header == nil {
 		return nil

@@ -175,7 +175,7 @@ type RPCCollectRewardsMsg struct {
 	DelegatorAddress string `json:"delegatorAddress"`
 }
 
-// RPCCollectRewardsMsg represents a staking transaction's delegate directive that
+// RPCDelegateMsg represents a staking transaction's delegate directive that
 // will serialize to the RPC representation
 type RPCDelegateMsg struct {
 	DelegatorAddress string   `json:"delegatorAddress"`
@@ -191,6 +191,7 @@ type RPCUndelegateMsg struct {
 	Amount           *big.Int `json:"amount"`
 }
 
+// RPCTxReceipt represents a transaction receipt that will serialize to the RPC representation.
 type RPCTxReceipt struct {
 	BlockHash         common.Hash    `json:"blockHash"`
 	TransactionHash   common.Hash    `json:"transactionHash"`
@@ -208,6 +209,7 @@ type RPCTxReceipt struct {
 	Status            uint           `json:"status,omitempty"`
 }
 
+// RPCStakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
 type RPCStakingTxReceipt struct {
 	BlockHash         common.Hash       `json:"blockHash"`
 	TransactionHash   common.Hash       `json:"transactionHash"`

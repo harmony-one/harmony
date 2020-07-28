@@ -149,7 +149,7 @@ type RPCCollectRewardsMsg struct {
 	DelegatorAddress string `json:"delegatorAddress"`
 }
 
-// RPCCollectRewardsMsg represents a staking transaction's delegate directive that
+// RPCDelegateMsg represents a staking transaction's delegate directive that
 // will serialize to the RPC representation
 type RPCDelegateMsg struct {
 	DelegatorAddress string       `json:"delegatorAddress"`
@@ -310,6 +310,7 @@ func NewRPCReceipt(
 	return nil, fmt.Errorf("unknown transaction type for RPC receipt")
 }
 
+// NewRPCTxReceipt returns a transaction receipt that will serialize to the RPC representation
 func NewRPCTxReceipt(
 	tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
 ) (*RPCTxReceipt, error) {
@@ -369,6 +370,7 @@ func NewRPCTxReceipt(
 	return txReceipt, nil
 }
 
+// NewRPCStakingTxReceipt returns a staking transaction receipt that will serialize to the RPC representation
 func NewRPCStakingTxReceipt(
 	tx *staking.StakingTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
 ) (*RPCStakingTxReceipt, error) {

@@ -38,7 +38,7 @@ func (s *PublicHarmonyService) ProtocolVersion(
 	case V2:
 		return s.hmy.ProtocolVersion(), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error
 	case V2:
 		return 1, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 

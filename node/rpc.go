@@ -62,7 +62,7 @@ func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 	return node.TransactionErrorSink.PlainReport()
 }
 
-// StartServer start RPC service
+// StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
 	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
 

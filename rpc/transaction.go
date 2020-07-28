@@ -3,9 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/big"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,8 +18,8 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/rpc/v1"
-	"github.com/harmony-one/harmony/rpc/v2"
+	v1 "github.com/harmony-one/harmony/rpc/v1"
+	v2 "github.com/harmony-one/harmony/rpc/v2"
 )
 
 const (
@@ -32,7 +33,7 @@ type PublicTransactionService struct {
 	version Version
 }
 
-// NewPublicBlockChainAPI creates a new API for the RPC interface
+// NewPublicTransactionAPI creates a new API for the RPC interface
 func NewPublicTransactionAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
@@ -95,7 +96,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 	case V2:
 		return nonce, nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -184,7 +185,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -224,7 +225,7 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -351,7 +352,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 	case V2:
 		return len(block.Transactions()), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -377,7 +378,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 	case V2:
 		return len(block.Transactions()), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -413,7 +414,7 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -446,7 +447,7 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -475,7 +476,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 	case V2:
 		return len(block.StakingTransactions()), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -501,7 +502,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 	case V2:
 		return len(block.StakingTransactions()), nil
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -537,7 +538,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -570,7 +571,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 		}
 		return NewStructuredResponse(tx)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -605,19 +606,19 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 	// Format response according to version
 	switch s.version {
 	case V1:
-		RpcReceipt, err := v1.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		RPCReceipt, err := v1.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
 		if err != nil {
 			return nil, err
 		}
-		return NewStructuredResponse(RpcReceipt)
+		return NewStructuredResponse(RPCReceipt)
 	case V2:
-		RpcReceipt, err := v2.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+		RPCReceipt, err := v2.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
 		if err != nil {
 			return nil, err
 		}
-		return NewStructuredResponse(RpcReceipt)
+		return NewStructuredResponse(RPCReceipt)
 	default:
-		return nil, ErrUnknownRpcVersion
+		return nil, ErrUnknownRPCVersion
 	}
 }
 
@@ -641,7 +642,7 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 			}
 			return NewStructuredResponse(tx)
 		default:
-			return nil, ErrUnknownRpcVersion
+			return nil, ErrUnknownRPCVersion
 		}
 	}
 	utils.Logger().Debug().

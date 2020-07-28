@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -14,8 +15,8 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/rpc/v1"
-	"github.com/harmony-one/harmony/rpc/v2"
+	v1 "github.com/harmony-one/harmony/rpc/v1"
+	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -26,7 +27,7 @@ type PublicPoolService struct {
 	version Version
 }
 
-// NewPublicBlockChainAPI creates a new API for the RPC interface
+// NewPublicPoolAPI creates a new API for the RPC interface
 func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
@@ -172,7 +173,7 @@ func (s *PublicPoolService) PendingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			default:
-				return nil, ErrUnknownRpcVersion
+				return nil, ErrUnknownRPCVersion
 			}
 			rpcTx, err := NewStructuredResponse(tx)
 			if err == nil {
@@ -226,7 +227,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			default:
-				return nil, ErrUnknownRpcVersion
+				return nil, ErrUnknownRPCVersion
 			}
 			rpcTx, err := NewStructuredResponse(tx)
 			if err == nil {

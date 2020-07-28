@@ -31,7 +31,7 @@ type PublicContractService struct {
 	version Version
 }
 
-// NewPublicStakingAPI creates a new API for the RPC interface
+// NewPublicContractAPI creates a new API for the RPC interface
 func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
