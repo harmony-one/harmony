@@ -54,10 +54,10 @@ var (
 	wsOrigins        = []string{"*"}
 )
 
-// Version ..
+// Version of the RPC
 type Version int
 
-// Namespace ..
+// Namespace of the RPC version
 func (n Version) Namespace() string {
 	return HTTPModules[n]
 }
@@ -119,8 +119,8 @@ func getAPIs(hmy *hmy.Harmony) []rpc.API {
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
-		NewPublicBlockChainAPI(hmy, V1),
-		NewPublicBlockChainAPI(hmy, V2),
+		NewPublicBlockchainAPI(hmy, V1),
+		NewPublicBlockchainAPI(hmy, V2),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
 		NewPublicTransactionAPI(hmy, V1),
@@ -151,7 +151,6 @@ func startHTTP(apis []rpc.API) (err error) {
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
-	// All listeners booted successfully
 	return nil
 }
 
@@ -160,6 +159,7 @@ func startWS(apis []rpc.API) (err error) {
 	if err != nil {
 		return err
 	}
+
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
 		Msg("WebSocket endpoint opened")

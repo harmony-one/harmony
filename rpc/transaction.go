@@ -174,13 +174,13 @@ func (s *PublicTransactionService) GetTransactionByHash(
 	// Format the response according to the version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v1.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v2.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
@@ -214,13 +214,13 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v1.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v2.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
@@ -264,12 +264,12 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 	for _, hash := range result {
 		tx, err := s.GetTransactionByHash(ctx, hash)
 		if err == nil {
-			// Legacy behavior is to not return RPC errors
 			txs = append(txs, tx)
 		} else {
 			utils.Logger().Debug().
 				Err(err).
 				Msgf("%v error at %v", LogTag, "GetTransactionsHistory")
+			// Legacy behavior is to not return RPC errors
 		}
 	}
 	return StructuredResponse{"transactions": txs}, nil
@@ -403,13 +403,13 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 	// Format response according to version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v2.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -436,13 +436,13 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 	// Format response according to version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v2.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -527,13 +527,13 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 	// Format response according to version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCStakingTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCStakingTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v2.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -560,13 +560,13 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 	// Format response according to version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewRPCStakingTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewRPCStakingTransactionFromBlockIndex(block, uint64(index))
+		tx, err := v2.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -606,9 +606,9 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 	switch s.version {
 	case V1:
 		if tx == nil {
-			RPCReceipt, err = v1.NewRPCReceipt(stx, blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v1.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
-			RPCReceipt, err = v1.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v1.NewReceipt(tx, blockHash, blockNumber, index, receipt)
 		}
 		if err != nil {
 			return nil, err
@@ -616,9 +616,9 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 		return NewStructuredResponse(RPCReceipt)
 	case V2:
 		if tx == nil {
-			RPCReceipt, err = v2.NewRPCReceipt(stx, blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v2.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
-			RPCReceipt, err = v2.NewRPCReceipt(tx, blockHash, blockNumber, index, receipt)
+			RPCReceipt, err = v2.NewReceipt(tx, blockHash, blockNumber, index, receipt)
 		}
 		if err != nil {
 			return nil, err
@@ -637,13 +637,13 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 		// Format response according to version
 		switch s.version {
 		case V1:
-			tx, err := v1.NewRPCCXReceipt(cx, blockHash, blockNumber)
+			tx, err := v1.NewCxReceipt(cx, blockHash, blockNumber)
 			if err != nil {
 				return nil, err
 			}
 			return NewStructuredResponse(tx)
 		case V2:
-			tx, err := v2.NewRPCCXReceipt(cx, blockHash, blockNumber)
+			tx, err := v2.NewCxReceipt(cx, blockHash, blockNumber)
 			if err != nil {
 				return nil, err
 			}

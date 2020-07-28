@@ -32,8 +32,8 @@ type PublicBlockchainService struct {
 	version Version
 }
 
-// NewPublicBlockChainAPI creates a new API for the RPC interface
-func NewPublicBlockChainAPI(hmy *hmy.Harmony, version Version) rpc.API {
+// NewPublicBlockchainAPI creates a new API for the RPC interface
+func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
@@ -135,9 +135,9 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	var rpcBlock interface{}
 	switch s.version {
 	case V1:
-		rpcBlock, err = v1.NewRPCBlock(blk, blockArgs, leader)
+		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
-		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
+		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -192,9 +192,9 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	var rpcBlock interface{}
 	switch s.version {
 	case V1:
-		rpcBlock, err = v1.NewRPCBlock(blk, blockArgs, leader)
+		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
-		rpcBlock, err = v2.NewRPCBlock(blk, blockArgs, leader)
+		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}

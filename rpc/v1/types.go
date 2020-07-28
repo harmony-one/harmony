@@ -15,9 +15,9 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// RPCBlockWithTxHash represents a block that will serialize to the RPC representation of a block
+// BlockWithTxHash represents a block that will serialize to the RPC representation of a block
 // having ONLY transaction hashes in the Transaction & Staking transaction fields.
-type RPCBlockWithTxHash struct {
+type BlockWithTxHash struct {
 	Number           *hexutil.Big   `json:"number"`
 	ViewID           *hexutil.Big   `json:"viewID"`
 	Epoch            *hexutil.Big   `json:"epoch"`
@@ -42,35 +42,35 @@ type RPCBlockWithTxHash struct {
 	Signers          []string       `json:"signers,omitempty"`
 }
 
-// RPCBlockWithFullTx represents a block that will serialize to the RPC representation of a block
+// BlockWithFullTx represents a block that will serialize to the RPC representation of a block
 // having FULL transactions in the Transaction & Staking transaction fields.
-type RPCBlockWithFullTx struct {
-	Number           *hexutil.Big             `json:"number"`
-	ViewID           *hexutil.Big             `json:"viewID"`
-	Epoch            *hexutil.Big             `json:"epoch"`
-	Hash             common.Hash              `json:"hash"`
-	ParentHash       common.Hash              `json:"parentHash"`
-	Nonce            uint64                   `json:"nonce"`
-	MixHash          common.Hash              `json:"mixHash"`
-	LogsBloom        ethtypes.Bloom           `json:"logsBloom"`
-	StateRoot        common.Hash              `json:"stateRoot"`
-	Miner            string                   `json:"miner"`
-	Difficulty       uint64                   `json:"difficulty"`
-	ExtraData        hexutil.Bytes            `json:"extraData"`
-	Size             hexutil.Uint64           `json:"size"`
-	GasLimit         hexutil.Uint64           `json:"gasLimit"`
-	GasUsed          hexutil.Uint64           `json:"gasUsed"`
-	Timestamp        hexutil.Uint64           `json:"timestamp"`
-	TransactionsRoot common.Hash              `json:"transactionsRoot"`
-	ReceiptsRoot     common.Hash              `json:"receiptsRoot"`
-	Uncles           []common.Hash            `json:"uncles"`
-	Transactions     []*RPCTransaction        `json:"transactions"`
-	StakingTxs       []*RPCStakingTransaction `json:"stakingTransactions"`
-	Signers          []string                 `json:"signers,omitempty"`
+type BlockWithFullTx struct {
+	Number           *hexutil.Big          `json:"number"`
+	ViewID           *hexutil.Big          `json:"viewID"`
+	Epoch            *hexutil.Big          `json:"epoch"`
+	Hash             common.Hash           `json:"hash"`
+	ParentHash       common.Hash           `json:"parentHash"`
+	Nonce            uint64                `json:"nonce"`
+	MixHash          common.Hash           `json:"mixHash"`
+	LogsBloom        ethtypes.Bloom        `json:"logsBloom"`
+	StateRoot        common.Hash           `json:"stateRoot"`
+	Miner            string                `json:"miner"`
+	Difficulty       uint64                `json:"difficulty"`
+	ExtraData        hexutil.Bytes         `json:"extraData"`
+	Size             hexutil.Uint64        `json:"size"`
+	GasLimit         hexutil.Uint64        `json:"gasLimit"`
+	GasUsed          hexutil.Uint64        `json:"gasUsed"`
+	Timestamp        hexutil.Uint64        `json:"timestamp"`
+	TransactionsRoot common.Hash           `json:"transactionsRoot"`
+	ReceiptsRoot     common.Hash           `json:"receiptsRoot"`
+	Uncles           []common.Hash         `json:"uncles"`
+	Transactions     []*Transaction        `json:"transactions"`
+	StakingTxs       []*StakingTransaction `json:"stakingTransactions"`
+	Signers          []string              `json:"signers,omitempty"`
 }
 
-// RPCTransaction represents a transaction that will serialize to the RPC representation of a transaction
-type RPCTransaction struct {
+// Transaction represents a transaction that will serialize to the RPC representation of a transaction
+type Transaction struct {
 	BlockHash        common.Hash    `json:"blockHash"`
 	BlockNumber      *hexutil.Big   `json:"blockNumber"`
 	From             string         `json:"from"`
@@ -90,9 +90,9 @@ type RPCTransaction struct {
 	S                *hexutil.Big   `json:"s"`
 }
 
-// RPCStakingTransaction represents a staking transaction that will serialize to the
+// StakingTransaction represents a staking transaction that will serialize to the
 // RPC representation of a staking transaction
-type RPCStakingTransaction struct {
+type StakingTransaction struct {
 	BlockHash        common.Hash    `json:"blockHash"`
 	BlockNumber      *hexutil.Big   `json:"blockNumber"`
 	From             string         `json:"from"`
@@ -109,9 +109,9 @@ type RPCStakingTransaction struct {
 	Msg              interface{}    `json:"msg"`
 }
 
-// RPCCreateValidatorMsg represents a staking transaction's create validator directive that
+// CreateValidatorMsg represents a staking transaction's create validator directive that
 // will serialize to the RPC representation
-type RPCCreateValidatorMsg struct {
+type CreateValidatorMsg struct {
 	ValidatorAddress   string                    `json:"validatorAddress"`
 	CommissionRate     *hexutil.Big              `json:"commissionRate"`
 	MaxCommissionRate  *hexutil.Big              `json:"maxCommissionRate"`
@@ -127,9 +127,9 @@ type RPCCreateValidatorMsg struct {
 	SlotPubKeys        []bls.SerializedPublicKey `json:"slotPubKeys"`
 }
 
-// RPCEditValidatorMsg represents a staking transaction's edit validator directive that
+// EditValidatorMsg represents a staking transaction's edit validator directive that
 // will serialize to the RPC representation
-type RPCEditValidatorMsg struct {
+type EditValidatorMsg struct {
 	ValidatorAddress   string                   `json:"validatorAddress"`
 	CommissionRate     *hexutil.Big             `json:"commissionRate"`
 	MinSelfDelegation  *hexutil.Big             `json:"minSelfDelegation"`
@@ -143,30 +143,30 @@ type RPCEditValidatorMsg struct {
 	SlotPubKeyToRemove *bls.SerializedPublicKey `json:"slotPubKeyToRemove"`
 }
 
-// RPCCollectRewardsMsg represents a staking transaction's collect rewards directive that
+// CollectRewardsMsg represents a staking transaction's collect rewards directive that
 // will serialize to the RPC representation
-type RPCCollectRewardsMsg struct {
+type CollectRewardsMsg struct {
 	DelegatorAddress string `json:"delegatorAddress"`
 }
 
-// RPCDelegateMsg represents a staking transaction's delegate directive that
+// DelegateMsg represents a staking transaction's delegate directive that
 // will serialize to the RPC representation
-type RPCDelegateMsg struct {
+type DelegateMsg struct {
 	DelegatorAddress string       `json:"delegatorAddress"`
 	ValidatorAddress string       `json:"validatorAddress"`
 	Amount           *hexutil.Big `json:"amount"`
 }
 
-// RPCUndelegateMsg represents a staking transaction's delegate directive that
+// UndelegateMsg represents a staking transaction's delegate directive that
 // will serialize to the RPC representation
-type RPCUndelegateMsg struct {
+type UndelegateMsg struct {
 	DelegatorAddress string       `json:"delegatorAddress"`
 	ValidatorAddress string       `json:"validatorAddress"`
 	Amount           *hexutil.Big `json:"amount"`
 }
 
-// RPCTxReceipt represents a transaction receipt that will serialize to the RPC representation.
-type RPCTxReceipt struct {
+// TxReceipt represents a transaction receipt that will serialize to the RPC representation.
+type TxReceipt struct {
 	BlockHash         common.Hash    `json:"blockHash"`
 	TransactionHash   common.Hash    `json:"transactionHash"`
 	BlockNumber       hexutil.Uint64 `json:"blockNumber"`
@@ -183,8 +183,8 @@ type RPCTxReceipt struct {
 	Status            hexutil.Uint   `json:"status,omitempty"`
 }
 
-// RPCStakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
-type RPCStakingTxReceipt struct {
+// StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
+type StakingTxReceipt struct {
 	BlockHash         common.Hash       `json:"blockHash"`
 	TransactionHash   common.Hash       `json:"transactionHash"`
 	BlockNumber       hexutil.Uint64    `json:"blockNumber"`
@@ -200,8 +200,8 @@ type RPCStakingTxReceipt struct {
 	Status            hexutil.Uint      `json:"status,omitempty"`
 }
 
-// RPCCXReceipt represents a CXReceipt that will serialize to the RPC representation of a CXReceipt
-type RPCCXReceipt struct {
+// CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
+type CxReceipt struct {
 	BlockHash   common.Hash  `json:"blockHash"`
 	BlockNumber *hexutil.Big `json:"blockNumber"`
 	TxHash      common.Hash  `json:"hash"`
@@ -212,9 +212,9 @@ type RPCCXReceipt struct {
 	Amount      *hexutil.Big `json:"value"`
 }
 
-// NewRPCCXReceipt returns a CXReceipt that will serialize to the RPC representation
-func NewRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uint64) (*RPCCXReceipt, error) {
-	result := &RPCCXReceipt{
+// NewCxReceipt returns a CxReceipt that will serialize to the RPC representation
+func NewCxReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uint64) (*CxReceipt, error) {
+	result := &CxReceipt{
 		BlockHash: blockHash,
 		TxHash:    cx.TxHash,
 		Amount:    (*hexutil.Big)(cx.Amount),
@@ -242,20 +242,20 @@ func NewRPCCXReceipt(cx *types.CXReceipt, blockHash common.Hash, blockNumber uin
 	return result, nil
 }
 
-// NewRPCTransaction returns a transaction that will serialize to the RPC
+// NewTransaction returns a transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
 // Note that all txs on Harmony are replay protected (post EIP155 epoch).
-func NewRPCTransaction(
+func NewTransaction(
 	tx *types.Transaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
-) (*RPCTransaction, error) {
+) (*Transaction, error) {
 	from, err := tx.SenderAddress()
 	if err != nil {
 		return nil, err
 	}
 	v, r, s := tx.RawSignatureValues()
 
-	result := &RPCTransaction{
+	result := &Transaction{
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
@@ -294,26 +294,26 @@ func NewRPCTransaction(
 	return result, nil
 }
 
-// NewRPCReceipt returns a transaction OR staking transaction that will serialize to the RPC
+// NewReceipt returns a transaction OR staking transaction that will serialize to the RPC
 // representation.
-func NewRPCReceipt(
+func NewReceipt(
 	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
 ) (interface{}, error) {
 	plainTx, ok := tx.(*types.Transaction)
 	if ok {
-		return NewRPCTxReceipt(plainTx, blockHash, blockIndex, blockNumber, receipt)
+		return NewTxReceipt(plainTx, blockHash, blockIndex, blockNumber, receipt)
 	}
 	stakingTx, ok := tx.(*staking.StakingTransaction)
 	if ok {
-		return NewRPCStakingTxReceipt(stakingTx, blockHash, blockIndex, blockNumber, receipt)
+		return NewStakingTxReceipt(stakingTx, blockHash, blockIndex, blockNumber, receipt)
 	}
 	return nil, fmt.Errorf("unknown transaction type for RPC receipt")
 }
 
-// NewRPCTxReceipt returns a transaction receipt that will serialize to the RPC representation
-func NewRPCTxReceipt(
+// NewTxReceipt returns a transaction receipt that will serialize to the RPC representation
+func NewTxReceipt(
 	tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (*RPCTxReceipt, error) {
+) (*TxReceipt, error) {
 	// Set correct to & from address
 	senderAddr, err := tx.SenderAddress()
 	if err != nil {
@@ -337,7 +337,7 @@ func NewRPCTxReceipt(
 	}
 
 	// Declare receipt
-	txReceipt := &RPCTxReceipt{
+	txReceipt := &TxReceipt{
 		BlockHash:         blockHash,
 		TransactionHash:   tx.Hash(),
 		BlockNumber:       hexutil.Uint64(blockNumber),
@@ -370,10 +370,10 @@ func NewRPCTxReceipt(
 	return txReceipt, nil
 }
 
-// NewRPCStakingTxReceipt returns a staking transaction receipt that will serialize to the RPC representation
-func NewRPCStakingTxReceipt(
+// NewStakingTxReceipt returns a staking transaction receipt that will serialize to the RPC representation
+func NewStakingTxReceipt(
 	tx *staking.StakingTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (*RPCStakingTxReceipt, error) {
+) (*StakingTxReceipt, error) {
 	// Set correct sender
 	senderAddr, err := tx.SenderAddress()
 	if err != nil {
@@ -385,7 +385,7 @@ func NewRPCStakingTxReceipt(
 	}
 
 	// Declare receipt
-	txReceipt := &RPCStakingTxReceipt{
+	txReceipt := &StakingTxReceipt{
 		BlockHash:         blockHash,
 		TransactionHash:   tx.Hash(),
 		BlockNumber:       hexutil.Uint64(blockNumber),
@@ -417,11 +417,11 @@ func NewRPCStakingTxReceipt(
 	return txReceipt, nil
 }
 
-// NewRPCStakingTransaction returns a staking transaction that will serialize to the RPC
+// NewStakingTransaction returns a staking transaction that will serialize to the RPC
 // representation, with the given location metadata set (if available).
-func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash,
+func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
-) (*RPCStakingTransaction, error) {
+) (*StakingTransaction, error) {
 	from, err := tx.SenderAddress()
 	if err != nil {
 		return nil, err
@@ -443,7 +443,7 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		if err != nil {
 			return nil, err
 		}
-		rpcMsg = &RPCCreateValidatorMsg{
+		rpcMsg = &CreateValidatorMsg{
 			ValidatorAddress:   validatorAddress,
 			CommissionRate:     (*hexutil.Big)(msg.CommissionRates.Rate.Int),
 			MaxCommissionRate:  (*hexutil.Big)(msg.CommissionRates.MaxRate.Int),
@@ -476,7 +476,7 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		if msg.CommissionRate != nil {
 			commissionRate = (*hexutil.Big)(msg.CommissionRate.Int)
 		}
-		rpcMsg = &RPCEditValidatorMsg{
+		rpcMsg = &EditValidatorMsg{
 			ValidatorAddress:   validatorAddress,
 			CommissionRate:     commissionRate,
 			MinSelfDelegation:  (*hexutil.Big)(msg.MinSelfDelegation),
@@ -502,7 +502,7 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		if err != nil {
 			return nil, err
 		}
-		rpcMsg = &RPCCollectRewardsMsg{DelegatorAddress: delegatorAddress}
+		rpcMsg = &CollectRewardsMsg{DelegatorAddress: delegatorAddress}
 	case staking.DirectiveDelegate:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
@@ -520,7 +520,7 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		if err != nil {
 			return nil, err
 		}
-		rpcMsg = &RPCDelegateMsg{
+		rpcMsg = &DelegateMsg{
 			DelegatorAddress: delegatorAddress,
 			ValidatorAddress: validatorAddress,
 			Amount:           (*hexutil.Big)(msg.Amount),
@@ -542,14 +542,14 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 		if err != nil {
 			return nil, err
 		}
-		rpcMsg = &RPCUndelegateMsg{
+		rpcMsg = &UndelegateMsg{
 			DelegatorAddress: delegatorAddress,
 			ValidatorAddress: validatorAddress,
 			Amount:           (*hexutil.Big)(msg.Amount),
 		}
 	}
 
-	result := &RPCStakingTransaction{
+	result := &StakingTransaction{
 		Gas:       hexutil.Uint64(tx.Gas()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
@@ -576,26 +576,26 @@ func NewRPCStakingTransaction(tx *staking.StakingTransaction, blockHash common.H
 	return result, nil
 }
 
-// NewRPCBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
+// NewBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
-func NewRPCBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (interface{}, error) {
+func NewBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (interface{}, error) {
 	if blockArgs.FullTx {
-		return NewRPCBlockWithFullTx(b, blockArgs, leader)
+		return NewBlockWithFullTx(b, blockArgs, leader)
 	}
-	return NewRPCBlockWithTxHash(b, blockArgs, leader)
+	return NewBlockWithTxHash(b, blockArgs, leader)
 }
 
-// NewRPCBlockWithTxHash ..
-func NewRPCBlockWithTxHash(
+// NewBlockWithTxHash ..
+func NewBlockWithTxHash(
 	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
-) (*RPCBlockWithTxHash, error) {
+) (*BlockWithTxHash, error) {
 	if blockArgs.FullTx {
 		return nil, fmt.Errorf("block args specifies full tx, but requested RPC block with only tx hash")
 	}
 
 	head := b.Header()
-	blk := &RPCBlockWithTxHash{
+	blk := &BlockWithTxHash{
 		Number:           (*hexutil.Big)(head.Number()),
 		ViewID:           (*hexutil.Big)(head.ViewID()),
 		Epoch:            (*hexutil.Big)(head.Epoch()),
@@ -635,16 +635,16 @@ func NewRPCBlockWithTxHash(
 	return blk, nil
 }
 
-// NewRPCBlockWithFullTx ..
-func NewRPCBlockWithFullTx(
+// NewBlockWithFullTx ..
+func NewBlockWithFullTx(
 	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
-) (*RPCBlockWithFullTx, error) {
+) (*BlockWithFullTx, error) {
 	if !blockArgs.FullTx {
 		return nil, fmt.Errorf("block args specifies NO full tx, but requested RPC block with full tx")
 	}
 
 	head := b.Header()
-	blk := &RPCBlockWithFullTx{
+	blk := &BlockWithFullTx{
 		Number:           (*hexutil.Big)(head.Number()),
 		ViewID:           (*hexutil.Big)(head.ViewID()),
 		Epoch:            (*hexutil.Big)(head.Epoch()),
@@ -664,12 +664,12 @@ func NewRPCBlockWithFullTx(
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
 		Uncles:           []common.Hash{},
-		Transactions:     []*RPCTransaction{},
-		StakingTxs:       []*RPCStakingTransaction{},
+		Transactions:     []*Transaction{},
+		StakingTxs:       []*StakingTransaction{},
 	}
 
 	for _, tx := range b.Transactions() {
-		fmtTx, err := NewRPCTransactionFromBlockHash(b, tx.Hash())
+		fmtTx, err := NewTransactionFromBlockHash(b, tx.Hash())
 		if err != nil {
 			return nil, err
 		}
@@ -678,7 +678,7 @@ func NewRPCBlockWithFullTx(
 
 	if blockArgs.InclStaking {
 		for _, stx := range b.StakingTransactions() {
-			fmtStx, err := NewRPCStakingTransactionFromBlockHash(b, stx.Hash())
+			fmtStx, err := NewStakingTransactionFromBlockHash(b, stx.Hash())
 			if err != nil {
 				return nil, err
 			}
@@ -692,44 +692,44 @@ func NewRPCBlockWithFullTx(
 	return blk, nil
 }
 
-// NewRPCTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
-func NewRPCTransactionFromBlockHash(b *types.Block, hash common.Hash) (*RPCTransaction, error) {
+// NewTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
+func NewTransactionFromBlockHash(b *types.Block, hash common.Hash) (*Transaction, error) {
 	for idx, tx := range b.Transactions() {
 		if tx.Hash() == hash {
-			return NewRPCTransactionFromBlockIndex(b, uint64(idx))
+			return NewTransactionFromBlockIndex(b, uint64(idx))
 		}
 	}
 	return nil, fmt.Errorf("tx %v not found in block %v", hash, b.Hash().String())
 }
 
-// NewRPCTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
-func NewRPCTransactionFromBlockIndex(b *types.Block, index uint64) (*RPCTransaction, error) {
+// NewTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
+func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, error) {
 	txs := b.Transactions()
 	if index >= uint64(len(txs)) {
 		return nil, fmt.Errorf(
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewRPCTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	return NewTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
 
-// NewRPCStakingTransactionFromBlockHash returns a staking transaction that will serialize to the RPC representation.
-func NewRPCStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) (*RPCStakingTransaction, error) {
+// NewStakingTransactionFromBlockHash returns a staking transaction that will serialize to the RPC representation.
+func NewStakingTransactionFromBlockHash(b *types.Block, hash common.Hash) (*StakingTransaction, error) {
 	for idx, tx := range b.StakingTransactions() {
 		if tx.Hash() == hash {
-			return NewRPCStakingTransactionFromBlockIndex(b, uint64(idx))
+			return NewStakingTransactionFromBlockIndex(b, uint64(idx))
 		}
 	}
 	return nil, fmt.Errorf("tx %v not found in block %v", hash, b.Hash().String())
 }
 
-// NewRPCStakingTransactionFromBlockIndex returns a staking transaction that will serialize to the RPC representation.
-func NewRPCStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*RPCStakingTransaction, error) {
+// NewStakingTransactionFromBlockIndex returns a staking transaction that will serialize to the RPC representation.
+func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*StakingTransaction, error) {
 	txs := b.StakingTransactions()
 	if index >= uint64(len(txs)) {
 		return nil, fmt.Errorf(
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewRPCStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	return NewStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }

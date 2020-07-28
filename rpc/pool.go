@@ -157,7 +157,7 @@ func (s *PublicPoolService) PendingTransactions(
 			var tx interface{}
 			switch s.version {
 			case V1:
-				tx, err = v1.NewRPCTransaction(plainTx, common.Hash{}, 0, 0, 0)
+				tx, err = v1.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
@@ -165,7 +165,7 @@ func (s *PublicPoolService) PendingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			case V2:
-				tx, err = v2.NewRPCTransaction(plainTx, common.Hash{}, 0, 0, 0)
+				tx, err = v2.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
@@ -177,8 +177,9 @@ func (s *PublicPoolService) PendingTransactions(
 			}
 			rpcTx, err := NewStructuredResponse(tx)
 			if err == nil {
-				transactions = append(transactions, rpcTx) // Legacy behavior is to not return error here
+				transactions = append(transactions, rpcTx)
 			} else {
+				// Legacy behavior is to not return error here
 				utils.Logger().Debug().
 					Err(err).
 					Msgf("%v error at %v", LogTag, "PendingTransactions")
@@ -211,7 +212,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 			var tx interface{}
 			switch s.version {
 			case V1:
-				tx, err = v1.NewRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
+				tx, err = v1.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
@@ -219,7 +220,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			case V2:
-				tx, err = v2.NewRPCStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
+				tx, err = v2.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
@@ -231,8 +232,9 @@ func (s *PublicPoolService) PendingStakingTransactions(
 			}
 			rpcTx, err := NewStructuredResponse(tx)
 			if err == nil {
-				transactions = append(transactions, rpcTx) // Legacy behavior is to not return error here
+				transactions = append(transactions, rpcTx)
 			} else {
+				// Legacy behavior is to not return error here
 				utils.Logger().Debug().
 					Err(err).
 					Msgf("%v error at %v", LogTag, "PendingStakingTransactions")
@@ -250,8 +252,8 @@ func (s *PublicPoolService) GetCurrentTransactionErrorSink(
 ) ([]StructuredResponse, error) {
 	// For each transaction error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
-	for _, err := range s.hmy.GetCurrentTransactionErrorSink() {
-		formattedErr, err := NewStructuredResponse(err)
+	for _, txError := range s.hmy.GetCurrentTransactionErrorSink() {
+		formattedErr, err := NewStructuredResponse(txError)
 		if err != nil {
 			return nil, err
 		}
@@ -266,8 +268,8 @@ func (s *PublicPoolService) GetCurrentStakingErrorSink(
 ) ([]StructuredResponse, error) {
 	// For each staking tx error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
-	for _, err := range s.hmy.GetCurrentStakingErrorSink() {
-		formattedErr, err := NewStructuredResponse(err)
+	for _, txErr := range s.hmy.GetCurrentStakingErrorSink() {
+		formattedErr, err := NewStructuredResponse(txErr)
 		if err != nil {
 			return nil, err
 		}
