@@ -33,13 +33,13 @@ func (hmy *Harmony) GetShardState() (*shard.State, error) {
 
 // GetBlockSigners ..
 func (hmy *Harmony) GetBlockSigners(
-	ctx context.Context, blockNr rpc.BlockNumber,
+	ctx context.Context, blockNum rpc.BlockNumber,
 ) (shard.SlotList, *internal_bls.Mask, error) {
-	blk, err := hmy.BlockByNumber(ctx, blockNr)
+	blk, err := hmy.BlockByNumber(ctx, blockNum)
 	if err != nil {
 		return nil, nil, err
 	}
-	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNr+1)
+	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNum+1)
 	if err != nil {
 		return nil, nil, err
 	}
