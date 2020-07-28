@@ -85,8 +85,7 @@ type Consensus struct {
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
-	prepareMutex sync.RWMutex
-	commitMutex  sync.RWMutex
+	mutex sync.Mutex
 	// mutex for view change
 	vcLock sync.Mutex
 	// Signal channel for starting a new consensus process
