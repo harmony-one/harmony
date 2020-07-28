@@ -12,26 +12,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// defaultPageSize is to have default pagination.
-const (
-	defaultPageSize = uint32(1000)
-)
-
-// ReturnWithPagination returns result with pagination (offset, page in TxHistoryArgs).
-func ReturnWithPagination(hashes []common.Hash, pageIndex uint32, pageSize uint32) []common.Hash {
-	size := defaultPageSize
-	if pageSize > 0 {
-		size = pageSize
-	}
-	if uint64(size)*uint64(pageIndex) >= uint64(len(hashes)) {
-		return make([]common.Hash, 0)
-	}
-	if uint64(size)*uint64(pageIndex)+uint64(size) > uint64(len(hashes)) {
-		return hashes[size*pageIndex:]
-	}
-	return hashes[size*pageIndex : size*pageIndex+size]
-}
-
 // SubmitTransaction is a helper function that submits tx to txPool and logs a message.
 func SubmitTransaction(
 	ctx context.Context, hmy *hmy.Harmony, tx *types.Transaction,
@@ -68,6 +48,8 @@ func SubmitStakingTransaction(
 		utils.Logger().Warn().Err(err).Msg("Could not submit staking transaction")
 		return tx.Hash(), err
 	}
-	utils.Logger().Info().Str("fullhash", tx.Hash().Hex()).Msg("Submitted Staking transaction")
+	utils.Logger().Info().
+		Str("fullhash", tx.Hash().Hex()).
+		Msg("Submitted Staking transaction")
 	return tx.Hash(), nil
 }
