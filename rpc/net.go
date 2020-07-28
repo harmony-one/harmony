@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -39,11 +40,20 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 }
 
 // PeerCount returns the number of connected peers
-func (s *PublicNetService) PeerCount() hexutil.Uint {
-	return hexutil.Uint(s.net.GetPeerCount())
+// Note that the return type is an interface to account for the different versions
+func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
+	// Format response according to version
+	switch s.version {
+	case V1:
+		return hexutil.Uint(s.net.GetPeerCount()), nil
+	case V2:
+		return s.net.GetPeerCount(), nil
+	default:
+		return nil, ErrUnknownRpcVersion
+	}
 }
 
 // Version returns the network version, i.e. ChainID identifying which network we are using
-func (s *PublicNetService) Version() string {
+func (s *PublicNetService) Version(ctx context.Context) string {
 	return fmt.Sprintf("%d", s.chainID)
 }

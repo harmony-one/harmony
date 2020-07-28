@@ -28,8 +28,19 @@ func NewPublicHarmonyAPI(hmy *hmy.Harmony, version Version) rpc.API {
 }
 
 // ProtocolVersion returns the current Harmony protocol version this node supports
-func (s *PublicHarmonyService) ProtocolVersion() hexutil.Uint {
-	return hexutil.Uint(s.hmy.ProtocolVersion())
+// Note that the return type is an interface to account for the different versions
+func (s *PublicHarmonyService) ProtocolVersion(
+	ctx context.Context,
+) (interface{}, error) {
+	// Format response according to version
+	switch s.version {
+	case V1:
+		return hexutil.Uint(s.hmy.ProtocolVersion()), nil
+	case V2:
+		return s.hmy.ProtocolVersion(), nil
+	default:
+		return nil, ErrUnknownRpcVersion
+	}
 }
 
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
@@ -39,25 +50,40 @@ func (s *PublicHarmonyService) ProtocolVersion() hexutil.Uint {
 // - highestBlock:  block number of the highest block header this node has received from peers
 // - pulledStates:  number of state entries processed until now
 // - knownStates:   number of known state entries that still need to be pulled
-func (s *PublicHarmonyService) Syncing() (interface{}, error) {
+func (s *PublicHarmonyService) Syncing(
+	ctx context.Context,
+) (interface{}, error) {
 	// TODO(dm): find our Downloader module for syncing blocks
 	return false, nil
 }
 
 // GasPrice returns a suggestion for a gas price.
-func (s *PublicHarmonyService) GasPrice(ctx context.Context) (*hexutil.Big, error) {
+// Note that the return type is an interface to account for the different versions
+func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error) {
 	// TODO(dm): add SuggestPrice API
-	return (*hexutil.Big)(big.NewInt(1)), nil
+	// Format response according to version
+	switch s.version {
+	case V1:
+		return (*hexutil.Big)(big.NewInt(1)), nil
+	case V2:
+		return 1, nil
+	default:
+		return nil, ErrUnknownRpcVersion
+	}
 }
 
 // GetNodeMetadata produces a NodeMetadata record, data is from the answering RPC node
-func (s *PublicHarmonyService) GetNodeMetadata() (rpc_common.StructuredResponse, error) {
+func (s *PublicHarmonyService) GetNodeMetadata(
+	ctx context.Context,
+) (rpc_common.StructuredResponse, error) {
 	// Response output is the same for all versions
 	return rpc_common.NewStructuredResponse(s.hmy.GetNodeMetadata())
 }
 
 // GetPeerInfo produces a NodePeerInfo record
-func (s *PublicHarmonyService) GetPeerInfo() (rpc_common.StructuredResponse, error) {
+func (s *PublicHarmonyService) GetPeerInfo(
+	ctx context.Context,
+) (rpc_common.StructuredResponse, error) {
 	// Response output is the same for all versions
 	return rpc_common.NewStructuredResponse(s.hmy.GetPeerInfo())
 }

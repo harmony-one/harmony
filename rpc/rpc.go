@@ -18,6 +18,7 @@ const (
 	// APIVersion used for DApp's, bumped after RPC refactor (7/2020)
 	APIVersion  = "1.1"
 	CallTimeout = 5 * time.Second
+	LogTag      = "[RPC]"
 )
 
 // Version ..
