@@ -17,7 +17,7 @@ func init() {
 	os.MkdirAll(baseTestDir, 0777)
 }
 
-var baseTestDir = filepath.Join(os.TempDir(), "harmony/BlsLoader")
+var baseTestDir = filepath.Join(".testdata")
 
 type testKey struct {
 	publicKey   string
