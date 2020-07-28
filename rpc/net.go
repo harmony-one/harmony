@@ -3,10 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -23,9 +23,9 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 	var namespace string
 	switch version {
 	case V1:
-		namespace = "net"
+		namespace = netV1Namespace
 	case V2:
-		namespace = "netv2"
+		namespace = netV2Namespace
 	default:
 		utils.Logger().Error().Msgf("Unknown version %v, ignoring API.", version)
 		return rpc.API{}
