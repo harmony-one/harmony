@@ -46,6 +46,30 @@ func (ba *BlockArgs) UnmarshalFromInterface(blockArgs interface{}) error {
 	return nil
 }
 
+// TxHistoryArgs is struct to include optional transaction formatting params.
+type TxHistoryArgs struct {
+	Address   string `json:"address"`
+	PageIndex uint32 `json:"pageIndex"`
+	PageSize  uint32 `json:"pageSize"`
+	FullTx    bool   `json:"fullTx"`
+	TxType    string `json:"txType"`
+	Order     string `json:"order"`
+}
+
+// UnmarshalFromInterface ..
+func (ta *TxHistoryArgs) UnmarshalFromInterface(blockArgs interface{}) error {
+	var args TxHistoryArgs
+	dat, err := json.Marshal(blockArgs)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &args); err != nil {
+		return err
+	}
+	*ta = args
+	return nil
+}
+
 // C ..
 type C struct {
 	TotalKnownPeers int `json:"total-known-peers"`
