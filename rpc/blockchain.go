@@ -21,8 +21,11 @@ import (
 )
 
 const (
-	defaultBlocksPeriod = 15000
-	initSupply          = int64(12600000000)
+	initSupply = int64(12600000000)
+)
+
+var (
+	blocksPeriod = shard.Schedule.BlocksPerEpoch()
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
@@ -364,7 +367,8 @@ func (s *PublicBlockchainService) IsBlockSigner(
 	return false, nil
 }
 
-// GetSignedBlocks returns how many blocks a particular validator signed for last defaultBlocksPeriod (3 hours ~ 1500 blocks).
+// GetSignedBlocks returns how many blocks a particular validator signed for
+// last blocksPeriod (1 epoch's worth of blocks).
 func (s *PublicBlockchainService) GetSignedBlocks(
 	ctx context.Context, address string,
 ) (interface{}, error) {
@@ -372,8 +376,8 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
 	blockHeight := s.hmy.CurrentBlock().Number().Uint64()
-	if blockHeight >= defaultBlocksPeriod {
-		lastBlock = blockHeight - defaultBlocksPeriod + 1
+	if blockHeight >= blocksPeriod {
+		lastBlock = blockHeight - blocksPeriod + 1
 	}
 	for i := lastBlock; i <= blockHeight; i++ {
 		signed, err := s.IsBlockSigner(ctx, BlockNumber(i), address)
