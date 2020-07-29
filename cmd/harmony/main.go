@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -25,7 +24,6 @@ import (
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/internal/blsgen"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
@@ -89,13 +87,7 @@ var (
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node
-	shardID            = flag.Int("shard_id", -1, "the shard ID of this node")
-	cmkEncryptedBLSKey = flag.String("aws_blskey", "", "The aws CMK encrypted bls private key file.")
-	blsKeyFile         = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
-	blsFolder          = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
-	blsPass            = flag.String("blspass", "", "The file containing passphrase to decrypt the encrypted bls file.")
-	blsPassphrase      string
-	maxBLSKeysPerNode  = flag.Int("max_bls_keys_per_node", 4, "maximum number of bls keys allowed per node (default 4)")
+	shardID = flag.Int("shard_id", -1, "the shard ID of this node")
 	// Sharding configuration parameters for devnet
 	devnetNumShards   = flag.Uint("dn_num_shards", 2, "number of shards for -network_type=devnet (default: 2)")
 	devnetShardSize   = flag.Int("dn_shard_size", 10, "number of nodes per shard for -network_type=devnet (default 10)")
@@ -115,8 +107,6 @@ var (
 	webHookYamlPath    = flag.String(
 		"webhook_yaml", "", "path for yaml config reporting double signing",
 	)
-	// aws credentials
-	awsSettingString = ""
 )
 
 func initSetup() {
@@ -124,14 +114,6 @@ func initSetup() {
 	// Setup pprof
 	if addr := *pprof; addr != "" {
 		go func() { http.ListenAndServe(addr, nil) }()
-	}
-
-	// maybe request passphrase for bls key.
-	if *cmkEncryptedBLSKey == "" {
-		passphraseForBLS()
-	} else {
-		// Get aws credentials from stdin prompt
-		awsSettingString, _ = blsgen.Readln(1 * time.Second)
 	}
 
 	// Configure log parameters
@@ -162,29 +144,6 @@ func initSetup() {
 	}
 }
 
-func passphraseForBLS() {
-	// If FN node running, they should either specify blsPrivateKey or the file with passphrase
-	// However, explorer or non-validator nodes need no blskey
-	if *nodeType != "validator" {
-		return
-	}
-
-	if *blsKeyFile == "" && *blsFolder == "" {
-		fmt.Println("blskey_file or blsfolder option must be provided")
-		os.Exit(101)
-	}
-	if *blsPass == "" {
-		fmt.Println("Internal nodes need to have blspass to decrypt blskey")
-		os.Exit(101)
-	}
-	passphrase, err := utils.GetPassphraseFromSource(*blsPass)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR when reading passphrase file: %v\n", err)
-		os.Exit(100)
-	}
-	blsPassphrase = passphrase
-}
-
 func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.PublicKeys) {
 	for _, key := range pubKeys {
 		keyStr := key.Bytes.Hex()
@@ -197,7 +156,7 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.Publ
 
 func setupLegacyNodeAccount() error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
-	multiBLSPubKey := setupConsensusKey(nodeconfig.GetDefaultConfig()).GetPublicKeys()
+	multiBLSPubKey := setupConsensusKeys(nodeconfig.GetDefaultConfig())
 
 	reshardingEpoch := genesisShardingConfig.ReshardingEpoch()
 	if len(reshardingEpoch) > 0 {
@@ -228,17 +187,17 @@ func setupLegacyNodeAccount() error {
 }
 
 func setupStakingNodeAccount() error {
-	pubKey := setupConsensusKey(nodeconfig.GetDefaultConfig()).GetPublicKeys()
+	pubKeys := setupConsensusKeys(nodeconfig.GetDefaultConfig())
 	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
 	if err != nil {
 		return errors.Wrap(err, "cannot determine shard to join")
 	}
 	if err := nodeconfig.GetDefaultConfig().ValidateConsensusKeysForSameShard(
-		pubKey, shardID,
+		pubKeys, shardID,
 	); err != nil {
 		return err
 	}
-	for _, blsKey := range pubKey {
+	for _, blsKey := range pubKeys {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
 		initialAccount.BLSPublicKey = blsKey.Bytes.Hex()
@@ -246,121 +205,6 @@ func setupStakingNodeAccount() error {
 		initialAccounts = append(initialAccounts, initialAccount)
 	}
 	return nil
-}
-
-func readMultiBLSKeys(consensusMultiBLSPriKey *multibls.PrivateKeys) error {
-	keyPasses := map[string]string{}
-	blsKeyFiles := []os.FileInfo{}
-	awsEncryptedBLSKeyFiles := []os.FileInfo{}
-
-	if err := filepath.Walk(*blsFolder, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		fullName := info.Name()
-		ext := filepath.Ext(fullName)
-		if ext == ".key" {
-			blsKeyFiles = append(blsKeyFiles, info)
-		} else if ext == ".pass" {
-			passFileName := "file:" + path
-			passphrase, err := utils.GetPassphraseFromSource(passFileName)
-			if err != nil {
-				return err
-			}
-			name := fullName[:len(fullName)-len(ext)]
-			keyPasses[name] = passphrase
-		} else if ext == ".bls" {
-			awsEncryptedBLSKeyFiles = append(awsEncryptedBLSKeyFiles, info)
-		} else {
-			return errors.Errorf(
-				"[Multi-BLS] found file: %s that does not have .bls, .key or .pass file extension",
-				path,
-			)
-		}
-		return nil
-	}); err != nil {
-		fmt.Fprintf(os.Stderr,
-			"[Multi-BLS] ERROR when reading blskey file under %s: %v\n",
-			*blsFolder,
-			err,
-		)
-		os.Exit(100)
-	}
-
-	var keyFiles []os.FileInfo
-	legacyBLSFile := true
-
-	if len(awsEncryptedBLSKeyFiles) > 0 {
-		keyFiles = awsEncryptedBLSKeyFiles
-		legacyBLSFile = false
-	} else {
-		keyFiles = blsKeyFiles
-	}
-
-	if len(keyFiles) > *maxBLSKeysPerNode {
-		fmt.Fprintf(os.Stderr,
-			"[Multi-BLS] maximum number of bls keys per node is %d, found: %d\n",
-			*maxBLSKeysPerNode,
-			len(keyFiles),
-		)
-		os.Exit(100)
-	}
-
-	for _, blsKeyFile := range keyFiles {
-		var consensusPriKey *bls.SecretKey
-		var err error
-		blsKeyFilePath := path.Join(*blsFolder, blsKeyFile.Name())
-		if legacyBLSFile {
-			fullName := blsKeyFile.Name()
-			ext := filepath.Ext(fullName)
-			name := fullName[:len(fullName)-len(ext)]
-			if val, ok := keyPasses[name]; ok {
-				blsPassphrase = val
-			}
-			consensusPriKey, err = blsgen.LoadBLSKeyWithPassPhrase(blsKeyFilePath, blsPassphrase)
-		} else {
-			consensusPriKey, err = blsgen.LoadAwsCMKEncryptedBLSKey(blsKeyFilePath, awsSettingString)
-		}
-		if err != nil {
-			return err
-		}
-
-		*consensusMultiBLSPriKey = append(*consensusMultiBLSPriKey, multibls.GetPrivateKeys(consensusPriKey)...)
-	}
-
-	return nil
-}
-
-func setupConsensusKey(nodeConfig *nodeconfig.ConfigType) multibls.PrivateKeys {
-	consensusMultiPriKey := multibls.PrivateKeys{}
-
-	if *blsKeyFile != "" {
-		consensusPriKey, err := blsgen.LoadBLSKeyWithPassPhrase(*blsKeyFile, blsPassphrase)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR when loading bls key, err :%v\n", err)
-			os.Exit(100)
-		}
-		consensusMultiPriKey = append(consensusMultiPriKey, multibls.GetPrivateKeys(consensusPriKey)...)
-	} else if *cmkEncryptedBLSKey != "" {
-		consensusPriKey, err := blsgen.LoadAwsCMKEncryptedBLSKey(*cmkEncryptedBLSKey, awsSettingString)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR when loading aws CMK encrypted bls key, err :%v\n", err)
-			os.Exit(100)
-		}
-
-		consensusMultiPriKey = append(consensusMultiPriKey, multibls.GetPrivateKeys(consensusPriKey)...)
-	} else {
-		err := readMultiBLSKeys(&consensusMultiPriKey)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[Multi-BLS] ERROR when loading bls keys, err :%v\n", err)
-			os.Exit(100)
-		}
-	}
-
-	// Consensus keys are the BLS12-381 keys used to sign consensus messages
-	nodeConfig.ConsensusPriKey = consensusMultiPriKey
-
-	return consensusMultiPriKey
 }
 
 func createGlobalConfig() (*nodeconfig.ConfigType, error) {
@@ -372,7 +216,7 @@ func createGlobalConfig() (*nodeconfig.ConfigType, error) {
 	nodeConfig := nodeconfig.GetShardConfig(initialAccounts[0].ShardID)
 	if *nodeType == "validator" {
 		// Set up consensus keys.
-		setupConsensusKey(nodeConfig)
+		setupConsensusKeys(nodeConfig)
 	} else {
 		// set dummy bls key for consensus object
 		nodeConfig.ConsensusPriKey = multibls.GetPrivateKeys(&bls.SecretKey{})

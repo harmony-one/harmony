@@ -7,26 +7,17 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/pkg/errors"
 )
-
-type awsConfiguration struct {
-	AccessKey string `json:"aws-access-key-id"`
-	SecretKey string `json:"aws-secret-access-key"`
-	Region    string `json:"aws-region"`
-}
 
 // GenBLSKeyWithPassPhrase generates bls key with passphrase and write into disk.
 func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
@@ -42,25 +33,6 @@ func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, err
 	// Write to file.
 	err = WriteToFile(fileName, encryptedPrivateKeyStr)
 	return privateKey, fileName, err
-}
-
-// WritePriKeyWithPassPhrase writes encrypted key with passphrase.
-func WritePriKeyWithPassPhrase(
-	privateKey *ffi_bls.SecretKey, passphrase string,
-) (string, error) {
-	publickKey := privateKey.GetPublicKey()
-	fileName := publickKey.SerializeToHexStr() + ".key"
-	privateKeyHex := privateKey.SerializeToHexStr()
-	// Encrypt with passphrase
-	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
-	if err != nil {
-		return "", err
-	}
-	// Write to file.
-	if err := WriteToFile(fileName, encryptedPrivateKeyStr); err != nil {
-		return fileName, err
-	}
-	return fileName, nil
 }
 
 // WriteToFile will print any string of text to a file safely by
@@ -82,11 +54,10 @@ func WriteToFile(filename string, data string) error {
 func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "attemped to load from %s", fileName)
+		return nil, errors.Wrapf(err, "attempted to load from %s", fileName)
 	}
-	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
-		passphrase = passphrase[:len(passphrase)-1]
-	}
+	passphrase = strings.TrimSpace(passphrase)
+
 	decryptedBytes, err := decrypt(encryptedPrivateKeyBytes, passphrase)
 	if err != nil {
 		return nil, err
@@ -129,31 +100,7 @@ func Readln(timeout time.Duration) (string, error) {
 }
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
-func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.SecretKey, error) {
-	if awsSettingString == "" {
-		return nil, errors.New("aws credential is not set")
-	}
-
-	var awsConfig awsConfiguration
-	if err := json.Unmarshal([]byte(awsSettingString), &awsConfig); err != nil {
-		return nil, errors.New(awsSettingString + " is not a valid JSON string for setting aws configuration.")
-	}
-
-	// Initialize a session that the aws SDK uses to load
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
-
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create aws session")
-	}
-
-	// Create KMS service client
-	svc := kms.New(sess, &aws.Config{
-		Region:      aws.String(awsConfig.Region),
-		Credentials: credentials.NewStaticCredentials(awsConfig.AccessKey, awsConfig.SecretKey, ""),
-	})
-
+func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
@@ -164,7 +111,7 @@ func LoadAwsCMKEncryptedBLSKey(fileName, awsSettingString string) (*ffi_bls.Secr
 		return nil, err
 	}
 
-	clearKey, err := svc.Decrypt(&kms.DecryptInput{
+	clearKey, err := kmsClient.Decrypt(&kms.DecryptInput{
 		CiphertextBlob: unhexed,
 	})
 
@@ -232,49 +179,4 @@ func decryptRaw(data []byte, passphrase string) ([]byte, error) {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	return plaintext, err
-}
-
-func decryptNonHumanReadable(data []byte, passphrase string) ([]byte, error) {
-	var err error
-	key := []byte(createHash(passphrase))
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	nonceSize := gcm.NonceSize()
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
-		return nil, err
-	}
-	return plaintext, nil
-}
-
-// LoadNonHumanReadableBLSKeyWithPassPhrase loads bls key with passphrase.
-func LoadNonHumanReadableBLSKeyWithPassPhrase(fileName, passFile string) (*ffi_bls.SecretKey, error) {
-	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-	data, err := ioutil.ReadFile(passFile)
-	if err != nil {
-		return nil, err
-	}
-	passphrase := string(data)
-	for len(passphrase) > 0 && passphrase[len(passphrase)-1] == '\n' {
-		passphrase = passphrase[:len(passphrase)-1]
-	}
-	decryptedBytes, err := decryptNonHumanReadable(encryptedPrivateKeyBytes, passphrase)
-	if err != nil {
-		return nil, err
-	}
-
-	priKey := &ffi_bls.SecretKey{}
-	priKey.DeserializeHexStr(string(decryptedBytes))
-	return priKey, nil
 }
