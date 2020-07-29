@@ -823,7 +823,20 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return errors.WithMessagef(ErrInvalidSender, "staking transaction sender is %s", b32)
 		}
 
-		_, _, err = VerifyAndDelegateFromMsg(pool.currentState, stkMsg)
+		chain, ok := pool.chain.(ChainContext)
+		if !ok {
+			return nil // for testing, chain could be testing blockchain
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		pendingEpoch := pool.chain.CurrentBlock().Epoch()
+		if shard.Schedule.IsLastBlock(pool.chain.CurrentBlock().Number().Uint64()) {
+			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
+		}
+		_, _, err = VerifyAndDelegateFromMsg(
+			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig.IsRedelegation(pendingEpoch))
 		return err
 	case staking.DirectiveUndelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)

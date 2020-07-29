@@ -721,44 +721,59 @@ func defaultExpWrapperEditValidator() staking.ValidatorWrapper {
 
 func TestVerifyAndDelegateFromMsg(t *testing.T) {
 	tests := []struct {
-		sdb vm.StateDB
-		msg staking.Delegate
+		sdb        vm.StateDB
+		msg        staking.Delegate
+		ds         []staking.DelegationIndex
+		epoch      *big.Int
+		redelegate bool
 
-		expVWrapper staking.ValidatorWrapper
-		expAmt      *big.Int
-		expErr      error
+		expVWrappers []staking.ValidatorWrapper
+		expAmt       *big.Int
+		expErr       error
 	}{
 		{
 			// 0: new delegate
-			sdb: makeStateDBForStake(t),
-			msg: defaultMsgDelegate(),
+			sdb:        makeStateDBForStake(t),
+			msg:        defaultMsgDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
-			expVWrapper: defaultExpVWrapperDelegate(),
-			expAmt:      tenKOnes,
+			expVWrappers: []staking.ValidatorWrapper{defaultExpVWrapperDelegate()},
+			expAmt:       tenKOnes,
 		},
 		{
 			// 1: add amount to current delegate
-			sdb: makeStateDBForStake(t),
-			msg: defaultMsgSelfDelegate(),
+			sdb:        makeStateDBForStake(t),
+			msg:        defaultMsgSelfDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
-			expVWrapper: defaultExpVWrapperSelfDelegate(),
-			expAmt:      tenKOnes,
+			expVWrappers: []staking.ValidatorWrapper{defaultExpVWrapperSelfDelegate()},
+			expAmt:       tenKOnes,
 		},
 		{
 			// 2: nil state db
-			sdb: nil,
-			msg: defaultMsgDelegate(),
+			sdb:        nil,
+			msg:        defaultMsgDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errStateDBIsMissing,
 		},
 		{
 			// 3: validatorFlag not set
 			sdb: makeStateDBForStake(t),
+			ds:  makeMsgCollectRewards(),
 			msg: func() staking.Delegate {
 				msg := defaultMsgDelegate()
 				msg.ValidatorAddress = makeTestAddr("not in state")
 				return msg
 			}(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errValidatorNotExist,
 		},
@@ -770,6 +785,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = big.NewInt(-1)
 				return msg
 			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errNegativeAmount,
 		},
@@ -781,6 +799,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = big.NewInt(100)
 				return msg
 			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errDelegationTooSmall,
 		},
@@ -796,6 +817,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.ValidatorAddress = createValidatorAddr
 				return d
 			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errors.New("address not present in state"),
 		},
@@ -806,7 +830,10 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				sdb.SetBalance(delegatorAddr, big.NewInt(100))
 				return sdb
 			}(),
-			msg: defaultMsgDelegate(),
+			msg:        defaultMsgDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errInsufficientBalanceForStake,
 		},
@@ -818,6 +845,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.Amount = hundredKOnes
 				return d
 			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errors.New(" total delegation can not be bigger than max_total_delegation"),
 		},
@@ -829,12 +859,37 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.Amount = hundredKOnes
 				return d
 			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: false,
 
 			expErr: errors.New(" total delegation can not be bigger than max_total_delegation"),
 		},
+		{
+			// 10: redelegate
+			sdb:        makeStateForRedelegate(t),
+			msg:        defaultMsgDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: true,
+
+			expVWrappers: []staking.ValidatorWrapper{defaultExpVWrapperRedelegate()},
+			expAmt:       tenKOnes,
+		},
+		{
+			// 11: redelegate error on existing undelegations
+			sdb:        makeStateForRedelegate(t),
+			msg:        defaultMsgSelfDelegate(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(0),
+			redelegate: true,
+
+			expVWrappers: []staking.ValidatorWrapper{defaultExpVWrapperRedelegate()},
+			expAmt:       tenKOnes,
+		},
 	}
 	for i, test := range tests {
-		w, amt, err := VerifyAndDelegateFromMsg(test.sdb, &test.msg)
+		ws, amt, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -846,10 +901,45 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		if amt.Cmp(test.expAmt) != 0 {
 			t.Errorf("Test %v: unexpected amount %v / %v", i, amt, test.expAmt)
 		}
-		if err := staketest.CheckValidatorWrapperEqual(*w, test.expVWrapper); err != nil {
-			t.Errorf("Test %v: %v", i, err)
+		for j := range ws {
+			if err := staketest.CheckValidatorWrapperEqual(*ws[j], test.expVWrappers[j]); err != nil {
+				t.Errorf("Test %v: %v", i, err)
+			}
 		}
 	}
+}
+
+func makeStateForRedelegate(t *testing.T) *state.DB {
+	sdb := makeStateDBForStake(t)
+
+	if err := addStateUndelegationForAddr(sdb, validatorAddr); err != nil {
+		t.Fatal(err)
+	}
+	if err := addStateUndelegationForAddr(sdb, validatorAddr2); err != nil {
+		t.Fatal(err)
+	}
+
+	sdb.IntermediateRoot(true)
+	return sdb
+}
+
+func addStateUndelegationForAddr(sdb *state.DB, addr common.Address) error {
+	w, err := sdb.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
+	w.Delegations = append(w.Delegations,
+		staking.NewDelegation(delegatorAddr, new(big.Int).Set(twentyKOnes)),
+	)
+	w.Delegations[1].Undelegations = staking.Undelegations{staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultEpoch)}}
+
+	return sdb.UpdateValidatorWrapper(addr, w)
+}
+
+func defaultExpVWrapperRedelegate() staking.ValidatorWrapper {
+	w := makeVWrapperByIndex(validatorIndex)
+	w.Delegations = append(w.Delegations, staking.NewDelegation(delegatorAddr, tenKOnes))
+	return w
 }
 
 func defaultMsgDelegate() staking.Delegate {
