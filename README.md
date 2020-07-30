@@ -60,9 +60,9 @@ cd $(go env GOPATH)/src/github.com/harmony-one
 
 2. Clone this repo & dependent repos.
 ```bash
-git clone git@github.com:harmony-one/mcl.git
-git clone git@github.com:harmony-one/bls.git
-git clone git@github.com:harmony-one/harmony.git
+git clone https://github.com/harmony-one/mcl.git
+git clone https://github.com/harmony-one/bls.git
+git clone https://github.com/harmony-one/harmony.git
 cd harmony
 ```
 
