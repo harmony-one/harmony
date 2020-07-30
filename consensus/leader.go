@@ -289,7 +289,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {
-			time.Sleep(2 * time.Second)
+			time.Sleep(2500 * time.Millisecond)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 			consensus.commitFinishChan <- viewID
 		}(viewID)

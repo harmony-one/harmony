@@ -22,7 +22,7 @@ type LDBFactory struct {
 // NewChainDB returns a new LDB for the blockchain for given shard.
 func (f *LDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 	dir := path.Join(f.RootDir, fmt.Sprintf("harmony_db_%d", shardID))
-	return ethdb.NewLDBDatabase(dir, 0, 0)
+	return ethdb.NewLDBDatabase(dir, 128, 1024)
 }
 
 // MemDBFactory is a memory-backed blockchain database factory.
