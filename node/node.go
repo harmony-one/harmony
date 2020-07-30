@@ -492,12 +492,6 @@ func (node *Node) validateShardBoundMessage(
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, true, errors.WithStack(errNotRightKeySize)
 	}
-
-	if !node.Consensus.IsValidatorInCommittee(senderKey) {
-		atomic.AddUint32(&node.NumSlotMessages, 1)
-		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
-	}
-
 	// ignore mesage not intended for validator
 	// but still forward them to the network
 	if !node.Consensus.IsLeader() {
@@ -506,6 +500,11 @@ func (node *Node) validateShardBoundMessage(
 			atomic.AddUint32(&node.NumIgnoredMessages, 1)
 			return nil, nil, true, nil
 		}
+	}
+
+	if !node.Consensus.IsValidatorInCommittee(senderKey) {
+		atomic.AddUint32(&node.NumSlotMessages, 1)
+		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
