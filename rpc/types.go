@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -62,7 +63,10 @@ func NewStructuredResponse(input interface{}) (StructuredResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(dat, &objMap); err != nil {
+	d := json.NewDecoder(bytes.NewReader(dat))
+	d.UseNumber()
+	err = d.Decode(&objMap)
+	if err != nil {
 		return nil, err
 	}
 	return objMap, nil
