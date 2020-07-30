@@ -41,7 +41,7 @@ func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
 	if len(keys) == 0 {
 		return nil, fmt.Errorf("0 bls keys loaded")
 	}
-	if len(keys) >= raw.MaxKeys {
+	if len(keys) > raw.MaxKeys {
 		return nil, fmt.Errorf("bls keys exceed maximum count %v", raw.MaxKeys)
 	}
 	return keys, err
