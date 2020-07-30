@@ -1,41 +1,14 @@
 package node
 
 import (
-	"fmt"
-	"net"
 	"strconv"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/hmyapi"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv1"
-	"github.com/harmony-one/harmony/internal/hmyapi/apiv2"
-	"github.com/harmony-one/harmony/internal/hmyapi/filters"
-	"github.com/harmony-one/harmony/internal/utils"
+	hmy_rpc "github.com/harmony-one/harmony/rpc"
+	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
-)
-
-const (
-	rpcHTTPPortOffset = 500
-	rpcWSPortOffset   = 800
-)
-
-var (
-	// HTTP RPC
-	httpListener     net.Listener
-	httpHandler      *rpc.Server
-	httpEndpoint     = ""
-	wsEndpoint       = ""
-	httpModules      = []string{"hmy", "hmyv2", "net", "netv2", "explorer"}
-	httpVirtualHosts = []string{"*"}
-	httpTimeouts     = rpc.DefaultHTTPTimeouts
-	httpOrigins      = []string{"*"}
-	wsModules        = []string{"hmy", "hmyv2", "net", "netv2", "web3"}
-	wsOrigins        = []string{"*"}
-	harmony          *hmy.Harmony
 )
 
 // IsCurrentlyLeader exposes if node is currently the leader node
@@ -91,8 +64,10 @@ func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 
 // StartRPC start RPC service
 func (node *Node) StartRPC(nodePort string) error {
+	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+
 	// Gather all the possible APIs to surface
-	apis := node.APIs()
+	apis := node.APIs(harmony)
 
 	for _, service := range node.serviceManager.GetServices() {
 		apis = append(apis, service.APIs()...)
@@ -100,105 +75,26 @@ func (node *Node) StartRPC(nodePort string) error {
 
 	port, _ := strconv.Atoi(nodePort)
 
-	ip := ""
-	if !nodeconfig.GetPublicRPC() {
-		ip = "127.0.0.1"
-	}
-	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcHTTPPortOffset)
-
-	if err := node.startHTTP(httpEndpoint, apis, httpModules, httpOrigins, httpVirtualHosts, httpTimeouts); err != nil {
-		return err
-	}
-	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+rpcWSPortOffset)
-	if err := node.startWS(wsEndpoint, apis, wsModules, wsOrigins, true); err != nil {
-		node.stopHTTP()
-		return err
-	}
-
-	return nil
+	return hmy_rpc.StartServers(harmony, port, apis)
 }
 
-// startHTTP initializes and starts the HTTP RPC endpoint.
-func (node *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, timeouts rpc.HTTPTimeouts) error {
-	// Short circuit if the HTTP endpoint isn't being exposed
-	if endpoint == "" {
-		return nil
-	}
-
-	listener, handler, err := rpc.StartHTTPEndpoint(endpoint, apis, modules, cors, vhosts, timeouts)
-	if err != nil {
-		return err
-	}
-
-	utils.Logger().Info().
-		Str("url", fmt.Sprintf("http://%s", endpoint)).
-		Str("cors", strings.Join(cors, ",")).
-		Str("vhosts", strings.Join(vhosts, ",")).
-		Msg("HTTP endpoint opened")
-	// All listeners booted successfully
-	httpListener = listener
-	httpHandler = handler
-	return nil
+// StopRPC stop RPC service
+func (node *Node) StopRPC() error {
+	return hmy_rpc.StopServers()
 }
 
-// stopHTTP terminates the HTTP RPC endpoint.
-func (node *Node) stopHTTP() {
-	if httpListener != nil {
-		httpListener.Close()
-		httpListener = nil
-		utils.Logger().Info().Str("url", fmt.Sprintf("http://%s", httpEndpoint)).Msg("HTTP endpoint closed")
-	}
-	if httpHandler != nil {
-		httpHandler.Stop()
-		httpHandler = nil
-	}
-}
-
-// startWS initializes and starts the websocket RPC endpoint.
-func (node *Node) startWS(
-	endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool,
-) error {
-	// Short circuit if the WS endpoint isn't being exposed
-	if endpoint == "" {
-		return nil
-	}
-	listener, _, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
-	if err != nil {
-		return err
-	}
-	utils.Logger().Info().
-		Str("url", fmt.Sprintf("ws://%s", listener.Addr())).
-		Msg("WebSocket endpoint opened")
-	return nil
-}
-
-// APIs return the collection of RPC services the ethereum package offers.
+// APIs return the collection of local RPC services.
 // NOTE, some of these services probably need to be moved to somewhere else.
-func (node *Node) APIs() []rpc.API {
-	if harmony == nil {
-		harmony = hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
-	}
-	// Gather all the possible APIs to surface
-	apis := hmyapi.GetAPIs(harmony)
+func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
 	// Append all the local APIs and return
-	return append(apis, []rpc.API{
+	return []rpc.API{
+		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V1),
+		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V2),
 		{
 			Namespace: "hmy",
-			Version:   "1.0",
+			Version:   hmy_rpc.APIVersion,
 			Service:   filters.NewPublicFilterAPI(harmony, false),
 			Public:    true,
 		},
-		{
-			Namespace: "net",
-			Version:   "1.0",
-			Service:   apiv1.NewPublicNetAPI(node.host, harmony.ChainID),
-			Public:    true,
-		},
-		{
-			Namespace: "netv2",
-			Version:   "1.0",
-			Service:   apiv2.NewPublicNetAPI(node.host, harmony.ChainID),
-			Public:    true,
-		},
-	}...)
+	}
 }

@@ -2,7 +2,7 @@ package hmy
 
 import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	commonRPC "github.com/harmony-one/harmony/internal/hmyapi/common"
+	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/staking/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 )

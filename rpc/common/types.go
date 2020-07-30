@@ -1,9 +1,34 @@
 package common
 
 import (
+	"encoding/json"
+
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
+
+// BlockArgs is struct to include optional block formatting params.
+type BlockArgs struct {
+	WithSigners bool     `json:"withSigners"`
+	InclTx      bool     `json:"inclTx"`
+	FullTx      bool     `json:"fullTx"`
+	Signers     []string `json:"signers"`
+	InclStaking bool     `json:"inclStaking"`
+}
+
+// UnmarshalFromInterface ..
+func (ba *BlockArgs) UnmarshalFromInterface(blockArgs interface{}) error {
+	var args BlockArgs
+	dat, err := json.Marshal(blockArgs)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &args); err != nil {
+		return err
+	}
+	*ba = args
+	return nil
+}
 
 // C ..
 type C struct {
