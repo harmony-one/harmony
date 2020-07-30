@@ -138,12 +138,12 @@ func TestPromptACProvider_prompt(t *testing.T) {
 	}{
 		{
 			delay:   100 * time.Microsecond,
-			timeout: 1000 * time.Microsecond,
+			timeout: 1 * time.Second,
 			expErr:  nil,
 		},
 		{
-			delay:   2000 * time.Microsecond,
-			timeout: 1000 * time.Microsecond,
+			delay:   2 * time.Second,
+			timeout: 1 * time.Second,
 			expErr:  errors.New("timed out"),
 		},
 	}
