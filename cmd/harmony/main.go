@@ -188,12 +188,8 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.FatalErrMsg(err, "cannot parse bootnode list %#v",
 			bootNodes)
 	}
-	// TODO: seperate use of port rpc / p2p
-	nodeconfig.GetDefaultConfig().Port = strconv.Itoa(hc.RPC.Port)
-	nodeconfig.GetDefaultConfig().IP = hc.RPC.IP
 
 	nodeconfig.SetShardingSchedule(shard.Schedule)
-	nodeconfig.SetPublicRPC(true)
 	nodeconfig.SetVersion(getHarmonyVersion())
 	nodeconfigSetShardSchedule(hc)
 
@@ -247,6 +243,15 @@ func setupNodeAndRun(hc harmonyConfig) {
 		}
 	}()
 
+	// Parse RPC config
+	nodeConfig.RPCServer = nodeconfig.RPCServerConfig{
+		HTTPEnabled: hc.HTTP.Enabled,
+		HTTPIp:      hc.HTTP.IP,
+		HTTPPort:    hc.HTTP.Port,
+		WSEnabled:   hc.WS.Enabled,
+		WSIp:        hc.WS.IP,
+		WSPort:      hc.WS.Port,
+	}
 	if nodeConfig.ShardID != shard.BeaconChainShardID {
 		utils.Logger().Info().
 			Uint32("shardID", currentNode.Blockchain().ShardID()).
@@ -286,7 +291,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.RPC.IP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
 
@@ -296,7 +301,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
 
-	if err := currentNode.StartRPC(strconv.Itoa(hc.RPC.Port)); err != nil {
+	if err := currentNode.StartRPC(); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("StartRPC failed")
@@ -505,7 +510,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	} else {
 		if hc.Network.NetworkType == nodeconfig.Localnet {
 			epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
-			selfPort := hc.Network.DNSPort
+			selfPort := hc.P2P.Port
 			currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 				6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 		} else {

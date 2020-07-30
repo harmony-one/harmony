@@ -782,6 +782,10 @@ do
       args+=(
          --public_rpc
       )
+   else
+      args+=(
+         --public_rpc=false
+      )
    fi
    if [ ! -z "${pprof}" ]; then
       args+=(
