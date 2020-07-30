@@ -26,6 +26,8 @@ var (
 	stressBootNodes = []string{
 		"/ip4/52.40.84.2/tcp/9842/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29",
 	}
+
+	devnetBootNodes = []string{}
 )
 
 const (
@@ -70,6 +72,8 @@ func GetDefaultBootNodes(networkType NetworkType) []string {
 		return partnerBootNodes
 	case Stressnet:
 		return stressBootNodes
+	case Devnet:
+		return devnetBootNodes
 	}
 	return nil
 }
