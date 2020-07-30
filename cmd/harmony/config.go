@@ -20,7 +20,7 @@ type harmonyConfig struct {
 	General   generalConfig
 	Network   networkConfig
 	P2P       p2pConfig
-	RPC       rpcConfig
+	HTTP      httpConfig
 	WS        wsConfig
 	Consensus consensusConfig
 	BLSKeys   blsConfig
@@ -99,7 +99,7 @@ type logContext struct {
 	Port int
 }
 
-type rpcConfig struct {
+type httpConfig struct {
 	Enabled bool
 	IP      string
 	Port    int

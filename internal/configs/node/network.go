@@ -44,11 +44,17 @@ const (
 	// TODO: refactor all 9000-3000 = 6000 stuff
 	DefaultDNSPort = 9000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
-	// TODO: modify this
-	DefaultRPCPort = 9000
+	DefaultRPCPort = 9500
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
-	// TODO: modify this
-	DefaultWSPort = 9000
+	DefaultWSPort = 9800
+)
+
+const (
+	// rpcHTTPPortOffset is the port offset for RPC HTTP requests
+	rpcHTTPPortOffset = 500
+
+	// rpcWSPortOffSet is the port offset for RPC websocket requests
+	rpcWSPortOffSet = 800
 )
 
 // GetDefaultBootNodes get the default bootnode with the given network type
@@ -88,4 +94,14 @@ func GetDefaultDNSZone(networkType NetworkType) string {
 // GetDefaultDNSPort get the default DNS port for the given network type
 func GetDefaultDNSPort(NetworkType) int {
 	return DefaultDNSPort
+}
+
+// GetHTTPPortFromBase return the HTTP port from base port
+func GetHTTPPortFromBase(basePort int) int {
+	return basePort + rpcHTTPPortOffset
+}
+
+// GetWSPortFromBase return the Websocket port from the base port
+func GetWSPortFromBase(basePort int) int {
+	return basePort + rpcWSPortOffSet
 }

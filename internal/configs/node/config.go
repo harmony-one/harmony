@@ -9,9 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
@@ -64,20 +63,20 @@ const (
 )
 
 var version string
-var publicRPC bool // enable public RPC access
 var peerID peer.ID // PeerID of the node
 
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon          GroupID // the beacon group ID
-	group           GroupID // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
-	client          GroupID // the client group ID of the shard
-	isClient        bool    // whether this node is a client node, such as wallet
-	ShardID         uint32  // ShardID of this node; TODO ek – revisit when resharding
-	role            Role    // Role of the node
-	Port            string  // Port of the node.
-	IP              string  // IP of the node.
+	beacon          GroupID         // the beacon group ID
+	group           GroupID         // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
+	client          GroupID         // the client group ID of the shard
+	isClient        bool            // whether this node is a client node, such as wallet
+	ShardID         uint32          // ShardID of this node; TODO ek – revisit when resharding
+	role            Role            // Role of the node
+	Port            string          // Port of the node.
+	IP              string          // IP of the node.
+	RPCServer       RPCServerConfig // RPC server port and ip
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey multibls.PrivateKeys
@@ -90,6 +89,17 @@ type ConfigType struct {
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
+}
+
+// RPCServerConfig is the config for rpc listen addresses
+type RPCServerConfig struct {
+	HTTPEnabled bool
+	HTTPIp      string
+	HTTPPort    int
+
+	WSEnabled bool
+	WSIp      string
+	WSPort    int
 }
 
 // configs is a list of node configuration.
@@ -223,16 +233,6 @@ func SetPeerID(pid peer.ID) {
 // GetPeerID returns the peer ID of the node
 func GetPeerID() peer.ID {
 	return peerID
-}
-
-// SetPublicRPC set the boolean value of public RPC access
-func SetPublicRPC(v bool) {
-	publicRPC = v
-}
-
-// GetPublicRPC get the boolean value of public RPC access
-func GetPublicRPC() bool {
-	return publicRPC
 }
 
 // ShardingSchedule returns the sharding schedule for this node config.

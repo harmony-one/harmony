@@ -278,13 +278,10 @@ var (
 		Name:  "bootnodes",
 		Usage: "a list of bootnode multiaddress (delimited by ,)",
 	}
-	// TODO: separate dns.client from dns.host. Add --dns.host to determine whether start
-	//   dns host, --dns.port / --dns.ip for serving endpoint
 	dnsZoneFlag = cli.StringFlag{
 		Name:  "dns.zone",
 		Usage: "use customized peers from the zone for state syncing",
 	}
-	// TODO: 9500 as default
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
@@ -395,23 +392,23 @@ var (
 	rpcEnabledFlag = cli.BoolFlag{
 		Name:     "http",
 		Usage:    "enable HTTP / RPC requests",
-		DefValue: defaultConfig.RPC.Enabled,
+		DefValue: defaultConfig.HTTP.Enabled,
 	}
 	rpcIPFlag = cli.StringFlag{
 		Name:     "http.ip",
 		Usage:    "ip address to listen for RPC calls",
-		DefValue: defaultConfig.RPC.IP,
+		DefValue: defaultConfig.HTTP.IP,
 	}
 	rpcPortFlag = cli.IntFlag{
 		Name:     "http.port",
-		Usage:    "rpc port to listen for RPC calls",
-		DefValue: defaultConfig.RPC.Port,
+		Usage:    "rpc port to listen for HTTP requests",
+		DefValue: defaultConfig.HTTP.Port,
 	}
 	legacyPublicRPCFlag = cli.BoolFlag{
 		Name:       "public_rpc",
-		Usage:      "Enable Public RPC Access (default: false)",
-		DefValue:   defaultConfig.RPC.Enabled,
-		Deprecated: "please use --http.ip to specify the ip address to listen",
+		Usage:      "Enable Public HTTP Access (default: false)",
+		DefValue:   defaultConfig.HTTP.Enabled,
+		Deprecated: "use --http.ip and --ws.ip to specify the ip address to listen. Use 127.0.0.1 to listen local requests.",
 	}
 )
 
@@ -419,19 +416,26 @@ func applyRPCFlags(cmd *cobra.Command, config *harmonyConfig) {
 	var isRPCSpecified bool
 
 	if cli.IsFlagChanged(cmd, rpcIPFlag) {
-		config.RPC.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
+		config.HTTP.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
 		isRPCSpecified = true
 	}
 
 	if cli.IsFlagChanged(cmd, rpcPortFlag) {
-		config.RPC.Port = cli.GetIntFlagValue(cmd, rpcPortFlag)
+		config.HTTP.Port = cli.GetIntFlagValue(cmd, rpcPortFlag)
 		isRPCSpecified = true
 	}
 
 	if cli.IsFlagChanged(cmd, rpcEnabledFlag) {
-		config.RPC.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
+		config.HTTP.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
 	} else if isRPCSpecified {
-		config.RPC.Enabled = true
+		config.HTTP.Enabled = true
+	}
+
+	if cli.IsFlagChanged(cmd, legacyPublicRPCFlag) {
+		if !cli.GetBoolFlagValue(cmd, legacyPublicRPCFlag) {
+			config.HTTP.IP = localEndpoint
+			config.WS.IP = localEndpoint
+		}
 	}
 }
 
@@ -1057,7 +1061,7 @@ var (
 	legacyIPFlag = cli.StringFlag{
 		Name:       "ip",
 		Usage:      "ip of the node",
-		DefValue:   defaultConfig.RPC.IP,
+		DefValue:   defaultConfig.HTTP.IP,
 		Deprecated: "use --http.ip",
 	}
 	legacyWebHookConfigFlag = cli.StringFlag{
@@ -1070,18 +1074,17 @@ var (
 
 // Note: this function need to be called before parse other flags
 func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
-	// TODO: move all port manipulation +500 -3000 logic here
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
-		config.RPC.Port = legacyPort
-		config.WS.Port = legacyPort
+		config.HTTP.Port = nodeconfig.GetHTTPPortFromBase(legacyPort)
+		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
 		legacyIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
-		config.RPC.IP = legacyIP
-		config.RPC.Enabled = true
+		config.HTTP.IP = legacyIP
+		config.HTTP.Enabled = true
 		config.P2P.IP = legacyIP
 		config.WS.IP = legacyIP
 	}

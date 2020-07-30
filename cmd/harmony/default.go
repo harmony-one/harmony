@@ -23,7 +23,7 @@ var defaultConfig = harmonyConfig{
 		Port:    nodeconfig.DefaultP2PPort,
 		KeyFile: "./.hmykey",
 	},
-	RPC: rpcConfig{
+	HTTP: httpConfig{
 		Enabled: true,
 		IP:      "127.0.0.1",
 		Port:    nodeconfig.DefaultRPCPort,
@@ -135,4 +135,8 @@ const (
 	legacyBLSKmsTypePrompt  = "prompt"
 	legacyBLSKmsTypeFile    = "file"
 	legacyBLSKmsTypeNone    = "none"
+)
+
+const (
+	localEndpoint = "127.0.0.1"
 )
