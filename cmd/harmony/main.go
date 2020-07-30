@@ -83,7 +83,7 @@ var (
 	// networkType indicates the type of the network
 	networkType = flag.String("network_type", "mainnet", "type of the network: mainnet, testnet, pangaea, partner, stressnet, devnet, localnet")
 	// blockPeriod indicates the how long the leader waits to propose a new block.
-	blockPeriod = flag.Int("block_period", 8, "how long in second the leader waits to propose a new block.")
+	blockPeriod = flag.Int("block_period", 5, "how long in second the leader waits to propose a new block.")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
 	// shardID indicates the shard ID of this node

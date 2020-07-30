@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200723.0"
+version="v1 20200723.1"
 
 unset -v progname
 progname="${0##*/}"
@@ -753,6 +753,7 @@ do
       -max_bls_keys_per_node="${max_bls_keys_per_node}"
       -broadcast_invalid_tx="${broadcast_invalid_tx}"
       -verbosity="${log_level}"
+      -block_period="5"
    )
    args+=(
       -is_archival="${archival}"
