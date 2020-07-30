@@ -36,16 +36,16 @@ require (
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2 // indirect
-	github.com/libp2p/go-libp2p v0.10.0
-	github.com/libp2p/go-libp2p-core v0.6.0
+	github.com/libp2p/go-libp2p v0.10.3
+	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-crypto v0.1.0
-	github.com/libp2p/go-libp2p-discovery v0.4.0
+	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-host v0.1.0
-	github.com/libp2p/go-libp2p-kad-dht v0.8.0
+	github.com/libp2p/go-libp2p-kad-dht v0.8.3
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.2.6
-	github.com/libp2p/go-libp2p-pubsub v0.3.2
+	github.com/libp2p/go-libp2p-pubsub v0.3.3
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
