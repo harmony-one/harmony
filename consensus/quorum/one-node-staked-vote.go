@@ -88,18 +88,19 @@ func (v *stakedVoteWeight) AddNewVote(
 
 	t := v.QuorumThreshold()
 
+	msg := "Attempt to reach quorum"
 	if !tallyQuorum.quorumAchieved {
 		tallyQuorum.quorumAchieved = tallyQuorum.tally.GT(t)
 
-		msg := "Attempt to reach quorum"
 		if tallyQuorum.quorumAchieved {
 			msg = "Quorum Achieved!"
 		}
-		utils.Logger().Info().
-			Str("phase", p.String()).
-			Str("total-power-of-signers", tallyQuorum.tally.String()).
-			Msg(msg)
 	}
+	utils.Logger().Info().
+		Str("phase", p.String()).
+		Int64("signer-count", v.SignersCount(p)).
+		Str("total-power-of-signers", tallyQuorum.tally.String()).
+		Msg(msg)
 	return ballet, nil
 }
 
