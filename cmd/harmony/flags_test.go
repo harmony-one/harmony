@@ -11,6 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	trueBool = true
+)
+
 func TestHarmonyFlags(t *testing.T) {
 	tests := []struct {
 		argStr    string
@@ -59,14 +63,12 @@ func TestHarmonyFlags(t *testing.T) {
 					IP:      "8.8.8.8",
 					Port:    9800,
 				},
-				Consensus: consensusConfig{
-					DelayCommit: "0ms",
-					BlockTime:   "8s",
-					MinPeers:    6,
+				Consensus: &consensusConfig{
+					MinPeers: 6,
 				},
 				BLSKeys: blsConfig{
 					KeyDir:           "./.hmy/blskeys",
-					KeyFiles:         nil,
+					KeyFiles:         []string{},
 					MaxKeys:          10,
 					PassEnabled:      true,
 					PassSrcType:      "auto",
@@ -77,8 +79,7 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: txPoolConfig{
-					BlacklistFile:      "./.hmy/blacklist.txt",
-					BroadcastInvalidTx: true,
+					BlacklistFile: "./.hmy/blacklist.txt",
 				},
 				Pprof: pprofConfig{
 					Enabled:    false,
@@ -93,6 +94,9 @@ func TestHarmonyFlags(t *testing.T) {
 						IP:   "8.8.8.8",
 						Port: 9000,
 					},
+				},
+				Legacy: &legacyConfig{
+					TPBroadcastInvalidTxn: &trueBool,
 				},
 			},
 		},
@@ -509,28 +513,23 @@ func TestBLSFlags(t *testing.T) {
 func TestConsensusFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig consensusConfig
+		expConfig *consensusConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.Consensus,
+			expConfig: nil,
 		},
 		{
-			args: []string{"--consensus.block-time", "5s", "--consensus.delay-commit", "10ms",
-				"--consensus.min-peers", "10"},
-			expConfig: consensusConfig{
-				DelayCommit: "10ms",
-				BlockTime:   "5s",
-				MinPeers:    10,
+			args: []string{"--consensus.min-peers", "10"},
+			expConfig: &consensusConfig{
+				MinPeers: 10,
 			},
 		},
 		{
 			args: []string{"--delay_commit", "10ms", "--block_period", "5", "--min_peers", "10"},
-			expConfig: consensusConfig{
-				DelayCommit: "10ms",
-				BlockTime:   "5s",
-				MinPeers:    10,
+			expConfig: &consensusConfig{
+				MinPeers: 10,
 			},
 		},
 	}
@@ -562,22 +561,19 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: txPoolConfig{
-				BlacklistFile:      defaultConfig.TxPool.BlacklistFile,
-				BroadcastInvalidTx: defaultConfig.TxPool.BroadcastInvalidTx,
+				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.broadcast-invalid-tx"},
+			args: []string{"--txpool.blacklist", "blacklist.file"},
 			expConfig: txPoolConfig{
-				BlacklistFile:      "blacklist.file",
-				BroadcastInvalidTx: true,
+				BlacklistFile: "blacklist.file",
 			},
 		},
 		{
-			args: []string{"--blacklist", "blacklist.file", "--broadcast_invalid_tx"},
+			args: []string{"--blacklist", "blacklist.file"},
 			expConfig: txPoolConfig{
-				BlacklistFile:      "blacklist.file",
-				BroadcastInvalidTx: true,
+				BlacklistFile: "blacklist.file",
 			},
 		},
 	}

@@ -81,22 +81,23 @@ var (
 		legacyKMSConfigSourceFlag,
 	}
 
-	consensusFlags = []cli.Flag{
-		consensusDelayCommitFlag,
-		consensusBlockTimeFlag,
-		consensusMinPeersFlag,
+	consensusFlags = append(consensusValidFlags, consensusInvalidFlags...)
 
+	// consensusValidFlags are flags that are effective
+	consensusValidFlags = []cli.Flag{
+		consensusMinPeersFlag,
+		legacyConsensusMinPeersFlag,
+	}
+
+	// consensusInvalidFlags are flags that are no longer effective
+	consensusInvalidFlags = []cli.Flag{
 		legacyDelayCommitFlag,
 		legacyBlockTimeFlag,
-		legacyConsensusMinPeersFlag,
 	}
 
 	txPoolFlags = []cli.Flag{
 		tpBlacklistFileFlag,
-		tpBroadcastInvalidTxFlag,
-
 		legacyTPBlacklistFileFlag,
-		legacyTPBroadcastInvalidTxFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -150,6 +151,7 @@ var (
 		legacyPortFlag,
 		legacyIPFlag,
 		legacyWebHookConfigFlag,
+		legacyTPBroadcastInvalidTxFlag,
 	}
 )
 
@@ -676,59 +678,35 @@ func legacyApplyKMSSourceVal(src string, config *harmonyConfig) {
 
 // consensus flags
 var (
-	// TODO: hard code value?
-	consensusDelayCommitFlag = cli.StringFlag{
-		Name:     "consensus.delay-commit",
-		Usage:    "how long to delay sending commit messages in consensus, e.g: 500ms, 1s",
-		DefValue: defaultConfig.Consensus.DelayCommit,
-		Hidden:   true,
-	}
-	// TODO: hard code value?
-	consensusBlockTimeFlag = cli.StringFlag{
-		Name:     "consensus.block-time",
-		Usage:    "block interval time, e.g: 8s",
-		DefValue: defaultConfig.Consensus.BlockTime,
-		Hidden:   true,
-	}
-	// TODO: hard code value?
 	consensusMinPeersFlag = cli.IntFlag{
 		Name:     "consensus.min-peers",
 		Usage:    "minimal number of peers in shard",
-		DefValue: defaultConfig.Consensus.MinPeers,
+		DefValue: defaultConsensusConfig.MinPeers,
 		Hidden:   true,
 	}
 	legacyDelayCommitFlag = cli.StringFlag{
 		Name:       "delay_commit",
 		Usage:      "how long to delay sending commit messages in consensus, ex: 500ms, 1s",
-		DefValue:   defaultConfig.Consensus.DelayCommit,
-		Deprecated: "use --consensus.delay-commit",
+		Deprecated: "flag delay_commit is no longer effective",
 	}
 	legacyBlockTimeFlag = cli.IntFlag{
 		Name:       "block_period",
 		Usage:      "how long in second the leader waits to propose a new block",
-		DefValue:   8,
-		Deprecated: "use --consensus.block-time",
+		DefValue:   5,
+		Deprecated: "flag block_period is no longer effective",
 	}
 	legacyConsensusMinPeersFlag = cli.IntFlag{
 		Name:     "min_peers",
 		Usage:    "Minimal number of Peers in shard",
-		DefValue: defaultConfig.Consensus.MinPeers,
+		DefValue: defaultConsensusConfig.MinPeers,
 		Hidden:   true,
 	}
 )
 
 func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.IsFlagChanged(cmd, consensusDelayCommitFlag) {
-		config.Consensus.DelayCommit = cli.GetStringFlagValue(cmd, consensusDelayCommitFlag)
-	} else if cli.IsFlagChanged(cmd, legacyDelayCommitFlag) {
-		config.Consensus.DelayCommit = cli.GetStringFlagValue(cmd, legacyDelayCommitFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, consensusBlockTimeFlag) {
-		config.Consensus.BlockTime = cli.GetStringFlagValue(cmd, consensusBlockTimeFlag)
-	} else if cli.IsFlagChanged(cmd, legacyBlockTimeFlag) {
-		sec := cli.GetIntFlagValue(cmd, legacyBlockTimeFlag)
-		config.Consensus.BlockTime = fmt.Sprintf("%ds", sec)
+	if cli.HasFlagsChanged(cmd, consensusValidFlags) {
+		cfg := getDefaultConsensusConfigCopy()
+		config.Consensus = &cfg
 	}
 
 	if cli.IsFlagChanged(cmd, consensusMinPeersFlag) {
@@ -745,24 +723,11 @@ var (
 		Usage:    "file of blacklisted wallet addresses",
 		DefValue: defaultConfig.TxPool.BlacklistFile,
 	}
-	// TODO: mark hard code?
-	tpBroadcastInvalidTxFlag = cli.BoolFlag{
-		Name:     "txpool.broadcast-invalid-tx",
-		Usage:    "whether to broadcast invalid transactions",
-		DefValue: defaultConfig.TxPool.BroadcastInvalidTx,
-		Hidden:   true,
-	}
 	legacyTPBlacklistFileFlag = cli.StringFlag{
 		Name:       "blacklist",
 		Usage:      "Path to newline delimited file of blacklisted wallet addresses",
 		DefValue:   defaultConfig.TxPool.BlacklistFile,
 		Deprecated: "use --txpool.blacklist",
-	}
-	legacyTPBroadcastInvalidTxFlag = cli.BoolFlag{
-		Name:       "broadcast_invalid_tx",
-		Usage:      "broadcast invalid transactions to sync pool state",
-		DefValue:   defaultConfig.TxPool.BroadcastInvalidTx,
-		Deprecated: "use --txpool.broadcast-invalid-tx",
 	}
 )
 
@@ -771,12 +736,6 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, legacyTPBlacklistFileFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, tpBroadcastInvalidTxFlag) {
-		config.TxPool.BroadcastInvalidTx = cli.GetBoolFlagValue(cmd, tpBroadcastInvalidTxFlag)
-	} else if cli.IsFlagChanged(cmd, legacyTPBroadcastInvalidTxFlag) {
-		config.TxPool.BroadcastInvalidTx = cli.GetBoolFlagValue(cmd, legacyTPBroadcastInvalidTxFlag)
 	}
 }
 
@@ -1060,6 +1019,12 @@ var (
 		DefValue: "",
 		Hidden:   true,
 	}
+	legacyTPBroadcastInvalidTxFlag = cli.BoolFlag{
+		Name:       "broadcast_invalid_tx",
+		Usage:      "broadcast invalid transactions to sync pool state",
+		DefValue:   defaultBroadcastInvalidTx,
+		Deprecated: "use --txpool.broadcast-invalid-tx",
+	}
 )
 
 // Note: this function need to be called before parse other flags
@@ -1090,9 +1055,16 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Log.Context = logCtx
 	}
 
-	if cli.IsFlagChanged(cmd, legacyWebHookConfigFlag) {
-		config.Legacy = &legacyConfig{
-			WebHookConfig: cli.GetStringFlagValue(cmd, legacyWebHookConfigFlag),
+	if cli.HasFlagsChanged(cmd, []cli.Flag{legacyWebHookConfigFlag, legacyTPBroadcastInvalidTxFlag}) {
+		config.Legacy = &legacyConfig{}
+		if cli.IsFlagChanged(cmd, legacyWebHookConfigFlag) {
+			val := cli.GetStringFlagValue(cmd, legacyWebHookConfigFlag)
+			config.Legacy.WebHookConfig = &val
+		}
+		if cli.IsFlagChanged(cmd, legacyTPBroadcastInvalidTxFlag) {
+			val := cli.GetBoolFlagValue(cmd, legacyTPBroadcastInvalidTxFlag)
+			config.Legacy.TPBroadcastInvalidTxn = &val
 		}
 	}
+
 }

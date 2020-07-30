@@ -455,8 +455,8 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 
 	nodeConfig.DBDir = hc.General.DataDir
 
-	if hc.Legacy != nil && len(hc.Legacy.WebHookConfig) != 0 {
-		p := hc.Legacy.WebHookConfig
+	if hc.Legacy != nil && hc.Legacy.WebHookConfig != nil && len(*hc.Legacy.WebHookConfig) != 0 {
+		p := *hc.Legacy.WebHookConfig
 		config, err := webhooks.NewWebHooksFromPath(p)
 		if err != nil {
 			fmt.Fprintf(
@@ -486,13 +486,17 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
 		os.Exit(1)
 	}
-	commitDelay, err := time.ParseDuration(hc.Consensus.DelayCommit)
-	if err != nil || commitDelay < 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid commit delay %#v", hc.Consensus.DelayCommit)
-		os.Exit(1)
+
+	currentConsensus.SetCommitDelay(time.Duration(0))
+
+	// Parse minPeers from harmonyConfig
+	var minPeers int
+	if hc.Consensus != nil {
+		minPeers = hc.Consensus.MinPeers
+	} else {
+		minPeers = defaultConsensusConfig.MinPeers
 	}
-	currentConsensus.SetCommitDelay(commitDelay)
-	currentConsensus.MinPeers = hc.Consensus.MinPeers
+	currentConsensus.MinPeers = minPeers
 
 	blacklist, err := setupBlacklist(hc)
 	if err != nil {
@@ -503,7 +507,12 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, hc.General.IsArchival)
-	currentNode.BroadcastInvalidTx = hc.TxPool.BroadcastInvalidTx
+
+	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
+		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
+	} else {
+		currentNode.BroadcastInvalidTx = defaultBroadcastInvalidTx
+	}
 
 	if hc.Network.LegacySyncing {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
@@ -560,13 +569,6 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
-	// Setup block period and block due time.
-	// TODO: move the error check to validation
-	currentConsensus.BlockPeriod, err = time.ParseDuration(hc.Consensus.BlockTime)
-	if err != nil {
-		fmt.Printf("Unknown block period: %v\n", hc.Consensus.BlockTime)
-		os.Exit(128)
-	}
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
 }
