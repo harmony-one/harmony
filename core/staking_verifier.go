@@ -218,6 +218,7 @@ func VerifyAndDelegateFromMsg(
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	delegateBalance := big.NewInt(0).Set(msg.Amount)
 
+	var delegateeWrapper *staking.ValidatorWrapper
 	if redelegation {
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
@@ -225,6 +226,9 @@ func VerifyAndDelegateFromMsg(
 			wrapper, err := stateDB.ValidatorWrapperCopy(delegationIndex.ValidatorAddress)
 			if err != nil {
 				return nil, nil, err
+			}
+			if bytes.Equal(delegationIndex.ValidatorAddress[:], msg.ValidatorAddress[:]) {
+				delegateeWrapper = wrapper
 			}
 			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
 				utils.Logger().Warn().
@@ -267,18 +271,22 @@ func VerifyAndDelegateFromMsg(
 		}
 	}
 
-	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
-	if err != nil {
-		return nil, nil, err
+	if delegateeWrapper == nil {
+		var err error
+		delegateeWrapper, err = stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
+		if err != nil {
+			return nil, nil, err
+		}
+		updatedValidatorWrappers = append(updatedValidatorWrappers, delegateeWrapper)
 	}
 
 	// Add to existing delegation if any
 	found := false
-	for i := range wrapper.Delegations {
-		delegation := &wrapper.Delegations[i]
+	for i := range delegateeWrapper.Delegations {
+		delegation := &delegateeWrapper.Delegations[i]
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
 			delegation.Amount.Add(delegation.Amount, msg.Amount)
-			if err := wrapper.SanityCheck(); err != nil {
+			if err := delegateeWrapper.SanityCheck(); err != nil {
 				return nil, nil, err
 			}
 			found = true
@@ -287,16 +295,15 @@ func VerifyAndDelegateFromMsg(
 
 	if !found {
 		// Add new delegation
-		wrapper.Delegations = append(
-			wrapper.Delegations, staking.NewDelegation(
+		delegateeWrapper.Delegations = append(
+			delegateeWrapper.Delegations, staking.NewDelegation(
 				msg.DelegatorAddress, msg.Amount,
 			),
 		)
-		if err := wrapper.SanityCheck(); err != nil {
+		if err := delegateeWrapper.SanityCheck(); err != nil {
 			return nil, nil, err
 		}
 	}
-	updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 
 	if delegateBalance.Cmp(big.NewInt(0)) == 0 {
 		// delegation fully from undelegated tokens, no need to deduct from balance.
@@ -311,7 +318,7 @@ func VerifyAndDelegateFromMsg(
 			big.NewInt(0).Sub(msg.Amount, delegateBalance), stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
 
-	return updatedValidatorWrappers, msg.Amount, nil
+	return updatedValidatorWrappers, delegateBalance, nil
 }
 
 // VerifyAndUndelegateFromMsg verifies the undelegate validator message
