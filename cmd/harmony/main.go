@@ -144,7 +144,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyGeneralFlags(cmd, config)
 	applyNetworkFlags(cmd, config)
 	applyP2PFlags(cmd, config)
-	applyRPCFlags(cmd, config)
+	applyHTTPFlags(cmd, config)
 	applyWSFlags(cmd, config)
 	applyBLSFlags(cmd, config)
 	applyConsensusFlags(cmd, config)
@@ -291,7 +291,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", publicEndpoint, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", publicListenIP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
 
@@ -443,7 +443,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	}
 
 	selfPeer := p2p.Peer{
-		IP:              publicEndpoint,
+		IP:              publicListenIP,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}

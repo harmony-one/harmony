@@ -55,12 +55,12 @@ func TestHarmonyFlags(t *testing.T) {
 				},
 				HTTP: httpConfig{
 					Enabled: true,
-					IP:      "8.8.8.8",
+					IP:      "127.0.0.1",
 					Port:    9500,
 				},
 				WS: wsConfig{
 					Enabled: true,
-					IP:      "8.8.8.8",
+					IP:      "127.0.0.1",
 					Port:    9800,
 				},
 				Consensus: &consensusConfig{
@@ -341,16 +341,16 @@ func TestRPCFlags(t *testing.T) {
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: httpConfig{
 				Enabled: true,
-				IP:      "8.8.8.8",
+				IP:      publicListenIP,
 				Port:    9501,
 			},
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, append(rpcFlags, legacyMiscFlags...),
+		ts := newFlagTestSuite(t, append(httpFlags, legacyMiscFlags...),
 			func(cmd *cobra.Command, config *harmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
-				applyRPCFlags(cmd, config)
+				applyHTTPFlags(cmd, config)
 			},
 		)
 
@@ -397,10 +397,10 @@ func TestWSFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--ip", "8.8.8.8", "--port", "9001"},
+			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: wsConfig{
 				Enabled: true,
-				IP:      "8.8.8.8",
+				IP:      publicListenIP,
 				Port:    9801,
 			},
 		},

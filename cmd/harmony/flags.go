@@ -43,12 +43,10 @@ var (
 		legacyKeyFileFlag,
 	}
 
-	rpcFlags = []cli.Flag{
-		rpcEnabledFlag,
-		rpcIPFlag,
-		rpcPortFlag,
-
-		legacyPublicRPCFlag,
+	httpFlags = []cli.Flag{
+		httpEnabledFlag,
+		httpIPFlag,
+		httpPortFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -150,6 +148,7 @@ var (
 	legacyMiscFlags = []cli.Flag{
 		legacyPortFlag,
 		legacyIPFlag,
+		legacyPublicRPCFlag,
 		legacyWebHookConfigFlag,
 		legacyTPBroadcastInvalidTxFlag,
 	}
@@ -221,7 +220,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
 	flags = append(flags, p2pFlags...)
-	flags = append(flags, rpcFlags...)
+	flags = append(flags, httpFlags...)
 	flags = append(flags, wsFlags...)
 	flags = append(flags, blsFlags...)
 	flags = append(flags, consensusFlags...)
@@ -379,58 +378,42 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-// rpc flags
+// http flags
 var (
-	rpcEnabledFlag = cli.BoolFlag{
+	httpEnabledFlag = cli.BoolFlag{
 		Name:     "http",
 		Usage:    "enable HTTP / RPC requests",
 		DefValue: defaultConfig.HTTP.Enabled,
 	}
-	rpcIPFlag = cli.StringFlag{
+	httpIPFlag = cli.StringFlag{
 		Name:     "http.ip",
 		Usage:    "ip address to listen for RPC calls. Use 0.0.0.0 for public endpoint",
 		DefValue: defaultConfig.HTTP.IP,
 	}
-	rpcPortFlag = cli.IntFlag{
+	httpPortFlag = cli.IntFlag{
 		Name:     "http.port",
 		Usage:    "rpc port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.Port,
 	}
-	legacyPublicRPCFlag = cli.BoolFlag{
-		Name:       "public_rpc",
-		Usage:      "Enable Public HTTP Access (default: false)",
-		DefValue:   defaultConfig.HTTP.Enabled,
-		Deprecated: "use --http.ip and --ws.ip to specify the ip address to listen. Use 127.0.0.1 to listen local requests.",
-	}
 )
 
-func applyRPCFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 	var isRPCSpecified bool
 
-	if cli.IsFlagChanged(cmd, rpcIPFlag) {
-		config.HTTP.IP = cli.GetStringFlagValue(cmd, rpcIPFlag)
+	if cli.IsFlagChanged(cmd, httpIPFlag) {
+		config.HTTP.IP = cli.GetStringFlagValue(cmd, httpIPFlag)
 		isRPCSpecified = true
 	}
 
-	if cli.IsFlagChanged(cmd, rpcPortFlag) {
-		config.HTTP.Port = cli.GetIntFlagValue(cmd, rpcPortFlag)
+	if cli.IsFlagChanged(cmd, httpPortFlag) {
+		config.HTTP.Port = cli.GetIntFlagValue(cmd, httpPortFlag)
 		isRPCSpecified = true
 	}
 
-	if cli.IsFlagChanged(cmd, rpcEnabledFlag) {
-		config.HTTP.Enabled = cli.GetBoolFlagValue(cmd, rpcEnabledFlag)
+	if cli.IsFlagChanged(cmd, httpEnabledFlag) {
+		config.HTTP.Enabled = cli.GetBoolFlagValue(cmd, httpEnabledFlag)
 	} else if isRPCSpecified {
 		config.HTTP.Enabled = true
-	}
-
-	if cli.IsFlagChanged(cmd, legacyPublicRPCFlag) {
-		if !cli.GetBoolFlagValue(cmd, legacyPublicRPCFlag) {
-			config.HTTP.IP = localEndpoint
-			config.WS.IP = localEndpoint
-		} else {
-			config.HTTP.IP = publicEndpoint
-			config.WS.IP = publicEndpoint
-		}
 	}
 }
 
@@ -1016,6 +999,12 @@ var (
 		DefValue:   defaultConfig.HTTP.IP,
 		Deprecated: "use --http.ip",
 	}
+	legacyPublicRPCFlag = cli.BoolFlag{
+		Name:       "public_rpc",
+		Usage:      "Enable Public HTTP Access (default: false)",
+		DefValue:   defaultConfig.HTTP.Enabled,
+		Deprecated: "use --http.ip and --ws.ip to specify the ip address to listen. Use 127.0.0.1 to listen local requests.",
+	}
 	legacyWebHookConfigFlag = cli.StringFlag{
 		Name:     "webhook_yaml",
 		Usage:    "path for yaml config reporting double signing",
@@ -1040,10 +1029,19 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
-		legacyIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
+		// legacy IP is not used for listening port
 		config.HTTP.Enabled = true
 		config.WS.Enabled = true
-		config.WS.IP = legacyIP
+	}
+
+	if cli.IsFlagChanged(cmd, legacyPublicRPCFlag) {
+		if !cli.GetBoolFlagValue(cmd, legacyPublicRPCFlag) {
+			config.HTTP.IP = localListenIP
+			config.WS.IP = localListenIP
+		} else {
+			config.HTTP.IP = publicListenIP
+			config.WS.IP = publicListenIP
+		}
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{legacyPortFlag, legacyIPFlag}) {
