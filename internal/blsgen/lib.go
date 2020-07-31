@@ -1,7 +1,6 @@
 package blsgen
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
@@ -11,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/service/kms"
 	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
@@ -70,33 +68,6 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 		)
 	}
 	return priKey, nil
-}
-
-// Readln reads aws configuratoin from prompt with a timeout
-func Readln(timeout time.Duration) (string, error) {
-	s := make(chan string)
-	e := make(chan error)
-
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			e <- err
-		} else {
-			s <- line
-		}
-		close(s)
-		close(e)
-	}()
-
-	select {
-	case line := <-s:
-		return line, nil
-	case err := <-e:
-		return "", err
-	case <-time.After(timeout):
-		return "", errors.New("Timeout")
-	}
 }
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
