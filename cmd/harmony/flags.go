@@ -386,7 +386,7 @@ var (
 	}
 	rpcIPFlag = cli.StringFlag{
 		Name:     "http.ip",
-		Usage:    "ip address to listen for RPC calls",
+		Usage:    "ip address to listen for RPC calls. Use 0.0.0.0 for public endpoint",
 		DefValue: defaultConfig.HTTP.IP,
 	}
 	rpcPortFlag = cli.IntFlag{
@@ -438,7 +438,7 @@ var (
 	}
 	wsIPFlag = cli.StringFlag{
 		Name:     "ws.ip",
-		Usage:    "ip endpoint for websocket",
+		Usage:    "ip endpoint for websocket. Use 0.0.0.0 for public endpoint",
 		DefValue: defaultConfig.WS.IP,
 	}
 	wsPortFlag = cli.IntFlag{
@@ -1073,8 +1073,8 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
 		legacyIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
-		config.HTTP.IP = legacyIP
 		config.HTTP.Enabled = true
+		config.WS.Enabled = true
 		config.WS.IP = legacyIP
 	}
 
