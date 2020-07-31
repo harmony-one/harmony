@@ -188,10 +188,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.FatalErrMsg(err, "cannot parse bootnode list %#v",
 			bootNodes)
 	}
-
+	nodeconfigSetShardSchedule(hc)
 	nodeconfig.SetShardingSchedule(shard.Schedule)
 	nodeconfig.SetVersion(getHarmonyVersion())
-	nodeconfigSetShardSchedule(hc)
 
 	if hc.General.NodeType == "validator" {
 		var err error
