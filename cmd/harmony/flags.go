@@ -427,6 +427,9 @@ func applyRPCFlags(cmd *cobra.Command, config *harmonyConfig) {
 		if !cli.GetBoolFlagValue(cmd, legacyPublicRPCFlag) {
 			config.HTTP.IP = localEndpoint
 			config.WS.IP = localEndpoint
+		} else {
+			config.HTTP.IP = publicEndpoint
+			config.WS.IP = publicEndpoint
 		}
 	}
 }
