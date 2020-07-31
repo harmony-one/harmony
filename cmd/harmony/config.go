@@ -42,7 +42,6 @@ type networkConfig struct {
 }
 
 type p2pConfig struct {
-	IP      string
 	Port    int
 	KeyFile string
 }

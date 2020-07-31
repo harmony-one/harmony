@@ -46,7 +46,6 @@ func TestHarmonyFlags(t *testing.T) {
 					DNSPort: 9000,
 				},
 				P2P: p2pConfig{
-					IP:      "8.8.8.8",
 					Port:    9000,
 					KeyFile: defaultConfig.P2P.KeyFile,
 				},
@@ -271,25 +270,15 @@ func TestP2PFlags(t *testing.T) {
 			expConfig: defaultConfig.P2P,
 		},
 		{
-			args: []string{"--p2p.ip", "8.8.8.8"},
+			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file"},
 			expConfig: p2pConfig{
-				IP:      "8.8.8.8",
-				Port:    defaultConfig.P2P.Port,
-				KeyFile: defaultConfig.P2P.KeyFile,
-			},
-		},
-		{
-			args: []string{"--p2p.ip", "8.8.8.8", "--p2p.port", "9001", "--p2p.keyfile", "./key.file"},
-			expConfig: p2pConfig{
-				IP:      "8.8.8.8",
 				Port:    9001,
 				KeyFile: "./key.file",
 			},
 		},
 		{
-			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--key", "./key.file"},
+			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: p2pConfig{
-				IP:      "8.8.8.8",
 				Port:    9001,
 				KeyFile: "./key.file",
 			},

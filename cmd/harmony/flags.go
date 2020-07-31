@@ -37,7 +37,6 @@ var (
 	}
 
 	p2pFlags = []cli.Flag{
-		p2pIPFlag,
 		p2pPortFlag,
 		p2pKeyFileFlag,
 
@@ -348,11 +347,6 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 
 // p2p flags
 var (
-	p2pIPFlag = cli.StringFlag{
-		Name:     "p2p.ip",
-		Usage:    "ip to listen for p2p protocols",
-		DefValue: defaultConfig.P2P.IP,
-	}
 	p2pPortFlag = cli.IntFlag{
 		Name:     "p2p.port",
 		Usage:    "port to listen for p2p protocols",
@@ -372,10 +366,6 @@ var (
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.IsFlagChanged(cmd, p2pIPFlag) {
-		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIPFlag)
-	}
-
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
@@ -1085,7 +1075,6 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		legacyIP := cli.GetStringFlagValue(cmd, legacyIPFlag)
 		config.HTTP.IP = legacyIP
 		config.HTTP.Enabled = true
-		config.P2P.IP = legacyIP
 		config.WS.IP = legacyIP
 	}
 
