@@ -789,13 +789,8 @@ do
    fi
    if [ ! -z "${pprof}" ]; then
       args+=(
-      --pprof "${pprof}"
+         --pprof "${pprof}"
       )
-   fi
-
-   if [ ! ${staking_mode} ]
-   then
-      args+=(--run.legacy)
    fi
 
 # backward compatible with older harmony node software
@@ -806,6 +801,12 @@ do
          args+=(
             --shard_id="${shard_id}"
          )
+
+         if [ ${staking_mode} == "false" ]; then
+            args+=(
+              --run.legacy
+            )
+         fi
          ;;
       esac
       ;;
