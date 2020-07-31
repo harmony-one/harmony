@@ -796,15 +796,16 @@ do
 # backward compatible with older harmony node software
    case "${node_type}" in
    validator)
+      if [ ! ${staking_mode} ]
+      then
+         args+=(--run.legacy)
+      fi
+
       case "${shard_id}" in
       ?*)
          args+=(
             --shard_id="${shard_id}"
          )
-         if [ ! ${staking_mode} ]
-         then
-            args+=(--run.legacy)
-         fi
          ;;
       esac
       ;;
