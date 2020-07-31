@@ -144,6 +144,6 @@ const (
 )
 
 const (
-	localEndpoint  = "127.0.0.1"
-	publicEndpoint = "0.0.0.0"
+	localListenIP  = "127.0.0.1"
+	publicListenIP = "0.0.0.0"
 )
