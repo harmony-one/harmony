@@ -19,7 +19,6 @@ var defaultConfig = harmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: p2pConfig{
-		IP:      "127.0.0.1",
 		Port:    nodeconfig.DefaultP2PPort,
 		KeyFile: "./.hmykey",
 	},
@@ -138,5 +137,6 @@ const (
 )
 
 const (
-	localEndpoint = "127.0.0.1"
+	localEndpoint  = "127.0.0.1"
+	publicEndpoint = "0.0.0.0"
 )
