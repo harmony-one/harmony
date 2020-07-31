@@ -789,7 +789,7 @@ do
    fi
    if [ ! -z "${pprof}" ]; then
       args+=(
-         --pprof "${pprof}"
+         --pprof.addr "${pprof}"
       )
    fi
 
