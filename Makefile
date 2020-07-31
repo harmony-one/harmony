@@ -68,3 +68,11 @@ linux_static:
 	make -C $(TOP)/mcl -j8
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -s
+
+arm_static:
+	go mod edit --require=github.com/ethereum/go-ethereum@v1.8.28
+	go mod edit -replace github.com/ethereum/go-ethereum=$(GOPATH)/src/github.com/ethereum/go-ethereum
+	make -C $(TOP)/mcl -j8
+	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
+	bash ./scripts/go_executable_build.sh -a arm64 -s
+	git checkout go.mod
