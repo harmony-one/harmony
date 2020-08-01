@@ -47,11 +47,28 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	// TODO: elaborate the usage
 	Use:   "harmony",
-	Short: "run harmony node",
-	Long:  "run harmony node",
-	Run:   runHarmonyNode,
+	Short: "harmony is the Harmony node binary file",
+	Long: `harmony is the Harmony node binary file
+
+Examples usage:
+
+# start a validator node with default bls folder (default bls key files in ./.hmy/blskeys)
+    ./harmony
+
+# start a validator node with customized bls key folder
+    ./harmony --bls.dir [bls_folder]
+
+# start a validator node with open RPC endpoints and customized ports
+    ./harmony --http.ip 0.0.0.0 --http.port [http_port] --ws.ip 0.0.0.0 --ws.port [ws_port]
+
+# start an explorer node
+    ./harmony --run explorer --run.archive --run.shard [shard_id]
+
+# start a harmony internal node on testnet
+    ./harmony --run.legacy --network
+`,
+	Run: runHarmonyNode,
 }
 
 var configFlag = cli.StringFlag{

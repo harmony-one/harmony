@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -151,6 +152,10 @@ func validateHarmonyConfig(config harmonyConfig) error {
 	accepts = []string{kmsConfigTypeShared, kmsConfigTypePrompt, kmsConfigTypeFile}
 	if err := checkStringAccepted("--bls.kms.src", kmsType, accepts); err != nil {
 		return err
+	}
+
+	if config.General.NodeType == nodeTypeExplorer && config.General.ShardID < 0 {
+		return errors.New("flag --run.shard must be specified for explorer node")
 	}
 
 	return nil
