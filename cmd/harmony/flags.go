@@ -849,16 +849,19 @@ var (
 		Name:     "devnet.num-shard",
 		Usage:    "number of shards for devnet",
 		DefValue: defaultDevnetConfig.NumShards,
+		Hidden:   true,
 	}
 	devnetShardSizeFlag = cli.IntFlag{
 		Name:     "devnet.shard-size",
 		Usage:    "number of nodes per shard for devnet",
 		DefValue: defaultDevnetConfig.ShardSize,
+		Hidden:   true,
 	}
 	devnetHmyNodeSizeFlag = cli.IntFlag{
 		Name:     "devnet.hmy-node-size",
 		Usage:    "number of Harmony-operated nodes per shard for devnet (negative means equal to --devnet.shard-size)",
 		DefValue: defaultDevnetConfig.HmyNodeSize,
+		Hidden:   true,
 	}
 	legacyDevnetNumShardsFlag = cli.IntFlag{
 		Name:       "dn_num_shards",
