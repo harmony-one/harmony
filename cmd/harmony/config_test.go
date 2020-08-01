@@ -58,6 +58,9 @@ func TestPersistConfig(t *testing.T) {
 					WebHookConfig:         &webHook,
 					TPBroadcastInvalidTxn: &trueBool,
 				}
+
+				logCtx := getDefaultLogContextCopy()
+				cfg.Log.Context = &logCtx
 			}),
 		},
 	}
