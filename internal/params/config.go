@@ -196,7 +196,8 @@ type ChainConfig struct {
 	// and block rewards adjusted to 17.5 ONE/block
 	FiveSecondsEpoch *big.Int `json:"five-seconds-epoch,omitempty"`
 
-	// RedelegationEpoch is the epoch when redelegation is supported
+	// RedelegationEpoch is the epoch when redelegation is supported and undelegation locking time
+	// is restored to 7 epoch
 	RedelegationEpoch *big.Int `json:"redelegation-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
