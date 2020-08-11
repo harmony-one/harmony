@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,12 @@ var (
 	builtAt string
 	commit  string
 )
+
+var versionFlag = cli.BoolFlag{
+	Name:      "version",
+	Shorthand: "V",
+	Usage:     "display version info",
+}
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

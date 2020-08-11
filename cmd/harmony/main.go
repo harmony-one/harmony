@@ -104,8 +104,12 @@ func registerRootCmdFlags() error {
 }
 
 func runHarmonyNode(cmd *cobra.Command, args []string) {
-	prepareRootCmd(cmd)
+	if cli.GetBoolFlagValue(cmd, versionFlag) {
+		printVersion()
+		os.Exit(0)
+	}
 
+	prepareRootCmd(cmd)
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
 		fmt.Println(err)

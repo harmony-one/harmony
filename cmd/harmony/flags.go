@@ -216,6 +216,7 @@ var (
 func getRootFlags() []cli.Flag {
 	var flags []cli.Flag
 
+	flags = append(flags, versionFlag)
 	flags = append(flags, configFlag)
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
