@@ -227,9 +227,6 @@ func VerifyAndDelegateFromMsg(
 			if err != nil {
 				return nil, nil, err
 			}
-			if bytes.Equal(delegationIndex.ValidatorAddress[:], msg.ValidatorAddress[:]) {
-				delegateeWrapper = wrapper
-			}
 			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
 				utils.Logger().Warn().
 					Str("validator", delegationIndex.ValidatorAddress.String()).
@@ -266,6 +263,9 @@ func VerifyAndDelegateFromMsg(
 					return nil, nil, err
 				}
 
+				if bytes.Equal(delegationIndex.ValidatorAddress[:], msg.ValidatorAddress[:]) {
+					delegateeWrapper = wrapper
+				}
 				updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 			}
 		}

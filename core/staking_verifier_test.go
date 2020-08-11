@@ -960,6 +960,33 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 			expErr: errors.New("index out of bound"),
 		},
+		{
+			// 16: no redelegation and full balance used (validator delegate to self)
+			sdb: makeStateForRedelegate(t),
+			msg: func() staking.Delegate {
+				del := defaultMsgDelegate()
+				del.DelegatorAddress = del.ValidatorAddress
+				return del
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(5),
+			redelegate: true,
+
+			expVWrappers: func() []staking.ValidatorWrapper {
+				wrappers := defaultExpVWrappersRedelegate()
+				wrappers[0].Delegations[1].Undelegations = append(
+					wrappers[0].Delegations[1].Undelegations,
+					staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultEpoch)})
+				wrappers[1].Delegations[1].Undelegations = append(
+					wrappers[1].Delegations[1].Undelegations,
+					staking.Undelegation{Amount: fiveKOnes, Epoch: big.NewInt(defaultNextEpoch)})
+
+				wrappers[0].Delegations[1].Amount = twentyKOnes
+				wrappers[0].Delegations[0].Amount = big.NewInt(0).Add(twentyKOnes, tenKOnes)
+				return wrappers
+			}(),
+			expAmt: tenKOnes,
+		},
 	}
 	for i, test := range tests {
 		ws, amt, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
@@ -977,7 +1004,6 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 		for j := range ws {
 			if err := staketest.CheckValidatorWrapperEqual(*ws[j], test.expVWrappers[j]); err != nil {
-				t.Log(test.expVWrappers[j])
 				t.Errorf("Test %v: %v", i, err)
 			}
 		}
