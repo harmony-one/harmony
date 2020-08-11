@@ -453,10 +453,10 @@ func (s *PublicStakingService) GetDelegationsByDelegator(
 		undelegations := make([]Undelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
-			undelegations = append(undelegations, Undelegation{
+			undelegations[j] = Undelegation{
 				Amount: delegation.Undelegations[j].Amount,
 				Epoch:  delegation.Undelegations[j].Epoch,
-			})
+			}
 		}
 		valAddr, _ := internal_common.AddressToBech32(validators[i])
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
@@ -546,13 +546,13 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 	result := []StructuredResponse{}
 	for i := range delegations {
 		delegation := delegations[i]
-		undelegations := []Undelegation{}
+		undelegations := make([]Undelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
-			undelegations = append(undelegations, Undelegation{
+			undelegations[j] = Undelegation{
 				Amount: delegation.Undelegations[j].Amount,
 				Epoch:  delegation.Undelegations[j].Epoch,
-			})
+			}
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
@@ -592,14 +592,13 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 			continue
 		}
 		delegation := delegations[i]
-
-		undelegations := []Undelegation{}
+		undelegations := make([]Undelegation, len(delegation.Undelegations))
 
 		for j := range delegation.Undelegations {
-			undelegations = append(undelegations, Undelegation{
+			undelegations[j] = Undelegation{
 				Amount: delegation.Undelegations[j].Amount,
 				Epoch:  delegation.Undelegations[j].Epoch,
-			})
+			}
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
