@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v2 20200801.1"
+version="v2 20200811.1"
 
 unset -v progname
 progname="${0##*/}"
@@ -345,7 +345,7 @@ mainnet)
     /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
-  REL=main
+  REL=main_v2
   network_type=mainnet
   dns_zone=t.hmny.io
   syncdir=mainnet.min
