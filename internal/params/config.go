@@ -90,7 +90,7 @@ var (
 		StakingEpoch:     big.NewInt(2),
 		PreStakingEpoch:  big.NewInt(1),
 		QuickUnlockEpoch: big.NewInt(0),
-		FiveSecondsEpoch: big.NewInt(17700),
+		FiveSecondsEpoch: big.NewInt(0),
 		EIP155Epoch:      big.NewInt(0),
 		S3Epoch:          big.NewInt(0),
 		ReceiptLogEpoch:  big.NewInt(0),
