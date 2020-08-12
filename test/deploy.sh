@@ -72,7 +72,7 @@ function launch_localnet() {
     verbosity=3
   fi
 
-  base_args=(-log_folder "${log_folder}" -min_peers "${MIN}" -bootnodes "${BN_MA}" "-network_type=$NETWORK" -blspass file:"${ROOT}/.hmy/blspass.txt" "-dns=false" "-verbosity=${verbosity}")
+  base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" "--network_type=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" "--dns=false" "--verbosity=${verbosity}")
   sleep 2
 
   # Start nodes
@@ -82,7 +82,7 @@ function launch_localnet() {
 
     # Read config for i-th node form config file
     IFS=' ' read -r ip port mode bls_key shard <<<"${line}"
-    args=("${base_args[@]}" -ip "${ip}" -port "${port}" -key "/tmp/${ip}-${port}.key" -db_dir "${ROOT}/db-${ip}-${port}" "-broadcast_invalid_tx=true")
+    args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=true")
     if [[ -z "$ip" || -z "$port" ]]; then
       echo "skip empty node"
       continue
@@ -90,11 +90,11 @@ function launch_localnet() {
 
     # Setup BLS key for i-th localnet node
     if [[ ! -e "$bls_key" ]]; then
-      args=("${args[@]}" -blskey_file "BLSKEY")
+      args=("${args[@]}" --blskey_file "BLSKEY")
     elif [[ -f "$bls_key" ]]; then
-      args=("${args[@]}" -blskey_file "${ROOT}/${bls_key}")
+      args=("${args[@]}" --blskey_file "${ROOT}/${bls_key}")
     elif [[ -d "$bls_key" ]]; then
-      args=("${args[@]}" -blsfolder "${ROOT}/${bls_key}")
+      args=("${args[@]}" --blsfolder "${ROOT}/${bls_key}")
     else
       echo "skipping unknown node"
       continue
@@ -103,19 +103,21 @@ function launch_localnet() {
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
-      args=("${args[@]}" "-node_type=explorer" "-shard_id=${shard}")
+      args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}")
       ;;
     archival)
-      args=("${args[@]}" -is_archival)
+      args=("${args[@]}" --is_archival --run.legacy)
       ;;
     leader)
-      args=("${args[@]}" -is_leader)
+      args=("${args[@]}" --is_leader --run.legacy)
       ;;
     external)
-      args=("${args[@]}" "-staking=true")
       ;;
     client)
-      continue
+      args=("${args[@]}" --run.legacy)
+      ;;
+    validator)
+      args=("${args[@]}" --run.legacy)
       ;;
     esac
 

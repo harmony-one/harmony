@@ -1,11 +1,8 @@
 package main
 
 import (
-	"errors"
-	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/harmony-one/harmony/internal/blsgen"
@@ -14,38 +11,26 @@ import (
 )
 
 var (
-	blsKeyFile        = flag.String("blskey_file", "", "The encrypted file of bls serialized private key by passphrase.")
-	blsFolder         = flag.String("blsfolder", ".hmy/blskeys", "The folder that stores the bls keys and corresponding passphrases; e.g. <blskey>.key and <blskey>.pass; all bls keys mapped to same shard")
-	maxBLSKeysPerNode = flag.Int("max_bls_keys_per_node", 10, "Maximum number of bls keys allowed per node (default 4)")
-
-	// TODO(jacky): rename it to a better name with cobra alias
-	blsPass         = flag.String("blspass", "default", "The source for bls passphrases. (default, no-prompt, prompt, file:$PASS_FILE, none)")
-	persistPass     = flag.Bool("save-passphrase", false, "Whether the prompt passphrase is saved after prompt.")
-	awsConfigSource = flag.String("aws-config-source", "default", "The source for aws config. (default, prompt, file:$CONFIG_FILE, none)")
-)
-
-var (
 	multiBLSPriKey multibls.PrivateKeys
 	onceLoadBLSKey sync.Once
 )
 
 // setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
-func setupConsensusKeys(config *nodeconfig.ConfigType) multibls.PublicKeys {
+func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibls.PublicKeys {
 	onceLoadBLSKey.Do(func() {
 		var err error
-		multiBLSPriKey, err = loadBLSKeys()
+		multiBLSPriKey, err = loadBLSKeys(hc.BLSKeys)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR when loading bls key: %v\n", err)
 			os.Exit(100)
 		}
-		fmt.Printf("Successfully loaded %v BLS keys\n", len(multiBLSPriKey))
 	})
 	config.ConsensusPriKey = multiBLSPriKey
 	return multiBLSPriKey.GetPublicKeys()
 }
 
-func loadBLSKeys() (multibls.PrivateKeys, error) {
-	config, err := parseBLSLoadingConfig()
+func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
+	config, err := parseBLSLoadingConfig(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -56,74 +41,70 @@ func loadBLSKeys() (multibls.PrivateKeys, error) {
 	if len(keys) == 0 {
 		return nil, fmt.Errorf("0 bls keys loaded")
 	}
-	if len(keys) > *maxBLSKeysPerNode {
-		return nil, fmt.Errorf("bls keys exceed maximum count %v", *maxBLSKeysPerNode)
+	if len(keys) > raw.MaxKeys {
+		return nil, fmt.Errorf("bls keys exceed maximum count %v", raw.MaxKeys)
 	}
 	return keys, err
 }
 
-func parseBLSLoadingConfig() (blsgen.Config, error) {
+func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {
 	var (
 		config blsgen.Config
 		err    error
 	)
-	if len(*blsKeyFile) != 0 {
-		config.MultiBlsKeys = strings.Split(*blsKeyFile, ",")
+	if len(raw.KeyFiles) != 0 {
+		config.MultiBlsKeys = raw.KeyFiles
 	}
-	config.BlsDir = blsFolder
+	config.BlsDir = &raw.KeyDir
 
-	config, err = parseBLSPass(config, *blsPass)
+	config, err = parseBLSPassConfig(config, raw)
 	if err != nil {
 		return blsgen.Config{}, err
 	}
-	config, err = parseAwsConfigSrc(config, *awsConfigSource)
+	config, err = parseBLSKmsConfig(config, raw)
 	if err != nil {
 		return blsgen.Config{}, err
 	}
 	return config, nil
 }
 
-func parseBLSPass(config blsgen.Config, src string) (blsgen.Config, error) {
-	methodArgs := strings.SplitN(src, ":", 2)
-	method := methodArgs[0]
-
-	switch method {
-	case "default", "stdin":
-		config.PassSrcType = blsgen.PassSrcAuto
-	case "file":
-		config.PassSrcType = blsgen.PassSrcFile
-		if len(methodArgs) < 2 {
-			return blsgen.Config{}, errors.New("must specify passphrase file")
-		}
-		config.PassFile = &methodArgs[1]
-	case "no-prompt":
-		config.PassSrcType = blsgen.PassSrcFile
-	case "prompt":
-		config.PassSrcType = blsgen.PassSrcPrompt
-		config.PersistPassphrase = *persistPass
-	case "none":
-		config.PassSrcType = blsgen.PassSrcNil
+func parseBLSPassConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+	if !raw.PassEnabled {
+		cfg.PassSrcType = blsgen.PassSrcNil
+		return blsgen.Config{}, nil
 	}
-	config.PersistPassphrase = *persistPass
-	return config, nil
+	switch raw.PassSrcType {
+	case "auto":
+		cfg.PassSrcType = blsgen.PassSrcAuto
+	case "file":
+		cfg.PassSrcType = blsgen.PassSrcFile
+	case "prompt":
+		cfg.PassSrcType = blsgen.PassSrcPrompt
+	default:
+		return blsgen.Config{}, fmt.Errorf("unknown pass source type [%v]", raw.PassSrcType)
+	}
+	cfg.PassFile = &raw.PassFile
+	cfg.PersistPassphrase = raw.SavePassphrase
+
+	return cfg, nil
 }
 
-func parseAwsConfigSrc(config blsgen.Config, src string) (blsgen.Config, error) {
-	methodArgs := strings.SplitN(src, ":", 2)
-	method := methodArgs[0]
-	switch method {
-	case "default":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcShared
-	case "file":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcFile
-		if len(methodArgs) < 2 {
-			return blsgen.Config{}, errors.New("must specify aws config file")
-		}
-		config.AwsConfigFile = &methodArgs[1]
-	case "prompt":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcPrompt
-	case "none":
-		config.AwsCfgSrcType = blsgen.AwsCfgSrcNil
+func parseBLSKmsConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+	if !raw.KMSEnabled {
+		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcNil
+		return cfg, nil
 	}
-	return config, nil
+	switch raw.KMSConfigSrcType {
+	case "shared":
+		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcShared
+	case "file":
+		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcFile
+	case "prompt":
+		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcPrompt
+	default:
+		return blsgen.Config{}, fmt.Errorf("unknown aws config source type [%v]", raw.KMSConfigSrcType)
+	}
+	cfg.AwsConfigFile = &raw.KMSConfigFile
+
+	return cfg, nil
 }

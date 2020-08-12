@@ -3,7 +3,6 @@ package blsgen
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -39,16 +38,6 @@ func checkIsDir(path string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("%v is a file", path)
-	}
-	return nil
-}
-
-func checkIsPassFile(path string) error {
-	if err := checkIsFile(path); err != nil {
-		return err
-	}
-	if filepath.Ext(path) != passExt {
-		return fmt.Errorf("pass file %v should have extension .pass", path)
 	}
 	return nil
 }

@@ -118,10 +118,18 @@ function build_only
             fi
          fi
          if [ "$(uname -s)" == "Linux" ]; then
-            $BINDIR/$bin -version || $BINDIR/$bin version
+            if [ $bin = harmony ]; then
+               $BINDIR/$bin version || $BINDIR/$bin version
+            else
+               $BINDIR/$bin --version || $BINDIR/$bin version
+            fi
          fi
          if [ "$(uname -s)" == "Darwin" -a "$GOOS" == "darwin" -a -e $BINDIR/$bin ]; then
-            $BINDIR/$bin -version || $BINDIR/$bin version
+            if [ $bin = harmony ]; then
+               $BINDIR/$bin version || $BINDIR/$bin version
+            else
+               $BINDIR/$bin --version || $BINDIR/$bin version
+            fi
          fi
       fi
    done

@@ -63,22 +63,23 @@ func (n Version) Namespace() string {
 }
 
 // StartServers starts the http & ws servers
-func StartServers(hmy *hmy.Harmony, port int, apis []rpc.API) error {
-	ip := ""
-	if !nodeconfig.GetPublicRPC() {
-		ip = "127.0.0.1"
-	}
-
+func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
 	apis = append(apis, getAPIs(hmy)...)
 
-	httpEndpoint = fmt.Sprintf("%v:%v", ip, port+HTTPPortOffset)
-	if err := startHTTP(apis); err != nil {
-		return err
+	if config.HTTPEnabled {
+		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
+		if err := startHTTP(apis); err != nil {
+			return err
+		}
 	}
-	wsEndpoint = fmt.Sprintf("%v:%v", ip, port+WSPortOffset)
-	if err := startWS(apis); err != nil {
-		return err
+
+	if config.WSEnabled {
+		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
+		if err := startWS(apis); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
