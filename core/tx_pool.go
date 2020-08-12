@@ -825,6 +825,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 
 		chain, ok := pool.chain.(ChainContext)
 		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
 			return nil // for testing, chain could be testing blockchain
 		}
 		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
@@ -871,6 +872,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 		chain, ok := pool.chain.(ChainContext)
 		if !ok {
+			utils.Logger().Debug().Msg("Missing chain context in txPool")
 			return nil // for testing, chain could be testing blockchain
 		}
 		delegations, err := chain.ReadDelegationsByDelegator(stkMsg.DelegatorAddress)
