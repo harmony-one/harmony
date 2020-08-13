@@ -45,9 +45,10 @@ var (
 
 	httpFlags = []cli.Flag{
 		httpEnabledFlag,
+		httpEnabledRosettaFlag,
 		httpIPFlag,
 		httpPortFlag,
-		httpPortRosettaFlag,
+		httpRosettaPortFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -397,15 +398,20 @@ var (
 		Usage:    "rpc port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.Port,
 	}
-	httpPortRosettaFlag = cli.IntFlag{
-		Name:     "http.port.rosetta",
+	httpEnabledRosettaFlag = cli.BoolFlag{
+		Name:     "http.rosetta",
+		Usage:    "enable HTTP / Rosetta requests",
+		DefValue: defaultConfig.HTTP.EnabledRosetta,
+	}
+	httpRosettaPortFlag = cli.IntFlag{
+		Name:     "http.rosetta.port",
 		Usage:    "rosetta port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.PortRosetta,
 	}
 )
 
 func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
-	var isRPCSpecified bool
+	var isRPCSpecified, isRosettaSpecified bool
 
 	if cli.IsFlagChanged(cmd, httpIPFlag) {
 		config.HTTP.IP = cli.GetStringFlagValue(cmd, httpIPFlag)
@@ -417,9 +423,15 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 		isRPCSpecified = true
 	}
 
-	if cli.IsFlagChanged(cmd, httpPortRosettaFlag) {
-		config.HTTP.PortRosetta = cli.GetIntFlagValue(cmd, httpPortRosettaFlag)
-		isRPCSpecified = true
+	if cli.IsFlagChanged(cmd, httpRosettaPortFlag) {
+		config.HTTP.PortRosetta = cli.GetIntFlagValue(cmd, httpRosettaPortFlag)
+		isRosettaSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpEnabledRosettaFlag) {
+		config.HTTP.EnabledRosetta = cli.GetBoolFlagValue(cmd, httpEnabledRosettaFlag)
+	} else if isRosettaSpecified {
+		config.HTTP.EnabledRosetta = true
 	}
 
 	if cli.IsFlagChanged(cmd, httpEnabledFlag) {
