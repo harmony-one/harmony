@@ -25,7 +25,8 @@ func NewNetworkAPIService(
 	}
 }
 
-// NetworkList implements the /network/list endpoint
+// NetworkList implements the /network/list endpoint (placeholder)
+// FIXME: remove placeholder & implement block endpoint
 func (s *NetworkAPIService) NetworkList(
 	ctx context.Context,
 	request *types.MetadataRequest,
@@ -37,7 +38,8 @@ func (s *NetworkAPIService) NetworkList(
 	}, nil
 }
 
-// NetworkStatus implements the /network/status endpoint.
+// NetworkStatus implements the /network/status endpoint (placeholder)
+// FIXME: remove placeholder & implement block endpoint
 func (s *NetworkAPIService) NetworkStatus(
 	ctx context.Context,
 	request *types.NetworkRequest,
@@ -60,7 +62,8 @@ func (s *NetworkAPIService) NetworkStatus(
 	}, nil
 }
 
-// NetworkOptions implements the /network/options endpoint.
+// NetworkOptions implements the /network/options endpoint (placeholder)
+// FIXME: remove placeholder & implement block endpoint
 func (s *NetworkAPIService) NetworkOptions(
 	ctx context.Context,
 	request *types.NetworkRequest,

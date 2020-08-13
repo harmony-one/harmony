@@ -66,6 +66,7 @@ func loggerMiddleware(router http.Handler) http.Handler {
 			time.Since(start),
 		)
 		utils.Logger().Info().Msg(msg)
-		fmt.Printf(msg) // Print to stdout for quick glace at rosetta activity
+		// Print to stdout for quick check of rosetta activity
+		fmt.Printf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), msg)
 	})
 }

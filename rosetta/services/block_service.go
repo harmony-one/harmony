@@ -27,7 +27,8 @@ func NewBlockAPIService(
 	}
 }
 
-// Block implements the /block endpoint.
+// Block implements the /block endpoint (placeholder)
+// FIXME: remove placeholder & implement block endpoint
 func (s *BlockAPIService) Block(
 	ctx context.Context,
 	request *types.BlockRequest,
@@ -122,7 +123,8 @@ func (s *BlockAPIService) Block(
 	}, nil
 }
 
-// BlockTransaction implements the /block/transaction endpoint.
+// BlockTransaction implements the /block/transaction endpoint (placeholder)
+// FIXME: remove placeholder & implement block endpoint
 func (s *BlockAPIService) BlockTransaction(
 	ctx context.Context,
 	request *types.BlockTransactionRequest,
