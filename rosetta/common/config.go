@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"time"
 
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rpc"
@@ -36,6 +36,15 @@ var (
 		staking.DirectiveUndelegate.String(),
 		staking.DirectiveCollectRewards.String(),
 	}
+
+	// ReadTimeout..
+	ReadTimeout = 30 * time.Second
+
+	// WriteTimeout..
+	WriteTimeout = 30 * time.Second
+
+	// IdleTimeout..
+	IdleTimeout = 120 * time.Second
 )
 
 // ShardMetadata for the network identifier

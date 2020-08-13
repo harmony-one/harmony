@@ -2,6 +2,7 @@ package rosetta
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -37,8 +38,25 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Rosetta server")
-	utils.Logger().Err(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort), router))
+
+	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
+	var (
+		listener net.Listener
+	)
+	if listener, err = net.Listen("tcp", endpoint); err != nil {
+		return err
+	}
+	go newHttpServer(router).Serve(listener)
 	return nil
+}
+
+func newHttpServer(handler http.Handler) *http.Server {
+	return &http.Server{
+		Handler:      handler,
+		ReadTimeout:  common.ReadTimeout,
+		WriteTimeout: common.WriteTimeout,
+		IdleTimeout:  common.IdleTimeout,
+	}
 }
 
 func getRouter(
