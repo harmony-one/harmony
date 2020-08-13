@@ -26,6 +26,7 @@ const (
 )
 
 var (
+	// TransactionTypes ..
 	TransactionTypes = []string{
 		"Transfer",
 		"CrossShardTransfer",
@@ -37,6 +38,7 @@ var (
 	}
 )
 
+// ShardMetadata for the network identifier
 type ShardMetadata struct {
 	IsBeacon bool `json:"isBeacon"`
 }

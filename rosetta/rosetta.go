@@ -22,25 +22,22 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return nil
 	}
 	network := common.GetNetwork(hmy.ShardID)
-	isExplorer := nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode
 
 	serverAsserter, err := asserter.NewServer(
 		common.TransactionTypes,
-		isExplorer,
+		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
 		[]*types.NetworkIdentifier{network},
 	)
 	if err != nil {
 		return err
 	}
 
-	router := getRouter(network, serverAsserter, hmy)
-	loggedRouter := loggerMiddleware(router)
-	corsRouter := server.CorsMiddleware(loggedRouter)
+	router := server.CorsMiddleware(loggerMiddleware(getRouter(network, serverAsserter, hmy)))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Rosetta server")
-	utils.Logger().Err(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort), corsRouter))
+	utils.Logger().Err(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort), router))
 	return nil
 }
 
