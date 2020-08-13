@@ -46,11 +46,11 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 	if listener, err = net.Listen("tcp", endpoint); err != nil {
 		return err
 	}
-	go newHttpServer(router).Serve(listener)
+	go newHTTPServer(router).Serve(listener)
 	return nil
 }
 
-func newHttpServer(handler http.Handler) *http.Server {
+func newHTTPServer(handler http.Handler) *http.Server {
 	return &http.Server{
 		Handler:      handler,
 		ReadTimeout:  common.ReadTimeout,

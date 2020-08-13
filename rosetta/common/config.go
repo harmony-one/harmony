@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/coinbase/rosetta-sdk-go/types"
 	"time"
 
+	"github.com/coinbase/rosetta-sdk-go/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
@@ -37,13 +37,13 @@ var (
 		staking.DirectiveCollectRewards.String(),
 	}
 
-	// ReadTimeout..
+	// ReadTimeout ..
 	ReadTimeout = 30 * time.Second
 
-	// WriteTimeout..
+	// WriteTimeout ..
 	WriteTimeout = 30 * time.Second
 
-	// IdleTimeout..
+	// IdleTimeout ..
 	IdleTimeout = 120 * time.Second
 )
 
