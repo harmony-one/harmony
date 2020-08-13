@@ -335,8 +335,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 	}
 
 	if err := currentNode.StartRosetta(); err != nil {
-		fmt.Println("FAILED TO START!!!")
-		fmt.Printf("%v\n", err.Error())
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Rosetta failed")
