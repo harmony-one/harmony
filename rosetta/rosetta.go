@@ -16,7 +16,11 @@ import (
 )
 
 // StartServers starts the rosetta http server
-func StartServers(hmy *hmy.Harmony, port int) error {
+func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
+	if !config.HTTPEnabled {
+		utils.Logger().Info().Msg("Rosetta http server disabled...")
+		return nil
+	}
 	network := common.GetNetwork(hmy.ShardID)
 	isExplorer := nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode
 
@@ -32,8 +36,11 @@ func StartServers(hmy *hmy.Harmony, port int) error {
 	router := getRouter(network, serverAsserter, hmy)
 	loggedRouter := loggerMiddleware(router)
 	corsRouter := server.CorsMiddleware(loggedRouter)
-	utils.Logger().Info().Int("port", port).Msg("Starting Rosetta server")
-	utils.Logger().Err(http.ListenAndServe(fmt.Sprintf(":%d", port), corsRouter))
+	utils.Logger().Info().
+		Int("port", config.HTTPPort).
+		Str("ip", config.HTTPIp).
+		Msg("Starting Rosetta server")
+	utils.Logger().Err(http.ListenAndServe(fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort), corsRouter))
 	return nil
 }
 
