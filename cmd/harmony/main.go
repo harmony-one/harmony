@@ -279,6 +279,13 @@ func setupNodeAndRun(hc harmonyConfig) {
 		currentNode.SupportBeaconSyncing()
 	}
 
+	// Parse rosetta config
+	nodeConfig.RosettaServer = nodeconfig.RosettaServerConfig{
+		HTTPEnabled: hc.HTTP.Enabled,
+		HTTPIp:      hc.HTTP.IP,
+		HTTPPort:    hc.HTTP.PortRosetta,
+	}
+
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
@@ -325,6 +332,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("StartRPC failed")
+	}
+
+	if err := currentNode.StartRosetta(); err != nil {
+		fmt.Println("FAILED TO START!!!")
+		fmt.Printf("%v\n", err.Error())
+		utils.Logger().Warn().
+			Err(err).
+			Msg("Start Rosetta failed")
 	}
 
 	if err := currentNode.BootstrapConsensus(); err != nil {

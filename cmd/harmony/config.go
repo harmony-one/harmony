@@ -97,9 +97,10 @@ type logContext struct {
 }
 
 type httpConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled     bool
+	IP          string
+	Port        int
+	PortRosetta int
 }
 
 type wsConfig struct {

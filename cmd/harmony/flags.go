@@ -47,6 +47,7 @@ var (
 		httpEnabledFlag,
 		httpIPFlag,
 		httpPortFlag,
+		httpPortRosettaFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -396,6 +397,11 @@ var (
 		Usage:    "rpc port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.Port,
 	}
+	httpPortRosettaFlag = cli.IntFlag{
+		Name:     "http.port.rosetta",
+		Usage:    "rosetta port to listen for HTTP requests",
+		DefValue: defaultConfig.HTTP.PortRosetta,
+	}
 )
 
 func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
@@ -408,6 +414,11 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, httpPortFlag) {
 		config.HTTP.Port = cli.GetIntFlagValue(cmd, httpPortFlag)
+		isRPCSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpPortRosettaFlag) {
+		config.HTTP.PortRosetta = cli.GetIntFlagValue(cmd, httpPortRosettaFlag)
 		isRPCSpecified = true
 	}
 
@@ -1028,7 +1039,8 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
-		config.HTTP.Port = nodeconfig.GetHTTPPortFromBase(legacyPort)
+		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
+		config.HTTP.PortRosetta = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 

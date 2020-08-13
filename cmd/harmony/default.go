@@ -23,9 +23,10 @@ var defaultConfig = harmonyConfig{
 		KeyFile: "./.hmykey",
 	},
 	HTTP: httpConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultRPCPort,
+		Enabled:     true,
+		IP:          "127.0.0.1",
+		Port:        nodeconfig.DefaultRPCPort,
+		PortRosetta: nodeconfig.DefaultRosettaPort,
 	},
 	WS: wsConfig{
 		Enabled: true,

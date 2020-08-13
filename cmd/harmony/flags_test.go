@@ -54,9 +54,10 @@ func TestHarmonyFlags(t *testing.T) {
 					KeyFile: defaultConfig.P2P.KeyFile,
 				},
 				HTTP: httpConfig{
-					Enabled: true,
-					IP:      "127.0.0.1",
-					Port:    9500,
+					Enabled:     true,
+					IP:          "127.0.0.1",
+					Port:        9500,
+					PortRosetta: 10000,
 				},
 				WS: wsConfig{
 					Enabled: true,
@@ -324,25 +325,46 @@ func TestRPCFlags(t *testing.T) {
 		{
 			args: []string{"--http=false"},
 			expConfig: httpConfig{
-				Enabled: false,
-				IP:      defaultConfig.HTTP.IP,
-				Port:    defaultConfig.HTTP.Port,
+				Enabled:     false,
+				IP:          defaultConfig.HTTP.IP,
+				Port:        defaultConfig.HTTP.Port,
+				PortRosetta: defaultConfig.HTTP.PortRosetta,
 			},
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001"},
 			expConfig: httpConfig{
-				Enabled: true,
-				IP:      "8.8.8.8",
-				Port:    9001,
+				Enabled:     true,
+				IP:          "8.8.8.8",
+				Port:        9001,
+				PortRosetta: defaultConfig.HTTP.PortRosetta,
+			},
+		},
+		{
+			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001", "--http.port.rosetta", "10001"},
+			expConfig: httpConfig{
+				Enabled:     true,
+				IP:          "8.8.8.8",
+				Port:        9001,
+				PortRosetta: 10001,
+			},
+		},
+		{
+			args: []string{"--http.ip", "8.8.8.8", "--http.port.rosetta", "10001"},
+			expConfig: httpConfig{
+				Enabled:     true,
+				IP:          "8.8.8.8",
+				Port:        defaultConfig.HTTP.Port,
+				PortRosetta: 10001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: httpConfig{
-				Enabled: true,
-				IP:      publicListenIP,
-				Port:    9501,
+				Enabled:     true,
+				IP:          publicListenIP,
+				Port:        9501,
+				PortRosetta: 10001,
 			},
 		},
 	}
