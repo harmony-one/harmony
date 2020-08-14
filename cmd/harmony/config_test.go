@@ -102,8 +102,7 @@ func TestV1_0_0Config(t *testing.T) {
 	if config.Version != "1.0.0" {
 		t.Errorf("Expected config version: 1.0.0, not %v", config.Version)
 	}
-	config.Version = defaultConfig.Version                   // Shortcut for testing, value checked above
-	config.HTTP.PortRosetta = defaultConfig.HTTP.PortRosetta // Shortcut for testing, value does not matter
+	config.Version = defaultConfig.Version // Shortcut for testing, value checked above
 	if !reflect.DeepEqual(config, defaultConfig) {
 		t.Errorf("Unexpected config \n\t%+v \n\t%+v", config, defaultConfig)
 	}

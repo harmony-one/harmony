@@ -237,6 +237,11 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	if err := toml.Unmarshal(b, &config); err != nil {
 		return harmonyConfig{}, err
 	}
+
+	// Correct for old config version load (port 0 is invalid anyways)
+	if config.HTTP.PortRosetta == 0 {
+		config.HTTP.PortRosetta = defaultConfig.HTTP.PortRosetta
+	}
 	return config, nil
 }
 
