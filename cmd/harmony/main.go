@@ -552,15 +552,18 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		currentNode.BroadcastInvalidTx = defaultBroadcastInvalidTx
 	}
 
-	if hc.Network.LegacySyncing {
-		if hc.Network.NetworkType == nodeconfig.Localnet {
-			epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
-			selfPort := hc.P2P.Port
-			currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
-				6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
-		} else {
-			currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
-		}
+	// Syncing provider is provided by following rules:
+	//   1. If starting with a localnet, use local sync peers.
+	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
+	//      discover peers.
+	//   3. Else, use the dns for syncing.
+	if hc.Network.NetworkType == nodeconfig.Localnet {
+		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
+		selfPort := hc.P2P.Port
+		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
+			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
+	} else if hc.Network.LegacySyncing {
+		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, syncing.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
 	}
