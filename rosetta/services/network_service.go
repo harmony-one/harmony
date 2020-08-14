@@ -7,33 +7,38 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/rosetta/common"
 )
 
 // NetworkAPIService implements the server.NetworkAPIServicer interface.
 type NetworkAPIService struct {
-	hmy     *hmy.Harmony
-	network *types.NetworkIdentifier
+	hmy *hmy.Harmony
 }
 
 // NewNetworkAPIService creates a new instance of a NetworkAPIService.
-func NewNetworkAPIService(
-	network *types.NetworkIdentifier, hmy *hmy.Harmony,
-) server.NetworkAPIServicer {
+func NewNetworkAPIService(hmy *hmy.Harmony) server.NetworkAPIServicer {
 	return &NetworkAPIService{
-		hmy:     hmy,
-		network: network,
+		hmy: hmy,
 	}
 }
 
 // NetworkList implements the /network/list endpoint (placeholder)
-// FIXME: remove placeholder & implement block endpoint
+// TODO (dm): Update Node API to support beacon shard functionality for all nodes.
 func (s *NetworkAPIService) NetworkList(
 	ctx context.Context,
 	request *types.MetadataRequest,
 ) (*types.NetworkListResponse, *types.Error) {
+	network, err := common.GetNetwork(s.hmy.ShardID)
+	if err != nil {
+		return nil, &types.Error{
+			Code:      common.CatchAllError.Code(),
+			Message:   err.Error(),
+			Retriable: false,
+		}
+	}
 	return &types.NetworkListResponse{
 		NetworkIdentifiers: []*types.NetworkIdentifier{
-			s.network,
+			network,
 		},
 	}, nil
 }

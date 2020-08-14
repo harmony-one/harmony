@@ -13,17 +13,13 @@ import (
 
 // BlockAPIService implements the server.BlockAPIServicer interface.
 type BlockAPIService struct {
-	hmy     *hmy.Harmony
-	network *types.NetworkIdentifier
+	hmy *hmy.Harmony
 }
 
 // NewBlockAPIService creates a new instance of a BlockAPIService.
-func NewBlockAPIService(
-	network *types.NetworkIdentifier, hmy *hmy.Harmony,
-) server.BlockAPIServicer {
+func NewBlockAPIService(hmy *hmy.Harmony) server.BlockAPIServicer {
 	return &BlockAPIService{
-		hmy:     hmy,
-		network: network,
+		hmy: hmy,
 	}
 }
 

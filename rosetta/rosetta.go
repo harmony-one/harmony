@@ -12,7 +12,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	common "github.com/harmony-one/harmony/rosetta/common"
+	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rosetta/services"
 )
 
@@ -24,8 +24,11 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		utils.Logger().Info().Msg("Rosetta http server disabled...")
 		return nil
 	}
-	network := common.GetNetwork(hmy.ShardID)
 
+	network, err := common.GetNetwork(hmy.ShardID)
+	if err != nil {
+		return err
+	}
 	serverAsserter, err := asserter.NewServer(
 		common.TransactionTypes,
 		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
@@ -35,12 +38,11 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 
-	router := server.CorsMiddleware(loggerMiddleware(getRouter(network, serverAsserter, hmy)))
+	router := server.CorsMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy)))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Rosetta server")
-
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
 	if listener, err = net.Listen("tcp", endpoint); err != nil {
 		return err
@@ -67,13 +69,12 @@ func newHTTPServer(handler http.Handler) *http.Server {
 }
 
 func getRouter(
-	network *types.NetworkIdentifier,
 	asserter *asserter.Asserter,
 	hmy *hmy.Harmony,
 ) http.Handler {
 	return server.NewRouter(
-		server.NewNetworkAPIController(services.NewNetworkAPIService(network, hmy), asserter),
-		server.NewBlockAPIController(services.NewBlockAPIService(network, hmy), asserter),
+		server.NewNetworkAPIController(services.NewNetworkAPIService(hmy), asserter),
+		server.NewBlockAPIController(services.NewBlockAPIService(hmy), asserter),
 	)
 }
 
