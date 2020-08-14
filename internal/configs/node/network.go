@@ -47,8 +47,8 @@ const (
 	DefaultDNSPort = 9000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
 	DefaultRPCPort = 9500
-	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+1000
-	DefaultRosettaPort = 10000
+	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
+	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
 )
@@ -58,7 +58,7 @@ const (
 	rpcHTTPPortOffset = 500
 
 	// rpcHTTPPortOffset is the port offset for rosetta HTTP requests
-	rosettaHTTPPortOffset = 1000
+	rosettaHTTPPortOffset = 700
 
 	// rpcWSPortOffSet is the port offset for RPC websocket requests
 	rpcWSPortOffSet = 800

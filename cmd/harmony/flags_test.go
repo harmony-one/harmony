@@ -58,7 +58,7 @@ func TestHarmonyFlags(t *testing.T) {
 					IP:             "127.0.0.1",
 					Port:           9500,
 					EnabledRosetta: false,
-					PortRosetta:    10000,
+					PortRosetta:    9700,
 				},
 				WS: wsConfig{
 					Enabled: true,
@@ -370,7 +370,7 @@ func TestRPCFlags(t *testing.T) {
 				EnabledRosetta: false,
 				IP:             publicListenIP,
 				Port:           9501,
-				PortRosetta:    10001,
+				PortRosetta:    9701,
 			},
 		},
 	}
