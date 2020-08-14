@@ -16,6 +16,8 @@ import (
 	"github.com/harmony-one/harmony/rosetta/services"
 )
 
+var listener net.Listener
+
 // StartServers starts the rosetta http server
 func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
 	if !config.HTTPEnabled {
@@ -40,13 +42,18 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		Msg("Starting Rosetta server")
 
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
-	var (
-		listener net.Listener
-	)
 	if listener, err = net.Listen("tcp", endpoint); err != nil {
 		return err
 	}
 	go newHTTPServer(router).Serve(listener)
+	return nil
+}
+
+// StopServers stops the rosetta http server
+func StopServers() error {
+	if err := listener.Close(); err != nil {
+		return err
+	}
 	return nil
 }
 
