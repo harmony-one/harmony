@@ -47,6 +47,8 @@ const (
 	DefaultDNSPort = 9000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
 	DefaultRPCPort = 9500
+	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
+	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
 )
@@ -54,6 +56,9 @@ const (
 const (
 	// rpcHTTPPortOffset is the port offset for RPC HTTP requests
 	rpcHTTPPortOffset = 500
+
+	// rpcHTTPPortOffset is the port offset for rosetta HTTP requests
+	rosettaHTTPPortOffset = 700
 
 	// rpcWSPortOffSet is the port offset for RPC websocket requests
 	rpcWSPortOffSet = 800
@@ -100,9 +105,14 @@ func GetDefaultDNSPort(NetworkType) int {
 	return DefaultDNSPort
 }
 
-// GetHTTPPortFromBase return the HTTP port from base port
-func GetHTTPPortFromBase(basePort int) int {
+// GetRPCHTTPPortFromBase return the rpc HTTP port from base port
+func GetRPCHTTPPortFromBase(basePort int) int {
 	return basePort + rpcHTTPPortOffset
+}
+
+// GetRosettaHTTPPortFromBase return the rosetta HTTP port from base port
+func GetRosettaHTTPPortFromBase(basePort int) int {
+	return basePort + rosettaHTTPPortOffset
 }
 
 // GetWSPortFromBase return the Websocket port from the base port

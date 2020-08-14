@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.0"
+const tomlConfigVersion = "1.0.1"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -23,9 +23,11 @@ var defaultConfig = harmonyConfig{
 		KeyFile: "./.hmykey",
 	},
 	HTTP: httpConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultRPCPort,
+		Enabled:        true,
+		RosettaEnabled: false,
+		IP:             "127.0.0.1",
+		Port:           nodeconfig.DefaultRPCPort,
+		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: wsConfig{
 		Enabled: true,

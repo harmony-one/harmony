@@ -45,8 +45,10 @@ var (
 
 	httpFlags = []cli.Flag{
 		httpEnabledFlag,
+		httpRosettaEnabledFlag,
 		httpIPFlag,
 		httpPortFlag,
+		httpRosettaPortFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -396,10 +398,20 @@ var (
 		Usage:    "rpc port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.Port,
 	}
+	httpRosettaEnabledFlag = cli.BoolFlag{
+		Name:     "http.rosetta",
+		Usage:    "enable HTTP / Rosetta requests",
+		DefValue: defaultConfig.HTTP.RosettaEnabled,
+	}
+	httpRosettaPortFlag = cli.IntFlag{
+		Name:     "http.rosetta.port",
+		Usage:    "rosetta port to listen for HTTP requests",
+		DefValue: defaultConfig.HTTP.RosettaPort,
+	}
 )
 
 func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
-	var isRPCSpecified bool
+	var isRPCSpecified, isRosettaSpecified bool
 
 	if cli.IsFlagChanged(cmd, httpIPFlag) {
 		config.HTTP.IP = cli.GetStringFlagValue(cmd, httpIPFlag)
@@ -409,6 +421,17 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, httpPortFlag) {
 		config.HTTP.Port = cli.GetIntFlagValue(cmd, httpPortFlag)
 		isRPCSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpRosettaPortFlag) {
+		config.HTTP.RosettaPort = cli.GetIntFlagValue(cmd, httpRosettaPortFlag)
+		isRosettaSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpRosettaEnabledFlag) {
+		config.HTTP.RosettaEnabled = cli.GetBoolFlagValue(cmd, httpRosettaEnabledFlag)
+	} else if isRosettaSpecified {
+		config.HTTP.RosettaEnabled = true
 	}
 
 	if cli.IsFlagChanged(cmd, httpEnabledFlag) {
@@ -1028,7 +1051,8 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
-		config.HTTP.Port = nodeconfig.GetHTTPPortFromBase(legacyPort)
+		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
+		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 

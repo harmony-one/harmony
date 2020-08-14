@@ -148,6 +148,11 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	if err != nil {
 		return harmonyConfig{}, err
 	}
+	if config.Version != defaultConfig.Version {
+		fmt.Printf("Loaded config version %s which is not latest (%s).\n",
+			config.Version, defaultConfig.Version)
+		fmt.Println("Update saved config with `./harmony dumpconfig [config_file]`")
+	}
 
 	applyRootFlags(cmd, &config)
 
@@ -279,6 +284,13 @@ func setupNodeAndRun(hc harmonyConfig) {
 		currentNode.SupportBeaconSyncing()
 	}
 
+	// Parse rosetta config
+	nodeConfig.RosettaServer = nodeconfig.RosettaServerConfig{
+		HTTPEnabled: hc.HTTP.RosettaEnabled,
+		HTTPIp:      hc.HTTP.IP,
+		HTTPPort:    hc.HTTP.RosettaPort,
+	}
+
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
@@ -325,6 +337,12 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("StartRPC failed")
+	}
+
+	if err := currentNode.StartRosetta(); err != nil {
+		utils.Logger().Warn().
+			Err(err).
+			Msg("Start Rosetta failed")
 	}
 
 	if err := currentNode.BootstrapConsensus(); err != nil {

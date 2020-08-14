@@ -97,9 +97,11 @@ type logContext struct {
 }
 
 type httpConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled        bool
+	IP             string
+	Port           int
+	RosettaEnabled bool
+	RosettaPort    int
 }
 
 type wsConfig struct {
@@ -234,6 +236,11 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	var config harmonyConfig
 	if err := toml.Unmarshal(b, &config); err != nil {
 		return harmonyConfig{}, err
+	}
+
+	// Correct for old config version load (port 0 is invalid anyways)
+	if config.HTTP.RosettaPort == 0 {
+		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
 	}
 	return config, nil
 }

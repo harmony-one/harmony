@@ -68,15 +68,16 @@ var peerID peer.ID // PeerID of the node
 // ConfigType is the structure of all node related configuration variables
 type ConfigType struct {
 	// The three groupID design, please refer to https://github.com/harmony-one/harmony/blob/master/node/node.md#libp2p-integration
-	beacon          GroupID         // the beacon group ID
-	group           GroupID         // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
-	client          GroupID         // the client group ID of the shard
-	isClient        bool            // whether this node is a client node, such as wallet
-	ShardID         uint32          // ShardID of this node; TODO ek – revisit when resharding
-	role            Role            // Role of the node
-	Port            string          // Port of the node.
-	IP              string          // IP of the node.
-	RPCServer       RPCServerConfig // RPC server port and ip
+	beacon          GroupID             // the beacon group ID
+	group           GroupID             // the group ID of the shard (note: for beacon chain node, the beacon and shard group are the same)
+	client          GroupID             // the client group ID of the shard
+	isClient        bool                // whether this node is a client node, such as wallet
+	ShardID         uint32              // ShardID of this node; TODO ek – revisit when resharding
+	role            Role                // Role of the node
+	Port            string              // Port of the node.
+	IP              string              // IP of the node.
+	RPCServer       RPCServerConfig     // RPC server port and ip
+	RosettaServer   RosettaServerConfig // rosetta server port and ip
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey multibls.PrivateKeys
@@ -100,6 +101,13 @@ type RPCServerConfig struct {
 	WSEnabled bool
 	WSIp      string
 	WSPort    int
+}
+
+// RosettaServerConfig is the config for the rosetta server
+type RosettaServerConfig struct {
+	HTTPEnabled bool
+	HTTPIp      string
+	HTTPPort    int
 }
 
 // configs is a list of node configuration.

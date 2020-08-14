@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -77,6 +78,12 @@ func (node *Node) StartRPC() error {
 // StopRPC stop RPC service
 func (node *Node) StopRPC() error {
 	return hmy_rpc.StopServers()
+}
+
+// StartRosetta start rosetta service
+func (node *Node) StartRosetta() error {
+	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer)
 }
 
 // APIs return the collection of local RPC services.

@@ -54,9 +54,11 @@ func TestHarmonyFlags(t *testing.T) {
 					KeyFile: defaultConfig.P2P.KeyFile,
 				},
 				HTTP: httpConfig{
-					Enabled: true,
-					IP:      "127.0.0.1",
-					Port:    9500,
+					Enabled:        true,
+					IP:             "127.0.0.1",
+					Port:           9500,
+					RosettaEnabled: false,
+					RosettaPort:    9700,
 				},
 				WS: wsConfig{
 					Enabled: true,
@@ -324,25 +326,51 @@ func TestRPCFlags(t *testing.T) {
 		{
 			args: []string{"--http=false"},
 			expConfig: httpConfig{
-				Enabled: false,
-				IP:      defaultConfig.HTTP.IP,
-				Port:    defaultConfig.HTTP.Port,
+				Enabled:        false,
+				RosettaEnabled: false,
+				IP:             defaultConfig.HTTP.IP,
+				Port:           defaultConfig.HTTP.Port,
+				RosettaPort:    defaultConfig.HTTP.RosettaPort,
 			},
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001"},
 			expConfig: httpConfig{
-				Enabled: true,
-				IP:      "8.8.8.8",
-				Port:    9001,
+				Enabled:        true,
+				RosettaEnabled: false,
+				IP:             "8.8.8.8",
+				Port:           9001,
+				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+			},
+		},
+		{
+			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001", "--http.rosetta.port", "10001"},
+			expConfig: httpConfig{
+				Enabled:        true,
+				RosettaEnabled: true,
+				IP:             "8.8.8.8",
+				Port:           9001,
+				RosettaPort:    10001,
+			},
+		},
+		{
+			args: []string{"--http.ip", "8.8.8.8", "--http.rosetta.port", "10001"},
+			expConfig: httpConfig{
+				Enabled:        true,
+				RosettaEnabled: true,
+				IP:             "8.8.8.8",
+				Port:           defaultConfig.HTTP.Port,
+				RosettaPort:    10001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: httpConfig{
-				Enabled: true,
-				IP:      publicListenIP,
-				Port:    9501,
+				Enabled:        true,
+				RosettaEnabled: false,
+				IP:             publicListenIP,
+				Port:           9501,
+				RosettaPort:    9701,
 			},
 		},
 	}

@@ -82,7 +82,7 @@ function launch_localnet() {
 
     # Read config for i-th node form config file
     IFS=' ' read -r ip port mode bls_key shard <<<"${line}"
-    args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=true")
+    args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=false")
     if [[ -z "$ip" || -z "$port" ]]; then
       echo "skip empty node"
       continue
@@ -103,7 +103,7 @@ function launch_localnet() {
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
-      args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}")
+      args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}" "--http.rosetta=true")
       ;;
     archival)
       args=("${args[@]}" --is_archival --run.legacy)
