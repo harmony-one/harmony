@@ -148,6 +148,11 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	if err != nil {
 		return harmonyConfig{}, err
 	}
+	if config.Version != defaultConfig.Version {
+		fmt.Printf("Loaded config version %s which is not latest (%s).\n",
+			config.Version, defaultConfig.Version)
+		fmt.Println("Update saved config with `./harmony dumpconfig [config_file]`")
+	}
 
 	applyRootFlags(cmd, &config)
 
