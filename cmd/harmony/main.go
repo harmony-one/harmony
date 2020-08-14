@@ -286,9 +286,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	// Parse rosetta config
 	nodeConfig.RosettaServer = nodeconfig.RosettaServerConfig{
-		HTTPEnabled: hc.HTTP.EnabledRosetta,
+		HTTPEnabled: hc.HTTP.RosettaEnabled,
 		HTTPIp:      hc.HTTP.IP,
-		HTTPPort:    hc.HTTP.PortRosetta,
+		HTTPPort:    hc.HTTP.RosettaPort,
 	}
 
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {

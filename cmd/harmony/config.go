@@ -100,8 +100,8 @@ type httpConfig struct {
 	Enabled        bool
 	IP             string
 	Port           int
-	EnabledRosetta bool
-	PortRosetta    int
+	RosettaEnabled bool
+	RosettaPort    int
 }
 
 type wsConfig struct {
@@ -239,8 +239,8 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	}
 
 	// Correct for old config version load (port 0 is invalid anyways)
-	if config.HTTP.PortRosetta == 0 {
-		config.HTTP.PortRosetta = defaultConfig.HTTP.PortRosetta
+	if config.HTTP.RosettaPort == 0 {
+		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
 	}
 	return config, nil
 }

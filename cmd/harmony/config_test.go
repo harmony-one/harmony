@@ -96,7 +96,7 @@ func TestV1_0_0Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.HTTP.EnabledRosetta {
+	if config.HTTP.RosettaEnabled {
 		t.Errorf("Expected rosetta http server to be disabled when loading old config")
 	}
 	if config.Version != "1.0.0" {

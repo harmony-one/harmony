@@ -24,10 +24,10 @@ var defaultConfig = harmonyConfig{
 	},
 	HTTP: httpConfig{
 		Enabled:        true,
-		EnabledRosetta: false,
+		RosettaEnabled: false,
 		IP:             "127.0.0.1",
 		Port:           nodeconfig.DefaultRPCPort,
-		PortRosetta:    nodeconfig.DefaultRosettaPort,
+		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: wsConfig{
 		Enabled: true,
