@@ -49,7 +49,7 @@ var (
 
 // ShardMetadata for the network identifier
 type ShardMetadata struct {
-	IsBeacon bool `json:"isBeacon"`
+	IsBeacon bool `json:"is_beacon"`
 }
 
 // GetNetwork fetches the networking identifier for the given shard
