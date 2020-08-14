@@ -553,16 +553,16 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	}
 
 	if hc.Network.LegacySyncing {
-		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
-	} else {
 		if hc.Network.NetworkType == nodeconfig.Localnet {
 			epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 			selfPort := hc.P2P.Port
 			currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 				6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
 		} else {
-			currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, syncing.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
+			currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 		}
+	} else {
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, syncing.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
