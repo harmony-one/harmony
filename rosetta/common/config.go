@@ -1,4 +1,4 @@
-package config
+package common
 
 import (
 	"fmt"
@@ -53,10 +53,13 @@ type ShardMetadata struct {
 }
 
 // GetNetwork fetches the networking identifier for the given shard
-func GetNetwork(shardID uint32) *types.NetworkIdentifier {
-	metadata, _ := rpc.NewStructuredResponse(ShardMetadata{
+func GetNetwork(shardID uint32) (*types.NetworkIdentifier, error) {
+	metadata, err := rpc.NewStructuredResponse(ShardMetadata{
 		IsBeacon: shardID == shard.BeaconChainShardID,
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &types.NetworkIdentifier{
 		Blockchain: Blockchain,
 		Network:    getNetworkName(),
@@ -64,7 +67,7 @@ func GetNetwork(shardID uint32) *types.NetworkIdentifier {
 			Network:  fmt.Sprintf("shard %d", shardID),
 			Metadata: metadata,
 		},
-	}
+	}, nil
 }
 
 func getNetworkName() string {
