@@ -1,14 +1,35 @@
 package common
 
-// Error for rosetta error responses
-type Error int32
-
-const (
-	// CatchAllError ..
-	CatchAllError Error = iota
+import (
+	"github.com/coinbase/rosetta-sdk-go/types"
 )
 
-// Code ..
-func (e Error) Code() int32 {
-	return int32(e)
-}
+var (
+	// CatchAllError ..
+	CatchAllError = types.Error{
+		Code:      0,
+		Message:   "catch all error",
+		Retriable: false,
+	}
+
+	// SanityCheckError ..
+	SanityCheckError = types.Error{
+		Code:      1,
+		Message:   "sanity check error",
+		Retriable: false,
+	}
+
+	// TransactionSubmissionError ..
+	TransactionSubmissionError = types.Error{
+		Code:      2,
+		Message:   "transaction submission error",
+		Retriable: true,
+	}
+
+	// StakingTransactionSubmissionError ..
+	StakingTransactionSubmissionError = types.Error{
+		Code:      3,
+		Message:   "staking transaction submission error",
+		Retriable: true,
+	}
+)

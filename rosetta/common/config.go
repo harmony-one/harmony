@@ -8,10 +8,12 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
+	// RosettaVersion ..
+	RosettaVersion = "1.0.0"
+
 	// Blockchain ..
 	Blockchain = "Harmony"
 
@@ -26,17 +28,6 @@ const (
 )
 
 var (
-	// TransactionTypes ..
-	TransactionTypes = []string{
-		"Transfer",
-		"CrossShardTransfer",
-		staking.DirectiveCreateValidator.String(),
-		staking.DirectiveEditValidator.String(),
-		staking.DirectiveDelegate.String(),
-		staking.DirectiveUndelegate.String(),
-		staking.DirectiveCollectRewards.String(),
-	}
-
 	// ReadTimeout ..
 	ReadTimeout = 30 * time.Second
 
