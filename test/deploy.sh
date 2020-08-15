@@ -103,7 +103,7 @@ function launch_localnet() {
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
-      args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}" "--http.rosetta=true")
+      args=("${args[@]}" "--node_type=explorer" "--shard_id=${shard}" "--http.rosetta=true" "--run.archive")
       ;;
     archival)
       args=("${args[@]}" --is_archival --run.legacy)
