@@ -416,14 +416,25 @@ func (st *StateTransition) verifyAndApplyEditValidatorTx(
 }
 
 func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) error {
-	wrapper, balanceToBeDeducted, err := VerifyAndDelegateFromMsg(st.state, delegate)
+	delegations, err := st.bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+	if err != nil {
+		return err
+	}
+	updatedValidatorWrappers, balanceToBeDeducted, err := VerifyAndDelegateFromMsg(
+		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig().IsRedelegation(st.evm.EpochNumber))
 	if err != nil {
 		return err
 	}
 
+	for _, wrapper := range updatedValidatorWrappers {
+		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+			return err
+		}
+	}
+
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	return nil
 }
 
 func (st *StateTransition) verifyAndApplyUndelegateTx(

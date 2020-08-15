@@ -293,7 +293,9 @@ func payoutUndelegations(
 			)
 		}
 		lockPeriod := staking.LockPeriodInEpoch
-		if chain.Config().IsQuickUnlock(header.Epoch()) {
+		if chain.Config().IsRedelegation(header.Epoch()) {
+			lockPeriod = staking.LockPeriodInEpoch
+		} else if chain.Config().IsQuickUnlock(header.Epoch()) {
 			lockPeriod = staking.LockPeriodInEpochV2
 		}
 		for i := range wrapper.Delegations {
