@@ -30,7 +30,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 	serverAsserter, err := asserter.NewServer(
-		common.TransactionTypes,
+		append(common.PlainOperationTypes, common.StakingOperationTypes...),
 		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
 		[]*types.NetworkIdentifier{network},
 	)

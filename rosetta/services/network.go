@@ -5,9 +5,10 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-
 	"github.com/harmony-one/harmony/hmy"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // NetworkAPIService implements the server.NetworkAPIServicer interface.
@@ -30,11 +31,11 @@ func (s *NetworkAPIService) NetworkList(
 ) (*types.NetworkListResponse, *types.Error) {
 	network, err := common.GetNetwork(s.hmy.ShardID)
 	if err != nil {
-		return nil, &types.Error{
-			Code:      common.CatchAllError.Code(),
-			Message:   err.Error(),
-			Retriable: false,
+		rosettaError := common.CatchAllError
+		rosettaError.Details = map[string]interface{}{
+			"message": err.Error(),
 		}
+		return nil, &rosettaError
 	}
 	return &types.NetworkListResponse{
 		NetworkIdentifiers: []*types.NetworkIdentifier{
@@ -68,38 +69,69 @@ func (s *NetworkAPIService) NetworkStatus(
 }
 
 // NetworkOptions implements the /network/options endpoint (placeholder)
-// FIXME: remove placeholder & implement block endpoint
 func (s *NetworkAPIService) NetworkOptions(
 	ctx context.Context,
 	request *types.NetworkRequest,
 ) (*types.NetworkOptionsResponse, *types.Error) {
+	version := &types.Version{
+		RosettaVersion: common.RosettaVersion,
+		NodeVersion:    nodeconfig.GetVersion(),
+	}
+
+	var allow *types.Allow
+	isArchival := nodeconfig.GetDefaultConfig().GetArchival()
+	if s.hmy.ShardID == shard.BeaconChainShardID {
+		allow = getBeaconAllow(isArchival)
+	} else {
+		allow = getAllow(isArchival)
+	}
+
 	return &types.NetworkOptionsResponse{
-		Version: &types.Version{
-			RosettaVersion: "1.4.0",
-			NodeVersion:    "0.0.1",
-		},
-		Allow: &types.Allow{
-			OperationStatuses: []*types.OperationStatus{
-				{
-					Status:     "Success",
-					Successful: true,
-				},
-				{
-					Status:     "Reverted",
-					Successful: false,
-				},
-			},
-			OperationTypes: []string{
-				"Transfer",
-				"Reward",
-			},
-			Errors: []*types.Error{
-				{
-					Code:      1,
-					Message:   "not implemented",
-					Retriable: false,
-				},
-			},
-		},
+		Version: version,
+		Allow:   allow,
 	}, nil
+}
+
+func getBeaconAllow(isArchival bool) *types.Allow {
+	return &types.Allow{
+		OperationStatuses:       append(getOperationStatuses(), getBeaconOperationStatuses()...),
+		OperationTypes:          append(common.PlainOperationTypes, common.StakingOperationTypes...),
+		Errors:                  append(getErrors(), getBeaconErrors()...),
+		HistoricalBalanceLookup: isArchival,
+	}
+}
+
+func getAllow(isArchival bool) *types.Allow {
+	return &types.Allow{
+		OperationStatuses:       getOperationStatuses(),
+		OperationTypes:          common.PlainOperationTypes,
+		Errors:                  getErrors(),
+		HistoricalBalanceLookup: isArchival,
+	}
+}
+
+func getBeaconOperationStatuses() []*types.OperationStatus {
+	return []*types.OperationStatus{}
+}
+
+func getOperationStatuses() []*types.OperationStatus {
+	return []*types.OperationStatus{
+		common.SuccessOperationStatus,
+		common.FailureOperationStatus,
+		common.ContractFailureOperationStatus,
+	}
+}
+
+func getBeaconErrors() []*types.Error {
+	return []*types.Error{
+		&common.StakingTransactionSubmissionError,
+	}
+}
+
+func getErrors() []*types.Error {
+	return []*types.Error{
+		&common.CatchAllError,
+		&common.SanityCheckError,
+		&common.TransactionSubmissionError,
+	}
 }
