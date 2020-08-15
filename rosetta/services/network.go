@@ -2,9 +2,13 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -45,25 +49,47 @@ func (s *NetworkAPIService) NetworkList(
 }
 
 // NetworkStatus implements the /network/status endpoint (placeholder)
-// FIXME: remove placeholder & implement block endpoint
 func (s *NetworkAPIService) NetworkStatus(
 	ctx context.Context,
 	request *types.NetworkRequest,
 ) (*types.NetworkStatusResponse, *types.Error) {
+	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		rosettaError := common.CatchAllError
+		rosettaError.Details = map[string]interface{}{
+			"message": fmt.Sprintf("unable to get current header: %v", err.Error()),
+		}
+		return nil, &rosettaError
+	}
+
+	genesisHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(0))
+	if err != nil {
+		rosettaError := common.CatchAllError
+		rosettaError.Details = map[string]interface{}{
+			"message": fmt.Sprintf("unable to get genesis header: %v", err.Error()),
+		}
+		return nil, &rosettaError
+	}
+
+	peers, fmtErr := s.getPeers()
+	if fmtErr != nil {
+		return nil, fmtErr
+	}
+
 	return &types.NetworkStatusResponse{
 		CurrentBlockIdentifier: &types.BlockIdentifier{
-			Index: 1000,
-			Hash:  "block 1000",
+			Index: currentHeader.Number().Int64(),
+			Hash:  currentHeader.Hash().String(),
 		},
-		CurrentBlockTimestamp: int64(1586483189000),
+		CurrentBlockTimestamp: currentHeader.Time().Int64() * 1e3, // Timestamp must be in ms.
 		GenesisBlockIdentifier: &types.BlockIdentifier{
-			Index: 0,
-			Hash:  "block 0",
+			Index: genesisHeader.Number().Int64(),
+			Hash:  genesisHeader.Hash().String(),
 		},
-		Peers: []*types.Peer{
-			{
-				PeerID: "peer 1",
-			},
+		Peers: peers,
+		// TODO (dm): implement proper sync status report
+		SyncStatus: &types.SyncStatus{
+			CurrentIndex: currentHeader.Number().Int64(),
 		},
 	}, nil
 }
@@ -90,6 +116,42 @@ func (s *NetworkAPIService) NetworkOptions(
 		Version: version,
 		Allow:   allow,
 	}, nil
+}
+
+// getPeers fetches all the unique peers and notes each topic for each peer in the metadata.
+func (s *NetworkAPIService) getPeers() ([]*types.Peer, *types.Error) {
+	seenPeerIndex := map[peer.ID]int{}
+	allPeerInfo := s.hmy.GetPeerInfo()
+	peers := []*types.Peer{}
+	for _, peerInfo := range allPeerInfo.P {
+		for _, pID := range peerInfo.Peers {
+			i, ok := seenPeerIndex[pID]
+			if !ok {
+				newPeer := &types.Peer{
+					PeerID: pID.String(),
+					Metadata: map[string]interface{}{
+						"topics": []string{peerInfo.Topic},
+					},
+				}
+				peers = append(peers, newPeer)
+				seenPeerIndex[pID] = len(peers) - 1
+			} else {
+				topics, ok := peers[i].Metadata["topics"].([]string)
+				if !ok {
+					err := common.SanityCheckError
+					err.Message = "could not cast peer metadata to slice of string"
+					return nil, &err
+				}
+				for _, topic := range topics {
+					if peerInfo.Topic == topic {
+						continue
+					}
+				}
+				peers[i].Metadata["topics"] = append(topics, peerInfo.Topic)
+			}
+		}
+	}
+	return peers, nil
 }
 
 func getBeaconAllow(isArchival bool) *types.Allow {
