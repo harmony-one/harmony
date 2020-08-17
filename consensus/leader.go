@@ -1,13 +1,14 @@
 package consensus
 
 import (
+	bls "github.com/harmony-one/harmony/crypto/bls"
 	"time"
 
 	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
@@ -37,7 +38,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, key)
+	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []*bls.PrivateKeyWrapper{key})
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
@@ -148,7 +149,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	// Check BLS signature for the multi-sig
 	prepareSig := recvMsg.Payload
-	var sign bls.Sign
+	var sign bls_core.Sign
 	err = sign.Deserialize(prepareSig)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
@@ -220,7 +221,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Int64("numReceivedSoFar", signerCount).Logger()
 
 	logger.Debug().Msg("[OnCommit] Received new commit message")
-	var sign bls.Sign
+	var sign bls_core.Sign
 	if err := sign.Deserialize(commitSig); err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return

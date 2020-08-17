@@ -137,11 +137,25 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
 
+	priKeys := []*bls.PrivateKeyWrapper{}
 	for _, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		msgToSend := consensus.constructViewChangeMessage(&key)
+		priKeys = append(priKeys, &key)
+
+		if !consensus.MultiSig {
+			msgToSend := consensus.constructViewChangeMessage([]*bls.PrivateKeyWrapper{&key})
+			consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+				p2p.ConstructMessage(msgToSend),
+			)
+		}
+	}
+
+	if consensus.MultiSig {
+		msgToSend := consensus.constructViewChangeMessage(priKeys)
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
@@ -624,14 +638,37 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
 		groupID := []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+
+		priKeys := []*bls.PrivateKeyWrapper{}
 		for _, key := range consensus.priKey {
 			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 				continue
 			}
+			priKeys = append(priKeys, &key)
+			if !consensus.MultiSig {
+				network, err := consensus.construct(
+					msg_pb.MessageType_COMMIT,
+					commitPayload,
+					[]*bls.PrivateKeyWrapper{&key},
+				)
+				if err != nil {
+					consensus.getLogger().Err(err).Msg("could not create commit message")
+					return
+				}
+				msgToSend := network.Bytes
+				consensus.getLogger().Info().Msg("onNewView === commit")
+				consensus.host.SendMessageToGroups(
+					groupID,
+					p2p.ConstructMessage(msgToSend),
+				)
+			}
+		}
+
+		if consensus.MultiSig {
 			network, err := consensus.construct(
 				msg_pb.MessageType_COMMIT,
 				commitPayload,
-				&key,
+				priKeys,
 			)
 			if err != nil {
 				consensus.getLogger().Err(err).Msg("could not create commit message")

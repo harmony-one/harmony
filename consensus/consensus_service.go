@@ -59,8 +59,8 @@ var (
 
 // Signs the consensus message and returns the marshaled message.
 func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
-	priKey *bls_core.SecretKey) ([]byte, error) {
-	if err := consensus.signConsensusMessage(message, priKey); err != nil {
+	priKeys []*bls.PrivateKeyWrapper) ([]byte, error) {
+	if err := consensus.signConsensusMessage(message, priKeys); err != nil {
 		return empty, err
 	}
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -111,23 +111,27 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
+// Sign on the hash of the message with the private keys and return the signature.
+// If multiple keys are provided, the aggregated signature will be returned.
+func (consensus *Consensus) signMessage(message []byte, priKeys []*bls.PrivateKeyWrapper) []byte {
 	hash := hash.Keccak256(message)
-	signature := priKey.SignHash(hash[:])
+	signature := bls_core.Sign{}
+	for _, priKey := range priKeys {
+		signature.Add(priKey.Pri.SignHash(hash[:]))
+	}
 	return signature.Serialize()
 }
 
 // Sign on the consensus message signature field.
 func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
-	priKey *bls_core.SecretKey) error {
+	priKeys []*bls.PrivateKeyWrapper) error {
 	message.Signature = nil
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
 	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage, priKey)
+	signature := consensus.signMessage(marshaledMessage, priKeys)
 	message.Signature = signature
 	return nil
 }

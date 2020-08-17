@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -38,8 +39,11 @@ func (consensus *Consensus) populateMessageFields(
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSign []byte, priKey *bls.PrivateKeyWrapper,
+	p msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper,
 ) (*NetworkMessage, error) {
+	if len(priKeys) == 0 {
+		return nil, errors.New("No private keys provided")
+	}
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        p,
@@ -52,9 +56,13 @@ func (consensus *Consensus) construct(
 		aggSig       *bls_core.Sign
 	)
 
-	consensusMsg = consensus.populateMessageFields(
-		message.GetConsensus(), consensus.blockHash[:], priKey.Pub.Bytes,
-	)
+	if len(priKeys) == 1 {
+		consensusMsg = consensus.populateMessageFields(
+			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
+		)
+	} else {
+		// TODO: add bitmap logic
+	}
 
 	// Do the signing, 96 byte of bls signature
 	switch p {
@@ -69,12 +77,20 @@ func (consensus *Consensus) construct(
 		buffer.Write(consensus.prepareBitmap.Bitmap)
 		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_PREPARE:
-		if s := priKey.Pri.SignHash(consensusMsg.BlockHash); s != nil {
-			consensusMsg.Payload = s.Serialize()
+		sig := bls_core.Sign{}
+		for _, priKey := range priKeys {
+			if s := priKey.Pri.SignHash(consensusMsg.BlockHash); s != nil {
+				sig.Add(s)
+			}
 		}
+		consensusMsg.Payload = sig.Serialize()
 	case msg_pb.MessageType_COMMIT:
-		if s := priKey.Pri.SignHash(payloadForSign); s != nil {
-			consensusMsg.Payload = s.Serialize()
+
+		sig := bls_core.Sign{}
+		for _, priKey := range priKeys {
+			if s := priKey.Pri.SignHash(payloadForSign); s != nil {
+				sig.Add(s)
+			}
 		}
 	case msg_pb.MessageType_COMMITTED:
 		buffer := bytes.Buffer{}
@@ -88,7 +104,7 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.blockHash[:]
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKeys)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Str("phase", p.String()).

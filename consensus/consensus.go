@@ -122,6 +122,8 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
+	// Temporary flag to control whether multi-sig signing is enabled
+	MultiSig bool
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

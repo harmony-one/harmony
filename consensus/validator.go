@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,11 +60,38 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 
 func (consensus *Consensus) prepare() {
 	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+	priKeys := []*bls.PrivateKeyWrapper{}
 	for _, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, &key)
+		priKeys = append(priKeys, &key)
+		if !consensus.MultiSig {
+			networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []*bls.PrivateKeyWrapper{&key})
+			if err != nil {
+				consensus.getLogger().Err(err).
+					Str("message-type", msg_pb.MessageType_PREPARE.String()).
+					Msg("could not construct message")
+				return
+			}
+
+			// TODO: this will not return immediately, may block
+			if consensus.current.Mode() != Listening {
+				if err := consensus.msgSender.SendWithoutRetry(
+					groupID,
+					p2p.ConstructMessage(networkMessage.Bytes),
+				); err != nil {
+					consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+				} else {
+					consensus.getLogger().Info().
+						Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+						Msg("[OnAnnounce] Sent Prepare Message!!")
+				}
+			}
+		}
+	}
+	if consensus.MultiSig {
+		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, priKeys)
 		if err != nil {
 			consensus.getLogger().Err(err).
 				Str("message-type", msg_pb.MessageType_PREPARE.String()).
@@ -212,17 +240,51 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	groupID := []nodeconfig.GroupID{
 		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 	}
+
+	priKeys := []*bls.PrivateKeyWrapper{}
 	for _, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
+		priKeys = append(priKeys, &key)
+		if !consensus.MultiSig {
+			networkMessage, err := consensus.construct(msg_pb.MessageType_COMMIT,
+				commitPayload, []*bls.PrivateKeyWrapper{&key})
+			if err != nil {
+				consensus.getLogger().Err(err).
+					Str("message-type", msg_pb.MessageType_COMMIT.String()).
+					Msg("could not construct message")
+				return
+			}
 
-		networkMessage, _ := consensus.construct(
-			msg_pb.MessageType_COMMIT,
-			commitPayload,
-			&key,
-		)
+			// TODO: this will not return immediately, may block
+			if consensus.current.Mode() != Listening {
+				if err := consensus.msgSender.SendWithoutRetry(
+					groupID,
+					p2p.ConstructMessage(networkMessage.Bytes),
+				); err != nil {
+					consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
+				} else {
+					consensus.getLogger().Info().
+						Uint64("blockNum", consensus.blockNum).
+						Hex("blockHash", consensus.blockHash[:]).
+						Msg("[OnPrepared] Sent Commit Message!!")
+				}
+			}
+		}
+	}
 
+	if consensus.MultiSig {
+		networkMessage, err := consensus.construct(msg_pb.MessageType_COMMIT,
+			commitPayload, priKeys)
+		if err != nil {
+			consensus.getLogger().Err(err).
+				Str("message-type", msg_pb.MessageType_COMMIT.String()).
+				Msg("could not construct message")
+			return
+		}
+
+		// TODO: this will not return immediately, may block
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
@@ -237,6 +299,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			}
 		}
 	}
+
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).
