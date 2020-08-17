@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"encoding/binary"
+
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -39,7 +40,6 @@ func (consensus *Consensus) constructViewChangeMessage(priKeys []*bls.PrivateKey
 	} else {
 		// TODO: add bitmap logic
 	}
-
 
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Bytes[:]
@@ -91,14 +91,12 @@ func (consensus *Consensus) constructViewChangeMessage(priKeys []*bls.PrivateKey
 	}
 	vcMsg.ViewchangeSig = sign.Serialize()
 
-
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
 
-
 	sign1 := bls_core.Sign{}
 	for _, priKey := range priKeys {
-		sign.Add(priKey.Pri.SignHash(viewIDBytes))
+		sign1.Add(priKey.Pri.SignHash(viewIDBytes))
 	}
 	vcMsg.ViewidSig = sign1.Serialize()
 

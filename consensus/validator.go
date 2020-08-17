@@ -3,8 +3,9 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"time"
+
+	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"

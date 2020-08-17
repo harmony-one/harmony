@@ -85,13 +85,13 @@ func (consensus *Consensus) construct(
 		}
 		consensusMsg.Payload = sig.Serialize()
 	case msg_pb.MessageType_COMMIT:
-
 		sig := bls_core.Sign{}
 		for _, priKey := range priKeys {
 			if s := priKey.Pri.SignHash(payloadForSign); s != nil {
 				sig.Add(s)
 			}
 		}
+		consensusMsg.Payload = sig.Serialize()
 	case msg_pb.MessageType_COMMITTED:
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
