@@ -139,9 +139,9 @@ func (s *BlockAPIService) BlockTransaction(
 
 	// Note: Use pool transaction interface to handle both plain & staking transactions
 	var tx hmy_types.PoolTransaction
-	tx, blockHash, _, _ := rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
+	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
 	if tx == nil {
-		tx, blockHash, _, _ = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
+		tx, blockHash, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
 	}
 
 	if tx == nil {
@@ -158,11 +158,36 @@ func (s *BlockAPIService) BlockTransaction(
 		return nil, &rosettaError
 	}
 
-	transaction, rosettaError := formatTransaction(tx)
+	receipt, rosettaError := s.getTransactionReceiptFromIndex(ctx, blockHash, index)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	transaction, rosettaError := formatTransaction(tx, receipt)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
 	return &types.BlockTransactionResponse{Transaction: transaction}, nil
+}
+
+func (s *BlockAPIService) getTransactionReceiptFromIndex(
+	ctx context.Context, blockHash eth_common.Hash, index uint64,
+) (*hmy_types.Receipt, *types.Error) {
+	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	if err != nil || len(receipts) <= int(index) {
+		rosettaError := common.ReceiptNotFoundError
+		if err == nil {
+			rosettaError.Details = map[string]interface{}{
+				"message": fmt.Sprintf("Transasction receipt not found"),
+			}
+		} else {
+			rosettaError.Details = map[string]interface{}{
+				"message": fmt.Sprintf("Transasction receipt not found: %v", err.Error()),
+			}
+		}
+		return nil, &rosettaError
+	}
+	return receipts[index], nil
 }
 
 // TransactionMetadata ..
@@ -172,7 +197,7 @@ type TransactionMetadata struct {
 }
 
 func formatTransaction(
-	tx hmy_types.PoolTransaction,
+	tx hmy_types.PoolTransaction, receipt *hmy_types.Receipt,
 ) (txs *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
 	var isCrossShard bool
@@ -188,14 +213,14 @@ func formatTransaction(
 			}
 			return nil, &rosettaError
 		}
-		operations, rosettaError = getOperationsFromTransaction(plainTx)
+		operations, rosettaError = getOperationsFromTransaction(plainTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
 		isCrossShard = plainTx.ShardID() != plainTx.ToShardID()
 		toShard = plainTx.ToShardID()
 	} else {
-		operations, rosettaError = getOperationsFromStakingTransaction(stakingTx)
+		operations, rosettaError = getOperationsFromStakingTransaction(stakingTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -228,10 +253,14 @@ func formatTransaction(
 	}, nil
 }
 
-func getOperationsFromStakingTransaction(tx *staking.StakingTransaction) ([]*types.Operation, *types.Error) {
-	// TODO: implement
+func getOperationsFromStakingTransaction(
+	tx *staking.StakingTransaction, receipt *hmy_types.Receipt,
+) ([]*types.Operation, *types.Error) {
+
 }
 
-func getOperationsFromTransaction(tx *hmy_types.Transaction) ([]*types.Operation, *types.Error) {
-	// TODO: implement
+func getOperationsFromTransaction(
+	tx *hmy_types.Transaction, receipt *hmy_types.Receipt,
+) ([]*types.Operation, *types.Error) {
+
 }
