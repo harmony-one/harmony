@@ -27,7 +27,7 @@ func NewNetworkAPIService(hmy *hmy.Harmony) server.NetworkAPIServicer {
 	}
 }
 
-// NetworkList implements the /network/list endpoint (placeholder)
+// NetworkList implements the /network/list endpoint
 // TODO (dm): Update Node API to support beacon shard functionality for all nodes.
 func (s *NetworkAPIService) NetworkList(
 	ctx context.Context,
@@ -48,11 +48,15 @@ func (s *NetworkAPIService) NetworkList(
 	}, nil
 }
 
-// NetworkStatus implements the /network/status endpoint (placeholder)
+// NetworkStatus implements the /network/status endpoint
 func (s *NetworkAPIService) NetworkStatus(
 	ctx context.Context,
 	request *types.NetworkRequest,
 ) (*types.NetworkStatusResponse, *types.Error) {
+	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
+		return nil, err
+	}
+
 	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
 		rosettaError := common.CatchAllError
@@ -94,11 +98,15 @@ func (s *NetworkAPIService) NetworkStatus(
 	}, nil
 }
 
-// NetworkOptions implements the /network/options endpoint (placeholder)
+// NetworkOptions implements the /network/options endpoint
 func (s *NetworkAPIService) NetworkOptions(
 	ctx context.Context,
 	request *types.NetworkRequest,
 ) (*types.NetworkOptionsResponse, *types.Error) {
+	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
+		return nil, err
+	}
+
 	version := &types.Version{
 		RosettaVersion: common.RosettaVersion,
 		NodeVersion:    nodeconfig.GetVersion(),
@@ -194,6 +202,60 @@ func getErrors() []*types.Error {
 	return []*types.Error{
 		&common.CatchAllError,
 		&common.SanityCheckError,
+		&common.InvalidNetworkError,
 		&common.TransactionSubmissionError,
 	}
+}
+
+func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32) *types.Error {
+	currNetID, err := common.GetNetwork(shardID)
+	if err != nil {
+		rosettaError := common.SanityCheckError
+		rosettaError.Details = map[string]interface{}{
+			"message": fmt.Sprintf("Error while asserting valid network ID: %v", err.Error()),
+		}
+		return &rosettaError
+	}
+
+	// Check for valid network ID and set a message if an error occurs
+	message := ""
+	if netID.Blockchain != currNetID.Blockchain {
+		message = fmt.Sprintf("Invalid blockchain, expected %v", currNetID.Blockchain)
+	} else if netID.Network != currNetID.Network {
+		message = fmt.Sprintf("Invalid network, expected %v", currNetID.Network)
+	} else if netID.SubNetworkIdentifier.Network != currNetID.SubNetworkIdentifier.Network {
+		message = fmt.Sprintf(
+			"Invalid subnetwork, expected %v", currNetID.SubNetworkIdentifier.Network,
+		)
+	} else {
+		var metadata, currMetadata common.SubNetworkMetadata
+
+		if err := currMetadata.UnmarshalFromInterface(currNetID.SubNetworkIdentifier.Metadata); err != nil {
+			rosettaError := common.SanityCheckError
+			rosettaError.Details = map[string]interface{}{
+				"message": fmt.Sprintf("Error while asserting valid network ID: %v", err.Error()),
+			}
+			return &rosettaError
+		}
+		if err := metadata.UnmarshalFromInterface(netID.SubNetworkIdentifier.Metadata); err != nil {
+			message = fmt.Sprintf("Subnetwork metadata is of unknown format: %v", err.Error())
+		}
+
+		if metadata.IsBeacon != currMetadata.IsBeacon {
+			if currMetadata.IsBeacon {
+				message = "Invalid subnetwork, expected beacon chain subnetwork"
+			} else {
+				message = "Invalid subnetwork, expected non-beacon chain subnetwork"
+			}
+		}
+	}
+
+	if message != "" {
+		rosettaError := common.InvalidNetworkError
+		rosettaError.Details = map[string]interface{}{
+			"message": message,
+		}
+		return &rosettaError
+	}
+	return nil
 }
