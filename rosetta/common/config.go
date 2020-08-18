@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 )
 
 const (
-	// RosettaVersion ..
-	RosettaVersion = "1.0.0"
+	// RosettaVersion tied back to the version of the rosetta go-sdk
+	RosettaVersion = "0.3.4" // TODO (dm): set variable via build flags
 
 	// Blockchain ..
 	Blockchain = "Harmony"
@@ -38,14 +39,28 @@ var (
 	IdleTimeout = 120 * time.Second
 )
 
-// ShardMetadata for the network identifier
-type ShardMetadata struct {
+// SubNetworkMetadata for the sub network identifier of a shard
+type SubNetworkMetadata struct {
 	IsBeacon bool `json:"is_beacon"`
+}
+
+// UnmarshalFromInterface ..
+func (s *SubNetworkMetadata) UnmarshalFromInterface(metadata interface{}) error {
+	var newMetadata SubNetworkMetadata
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &newMetadata); err != nil {
+		return err
+	}
+	*s = newMetadata
+	return nil
 }
 
 // GetNetwork fetches the networking identifier for the given shard
 func GetNetwork(shardID uint32) (*types.NetworkIdentifier, error) {
-	metadata, err := rpc.NewStructuredResponse(ShardMetadata{
+	metadata, err := rpc.NewStructuredResponse(SubNetworkMetadata{
 		IsBeacon: shardID == shard.BeaconChainShardID,
 	})
 	if err != nil {
