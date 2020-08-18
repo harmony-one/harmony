@@ -523,6 +523,7 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	return b, nil
 }
 
+// IsOutOfSync ...
 func (node *Node) IsOutOfSync(bc *core.BlockChain) bool {
 	return node.stateSync.IsOutOfSync(bc)
 }
