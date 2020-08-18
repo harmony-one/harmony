@@ -162,8 +162,10 @@ func (consensus *Consensus) UpdateBitmaps() {
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.multiSigBitmap = multiSigBitmap
 }
 
 // ResetState resets the state of the consensus
@@ -180,6 +182,9 @@ func (consensus *Consensus) ResetState() {
 	}
 	if consensus.commitBitmap != nil {
 		consensus.commitBitmap.Clear()
+	}
+	if consensus.multiSigBitmap != nil {
+		consensus.multiSigBitmap.Clear()
 	}
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
@@ -230,7 +235,10 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.current.SetMode(Normal)
 		consensus.viewID = msg.ViewID
 		consensus.current.SetViewID(msg.ViewID)
-		consensus.LeaderPubKey = msg.SenderPubkeys
+		if len(msg.SenderPubkeys) != 1 {
+			return errors.New("multiple signers from the leader")
+		}
+		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().

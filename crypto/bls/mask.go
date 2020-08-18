@@ -66,7 +66,7 @@ func AggregateSig(sigs []*bls.Sign) *bls.Sign {
 // Mask represents a cosigning participation bitmask.
 type Mask struct {
 	Bitmap          []byte
-	Publics         []*bls.PublicKey
+	Publics         []*PublicKeyWrapper
 	PublicsIndex    map[SerializedPublicKey]int
 	AggregatePublic *bls.PublicKey
 }
@@ -77,9 +77,9 @@ type Mask struct {
 // bitmask to 1 (enabled).
 func NewMask(publics []PublicKeyWrapper, myKey *PublicKeyWrapper) (*Mask, error) {
 	index := map[SerializedPublicKey]int{}
-	publicKeys := make([]*bls.PublicKey, len(publics))
+	publicKeys := make([]*PublicKeyWrapper, len(publics))
 	for i, key := range publics {
-		publicKeys[i] = key.Object
+		publicKeys[i] = &key
 		index[key.Bytes] = i
 	}
 	m := &Mask{
@@ -135,11 +135,11 @@ func (m *Mask) SetMask(mask []byte) error {
 		msk := byte(1) << uint(i&7)
 		if ((m.Bitmap[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-			m.AggregatePublic.Add(m.Publics[i])
+			m.AggregatePublic.Add(m.Publics[i].Object)
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			m.AggregatePublic.Sub(m.Publics[i])
+			m.AggregatePublic.Sub(m.Publics[i].Object)
 		}
 	}
 	return nil
@@ -155,11 +155,11 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	msk := byte(1) << uint(i&7)
 	if ((m.Bitmap[byt] & msk) == 0) && enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-		m.AggregatePublic.Add(m.Publics[i])
+		m.AggregatePublic.Add(m.Publics[i].Object)
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		m.AggregatePublic.Sub(m.Publics[i])
+		m.AggregatePublic.Sub(m.Publics[i].Object)
 	}
 	return nil
 }
@@ -173,15 +173,35 @@ func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
 		msk := byte(1) << uint(i&7)
 		if flag {
 			if (m.Bitmap[byt] & msk) != 0 {
-				pubKeys = append(pubKeys, m.Publics[i])
+				pubKeys = append(pubKeys, m.Publics[i].Object)
 			}
 		} else {
 			if (m.Bitmap[byt] & msk) == 0 {
-				pubKeys = append(pubKeys, m.Publics[i])
+				pubKeys = append(pubKeys, m.Publics[i].Object)
 			}
 		}
 	}
 	return pubKeys
+}
+
+// GetSignedPubKeysFromBitmap will return pubkeys that are signed based on the specified bitmap.
+func (m *Mask) GetSignedPubKeysFromBitmap(bitmap []byte) ([]*PublicKeyWrapper, error) {
+	if m.Len() != len(bitmap) {
+		return nil, errors.Errorf(
+			"mismatching bitmap lengths expectedBitmapLength %d providedBitmapLength %d",
+			m.Len(),
+			len(bitmap),
+		)
+	}
+	pubKeys := []*PublicKeyWrapper{}
+	for i := range m.Publics {
+		byt := i >> 3
+		msk := byte(1) << uint(i&7)
+		if (bitmap[byt] & msk) != 0 {
+			pubKeys = append(pubKeys, m.Publics[i])
+		}
+	}
+	return pubKeys, nil
 }
 
 // IndexEnabled checks whether the given index is enabled in the Bitmap or not.

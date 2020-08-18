@@ -57,11 +57,15 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *stakedVoteWeight) AddNewVote(
-	p Phase, pubKeysBytes []bls.SerializedPublicKey,
+	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
-	// TODO(audit): pass in sig as byte[] too, so no need to serialize
+	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
+	for i, pubKey := range pubKeys {
+		pubKeysBytes[i] = pubKey.Bytes
+	}
+
 	ballet, err := v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
 
 	if err != nil {

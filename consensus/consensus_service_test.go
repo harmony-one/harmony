@@ -76,7 +76,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	consensus.blockHash = [32]byte{}
 
 	msg := &msg_pb.Message{}
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, blsPriKey)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(msg, []*bls.PrivateKeyWrapper{{Pri: blsPriKey}})
 
 	if err != nil || len(marshaledMessage) == 0 {
 		t.Errorf("Failed to sign and marshal the message: %s", err)

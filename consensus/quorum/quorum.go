@@ -117,7 +117,7 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkeys []bls.SerializedPublicKey,
+		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)

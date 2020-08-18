@@ -17,7 +17,7 @@ import (
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
 			Err(err).
@@ -124,7 +124,7 @@ func (consensus *Consensus) prepare() {
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnPrepared] Unparseable validator message")
 		return
@@ -309,7 +309,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return

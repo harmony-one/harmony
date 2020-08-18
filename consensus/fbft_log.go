@@ -241,7 +241,7 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 }
 
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
-func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
+func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	// TODO Have this do sanity checks on the message please
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
@@ -261,10 +261,14 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 		if err != nil {
 			return nil, err
 		}
-		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{&bls.PublicKeyWrapper{Object: pubKey}}
+		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
 		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
 	} else {
-		// TODO populate with bitmap
+		pubKeys, err := consensus.multiSigBitmap.GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
+		if err != nil {
+			return nil, err
+		}
+		pbftMsg.SenderPubkeys = pubKeys
 	}
 
 	return &pbftMsg, nil
