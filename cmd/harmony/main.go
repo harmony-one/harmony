@@ -66,7 +66,7 @@ Examples usage:
     ./harmony --run=explorer --run.shard=[shard_id]
 
 # start a harmony internal node on testnet
-    ./harmony --run.legacy --network
+    ./harmony --run.legacy --network testnet
 `,
 	Run: runHarmonyNode,
 }
