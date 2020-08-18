@@ -18,6 +18,8 @@ func TestErrors(t *testing.T) {
 		&common.SanityCheckError,
 		&common.InvalidNetworkError,
 		&common.TransactionSubmissionError,
+		&common.BlockNotFoundError,
+		&common.TransactionNotFoundError,
 	}
 	refBeaconErrors := []*types.Error{
 		&common.StakingTransactionSubmissionError,

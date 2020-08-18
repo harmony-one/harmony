@@ -39,4 +39,18 @@ var (
 		Message:   "staking transaction submission error",
 		Retriable: true,
 	}
+
+	// BlockNotFoundError ..
+	BlockNotFoundError = types.Error{
+		Code:      5,
+		Message:   "block not found error",
+		Retriable: false,
+	}
+
+	// TransactionNotFoundError ..
+	TransactionNotFoundError = types.Error{
+		Code:      6,
+		Message:   "transaction or staking transaction not found",
+		Retriable: false,
+	}
 )

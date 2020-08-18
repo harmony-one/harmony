@@ -15,6 +15,8 @@ func TestErrorCodes(t *testing.T) {
 		InvalidNetworkError,
 		TransactionSubmissionError,
 		StakingTransactionSubmissionError,
+		BlockNotFoundError,
+		TransactionNotFoundError,
 	}
 
 	for i, err := range errors {
@@ -34,6 +36,8 @@ func TestRetryableError(t *testing.T) {
 		CatchAllError,
 		SanityCheckError,
 		InvalidNetworkError,
+		BlockNotFoundError,
+		TransactionNotFoundError,
 	}
 
 	for _, err := range retriableErrors {

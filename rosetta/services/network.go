@@ -169,6 +169,8 @@ func getErrors() []*types.Error {
 		&common.SanityCheckError,
 		&common.InvalidNetworkError,
 		&common.TransactionSubmissionError,
+		&common.BlockNotFoundError,
+		&common.TransactionNotFoundError,
 	}
 }
 
