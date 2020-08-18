@@ -73,7 +73,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	validatorKey.FromLibBLSPublicKey(validatorPubKey)
 	consensus.Decider.SubmitVote(
 		quorum.Prepare,
-		leaderKey,
+		[]bls.SerializedPublicKey{leaderKey},
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
@@ -81,7 +81,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	)
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare,
-		validatorKey,
+		[]bls.SerializedPublicKey{validatorKey},
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,

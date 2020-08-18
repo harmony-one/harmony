@@ -80,7 +80,7 @@ type ParticipantTracker interface {
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, pubkey bls.SerializedPublicKey,
+		p Phase, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
@@ -117,7 +117,7 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkey bls.SerializedPublicKey,
+		p Phase, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
@@ -230,30 +230,34 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) SubmitVote(
-	p Phase, pubkey bls.SerializedPublicKey,
+	p Phase, pubkeys []bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
-	if ballet := s.ReadBallot(p, pubkey); ballet != nil {
-		return nil, errors.Errorf("vote is already submitted %x", pubkey)
+	for _, pubKey := range pubkeys {
+		if ballet := s.ReadBallot(p, pubKey); ballet != nil {
+			return nil, errors.Errorf("vote is already submitted %x", pubKey)
+		}
 	}
 
 	ballot := &votepower.Ballot{
-		SignerPubKey:    pubkey,
+		SignerPubKeys:   pubkeys,
 		BlockHeaderHash: headerHash,
 		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
 		Height:          height,
 		ViewID:          viewID,
 	}
-	switch p {
-	case Prepare:
-		s.prepare.BallotBox[pubkey] = ballot
-	case Commit:
-		s.commit.BallotBox[pubkey] = ballot
-	case ViewChange:
-		s.viewChange.BallotBox[pubkey] = ballot
-	default:
-		return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
+	for _, pubKey := range pubkeys {
+		switch p {
+		case Prepare:
+			s.prepare.BallotBox[pubKey] = ballot
+		case Commit:
+			s.commit.BallotBox[pubKey] = ballot
+		case ViewChange:
+			s.viewChange.BallotBox[pubKey] = ballot
+		default:
+			return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
+		}
 	}
 	return ballot, nil
 }

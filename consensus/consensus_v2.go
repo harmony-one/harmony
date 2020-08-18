@@ -285,7 +285,7 @@ func (consensus *Consensus) tryCatchup() {
 
 		atomic.AddUint64(&consensus.blockNum, 1)
 		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
-		consensus.LeaderPubKey = committedMsg.SenderPubkey
+		consensus.LeaderPubKey = committedMsg.SenderPubkeys
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
 

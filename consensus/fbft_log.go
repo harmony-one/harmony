@@ -23,27 +23,28 @@ type FBFTLog struct {
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
 type FBFTMessage struct {
-	MessageType   msg_pb.MessageType
-	ViewID        uint64
-	BlockNum      uint64
-	BlockHash     common.Hash
-	Block         []byte
-	SenderPubkey  *bls.PublicKeyWrapper
-	LeaderPubkey  *bls.PublicKeyWrapper
-	Payload       []byte
-	ViewchangeSig *bls_core.Sign
-	ViewidSig     *bls_core.Sign
-	M2AggSig      *bls_core.Sign
-	M2Bitmap      *bls_cosi.Mask
-	M3AggSig      *bls_core.Sign
-	M3Bitmap      *bls_cosi.Mask
+	MessageType        msg_pb.MessageType
+	ViewID             uint64
+	BlockNum           uint64
+	BlockHash          common.Hash
+	Block              []byte
+	SenderPubkeys      []*bls.PublicKeyWrapper
+	SenderPubkeyBitmap []byte
+	LeaderPubkey       *bls.PublicKeyWrapper
+	Payload            []byte
+	ViewchangeSig      *bls_core.Sign
+	ViewidSig          *bls_core.Sign
+	M2AggSig           *bls_core.Sign
+	M2Bitmap           *bls_cosi.Mask
+	M3AggSig           *bls_core.Sign
+	M3Bitmap           *bls_cosi.Mask
 }
 
 // String ..
 func (m *FBFTMessage) String() string {
 	sender := ""
-	if m.SenderPubkey != nil {
-		sender = m.SenderPubkey.Bytes.Hex()
+	if m.SenderPubkeys != nil {
+		sender = fmt.Sprint(m.SenderPubkeys)
 	}
 	leader := ""
 	if m.LeaderPubkey != nil {
@@ -252,13 +253,19 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
+	pbftMsg.SenderPubkeyBitmap = make([]byte, len(consensusMsg.SenderPubkeyBitmap))
+	copy(pbftMsg.SenderPubkeyBitmap[:], consensusMsg.SenderPubkeyBitmap[:])
 
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
+	if len(consensusMsg.SenderPubkey) != 0 {
+		pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
+		if err != nil {
+			return nil, err
+		}
+		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{&bls.PublicKeyWrapper{Object: pubKey}}
+		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
+	} else {
+		// TODO populate with bitmap
 	}
-	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(pbftMsg.SenderPubkey.Bytes[:], consensusMsg.SenderPubkey[:])
 
 	return &pbftMsg, nil
 }
@@ -304,8 +311,8 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 		return nil, err
 	}
 
-	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(pbftMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+	pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
+	copy(pbftMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
 	pbftMsg.LeaderPubkey = &bls.PublicKeyWrapper{Object: leaderKey}
 	copy(pbftMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
 	pbftMsg.ViewchangeSig = &vcSig
@@ -336,8 +343,8 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		return nil, err
 	}
 
-	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+	FBFTMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
+	copy(FBFTMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
 
 	members := consensus.Decider.Participants()
 	if len(vcMsg.M3Aggsigs) > 0 {

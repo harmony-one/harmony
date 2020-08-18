@@ -62,7 +62,7 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Str("ValidatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
+			Str("ValidatorPubKey", recvMsg.SenderPubkeys.Bytes.Hex()).
 			Msg("BlockNum/viewID not match")
 		return false
 	}
@@ -75,11 +75,11 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	)
 	if len(logMsgs) > 0 {
 		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
-			bytes.Equal(logMsgs[0].SenderPubkey.Bytes[:], recvMsg.SenderPubkey.Bytes[:]) {
+			bytes.Equal(logMsgs[0].SenderPubkeys.Bytes[:], recvMsg.SenderPubkeys.Bytes[:]) {
 			consensus.getLogger().Debug().
-				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.Bytes.Hex()).
+				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys.Bytes.Hex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.Bytes.Hex()).
+				Str("recvMsg.SenderPubkeys", recvMsg.SenderPubkeys.Bytes.Hex()).
 				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
 				Uint64("recvMsg.ViewID", recvMsg.ViewID).
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).

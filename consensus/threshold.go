@@ -59,7 +59,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 
 		if _, err := consensus.Decider.AddNewVote(
 			quorum.Commit,
-			key.Pub.Bytes,
+			[]bls.SerializedPublicKey{key.Pub.Bytes},
 			key.Pri.SignHash(commitPayload),
 			blockObj.Hash(),
 			blockObj.NumberU64(),

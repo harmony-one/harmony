@@ -3,8 +3,6 @@ package consensus
 import (
 	"encoding/binary"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -16,12 +14,7 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage(priKeys []*bls.PrivateKeyWrapper) []byte {
-	if len(priKeys) == 0 {
-		utils.Logger().Error().
-			Msg("[constructViewChangeMessage] No private keys provided")
-		return []byte{}
-	}
+func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -35,11 +28,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKeys []*bls.PrivateKey
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
-	if len(priKeys) == 1 {
-		vcMsg.SenderPubkey = priKeys[0].Pub.Bytes[:]
-	} else {
-		// TODO: add bitmap logic
-	}
+	vcMsg.SenderPubkey = priKey.Pub.Bytes[:]
 
 	// next leader key already updated
 	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Bytes[:]
@@ -85,22 +74,23 @@ func (consensus *Consensus) constructViewChangeMessage(priKeys []*bls.PrivateKey
 		Str("pubKey", consensus.GetPublicKeys().SerializeToHexStr()).
 		Msg("[constructViewChangeMessage]")
 
-	sign := bls_core.Sign{}
-	for _, priKey := range priKeys {
-		sign.Add(priKey.Pri.SignHash(msgToSign))
+	sign := priKey.Pri.SignHash(msgToSign)
+	if sign != nil {
+		vcMsg.ViewchangeSig = sign.Serialize()
+	} else {
+		utils.Logger().Error().Msg("unable to serialize m1/m2 view change message signature")
 	}
-	vcMsg.ViewchangeSig = sign.Serialize()
 
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
-
-	sign1 := bls_core.Sign{}
-	for _, priKey := range priKeys {
-		sign1.Add(priKey.Pri.SignHash(viewIDBytes))
+	sign1 := priKey.Pri.SignHash(viewIDBytes)
+	if sign1 != nil {
+		vcMsg.ViewidSig = sign1.Serialize()
+	} else {
+		utils.Logger().Error().Msg("unable to serialize viewID signature")
 	}
-	vcMsg.ViewidSig = sign1.Serialize()
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKeys)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, []*bls.PrivateKeyWrapper{priKey})
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")

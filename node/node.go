@@ -352,11 +352,12 @@ type withError struct {
 }
 
 var (
-	errNotRightKeySize = errors.New("key received over wire is wrong size")
-	errNoSenderPubKey  = errors.New("no sender public BLS key in message")
-	errWrongShardID    = errors.New("wrong shard id")
-	errInvalidNodeMsg  = errors.New("invalid node message")
-	errIgnoreBeaconMsg = errors.New("ignore beacon sync block")
+	errNotRightKeySize   = errors.New("key received over wire is wrong size")
+	errNoSenderPubKey    = errors.New("no sender public BLS key in message")
+	errWrongSizeOfBitmap = errors.New("wrong size of sender bitmap")
+	errWrongShardID      = errors.New("wrong shard id")
+	errInvalidNodeMsg    = errors.New("invalid node message")
+	errIgnoreBeaconMsg   = errors.New("ignore beacon sync block")
 )
 
 // validateNodeMessage validate node message
@@ -470,6 +471,7 @@ func (node *Node) validateShardBoundMessage(
 
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
 	senderKey := bls.SerializedPublicKey{}
+	senderBitmap := []byte{}
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
@@ -477,6 +479,10 @@ func (node *Node) validateShardBoundMessage(
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		copy(senderKey[:], maybeCon.SenderPubkey[:])
+
+		if len(maybeCon.SenderPubkeyBitmap) > 0 {
+			senderBitmap = maybeCon.SenderPubkeyBitmap
+		}
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
@@ -502,9 +508,16 @@ func (node *Node) validateShardBoundMessage(
 		}
 	}
 
-	if !node.Consensus.IsValidatorInCommittee(senderKey) {
-		atomic.AddUint32(&node.NumSlotMessages, 1)
-		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+	if len(senderKey) > 0 {
+		if !node.Consensus.IsValidatorInCommittee(senderKey) {
+			atomic.AddUint32(&node.NumSlotMessages, 1)
+			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
+		}
+	} else {
+		count := node.Consensus.Decider.ParticipantsCount()
+		if (count+7)>>3 != int64(len(senderBitmap)) {
+			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
+		}
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)

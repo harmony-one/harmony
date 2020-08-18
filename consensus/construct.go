@@ -25,13 +25,31 @@ type NetworkMessage struct {
 
 // Populates the common basic fields for all consensus message.
 func (consensus *Consensus) populateMessageFields(
-	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
+	request *msg_pb.ConsensusRequest, blockHash []byte,
 ) *msg_pb.ConsensusRequest {
 	request.ViewId = consensus.viewID
 	request.BlockNum = consensus.blockNum
 	request.ShardId = consensus.ShardID
 	// 32 byte block hash
 	request.BlockHash = blockHash
+	return request
+}
+
+// Populates the common basic fields for all consensus message and single sender.
+func (consensus *Consensus) populateMessageFieldsAndSendersBitmap(
+	request *msg_pb.ConsensusRequest, blockHash []byte, bitmap []byte,
+) *msg_pb.ConsensusRequest {
+	consensus.populateMessageFields(request, blockHash)
+	// sender address
+	request.SenderPubkeyBitmap = bitmap
+	return request
+}
+
+// Populates the common basic fields for all consensus message and single sender.
+func (consensus *Consensus) populateMessageFieldsAndSender(
+	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
+) *msg_pb.ConsensusRequest {
+	consensus.populateMessageFields(request, blockHash)
 	// sender address
 	request.SenderPubkey = pubKey[:]
 	return request
@@ -57,11 +75,22 @@ func (consensus *Consensus) construct(
 	)
 
 	if len(priKeys) == 1 {
-		consensusMsg = consensus.populateMessageFields(
+		consensusMsg = consensus.populateMessageFieldsAndSender(
 			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
 		)
 	} else {
 		// TODO: add bitmap logic
+		mask, err := bls.NewMask(consensus.Decider.Participants(), nil)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("unable to setup mask for multi-sig message")
+			return nil, err
+		}
+		for _, key := range priKeys {
+			mask.SetKey(key.Pub.Bytes, true)
+		}
+		consensusMsg = consensus.populateMessageFieldsAndSendersBitmap(
+			message.GetConsensus(), consensus.blockHash[:], mask.Bitmap,
+		)
 	}
 
 	// Do the signing, 96 byte of bls signature
