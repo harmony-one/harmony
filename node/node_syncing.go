@@ -522,3 +522,7 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	blockReqCache.Add(hash, b)
 	return b, nil
 }
+
+func (node *Node) IsOutOfSync(bc *core.BlockChain) bool {
+	return node.stateSync.IsOutOfSync(bc)
+}

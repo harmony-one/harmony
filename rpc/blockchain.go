@@ -656,6 +656,16 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	})
 }
 
+// InSync returns if shard chain is syncing
+func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain), nil
+}
+
+// BeaconInSync returns if beacon chain is syncing
+func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain), nil
+}
+
 func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 	// rpc.BlockNumber is int64 (latest = -1. pending = -2) and currentBlockNum is uint64.
 	if blockNum == rpc.PendingBlockNumber {
