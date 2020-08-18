@@ -43,7 +43,7 @@ var defaultConfig = harmonyConfig{
 		PassSrcType:      blsPassTypeAuto,
 		PassFile:         "",
 		SavePassphrase:   false,
-		KMSEnabled:       true,
+		KMSEnabled:       false,
 		KMSConfigSrcType: kmsConfigTypeShared,
 		KMSConfigFile:    "",
 	},
