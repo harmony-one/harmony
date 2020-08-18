@@ -52,7 +52,4 @@ type PubSubHandler interface {
 
 	// HandleMsg handle the message with the validationCache in step ValidateMsg
 	HandleMsg(ctx context.Context, msg *Message, validateCache interface{}) error
-
-	// Options return the additional option used for pub sub handler registration.
-	Options() []libp2p_pubsub.ValidatorOpt
 }

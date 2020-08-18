@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -20,6 +21,8 @@ type ValidateResult struct {
 	Action ValidateAction
 }
 
+// ValidateAction is an encapsulated libp2p_pubsub.ValidationResult which defines
+// The action to be taken for the validation of a pubsub message.
 type ValidateAction libp2p_pubsub.ValidationResult
 
 const (
@@ -31,28 +34,66 @@ const (
 	MsgIgnore = ValidateAction(libp2p_pubsub.ValidationIgnore)
 )
 
+// Compare defines the priority of ValidateAction vs target ValidateAction.
+// Return 1 if larger, -1 if smaller, and 0 if equal.
+// The compare rule is: MsgAccept < MsgIgnore < MsgReject.
+// The compare rule is used by merging ValidateResults. Higher priority will
+// Override low priority actions.
+func (va ValidateAction) Compare(val ValidateAction) int {
+	p1 := getValidateActionPriority(va)
+	p2 := getValidateActionPriority(val)
+	if p1 > p2 {
+		return 1
+	}
+	if p1 < p2 {
+		return -1
+	}
+	return 0
+}
+
+// String return the string representation of the ValidateAction
+func (va ValidateAction) String() string {
+	switch va {
+	case MsgAccept:
+		return "accepted"
+	case MsgReject:
+		return "rejected"
+	case MsgIgnore:
+		return "ignored"
+	default:
+	}
+	return "unknown validation result"
+}
+
+func getValidateActionPriority(va ValidateAction) int {
+	switch va {
+	case MsgAccept:
+		return 0
+	case MsgIgnore:
+		return 1
+	case MsgReject:
+		return 2
+	default:
+	}
+	return -1
+}
+
 func mergeValidateResults(vrs []ValidateResult) ValidateResult {
 	var (
-		msg []string
-		res = MsgAccept
+		msgs []string
+		va   = MsgAccept
 	)
 	for _, vr := range vrs {
-		switch vr.Action {
-		case MsgReject:
-			res = MsgReject
-			msg = append(msg, vr.Reason)
-		case MsgIgnore:
-			if res == MsgReject {
-				continue
-			}
-			res = MsgIgnore
-			msg = append(msg, vr.Reason)
-		case MsgAccept:
+		if len(vr.Reason) != 0 {
+			msgs = append(msgs, fmt.Sprintf("%s: %v", vr.Action, vr.Reason))
+		}
+		if vr.Action.Compare(va) > 0 {
+			va = vr.Action
 		}
 	}
 	return ValidateResult{
-		Reason: strings.Join(msg, ", "),
-		Action: res,
+		Reason: strings.Join(msgs, "; "),
+		Action: va,
 	}
 }
 

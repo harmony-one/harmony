@@ -1,11 +1,79 @@
 package p2p
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"github.com/harmony-one/harmony/internal/testerr"
 )
+
+func TestValidateAction_Compare(t *testing.T) {
+	tests := []struct {
+		v1, v2 ValidateAction
+		expRes int
+	}{
+		{MsgAccept, MsgIgnore, -1},
+		{MsgIgnore, MsgIgnore, 0},
+		{MsgReject, MsgIgnore, 1},
+		{ValidateAction(100), MsgAccept, -1},
+		{MsgAccept, ValidateAction(100), 1},
+	}
+	for i, test := range tests {
+		res := test.v1.Compare(test.v2)
+		if res != test.expRes {
+			t.Errorf("Test %v: Unexpected result: %v / %v", i, res, test.expRes)
+		}
+	}
+}
+
+func TestMergeValidateResult(t *testing.T) {
+	tests := []struct {
+		vrs []ValidateResult
+		exp ValidateResult
+	}{
+		{
+			vrs: []ValidateResult{
+				{Reason: "accepted1", Action: MsgAccept},
+				{Reason: "rejected1", Action: MsgReject},
+				{Reason: "ignored1", Action: MsgIgnore},
+			},
+			exp: ValidateResult{
+				Reason: "accepted: accepted1; rejected: rejected1; ignored: ignored1",
+				Action: MsgReject,
+			},
+		},
+		{
+			vrs: []ValidateResult{
+				{Reason: "ignored1", Action: MsgIgnore},
+				{Reason: "accepted1", Action: MsgAccept},
+			},
+			exp: ValidateResult{
+				Reason: "ignored: ignored1; accepted: accepted1",
+				Action: MsgIgnore,
+			},
+		},
+		{
+			vrs: []ValidateResult{
+				{Reason: "", Action: MsgAccept},
+				{Reason: "", Action: MsgIgnore},
+			},
+			exp: ValidateResult{
+				Reason: "",
+				Action: MsgIgnore,
+			},
+		},
+	}
+	for i, test := range tests {
+		res := mergeValidateResults(test.vrs)
+		if !reflect.DeepEqual(res, test.exp) {
+			t.Errorf("Test %v: Unexpected result \n\t[%+v]\n\t[%+v]", i, res, test.exp)
+		}
+	}
+}
 
 type (
 	testStruct struct {
@@ -78,7 +146,7 @@ func TestMessage_VDataGlobal(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		msg := &Message{}
+		msg := &Message{&libp2p_pubsub.Message{}}
 		err := test.editMessage(msg)
 
 		if assErr := testerr.AssertError(err, test.expErr); assErr != nil {
@@ -116,7 +184,7 @@ func TestMessage_HandlerData(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		msg := &Message{}
+		msg := &Message{&libp2p_pubsub.Message{}}
 		test.editMessage(msg)
 
 		got := msg.getVDataHandler(test.getSpec)
@@ -124,4 +192,28 @@ func TestMessage_HandlerData(t *testing.T) {
 			t.Errorf("Test %v: unexpected val: [%+v] / [%+v]", i, got, test.expRes)
 		}
 	}
+}
+
+// Learning test for context cancel. Canceling a child context will not cancel parent context.
+func ExampleContextCancel() {
+	parent, _ := context.WithCancel(context.Background())
+
+	child, childCancel := context.WithCancel(parent)
+
+	childCancel()
+
+	select {
+	case <-child.Done():
+		fmt.Println("child already canceled")
+	}
+
+	select {
+	case <-parent.Done():
+		fmt.Println("parent also canceled")
+	default:
+		fmt.Println("parent not canceled")
+	}
+	// Output:
+	// child already canceled
+	// parent not canceled
 }

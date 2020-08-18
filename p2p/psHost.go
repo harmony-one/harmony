@@ -51,7 +51,8 @@ func (psh *pubSubHost) AddPubSubHandler(handler PubSubHandler) error {
 }
 
 // StopPubSubHandler stop the pub sub handler with the given specifier.
-// TODO: also cancel all running contexts
+// TODO: also cancel all running contexts. Need to implement cancel feature in each
+//       PubSubHandler
 func (psh *pubSubHost) StopPubSubHandler(spec string) error {
 	psh.lock.Lock()
 	defer psh.lock.Unlock()
