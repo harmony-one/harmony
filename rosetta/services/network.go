@@ -171,6 +171,7 @@ func getErrors() []*types.Error {
 		&common.TransactionSubmissionError,
 		&common.BlockNotFoundError,
 		&common.TransactionNotFoundError,
+		&common.ReceiptNotFoundError,
 	}
 }
 

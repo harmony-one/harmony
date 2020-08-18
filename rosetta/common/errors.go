@@ -53,4 +53,11 @@ var (
 		Message:   "transaction or staking transaction not found",
 		Retriable: false,
 	}
+
+	// ReceiptNotFoundError ..
+	ReceiptNotFoundError = types.Error{
+		Code:      7,
+		Message:   "receipt not found",
+		Retriable: false,
+	}
 )

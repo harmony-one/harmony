@@ -20,6 +20,7 @@ func TestErrors(t *testing.T) {
 		&common.TransactionSubmissionError,
 		&common.BlockNotFoundError,
 		&common.TransactionNotFoundError,
+		&common.ReceiptNotFoundError,
 	}
 	refBeaconErrors := []*types.Error{
 		&common.StakingTransactionSubmissionError,
