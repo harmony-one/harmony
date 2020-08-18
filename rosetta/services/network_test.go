@@ -1,11 +1,15 @@
 package services
 
 import (
+	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/harmony-one/harmony/rosetta/common"
+	commonRPC "github.com/harmony-one/harmony/rpc/common"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
 
 func TestErrors(t *testing.T) {
@@ -132,5 +136,82 @@ func TestInvalidAssertValidNetworkIdentifier(t *testing.T) {
 		t.Error("Expected error for bad subnetwork metadata for network ID")
 	} else if rosettaError.Code != common.InvalidNetworkError.Code {
 		t.Errorf("Expected returned error code to be %v", common.InvalidNetworkError.Code)
+	}
+}
+
+func TestGetPeersFromNodePeerInfo(t *testing.T) {
+	testNodePeerInfo := generateTestNodePeerInfoList()
+	peers, err := getPeersFromNodePeerInfo(testNodePeerInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	found := map[string]bool{}
+	for _, p := range peers {
+		found[p.PeerID] = true
+
+		var refTopics []string
+		switch p.PeerID {
+		case peer.ID("jim").String():
+			refTopics = []string{"test1", "test2"}
+		case peer.ID("bob").String():
+			refTopics = []string{"test1"}
+		case peer.ID("alice").String():
+			refTopics = []string{"test3"}
+		case peer.ID("mary").String():
+			refTopics = []string{"test3"}
+		default:
+			t.Fatalf("unknown peerID %v", p.PeerID)
+		}
+
+		if err := checkPeerID(p, refTopics); err != nil {
+			t.Errorf(err.Error())
+		}
+	}
+
+	if len(found) != 4 {
+		t.Errorf("Did not find peerIDs for all 4 peers: %v", found)
+	}
+}
+
+func checkPeerID(p *types.Peer, refTopics []string) error {
+	topics, ok := p.Metadata["topics"].([]string)
+	if !ok {
+		return fmt.Errorf("expected topics in metadata of %v to be a slice of string", p)
+	}
+	sort.Strings(topics)
+	sort.Strings(refTopics)
+	if !reflect.DeepEqual(topics, refTopics) {
+		return fmt.Errorf("topics %v does not match reference topics %v", topics, refTopics)
+	}
+	return nil
+}
+
+func generateTestNodePeerInfoList() commonRPC.NodePeerInfo {
+	return commonRPC.NodePeerInfo{
+		PeerID:       "test",
+		BlockedPeers: []peer.ID{},
+		P: []commonRPC.P{
+			{
+				Topic: "test1",
+				Peers: []peer.ID{
+					"jim",
+					"bob",
+				},
+			},
+			{
+				Topic: "test2",
+				Peers: []peer.ID{
+					"jim",
+				},
+			},
+			{
+				Topic: "test3",
+				Peers: []peer.ID{
+					"alice",
+					"mary",
+				},
+			},
+		},
 	}
 }

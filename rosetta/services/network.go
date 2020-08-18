@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
+	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -75,9 +76,9 @@ func (s *NetworkAPIService) NetworkStatus(
 		return nil, &rosettaError
 	}
 
-	peers, fmtErr := s.getPeers()
-	if fmtErr != nil {
-		return nil, fmtErr
+	peers, rosettaError := getPeersFromNodePeerInfo(s.hmy.GetPeerInfo())
+	if rosettaError != nil {
+		return nil, rosettaError
 	}
 
 	return &types.NetworkStatusResponse{
@@ -126,42 +127,6 @@ func (s *NetworkAPIService) NetworkOptions(
 	}, nil
 }
 
-// getPeers fetches all the unique peers and notes each topic for each peer in the metadata.
-func (s *NetworkAPIService) getPeers() ([]*types.Peer, *types.Error) {
-	seenPeerIndex := map[peer.ID]int{}
-	allPeerInfo := s.hmy.GetPeerInfo()
-	peers := []*types.Peer{}
-	for _, peerInfo := range allPeerInfo.P {
-		for _, pID := range peerInfo.Peers {
-			i, ok := seenPeerIndex[pID]
-			if !ok {
-				newPeer := &types.Peer{
-					PeerID: pID.String(),
-					Metadata: map[string]interface{}{
-						"topics": []string{peerInfo.Topic},
-					},
-				}
-				peers = append(peers, newPeer)
-				seenPeerIndex[pID] = len(peers) - 1
-			} else {
-				topics, ok := peers[i].Metadata["topics"].([]string)
-				if !ok {
-					err := common.SanityCheckError
-					err.Message = "could not cast peer metadata to slice of string"
-					return nil, &err
-				}
-				for _, topic := range topics {
-					if peerInfo.Topic == topic {
-						continue
-					}
-				}
-				peers[i].Metadata["topics"] = append(topics, peerInfo.Topic)
-			}
-		}
-	}
-	return peers, nil
-}
-
 func getBeaconAllow(isArchival bool) *types.Allow {
 	return &types.Allow{
 		OperationStatuses:       append(getOperationStatuses(), getBeaconOperationStatuses()...),
@@ -205,6 +170,42 @@ func getErrors() []*types.Error {
 		&common.InvalidNetworkError,
 		&common.TransactionSubmissionError,
 	}
+}
+
+// getPeersFromNodePeerInfo formats all the unique peers from the NodePeerInfo and
+// notes each topic for each peer in the metadata.
+func getPeersFromNodePeerInfo(allPeerInfo commonRPC.NodePeerInfo) ([]*types.Peer, *types.Error) {
+	seenPeerIndex := map[peer.ID]int{}
+	peers := []*types.Peer{}
+	for _, peerInfo := range allPeerInfo.P {
+		for _, pID := range peerInfo.Peers {
+			i, ok := seenPeerIndex[pID]
+			if !ok {
+				newPeer := &types.Peer{
+					PeerID: pID.String(),
+					Metadata: map[string]interface{}{
+						"topics": []string{peerInfo.Topic},
+					},
+				}
+				peers = append(peers, newPeer)
+				seenPeerIndex[pID] = len(peers) - 1
+			} else {
+				topics, ok := peers[i].Metadata["topics"].([]string)
+				if !ok {
+					err := common.SanityCheckError
+					err.Message = "could not cast peer metadata to slice of string"
+					return nil, &err
+				}
+				for _, topic := range topics {
+					if peerInfo.Topic == topic {
+						continue
+					}
+				}
+				peers[i].Metadata["topics"] = append(topics, peerInfo.Topic)
+			}
+		}
+	}
+	return peers, nil
 }
 
 func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32) *types.Error {
