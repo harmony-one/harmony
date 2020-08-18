@@ -19,16 +19,23 @@ var (
 		Retriable: false,
 	}
 
+	// InvalidNetworkError ..
+	InvalidNetworkError = types.Error{
+		Code:      2,
+		Message:   "invalid network error",
+		Retriable: false,
+	}
+
 	// TransactionSubmissionError ..
 	TransactionSubmissionError = types.Error{
-		Code:      2,
+		Code:      3,
 		Message:   "transaction submission error",
 		Retriable: true,
 	}
 
 	// StakingTransactionSubmissionError ..
 	StakingTransactionSubmissionError = types.Error{
-		Code:      3,
+		Code:      4,
 		Message:   "staking transaction submission error",
 		Retriable: true,
 	}
