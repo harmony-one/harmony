@@ -2,6 +2,7 @@ package chain
 
 import (
 	"fmt"
+	"github.com/harmony-one/harmony/internal/params"
 	"math/big"
 	"sort"
 
@@ -138,7 +139,12 @@ func AccumulateRewardsAndCountSigs(
 		defaultReward := network.BaseStakedReward
 
 		// After block time is reduced to 5 seconds, the block reward is adjusted accordingly
-		if bc.Config().IsFiveSeconds(header.Epoch()) {
+		if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+			// This is testnet requiring the one-off forking logic
+			if blockNum > 634644 {
+				defaultReward = network.FiveSecondsBaseStakedReward
+			}
+		} else if bc.Config().IsFiveSeconds(header.Epoch()) {
 			defaultReward = network.FiveSecondsBaseStakedReward
 		}
 
