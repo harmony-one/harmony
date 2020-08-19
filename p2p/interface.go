@@ -37,7 +37,7 @@ type PubSubHost interface {
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 }
 
-// PubSubHandler is the pub sub message handler for a given topic
+// PubSubHandler is the pub sub message handler of a certain topic
 // TODO: Add version compatibility to topic
 type PubSubHandler interface {
 	// Topic is the topic the handler is subscribed to
@@ -46,10 +46,12 @@ type PubSubHandler interface {
 	// Specifier defines the uniques specifier of a pub sub handler
 	Specifier() string
 
-	// ValidateMsg validate the message from the peer with PeerID. Return the validation cache
-	// and result. Returned cache is explicitly used in HandleMsg.
-	ValidateMsg(ctx context.Context, peer PeerID, msg *Message) (interface{}, ValidateResult)
+	// ValidateMsg validate the message from the peer with PeerID. Return ValidateResult.
+	// Cache in the result is parsed to DeliverMsg and can be used for further message handling.
+	ValidateMsg(ctx context.Context, peer PeerID, rawData []byte) ValidateResult
 
-	// HandleMsg handle the message with the validationCache in step ValidateMsg
-	HandleMsg(ctx context.Context, msg *Message, validateCache interface{}) error
+	// DeliverMsg deliver the message to target object with the validationCache from ValidateMsg
+	// Note: For the same handler under a topic, DeliverMsg are executed concurrently.
+	// And the error should be handled in HandleMsg for each handler.
+	DeliverMsg(ctx context.Context, rawData []byte, cache ValidateCache)
 }

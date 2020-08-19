@@ -11,5 +11,8 @@ var (
 
 	errGlobalValueOverwrite = errors.New("try to overwrite global val")
 
+	errTopicAlreadyRunning = errors.New("topic is already running")
+	errTopicAlreadyStopped = errors.New("topic has already stopped")
+
 	errUnknown = errors.New("unknown error")
 )

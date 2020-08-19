@@ -1,9 +1,9 @@
 package herrors
 
-type multiErr []error
+type multiError []error
 
-// Error indicates multiErr implements error interface
-func (errs multiErr) Error() string {
+// Error indicates multiError implements error interface
+func (errs multiError) Error() string {
 	if len(errs) == 0 {
 		return ""
 	}
@@ -21,6 +21,8 @@ func (errs multiErr) Error() string {
 	return errStr
 }
 
+// Join will join multiple errors to multiError.
+// TODO: optimize slice. Merge the underlying errors if an err is a multiError itself
 func Join(errs ...error) error {
 	if len(errs) == 0 {
 		return nil
@@ -28,5 +30,5 @@ func Join(errs ...error) error {
 	if len(errs) == 1 {
 		return errs[0]
 	}
-	return multiErr(errs)
+	return multiError(errs)
 }

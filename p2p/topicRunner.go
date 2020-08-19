@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/harmony-one/abool"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -13,108 +14,136 @@ import (
 // Currently, a topic runner is combined with multiple PubSubHandlers.
 // TODO: Redesign the topics and decouple the message usage according to PubSubHandler so that
 //       one topic has only one handler.
-// TODO: Make options can be set dynamically during runtime.
 type topicRunner struct {
-	topic  string
-	pubSub *libp2p_pubsub.PubSub
+	topic       string
+	pubSub      *libp2p_pubsub.PubSub
+	topicHandle *libp2p_pubsub.Topic
 
 	// all active handlers in the topic; lock protected
 	handlers []PubSubHandler
 	options  []libp2p_pubsub.ValidatorOpt
 
-	validateResultHook func(msg *Message, result ValidateResult)
+	validateResultHook func(msg *message, action ValidateAction, err error)
 
-	baseCtx context.Context
-	cancel  func()
-	stopCh  chan stopTopicTask
-	lock    sync.RWMutex
-	log     zerolog.Logger
+	baseCtx       context.Context
+	baseCtxCancel func()
+	running       abool.AtomicBool
+	closed        abool.AtomicBool
+	lock          sync.RWMutex
+	log           zerolog.Logger
 }
 
-func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) *topicRunner {
+func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
 	tr := &topicRunner{
 		topic:    topic,
 		pubSub:   host.pubsub,
 		handlers: handlers,
 		options:  options,
-		stopCh:   make(chan stopTopicTask, 1),
 		log:      host.log.With().Str("pubSubTopic", topic).Logger(),
 	}
+
+	var err error
+	tr.topicHandle, err = tr.pubSub.Join(tr.topic)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot join topic [%v]", tr.topic)
+	}
+
 	tr.validateResultHook = tr.recordInMetrics
-	return tr
+	return tr, nil
 }
 
-func (tr *topicRunner) start() error {
-	sub, err := tr.subscribe()
-	if err != nil {
-		return err
+func (tr *topicRunner) start() (err error) {
+	if changed := tr.running.SetToIf(false, true); !changed {
+		return errTopicAlreadyRunning
 	}
-	if err := tr.registerValidations(); err != nil {
-		return err
+	defer func() {
+		if err != nil {
+			tr.running.SetTo(false)
+		}
+	}()
+
+	tr.baseCtx, tr.baseCtxCancel = context.WithCancel(context.Background())
+
+	sub, err := tr.prepare()
+	if err != nil {
+		return
 	}
 
 	go tr.run(sub)
 
-	return nil
+	return
 }
 
-func (tr *topicRunner) subscribe() (*libp2p_pubsub.Subscription, error) {
-	topicHandle, err := tr.pubSub.Join(tr.topic)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot join topic [%v]", tr.topic)
-	}
-	sub, err := topicHandle.Subscribe()
+func (tr *topicRunner) prepare() (*libp2p_pubsub.Subscription, error) {
+	sub, err := tr.topicHandle.Subscribe()
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot subscribe topic [%v]", tr.topic)
+	}
+	if err := tr.pubSub.RegisterTopicValidator(tr.topic, tr.validateMsg, tr.options...); err != nil {
+		return nil, errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
 	}
 	return sub, nil
 }
 
-func (tr *topicRunner) registerValidations() error {
-	if err := tr.pubSub.RegisterTopicValidator(tr.topic, tr.validateMsg, tr.options...); err != nil {
-		return errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
-	}
-	return nil
-}
-
-func (tr *topicRunner) run(sub *libp2p_pubsub.Subscription) {
-	//for {
-	//	ctx := context.WithDeadline(tr.baseCtx, 10*time.Second)
-	//	nextMsg, err := sub.Next(context.Background())
-	//	// TODO: start here
-	//}
-}
-
-func (tr *topicRunner) stop(ctx context.Context) error {
-	errC := make(chan error)
-
-	tr.stopCh <- stopTopicTask{
-		errC: errC,
-	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-errC:
-		return err
-	}
-}
-
 func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
-	m := &Message{msg}
+	m := newMessage(msg)
 	handlers := tr.getHandlers()
 	vResults := make([]ValidateResult, len(handlers))
 
 	for _, handler := range handlers {
-		vCache, vRes := handler.ValidateMsg(ctx, peer, m)
-		m.setValidatorDataByHandler(handler.Specifier(), vCache)
+		vRes := handler.ValidateMsg(ctx, peer, m.raw.GetData())
 		vResults = append(vResults, vRes)
 	}
+	cache, action, err := mergeValidateResults(handlers, vResults)
+	m.setValidateCache(cache)
 
-	finalRes := mergeValidateResults(vResults)
-	tr.recordInMetrics(m, finalRes)
+	tr.validateResultHook(m, action, err)
+	return libp2p_pubsub.ValidationResult(action)
+}
 
-	return libp2p_pubsub.ValidationResult(finalRes.Action)
+func (tr *topicRunner) run(sub *libp2p_pubsub.Subscription) {
+	for {
+		msg, err := sub.Next(tr.baseCtx)
+		if err != nil {
+			// stop function has been called
+			return
+		}
+		tr.handleMessage(newMessage(msg))
+	}
+}
+
+func (tr *topicRunner) handleMessage(msg *message) {
+	handlers := tr.getHandlers()
+
+	for _, handler := range handlers {
+		go tr.deliverMessageForHandler(msg, handler)
+	}
+}
+
+func (tr *topicRunner) deliverMessageForHandler(msg *message, handler PubSubHandler) {
+	validationCache := msg.getHandlerCache(handler.Specifier())
+	handler.DeliverMsg(tr.baseCtx, msg.raw.GetData(), validationCache)
+}
+
+func (tr *topicRunner) stop() error {
+	if changed := tr.running.SetToIf(true, false); !changed {
+		return errTopicAlreadyStopped
+	}
+	tr.baseCtxCancel()
+	return nil
+}
+
+func (tr *topicRunner) close() error {
+	if err := tr.stop(); err != nil {
+		if err != errTopicAlreadyStopped {
+			return err
+		}
+	}
+	tr.closed.SetTo(true)
+	if err := tr.pubSub.UnregisterTopicValidator(tr.topic); err != nil {
+		return errors.Wrapf(err, "failed to unregister topic %v", tr.topic)
+	}
+	return nil
 }
 
 func (tr *topicRunner) getHandlers() []PubSubHandler {
@@ -127,6 +156,6 @@ func (tr *topicRunner) getHandlers() []PubSubHandler {
 	return handlers
 }
 
-func (tr *topicRunner) recordInMetrics(msg *Message, vRes ValidateResult) {
-	// TODO: Add metrics here
+func (tr *topicRunner) recordInMetrics(msg *message, action ValidateAction, err error) {
+	// TODO: Log and add metrics here
 }

@@ -2,13 +2,11 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/herrors"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-
-	"github.com/harmony-one/harmony/internal/testerr"
 )
 
 func TestValidateAction_Compare(t *testing.T) {
@@ -95,50 +93,50 @@ var (
 
 func TestMessage_VDataGlobal(t *testing.T) {
 	tests := []struct {
-		editMessage func(*Message) error
+		editMessage func(*message) error
 		getKey      string
 		expRes      interface{}
 		expErr      error
 	}{
 		{
-			editMessage: func(msg *Message) error {
-				return msg.SetVDataGlobal(testKey1, testVal1)
+			editMessage: func(msg *message) error {
+				return msg.setVDataGlobal(testKey1, testVal1)
 			},
 			getKey: testKey1,
 			expRes: testVal1,
 		},
 		{
-			editMessage: func(msg *Message) error {
-				return msg.SetVDataGlobal(testKey1, testVal1)
+			editMessage: func(msg *message) error {
+				return msg.setVDataGlobal(testKey1, testVal1)
 			},
 			getKey: testKey2,
 			expRes: nil,
 		},
 		{
-			editMessage: func(msg *Message) error {
-				if err := msg.SetVDataGlobal(testKey1, testVal1); err != nil {
+			editMessage: func(msg *message) error {
+				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
 					return err
 				}
-				return msg.SetVDataGlobal(testKey2, testVal2)
+				return msg.setVDataGlobal(testKey2, testVal2)
 			},
 			getKey: testKey2,
 			expRes: testVal2,
 		},
 		{
-			editMessage: func(msg *Message) error {
-				if err := msg.SetVDataGlobal(testKey1, testVal1); err != nil {
+			editMessage: func(msg *message) error {
+				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
 					return err
 				}
-				return msg.SetVDataGlobal(testKey1, testVal2)
+				return msg.setVDataGlobal(testKey1, testVal2)
 			},
 			expErr: errGlobalValueOverwrite,
 		},
 		{
-			editMessage: func(msg *Message) error {
-				if err := msg.SetVDataGlobal(testKey1, testVal1); err != nil {
+			editMessage: func(msg *message) error {
+				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
 					return err
 				}
-				msg.MustSetVDataGlobal(testKey1, testVal2)
+				msg.mustSetVDataGlobal(testKey1, testVal2)
 				return nil
 			},
 			getKey: testKey1,
@@ -146,16 +144,16 @@ func TestMessage_VDataGlobal(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		msg := &Message{&libp2p_pubsub.Message{}}
+		msg := &message{&libp2p_pubsub.Message{}}
 		err := test.editMessage(msg)
 
-		if assErr := testerr.AssertError(err, test.expErr); assErr != nil {
+		if assErr := herrors.AssertError(err, test.expErr); assErr != nil {
 			t.Fatalf("Test %v: unexpected error %v", i, assErr)
 		}
 		if err != nil {
 			continue
 		}
-		gotVal := msg.GetVDataGlobal(test.getKey)
+		gotVal := msg.getVDataGlobal(test.getKey)
 		if !reflect.DeepEqual(gotVal, test.expRes) {
 			t.Errorf("Test %v: unexpected val: [%+v] / [%+v]", i, gotVal, test.expRes)
 		}
@@ -164,19 +162,19 @@ func TestMessage_VDataGlobal(t *testing.T) {
 
 func TestMessage_HandlerData(t *testing.T) {
 	tests := []struct {
-		editMessage func(*Message)
+		editMessage func(*message)
 		getSpec     string
 		expRes      interface{}
 	}{
 		{
-			editMessage: func(msg *Message) {
+			editMessage: func(msg *message) {
 				msg.setValidatorDataByHandler(testSpec1, testVal1)
 			},
 			getSpec: testSpec1,
 			expRes:  testVal1,
 		},
 		{
-			editMessage: func(msg *Message) {
+			editMessage: func(msg *message) {
 				msg.setValidatorDataByHandler(testSpec2, testVal2)
 			},
 			getSpec: testSpec1,
@@ -184,36 +182,54 @@ func TestMessage_HandlerData(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		msg := &Message{&libp2p_pubsub.Message{}}
+		msg := &message{&libp2p_pubsub.Message{}}
 		test.editMessage(msg)
 
-		got := msg.getVDataHandler(test.getSpec)
+		got := msg.getHandlerCache(test.getSpec)
 		if !reflect.DeepEqual(got, test.expRes) {
 			t.Errorf("Test %v: unexpected val: [%+v] / [%+v]", i, got, test.expRes)
 		}
 	}
 }
 
-// Learning test for context cancel. Canceling a child context will not cancel parent context.
-func ExampleContextCancel() {
+// TestContextChildCancel is a learning test for context cancel.
+// Canceling a child context will not cancel parent context.
+func TestContextChildCancel(t *testing.T) {
 	parent, _ := context.WithCancel(context.Background())
-
 	child, childCancel := context.WithCancel(parent)
 
 	childCancel()
 
 	select {
 	case <-child.Done():
-		fmt.Println("child already canceled")
+	default:
+		t.Fatalf("child context should be cancelled")
 	}
 
 	select {
 	case <-parent.Done():
-		fmt.Println("parent also canceled")
+		t.Fatalf("canceling child context should not cancel parent context")
 	default:
-		fmt.Println("parent not canceled")
 	}
-	// Output:
-	// child already canceled
-	// parent not canceled
+}
+
+// TestContextParentCancel is a learning test showing that cancelling a parent
+// context will also cancel the child context.
+func TestContextParentCancel(t *testing.T) {
+	parent, parentCancel := context.WithCancel(context.Background())
+	child, _ := context.WithCancel(parent)
+
+	parentCancel()
+
+	select {
+	case <-parent.Done():
+	default:
+		t.Fatalf("parent context should be canceled")
+	}
+
+	select {
+	case <-child.Done():
+	default:
+		t.Fatalf("child context should also be canceled")
+	}
 }

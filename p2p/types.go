@@ -1,25 +1,14 @@
 package p2p
 
 import (
-	"context"
-	"fmt"
-	"strings"
-
-	"github.com/pkg/errors"
-
+	"github.com/harmony-one/harmony/internal/herrors"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
 )
 
 // PeerID is an alias to libp2p_peer.ID, basically a string
 type PeerID libp2p_peer.ID
-
-// ValidateResult is a wrapper around libp2p_pubsub.ValidationResult. Defines
-// what to do with the pub sub message and why do this.
-type ValidateResult struct {
-	Reason string
-	Action ValidateAction
-}
 
 // ValidateAction is an encapsulated libp2p_pubsub.ValidationResult which defines
 // The action to be taken for the validation of a pubsub message.
@@ -28,9 +17,16 @@ type ValidateAction libp2p_pubsub.ValidationResult
 const (
 	// MsgAccept is an alias to libp2p_pubsub.ValidationAccept
 	MsgAccept = ValidateAction(libp2p_pubsub.ValidationAccept)
-	// ValidaMsgRejecttionReject is an alias to libp2p_pubsub.ValidationReject
+	// ValidaMsgRejecttionReject is an alias to libp2p_pubsub.ValidationReject.
+	// The action indicates an invalid message that should not be delivered to
+	// the application or forwarded to the application. Furthermore the peer that
+	// forwarded the message should be penalized by peer scoring routers.
 	MsgReject = ValidateAction(libp2p_pubsub.ValidationReject)
-	// MsgIgnore is an alias to libp2p_pubsub.ValidationIgnore
+	// MsgIgnore is an alias to libp2p_pubsub.ValidationIgnore.
+	// This action indicates a message that should be ignored: it will be neither
+	// delivered to the application nor forwarded to the network. However, in
+	// contrast to ValidationReject, the peer that forwarded the message must not
+	//be penalized by peer scoring routers.
 	MsgIgnore = ValidateAction(libp2p_pubsub.ValidationIgnore)
 )
 
@@ -51,6 +47,19 @@ func (va ValidateAction) Compare(val ValidateAction) int {
 	return 0
 }
 
+func getValidateActionPriority(va ValidateAction) int {
+	switch va {
+	case MsgAccept:
+		return 0
+	case MsgIgnore:
+		return 1
+	case MsgReject:
+		return 2
+	default:
+	}
+	return -1
+}
+
 // String return the string representation of the ValidateAction
 func (va ValidateAction) String() string {
 	switch va {
@@ -65,79 +74,80 @@ func (va ValidateAction) String() string {
 	return "unknown validation result"
 }
 
-func getValidateActionPriority(va ValidateAction) int {
-	switch va {
-	case MsgAccept:
-		return 0
-	case MsgIgnore:
-		return 1
-	case MsgReject:
-		return 2
-	default:
-	}
-	return -1
+// ValidateResult is the result returned by validateMsg function by handlers.
+type ValidateResult struct {
+	// ValidateCache is stored in ValidateResult which will be further used in
+	// DeliverMsg.
+	ValidateCache
+
+	// Action is the action to be taken for a specific message. Available Actions:
+	// MsgAccept, MsgIgnore, MsgReject
+	Action ValidateAction
+
+	// Err is the error happened during the validation process
+	Err error
 }
 
-func mergeValidateResults(vrs []ValidateResult) ValidateResult {
+// ValidateCache is the data structure for storing the cache in the process of
+// handler ValidateMsg.
+type ValidateCache struct {
+	// GlobalCache is the data stored as cache that can be shared among different
+	// handlers.
+	// WARN: write GlobalCache after validation is forbidden since it will result in
+	// potential race condition and inconsistent handling results.
+	GlobalCache map[string]interface{}
+
+	// HandlerCache is the data stored as cache for further handling the message.
+	HandlerCache interface{}
+}
+
+func mergeValidateResults(handlers []PubSubHandler, vrs []ValidateResult) (*vData, ValidateAction, error) {
 	var (
-		msgs []string
-		va   = MsgAccept
+		errs   []error
+		action = MsgAccept
+		cache  = newVData()
 	)
-	for _, vr := range vrs {
-		if len(vr.Reason) != 0 {
-			msgs = append(msgs, fmt.Sprintf("%s: %v", vr.Action, vr.Reason))
+	for i, vr := range vrs {
+		handler := handlers[i]
+		if vr.Err != nil {
+			err := errors.Wrapf(vr.Err, "validated by %v", handlers[i])
+			errs = append(errs, err)
 		}
-		if vr.Action.Compare(va) > 0 {
-			va = vr.Action
+		if vr.Action.Compare(action) > 0 {
+			action = vr.Action
 		}
+		for k, v := range vr.GlobalCache {
+			cache.globals[k] = v
+		}
+		cache.handlerData[handler.Specifier()] = vr.HandlerCache
 	}
-	return ValidateResult{
-		Reason: strings.Join(msgs, "; "),
-		Action: va,
-	}
+	return cache, action, herrors.Join(errs...)
 }
 
-// Message is the wrapper of libp2p message
-type Message struct {
+// message is the wrapper of libp2p message. It handles the underlying validatorData
+// as the cache.
+type message struct {
 	raw *libp2p_pubsub.Message
 }
 
-// GetRawData get the raw data from libp2p message
-func (msg *Message) GetRawData() []byte {
-	return msg.raw.GetData()
+func newMessage(raw *libp2p_pubsub.Message) *message {
+	return &message{raw}
 }
 
-// SetValidatedGlobal set the global values shared among pubSubHandlers. If the given global key
-// is already written, return err errGlobalValueOverwrite
-func (msg *Message) SetVDataGlobal(key, val interface{}) error {
+func (msg *message) setValidateCache(cache *vData) {
+	msg.raw.ValidatorData = cache
+}
+
+func (msg *message) getHandlerCache(spec string) ValidateCache {
 	vd := msg.getVData()
-	err := vd.setGlobal(key, val)
-	return errors.Wrapf(err, "set global [%s]=>[%s]", key, val)
+
+	return ValidateCache{
+		GlobalCache:  vd.globals,
+		HandlerCache: vd.handlerData[spec],
+	}
 }
 
-// MustSetVDataGlobal force set or update the value to be shared among pubSubHandlers.
-// Note using this function might result in some global data is overwritten with the same key.
-func (msg *Message) MustSetVDataGlobal(key, val interface{}) {
-	vd := msg.getVData()
-	vd.mustSetGlobal(key, val)
-}
-
-func (msg *Message) setValidatorDataByHandler(spec string, data interface{}) {
-	vd := msg.getVData()
-	vd.setHandlerData(spec, data)
-}
-
-func (msg *Message) GetVDataGlobal(key interface{}) interface{} {
-	vd := msg.getVData()
-	return vd.getGlobal(key)
-}
-
-func (msg *Message) getVDataHandler(spec string) interface{} {
-	vd := msg.getVData()
-	return vd.getHandlerData(spec)
-}
-
-func (msg *Message) getVData() *vData {
+func (msg *message) getVData() *vData {
 	if msg.raw.ValidatorData == nil {
 		msg.raw.ValidatorData = newVData()
 	}
@@ -145,42 +155,18 @@ func (msg *Message) getVData() *vData {
 	return vd
 }
 
-// vData is the data added to Message after validation. It is used as a in-memory cache to
+// vData is the data added to message after validation. It is used as a in-memory cache to
 // prevent data computed in the validation process being calculated twice or more.
 // vData consist of two parts, one is globals which can be shared among modules. Second is
 // data that is used privately by each handler.
 type vData struct {
-	globals     context.Context
+	globals     map[string]interface{}
 	handlerData map[string]interface{}
 }
 
 func newVData() *vData {
 	return &vData{
-		globals:     context.Background(),
+		globals:     make(map[string]interface{}),
 		handlerData: make(map[string]interface{}),
 	}
-}
-
-func (vd *vData) setGlobal(key, val interface{}) error {
-	if vd.globals.Value(key) != nil {
-		return errGlobalValueOverwrite
-	}
-	vd.globals = context.WithValue(vd.globals, key, val)
-	return nil
-}
-
-func (vd *vData) mustSetGlobal(key, val interface{}) {
-	vd.globals = context.WithValue(vd.globals, key, val)
-}
-
-func (vd *vData) setHandlerData(spec string, val interface{}) {
-	vd.handlerData[spec] = val
-}
-
-func (vd *vData) getGlobal(key interface{}) interface{} {
-	return vd.globals.Value(key)
-}
-
-func (vd *vData) getHandlerData(spec string) interface{} {
-	return vd.handlerData[spec]
 }
