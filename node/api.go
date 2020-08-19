@@ -1,11 +1,10 @@
 package node
 
 import (
-	"strconv"
-
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -63,7 +62,7 @@ func (node *Node) ReportPlainErrorSink() types.TransactionErrorReports {
 }
 
 // StartRPC start RPC service
-func (node *Node) StartRPC(nodePort string) error {
+func (node *Node) StartRPC() error {
 	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
 
 	// Gather all the possible APIs to surface
@@ -73,14 +72,18 @@ func (node *Node) StartRPC(nodePort string) error {
 		apis = append(apis, service.APIs()...)
 	}
 
-	port, _ := strconv.Atoi(nodePort)
-
-	return hmy_rpc.StartServers(harmony, port, apis)
+	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer)
 }
 
 // StopRPC stop RPC service
 func (node *Node) StopRPC() error {
 	return hmy_rpc.StopServers()
+}
+
+// StartRosetta start rosetta service
+func (node *Node) StartRosetta() error {
+	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
+	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer)
 }
 
 // APIs return the collection of local RPC services.

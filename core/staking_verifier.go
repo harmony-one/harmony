@@ -200,8 +200,8 @@ var (
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndDelegateFromMsg(
-	stateDB vm.StateDB, msg *staking.Delegate,
-) (*staking.ValidatorWrapper, *big.Int, error) {
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, redelegation bool,
+) ([]*staking.ValidatorWrapper, *big.Int, error) {
 	if stateDB == nil {
 		return nil, nil, errStateDBIsMissing
 	}
@@ -214,40 +214,111 @@ func VerifyAndDelegateFromMsg(
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
 		return nil, nil, errDelegationTooSmall
 	}
-	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	// Check if there is enough liquid token to delegate
-	if !CanTransfer(stateDB, msg.DelegatorAddress, msg.Amount) {
-		return nil, nil, errors.Wrapf(
-			errInsufficientBalanceForStake, "had %v, tried to stake %v",
-			stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
-	}
+	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
+	delegateBalance := big.NewInt(0).Set(msg.Amount)
 
-	// Check for existing delegation
-	for i := range wrapper.Delegations {
-		delegation := &wrapper.Delegations[i]
-		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
-			delegation.Amount.Add(delegation.Amount, msg.Amount)
-			if err := wrapper.SanityCheck(); err != nil {
+	var delegateeWrapper *staking.ValidatorWrapper
+	if redelegation {
+		// Check if we can use tokens in undelegation to delegate (redelegate)
+		for i := range delegations {
+			delegationIndex := &delegations[i]
+			wrapper, err := stateDB.ValidatorWrapperCopy(delegationIndex.ValidatorAddress)
+			if err != nil {
 				return nil, nil, err
 			}
-			return wrapper, msg.Amount, nil
+			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+				utils.Logger().Warn().
+					Str("validator", delegationIndex.ValidatorAddress.String()).
+					Uint64("delegation index", delegationIndex.Index).
+					Int("delegations length", len(wrapper.Delegations)).
+					Msg("Delegation index out of bound")
+				return nil, nil, errors.New("Delegation index out of bound")
+			}
+
+			delegation := &wrapper.Delegations[delegationIndex.Index]
+
+			startBalance := big.NewInt(0).Set(delegateBalance)
+			// Start from the oldest undelegated tokens
+			curIndex := 0
+			for ; curIndex < len(delegation.Undelegations); curIndex++ {
+				if delegation.Undelegations[curIndex].Epoch.Cmp(epoch) >= 0 {
+					break
+				}
+				if delegation.Undelegations[curIndex].Amount.Cmp(delegateBalance) <= 0 {
+					delegateBalance.Sub(delegateBalance, delegation.Undelegations[curIndex].Amount)
+				} else {
+					delegation.Undelegations[curIndex].Amount.Sub(
+						delegation.Undelegations[curIndex].Amount, delegateBalance,
+					)
+					delegateBalance = big.NewInt(0)
+					break
+				}
+			}
+
+			if startBalance.Cmp(delegateBalance) > 0 {
+				// Used undelegated token for redelegation
+				delegation.Undelegations = delegation.Undelegations[curIndex:]
+				if err := wrapper.SanityCheck(); err != nil {
+					return nil, nil, err
+				}
+
+				if bytes.Equal(delegationIndex.ValidatorAddress[:], msg.ValidatorAddress[:]) {
+					delegateeWrapper = wrapper
+				}
+				updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
+			}
 		}
 	}
 
-	// Add new delegation
-	wrapper.Delegations = append(
-		wrapper.Delegations, staking.NewDelegation(
-			msg.DelegatorAddress, msg.Amount,
-		),
-	)
-	if err := wrapper.SanityCheck(); err != nil {
-		return nil, nil, err
+	if delegateeWrapper == nil {
+		var err error
+		delegateeWrapper, err = stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
+		if err != nil {
+			return nil, nil, err
+		}
+		updatedValidatorWrappers = append(updatedValidatorWrappers, delegateeWrapper)
 	}
-	return wrapper, msg.Amount, nil
+
+	// Add to existing delegation if any
+	found := false
+	for i := range delegateeWrapper.Delegations {
+		delegation := &delegateeWrapper.Delegations[i]
+		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
+			delegation.Amount.Add(delegation.Amount, msg.Amount)
+			if err := delegateeWrapper.SanityCheck(); err != nil {
+				return nil, nil, err
+			}
+			found = true
+		}
+	}
+
+	if !found {
+		// Add new delegation
+		delegateeWrapper.Delegations = append(
+			delegateeWrapper.Delegations, staking.NewDelegation(
+				msg.DelegatorAddress, msg.Amount,
+			),
+		)
+		if err := delegateeWrapper.SanityCheck(); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if delegateBalance.Cmp(big.NewInt(0)) == 0 {
+		// delegation fully from undelegated tokens, no need to deduct from balance.
+		return updatedValidatorWrappers, big.NewInt(0), nil
+	}
+
+	// Still need to deduct tokens from balance for delegation
+	// Check if there is enough liquid token to delegate
+	if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
+		return nil, nil, errors.Wrapf(
+			errInsufficientBalanceForStake, "totalRedelegatable: %v, balance: %v; trying to stake %v",
+			big.NewInt(0).Sub(msg.Amount, delegateBalance), stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
+	}
+
+	return updatedValidatorWrappers, delegateBalance, nil
 }
 
 // VerifyAndUndelegateFromMsg verifies the undelegate validator message

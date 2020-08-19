@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v1 20200723.1"
+version="v2 20200811.1"
 
 unset -v progname
 progname="${0##*/}"
@@ -309,7 +309,7 @@ do
    r) pprof="${OPTARG}";;
    v) msg "version: $version"
       exit 0 ;;
-   V) INSTALLED_VERSION=$(LD_LIBRARY_PATH=. ./harmony -version 2>&1)
+   V) INSTALLED_VERSION=$(LD_LIBRARY_PATH=. ./harmony version 2>&1)
       RUNNING_VERSION=$(curl -s --request POST 'http://127.0.0.1:9500/' --header 'Content-Type: application/json' --data-raw '{ "jsonrpc": "2.0", "method": "hmyv2_getNodeMetadata", "params": [], "id": 1}' | grep -Eo '"version":"[^"]*"' | cut -c11- | tr -d \")
       echo "Binary  Version: $INSTALLED_VERSION"
       echo "Running Version: $RUNNING_VERSION"
@@ -345,7 +345,7 @@ mainnet)
     /ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX
     /ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj
   )
-  REL=main
+  REL=main_v2
   network_type=mainnet
   dns_zone=t.hmny.io
   syncdir=mainnet.min
@@ -743,50 +743,53 @@ while :
 do
    msg "############### Running Harmony Process ###############"
    args=(
-      -bootnodes "${BN_MA}"
-      -ip "${PUB_IP}"
-      -port "${NODE_PORT}"
-      -network_type="${network_type}"
-      -dns_zone="${dns_zone}"
-      -blacklist="${blacklist}"
-      -min_peers="${minpeers}"
-      -max_bls_keys_per_node="${max_bls_keys_per_node}"
-      -broadcast_invalid_tx="${broadcast_invalid_tx}"
-      -verbosity="${log_level}"
-      -block_period="5"
+      --bootnodes "${BN_MA}"
+      --ip "${PUB_IP}"
+      --port "${NODE_PORT}"
+      --network_type="${network_type}"
+      --dns_zone="${dns_zone}"
+      --blacklist="${blacklist}"
+      --min_peers="${minpeers}"
+      --max_bls_keys_per_node="${max_bls_keys_per_node}"
+      --broadcast_invalid_tx="${broadcast_invalid_tx}"
+      --verbosity="${log_level}"
    )
    args+=(
-      -is_archival="${archival}"
+      --is_archival="${archival}"
    )
    if [ ! -z "$BLSKEYFILES" ]; then
       args+=(
-         -blskey_file "${BLSKEYFILES}"
+         --blskey_file "${BLSKEYFILES}"
       )
    fi
    if [ ! -z "$blsfolder" ]; then
       args+=(
-         -blsfolder "${blsfolder}"
+         --blsfolder "${blsfolder}"
       )
    fi
    if [ ! -z "$blspass" ]; then
       args+=(
-         -blspass "file:${blspass}"
+         --blspass "file:${blspass}"
       )
    else
       if $no_bls_pass_prompt; then
          args+=(
-            -blspass no-prompt
+            --blspass no-prompt
          )
       fi
    fi
    if ${public_rpc}; then
       args+=(
-         -public_rpc
+         --public_rpc
+      )
+   else
+      args+=(
+         --public_rpc=false
       )
    fi
    if [ ! -z "${pprof}" ]; then
       args+=(
-      -pprof "${pprof}"
+         --pprof.addr "${pprof}"
       )
    fi
 
@@ -796,19 +799,21 @@ do
       case "${shard_id}" in
       ?*)
          args+=(
-            -shard_id="${shard_id}"
+            --shard_id="${shard_id}"
          )
-         if ${staking_mode}
-         then
-            args+=(-staking="${staking_mode}")
+
+         if [ ${staking_mode} == "false" ]; then
+            args+=(
+              --run.legacy
+            )
          fi
          ;;
       esac
       ;;
    explorer)
       args+=(
-      -node_type="${node_type}"
-      -shard_id="${shard_id}"
+      --node_type="${node_type}"
+      --shard_id="${shard_id}"
       )
       ;;
    esac
