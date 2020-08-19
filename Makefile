@@ -88,15 +88,16 @@ deb: rpm
 	fpm -s dir -t deb -n $(PKGNAME) -v $(VERSION)-$(COMMIT) --prefix /usr/local bin/harmony
 	fpm -s pleaserun -t deb -n $(PKGNAME)-service -v $(VERSION) /usr/local/bin/harmony
 
-rpm_init:
+rpm_init: bin/harmony
 	rm -rf $(RPMBUILD)
 	mkdir -p $(RPMBUILD)/{SOURCES,SPECS,BUILD,RPMS,BUILDROOT,SRPMS}
 	mkdir -p $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f bin/harmony $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	bin/harmony dumpconfig $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)/harmony.cfg
 	cp -f scripts/rpm/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	cp -f scripts/rpm/harmony-*.cfg $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+#	cp -f scripts/rpm/harmony-*.cfg $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony.spec $(RPMBUILD)/SPECS
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
