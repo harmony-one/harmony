@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -62,11 +62,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 func (consensus *Consensus) prepare() {
 	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 	priKeys := []*bls.PrivateKeyWrapper{}
-	for _, key := range consensus.priKey {
+	for i, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		priKeys = append(priKeys, &key)
+		priKeys = append(priKeys, &consensus.priKey[i])
 		if !consensus.MultiSig {
 			networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []*bls.PrivateKeyWrapper{&key})
 			if err != nil {
@@ -219,7 +219,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
 		time.Sleep(consensus.delayCommit)
@@ -243,11 +242,11 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	priKeys := []*bls.PrivateKeyWrapper{}
-	for _, key := range consensus.priKey {
+	for i, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		priKeys = append(priKeys, &key)
+		priKeys = append(priKeys, &consensus.priKey[i])
 		if !consensus.MultiSig {
 			networkMessage, err := consensus.construct(msg_pb.MessageType_COMMIT,
 				commitPayload, []*bls.PrivateKeyWrapper{&key})

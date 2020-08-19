@@ -79,7 +79,6 @@ func (consensus *Consensus) construct(
 			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
 		)
 	} else {
-		// TODO: add bitmap logic
 		mask, err := bls.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("unable to setup mask for multi-sig message")
@@ -101,6 +100,7 @@ func (consensus *Consensus) construct(
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
 		aggSig = consensus.Decider.AggregateVotes(quorum.Prepare)
+
 		buffer.Write(aggSig.Serialize())
 		// Bitmap
 		buffer.Write(consensus.prepareBitmap.Bitmap)

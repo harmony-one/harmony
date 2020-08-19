@@ -172,6 +172,7 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 		sig := &bls_core.Sign{}
 		// NOTE invariant that shouldn't happen by now
 		// but pointers are pointers
+
 		if ballot != nil {
 			sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
 			sigs = append(sigs, sig)

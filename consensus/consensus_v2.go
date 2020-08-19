@@ -274,19 +274,10 @@ func (consensus *Consensus) tryCatchup() {
 		}
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
-		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-			msg_pb.MessageType_PREPARED, committedMsg.BlockNum, committedMsg.BlockHash,
-		)
-		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-		if msg == nil {
-			break
-		}
-		consensus.getLogger().Info().Msg("[TryCatchup] prepared message found to commit")
-
 		atomic.AddUint64(&consensus.blockNum, 1)
 		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
 
-		if len(msg.SenderPubkeys) != 1 {
+		if len(committedMsg.SenderPubkeys) != 1 {
 			consensus.getLogger().Error().Msg("[TryCatchup] multiple signers from the leader.")
 			break
 		}

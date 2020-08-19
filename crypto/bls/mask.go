@@ -79,7 +79,7 @@ func NewMask(publics []PublicKeyWrapper, myKey *PublicKeyWrapper) (*Mask, error)
 	index := map[SerializedPublicKey]int{}
 	publicKeys := make([]*PublicKeyWrapper, len(publics))
 	for i, key := range publics {
-		publicKeys[i] = &key
+		publicKeys[i] = &publics[i]
 		index[key.Bytes] = i
 	}
 	m := &Mask{

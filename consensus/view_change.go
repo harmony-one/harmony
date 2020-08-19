@@ -635,11 +635,11 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 
 		priKeys := []*bls.PrivateKeyWrapper{}
-		for _, key := range consensus.priKey {
+		for i, key := range consensus.priKey {
 			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 				continue
 			}
-			priKeys = append(priKeys, &key)
+			priKeys = append(priKeys, &consensus.priKey[i])
 			if !consensus.MultiSig {
 				network, err := consensus.construct(
 					msg_pb.MessageType_COMMIT,
