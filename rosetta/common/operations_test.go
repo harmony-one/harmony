@@ -49,8 +49,10 @@ func TestOperationSuccessful(t *testing.T) {
 func TestPlainOperationTypes(t *testing.T) {
 	plainOperationTypes := PlainOperationTypes
 	referenceOperationTypes := []string{
-		"Transfer",
-		"CrossShardTransfer",
+		ExpendGasOperation,
+		TransferOperation,
+		CrossShardTransferOperation,
+		ContractCreationOperation,
 	}
 	sort.Strings(referenceOperationTypes)
 	sort.Strings(plainOperationTypes)

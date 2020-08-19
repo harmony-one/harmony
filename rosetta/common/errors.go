@@ -2,6 +2,7 @@ package common
 
 import (
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/harmony-one/harmony/rpc"
 )
 
 var (
@@ -61,3 +62,18 @@ var (
 		Retriable: false,
 	}
 )
+
+// NewError create a new error with a given detail structure
+func NewError(rosettaError types.Error, detailStructure interface{}) *types.Error {
+	details, err := rpc.NewStructuredResponse(detailStructure)
+	if err != nil {
+		newError := CatchAllError
+		CatchAllError.Details = map[string]interface{}{
+			"message": err.Error(),
+		}
+		return &newError
+	}
+	newError := rosettaError
+	newError.Details = details
+	return &newError
+}

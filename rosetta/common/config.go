@@ -37,6 +37,12 @@ var (
 
 	// IdleTimeout ..
 	IdleTimeout = 120 * time.Second
+
+	// Currency ..
+	Currency = &types.Currency{
+		Symbol:   Symbol,
+		Decimals: Decimals,
+	}
 )
 
 // SubNetworkMetadata for the sub network identifier of a shard

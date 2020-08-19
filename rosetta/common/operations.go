@@ -5,11 +5,27 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	// ExpendGasOperation ..
+	ExpendGasOperation = "Gas"
+
+	// TransferOperation ..
+	TransferOperation = "Transfer"
+
+	// CrossShardTransferOperation ..
+	CrossShardTransferOperation = "CrossShardTransfer"
+
+	// ContractCreationOperation ..
+	ContractCreationOperation = "ContractCreation"
+)
+
 var (
 	// PlainOperationTypes ..
 	PlainOperationTypes = []string{
-		"Transfer",
-		"CrossShardTransfer",
+		ExpendGasOperation,
+		TransferOperation,
+		CrossShardTransferOperation,
+		ContractCreationOperation,
 	}
 
 	// StakingOperationTypes ..
