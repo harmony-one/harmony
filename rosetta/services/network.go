@@ -36,11 +36,9 @@ func (s *NetworkAPIService) NetworkList(
 ) (*types.NetworkListResponse, *types.Error) {
 	network, err := common.GetNetwork(s.hmy.ShardID)
 	if err != nil {
-		rosettaError := common.CatchAllError
-		rosettaError.Details = map[string]interface{}{
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
-		}
-		return nil, &rosettaError
+		})
 	}
 	return &types.NetworkListResponse{
 		NetworkIdentifiers: []*types.NetworkIdentifier{
@@ -60,20 +58,16 @@ func (s *NetworkAPIService) NetworkStatus(
 
 	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
-		rosettaError := common.CatchAllError
-		rosettaError.Details = map[string]interface{}{
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get current header: %v", err.Error()),
-		}
-		return nil, &rosettaError
+		})
 	}
 
 	genesisHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(0))
 	if err != nil {
-		rosettaError := common.CatchAllError
-		rosettaError.Details = map[string]interface{}{
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get genesis header: %v", err.Error()),
-		}
-		return nil, &rosettaError
+		})
 	}
 
 	peers, rosettaError := getPeersFromNodePeerInfo(s.hmy.GetPeerInfo())
@@ -195,9 +189,9 @@ func getPeersFromNodePeerInfo(allPeerInfo commonRPC.NodePeerInfo) ([]*types.Peer
 			} else {
 				topics, ok := peers[i].Metadata["topics"].([]string)
 				if !ok {
-					err := common.SanityCheckError
-					err.Message = "could not cast peer metadata to slice of string"
-					return nil, &err
+					return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+						"message": "could not cast peer metadata to slice of string",
+					})
 				}
 				for _, topic := range topics {
 					if peerInfo.Topic == topic {
@@ -214,11 +208,9 @@ func getPeersFromNodePeerInfo(allPeerInfo commonRPC.NodePeerInfo) ([]*types.Peer
 func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32) *types.Error {
 	currNetID, err := common.GetNetwork(shardID)
 	if err != nil {
-		rosettaError := common.SanityCheckError
-		rosettaError.Details = map[string]interface{}{
+		return common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": fmt.Sprintf("Error while asserting valid network ID: %v", err.Error()),
-		}
-		return &rosettaError
+		})
 	}
 
 	// Check for valid network ID and set a message if an error occurs
@@ -235,11 +227,9 @@ func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32
 		var metadata, currMetadata common.SubNetworkMetadata
 
 		if err := currMetadata.UnmarshalFromInterface(currNetID.SubNetworkIdentifier.Metadata); err != nil {
-			rosettaError := common.SanityCheckError
-			rosettaError.Details = map[string]interface{}{
+			return common.NewError(common.SanityCheckError, map[string]interface{}{
 				"message": fmt.Sprintf("Error while asserting valid network ID: %v", err.Error()),
-			}
-			return &rosettaError
+			})
 		}
 		if err := metadata.UnmarshalFromInterface(netID.SubNetworkIdentifier.Metadata); err != nil {
 			message = fmt.Sprintf("Subnetwork metadata is of unknown format: %v", err.Error())
@@ -255,11 +245,9 @@ func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32
 	}
 
 	if message != "" {
-		rosettaError := common.InvalidNetworkError
-		rosettaError.Details = map[string]interface{}{
+		return common.NewError(common.InvalidNetworkError, map[string]interface{}{
 			"message": message,
-		}
-		return &rosettaError
+		})
 	}
 	return nil
 }
