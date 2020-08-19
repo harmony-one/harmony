@@ -54,9 +54,7 @@ install -m 0755 harmony ${RPM_BUILD_ROOT}/usr/local/sbin/
 install -m 0755 harmony-setup.sh ${RPM_BUILD_ROOT}/usr/local/sbin/
 install -m 0644 harmony.service ${RPM_BUILD_ROOT}/etc/systemd/system/
 install -m 0644 harmony-sysctl.conf ${RPM_BUILD_ROOT}/etc/sysctl.d/
-install -m 0644 harmony-validator.cfg ${RPM_BUILD_ROOT}/etc/harmony/
-install -m 0644 harmony-explorer.cfg ${RPM_BUILD_ROOT}/etc/harmony/
-pushd ${RPM_BUILD_ROOT}/etc/harmony; ln -s harmony-validator.cfg harmony.cfg; popd
+install -m 0644 harmony.cfg ${RPM_BUILD_ROOT}/etc/harmony/
 exit 0
 
 %post
@@ -74,8 +72,6 @@ exit 0
 /usr/local/sbin/harmony-setup.sh
 /etc/sysctl.d/harmony-sysctl.conf
 /etc/systemd/system/harmony.service
-/etc/harmony/harmony-validator.cfg
-/etc/harmony/harmony-explorer.cfg
 /etc/harmony/harmony.cfg
 
 %doc
