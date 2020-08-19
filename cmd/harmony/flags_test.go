@@ -164,6 +164,16 @@ func TestGeneralFlags(t *testing.T) {
 				DataDir:    "./",
 			},
 		},
+		{
+			args: []string{"--run", "explorer", "--run.shard", "0"},
+			expConfig: generalConfig{
+				NodeType:   "explorer",
+				NoStaking:  false,
+				ShardID:    0,
+				IsArchival: true,
+				DataDir:    "./",
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, generalFlags, applyGeneralFlags)
