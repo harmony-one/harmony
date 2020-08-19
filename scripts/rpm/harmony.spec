@@ -61,6 +61,7 @@ exit 0
 
 %post
 %systemd_post %{name}.service
+%sysctl_apply %{name}-sysctl.conf
 
 %preun
 %systemd_preun %{name}.service
