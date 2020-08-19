@@ -168,10 +168,27 @@ type depInject struct {
 func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 	ballots := s.ReadAllBallots(p)
 	sigs := make([]*bls_core.Sign, 0, len(ballots))
+	collectedKeys := map[bls_cosi.SerializedPublicKey]struct{}{}
 	for _, ballot := range ballots {
 		sig := &bls_core.Sign{}
 		// NOTE invariant that shouldn't happen by now
 		// but pointers are pointers
+
+		// If the multisig from any of the signers in this ballot are already collected,
+		// we need to skip this ballot as its multisig is a duplicate.
+		alreadyCollected := false
+		for _, key := range ballot.SignerPubKeys {
+			if _, ok := collectedKeys[key]; ok {
+				alreadyCollected = true
+			}
+		}
+		if alreadyCollected {
+			continue
+		} else {
+			for _, key := range ballot.SignerPubKeys {
+				collectedKeys[key] = struct{}{}
+			}
+		}
 
 		if ballot != nil {
 			sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
@@ -248,6 +265,7 @@ func (s *cIdentities) SubmitVote(
 		Height:          height,
 		ViewID:          viewID,
 	}
+
 	for _, pubKey := range pubkeys {
 		switch p {
 		case Prepare:

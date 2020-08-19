@@ -86,6 +86,8 @@ var (
 	blockPeriod = flag.Int("block_period", 5, "how long in second the leader waits to propose a new block.")
 	// staking indicates whether the node is operating in staking mode.
 	stakingFlag = flag.Bool("staking", false, "whether the node should operate in staking mode")
+	// multiSig indicates whether the node sends a single multi-signature or multiple signatures for multiple keys
+	multiSigFlag = flag.Bool("multi_sig", false, "whether the node sends a single multi-signature or multiple signatures for multiple keys")
 	// shardID indicates the shard ID of this node
 	shardID = flag.Int("shard_id", -1, "the shard ID of this node")
 	// Sharding configuration parameters for devnet
@@ -361,6 +363,7 @@ func setupConsensusAndNode(nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Setup block period and block due time.
 	currentConsensus.BlockPeriod = time.Duration(*blockPeriod) * time.Second
 	currentConsensus.NextBlockDue = time.Now()
+	currentConsensus.MultiSig = *multiSigFlag
 	return currentNode
 }
 
@@ -406,6 +409,7 @@ func setupViperConfig() {
 	viperconfig.ResetConfString(networkType, envViper, configFileViper, "", "network_type")
 	viperconfig.ResetConfInt(blockPeriod, envViper, configFileViper, "", "block_period")
 	viperconfig.ResetConfBool(stakingFlag, envViper, configFileViper, "", "staking")
+	viperconfig.ResetConfBool(multiSigFlag, envViper, configFileViper, "", "multi_sig")
 	viperconfig.ResetConfInt(shardID, envViper, configFileViper, "", "shard_id")
 	viperconfig.ResetConfString(blsKeyFile, envViper, configFileViper, "", "blskey_file")
 	viperconfig.ResetConfString(blsFolder, envViper, configFileViper, "", "blsfolder")

@@ -470,7 +470,7 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
-	senderKey := bls.SerializedPublicKey{}
+	senderKey := []byte{}
 	senderBitmap := []byte{}
 
 	if maybeCon != nil {
@@ -478,7 +478,7 @@ func (node *Node) validateShardBoundMessage(
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
-		copy(senderKey[:], maybeCon.SenderPubkey[:])
+		senderKey = maybeCon.SenderPubkey
 
 		if len(maybeCon.SenderPubkeyBitmap) > 0 {
 			senderBitmap = maybeCon.SenderPubkeyBitmap
@@ -488,16 +488,12 @@ func (node *Node) validateShardBoundMessage(
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
-		copy(senderKey[:], maybeVC.SenderPubkey)
+		senderKey = maybeVC.SenderPubkey
 	} else {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
-	if len(senderKey) != bls.PublicKeySizeInBytes {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
-		return nil, nil, true, errors.WithStack(errNotRightKeySize)
-	}
 	// ignore mesage not intended for validator
 	// but still forward them to the network
 	if !node.Consensus.IsLeader() {
@@ -508,8 +504,15 @@ func (node *Node) validateShardBoundMessage(
 		}
 	}
 
+	serializedKey := bls.SerializedPublicKey{}
 	if len(senderKey) > 0 {
-		if !node.Consensus.IsValidatorInCommittee(senderKey) {
+		if len(senderKey) != bls.PublicKeySizeInBytes {
+			atomic.AddUint32(&node.NumInvalidMessages, 1)
+			return nil, nil, true, errors.WithStack(errNotRightKeySize)
+		}
+
+		copy(serializedKey[:], senderKey)
+		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
 			atomic.AddUint32(&node.NumSlotMessages, 1)
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
@@ -521,7 +524,9 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
-	return &m, &senderKey, false, nil
+
+	// serializedKey will be empty for multiSig sender
+	return &m, &serializedKey, false, nil
 }
 
 var (
