@@ -5,8 +5,8 @@
 
 
 Name:		harmony
-Version:	2.3.4
-Release:	0%{?dist}
+Version:	2.3.5
+Release:	0
 Summary:	harmony blockchain validator node program
 
 License:	MIT
@@ -24,7 +24,7 @@ BuildRoot: ~/rpmbuild/
 
 %description
 Harmony is a sharded, fast finality, low fee, PoS public blockchain.
-This is the validator node program for harmony blockchain.
+This package contains the validator node program for harmony blockchain.
 
 %global debug_package %{nil}
 
@@ -32,27 +32,31 @@ This is the validator node program for harmony blockchain.
 %setup -q
 
 %build
-echo make %{?_smp_mflags}
 exit 0
-
 
 %check
 ./harmony --version
-exit
+exit 0
 
 %pre
 getent group harmony >/dev/null || groupadd -r harmony
 getent passwd harmony >/dev/null || \
    useradd -r -g harmony -d /home/harmony -m -s /sbin/nologin \
    -c "Harmony validator node account" harmony
+mkdir -p /home/harmony/.hmy/blskeys
+chown -R harmony.harmony /home/harmony
 exit 0
 
 
 %install
-install -m 0755 -d ${RPM_BUILD_ROOT}/usr/local/sbin ${RPM_BUILD_ROOT}/etc/systemd/system ${RPM_BUILD_ROOT}/etc/sysctl.d
+install -m 0755 -d ${RPM_BUILD_ROOT}/usr/local/sbin ${RPM_BUILD_ROOT}/etc/systemd/system ${RPM_BUILD_ROOT}/etc/sysctl.d ${RPM_BUILD_ROOT}/etc/harmony
 install -m 0755 harmony ${RPM_BUILD_ROOT}/usr/local/sbin/
+install -m 0755 harmony-setup.sh ${RPM_BUILD_ROOT}/usr/local/sbin/
 install -m 0644 harmony.service ${RPM_BUILD_ROOT}/etc/systemd/system/
 install -m 0644 harmony-sysctl.conf ${RPM_BUILD_ROOT}/etc/sysctl.d/
+install -m 0644 harmony-validator.cfg ${RPM_BUILD_ROOT}/etc/harmony/
+install -m 0644 harmony-explorer.cfg ${RPM_BUILD_ROOT}/etc/harmony/
+pushd ${RPM_BUILD_ROOT}/etc/harmony; ln -s harmony-validator.cfg harmony.cfg; popd
 exit 0
 
 %post
@@ -66,8 +70,12 @@ exit 0
 
 %files
 /usr/local/sbin/harmony
+/usr/local/sbin/harmony-setup.sh
 /etc/sysctl.d/harmony-sysctl.conf
 /etc/systemd/system/harmony.service
+/etc/harmony/harmony-validator.cfg
+/etc/harmony/harmony-explorer.cfg
+/etc/harmony/harmony.cfg
 
 %doc
 %license
@@ -75,5 +83,5 @@ exit 0
 
 
 %changelog
-* Tue Aug 18 2020 Leo Chen <leo at harmony dot one> 2.3.4
+* Tue Aug 18 2020 Leo Chen <leo at harmony dot one> 2.3.5
   - init version of the harmony node program
