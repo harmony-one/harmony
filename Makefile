@@ -6,10 +6,10 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 PKGNAME=harmony
-VERSION=2.3.4
+VERSION=2.3.5
 RPMBUILD=$(HOME)/rpmbuild
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static rpm
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb rpm_init rpm_build rpm
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -30,6 +30,7 @@ help:
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
 	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
 	@echo "rpm - build a harmony RPM pacakge"
+	@echo "deb - build a harmony Debian pacakge (todo)"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -83,7 +84,7 @@ arm_static:
 	bash ./scripts/go_executable_build.sh -a arm64 -s
 	git checkout go.mod
 
-deb_package: rpm
+deb: rpm
 	fpm -s dir -t deb -n $(PKGNAME) -v $(VERSION)-$(COMMIT) --prefix /usr/local bin/harmony
 	fpm -s pleaserun -t deb -n $(PKGNAME)-service -v $(VERSION) /usr/local/bin/harmony
 
@@ -93,7 +94,9 @@ rpm_init:
 	mkdir -p $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f bin/harmony $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/rpm/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/rpm/harmony-*.cfg $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony.spec $(RPMBUILD)/SPECS
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
@@ -101,6 +104,3 @@ rpm_build:
 	rpmbuild --target x86_64 -bb scripts/rpm/harmony.spec
 
 rpm: rpm_init rpm_build
-
-rpm_test: rpm
-	echo "sudo docker run -it -v $(RPMBUILD):/mnt/rpmbuild tqhh/rpmtest"
