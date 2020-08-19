@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 
+	protobuf "github.com/golang/protobuf/proto"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -79,6 +81,7 @@ func (consensus *Consensus) construct(
 			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
 		)
 	} else {
+		// TODO: use a persistent bitmap to report bitmap
 		mask, err := bls.NewMask(consensus.Decider.Participants(), nil)
 		if err != nil {
 			utils.Logger().Warn().Err(err).Msg("unable to setup mask for multi-sig message")
@@ -93,6 +96,7 @@ func (consensus *Consensus) construct(
 	}
 
 	// Do the signing, 96 byte of bls signature
+	needMsgSig := true
 	switch p {
 	case msg_pb.MessageType_PREPARED:
 		consensusMsg.Block = consensus.block
@@ -100,12 +104,12 @@ func (consensus *Consensus) construct(
 		buffer := bytes.Buffer{}
 		// 96 bytes aggregated signature
 		aggSig = consensus.Decider.AggregateVotes(quorum.Prepare)
-
 		buffer.Write(aggSig.Serialize())
 		// Bitmap
 		buffer.Write(consensus.prepareBitmap.Bitmap)
 		consensusMsg.Payload = buffer.Bytes()
 	case msg_pb.MessageType_PREPARE:
+		needMsgSig = false
 		sig := bls_core.Sign{}
 		for _, priKey := range priKeys {
 			if s := priKey.Pri.SignHash(consensusMsg.BlockHash); s != nil {
@@ -114,6 +118,7 @@ func (consensus *Consensus) construct(
 		}
 		consensusMsg.Payload = sig.Serialize()
 	case msg_pb.MessageType_COMMIT:
+		needMsgSig = false
 		sig := bls_core.Sign{}
 		for _, priKey := range priKeys {
 			if s := priKey.Pri.SignHash(payloadForSign); s != nil {
@@ -133,7 +138,16 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.blockHash[:]
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKeys)
+	var marshaledMessage []byte
+	var err error
+	if needMsgSig {
+		// The message that needs signing only needs to be signed with a single key
+		marshaledMessage, err = consensus.signAndMarshalConsensusMessage(message, priKeys[0].Pri)
+	} else {
+		// Skip message (potentially multi-sig) signing for validator consensus messages (prepare and commit)
+		// as signature is already signed on the block data.
+		marshaledMessage, err = protobuf.Marshal(message)
+	}
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Str("phase", p.String()).

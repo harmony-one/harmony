@@ -266,6 +266,8 @@ func (s *cIdentities) SubmitVote(
 		ViewID:          viewID,
 	}
 
+	// For each of the keys signed in the multi-sig, a separate ballot with the same multisig is recorded
+	// This way it's easier to check if a specific key already signed or not.
 	for _, pubKey := range pubkeys {
 		switch p {
 		case Prepare:

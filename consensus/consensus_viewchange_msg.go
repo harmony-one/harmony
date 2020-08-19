@@ -90,7 +90,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		utils.Logger().Error().Msg("unable to serialize viewID signature")
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, []*bls.PrivateKeyWrapper{priKey})
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
@@ -145,7 +145,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		vcMsg.M3Bitmap = consensus.viewIDBitmap[viewID].Bitmap
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, []*bls.PrivateKeyWrapper{priKey})
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Msg("[constructNewViewMessage] failed to sign and marshal the new view message")

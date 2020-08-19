@@ -278,7 +278,7 @@ func (consensus *Consensus) tryCatchup() {
 		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
 
 		if len(committedMsg.SenderPubkeys) != 1 {
-			consensus.getLogger().Error().Msg("[TryCatchup] multiple signers from the leader.")
+			consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
 			break
 		}
 		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]

@@ -257,6 +257,7 @@ func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 	copy(pbftMsg.SenderPubkeyBitmap[:], consensusMsg.SenderPubkeyBitmap[:])
 
 	if len(consensusMsg.SenderPubkey) != 0 {
+		// If SenderPubKey is populated, treat it as a single key message
 		pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
 		if err != nil {
 			return nil, err
@@ -264,6 +265,7 @@ func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
 		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
 	} else {
+		// else, it should be a multi-key message where the bitmap is populated
 		pubKeys, err := consensus.multiSigBitmap.GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
 		if err != nil {
 			return nil, err

@@ -187,11 +187,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
-	for _, pubKey := range recvMsg.SenderPubkeys {
-		if err := prepareBitmap.SetKey(pubKey.Bytes, true); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
-			return
-		}
+	if err := prepareBitmap.SetKeysAtomic(recvMsg.SenderPubkeys, true); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[OnPrepare] prepareBitmap.SetKey failed")
+		return
 	}
 	//// Write - End
 
@@ -207,9 +205,6 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
-	if consensus.viewID == 10 {
-		return
-	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
@@ -285,12 +280,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		return
 	}
 	// Set the bitmap indicating that this validator signed.
-	for _, pubKey := range recvMsg.SenderPubkeys {
-		if err := commitBitmap.SetKey(pubKey.Bytes, true); err != nil {
-			consensus.getLogger().Warn().Err(err).
-				Msg("[OnCommit] commitBitmap.SetKey failed")
-			return
-		}
+	if err := commitBitmap.SetKeysAtomic(recvMsg.SenderPubkeys, true); err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Msg("[OnCommit] commitBitmap.SetKey failed")
+		return
 	}
 	//// Write - End
 

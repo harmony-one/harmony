@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,8 +61,8 @@ var (
 
 // Signs the consensus message and returns the marshaled message.
 func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
-	priKeys []*bls.PrivateKeyWrapper) ([]byte, error) {
-	if err := consensus.signConsensusMessage(message, priKeys); err != nil {
+	priKey *bls_core.SecretKey) ([]byte, error) {
+	if err := consensus.signConsensusMessage(message, priKey); err != nil {
 		return empty, err
 	}
 	marshaledMessage, err := protobuf.Marshal(message)
@@ -97,6 +99,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
+	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
@@ -113,25 +116,22 @@ func NewFaker() *Consensus {
 
 // Sign on the hash of the message with the private keys and return the signature.
 // If multiple keys are provided, the aggregated signature will be returned.
-func (consensus *Consensus) signMessage(message []byte, priKeys []*bls.PrivateKeyWrapper) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
-	signature := bls_core.Sign{}
-	for _, priKey := range priKeys {
-		signature.Add(priKey.Pri.SignHash(hash[:]))
-	}
+	signature := priKey.SignHash(hash[:])
 	return signature.Serialize()
 }
 
 // Sign on the consensus message signature field.
 func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
-	priKeys []*bls.PrivateKeyWrapper) error {
+	priKey *bls_core.SecretKey) error {
 	message.Signature = nil
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
 	}
 	// 64 byte of signature on previous data
-	signature := consensus.signMessage(marshaledMessage, priKeys)
+	signature := consensus.signMessage(marshaledMessage, priKey)
 	message.Signature = signature
 	return nil
 }
@@ -236,7 +236,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.viewID = msg.ViewID
 		consensus.current.SetViewID(msg.ViewID)
 		if len(msg.SenderPubkeys) != 1 {
-			return errors.New("multiple signers from the leader")
+			return errors.New("Leader message can not have multiple sender keys")
 		}
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
@@ -362,7 +362,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.BlockPeriod = 5 * time.Second
 
 	// TODO: remove once multisig is fully upgraded in the network
-	if curEpoch.Cmp(big.NewInt(1000)) > 0 {
+	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
 		consensus.MultiSig = true
 	}
 

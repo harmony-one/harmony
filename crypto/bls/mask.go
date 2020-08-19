@@ -233,6 +233,22 @@ func (m *Mask) SetKey(public SerializedPublicKey, enable bool) error {
 	return errors.New("key not found")
 }
 
+// SetKeysAtomic set the bit in the Bitmap for the given cosigners only when all the cosigners are present in the map.
+func (m *Mask) SetKeysAtomic(publics []*PublicKeyWrapper, enable bool) error {
+	indexes := make([]int, len(publics))
+	for i, key := range publics {
+		index, found := m.PublicsIndex[key.Bytes]
+		if !found {
+			errors.New("key not found")
+		}
+		indexes[i] = index
+	}
+	for _, index := range indexes {
+		return m.SetBit(index, enable)
+	}
+	return errors.New("key not found")
+}
+
 // CountEnabled returns the number of enabled nodes in the CoSi participation
 // Bitmap.
 func (m *Mask) CountEnabled() int {
