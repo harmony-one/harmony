@@ -63,7 +63,7 @@ Examples usage:
     ./harmony --http.ip=0.0.0.0 --http.port=[http_port] --ws.ip=0.0.0.0 --ws.port=[ws_port]
 
 # start an explorer node
-    ./harmony --run=explorer --run.archive --run.shard=[shard_id]
+    ./harmony --run=explorer --run.shard=[shard_id]
 
 # start a harmony internal node on testnet
     ./harmony --run.legacy --network
