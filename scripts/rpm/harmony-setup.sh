@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ME=$(basename "$0")
-CONFIGDIR=/etc/harmony
+CONFIG=/etc/harmony/harmony.cfg
 VER=v1.0
 
 function usage() {
@@ -23,27 +23,11 @@ EOT
 }
 
 function _setup_validator_config_file() {
-   cat<<-EOT > $CONFIGDIR/harmony-validator.cfg
-# SHARD set to -1 for normal validator
-# The real shard is determined by the blskey
-SHARD=-1
-TYPE=validator
-EOT
-   pushd ${CONFIGDIR} &> /dev/null
-   ln -sf harmony-validator.cfg harmony.cfg
-   popd &> /dev/null
+   sed -i.bak 's,NodeType =.*,NodeType = "validator",; s,ShardID = .*,ShardID = -1,' $CONFIG
 }
 
 function _setup_explorer_config_file() {
-   cat<<-EOT > $CONFIGDIR/harmony-explorer.cfg
-# Set SHARD to 0,1,2,3
-# It is used to setup RPC endpoint
-SHARD=$SHARD
-TYPE=explorer
-EOT
-   pushd ${CONFIGDIR} &> /dev/null
-   ln -sf harmony-explorer.cfg harmony.cfg
-   popd &> /dev/null
+   sed -i.bak "s,NodeType =.*,NodeType = \"explorer\",; s,ShardID = .*,ShardID = $SHARD," $CONFIG
 }
 
 function setup_config_file() {
@@ -52,11 +36,6 @@ function setup_config_file() {
       explorer) _setup_explorer_config_file ;;
       *) usage ;;
    esac
-}
-
-function restart_systemd_service() {
-   systemctl daemon-reload
-   systemctl restart harmony
 }
 
 ####### default value ######
@@ -92,4 +71,5 @@ case ${TYPE} in
 esac
 
 setup_config_file
-restart_systemd_service
+
+echo "Please run 'sudo systemctl restart harmony' to reload the configuration"
