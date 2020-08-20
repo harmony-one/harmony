@@ -14,12 +14,10 @@ URL:		https://harmony.one
 Source0:	%{name}-%{version}.tar
 BuildArch: x86_64
 Packager: Leo Chen
+Provides: /bin/sh
 Requires(pre): shadow-utils
-Requires: bash
 Requires: systemd-rpm-macros
 
-BuildRequires:	info
-Requires:	   info
 BuildRoot: ~/rpmbuild/
 
 %description
