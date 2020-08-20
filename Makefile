@@ -93,14 +93,16 @@ rpm_init: bin/harmony
 	mkdir -p $(RPMBUILD)/{SOURCES,SPECS,BUILD,RPMS,BUILDROOT,SRPMS}
 	mkdir -p $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f bin/harmony $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	bin/harmony dumpconfig $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)/harmony.cfg
-	cp -f scripts/rpm/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	cp -f scripts/rpm/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	cp -f scripts/rpm/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	cp -f scripts/rpm/harmony.spec $(RPMBUILD)/SPECS
+	bin/harmony dumpconfig $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)/harmony.conf
+	cp -f scripts/package/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-rclone.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/rclone.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/rpm/harmony.spec $(RPMBUILD)/SPECS
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
 rpm_build:
-	rpmbuild --target x86_64 -bb scripts/rpm/harmony.spec
+	rpmbuild --target x86_64 -bb scripts/package/rpm/harmony.spec
 
 rpm: rpm_init rpm_build

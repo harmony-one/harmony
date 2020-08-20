@@ -39,20 +39,24 @@ exit 0
 %pre
 getent group harmony >/dev/null || groupadd -r harmony
 getent passwd harmony >/dev/null || \
-   useradd -r -g harmony -d /home/harmony -m -s /sbin/nologin \
+   useradd -r -g harmony -d /data/harmony -m -s /sbin/nologin \
    -c "Harmony validator node account" harmony
-mkdir -p /home/harmony/.hmy/blskeys
-chown -R harmony.harmony /home/harmony
+mkdir -p /data/harmony/.hmy/blskeys
+mkdir -p /data/harmony/.config/rclone
+chown -R harmony.harmony /data/harmony
 exit 0
 
 
 %install
 install -m 0755 -d ${RPM_BUILD_ROOT}/usr/local/sbin ${RPM_BUILD_ROOT}/etc/systemd/system ${RPM_BUILD_ROOT}/etc/sysctl.d ${RPM_BUILD_ROOT}/etc/harmony
+install -m 0755 -d ${RPM_BUILD_ROOT}/data/harmony/.config/rclone
 install -m 0755 harmony ${RPM_BUILD_ROOT}/usr/local/sbin/
 install -m 0755 harmony-setup.sh ${RPM_BUILD_ROOT}/usr/local/sbin/
+install -m 0755 harmony-rclone.sh ${RPM_BUILD_ROOT}/usr/local/sbin/
+install -m 0644 rclone.conf ${RPM_BUILD_ROOT}/data/harmony/.config/rclone/
 install -m 0644 harmony.service ${RPM_BUILD_ROOT}/etc/systemd/system/
 install -m 0644 harmony-sysctl.conf ${RPM_BUILD_ROOT}/etc/sysctl.d/
-install -m 0644 harmony.cfg ${RPM_BUILD_ROOT}/etc/harmony/
+install -m 0644 harmony.conf ${RPM_BUILD_ROOT}/etc/harmony/
 exit 0
 
 %post
@@ -68,9 +72,11 @@ exit 0
 %files
 /usr/local/sbin/harmony
 /usr/local/sbin/harmony-setup.sh
+/usr/local/sbin/harmony-rclone.sh
 /etc/sysctl.d/harmony-sysctl.conf
 /etc/systemd/system/harmony.service
-/etc/harmony/harmony.cfg
+/etc/harmony/harmony.conf
+/data/harmony/.config/rclone
 
 %doc
 %license
