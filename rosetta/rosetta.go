@@ -69,10 +69,7 @@ func newHTTPServer(handler http.Handler) *http.Server {
 	}
 }
 
-func getRouter(
-	asserter *asserter.Asserter,
-	hmy *hmy.Harmony,
-) http.Handler {
+func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 	return server.NewRouter(
 		server.NewNetworkAPIController(services.NewNetworkAPIService(hmy), asserter),
 		server.NewBlockAPIController(services.NewBlockAPIService(hmy), asserter),

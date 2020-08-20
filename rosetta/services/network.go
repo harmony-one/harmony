@@ -29,10 +29,9 @@ func NewNetworkAPIService(hmy *hmy.Harmony) server.NetworkAPIServicer {
 }
 
 // NetworkList implements the /network/list endpoint
-// TODO (dm): Update Node API to support beacon shard functionality for all nodes.
+// TODO (dm): Update Node API to support multiple shards...
 func (s *NetworkAPIService) NetworkList(
-	ctx context.Context,
-	request *types.MetadataRequest,
+	ctx context.Context, request *types.MetadataRequest,
 ) (*types.NetworkListResponse, *types.Error) {
 	network, err := common.GetNetwork(s.hmy.ShardID)
 	if err != nil {
@@ -49,8 +48,7 @@ func (s *NetworkAPIService) NetworkList(
 
 // NetworkStatus implements the /network/status endpoint
 func (s *NetworkAPIService) NetworkStatus(
-	ctx context.Context,
-	request *types.NetworkRequest,
+	ctx context.Context, request *types.NetworkRequest,
 ) (*types.NetworkStatusResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
@@ -95,8 +93,7 @@ func (s *NetworkAPIService) NetworkStatus(
 
 // NetworkOptions implements the /network/options endpoint
 func (s *NetworkAPIService) NetworkOptions(
-	ctx context.Context,
-	request *types.NetworkRequest,
+	ctx context.Context, request *types.NetworkRequest,
 ) (*types.NetworkOptionsResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
