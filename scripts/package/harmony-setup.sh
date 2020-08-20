@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ME=$(basename "$0")
-CONFIG=/etc/harmony/harmony.cfg
+CONFIG=/etc/harmony/harmony.conf
 VER=v1.0
 
 function usage() {

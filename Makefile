@@ -8,6 +8,8 @@ export GO111MODULE:=on
 PKGNAME=harmony
 VERSION=2.3.5
 RPMBUILD=$(HOME)/rpmbuild
+DEBBUILD=$(HOME)/debbuild
+SHELL := bash
 
 .PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb rpm_init rpm_build rpm
 
@@ -84,11 +86,25 @@ arm_static:
 	bash ./scripts/go_executable_build.sh -a arm64 -s
 	git checkout go.mod
 
-deb: rpm
-	fpm -s dir -t deb -n $(PKGNAME) -v $(VERSION)-$(COMMIT) --prefix /usr/local bin/harmony
-	fpm -s pleaserun -t deb -n $(PKGNAME)-service -v $(VERSION) /usr/local/bin/harmony
+deb_init:
+	rm -rf $(DEBBUILD)
+	mkdir -p $(DEBBUILD)/$(PKGNAME)-$(VERSION)/{etc/systemd/system,usr/sbin,etc/sysctl.d,etc/harmony}
+	cp -f bin/harmony $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
+	bin/harmony dumpconfig $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/harmony/harmony.conf
+	cp -f scripts/package/rclone.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/harmony/
+	cp -f scripts/package/harmony.service $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/systemd/system/
+	cp -f scripts/package/harmony-setup.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
+	cp -f scripts/package/harmony-rclone.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
+	cp -f scripts/package/harmony-sysctl.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/sysctl.d/99-harmony.conf
+	cp -r scripts/package/deb/DEBIAN $(DEBBUILD)/$(PKGNAME)-$(VERSION)
+	VER=$(VERSION) scripts/package/templater.sh scripts/package/deb/DEBIAN/control > $(DEBBUILD)/$(PKGNAME)-$(VERSION)/DEBIAN/control
 
-rpm_init: bin/harmony
+deb_build:
+	(cd $(DEBBUILD); dpkg-deb --build $(PKGNAME)-$(VERSION)/)
+
+deb: deb_init deb_build
+
+rpm_init:
 	rm -rf $(RPMBUILD)
 	mkdir -p $(RPMBUILD)/{SOURCES,SPECS,BUILD,RPMS,BUILDROOT,SRPMS}
 	mkdir -p $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
@@ -99,10 +115,10 @@ rpm_init: bin/harmony
 	cp -f scripts/package/harmony-rclone.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/package/rclone.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/package/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	cp -f scripts/package/rpm/harmony.spec $(RPMBUILD)/SPECS
+	VER=$(VERSION) scripts/package/templater.sh scripts/package/rpm/harmony.spec > $(RPMBUILD)/SPECS/harmony.spec
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
 rpm_build:
-	rpmbuild --target x86_64 -bb scripts/package/rpm/harmony.spec
+	rpmbuild --target x86_64 -bb $(RPMBUILD)/SPECS/harmony.spec
 
 rpm: rpm_init rpm_build
