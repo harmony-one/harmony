@@ -39,7 +39,7 @@ var (
 	IdleTimeout = 120 * time.Second
 
 	// Currency ..
-	Currency = &types.Currency{
+	Currency = types.Currency{
 		Symbol:   Symbol,
 		Decimals: Decimals,
 	}

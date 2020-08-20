@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -17,7 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
-	rpcv2 "github.com/harmony-one/harmony/rpc/v2"
+	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -36,94 +35,61 @@ func NewBlockAPIService(hmy *hmy.Harmony) server.BlockAPIServicer {
 // Block implements the /block endpoint
 func (s *BlockAPIService) Block(
 	ctx context.Context, request *types.BlockRequest,
-) (*types.BlockResponse, *types.Error) {
-	if *request.BlockIdentifier.Index != 1000 {
-		previousBlockIndex := *request.BlockIdentifier.Index - 1
-		if previousBlockIndex < 0 {
-			previousBlockIndex = 0
-		}
+) (response *types.BlockResponse, rosettaError *types.Error) {
+	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
+		return nil, err
+	}
 
-		return &types.BlockResponse{
-			Block: &types.Block{
-				BlockIdentifier: &types.BlockIdentifier{
-					Index: *request.BlockIdentifier.Index,
-					Hash:  fmt.Sprintf("block %d", *request.BlockIdentifier.Index),
-				},
-				ParentBlockIdentifier: &types.BlockIdentifier{
-					Index: previousBlockIndex,
-					Hash:  fmt.Sprintf("block %d", previousBlockIndex),
-				},
-				Timestamp:    time.Now().UnixNano() / 1000000,
-				Transactions: []*types.Transaction{},
-			},
-		}, nil
+	var block *hmytypes.Block
+	var currBlockID, prevBlockID *types.BlockIdentifier
+	if block, rosettaError = s.getBlock(ctx, request); rosettaError != nil {
+		return nil, rosettaError
+	}
+	currBlockID = &types.BlockIdentifier{
+		Index: block.Number().Int64(),
+		Hash:  block.Hash().String(),
+	}
+
+	if block.Number().Int64() > 0 {
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(block.Number().Int64()).EthBlockNumber())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		prevBlockID = &types.BlockIdentifier{
+			Index: prevBlock.Number().Int64(),
+			Hash:  prevBlock.Hash().String(),
+		}
+	} else {
+		prevBlockID = &types.BlockIdentifier{
+			Index: -1,
+			Hash:  block.Hash().String(),
+		}
+	}
+
+	responseBlock := &types.Block{
+		BlockIdentifier:       currBlockID,
+		ParentBlockIdentifier: prevBlockID,
+		Timestamp:             block.Time().Int64() * 1e3, // Timestamp must be in ms.
+		Transactions:          []*types.Transaction{},     // Do not return tx details as it is optional.
+	}
+
+	otherTransactions := []*types.TransactionIdentifier{}
+	for _, tx := range block.Transactions() {
+		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
+			Hash: tx.Hash().String(),
+		})
+	}
+	for _, tx := range block.StakingTransactions() {
+		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
+			Hash: tx.Hash().String(),
+		})
 	}
 
 	return &types.BlockResponse{
-		Block: &types.Block{
-			BlockIdentifier: &types.BlockIdentifier{
-				Index: 1000,
-				Hash:  "block 1000",
-			},
-			ParentBlockIdentifier: &types.BlockIdentifier{
-				Index: 999,
-				Hash:  "block 999",
-			},
-			Timestamp: 1586483189000,
-			Transactions: []*types.Transaction{
-				{
-					TransactionIdentifier: &types.TransactionIdentifier{
-						Hash: "transaction 0",
-					},
-					Operations: []*types.Operation{
-						{
-							OperationIdentifier: &types.OperationIdentifier{
-								Index: 0,
-							},
-							Type:   "Transfer",
-							Status: "Success",
-							Account: &types.AccountIdentifier{
-								Address: "account 0",
-							},
-							Amount: &types.Amount{
-								Value: "-1000",
-								Currency: &types.Currency{
-									Symbol:   "ROS",
-									Decimals: 2,
-								},
-							},
-						},
-						{
-							OperationIdentifier: &types.OperationIdentifier{
-								Index: 1,
-							},
-							RelatedOperations: []*types.OperationIdentifier{
-								{
-									Index: 0,
-								},
-							},
-							Type:   "Transfer",
-							Status: "Reverted",
-							Account: &types.AccountIdentifier{
-								Address: "account 1",
-							},
-							Amount: &types.Amount{
-								Value: "1000",
-								Currency: &types.Currency{
-									Symbol:   "ROS",
-									Decimals: 2,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		OtherTransactions: []*types.TransactionIdentifier{
-			{
-				Hash: "transaction 1",
-			},
-		},
+		Block:             responseBlock,
+		OtherTransactions: otherTransactions,
 	}, nil
 }
 
@@ -154,6 +120,26 @@ func (s *BlockAPIService) BlockTransaction(
 		return nil, &common.TransactionNotFoundError
 	}
 	return &types.BlockTransactionResponse{Transaction: transaction}, nil
+}
+
+func (s *BlockAPIService) getBlock(
+	ctx context.Context, request *types.BlockRequest,
+) (block *hmytypes.Block, rosettaError *types.Error) {
+	var err error
+	if request.BlockIdentifier.Hash != nil {
+		requestBlockHash := ethcommon.HexToHash(*request.BlockIdentifier.Hash)
+		block, err = s.hmy.GetBlock(ctx, requestBlockHash)
+	} else if request.BlockIdentifier.Index != nil {
+		block, err = s.hmy.BlockByNumber(ctx, rpc.BlockNumber(*request.BlockIdentifier.Index).EthBlockNumber())
+	} else {
+		return nil, &common.BlockNotFoundError
+	}
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	return block, nil
 }
 
 // transactionInfo stores all related information for any transaction on the Harmony chain
@@ -264,7 +250,7 @@ func formatCrossShardReceiverTransaction(
 				Account: receiverAccountID,
 				Amount: &types.Amount{
 					Value:    fmt.Sprintf("%v", cxReceipt.Amount.Uint64()),
-					Currency: common.Currency,
+					Currency: &common.Currency,
 				},
 				Metadata: map[string]interface{}{"from_account": senderAccountID},
 			},
@@ -378,7 +364,7 @@ func getStakingOperations(
 
 	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
 	gasOperations := newOperations(gasExpended, accountID)
-	rpcStakingTx, err := rpcv2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
+	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -442,7 +428,7 @@ func newTransferOperations(
 	}
 	subAmount := &types.Amount{
 		Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
-		Currency: common.Currency,
+		Currency: &common.Currency,
 	}
 
 	// Addition operation elements
@@ -458,7 +444,7 @@ func newTransferOperations(
 	}
 	addAmount := &types.Amount{
 		Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
-		Currency: common.Currency,
+		Currency: &common.Currency,
 	}
 
 	return []*types.Operation{
@@ -511,7 +497,7 @@ func newCrossShardSenderTransferOperations(
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
-				Currency: common.Currency,
+				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
 				"to_account": receiverAccountID,
@@ -549,7 +535,7 @@ func newContractCreationOperations(
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
-				Currency: common.Currency,
+				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
 				"contract_address": receipt.ContractAddress.String(),
@@ -598,7 +584,7 @@ func newOperations(
 			Account: accountID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("-%v", gasExpended),
-				Currency: common.Currency,
+				Currency: &common.Currency,
 			},
 		},
 	}
