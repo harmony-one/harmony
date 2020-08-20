@@ -97,7 +97,6 @@ rpm_init: bin/harmony
 	cp -f scripts/rpm/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-#	cp -f scripts/rpm/harmony-*.cfg $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/rpm/harmony.spec $(RPMBUILD)/SPECS
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
