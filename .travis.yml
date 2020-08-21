@@ -1,6 +1,5 @@
-sudo: required
-services:
-  - docker
+os: linux
+dist: bionic
 language: go
 go:
   - 1.14
