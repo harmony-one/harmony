@@ -102,6 +102,7 @@ func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
 	stateSync.selfPeerHash = peerHash
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
+	stateSync.syncConfig = &SyncConfig{}
 	return stateSync
 }
 
