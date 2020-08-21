@@ -836,7 +836,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		if shard.Schedule.IsLastBlock(pool.chain.CurrentBlock().Number().Uint64()) {
 			pendingEpoch = new(big.Int).Add(pendingEpoch, big.NewInt(1))
 		}
-		_, _, err = VerifyAndDelegateFromMsg(
+		_, _, _, err = VerifyAndDelegateFromMsg(
 			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig.IsRedelegation(pendingEpoch))
 		return err
 	case staking.DirectiveUndelegate:
