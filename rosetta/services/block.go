@@ -53,7 +53,7 @@ func (s *BlockAPIService) Block(
 	}
 
 	if block.Number().Int64() > 0 {
-		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(block.Number().Int64()).EthBlockNumber())
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(block.Number().Int64()-1).EthBlockNumber())
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 				"message": err.Error(),
@@ -64,10 +64,7 @@ func (s *BlockAPIService) Block(
 			Hash:  prevBlock.Hash().String(),
 		}
 	} else {
-		prevBlockID = &types.BlockIdentifier{
-			Index: -1,
-			Hash:  block.Hash().String(),
-		}
+		prevBlockID = currBlockID
 	}
 
 	responseBlock := &types.Block{
@@ -103,12 +100,15 @@ func (s *BlockAPIService) BlockTransaction(
 		return nil, err
 	}
 
-	requestBlockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
+	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
-	txInfo, rosettaError := s.getTransactionInfo(ctx, requestBlockHash, txHash)
+	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
 
 	var transaction *types.Transaction
-	if txInfo.tx != nil {
+	if txInfo.tx != nil && txInfo.receipt != nil {
 		transaction, rosettaError = formatTransaction(txInfo.tx, txInfo.receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
@@ -155,32 +155,30 @@ type transactionInfo struct {
 
 // getTransactionInfo given the block hash and transaction hash
 func (s *BlockAPIService) getTransactionInfo(
-	ctx context.Context, requestBlockHash ethcommon.Hash, txHash ethcommon.Hash,
+	ctx context.Context, blockHash, txHash ethcommon.Hash,
 ) (txInfo *transactionInfo, rosettaError *types.Error) {
 	// Look for all of the possible transactions
 	// Note: Use pool transaction interface to handle both plain & staking transactions
 	var tx hmytypes.PoolTransaction
-	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
+	tx, _, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
 	if tx == nil {
-		tx, blockHash, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
+		tx, _, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
 	}
-	cxReceipt, blockHash, _, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), txHash)
+	cxReceipt, _, _, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), txHash)
 
 	if tx == nil && cxReceipt == nil {
 		return nil, &common.TransactionNotFoundError
 	}
-	if requestBlockHash != blockHash {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": fmt.Sprintf(
-				"Given block hash of %v != transaction block hash %v",
-				requestBlockHash.String(), blockHash.String(),
-			),
+
+	var receipt *hmytypes.Receipt
+	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
 		})
 	}
-
-	receipt, rosettaError := s.getTransactionReceiptFromIndex(ctx, blockHash, index)
-	if rosettaError != nil {
-		return nil, rosettaError
+	if int(index) < len(receipts) {
+		receipt = receipts[index]
 	}
 
 	return &transactionInfo{

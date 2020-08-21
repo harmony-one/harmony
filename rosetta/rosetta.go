@@ -1,6 +1,7 @@
 package rosetta
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -39,7 +40,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 
-	router := server.CorsMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy)))
+	router := server.CorsMiddleware(recoverMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy))))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
@@ -74,6 +75,30 @@ func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 		server.NewNetworkAPIController(services.NewNetworkAPIService(hmy), asserter),
 		server.NewBlockAPIController(services.NewBlockAPIService(hmy), asserter),
 	)
+}
+
+func recoverMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		defer func() {
+			r := recover()
+			if r != nil {
+				switch t := r.(type) {
+				case string:
+					err = errors.New(t)
+				case error:
+					err = t
+				default:
+					err = errors.New("unknown error")
+				}
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				utils.Logger().Error().Err(err).Msg("Rosetta Error")
+				// Print to stdout for quick check of rosetta activity
+				fmt.Printf("%s PANIC: %s\n", time.Now().Format("2006-01-02 15:04:05"), err.Error())
+			}
+		}()
+		h.ServeHTTP(w, r)
+	})
 }
 
 func loggerMiddleware(router http.Handler) http.Handler {
