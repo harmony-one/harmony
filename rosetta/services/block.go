@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -17,7 +18,8 @@ import (
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/staking"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 // BlockAPIService implements the server.BlockAPIServicer interface.
@@ -265,7 +267,7 @@ func formatTransaction(
 	var isCrossShard bool
 	var toShard uint32
 
-	stakingTx, isStaking := tx.(*staking.StakingTransaction)
+	stakingTx, isStaking := tx.(*stakingTypes.StakingTransaction)
 	if !isStaking {
 		plainTx, ok := tx.(*hmytypes.Transaction)
 		if !ok {
@@ -353,7 +355,7 @@ func getOperations(
 }
 
 func getStakingOperations(
-	tx *staking.StakingTransaction, receipt *hmytypes.Receipt,
+	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	// Sender address should have errored prior to call this function
 	senderAddress, _ := tx.SenderAddress()
@@ -377,6 +379,23 @@ func getStakingOperations(
 		})
 	}
 
+	var amount *big.Int
+	if tx.StakingType() == stakingTypes.DirectiveCollectRewards {
+		logs := findLogsWithTopic(receipt, staking.CollectRewardsTopic)
+		for _, log := range logs {
+			if log.Address == senderAddress {
+				amount = big.NewInt(0).SetBytes(log.Data)
+			}
+		}
+		if amount == nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress),
+			})
+		}
+	} else {
+		amount = tx.Value()
+	}
+
 	return append(gasOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{
 			Index: gasOperations[0].OperationIdentifier.Index + 1,
@@ -388,7 +407,8 @@ func getStakingOperations(
 		Status:  common.SuccessOperationStatus.Status,
 		Account: accountID,
 		Amount: &types.Amount{
-			Value: fmt.Sprintf("-%v", tx.Value().Uint64()),
+			Value:    fmt.Sprintf("-%v", amount.Uint64()),
+			Currency: &common.Currency,
 		},
 		Metadata: metadata,
 	}), nil
@@ -588,4 +608,19 @@ func newOperations(
 			},
 		},
 	}
+}
+
+func findLogsWithTopic(
+	receipt *hmytypes.Receipt, targetTopic ethcommon.Hash,
+) []*hmytypes.Log {
+	logs := []*hmytypes.Log{}
+	for _, log := range receipt.Logs {
+		for _, topic := range log.Topics {
+			if topic == targetTopic {
+				logs = append(logs, log)
+				break
+			}
+		}
+	}
+	return logs
 }
