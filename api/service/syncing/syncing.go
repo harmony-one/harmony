@@ -102,6 +102,7 @@ func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
 	stateSync.selfPeerHash = peerHash
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
+	stateSync.syncConfig = &SyncConfig{}
 	return stateSync
 }
 
@@ -243,10 +244,6 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	if len(peers) == 0 {
 		return errors.New("[SYNC] no peers to connect to")
 	}
-	if ss.syncConfig != nil {
-		ss.syncConfig.CloseConnections()
-	}
-	ss.syncConfig = &SyncConfig{}
 
 	var wg sync.WaitGroup
 	for _, peer := range peers {
