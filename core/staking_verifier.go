@@ -201,22 +201,23 @@ var (
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndDelegateFromMsg(
 	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, redelegation bool,
-) ([]*staking.ValidatorWrapper, *big.Int, error) {
+) ([]*staking.ValidatorWrapper, *big.Int, map[common.Address]*big.Int, error) {
 	if stateDB == nil {
-		return nil, nil, errStateDBIsMissing
+		return nil, nil, nil, errStateDBIsMissing
 	}
 	if !stateDB.IsValidator(msg.ValidatorAddress) {
-		return nil, nil, errValidatorNotExist
+		return nil, nil, nil, errValidatorNotExist
 	}
 	if msg.Amount.Sign() == -1 {
-		return nil, nil, errNegativeAmount
+		return nil, nil, nil, errNegativeAmount
 	}
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
-		return nil, nil, errDelegationTooSmall
+		return nil, nil, nil, errDelegationTooSmall
 	}
 
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	delegateBalance := big.NewInt(0).Set(msg.Amount)
+	fromLockedTokens := map[common.Address]*big.Int{}
 
 	var delegateeWrapper *staking.ValidatorWrapper
 	if redelegation {
@@ -225,7 +226,7 @@ func VerifyAndDelegateFromMsg(
 			delegationIndex := &delegations[i]
 			wrapper, err := stateDB.ValidatorWrapperCopy(delegationIndex.ValidatorAddress)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
 				utils.Logger().Warn().
@@ -233,7 +234,7 @@ func VerifyAndDelegateFromMsg(
 					Uint64("delegation index", delegationIndex.Index).
 					Int("delegations length", len(wrapper.Delegations)).
 					Msg("Delegation index out of bound")
-				return nil, nil, errors.New("Delegation index out of bound")
+				return nil, nil, nil, errors.New("Delegation index out of bound")
 			}
 
 			delegation := &wrapper.Delegations[delegationIndex.Index]
@@ -260,13 +261,14 @@ func VerifyAndDelegateFromMsg(
 				// Used undelegated token for redelegation
 				delegation.Undelegations = delegation.Undelegations[curIndex:]
 				if err := wrapper.SanityCheck(); err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				if bytes.Equal(delegationIndex.ValidatorAddress[:], msg.ValidatorAddress[:]) {
 					delegateeWrapper = wrapper
 				}
 				updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
+				fromLockedTokens[delegationIndex.ValidatorAddress] = big.NewInt(0).Sub(startBalance, delegateBalance)
 			}
 		}
 	}
@@ -275,7 +277,7 @@ func VerifyAndDelegateFromMsg(
 		var err error
 		delegateeWrapper, err = stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, delegateeWrapper)
 	}
@@ -287,7 +289,7 @@ func VerifyAndDelegateFromMsg(
 		if bytes.Equal(delegation.DelegatorAddress.Bytes(), msg.DelegatorAddress.Bytes()) {
 			delegation.Amount.Add(delegation.Amount, msg.Amount)
 			if err := delegateeWrapper.SanityCheck(); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			found = true
 		}
@@ -301,24 +303,24 @@ func VerifyAndDelegateFromMsg(
 			),
 		)
 		if err := delegateeWrapper.SanityCheck(); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
 	if delegateBalance.Cmp(big.NewInt(0)) == 0 {
 		// delegation fully from undelegated tokens, no need to deduct from balance.
-		return updatedValidatorWrappers, big.NewInt(0), nil
+		return updatedValidatorWrappers, big.NewInt(0), fromLockedTokens, nil
 	}
 
 	// Still need to deduct tokens from balance for delegation
 	// Check if there is enough liquid token to delegate
 	if !CanTransfer(stateDB, msg.DelegatorAddress, delegateBalance) {
-		return nil, nil, errors.Wrapf(
+		return nil, nil, nil, errors.Wrapf(
 			errInsufficientBalanceForStake, "totalRedelegatable: %v, balance: %v; trying to stake %v",
 			big.NewInt(0).Sub(msg.Amount, delegateBalance), stateDB.GetBalance(msg.DelegatorAddress), msg.Amount)
 	}
 
-	return updatedValidatorWrappers, delegateBalance, nil
+	return updatedValidatorWrappers, delegateBalance, fromLockedTokens, nil
 }
 
 // VerifyAndUndelegateFromMsg verifies the undelegate validator message

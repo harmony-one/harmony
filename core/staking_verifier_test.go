@@ -729,6 +729,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 		expVWrappers []staking.ValidatorWrapper
 		expAmt       *big.Int
+		expRedel     map[common.Address]*big.Int
 		expErr       error
 	}{
 		{
@@ -875,6 +876,10 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 			expVWrappers: defaultExpVWrappersRedelegate(),
 			expAmt:       big.NewInt(0),
+			expRedel: map[common.Address]*big.Int{
+				validatorAddr:  fiveKOnes,
+				validatorAddr2: fiveKOnes,
+			},
 		},
 		{
 			// 11: redelegate with undelegation epoch too recent, have to use some balance
@@ -892,6 +897,9 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				return wrappers
 			}(),
 			expAmt: fiveKOnes,
+			expRedel: map[common.Address]*big.Int{
+				validatorAddr: fiveKOnes,
+			},
 		},
 		{
 			// 12: redelegate with not enough undelegated token, have to use some balance
@@ -911,6 +919,10 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				return wrappers
 			}(),
 			expAmt: tenKOnes,
+			expRedel: map[common.Address]*big.Int{
+				validatorAddr:  fiveKOnes,
+				validatorAddr2: fiveKOnes,
+			},
 		},
 		{
 			// 13: no redelegation and full balance used
@@ -989,7 +1001,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ws, amt, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
+		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1002,6 +1014,19 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			t.Errorf("Test %v: unexpected amount %v / %v", i, amt, test.expAmt)
 		}
 
+		if len(amtRedel) != len(test.expRedel) {
+			t.Errorf("Test %v: wrong expected redelegation length %d / %d", i, len(amtRedel), len(test.expRedel))
+		} else {
+			for key, value := range test.expRedel {
+				actValue, ok := amtRedel[key]
+				if !ok {
+					t.Errorf("Test %v: missing expected redelegation key/value %v / %v", i, key, value)
+				}
+				if value.Cmp(actValue) != 0 {
+					t.Errorf("Test %v: unexpeced redelegation value %v / %v", i, actValue, value)
+				}
+			}
+		}
 		for j := range ws {
 			if err := staketest.CheckValidatorWrapperEqual(*ws[j], test.expVWrappers[j]); err != nil {
 				t.Errorf("Test %v: %v", i, err)
