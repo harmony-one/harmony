@@ -213,6 +213,7 @@ type TransactionMetadata struct {
 	Data                 string                       `json:"data,omitempty"`
 }
 
+// formatCrossShardReceiverTransaction for cross-shard payouts on destination shard
 func formatCrossShardReceiverTransaction(
 	cxReceipt *hmytypes.CXReceipt,
 ) (txs *types.Transaction, rosettaError *types.Error) {
@@ -227,7 +228,6 @@ func formatCrossShardReceiverTransaction(
 			"message": err.Error(),
 		})
 	}
-
 	senderAccountID, rosettaError := newAccountIdentifier(cxReceipt.From)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -258,6 +258,7 @@ func formatCrossShardReceiverTransaction(
 	}, nil
 }
 
+// formatTransaction for staking, cross-shard sender, and plain transactions
 func formatTransaction(
 	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
 ) (txs *types.Transaction, rosettaError *types.Error) {
@@ -265,6 +266,7 @@ func formatTransaction(
 	var isCrossShard bool
 	var toShard uint32
 
+	// Fetch correct operations depending on transaction type
 	stakingTx, isStaking := tx.(*stakingTypes.StakingTransaction)
 	if !isStaking {
 		plainTx, ok := tx.(*hmytypes.Transaction)
@@ -289,6 +291,7 @@ func formatTransaction(
 	}
 	txID := &types.TransactionIdentifier{Hash: tx.Hash().String()}
 
+	// Set transaction metadata if needed
 	var txMetadata TransactionMetadata
 	var err error
 	if isCrossShard {
@@ -296,7 +299,7 @@ func formatTransaction(
 		txMetadata.ToShardID = toShard
 		txMetadata.FromShardID = tx.ShardID()
 	}
-	if len(tx.Data()) > 0 {
+	if len(tx.Data()) > 0 && !isStaking {
 		txMetadata.Data = hex.EncodeToString(tx.Data())
 	}
 	metadata, err := rpc.NewStructuredResponse(txMetadata)
@@ -313,6 +316,8 @@ func formatTransaction(
 	}, nil
 }
 
+// getOperations for correct one of the following transactions:
+// contract creation, cross-shard sender, same-shard transfer
 func getOperations(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
@@ -331,6 +336,7 @@ func getOperations(
 	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
 	gasOperations := newOperations(gasExpended, accountID)
 
+	// Handle different cases of plain transactions
 	var txOperations []*types.Operation
 	if tx.To() == nil {
 		txOperations, rosettaError = newContractCreationOperations(
@@ -338,7 +344,7 @@ func getOperations(
 		)
 	} else if tx.ShardID() != tx.ToShardID() {
 		txOperations, rosettaError = newCrossShardSenderTransferOperations(
-			gasOperations[0].OperationIdentifier, tx, receipt,
+			gasOperations[0].OperationIdentifier, tx,
 		)
 	} else {
 		txOperations, rosettaError = newTransferOperations(
@@ -352,6 +358,7 @@ func getOperations(
 	return append(gasOperations, txOperations...), nil
 }
 
+// getStakingOperations for all staking directives
 func getStakingOperations(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
@@ -362,8 +369,11 @@ func getStakingOperations(
 		return nil, rosettaError
 	}
 
+	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
 	gasOperations := newOperations(gasExpended, accountID)
+
+	// Format staking message for metadata
 	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -377,12 +387,69 @@ func getStakingOperations(
 		})
 	}
 
-	var amount *big.Int
-	if tx.StakingType() == stakingTypes.DirectiveCollectRewards {
+	// Set correct amount depending on staking message directive
+	var amount *types.Amount
+	switch tx.StakingType() {
+	case stakingTypes.DirectiveCreateValidator:
+		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveCreateValidator)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		stkMsg, ok := msg.(*stakingTypes.CreateValidator)
+		if !ok {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unable to parse staking message for create validator tx",
+			})
+		}
+		amount = &types.Amount{
+			Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+			Currency: &common.Currency,
+		}
+	case stakingTypes.DirectiveDelegate:
+		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveDelegate)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		stkMsg, ok := msg.(*stakingTypes.Delegate)
+		if !ok {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unable to parse staking message for delegate tx",
+			})
+		}
+		amount = &types.Amount{
+			Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+			Currency: &common.Currency,
+		}
+	case stakingTypes.DirectiveUndelegate:
+		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveUndelegate)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		stkMsg, ok := msg.(*stakingTypes.Undelegate)
+		if !ok {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unable to parse staking message for undelegate tx",
+			})
+		}
+		amount = &types.Amount{
+			Value:    fmt.Sprintf("%v", stkMsg.Amount.Uint64()),
+			Currency: &common.Currency,
+		}
+	case stakingTypes.DirectiveCollectRewards:
 		logs := findLogsWithTopic(receipt, staking.CollectRewardsTopic)
 		for _, log := range logs {
 			if log.Address == senderAddress {
-				amount = big.NewInt(0).SetBytes(log.Data)
+				amount = &types.Amount{
+					Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data).Uint64()),
+					Currency: &common.Currency,
+				}
+				break
 			}
 		}
 		if amount == nil {
@@ -390,8 +457,11 @@ func getStakingOperations(
 				"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress),
 			})
 		}
-	} else {
-		amount = tx.Value()
+	default:
+		amount = &types.Amount{
+			Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+			Currency: &common.Currency,
+		}
 	}
 
 	return append(gasOperations, &types.Operation{
@@ -401,17 +471,16 @@ func getStakingOperations(
 		RelatedOperations: []*types.OperationIdentifier{
 			gasOperations[0].OperationIdentifier,
 		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: accountID,
-		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", amount.Uint64()),
-			Currency: &common.Currency,
-		},
+		Type:     tx.StakingType().String(),
+		Status:   common.SuccessOperationStatus.Status,
+		Account:  accountID,
+		Amount:   amount,
 		Metadata: metadata,
 	}), nil
 }
 
+// newTransferOperations extracts & formats the operation(s) for plain transaction,
+// including contract transactions.
 func newTransferOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
@@ -473,6 +542,7 @@ func newTransferOperations(
 			Status:              opStatus,
 			Account:             subAccountID,
 			Amount:              subAmount,
+			Metadata:            map[string]interface{}{},
 		},
 		{
 			OperationIdentifier: addOperationID,
@@ -481,18 +551,20 @@ func newTransferOperations(
 			Status:              opStatus,
 			Account:             addAccountID,
 			Amount:              addAmount,
+			Metadata:            map[string]interface{}{},
 		},
 	}, nil
 }
 
+// newCrossShardSenderTransferOperations extracts & formats the operation(s) for cross-shard-tx
+// on the sender's shard.
 func newCrossShardSenderTransferOperations(
 	startingOperationID *types.OperationIdentifier,
-	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
+	tx *hmytypes.Transaction,
 ) ([]*types.Operation, *types.Error) {
 	// Sender address should have errored prior to call this function
 	senderAddress, _ := tx.SenderAddress()
 	receiverAddress := *tx.To()
-
 	senderAccountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -524,9 +596,10 @@ func newCrossShardSenderTransferOperations(
 	}, nil
 }
 
+// newContractCreationOperations extracts & formats the operation(s) for a contract creation tx
 func newContractCreationOperations(
 	startingOperationID *types.OperationIdentifier,
-	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
+	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	// Sender address should have errored prior to call this function
 	senderAddress, _ := tx.SenderAddress()
@@ -535,8 +608,9 @@ func newContractCreationOperations(
 		return nil, rosettaError
 	}
 
+	// Set execution status as necessary
 	status := common.SuccessOperationStatus.Status
-	if receipt.Status == hmytypes.ReceiptStatusFailed {
+	if txReceipt.Status == hmytypes.ReceiptStatusFailed {
 		status = common.ContractFailureOperationStatus.Status
 	}
 
@@ -556,17 +630,18 @@ func newContractCreationOperations(
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
-				"contract_address": receipt.ContractAddress.String(),
+				"contract_address": txReceipt.ContractAddress.String(),
 			},
 		},
 	}, nil
 }
 
-// AccountMetadata ..
+// AccountMetadata used for account identifiers
 type AccountMetadata struct {
 	Address string `json:"hex_address"`
 }
 
+// newAccountIdentifier ..
 func newAccountIdentifier(
 	address ethcommon.Address,
 ) (*types.AccountIdentifier, *types.Error) {
@@ -589,8 +664,10 @@ func newAccountIdentifier(
 	}, nil
 }
 
+// newOperations creates a new operation with the gas fee as the first operation.
+// Note: the gas fee is gasPrice * gasUsed.
 func newOperations(
-	gasExpended uint64, accountID *types.AccountIdentifier,
+	gasFeeInATTO uint64, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{
 		{
@@ -601,13 +678,14 @@ func newOperations(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: accountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", gasExpended),
+				Value:    fmt.Sprintf("-%v", gasFeeInATTO),
 				Currency: &common.Currency,
 			},
 		},
 	}
 }
 
+// findLogsWithTopic returns all the logs that contain the given receipt
 func findLogsWithTopic(
 	receipt *hmytypes.Receipt, targetTopic ethcommon.Hash,
 ) []*hmytypes.Log {
