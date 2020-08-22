@@ -54,20 +54,19 @@ func (s *NetworkAPIService) NetworkStatus(
 		return nil, err
 	}
 
+	// Fetch relevant headers & peers
 	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get current header: %v", err.Error()),
 		})
 	}
-
 	genesisHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(0))
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get genesis header: %v", err.Error()),
 		})
 	}
-
 	peers, rosettaError := getPeersFromNodePeerInfo(s.hmy.GetPeerInfo())
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -99,11 +98,7 @@ func (s *NetworkAPIService) NetworkOptions(
 		return nil, err
 	}
 
-	version := &types.Version{
-		RosettaVersion: common.RosettaVersion,
-		NodeVersion:    nodeconfig.GetVersion(),
-	}
-
+	// Fetch allows based on current network option
 	var allow *types.Allow
 	isArchival := nodeconfig.GetDefaultConfig().GetArchival()
 	if s.hmy.ShardID == shard.BeaconChainShardID {
@@ -113,8 +108,11 @@ func (s *NetworkAPIService) NetworkOptions(
 	}
 
 	return &types.NetworkOptionsResponse{
-		Version: version,
-		Allow:   allow,
+		Version: &types.Version{
+			RosettaVersion: common.RosettaVersion,
+			NodeVersion:    nodeconfig.GetVersion(),
+		},
+		Allow: allow,
 	}, nil
 }
 
