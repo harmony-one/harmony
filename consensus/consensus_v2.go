@@ -272,15 +272,17 @@ func (consensus *Consensus) tryCatchup() {
 			consensus.getLogger().Debug().Msg("[TryCatchup] parent block hash not match")
 			break
 		}
-		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
-
-		atomic.AddUint64(&consensus.blockNum, 1)
-		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
 
 		if len(committedMsg.SenderPubkeys) != 1 {
 			consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
 			break
 		}
+
+		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
+
+		atomic.AddUint64(&consensus.blockNum, 1)
+		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
+
 		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")

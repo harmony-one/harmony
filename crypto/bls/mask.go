@@ -239,14 +239,17 @@ func (m *Mask) SetKeysAtomic(publics []*PublicKeyWrapper, enable bool) error {
 	for i, key := range publics {
 		index, found := m.PublicsIndex[key.Bytes]
 		if !found {
-			errors.New("key not found")
+			return errors.New("key not found")
 		}
 		indexes[i] = index
 	}
 	for _, index := range indexes {
-		return m.SetBit(index, enable)
+		err := m.SetBit(index, enable)
+		if err != nil {
+			return err
+		}
 	}
-	return errors.New("key not found")
+	return nil
 }
 
 // CountEnabled returns the number of enabled nodes in the CoSi participation

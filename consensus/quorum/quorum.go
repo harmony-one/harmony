@@ -180,6 +180,7 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 		for _, key := range ballot.SignerPubKeys {
 			if _, ok := collectedKeys[key]; ok {
 				alreadyCollected = true
+				break
 			}
 		}
 		if alreadyCollected {
