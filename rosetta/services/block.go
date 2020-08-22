@@ -480,7 +480,7 @@ func getAmountFromUndelegateMessage(data []byte) (*types.Amount, *types.Error) {
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("%v", stkMsg.Amount.Uint64()),
 		Currency: &common.Currency,
 	}, nil
 }
