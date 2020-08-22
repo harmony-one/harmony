@@ -734,7 +734,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 		Amount:    tx.Value(),
 	}
 
-	refCxId := &types.TransactionIdentifier{Hash: tx.Hash().String()}
+	refCxID := &types.TransactionIdentifier{Hash: tx.Hash().String()}
 	refOperations := []*types.Operation{
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -753,12 +753,12 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 		},
 	}
 	refMetadata, err := rpc.NewStructuredResponse(TransactionMetadata{
-		CrossShardIdentifier: refCxId,
+		CrossShardIdentifier: refCxID,
 		ToShardID:            tx.ToShardID(),
 		FromShardID:          tx.ShardID(),
 	})
 	refRosettaTx := &types.Transaction{
-		TransactionIdentifier: refCxId,
+		TransactionIdentifier: refCxID,
 		Operations:            refOperations,
 		Metadata:              refMetadata,
 	}
