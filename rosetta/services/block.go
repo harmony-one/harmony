@@ -391,71 +391,20 @@ func getStakingOperations(
 	var amount *types.Amount
 	switch tx.StakingType() {
 	case stakingTypes.DirectiveCreateValidator:
-		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveCreateValidator)
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": err.Error(),
-			})
-		}
-		stkMsg, ok := msg.(*stakingTypes.CreateValidator)
-		if !ok {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": "unable to parse staking message for create validator tx",
-			})
-		}
-		amount = &types.Amount{
-			Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
-			Currency: &common.Currency,
+		if amount, rosettaError = getAmountFromCreateValidatorMessage(tx.Data()); rosettaError != nil {
+			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveDelegate:
-		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveDelegate)
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": err.Error(),
-			})
-		}
-		stkMsg, ok := msg.(*stakingTypes.Delegate)
-		if !ok {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": "unable to parse staking message for delegate tx",
-			})
-		}
-		amount = &types.Amount{
-			Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
-			Currency: &common.Currency,
+		if amount, rosettaError = getAmountFromDelegateMessage(tx.Data()); rosettaError != nil {
+			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveUndelegate:
-		msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveUndelegate)
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": err.Error(),
-			})
-		}
-		stkMsg, ok := msg.(*stakingTypes.Undelegate)
-		if !ok {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": "unable to parse staking message for undelegate tx",
-			})
-		}
-		amount = &types.Amount{
-			Value:    fmt.Sprintf("%v", stkMsg.Amount.Uint64()),
-			Currency: &common.Currency,
+		if amount, rosettaError = getAmountFromUndelegateMessage(tx.Data()); rosettaError != nil {
+			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveCollectRewards:
-		logs := findLogsWithTopic(receipt, staking.CollectRewardsTopic)
-		for _, log := range logs {
-			if log.Address == senderAddress {
-				amount = &types.Amount{
-					Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data).Uint64()),
-					Currency: &common.Currency,
-				}
-				break
-			}
-		}
-		if amount == nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress),
-			})
+		if amount, rosettaError = getAmountFromCollectRewards(receipt, senderAddress); rosettaError != nil {
+			return nil, rosettaError
 		}
 	default:
 		amount = &types.Amount{
@@ -477,6 +426,85 @@ func getStakingOperations(
 		Amount:   amount,
 		Metadata: metadata,
 	}), nil
+}
+
+func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Error) {
+	msg, err := stakingTypes.RLPDecodeStakeMsg(data, stakingTypes.DirectiveCreateValidator)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	stkMsg, ok := msg.(*stakingTypes.CreateValidator)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unable to parse staking message for create validator tx",
+		})
+	}
+	return &types.Amount{
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Currency: &common.Currency,
+	}, nil
+}
+
+func getAmountFromDelegateMessage(data []byte) (*types.Amount, *types.Error) {
+	msg, err := stakingTypes.RLPDecodeStakeMsg(data, stakingTypes.DirectiveDelegate)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	stkMsg, ok := msg.(*stakingTypes.Delegate)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unable to parse staking message for delegate tx",
+		})
+	}
+	return &types.Amount{
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Currency: &common.Currency,
+	}, nil
+}
+
+func getAmountFromUndelegateMessage(data []byte) (*types.Amount, *types.Error) {
+	msg, err := stakingTypes.RLPDecodeStakeMsg(data, stakingTypes.DirectiveUndelegate)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	stkMsg, ok := msg.(*stakingTypes.Undelegate)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unable to parse staking message for undelegate tx",
+		})
+	}
+	return &types.Amount{
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Currency: &common.Currency,
+	}, nil
+}
+
+func getAmountFromCollectRewards(
+	receipt *hmytypes.Receipt, senderAddress ethcommon.Address,
+) (*types.Amount, *types.Error) {
+	var amount *types.Amount
+	logs := findLogsWithTopic(receipt, staking.CollectRewardsTopic)
+	for _, log := range logs {
+		if log.Address == senderAddress {
+			amount = &types.Amount{
+				Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data).Uint64()),
+				Currency: &common.Currency,
+			}
+			break
+		}
+	}
+	if amount == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress),
+		})
+	}
+	return amount, nil
 }
 
 // newTransferOperations extracts & formats the operation(s) for plain transaction,
