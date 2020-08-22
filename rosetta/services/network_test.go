@@ -177,19 +177,6 @@ func TestGetPeersFromNodePeerInfo(t *testing.T) {
 	}
 }
 
-func checkPeerID(p *types.Peer, refTopics []string) error {
-	topics, ok := p.Metadata["topics"].([]string)
-	if !ok {
-		return fmt.Errorf("expected topics in metadata of %v to be a slice of string", p)
-	}
-	sort.Strings(topics)
-	sort.Strings(refTopics)
-	if !reflect.DeepEqual(topics, refTopics) {
-		return fmt.Errorf("topics %v does not match reference topics %v", topics, refTopics)
-	}
-	return nil
-}
-
 func generateTestNodePeerInfoList() commonRPC.NodePeerInfo {
 	return commonRPC.NodePeerInfo{
 		PeerID:       "test",
@@ -217,4 +204,17 @@ func generateTestNodePeerInfoList() commonRPC.NodePeerInfo {
 			},
 		},
 	}
+}
+
+func checkPeerID(p *types.Peer, refTopics []string) error {
+	topics, ok := p.Metadata["topics"].([]string)
+	if !ok {
+		return fmt.Errorf("expected topics in metadata of %v to be a slice of string", p)
+	}
+	sort.Strings(topics)
+	sort.Strings(refTopics)
+	if !reflect.DeepEqual(topics, refTopics) {
+		return fmt.Errorf("topics %v does not match reference topics %v", topics, refTopics)
+	}
+	return nil
 }
