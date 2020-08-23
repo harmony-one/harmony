@@ -122,3 +122,10 @@ rpm_build:
 	rpmbuild --target x86_64 -bb $(RPMBUILD)/SPECS/harmony.spec
 
 rpm: rpm_init rpm_build
+	rpm --addsign $(RPMBUILD)/RPMS/x86_64/$(PKGNAME)-$(VERSION)-0.x86_64.rpm
+
+rpmpub_dev: rpm
+	./scripts/package/publish-repo.sh -p dev -t rpm -s $(RPMBUILD)
+
+rpmpub_prod: rpm
+	./scripts/package/publish-repo.sh -p prod -t rpm -s $(RPMBUILD)

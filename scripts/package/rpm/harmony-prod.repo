@@ -1,0 +1,6 @@
+[harmony-prod]
+name=Production Packages - $basearch
+baseurl=http://pub.harmony.one.s3.amazonaws.com/release/package/yum/$basearch/
+enabled=1
+gpgkey=https://raw.githubusercontent.com/harmony-one/harmony-open/master/harmony-release/harmony-pub.key
+gpgcheck=1
