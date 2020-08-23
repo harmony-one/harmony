@@ -6,12 +6,12 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 PKGNAME=harmony
-VERSION?=2.3.5
+VERSION?=2.3.6
 RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb rpm_init rpm_build rpm
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -32,7 +32,7 @@ help:
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
 	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
 	@echo "rpm - build a harmony RPM pacakge"
-	@echo "deb - build a harmony Debian pacakge (todo)"
+	@echo "deb - build a harmony Debian pacakge"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -104,6 +104,14 @@ deb_build:
 
 deb: deb_init deb_build
 
+debpub_dev: deb
+	cp scripts/package/deb/dev.aptly.conf ~/.aptly.conf
+	./scripts/package/publish-repo.sh -p dev -n deb -s $(DEBBUILD)
+
+debpub_prod: deb
+	cp scripts/package/deb/prod.aptly.conf ~/.aptly.conf
+	./scripts/package/publish-repo.sh -p prod -n deb -s $(DEBBUILD)
+
 rpm_init:
 	rm -rf $(RPMBUILD)
 	mkdir -p $(RPMBUILD)/{SOURCES,SPECS,BUILD,RPMS,BUILDROOT,SRPMS}
@@ -125,7 +133,7 @@ rpm: rpm_init rpm_build
 	rpm --addsign $(RPMBUILD)/RPMS/x86_64/$(PKGNAME)-$(VERSION)-0.x86_64.rpm
 
 rpmpub_dev: rpm
-	./scripts/package/publish-repo.sh -p dev -t rpm -s $(RPMBUILD)
+	./scripts/package/publish-repo.sh -p dev -n rpm -s $(RPMBUILD)
 
 rpmpub_prod: rpm
-	./scripts/package/publish-repo.sh -p prod -t rpm -s $(RPMBUILD)
+	./scripts/package/publish-repo.sh -p prod -n rpm -s $(RPMBUILD)

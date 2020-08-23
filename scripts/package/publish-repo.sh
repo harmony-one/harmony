@@ -69,7 +69,16 @@ function publish_rpm() {
 }
 
 function publish_deb() {
-   :
+   if aptly repo show harmony-$PROFILE > /dev/null; then
+      aptly repo add harmony-$PROFILE $SRC
+      aptly publish update bionic s3:harmony-$PROFILE:
+   else
+      aptly repo create -distribution=bionic -component=main harmony-$PROFILE
+      aptly repo add harmony-$PROFILE $SRC
+      aptly publish repo harmony-$PROFILE s3:harmony-$PROFILE:
+   fi
+   # remove the local repo
+   aptly repo drop harmony-$PROFILE
 }
 
 ################## MAIN ##################
