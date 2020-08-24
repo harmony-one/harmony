@@ -1,6 +1,6 @@
 # Harmony
 
-[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/harmony-one/harmony)
+[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?branch=main)](https://travis-ci.com/harmony-one/harmony)
 ![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)
 ![Discord](https://img.shields.io/discord/532383335348043777.svg)
 [![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=main)](https://coveralls.io/github/harmony-one/harmony?branch=master)
