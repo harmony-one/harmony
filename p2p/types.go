@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"github.com/harmony-one/harmony/internal/herrors"
+	"github.com/harmony-one/harmony/common/herrors"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
@@ -95,22 +95,24 @@ type ValidateCache struct {
 	// handlers.
 	// WARN: write GlobalCache after validation is forbidden since it will result in
 	// potential race condition and inconsistent handling results.
+	// TODO: abstract this cache to a getter / setter interface and separate use
+	//   to protect global data during message processing in different handlers.
 	GlobalCache map[string]interface{}
 
 	// HandlerCache is the data stored as cache for further handling the message.
 	HandlerCache interface{}
 }
 
-func mergeValidateResults(handlers []PubSubHandler, vrs []ValidateResult) (*vData, ValidateAction, error) {
+func mergeValidateResults(handlers []PubSubHandler, vrs []ValidateResult) (vData, ValidateAction, error) {
 	var (
-		errs   []error
-		action = MsgAccept
 		cache  = newVData()
+		action = MsgAccept
+		errs   []error
 	)
 	for i, vr := range vrs {
 		handler := handlers[i]
 		if vr.Err != nil {
-			err := errors.Wrapf(vr.Err, "validated by %v", handlers[i])
+			err := errors.Wrapf(vr.Err, "%v", handlers[i].Specifier())
 			errs = append(errs, err)
 		}
 		if vr.Action.Compare(action) > 0 {
@@ -134,7 +136,7 @@ func newMessage(raw *libp2p_pubsub.Message) *message {
 	return &message{raw}
 }
 
-func (msg *message) setValidateCache(cache *vData) {
+func (msg *message) setValidateCache(cache vData) {
 	msg.raw.ValidatorData = cache
 }
 
@@ -147,11 +149,11 @@ func (msg *message) getHandlerCache(spec string) ValidateCache {
 	}
 }
 
-func (msg *message) getVData() *vData {
+func (msg *message) getVData() vData {
 	if msg.raw.ValidatorData == nil {
 		msg.raw.ValidatorData = newVData()
 	}
-	vd := msg.raw.ValidatorData.(*vData)
+	vd := msg.raw.ValidatorData.(vData)
 	return vd
 }
 
@@ -164,8 +166,8 @@ type vData struct {
 	handlerData map[string]interface{}
 }
 
-func newVData() *vData {
-	return &vData{
+func newVData() vData {
+	return vData{
 		globals:     make(map[string]interface{}),
 		handlerData: make(map[string]interface{}),
 	}

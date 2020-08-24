@@ -5,7 +5,6 @@ import (
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
@@ -38,7 +37,9 @@ type PubSubHost interface {
 }
 
 // PubSubHandler is the pub sub message handler of a certain topic
-// TODO: Add version compatibility to topic
+// TODO: Add version string to topic to enable compatibility
+// TODO: add decode algorithm with pb. Change related interface from []byte
+//       to decoded message
 type PubSubHandler interface {
 	// Topic is the topic the handler is subscribed to
 	Topic() string

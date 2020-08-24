@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// topicRunner runs the message handlers on a given topic.
+// topicRunner runs the message handlers on a specific topic.
 // Currently, a topic runner is combined with multiple PubSubHandlers.
 // TODO: Redesign the topics and decouple the message usage according to PubSubHandler so that
 //       one topic has only one handler.
@@ -18,10 +18,11 @@ type topicRunner struct {
 	topic       string
 	pubSub      *libp2p_pubsub.PubSub
 	topicHandle *libp2p_pubsub.Topic
+	options     []libp2p_pubsub.ValidatorOpt
 
 	// all active handlers in the topic; lock protected
 	handlers []PubSubHandler
-	options  []libp2p_pubsub.ValidatorOpt
+	lock     sync.RWMutex
 
 	validateResultHook func(msg *message, action ValidateAction, err error)
 
@@ -29,7 +30,6 @@ type topicRunner struct {
 	baseCtxCancel func()
 	running       abool.AtomicBool
 	closed        abool.AtomicBool
-	lock          sync.RWMutex
 	log           zerolog.Logger
 }
 
@@ -55,6 +55,9 @@ func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, op
 func (tr *topicRunner) start() (err error) {
 	if changed := tr.running.SetToIf(false, true); !changed {
 		return errTopicAlreadyRunning
+	}
+	if tr.closed.IsSet() {
+		return errTopicClosed
 	}
 	defer func() {
 		if err != nil {
@@ -85,10 +88,10 @@ func (tr *topicRunner) prepare() (*libp2p_pubsub.Subscription, error) {
 	return sub, nil
 }
 
-func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
-	m := newMessage(msg)
+func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, raw *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
+	m := newMessage(raw)
 	handlers := tr.getHandlers()
-	vResults := make([]ValidateResult, len(handlers))
+	vResults := make([]ValidateResult, 0, len(handlers))
 
 	for _, handler := range handlers {
 		vRes := handler.ValidateMsg(ctx, peer, m.raw.GetData())
@@ -102,6 +105,8 @@ func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, msg *libp2p
 }
 
 func (tr *topicRunner) run(sub *libp2p_pubsub.Subscription) {
+	defer sub.Cancel()
+
 	for {
 		msg, err := sub.Next(tr.baseCtx)
 		if err != nil {
@@ -134,12 +139,14 @@ func (tr *topicRunner) stop() error {
 }
 
 func (tr *topicRunner) close() error {
+	if changed := tr.closed.SetToIf(false, true); !changed {
+		return errTopicClosed
+	}
 	if err := tr.stop(); err != nil {
 		if err != errTopicAlreadyStopped {
 			return err
 		}
 	}
-	tr.closed.SetTo(true)
 	if err := tr.pubSub.UnregisterTopicValidator(tr.topic); err != nil {
 		return errors.Wrapf(err, "failed to unregister topic %v", tr.topic)
 	}
@@ -154,6 +161,34 @@ func (tr *topicRunner) getHandlers() []PubSubHandler {
 	copy(handlers, tr.handlers)
 
 	return handlers
+}
+
+func (tr *topicRunner) addHandler(newHandler PubSubHandler) error {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+
+	for _, handler := range tr.handlers {
+		if handler.Specifier() == newHandler.Specifier() {
+			return errors.Wrapf(errHandlerAlreadyExist, "cannot add handler [%v] at [%v]",
+				handler.Specifier(), tr.topic)
+		}
+	}
+	tr.handlers = append(tr.handlers, newHandler)
+	return nil
+}
+
+func (tr *topicRunner) removeHandler(spec string) error {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+
+	for i, handler := range tr.handlers {
+		if handler.Specifier() == spec {
+			tr.handlers = append(tr.handlers[:i], tr.handlers[i+1:]...)
+			return nil
+		}
+	}
+	return errors.Wrapf(errHandlerNotExist, "cannot remove handler [%v] from [%v]",
+		spec, tr.topic)
 }
 
 func (tr *topicRunner) recordInMetrics(msg *message, action ValidateAction, err error) {

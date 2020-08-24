@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/internal/herrors"
+	"github.com/harmony-one/harmony/common/herrors"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
 )
 
 func TestValidateAction_Compare(t *testing.T) {
@@ -28,58 +30,6 @@ func TestValidateAction_Compare(t *testing.T) {
 	}
 }
 
-func TestMergeValidateResult(t *testing.T) {
-	tests := []struct {
-		vrs []ValidateResult
-		exp ValidateResult
-	}{
-		{
-			vrs: []ValidateResult{
-				{Reason: "accepted1", Action: MsgAccept},
-				{Reason: "rejected1", Action: MsgReject},
-				{Reason: "ignored1", Action: MsgIgnore},
-			},
-			exp: ValidateResult{
-				Reason: "accepted: accepted1; rejected: rejected1; ignored: ignored1",
-				Action: MsgReject,
-			},
-		},
-		{
-			vrs: []ValidateResult{
-				{Reason: "ignored1", Action: MsgIgnore},
-				{Reason: "accepted1", Action: MsgAccept},
-			},
-			exp: ValidateResult{
-				Reason: "ignored: ignored1; accepted: accepted1",
-				Action: MsgIgnore,
-			},
-		},
-		{
-			vrs: []ValidateResult{
-				{Reason: "", Action: MsgAccept},
-				{Reason: "", Action: MsgIgnore},
-			},
-			exp: ValidateResult{
-				Reason: "",
-				Action: MsgIgnore,
-			},
-		},
-	}
-	for i, test := range tests {
-		res := mergeValidateResults(test.vrs)
-		if !reflect.DeepEqual(res, test.exp) {
-			t.Errorf("Test %v: Unexpected result \n\t[%+v]\n\t[%+v]", i, res, test.exp)
-		}
-	}
-}
-
-type (
-	testStruct struct {
-		field1 int
-		field2 string
-	}
-)
-
 var (
 	testKey1 = "key1"
 	testKey2 = "key2"
@@ -89,107 +39,176 @@ var (
 
 	testVal1 = &testStruct{1, "test1"}
 	testVal2 = &testStruct{2, "test2"}
+
+	testTopic = "test topic"
+
+	errIntended = errors.New("intended error")
 )
 
-func TestMessage_VDataGlobal(t *testing.T) {
+func TestMergeValidateResults(t *testing.T) {
 	tests := []struct {
-		editMessage func(*message) error
-		getKey      string
-		expRes      interface{}
-		expErr      error
+		handlers []PubSubHandler
+		vrs      []ValidateResult
+
+		expCache  vData
+		expAction ValidateAction
+		expErr    error
 	}{
 		{
-			editMessage: func(msg *message) error {
-				return msg.setVDataGlobal(testKey1, testVal1)
-			},
-			getKey: testKey1,
-			expRes: testVal1,
+			handlers: nil,
+			vrs:      nil,
+
+			expCache:  newVData(),
+			expAction: MsgAccept,
+			expErr:    nil,
 		},
 		{
-			editMessage: func(msg *message) error {
-				return msg.setVDataGlobal(testKey1, testVal1)
+			handlers: makeFakeHandlers(testTopic, 2, 0),
+			vrs: []ValidateResult{
+				{
+					ValidateCache: ValidateCache{
+						GlobalCache:  map[string]interface{}{testKey1: testVal1},
+						HandlerCache: testVal1,
+					},
+					Action: MsgAccept,
+				},
+				{
+					ValidateCache: ValidateCache{
+						GlobalCache:  map[string]interface{}{testKey2: testVal2},
+						HandlerCache: testVal2,
+					},
+					Action: MsgAccept,
+				},
 			},
-			getKey: testKey2,
-			expRes: nil,
+
+			expCache: vData{
+				globals:     map[string]interface{}{testKey1: testVal1, testKey2: testVal2},
+				handlerData: map[string]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
+			},
+			expAction: MsgAccept,
+			expErr:    nil,
 		},
 		{
-			editMessage: func(msg *message) error {
-				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
-					return err
-				}
-				return msg.setVDataGlobal(testKey2, testVal2)
+			handlers: makeFakeHandlers(testTopic, 3, 0),
+			vrs: []ValidateResult{
+				{
+					ValidateCache: ValidateCache{
+						GlobalCache:  map[string]interface{}{testKey1: testVal1},
+						HandlerCache: testVal1,
+					},
+					Action: MsgAccept,
+				},
+				{
+					ValidateCache: ValidateCache{
+						GlobalCache:  map[string]interface{}{testKey2: testVal2},
+						HandlerCache: testVal2,
+					},
+					Action: MsgReject,
+					Err:    errIntended,
+				},
 			},
-			getKey: testKey2,
-			expRes: testVal2,
-		},
-		{
-			editMessage: func(msg *message) error {
-				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
-					return err
-				}
-				return msg.setVDataGlobal(testKey1, testVal2)
+
+			expCache: vData{
+				globals:     map[string]interface{}{testKey1: testVal1, testKey2: testVal2},
+				handlerData: map[string]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
 			},
-			expErr: errGlobalValueOverwrite,
-		},
-		{
-			editMessage: func(msg *message) error {
-				if err := msg.setVDataGlobal(testKey1, testVal1); err != nil {
-					return err
-				}
-				msg.mustSetVDataGlobal(testKey1, testVal2)
-				return nil
-			},
-			getKey: testKey1,
-			expRes: testVal2,
+			expAction: MsgReject,
+			expErr:    fmt.Errorf("%v: %v", makeSpecifier(1), errIntended),
 		},
 	}
-	for i, test := range tests {
-		msg := &message{&libp2p_pubsub.Message{}}
-		err := test.editMessage(msg)
 
-		if assErr := herrors.AssertError(err, test.expErr); assErr != nil {
-			t.Fatalf("Test %v: unexpected error %v", i, assErr)
+	for i, test := range tests {
+		cache, action, gotErr := mergeValidateResults(test.handlers, test.vrs)
+
+		if err := assertVDataEqual(cache, test.expCache); err != nil {
+			t.Errorf("Test %v: unexpected cache:\n\tgot:  \t%v\n\texpect: %v", i, cache, test.expCache)
 		}
-		if err != nil {
-			continue
+		if action != test.expAction {
+			t.Errorf("Test %v: unexpected action: %v / %v", i, action, test.expAction)
 		}
-		gotVal := msg.getVDataGlobal(test.getKey)
-		if !reflect.DeepEqual(gotVal, test.expRes) {
-			t.Errorf("Test %v: unexpected val: [%+v] / [%+v]", i, gotVal, test.expRes)
+		if err := herrors.AssertError(gotErr, test.expErr); err != nil {
+			t.Errorf("Test %v: unexpected error:\n\tgot:  \t%v\n\texpect: %v", i, err, test.expErr)
 		}
 	}
 }
 
-func TestMessage_HandlerData(t *testing.T) {
+func TestMessage_Cache(t *testing.T) {
 	tests := []struct {
-		editMessage func(*message)
-		getSpec     string
-		expRes      interface{}
+		cache           vData
+		handlerSpec     string
+		expHandlerCache ValidateCache
 	}{
 		{
-			editMessage: func(msg *message) {
-				msg.setValidatorDataByHandler(testSpec1, testVal1)
+			cache: vData{
+				globals: getTestGlobals(),
+				handlerData: map[string]interface{}{
+					testSpec1: testVal1,
+					testSpec2: testVal2,
+				},
 			},
-			getSpec: testSpec1,
-			expRes:  testVal1,
-		},
-		{
-			editMessage: func(msg *message) {
-				msg.setValidatorDataByHandler(testSpec2, testVal2)
+			handlerSpec: testSpec1,
+			expHandlerCache: ValidateCache{
+				GlobalCache:  getTestGlobals(),
+				HandlerCache: testVal1,
 			},
-			getSpec: testSpec1,
-			expRes:  nil,
 		},
 	}
 	for i, test := range tests {
-		msg := &message{&libp2p_pubsub.Message{}}
-		test.editMessage(msg)
+		m := newMessage(&libp2p_pubsub.Message{})
 
-		got := msg.getHandlerCache(test.getSpec)
-		if !reflect.DeepEqual(got, test.expRes) {
-			t.Errorf("Test %v: unexpected val: [%+v] / [%+v]", i, got, test.expRes)
+		m.setValidateCache(test.cache)
+
+		got := m.getHandlerCache(test.handlerSpec)
+
+		if err := assertValidateCacheEqual(got, test.expHandlerCache); err != nil {
+			t.Errorf("Test %v: %v", i, err)
 		}
 	}
+}
+
+func getTestGlobals() map[string]interface{} {
+	return map[string]interface{}{
+		"key1": "value1",
+		"key2": 2,
+	}
+}
+
+var errNotEqual = errors.New("not equal")
+
+func assertValidateCacheEqual(vc1, vc2 ValidateCache) error {
+	if err := assertMapEqual(vc1.GlobalCache, vc2.GlobalCache); err != nil {
+		return errors.Wrapf(err, "global cache %v", err)
+	}
+	if !reflect.DeepEqual(vc1.HandlerCache, vc2.HandlerCache) {
+		return errors.Wrapf(errNotEqual, "handler cache:")
+	}
+	return nil
+}
+
+func assertVDataEqual(vd1, vd2 vData) error {
+	if err := assertMapEqual(vd1.globals, vd2.globals); err != nil {
+		return errors.Wrapf(err, "globals:")
+	}
+	if err := assertMapEqual(vd1.handlerData, vd2.handlerData); err != nil {
+		return errors.Wrapf(err, "handler data:")
+	}
+	return nil
+}
+
+func assertMapEqual(m1, m2 map[string]interface{}) error {
+	if len(m1) != len(m2) {
+		return errNotEqual
+	}
+	for k1, v1 := range m1 {
+		v2, exist := m2[k1]
+		if !exist {
+			return errNotEqual
+		}
+		if !reflect.DeepEqual(v1, v2) {
+			return errNotEqual
+		}
+	}
+	return nil
 }
 
 // TestContextChildCancel is a learning test for context cancel.

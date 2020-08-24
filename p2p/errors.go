@@ -13,6 +13,9 @@ var (
 
 	errTopicAlreadyRunning = errors.New("topic is already running")
 	errTopicAlreadyStopped = errors.New("topic has already stopped")
+	errTopicClosed         = errors.New("topic has been closed")
+	errHandlerAlreadyExist = errors.New("handler has already been registered")
+	errHandlerNotExist     = errors.New("handler not exist in topic")
 
 	errUnknown = errors.New("unknown error")
 )
