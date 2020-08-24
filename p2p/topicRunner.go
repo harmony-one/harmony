@@ -28,9 +28,11 @@ type topicRunner struct {
 
 	baseCtx       context.Context
 	baseCtxCancel func()
-	running       abool.AtomicBool
-	closed        abool.AtomicBool
-	log           zerolog.Logger
+
+	metric  *psMetric
+	running abool.AtomicBool
+	closed  abool.AtomicBool
+	log     zerolog.Logger
 }
 
 func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
@@ -42,13 +44,18 @@ func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, op
 		log:      host.log.With().Str("pubSubTopic", topic).Logger(),
 	}
 
+	tr.metric = newPsMetric(topic, defaultMetricInterval, tr.log)
+
 	var err error
 	tr.topicHandle, err = tr.pubSub.Join(tr.topic)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot join topic [%v]", tr.topic)
 	}
+	if err := tr.pubSub.RegisterTopicValidator(tr.topic, tr.validateMsg, tr.options...); err != nil {
+		return nil, errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
+	}
 
-	tr.validateResultHook = tr.recordInMetrics
+	tr.validateResultHook = tr.recordMetrics
 	return tr, nil
 }
 
@@ -67,25 +74,15 @@ func (tr *topicRunner) start() (err error) {
 
 	tr.baseCtx, tr.baseCtxCancel = context.WithCancel(context.Background())
 
-	sub, err := tr.prepare()
+	sub, err := tr.topicHandle.Subscribe()
 	if err != nil {
-		return
+		return errors.Wrapf(err, "cannot subscribe topic [%v]", tr.topic)
 	}
 
+	go tr.metric.run()
 	go tr.run(sub)
 
 	return
-}
-
-func (tr *topicRunner) prepare() (*libp2p_pubsub.Subscription, error) {
-	sub, err := tr.topicHandle.Subscribe()
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot subscribe topic [%v]", tr.topic)
-	}
-	if err := tr.pubSub.RegisterTopicValidator(tr.topic, tr.validateMsg, tr.options...); err != nil {
-		return nil, errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
-	}
-	return sub, nil
 }
 
 func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, raw *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
@@ -110,7 +107,7 @@ func (tr *topicRunner) run(sub *libp2p_pubsub.Subscription) {
 	for {
 		msg, err := sub.Next(tr.baseCtx)
 		if err != nil {
-			// stop function has been called
+			// baseCtx has been canceled
 			return
 		}
 		tr.handleMessage(newMessage(msg))
@@ -121,6 +118,7 @@ func (tr *topicRunner) handleMessage(msg *message) {
 	handlers := tr.getHandlers()
 
 	for _, handler := range handlers {
+		// deliver non-block
 		go tr.deliverMessageForHandler(msg, handler)
 	}
 }
@@ -135,6 +133,7 @@ func (tr *topicRunner) stop() error {
 		return errTopicAlreadyStopped
 	}
 	tr.baseCtxCancel()
+	tr.metric.stop()
 	return nil
 }
 
@@ -191,6 +190,7 @@ func (tr *topicRunner) removeHandler(spec string) error {
 		spec, tr.topic)
 }
 
-func (tr *topicRunner) recordInMetrics(msg *message, action ValidateAction, err error) {
-	// TODO: Log and add metrics here
+func (tr *topicRunner) recordMetrics(msg *message, action ValidateAction, err error) {
+	// log in metric non-block
+	go tr.metric.recordValidateResult(msg, action, err)
 }

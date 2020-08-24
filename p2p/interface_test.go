@@ -9,10 +9,12 @@ import (
 )
 
 type fakePubSubHandler struct {
-	topic       string
-	index       int
-	numHandlers int
-	delay       time.Duration
+	topic         string
+	index         int
+	numHandlers   int
+	validateDelay time.Duration
+	deliverDelay  time.Duration
+	deliverFunc   func(ctx context.Context, rawData []byte, cache ValidateCache)
 }
 
 type (
@@ -22,14 +24,16 @@ type (
 	}
 )
 
-func makeFakeHandlers(topic string, num int, delay time.Duration) []PubSubHandler {
+func makeFakeHandlers(topic string, num int, deliver func(ctx context.Context, rawData []byte, cache ValidateCache), vDelay, dDelay time.Duration) []PubSubHandler {
 	handlers := make([]PubSubHandler, 0, num)
 	for i := 0; i != num; i++ {
 		handler := &fakePubSubHandler{
-			topic:       topic,
-			index:       i,
-			numHandlers: num,
-			delay:       delay,
+			topic:         topic,
+			index:         i,
+			numHandlers:   num,
+			validateDelay: vDelay,
+			deliverDelay:  dDelay,
+			deliverFunc:   deliver,
 		}
 		handlers = append(handlers, handler)
 	}
@@ -59,7 +63,7 @@ func (handler *fakePubSubHandler) ValidateMsg(ctx context.Context, peer PeerID, 
 	}
 
 	select {
-	case <-time.After(handler.delay):
+	case <-time.After(handler.validateDelay):
 	case <-ctx.Done():
 		return ValidateResult{
 			Action: MsgReject,
@@ -84,9 +88,12 @@ func (handler *fakePubSubHandler) ValidateMsg(ctx context.Context, peer PeerID, 
 
 func (handler *fakePubSubHandler) DeliverMsg(ctx context.Context, rawData []byte, cache ValidateCache) {
 	select {
-	case <-time.After(handler.delay):
+	case <-time.After(handler.deliverDelay):
 	case <-ctx.Done():
 		return
+	}
+	if handler.deliverFunc != nil {
+		handler.deliverFunc(ctx, rawData, cache)
 	}
 	return
 }
