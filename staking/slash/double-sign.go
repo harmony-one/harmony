@@ -189,7 +189,7 @@ func Verify(
 		for _, pubKey2 := range second.SignerPubKeys {
 			if shard.CompareBLSPublicKey(pubKey1, pubKey2) == 0 {
 				doubleSignKeys = append(doubleSignKeys, pubKey1)
-
+				break
 			}
 		}
 	}
@@ -529,7 +529,17 @@ func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
 	rate := numeric.ZeroDec()
 
 	for i := range records {
-		for _, key := range records[i].Evidence.SecondVote.SignerPubKeys {
+		doubleSignKeys := []bls.SerializedPublicKey{}
+		for _, pubKey1 := range records[i].Evidence.FirstVote.SignerPubKeys {
+			for _, pubKey2 := range records[i].Evidence.SecondVote.SignerPubKeys {
+				if shard.CompareBLSPublicKey(pubKey1, pubKey2) == 0 {
+					doubleSignKeys = append(doubleSignKeys, pubKey1)
+					break
+				}
+			}
+		}
+
+		for _, key := range doubleSignKeys {
 			if card, exists := votingPower.Voters[key]; exists &&
 				bytes.Equal(card.EarningAccount[:], records[i].Evidence.Offender[:]) {
 				rate = rate.Add(card.GroupPercent)

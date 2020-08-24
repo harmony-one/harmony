@@ -1,6 +1,9 @@
 package consensus
 
 import (
+	"bytes"
+	"sort"
+
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -18,18 +21,15 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 				quorum.Commit, pubKey2.Bytes,
 			); alreadyCastBallot != nil {
 				for _, pubKey1 := range alreadyCastBallot.SignerPubKeys {
-					firstPubKey, err := bls.BytesToBLSPublicKey(pubKey1[:])
-					if err != nil {
-						return false
-					}
-					if pubKey2.Object.IsEqual(firstPubKey) {
-						for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
-							firstSignedBlock := blk.Header()
-							areHeightsEqual := firstSignedBlock.Number().Uint64() == recvMsg.BlockNum
-							areViewIDsEqual := firstSignedBlock.ViewID().Uint64() == recvMsg.ViewID
-							areHeadersEqual := firstSignedBlock.Hash() == recvMsg.BlockHash
+					if bytes.Compare(pubKey2.Bytes[:], pubKey1[:]) == 0 {
+						firstSignedBlock := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+						if firstSignedBlock != nil {
+							firstSignedHeader := firstSignedBlock.Header()
+							areHeightsEqual := firstSignedHeader.Number().Uint64() == recvMsg.BlockNum
+							areViewIDsEqual := firstSignedHeader.ViewID().Uint64() == recvMsg.ViewID
+							areHeadersEqual := firstSignedHeader.Hash() == recvMsg.BlockHash
 
-							// If signer already firstSignedBlock, and the block height is the same
+							// If signer already firstSignedHeader, and the block height is the same
 							// and the viewID is the same, then we need to verify the block
 							// hash, and if block hash is different, then that is a clear
 							// case of double signing
@@ -102,6 +102,17 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 										},
 										Offender: *addr,
 									}
+
+									sort.SliceStable(evid.ConflictingVotes.FirstVote.SignerPubKeys, func(i, j int) bool {
+										return bytes.Compare(
+											evid.ConflictingVotes.FirstVote.SignerPubKeys[i][:],
+											evid.ConflictingVotes.FirstVote.SignerPubKeys[j][:]) < 0
+									})
+									sort.SliceStable(evid.ConflictingVotes.SecondVote.SignerPubKeys, func(i, j int) bool {
+										return bytes.Compare(
+											evid.ConflictingVotes.SecondVote.SignerPubKeys[i][:],
+											evid.ConflictingVotes.SecondVote.SignerPubKeys[j][:]) < 0
+									})
 									proof := slash.Record{
 										Evidence: evid,
 										Reporter: reporter,

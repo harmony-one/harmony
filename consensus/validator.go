@@ -62,6 +62,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 func (consensus *Consensus) prepare() {
 	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 	priKeys := []*bls.PrivateKeyWrapper{}
+	p2pMsgs := []*NetworkMessage{}
 	for i, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
@@ -76,19 +77,7 @@ func (consensus *Consensus) prepare() {
 				return
 			}
 
-			// TODO: this will not return immediately, may block
-			if consensus.current.Mode() != Listening {
-				if err := consensus.msgSender.SendWithoutRetry(
-					groupID,
-					p2p.ConstructMessage(networkMessage.Bytes),
-				); err != nil {
-					consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-				} else {
-					consensus.getLogger().Info().
-						Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-						Msg("[OnAnnounce] Sent Prepare Message!!")
-				}
-			}
+			p2pMsgs = append(p2pMsgs, networkMessage)
 		}
 	}
 	if consensus.MultiSig {
@@ -100,11 +89,15 @@ func (consensus *Consensus) prepare() {
 			return
 		}
 
+		p2pMsgs = append(p2pMsgs, networkMessage)
+	}
+
+	for _, p2pMsg := range p2pMsgs {
 		// TODO: this will not return immediately, may block
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
+				p2p.ConstructMessage(p2pMsg.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
 			} else {
@@ -242,6 +235,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	}
 
 	priKeys := []*bls.PrivateKeyWrapper{}
+	p2pMsgs := []*NetworkMessage{}
 	for i, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
@@ -257,20 +251,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 				return
 			}
 
-			// TODO: this will not return immediately, may block
-			if consensus.current.Mode() != Listening {
-				if err := consensus.msgSender.SendWithoutRetry(
-					groupID,
-					p2p.ConstructMessage(networkMessage.Bytes),
-				); err != nil {
-					consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-				} else {
-					consensus.getLogger().Info().
-						Uint64("blockNum", consensus.blockNum).
-						Hex("blockHash", consensus.blockHash[:]).
-						Msg("[OnPrepared] Sent Commit Message!!")
-				}
-			}
+			p2pMsgs = append(p2pMsgs, networkMessage)
 		}
 	}
 
@@ -284,11 +265,15 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			return
 		}
 
+		p2pMsgs = append(p2pMsgs, networkMessage)
+	}
+
+	for _, p2pMsg := range p2pMsgs {
 		// TODO: this will not return immediately, may block
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
 				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
+				p2p.ConstructMessage(p2pMsg.Bytes),
 			); err != nil {
 				consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
 			} else {
@@ -299,7 +284,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			}
 		}
 	}
-
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTCommit.String()).

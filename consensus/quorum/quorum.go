@@ -185,10 +185,10 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 		}
 		if alreadyCollected {
 			continue
-		} else {
-			for _, key := range ballot.SignerPubKeys {
-				collectedKeys[key] = struct{}{}
-			}
+		}
+
+		for _, key := range ballot.SignerPubKeys {
+			collectedKeys[key] = struct{}{}
 		}
 
 		if ballot != nil {

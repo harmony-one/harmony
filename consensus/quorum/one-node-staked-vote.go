@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 
@@ -62,7 +63,19 @@ func (v *stakedVoteWeight) AddNewVote(
 	height, viewID uint64) (*votepower.Ballot, error) {
 
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
+	signerAddr := common.Address{}
 	for i, pubKey := range pubKeys {
+		voter, ok := v.roster.Voters[pubKey.Bytes]
+		if !ok {
+			return nil, errors.Errorf("Signer not in committee: %x", pubKey.Bytes)
+		}
+		if i == 0 {
+			signerAddr = voter.EarningAccount
+		} else {
+			if bytes.Compare(signerAddr.Bytes(), voter.EarningAccount[:]) != 0 {
+				return nil, errors.Errorf("Multiple signer accounts used in multi-sig: %x, %x", signerAddr.Bytes(), voter.EarningAccount)
+			}
+		}
 		pubKeysBytes[i] = pubKey.Bytes
 	}
 

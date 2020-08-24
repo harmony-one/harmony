@@ -635,6 +635,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
 
 		priKeys := []*bls.PrivateKeyWrapper{}
+		p2pMsgs := []*NetworkMessage{}
 		for i, key := range consensus.priKey {
 			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 				continue
@@ -650,12 +651,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 					consensus.getLogger().Err(err).Msg("could not create commit message")
 					return
 				}
-				msgToSend := network.Bytes
-				consensus.getLogger().Info().Msg("onNewView === commit")
-				consensus.host.SendMessageToGroups(
-					groupID,
-					p2p.ConstructMessage(msgToSend),
-				)
+				p2pMsgs = append(p2pMsgs, network)
 			}
 		}
 
@@ -669,11 +665,14 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				consensus.getLogger().Err(err).Msg("could not create commit message")
 				return
 			}
-			msgToSend := network.Bytes
+			p2pMsgs = append(p2pMsgs, network)
+		}
+
+		for _, p2pMsg := range p2pMsgs {
 			consensus.getLogger().Info().Msg("onNewView === commit")
 			consensus.host.SendMessageToGroups(
 				groupID,
-				p2p.ConstructMessage(msgToSend),
+				p2p.ConstructMessage(p2pMsg.Bytes),
 			)
 		}
 		consensus.getLogger().Info().
