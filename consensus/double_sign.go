@@ -22,9 +22,8 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 			); alreadyCastBallot != nil {
 				for _, pubKey1 := range alreadyCastBallot.SignerPubKeys {
 					if bytes.Compare(pubKey2.Bytes[:], pubKey1[:]) == 0 {
-						firstSignedBlock := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
-						if firstSignedBlock != nil {
-							firstSignedHeader := firstSignedBlock.Header()
+						for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
+							firstSignedHeader := blk.Header()
 							areHeightsEqual := firstSignedHeader.Number().Uint64() == recvMsg.BlockNum
 							areViewIDsEqual := firstSignedHeader.ViewID().Uint64() == recvMsg.ViewID
 							areHeadersEqual := firstSignedHeader.Hash() == recvMsg.BlockHash
