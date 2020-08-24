@@ -42,6 +42,8 @@ const (
 	// shall be between numPeersLowBound and numPeersHighBound
 	NumPeersLowBound  = 3
 	numPeersHighBound = 5
+
+	downloadTaskBatch = 30
 )
 
 // SyncPeerConfig is peer config to sync.
@@ -64,6 +66,35 @@ func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
 type SyncBlockTask struct {
 	index     int
 	blockHash []byte
+}
+
+type syncBlockTasks []SyncBlockTask
+
+func (tasks syncBlockTasks) blockHashes() [][]byte {
+	hashes := make([][]byte, 0, len(tasks))
+	for _, task := range tasks {
+		hash := make([]byte, len(task.blockHash))
+		copy(hash, task.blockHash)
+		hashes = append(hashes, task.blockHash)
+	}
+	return hashes
+}
+
+func (tasks syncBlockTasks) blockHashesStr() []string {
+	hashes := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		hash := hex.EncodeToString(task.blockHash)
+		hashes = append(hashes, hash)
+	}
+	return hashes
+}
+
+func (tasks syncBlockTasks) indexes() []int {
+	indexes := make([]int, 0, len(tasks))
+	for _, task := range tasks {
+		indexes = append(indexes, task.index)
+	}
+	return indexes
 }
 
 // SyncConfig contains an array of SyncPeerConfig.
@@ -438,63 +469,135 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	// Initialize blockchain
 	var wg sync.WaitGroup
 	count := 0
+	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
-		go func(stateSyncTaskQueue *queue.Queue, bc *core.BlockChain) {
+		go func() {
 			defer wg.Done()
-			for !stateSyncTaskQueue.Empty() {
-				task, err := ss.stateSyncTaskQueue.Poll(1, time.Millisecond)
-				if err == queue.ErrTimeout || len(task) == 0 {
+			for !taskQueue.empty() {
+				tasks, err := taskQueue.poll(downloadTaskBatch, time.Millisecond)
+				if err != nil || len(tasks) == 0 {
+					if err == queue.ErrDisposed {
+						continue
+					}
 					utils.Logger().Error().Err(err).Msg("[SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
 					break
 				}
-				syncTask := task[0].(SyncBlockTask)
-				//id := syncTask.index
-				payload, err := peerConfig.GetBlocks([][]byte{syncTask.blockHash})
+				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil || len(payload) == 0 {
 					count++
 					utils.Logger().Error().Err(err).Int("failNumber", count).Msg("[SYNC] downloadBlocks: GetBlocks failed")
 					if count > downloadBlocksRetryLimit {
 						break
 					}
-					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
+					if err := taskQueue.put(tasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
-							Int("taskIndex", syncTask.index).
-							Str("taskBlock", hex.EncodeToString(syncTask.blockHash)).
+							Interface("taskIndexes", tasks.indexes()).
+							Interface("taskBlockes", tasks.blockHashesStr()).
 							Msg("downloadBlocks: cannot add task")
 					}
 					continue
 				}
 
-				var blockObj types.Block
-				// currently only send one block a time
-				err = rlp.DecodeBytes(payload[0], &blockObj)
+				failedTasks := ss.handleBlockSyncResult(payload, tasks)
 
-				if err != nil {
+				if len(failedTasks) != 0 {
 					count++
-					utils.Logger().Error().Err(err).Msg("[SYNC] downloadBlocks: failed to DecodeBytes from received new block")
 					if count > downloadBlocksRetryLimit {
 						break
 					}
-					if err := ss.stateSyncTaskQueue.Put(syncTask); err != nil {
+					if err := ss.stateSyncTaskQueue.Put(failedTasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
-							Int("taskIndex", syncTask.index).
-							Str("taskBlock", hex.EncodeToString(syncTask.blockHash)).
+							Interface("taskIndexes", failedTasks.indexes()).
+							Interface("taskBlockes", tasks.blockHashesStr()).
 							Msg("cannot add task")
 					}
 					continue
 				}
-				ss.syncMux.Lock()
-				ss.commonBlocks[syncTask.index] = &blockObj
-				ss.syncMux.Unlock()
 			}
-		}(ss.stateSyncTaskQueue, bc)
+		}()
 		return
 	})
 	wg.Wait()
 	utils.Logger().Info().Msg("[SYNC] downloadBlocks: finished")
+}
+
+func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
+	if len(payload) > len(tasks) {
+		utils.Logger().Warn().
+			Err(errors.New("unexpected number of block delivered")).
+			Int("expect", len(tasks)).
+			Int("got", len(payload))
+		return tasks
+	}
+
+	var failedTasks syncBlockTasks
+	if len(payload) < len(tasks) {
+		utils.Logger().Warn().
+			Err(errors.New("unexpected number of block delivered")).
+			Int("expect", len(tasks)).
+			Int("got", len(payload))
+		failedTasks = append(failedTasks, tasks[len(payload):]...)
+	}
+
+	for i, blockBytes := range payload {
+		var blockObj types.Block
+		if err := rlp.DecodeBytes(blockBytes, &blockObj); err != nil {
+			utils.Logger().Warn().
+				Err(err).
+				Int("taskIndex", tasks[i].index).
+				Str("taskBlock", hex.EncodeToString(tasks[i].blockHash)).
+				Msg("download block")
+			failedTasks = append(failedTasks, tasks[i])
+			continue
+		}
+		gotHash := blockObj.Hash()
+		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
+			utils.Logger().Warn().
+				Err(errors.New("wrong block delivery")).
+				Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
+				Str("gotHash", hex.EncodeToString(gotHash[:]))
+			failedTasks = append(failedTasks, tasks[i])
+			continue
+		}
+		ss.syncMux.Lock()
+		ss.commonBlocks[tasks[i].index] = &blockObj
+		ss.syncMux.Unlock()
+	}
+	return failedTasks
+}
+
+// downloadTaskQueue is wrapper around Queue with item to be SyncBlockTask
+type downloadTaskQueue struct {
+	q *queue.Queue
+}
+
+func (queue downloadTaskQueue) poll(num int64, timeOut time.Duration) (syncBlockTasks, error) {
+	items, err := queue.q.Poll(num, timeOut)
+	if err != nil {
+		return nil, err
+	}
+	tasks := make(syncBlockTasks, 0, len(items))
+	for _, item := range items {
+		task := item.(SyncBlockTask)
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+func (queue downloadTaskQueue) put(tasks syncBlockTasks) error {
+	for _, task := range tasks {
+		if err := queue.q.Put(task); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (queue downloadTaskQueue) empty() bool {
+	return queue.q.Empty()
 }
 
 // CompareBlockByHash compares two block by hash, it will be used in sort the blocks
