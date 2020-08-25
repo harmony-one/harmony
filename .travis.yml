@@ -12,20 +12,12 @@ install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
-  - pwd
-  - export GO111MODULE=on
-  - export GOPATH=$HOME/gopath
-  - export CGO_CPPFLAGS="-I$GOPATH/src/github.com/harmony-one/bls/include -I$GOPATH/src/github.com/harmony-one/mcl/include"
-  - export CGO_LDFLAGS="-L$GOPATH/src/github.com/harmony-one/bls/lib -L$GOPATH/src/github.com/harmony-one/mcl/lib"
-  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GOPATH/src/github.com/harmony-one/bls/lib:$GOPATH/src/github.com/harmony-one/mcl/lib
   - git clone https://github.com/harmony-one/mcl.git $HOME/gopath/src/github.com/harmony-one/mcl
   - git clone https://github.com/harmony-one/bls.git $HOME/gopath/src/github.com/harmony-one/bls
   - (cd $HOME/gopath/src/github.com/harmony-one/mcl; make -j4)
   - (cd $HOME/gopath/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
-  - go get -v ./...
+  - make go-get
   - scripts/install_build_tools.sh
-  - chmod +x scripts/travis_checker.sh
-  - chmod +x scripts/travis_node_checker.sh
 script:
   - ${TEST}
 after_success:

@@ -62,6 +62,10 @@ clean:
 	rm -f ./*.rlp
 	rm -rf ~/rpmbuild
 
+go-get:
+	source ./scripts/setup_bls_build_flags.sh
+	go get -v ./...
+
 test:
 	bash ./test/all.sh
 
