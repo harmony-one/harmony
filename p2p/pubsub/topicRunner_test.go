@@ -3,8 +3,10 @@ package pubsub
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"os"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +15,10 @@ import (
 )
 
 const timeBulletFly = 10 * time.Millisecond
+
+var (
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
 
 // TestTopicRunner_accept test the scenario of handlers accept all messages
 func TestTopicRunner_accept(t *testing.T) {
@@ -247,6 +253,76 @@ func TestTopicRunner_StartStop(t *testing.T) {
 	if err := assertTopicRunning(testTopic, fps, deliver, false); err != nil {
 		t.Fatalf("after closed and try restart: %v", err)
 	}
+}
+
+// TestTopicRunner_race test the race condition of the topicRunner
+func TestTopicRunner_race(t *testing.T) {
+	t.SkipNow()
+
+	host := makeTestPubSubHost()
+
+	numHandlers := 10
+	delivers, _ := makeDelivers(numHandlers)
+	validates := makeValidateAcceptFuncs(numHandlers)
+	handlers := makeFakeHandlers(testTopic, numHandlers, validates, delivers)
+
+	tr, err := newTopicRunner(host, testTopic, handlers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tr.start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Spawn several goroutines:
+	// 3 to feed messages
+	// 1 for Add and remove handler
+
+	var (
+		stop = make(chan struct{})
+		wg   sync.WaitGroup
+	)
+	wg.Add(4)
+
+	// 3 goroutine to feed messages
+	ps := host.pubsub.(*fakePubSub)
+	for i := 0; i != 3; i++ {
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				case <-time.After(10 * time.Millisecond):
+				}
+				ps.addMessage(testTopic, testMsg(1))
+			}
+		}()
+	}
+
+	// 1 goroutine to add or remove handler
+	go func() {
+		defer wg.Done()
+
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+			index := r.Intn(10)
+			ope := r.Intn(2)
+			if ope == 0 {
+				tr.addHandler(handlers[index])
+			} else {
+				tr.removeHandler(handlers[index].Specifier())
+			}
+		}
+	}()
+
+	time.Sleep(10 * time.Second)
+	close(stop)
+	wg.Wait()
 }
 
 func makeDelivers(num int) ([]deliverFunc, []chan ValidateCache) {
