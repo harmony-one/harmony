@@ -1,4 +1,4 @@
-package p2p
+package pubsub
 
 import "github.com/pkg/errors"
 
@@ -8,8 +8,6 @@ var (
 	errPubSubStopped       = errors.New("handler already stopped")
 	errPubSubNotActive     = errors.New("handler not active")
 	errPubSubStarted       = errors.New("handler already started")
-
-	errGlobalValueOverwrite = errors.New("try to overwrite global val")
 
 	errTopicAlreadyRunning = errors.New("topic is already running")
 	errTopicAlreadyStopped = errors.New("topic has already stopped")

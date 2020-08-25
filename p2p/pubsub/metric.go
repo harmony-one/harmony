@@ -1,7 +1,6 @@
-package p2p
+package pubsub
 
 import (
-	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -50,9 +49,6 @@ func (m *psMetric) run() {
 	for {
 		select {
 		case <-tick:
-			m.resetC <- struct{}{}
-
-		case <-m.resetC:
 			accept := atomic.SwapUint64(&m.numAccepted, 0)
 			ignore := atomic.SwapUint64(&m.numIgnored, 0)
 			reject := atomic.SwapUint64(&m.numRejected, 0)
@@ -65,13 +61,8 @@ func (m *psMetric) run() {
 	}
 }
 
-func (m *psMetric) stop() error {
-	select {
-	case m.stopC <- struct{}{}:
-	default:
-		return errors.New("already stopped")
-	}
-	return nil
+func (m *psMetric) stop() {
+	m.stopC <- struct{}{}
 }
 
 func (m *psMetric) recordValidateResult(msg *message, action ValidateAction, err error) {

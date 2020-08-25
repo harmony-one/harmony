@@ -1,7 +1,9 @@
-package p2p
+package pubsub
 
 import (
 	"context"
+
+	"github.com/harmony-one/harmony/p2p"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
@@ -13,12 +15,12 @@ import (
 type host interface {
 	PubSubHost
 
-	GetSelfPeer() Peer
-	AddPeer(*Peer) error
+	GetSelfPeer() p2p.Peer
+	AddPeer(*p2p.Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
 	GetPeerCount() int
-	ConnectHostPeer(Peer) error
+	ConnectHostPeer(p2p.Peer) error
 	PubSub() *libp2p_pubsub.PubSub
 	C() (int, int, int)
 	ListPeer(topic string) []libp2p_peer.ID
@@ -26,6 +28,7 @@ type host interface {
 	ListBlockedPeer() []libp2p_peer.ID
 }
 
+// PubSubHost is the interface for pubSubHost.
 type PubSubHost interface {
 	AddPubSubHandler(psh PubSubHandler) error
 	RemovePubSubHandler(spec string) error
@@ -38,8 +41,8 @@ type PubSubHost interface {
 
 // PubSubHandler is the pub sub message handler of a certain topic
 // TODO: Add version string to topic to enable compatibility
-// TODO: add decode algorithm with pb. Change related interface from []byte
-//       to decoded message
+// TODO: add decode algorithm with pb. Change arg in ValidateMsg and DeliverMsg from
+//       []byte to decoded message
 type PubSubHandler interface {
 	// Topic is the topic the handler is subscribed to
 	Topic() string
@@ -55,4 +58,21 @@ type PubSubHandler interface {
 	// Note: For the same handler under a topic, DeliverMsg are executed concurrently.
 	// And the error should be handled in HandleMsg for each handler.
 	DeliverMsg(ctx context.Context, rawData []byte, cache ValidateCache)
+}
+
+// pubSub is the interface used within the module to mock out the PubSub
+type pubSub interface {
+	Join(topic string) (psTopic, error)
+	RegisterTopicValidator(topic string, val interface{}, opts ...libp2p_pubsub.ValidatorOpt) error
+	UnregisterTopicValidator(topic string) error
+}
+
+// psTopic is the interface for libp2p_pubsub.Topic
+type psTopic interface {
+	Subscribe() (subscription, error)
+}
+
+// subscription is the interface for libp2p_pubsub.Subscription
+type subscription interface {
+	Next(ctx context.Context) (*libp2p_pubsub.Message, error)
 }
