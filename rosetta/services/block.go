@@ -115,7 +115,8 @@ func (s *BlockAPIService) BlockTransaction(
 		return nil, err
 	}
 
-	if request.BlockIdentifier.Index == 0 { // Special case for genesis block
+	// Special case for genesis block
+	if request.BlockIdentifier.Index == 0 {
 		txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, s.hmy.ShardID)
 		if rosettaError != nil {
 			return nil, rosettaError
@@ -295,9 +296,9 @@ func formatCrossShardReceiverTransaction(
 
 // formatGenesisTransaction for genesis block's initial balances
 func formatGenesisTransaction(
-	txID *types.TransactionIdentifier, shardId uint32,
+	txID *types.TransactionIdentifier, shardID uint32,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
-	genesisSpec := getGenesisSpec(shardId)
+	genesisSpec := getGenesisSpec(shardID)
 	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
 		if tx.To().String() == txID.Hash {
 			accID, rosettaError := newAccountIdentifier(*tx.To())
