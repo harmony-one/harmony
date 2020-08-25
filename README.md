@@ -16,13 +16,14 @@ http://api.hmny.io/
 
 ## Requirements
 
-### **Go 1.14.1**
+### **Go 1.14.7**
 ### **GMP and OpenSSL**
 
 On macOS:
 ```bash
 brew install gmp
 brew install openssl
+sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
 ```
 On Linux (Ubuntu)
 ```bash
