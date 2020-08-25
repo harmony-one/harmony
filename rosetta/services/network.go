@@ -54,7 +54,7 @@ func (s *NetworkAPIService) NetworkStatus(
 		return nil, err
 	}
 
-	// Fetch relevant headers & peers
+	// Fetch relevant headers, syncing status, & peers
 	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -71,6 +71,14 @@ func (s *NetworkAPIService) NetworkStatus(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
+	targetHeight := int64(s.hmy.NodeAPI.GetMaxPeerHeight())
+	syncStatus := common.SyncingFinish
+	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain) {
+		syncStatus = common.SyncingNewBlock
+	} else if targetHeight == 0 {
+		syncStatus = common.SyncingStartup
+	}
+	stage := syncStatus.String()
 
 	return &types.NetworkStatusResponse{
 		CurrentBlockIdentifier: &types.BlockIdentifier{
@@ -83,9 +91,10 @@ func (s *NetworkAPIService) NetworkStatus(
 			Hash:  genesisHeader.Hash().String(),
 		},
 		Peers: peers,
-		// TODO (dm): implement proper sync status report
 		SyncStatus: &types.SyncStatus{
 			CurrentIndex: currentHeader.Number().Int64(),
+			TargetIndex:  &targetHeight,
+			Stage:        &stage,
 		},
 	}, nil
 }
