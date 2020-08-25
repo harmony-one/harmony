@@ -50,6 +50,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 	go newHTTPServer(router).Serve(listener)
+	fmt.Printf("Started Rosetta server at: %v", endpoint)
 	return nil
 }
 

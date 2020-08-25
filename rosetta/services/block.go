@@ -10,14 +10,18 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -52,6 +56,7 @@ func (s *BlockAPIService) Block(
 		Hash:  block.Hash().String(),
 	}
 
+	otherTransactions := []*types.TransactionIdentifier{}
 	if block.Number().Int64() > 0 {
 		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(block.Number().Int64()-1).EthBlockNumber())
 		if err != nil {
@@ -65,6 +70,12 @@ func (s *BlockAPIService) Block(
 		}
 	} else {
 		prevBlockID = currBlockID
+		genesisSpec := getGenesisSpec(block.ShardID())
+		for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
+			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
+				Hash: tx.To().String(), // use hex address as tx identifiers for genesis block only
+			})
+		}
 	}
 
 	responseBlock := &types.Block{
@@ -74,7 +85,6 @@ func (s *BlockAPIService) Block(
 		Transactions:          []*types.Transaction{},     // Do not return tx details as it is optional.
 	}
 
-	otherTransactions := []*types.TransactionIdentifier{}
 	for _, tx := range block.Transactions() {
 		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 			Hash: tx.Hash().String(),
@@ -83,6 +93,11 @@ func (s *BlockAPIService) Block(
 	for _, tx := range block.StakingTransactions() {
 		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 			Hash: tx.Hash().String(),
+		})
+	}
+	for _, cxReceipt := range block.IncomingReceipts() {
+		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
+			Hash: cxReceipt.Header.Hash().String(),
 		})
 	}
 
@@ -98,6 +113,14 @@ func (s *BlockAPIService) BlockTransaction(
 ) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
+	}
+
+	if request.BlockIdentifier.Index == 0 { // Special case for genesis block
+		txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, s.hmy.ShardID)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		return &types.BlockTransactionResponse{Transaction: txs}, nil
 	}
 
 	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
@@ -205,6 +228,18 @@ func (s *BlockAPIService) getTransactionReceiptFromIndex(
 	return receipts[index], nil
 }
 
+// getPseudoTransactionForGenesis to create unsigned transaction that contain genesis funds.
+// Note that this is for internal usage only. Genesis funds are not transactions.
+func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction {
+	txs := []*hmytypes.Transaction{}
+	for acc, bal := range spec.Alloc {
+		txs = append(txs, hmytypes.NewTransaction(
+			0, acc, spec.ShardID, bal.Balance, 0, big.NewInt(0), spec.ExtraData,
+		))
+	}
+	return txs
+}
+
 // TransactionMetadata ..
 type TransactionMetadata struct {
 	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
@@ -258,10 +293,46 @@ func formatCrossShardReceiverTransaction(
 	}, nil
 }
 
+// formatGenesisTransaction for genesis block's initial balances
+func formatGenesisTransaction(
+	txID *types.TransactionIdentifier, shardId uint32,
+) (fmtTx *types.Transaction, rosettaError *types.Error) {
+	genesisSpec := getGenesisSpec(shardId)
+	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
+		if tx.To().String() == txID.Hash {
+			accID, rosettaError := newAccountIdentifier(*tx.To())
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+			return &types.Transaction{
+				TransactionIdentifier: txID,
+				Operations: []*types.Operation{
+					{
+						OperationIdentifier: &types.OperationIdentifier{
+							Index: 0,
+						},
+						Type:    common.TransferOperation,
+						Status:  common.SuccessOperationStatus.Status,
+						Account: accID,
+						Amount: &types.Amount{
+							Value:    fmt.Sprintf("%v", tx.Value()),
+							Currency: &common.Currency,
+						},
+						Metadata: map[string]interface{}{
+							"type": "genesis funds",
+						},
+					},
+				},
+			}, nil
+		}
+	}
+	return nil, &common.TransactionNotFoundError
+}
+
 // formatTransaction for staking, cross-shard sender, and plain transactions
 func formatTransaction(
 	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
-) (txs *types.Transaction, rosettaError *types.Error) {
+) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
 	var isCrossShard bool
 	var toShard uint32
@@ -408,7 +479,7 @@ func getStakingOperations(
 		}
 	default:
 		amount = &types.Amount{
-			Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+			Value:    fmt.Sprintf("-%v", tx.Value()),
 			Currency: &common.Currency,
 		}
 	}
@@ -542,7 +613,7 @@ func newTransferOperations(
 		return nil, rosettaError
 	}
 	subAmount := &types.Amount{
-		Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+		Value:    fmt.Sprintf("-%v", tx.Value()),
 		Currency: &common.Currency,
 	}
 
@@ -558,7 +629,7 @@ func newTransferOperations(
 		return nil, rosettaError
 	}
 	addAmount := &types.Amount{
-		Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
+		Value:    fmt.Sprintf("%v", tx.Value()),
 		Currency: &common.Currency,
 	}
 
@@ -614,7 +685,7 @@ func newCrossShardSenderTransferOperations(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    fmt.Sprintf("-%v", tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
@@ -654,7 +725,7 @@ func newContractCreationOperations(
 			Status:  status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    fmt.Sprintf("-%v", tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
@@ -727,4 +798,12 @@ func findLogsWithTopic(
 		}
 	}
 	return logs
+}
+
+// getGenesisSpec ..
+func getGenesisSpec(shardID uint32) *core.Genesis {
+	if shard.Schedule.GetNetworkID() == shardingconfig.MainNet {
+		return core.NewGenesisSpec(nodeconfig.Mainnet, shardID)
+	}
+	return core.NewGenesisSpec(nodeconfig.Testnet, shardID)
 }

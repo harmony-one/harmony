@@ -11,8 +11,10 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
@@ -213,6 +215,23 @@ func testFormatPlainTransaction(
 	}
 	if !reflect.DeepEqual(rosettaTx.Operations[0].Account, senderAccID) {
 		t.Error("Expected sender to pay gas fee")
+	}
+}
+
+func TestFormatGenesisTransaction(t *testing.T) {
+	genesisSpec := getGenesisSpec(0)
+	for acc := range genesisSpec.Alloc {
+		txID := &types.TransactionIdentifier{Hash: acc.String()}
+		tx, rosettaError := formatGenesisTransaction(txID, 0)
+		if rosettaError != nil {
+			t.Fatal(rosettaError)
+		}
+		if !reflect.DeepEqual(txID, tx.TransactionIdentifier) {
+			t.Error("expected transaction ID of formatted tx to be same as requested")
+		}
+		if len(tx.Operations) != 1 {
+			t.Error("expected exactly 1 operation")
+		}
 	}
 }
 
@@ -998,6 +1017,23 @@ func TestFindLogsWithTopic(t *testing.T) {
 		response := findLogsWithTopic(test.receipt, test.topic)
 		if !reflect.DeepEqual(test.expectedResponse, response) {
 			t.Errorf("Failed test %v, expected %v, got %v", i, test.expectedResponse, response)
+		}
+	}
+}
+
+func TestGetPseudoTransactionForGenesis(t *testing.T) {
+	genesisSpec := core.NewGenesisSpec(nodeconfig.Testnet, 0)
+	txs := getPseudoTransactionForGenesis(genesisSpec)
+	for acc := range genesisSpec.Alloc {
+		found := false
+		for _, tx := range txs {
+			if acc == *tx.To() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("unable to find genesis account in generated pseudo transactions")
 		}
 	}
 }
