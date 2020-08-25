@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"os"
@@ -95,7 +94,6 @@ type Node struct {
 	host p2p.Host
 	// Service manager.
 	serviceManager               *service.Manager
-	ContractDeployerKey          *ecdsa.PrivateKey
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
 	// Channel to notify consensus service to really start consensus
