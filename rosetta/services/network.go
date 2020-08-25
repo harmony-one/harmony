@@ -16,21 +16,21 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// NetworkAPIService implements the server.NetworkAPIServicer interface.
-type NetworkAPIService struct {
+// NetworkAPI implements the server.NetworkAPIServicer interface.
+type NetworkAPI struct {
 	hmy *hmy.Harmony
 }
 
-// NewNetworkAPIService creates a new instance of a NetworkAPIService.
-func NewNetworkAPIService(hmy *hmy.Harmony) server.NetworkAPIServicer {
-	return &NetworkAPIService{
+// NewNetworkAPI creates a new instance of a NetworkAPI.
+func NewNetworkAPI(hmy *hmy.Harmony) server.NetworkAPIServicer {
+	return &NetworkAPI{
 		hmy: hmy,
 	}
 }
 
 // NetworkList implements the /network/list endpoint
 // TODO (dm): Update Node API to support multiple shards...
-func (s *NetworkAPIService) NetworkList(
+func (s *NetworkAPI) NetworkList(
 	ctx context.Context, request *types.MetadataRequest,
 ) (*types.NetworkListResponse, *types.Error) {
 	network, err := common.GetNetwork(s.hmy.ShardID)
@@ -47,7 +47,7 @@ func (s *NetworkAPIService) NetworkList(
 }
 
 // NetworkStatus implements the /network/status endpoint
-func (s *NetworkAPIService) NetworkStatus(
+func (s *NetworkAPI) NetworkStatus(
 	ctx context.Context, request *types.NetworkRequest,
 ) (*types.NetworkStatusResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
@@ -100,7 +100,7 @@ func (s *NetworkAPIService) NetworkStatus(
 }
 
 // NetworkOptions implements the /network/options endpoint
-func (s *NetworkAPIService) NetworkOptions(
+func (s *NetworkAPI) NetworkOptions(
 	ctx context.Context, request *types.NetworkRequest,
 ) (*types.NetworkOptionsResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {

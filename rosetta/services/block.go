@@ -26,20 +26,20 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-// BlockAPIService implements the server.BlockAPIServicer interface.
-type BlockAPIService struct {
+// BlockAPI implements the server.BlockAPIServicer interface.
+type BlockAPI struct {
 	hmy *hmy.Harmony
 }
 
-// NewBlockAPIService creates a new instance of a BlockAPIService.
-func NewBlockAPIService(hmy *hmy.Harmony) server.BlockAPIServicer {
-	return &BlockAPIService{
+// NewBlockAPI creates a new instance of a BlockAPI.
+func NewBlockAPI(hmy *hmy.Harmony) server.BlockAPIServicer {
+	return &BlockAPI{
 		hmy: hmy,
 	}
 }
 
 // Block implements the /block endpoint
-func (s *BlockAPIService) Block(
+func (s *BlockAPI) Block(
 	ctx context.Context, request *types.BlockRequest,
 ) (response *types.BlockResponse, rosettaError *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
@@ -110,7 +110,7 @@ func (s *BlockAPIService) Block(
 }
 
 // BlockTransaction implements the /block/transaction endpoint
-func (s *BlockAPIService) BlockTransaction(
+func (s *BlockAPI) BlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
 ) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
@@ -150,7 +150,7 @@ func (s *BlockAPIService) BlockTransaction(
 	return &types.BlockTransactionResponse{Transaction: transaction}, nil
 }
 
-func (s *BlockAPIService) getBlock(
+func (s *BlockAPI) getBlock(
 	ctx context.Context, request *types.BlockRequest,
 ) (block *hmytypes.Block, rosettaError *types.Error) {
 	var err error
@@ -180,7 +180,7 @@ type transactionInfo struct {
 }
 
 // getTransactionInfo given the block hash and transaction hash
-func (s *BlockAPIService) getTransactionInfo(
+func (s *BlockAPI) getTransactionInfo(
 	ctx context.Context, blockHash, txHash ethcommon.Hash,
 ) (txInfo *transactionInfo, rosettaError *types.Error) {
 	// Look for all of the possible transactions
@@ -224,7 +224,7 @@ func (s *BlockAPIService) getTransactionInfo(
 	}, nil
 }
 
-func (s *BlockAPIService) getTransactionReceiptFromIndex(
+func (s *BlockAPI) getTransactionReceiptFromIndex(
 	ctx context.Context, blockHash ethcommon.Hash, index uint64,
 ) (*hmytypes.Receipt, *types.Error) {
 	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
