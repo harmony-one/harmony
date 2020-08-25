@@ -9,7 +9,7 @@ import (
 
 // pubSubHost is the host used for pubsub message handling
 type pubSubHost struct {
-	pubsub *libp2p_pubsub.PubSub
+	pubsub pubSub
 
 	activeHandlers map[string][]PubSubHandler // a map from topic to running handlers
 	handlers       map[string]PubSubHandler   // a map from handler specifier to the handler
@@ -17,12 +17,12 @@ type pubSubHost struct {
 	handlerTopics  map[string]string          // a map from handler specifier to the topic
 
 	lock sync.RWMutex
-	log  *zerolog.Logger
+	log  zerolog.Logger
 }
 
-func newPubSubHost(pubsub *libp2p_pubsub.PubSub) *pubSubHost {
+func newPubSubHost(pubSub *libp2p_pubsub.PubSub) *pubSubHost {
 	return &pubSubHost{
-		pubsub: pubsub,
+		pubsub: newPubSubAdapter(pubSub),
 
 		activeHandlers: make(map[string][]PubSubHandler),
 		handlers:       make(map[string]PubSubHandler),
@@ -82,7 +82,6 @@ func (psh *pubSubHost) stopPubSubHandler(spec string) error {
 }
 
 // RemovePubSubHandler removes a pub sub handler
-// TODO: context level management. Cancel all on-going message handlers
 func (psh *pubSubHost) RemovePubSubHandler(spec string) error {
 	psh.lock.Lock()
 	defer psh.lock.Unlock()

@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+)
 
-	"github.com/pkg/errors"
+type (
+	deliverFunc  func(ctx context.Context, rawData []byte, cache ValidateCache)
+	validateFunc func(rawData []byte) ValidateResult
 )
 
 type fakePubSubHandler struct {
-	topic       string
-	index       int
-	numHandlers int
-	deliverFunc func(ctx context.Context, rawData []byte, cache ValidateCache)
+	topic    string
+	index    int
+	validate validateFunc
+	deliver  deliverFunc
 }
 
 type (
@@ -34,14 +37,18 @@ func decodeTestMsg(b []byte) testMsg {
 	return testMsg(binary.LittleEndian.Uint64(b))
 }
 
-func makeFakeHandlers(topic string, num int, deliver func(ctx context.Context, rawData []byte, cache ValidateCache)) []PubSubHandler {
+func makeFakeHandlers(topic string, num int, validates []validateFunc, delivers []deliverFunc) []PubSubHandler {
 	handlers := make([]PubSubHandler, 0, num)
 	for i := 0; i != num; i++ {
 		handler := &fakePubSubHandler{
-			topic:       topic,
-			index:       i,
-			numHandlers: num,
-			deliverFunc: deliver,
+			topic: topic,
+			index: i,
+		}
+		if i < len(delivers) {
+			handler.deliver = delivers[i]
+		}
+		if i < len(validates) {
+			handler.validate = validates[i]
 		}
 		handlers = append(handlers, handler)
 	}
@@ -61,34 +68,19 @@ func makeSpecifier(index int) string {
 }
 
 func (handler *fakePubSubHandler) ValidateMsg(ctx context.Context, peer PeerID, rawData []byte) ValidateResult {
-	var (
-		action = MsgAccept
-		err    error
-	)
-	msg := decodeTestMsg(rawData)
-	if int(msg)%handler.numHandlers == handler.index {
-		action = MsgReject
-		err = errors.New("rejecting message")
+	if handler.validate == nil {
+		return ValidateResult{
+			ValidateCache: ValidateCache{},
+			Action:        MsgAccept,
+			Err:           nil,
+		}
 	}
-
-	return ValidateResult{
-		ValidateCache: ValidateCache{
-			GlobalCache: map[string]interface{}{
-				fmt.Sprintf("%v", handler.index): handler.topic,
-			},
-			HandlerCache: testStruct{
-				field1: msg,
-				field2: string(rawData),
-			},
-		},
-		Action: action,
-		Err:    err,
-	}
+	return handler.validate(rawData)
 }
 
 func (handler *fakePubSubHandler) DeliverMsg(ctx context.Context, rawData []byte, cache ValidateCache) {
-	if handler.deliverFunc != nil {
-		handler.deliverFunc(ctx, rawData, cache)
+	if handler.deliver != nil {
+		handler.deliver(ctx, rawData, cache)
 	}
 	return
 }

@@ -16,8 +16,8 @@ import (
 //       one topic has only one handler.
 type topicRunner struct {
 	topic       string
-	pubSub      *libp2p_pubsub.PubSub
-	topicHandle *libp2p_pubsub.Topic
+	pubSub      pubSub
+	topicHandle psTopic
 	options     []libp2p_pubsub.ValidatorOpt
 
 	// all active handlers in the topic; lock protected
@@ -29,10 +29,11 @@ type topicRunner struct {
 	baseCtx       context.Context
 	baseCtxCancel func()
 
-	metric  *psMetric
-	running abool.AtomicBool
-	closed  abool.AtomicBool
-	log     zerolog.Logger
+	metric   *psMetric
+	running  abool.AtomicBool
+	closed   abool.AtomicBool
+	stoppedC chan struct{}
+	log      zerolog.Logger
 }
 
 func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
@@ -41,6 +42,7 @@ func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, op
 		pubSub:   host.pubsub,
 		handlers: handlers,
 		options:  options,
+		stoppedC: make(chan struct{}),
 		log:      host.log.With().Str("pubSubTopic", topic).Logger(),
 	}
 
@@ -55,7 +57,7 @@ func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, op
 		return nil, errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
 	}
 
-	tr.validateResultHook = tr.recordMetrics
+	tr.validateResultHook = tr.recordValidateResult
 	return tr, nil
 }
 
@@ -72,12 +74,12 @@ func (tr *topicRunner) start() (err error) {
 		}
 	}()
 
-	tr.baseCtx, tr.baseCtxCancel = context.WithCancel(context.Background())
-
 	sub, err := tr.topicHandle.Subscribe()
 	if err != nil {
 		return errors.Wrapf(err, "cannot subscribe topic [%v]", tr.topic)
 	}
+
+	tr.baseCtx, tr.baseCtxCancel = context.WithCancel(context.Background())
 
 	go tr.metric.run()
 	go tr.run(sub)
@@ -101,8 +103,11 @@ func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, raw *libp2p
 	return libp2p_pubsub.ValidationResult(action)
 }
 
-func (tr *topicRunner) run(sub *libp2p_pubsub.Subscription) {
-	defer sub.Cancel()
+func (tr *topicRunner) run(sub subscription) {
+	defer func() {
+		sub.Cancel()
+		tr.stoppedC <- struct{}{}
+	}()
 
 	for {
 		msg, err := sub.Next(tr.baseCtx)
@@ -134,6 +139,7 @@ func (tr *topicRunner) stop() error {
 	}
 	tr.baseCtxCancel()
 	tr.metric.stop()
+	<-tr.stoppedC
 	return nil
 }
 
@@ -190,7 +196,7 @@ func (tr *topicRunner) removeHandler(spec string) error {
 		spec, tr.topic)
 }
 
-func (tr *topicRunner) recordMetrics(msg *message, action ValidateAction, err error) {
+func (tr *topicRunner) recordValidateResult(msg *message, action ValidateAction, err error) {
 	// log in metric non-block
 	go tr.metric.recordValidateResult(msg, action, err)
 }

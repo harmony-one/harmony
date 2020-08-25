@@ -76,19 +76,39 @@ func (ft *fakeTopic) Subscribe() (subscription, error) {
 		return nil, errors.New("already subscribed")
 	}
 	ft.subscribed = true
-
-	return &fakeSubscription{ft.msgCh}, nil
+	for {
+		haveMsg := false
+		select {
+		case <-ft.msgCh:
+			haveMsg = true
+		default:
+		}
+		if !haveMsg {
+			break
+		}
+	}
+	return &fakeSubscription{ft, ft.msgCh, false}, nil
 }
 
 type fakeSubscription struct {
-	msgCh chan *libp2p_pubsub.Message
+	topic    *fakeTopic
+	msgCh    chan *libp2p_pubsub.Message
+	Canceled bool
 }
 
 func (sub *fakeSubscription) Next(ctx context.Context) (*libp2p_pubsub.Message, error) {
+	if sub.Canceled {
+		return nil, errors.New("subscription already canceled")
+	}
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case msg := <-sub.msgCh:
 		return msg, nil
 	}
+}
+
+func (sub *fakeSubscription) Cancel() {
+	sub.Canceled = true
+	sub.topic.subscribed = false
 }

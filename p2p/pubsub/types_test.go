@@ -63,7 +63,7 @@ func TestMergeValidateResults(t *testing.T) {
 			expErr:    nil,
 		},
 		{
-			handlers: makeFakeHandlers(testTopic, 2, 0),
+			handlers: makeFakeHandlers(testTopic, 2, nil, nil),
 			vrs: []ValidateResult{
 				{
 					ValidateCache: ValidateCache{
@@ -89,7 +89,7 @@ func TestMergeValidateResults(t *testing.T) {
 			expErr:    nil,
 		},
 		{
-			handlers: makeFakeHandlers(testTopic, 3, 0),
+			handlers: makeFakeHandlers(testTopic, 3, nil, nil),
 			vrs: []ValidateResult{
 				{
 					ValidateCache: ValidateCache{

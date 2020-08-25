@@ -7,6 +7,10 @@ type pubSubAdapter struct {
 	raw libp2p_pubsub.PubSub
 }
 
+func newPubSubAdapter(raw *libp2p_pubsub.PubSub) *pubSubAdapter {
+	return &pubSubAdapter{raw: *raw}
+}
+
 // Join joins the given topic in pub-sub
 func (ps *pubSubAdapter) Join(topic string) (psTopic, error) {
 	handle, err := ps.raw.Join(topic)
