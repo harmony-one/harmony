@@ -1,6 +1,7 @@
-package config
+package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -8,10 +9,12 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 const (
+	// RosettaVersion tied back to the version of the rosetta go-sdk
+	RosettaVersion = "0.3.4" // TODO (dm): set variable via build flags
+
 	// Blockchain ..
 	Blockchain = "Harmony"
 
@@ -26,17 +29,6 @@ const (
 )
 
 var (
-	// TransactionTypes ..
-	TransactionTypes = []string{
-		"Transfer",
-		"CrossShardTransfer",
-		staking.DirectiveCreateValidator.String(),
-		staking.DirectiveEditValidator.String(),
-		staking.DirectiveDelegate.String(),
-		staking.DirectiveUndelegate.String(),
-		staking.DirectiveCollectRewards.String(),
-	}
-
 	// ReadTimeout ..
 	ReadTimeout = 30 * time.Second
 
@@ -45,18 +37,56 @@ var (
 
 	// IdleTimeout ..
 	IdleTimeout = 120 * time.Second
+
+	// Currency ..
+	Currency = types.Currency{
+		Symbol:   Symbol,
+		Decimals: Decimals,
+	}
 )
 
-// ShardMetadata for the network identifier
-type ShardMetadata struct {
-	IsBeacon bool `json:"isBeacon"`
+// SyncStatus ..
+type SyncStatus int
+
+// Sync status enum
+const (
+	SyncingStartup SyncStatus = iota
+	SyncingNewBlock
+	SyncingFinish
+)
+
+// String ..
+func (s SyncStatus) String() string {
+	return [...]string{"booting syncing service", "syncing new block(s)", "fully synced"}[s]
+}
+
+// SubNetworkMetadata for the sub network identifier of a shard
+type SubNetworkMetadata struct {
+	IsBeacon bool `json:"is_beacon"`
+}
+
+// UnmarshalFromInterface ..
+func (s *SubNetworkMetadata) UnmarshalFromInterface(metadata interface{}) error {
+	var newMetadata SubNetworkMetadata
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &newMetadata); err != nil {
+		return err
+	}
+	*s = newMetadata
+	return nil
 }
 
 // GetNetwork fetches the networking identifier for the given shard
-func GetNetwork(shardID uint32) *types.NetworkIdentifier {
-	metadata, _ := rpc.NewStructuredResponse(ShardMetadata{
+func GetNetwork(shardID uint32) (*types.NetworkIdentifier, error) {
+	metadata, err := rpc.NewStructuredResponse(SubNetworkMetadata{
 		IsBeacon: shardID == shard.BeaconChainShardID,
 	})
+	if err != nil {
+		return nil, err
+	}
 	return &types.NetworkIdentifier{
 		Blockchain: Blockchain,
 		Network:    getNetworkName(),
@@ -64,7 +94,7 @@ func GetNetwork(shardID uint32) *types.NetworkIdentifier {
 			Network:  fmt.Sprintf("shard %d", shardID),
 			Metadata: metadata,
 		},
-	}
+	}, nil
 }
 
 func getNetworkName() string {

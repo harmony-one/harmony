@@ -1,31 +1,41 @@
 package rosetta
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/asserter"
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
+
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	common "github.com/harmony-one/harmony/rosetta/common"
+	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rosetta/services"
 )
 
+var listener net.Listener
+
 // StartServers starts the rosetta http server
+// TODO (dm): optimize rosetta to use single flight to avoid re-processing data
 func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
 	if !config.HTTPEnabled {
 		utils.Logger().Info().Msg("Rosetta http server disabled...")
 		return nil
 	}
-	network := common.GetNetwork(hmy.ShardID)
 
+	network, err := common.GetNetwork(hmy.ShardID)
+	if err != nil {
+		return err
+	}
 	serverAsserter, err := asserter.NewServer(
-		common.TransactionTypes,
+		append(common.PlainOperationTypes, common.StakingOperationTypes...),
 		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
 		[]*types.NetworkIdentifier{network},
 	)
@@ -33,20 +43,25 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 
-	router := server.CorsMiddleware(loggerMiddleware(getRouter(network, serverAsserter, hmy)))
+	router := server.CorsMiddleware(recoverMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy))))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Rosetta server")
-
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
-	var (
-		listener net.Listener
-	)
 	if listener, err = net.Listen("tcp", endpoint); err != nil {
 		return err
 	}
 	go newHTTPServer(router).Serve(listener)
+	fmt.Printf("Started Rosetta server at: %v", endpoint)
+	return nil
+}
+
+// StopServers stops the rosetta http server
+func StopServers() error {
+	if err := listener.Close(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -59,15 +74,38 @@ func newHTTPServer(handler http.Handler) *http.Server {
 	}
 }
 
-func getRouter(
-	network *types.NetworkIdentifier,
-	asserter *asserter.Asserter,
-	hmy *hmy.Harmony,
-) http.Handler {
+func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 	return server.NewRouter(
-		server.NewNetworkAPIController(services.NewNetworkAPIService(network, hmy), asserter),
-		server.NewBlockAPIController(services.NewBlockAPIService(network, hmy), asserter),
+		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
+		server.NewBlockAPIController(services.NewBlockAPI(hmy), asserter),
 	)
+}
+
+func recoverMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		defer func() {
+			r := recover()
+			if r != nil {
+				switch t := r.(type) {
+				case string:
+					err = errors.New(t)
+				case error:
+					err = t
+				default:
+					err = errors.New("unknown error")
+				}
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				utils.Logger().Error().Err(err).Msg("Rosetta Error")
+				// Print to stderr for quick check of rosetta activity
+				debug.PrintStack()
+				_, _ = fmt.Fprintf(
+					os.Stderr, "%s PANIC: %s\n", time.Now().Format("2006-01-02 15:04:05"), err.Error(),
+				)
+			}
+		}()
+		h.ServeHTTP(w, r)
+	})
 }
 
 func loggerMiddleware(router http.Handler) http.Handler {

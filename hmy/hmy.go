@@ -80,6 +80,7 @@ type NodeAPI interface {
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(*core.BlockChain) bool
+	GetMaxPeerHeight() uint64
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof
