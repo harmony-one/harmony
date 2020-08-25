@@ -86,7 +86,7 @@ func (node *Node) StartRosetta() error {
 	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer)
 }
 
-// StopRosetta stop rosetta service
+// StopRosetta stops rosetta service
 func (node *Node) StopRosetta() error {
 	return rosetta.StopServers()
 }
