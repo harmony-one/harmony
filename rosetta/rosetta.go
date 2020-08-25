@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/asserter"
@@ -94,8 +96,11 @@ func recoverMiddleware(h http.Handler) http.Handler {
 				}
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				utils.Logger().Error().Err(err).Msg("Rosetta Error")
-				// Print to stdout for quick check of rosetta activity
-				fmt.Printf("%s PANIC: %s\n", time.Now().Format("2006-01-02 15:04:05"), err.Error())
+				// Print to stderr for quick check of rosetta activity
+				debug.PrintStack()
+				_, _ = fmt.Fprintf(
+					os.Stderr, "%s PANIC: %s\n", time.Now().Format("2006-01-02 15:04:05"), err.Error(),
+				)
 			}
 		}()
 		h.ServeHTTP(w, r)

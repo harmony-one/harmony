@@ -95,10 +95,12 @@ func (s *BlockAPIService) Block(
 			Hash: tx.Hash().String(),
 		})
 	}
-	for _, cxReceipt := range block.IncomingReceipts() {
-		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
-			Hash: cxReceipt.Header.Hash().String(),
-		})
+	for _, cxReceipts := range block.IncomingReceipts() {
+		for _, cxReceipt := range cxReceipts.Receipts {
+			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
+				Hash: cxReceipt.TxHash.String(),
+			})
+		}
 	}
 
 	return &types.BlockResponse{
@@ -182,15 +184,16 @@ func (s *BlockAPIService) getTransactionInfo(
 	ctx context.Context, blockHash, txHash ethcommon.Hash,
 ) (txInfo *transactionInfo, rosettaError *types.Error) {
 	// Look for all of the possible transactions
-	// Note: Use pool transaction interface to handle both plain & staking transactions
-	var tx hmytypes.PoolTransaction
-	tx, _, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
-	if tx == nil {
-		tx, _, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
+	var index uint64
+	var plainTx *hmytypes.Transaction
+	var stakingTx *stakingTypes.StakingTransaction
+	plainTx, _, _, index = rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
+	if plainTx == nil {
+		stakingTx, _, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
 	}
 	cxReceipt, _, _, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), txHash)
 
-	if tx == nil && cxReceipt == nil {
+	if plainTx == nil && stakingTx == nil && cxReceipt == nil {
 		return nil, &common.TransactionNotFoundError
 	}
 
@@ -203,6 +206,14 @@ func (s *BlockAPIService) getTransactionInfo(
 	}
 	if int(index) < len(receipts) {
 		receipt = receipts[index]
+	}
+
+	// Use pool transaction for concise formatting
+	var tx hmytypes.PoolTransaction
+	if stakingTx != nil {
+		tx = stakingTx
+	} else if plainTx != nil {
+		tx = plainTx
 	}
 
 	return &transactionInfo{
