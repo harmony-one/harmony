@@ -3,6 +3,8 @@ package pubsub
 import "github.com/pkg/errors"
 
 var (
+	errTopicRegistered     = errors.New("topic runner already registered")
+	errTopicNotRegistered  = errors.New("topic runner not registered")
 	errPubSubRegistered    = errors.New("handler already registered")
 	errPubSubNotRegistered = errors.New("handler not registered")
 	errPubSubStopped       = errors.New("handler already stopped")

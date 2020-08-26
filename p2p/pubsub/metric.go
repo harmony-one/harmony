@@ -14,7 +14,7 @@ const (
 
 // psMetric is the metric for p2p pub-sub validation.
 type psMetric struct {
-	topic       string
+	topic       Topic
 	logInterval time.Duration
 
 	numAccepted uint64
@@ -26,7 +26,7 @@ type psMetric struct {
 	log    zerolog.Logger
 }
 
-func newPsMetric(topic string, interval time.Duration, log zerolog.Logger) *psMetric {
+func newPsMetric(topic Topic, interval time.Duration, log zerolog.Logger) *psMetric {
 	return &psMetric{
 		topic:       topic,
 		logInterval: interval,
@@ -82,5 +82,5 @@ func (m *psMetric) writeLog(accept, ignore, reject uint64, duration time.Duratio
 		Uint64("accepted", accept).
 		Uint64("ignored", ignore).
 		Uint64("rejected", reject).
-		Msg(fmt.Sprintf("pubsub [%v] validation report", m.topic))
+		Msg(fmt.Sprintf("pubSub [%v] validation report", m.topic))
 }

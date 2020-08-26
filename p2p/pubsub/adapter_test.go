@@ -9,18 +9,18 @@ import (
 )
 
 type fakePubSub struct {
-	topicValidators map[string]interface{}
-	topicMsg        map[string]chan *libp2p_pubsub.Message
+	topicValidators map[Topic]interface{}
+	topicMsg        map[Topic]chan *libp2p_pubsub.Message
 }
 
 func newFakePubSub() *fakePubSub {
 	return &fakePubSub{
-		topicValidators: make(map[string]interface{}),
-		topicMsg:        make(map[string]chan *libp2p_pubsub.Message),
+		topicValidators: make(map[Topic]interface{}),
+		topicMsg:        make(map[Topic]chan *libp2p_pubsub.Message),
 	}
 }
 
-func (ps *fakePubSub) Join(topic string) (psTopic, error) {
+func (ps *fakePubSub) Join(topic Topic) (topicHandle, error) {
 	if _, joined := ps.topicMsg[topic]; joined {
 		return nil, errors.New("topic already joined")
 	}
@@ -32,12 +32,12 @@ func (ps *fakePubSub) Join(topic string) (psTopic, error) {
 	}, nil
 }
 
-func (ps *fakePubSub) RegisterTopicValidator(topic string, val interface{}, opts ...libp2p_pubsub.ValidatorOpt) error {
+func (ps *fakePubSub) RegisterTopicValidator(topic Topic, val interface{}, opts ...libp2p_pubsub.ValidatorOpt) error {
 	ps.topicValidators[topic] = val
 	return nil
 }
 
-func (ps *fakePubSub) UnregisterTopicValidator(topic string) error {
+func (ps *fakePubSub) UnregisterTopicValidator(topic Topic) error {
 	if _, exist := ps.topicValidators[topic]; !exist {
 		return errors.New("topic validator not registered")
 	}
@@ -45,7 +45,7 @@ func (ps *fakePubSub) UnregisterTopicValidator(topic string) error {
 	return nil
 }
 
-func (ps *fakePubSub) addMessage(topic string, msg testMsg) error {
+func (ps *fakePubSub) addMessage(topic Topic, msg testMsg) error {
 	msgCh, exist := ps.topicMsg[topic]
 	if !exist {
 		return errors.New("topic not joined")

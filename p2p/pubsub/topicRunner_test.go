@@ -38,7 +38,7 @@ func TestTopicRunner_accept(t *testing.T) {
 	// feed in message should receive in deliverChs
 	for i := 0; i != 10; i++ {
 		sendTm := testMsg(i)
-		if err := host.pubsub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
+		if err := host.pubSub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
 			t.Fatal(err)
 		}
 		// let the bullet fly
@@ -78,7 +78,7 @@ func TestTopicRunner_reject(t *testing.T) {
 
 	for i := 0; i != 10; i++ {
 		sendTm := testMsg(i)
-		if err := host.pubsub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
+		if err := host.pubSub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
 			t.Fatal(err)
 		}
 		// let the bullet fly
@@ -114,7 +114,7 @@ func TestTopicRunner_halfAccept(t *testing.T) {
 
 	for i := 0; i != 10; i++ {
 		sendTm := testMsg(i)
-		if err := host.pubsub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
+		if err := host.pubSub.(*fakePubSub).addMessage(testTopic, sendTm); err != nil {
 			t.Fatal(err)
 		}
 		// let the bullet fly
@@ -161,7 +161,7 @@ func TestTopicRunner_dynamicHandler(t *testing.T) {
 	if err := tr.start(); err != nil {
 		t.Fatal(err)
 	}
-	fps := host.pubsub.(*fakePubSub)
+	fps := host.pubSub.(*fakePubSub)
 	// Phase 1: only one handler that accept message
 	fps.addMessage(testTopic, testMsg(0))
 	time.Sleep(timeBulletFly)
@@ -206,7 +206,7 @@ func TestTopicRunner_dynamicHandler(t *testing.T) {
 func TestTopicRunner_StartStop(t *testing.T) {
 	host := makeTestPubSubHost()
 	handler, deliver := makeTestHandler(testTopic, 0, validateAcceptFn)
-	fps := host.pubsub.(*fakePubSub)
+	fps := host.pubSub.(*fakePubSub)
 
 	tr, err := newTopicRunner(host, testTopic, []PubSubHandler{handler}, nil)
 	if err != nil {
@@ -285,7 +285,7 @@ func TestTopicRunner_race(t *testing.T) {
 	wg.Add(4)
 
 	// 3 goroutine to feed messages
-	ps := host.pubsub.(*fakePubSub)
+	ps := host.pubSub.(*fakePubSub)
 	for i := 0; i != 3; i++ {
 		go func() {
 			defer wg.Done()
@@ -392,7 +392,7 @@ func validateAcceptHalfFunc(rawData []byte) ValidateResult {
 	}
 }
 
-func makeTestHandler(topic string, index int, validate validateFunc) (*fakePubSubHandler, chan ValidateCache) {
+func makeTestHandler(topic Topic, index int, validate validateFunc) (*fakePubSubHandler, chan ValidateCache) {
 	deliver, deliverCh := makeDeliverFunc()
 
 	return &fakePubSubHandler{
@@ -408,13 +408,13 @@ func makeTestPubSubHost() *pubSubHost {
 	log := zerolog.New(os.Stdout)
 
 	return &pubSubHost{
-		pubsub: ps,
+		pubSub: ps,
 		log:    log,
 	}
 }
 
 // assertTopicRunning send a probe message to see whether message handling is action
-func assertTopicRunning(topic string, pubSub *fakePubSub, deliver chan ValidateCache, running bool) error {
+func assertTopicRunning(topic Topic, pubSub *fakePubSub, deliver chan ValidateCache, running bool) error {
 	if err := pubSub.addMessage(topic, testMsg(0)); err != nil {
 		return err
 	}

@@ -12,7 +12,7 @@ type (
 )
 
 type fakePubSubHandler struct {
-	topic    string
+	topic    Topic
 	index    int
 	validate validateFunc
 	deliver  deliverFunc
@@ -37,7 +37,7 @@ func decodeTestMsg(b []byte) testMsg {
 	return testMsg(binary.LittleEndian.Uint64(b))
 }
 
-func makeFakeHandlers(topic string, num int, validates []validateFunc, delivers []deliverFunc) []PubSubHandler {
+func makeFakeHandlers(topic Topic, num int, validates []validateFunc, delivers []deliverFunc) []PubSubHandler {
 	handlers := make([]PubSubHandler, 0, num)
 	for i := 0; i != num; i++ {
 		handler := &fakePubSubHandler{
@@ -55,16 +55,16 @@ func makeFakeHandlers(topic string, num int, validates []validateFunc, delivers 
 	return handlers
 }
 
-func (handler *fakePubSubHandler) Topic() string {
+func (handler *fakePubSubHandler) Topic() Topic {
 	return handler.topic
 }
 
-func (handler *fakePubSubHandler) Specifier() string {
+func (handler *fakePubSubHandler) Specifier() HandlerSpecifier {
 	return makeSpecifier(handler.index)
 }
 
-func makeSpecifier(index int) string {
-	return fmt.Sprintf("testHandler [%v]", index)
+func makeSpecifier(index int) HandlerSpecifier {
+	return HandlerSpecifier(fmt.Sprintf("testHandler [%v]", index))
 }
 
 func (handler *fakePubSubHandler) ValidateMsg(ctx context.Context, peer PeerID, rawData []byte) ValidateResult {

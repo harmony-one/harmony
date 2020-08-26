@@ -1,97 +1,113 @@
 package pubsub
 
 import (
-	"sync"
-
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 )
 
-// pubSubHost is the host used for pubsub message handling
+// pubSubHost is the host used for pub-sub message handling.
+// All requests in pubSubHost are handled in a non-concurrent fashion.
 type pubSubHost struct {
-	pubsub pubSub
+	pubSub pubSub
 
-	activeHandlers map[string][]PubSubHandler // a map from topic to running handlers
-	handlers       map[string]PubSubHandler   // a map from handler specifier to the handler
-	stopped        map[string]PubSubHandler   // a map from handler specifier to stopped handler
-	handlerTopics  map[string]string          // a map from handler specifier to the topic
+	topicRunners  map[Topic]*topicRunner             // is a map from topic to topicRunner
+	topicHandlers map[Topic][]PubSubHandler          // a map from topic to handlers
+	handlers      map[HandlerSpecifier]PubSubHandler // a map from specifier to pubSubHandler
 
-	lock sync.RWMutex
-	log  zerolog.Logger
+	optionProvider ValidateOptionProvider
+
+	log zerolog.Logger
 }
 
-func newPubSubHost(pubSub *libp2p_pubsub.PubSub) *pubSubHost {
+func newPubSubHost(pubSub *libp2p_pubsub.PubSub, log zerolog.Logger) *pubSubHost {
 	return &pubSubHost{
-		pubsub: newPubSubAdapter(pubSub),
+		pubSub: newPubSubAdapter(pubSub),
 
-		activeHandlers: make(map[string][]PubSubHandler),
-		handlers:       make(map[string]PubSubHandler),
-		stopped:        make(map[string]PubSubHandler),
-		handlerTopics:  make(map[string]string),
+		topicRunners:  make(map[Topic]*topicRunner),
+		topicHandlers: make(map[Topic][]PubSubHandler),
+		handlers:      make(map[HandlerSpecifier]PubSubHandler),
+
+		log: log.With().Str("module", "pub-sub").Logger(),
 	}
 }
 
 // AddPubSubHandler add a pub sub handler
 func (psh *pubSubHost) AddPubSubHandler(handler PubSubHandler) error {
-	psh.lock.Lock()
-	defer psh.lock.Unlock()
-
-	spec := handler.Specifier()
-	if _, ok := psh.handlers[spec]; ok {
-		return errPubSubRegistered
-	}
-
-	topicHandlers := psh.activeHandlers[handler.Topic()]
-	psh.activeHandlers[handler.Topic()] = append(topicHandlers, handler)
-	psh.handlers[spec] = handler
-	psh.stopped[spec] = handler
-	psh.handlerTopics[spec] = handler.Topic()
-
 	return nil
 }
 
 // StopPubSubHandler stop the pub sub handler with the given specifier.
-// TODO: also cancel all running contexts. Need to implement cancel feature in each
-//       PubSubHandler
 func (psh *pubSubHost) StopPubSubHandler(spec string) error {
-	psh.lock.Lock()
-	defer psh.lock.Unlock()
-
-	if _, ok := psh.handlers[spec]; !ok {
-		return errPubSubNotRegistered
-	}
-	if _, ok := psh.stopped[spec]; ok {
-		return errPubSubStopped
-	}
 	return nil
-}
-
-// stopPubSubHandler stop a pub sub handler. Lock is assumed at caller.
-func (psh *pubSubHost) stopPubSubHandler(spec string) error {
-	topic := psh.handlerTopics[spec]
-	for i, handler := range psh.activeHandlers[topic] {
-		if handler.Specifier() != spec {
-			continue
-		}
-		raw := psh.activeHandlers[topic]
-		psh.stopped[spec] = handler
-		psh.activeHandlers[topic] = append(raw[:i], raw[i+1:]...)
-		return nil
-	}
-	return errPubSubNotActive
 }
 
 // RemovePubSubHandler removes a pub sub handler
 func (psh *pubSubHost) RemovePubSubHandler(spec string) error {
-	psh.lock.Lock()
-	defer psh.lock.Unlock()
-
-	if _, ok := psh.handlers[spec]; !ok {
-		return errPubSubNotRegistered
-	}
 	return nil
 }
 
 func (psh *pubSubHost) StartPubSubHandler(spec string) error {
 	return nil
+}
+
+func (psh *pubSubHost) addPubSubHandler(task *addHandlerTask) error {
+	var (
+		handler   = task.handler
+		topic     = handler.Topic()
+		specifier = handler.Specifier()
+	)
+	if _, exist := psh.handlers[specifier]; exist {
+		return errHandlerAlreadyExist
+	}
+	if err := psh.addTopicRunnerIfNotExist(topic); err != nil {
+		return err
+	}
+	//psh.handlers[specifier]
+	// TODO: implement here
+	return nil
+}
+
+func (psh *pubSubHost) addTopicRunnerIfNotExist(topic Topic) error {
+	if _, exist := psh.topicRunners[topic]; exist {
+		return nil
+	}
+	options := psh.optionProvider.getValidateOptions(topic)
+	tr, err := newTopicRunner(psh, topic, nil, options)
+	if err != nil {
+		return err
+	}
+	psh.topicRunners[topic] = tr
+	return nil
+}
+
+func (psh *pubSubHost) startTopicRunner(topic Topic) error {
+	tr, err := psh.getTopicRunner(topic)
+	if err != nil {
+		return err
+	}
+	return tr.start()
+}
+
+func (psh *pubSubHost) stopTopicRunner(topic Topic) error {
+	tr, err := psh.getTopicRunner(topic)
+	if err != nil {
+		return err
+	}
+	return tr.stop()
+}
+
+func (psh *pubSubHost) removeTopicRunner(topic Topic) error {
+	tr, err := psh.getTopicRunner(topic)
+	if err != nil {
+		return err
+	}
+	return tr.close()
+}
+
+func (psh *pubSubHost) getTopicRunner(topic Topic) (*topicRunner, error) {
+	tr, exist := psh.topicRunners[topic]
+	if !exist {
+		return nil, errTopicNotRegistered
+	}
+	return tr, nil
 }

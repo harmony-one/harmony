@@ -10,8 +10,14 @@ import (
 // PeerID is an alias to libp2p_peer.ID, basically a string
 type PeerID libp2p_peer.ID
 
+// HandlerSpecifier is a unique string for PubSubHandler
+type HandlerSpecifier string
+
+// Topic is the pub-sub subscribed topic, basically a string
+type Topic string
+
 // ValidateAction is an encapsulated libp2p_pubsub.ValidationResult which defines
-// The action to be taken for the validation of a pubsub message.
+// The action to be taken for the validation of a pubSub message.
 type ValidateAction libp2p_pubsub.ValidationResult
 
 const (
@@ -140,7 +146,7 @@ func (msg *message) setValidateCache(cache vData) {
 	msg.raw.ValidatorData = cache
 }
 
-func (msg *message) getHandlerCache(spec string) ValidateCache {
+func (msg *message) getHandlerCache(spec HandlerSpecifier) ValidateCache {
 	vd := msg.getVData()
 
 	return ValidateCache{
@@ -163,12 +169,12 @@ func (msg *message) getVData() vData {
 // data that is used privately by each handler.
 type vData struct {
 	globals     map[string]interface{}
-	handlerData map[string]interface{}
+	handlerData map[HandlerSpecifier]interface{}
 }
 
 func newVData() vData {
 	return vData{
 		globals:     make(map[string]interface{}),
-		handlerData: make(map[string]interface{}),
+		handlerData: make(map[HandlerSpecifier]interface{}),
 	}
 }

@@ -15,16 +15,14 @@ import (
 // TODO: Redesign the topics and decouple the message usage according to PubSubHandler so that
 //       one topic has only one handler.
 type topicRunner struct {
-	topic       string
+	topic       Topic
 	pubSub      pubSub
-	topicHandle psTopic
+	topicHandle topicHandle
 	options     []libp2p_pubsub.ValidatorOpt
 
 	// all active handlers in the topic; lock protected
 	handlers []PubSubHandler
 	lock     sync.RWMutex
-
-	validateResultHook func(msg *message, action ValidateAction, err error)
 
 	baseCtx       context.Context
 	baseCtxCancel func()
@@ -36,14 +34,14 @@ type topicRunner struct {
 	log      zerolog.Logger
 }
 
-func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
+func newTopicRunner(host *pubSubHost, topic Topic, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
 	tr := &topicRunner{
 		topic:    topic,
-		pubSub:   host.pubsub,
+		pubSub:   host.pubSub,
 		handlers: handlers,
 		options:  options,
 		stoppedC: make(chan struct{}),
-		log:      host.log.With().Str("pubSubTopic", topic).Logger(),
+		log:      host.log.With().Str("pubSubTopic", string(topic)).Logger(),
 	}
 
 	tr.metric = newPsMetric(topic, defaultMetricInterval, tr.log)
@@ -57,7 +55,6 @@ func newTopicRunner(host *pubSubHost, topic string, handlers []PubSubHandler, op
 		return nil, errors.Wrapf(err, "cannot register topic validator [%v]", tr.topic)
 	}
 
-	tr.validateResultHook = tr.recordValidateResult
 	return tr, nil
 }
 
@@ -99,7 +96,7 @@ func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, raw *libp2p
 	cache, action, err := mergeValidateResults(handlers, vResults)
 	m.setValidateCache(cache)
 
-	tr.validateResultHook(m, action, err)
+	tr.recordValidateResult(m, action, err)
 	return libp2p_pubsub.ValidationResult(action)
 }
 
@@ -168,6 +165,18 @@ func (tr *topicRunner) getHandlers() []PubSubHandler {
 	return handlers
 }
 
+func (tr *topicRunner) isHandlerRunning(specifier HandlerSpecifier) bool {
+	tr.lock.RLock()
+	defer tr.lock.RUnlock()
+
+	for _, handler := range tr.handlers {
+		if handler.Specifier() == specifier {
+			return true
+		}
+	}
+	return false
+}
+
 func (tr *topicRunner) addHandler(newHandler PubSubHandler) error {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
@@ -182,7 +191,7 @@ func (tr *topicRunner) addHandler(newHandler PubSubHandler) error {
 	return nil
 }
 
-func (tr *topicRunner) removeHandler(spec string) error {
+func (tr *topicRunner) removeHandler(spec HandlerSpecifier) error {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 

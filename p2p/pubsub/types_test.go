@@ -34,13 +34,13 @@ var (
 	testKey1 = "key1"
 	testKey2 = "key2"
 
-	testSpec1 = "spec1"
-	testSpec2 = "spec2"
+	testSpec1 = HandlerSpecifier("spec1")
+	testSpec2 = HandlerSpecifier("spec2")
 
 	testVal1 = &testStruct{1, "test1"}
 	testVal2 = &testStruct{2, "test2"}
 
-	testTopic = "test topic"
+	testTopic = Topic("test topic")
 
 	errIntended = errors.New("intended error")
 )
@@ -83,7 +83,7 @@ func TestMergeValidateResults(t *testing.T) {
 
 			expCache: vData{
 				globals:     map[string]interface{}{testKey1: testVal1, testKey2: testVal2},
-				handlerData: map[string]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
+				handlerData: map[HandlerSpecifier]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
 			},
 			expAction: MsgAccept,
 			expErr:    nil,
@@ -110,7 +110,7 @@ func TestMergeValidateResults(t *testing.T) {
 
 			expCache: vData{
 				globals:     map[string]interface{}{testKey1: testVal1, testKey2: testVal2},
-				handlerData: map[string]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
+				handlerData: map[HandlerSpecifier]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
 			},
 			expAction: MsgReject,
 			expErr:    fmt.Errorf("%v: %v", makeSpecifier(1), errIntended),
@@ -135,13 +135,13 @@ func TestMergeValidateResults(t *testing.T) {
 func TestMessage_Cache(t *testing.T) {
 	tests := []struct {
 		cache           vData
-		handlerSpec     string
+		handlerSpec     HandlerSpecifier
 		expHandlerCache ValidateCache
 	}{
 		{
 			cache: vData{
 				globals: getTestGlobals(),
-				handlerData: map[string]interface{}{
+				handlerData: map[HandlerSpecifier]interface{}{
 					testSpec1: testVal1,
 					testSpec2: testVal2,
 				},
@@ -189,13 +189,29 @@ func assertVDataEqual(vd1, vd2 vData) error {
 	if err := assertMapEqual(vd1.globals, vd2.globals); err != nil {
 		return errors.Wrapf(err, "globals:")
 	}
-	if err := assertMapEqual(vd1.handlerData, vd2.handlerData); err != nil {
+	if err := assertHandlerMapEqual(vd1.handlerData, vd2.handlerData); err != nil {
 		return errors.Wrapf(err, "handler data:")
 	}
 	return nil
 }
 
 func assertMapEqual(m1, m2 map[string]interface{}) error {
+	if len(m1) != len(m2) {
+		return errNotEqual
+	}
+	for k1, v1 := range m1 {
+		v2, exist := m2[k1]
+		if !exist {
+			return errNotEqual
+		}
+		if !reflect.DeepEqual(v1, v2) {
+			return errNotEqual
+		}
+	}
+	return nil
+}
+
+func assertHandlerMapEqual(m1, m2 map[HandlerSpecifier]interface{}) error {
 	if len(m1) != len(m2) {
 		return errNotEqual
 	}
