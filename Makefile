@@ -7,7 +7,7 @@ export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 PKGNAME=harmony
 VERSION?=$(shell git tag -l --sort=-v:refname | head -n 1 | tr -d v)
-RELEASE?=$(shell git describe | cut -f2 -d-)
+RELEASE?=$(shell git describe --long | cut -f2 -d-)
 RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
