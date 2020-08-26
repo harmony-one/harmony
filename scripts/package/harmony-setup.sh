@@ -5,7 +5,12 @@ CONFIG=/etc/harmony/harmony.conf
 VER=v1.0
 
 function usage() {
+   local MSG=${1}
+
    cat <<-EOT
+$MSG
+This script is a helper script to edit the $CONFIG.
+
 Usage: $ME [options]
 
 Options:
@@ -23,18 +28,18 @@ EOT
 }
 
 function _setup_validator_config_file() {
-   sed -i.bak 's,NodeType =.*,NodeType = "validator",; s,ShardID = .*,ShardID = -1,' $CONFIG
+   sed -i.bak 's,NodeType =.*,NodeType = "validator",; s,ShardID = .*,ShardID = -1,; s,IsArchival = .*,IsArchival = false,' $CONFIG
 }
 
 function _setup_explorer_config_file() {
-   sed -i.bak "s,NodeType =.*,NodeType = \"explorer\",; s,ShardID = .*,ShardID = $SHARD," $CONFIG
+   sed -i.bak "s,NodeType =.*,NodeType = \"explorer\",; s,ShardID = .*,ShardID = $SHARD,; s,IsArchival = .*,IsArchival = true," $CONFIG
 }
 
 function setup_config_file() {
    case $TYPE in
       validator) _setup_validator_config_file ;;
       explorer) _setup_explorer_config_file ;;
-      *) usage ;;
+      *) usage "ERROR: invalid node type! '$TYPE'" ;;
    esac
 }
 
@@ -58,16 +63,16 @@ case ${TYPE} in
    explorer)
       case ${SHARD} in
          0|1|2|3) ;;
-         *) usage ;;
+         *) usage "ERROR: invalid shard number! '$SHARD'" ;;
       esac
       ;;
    validator)
       case ${SHARD} in
          -1) ;;
-         *) usage ;;
+         *) usage "ERROR: do not specify shard number in validator type!!" ;;
       esac
       ;;
-   *) usage ;;
+   *) usage "ERROR: invalid node type! '$TYPE'" ;;
 esac
 
 setup_config_file

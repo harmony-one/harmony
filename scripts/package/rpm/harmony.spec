@@ -1,4 +1,5 @@
 {{VER=2.0.0}}
+{{REL=0}}
 # SPEC file overview:
 # https://docs.fedoraproject.org/en-US/quick-docs/creating-rpm-packages/#con_rpm-spec-file-overview
 # Fedora packaging guidelines:
@@ -6,16 +7,16 @@
 
 Name:		harmony
 Version:	{{ VER }}
-Release:	0
+Release:	{{ REL }}
 Summary:	harmony blockchain validator node program
 
 License:	MIT
 URL:		https://harmony.one
 Source0:	%{name}-%{version}.tar
 BuildArch: x86_64
-Packager: Leo Chen
+Packager: Leo Chen <leo@hamrony.one>
 Requires(pre): shadow-utils
-Requires: systemd-rpm-macros
+Requires: systemd-rpm-macros jq
 
 %description
 Harmony is a sharded, fast finality, low fee, PoS public blockchain.
@@ -57,14 +58,17 @@ install -m 0644 harmony.conf ${RPM_BUILD_ROOT}/etc/harmony/
 exit 0
 
 %post
-%systemd_post %{name}.service
+%systemd_user_post %{name}.service
 %sysctl_apply %{name}-sysctl.conf
+exit 0
 
 %preun
-%systemd_preun %{name}.service
+%systemd_user_preun %{name}.service
+exit 0
 
 %postun
-%systemd_postun_with_restart ${name}.service
+%systemd_postun_with_restart %{name}.service
+exit 0
 
 %files
 /usr/sbin/harmony
@@ -76,11 +80,21 @@ exit 0
 /etc/harmony/rclone.conf
 /home/harmony/.config/rclone
 
+%config(noreplace) /etc/harmony/harmony.conf
+%config /etc/harmony/rclone.conf
+%config /etc/sysctl.d/99-harmony.conf 
+%config /etc/systemd/system/harmony.service
+
 %doc
 %license
 
 
 
 %changelog
-* Tue Aug 18 2020 Leo Chen <leo at harmony dot one> 2.3.5
-  - init version of the harmony node program
+* Wed Aug 26 2020 Leo Chen <leo at harmony dot one> 2.3.5
+   - get version from git tag
+   - add %config macro to keep edited config files
+
+* Tue Aug 18 2020 Leo Chen <leo at harmony dot one> 2.3.4
+   - init version of the harmony node program
+

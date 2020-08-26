@@ -1,20 +1,23 @@
 #!/bin/sh
 
-set -e
-
 after_install() {
-   :
+   mkdir -p /home/harmony/.hmy/blskeys
+   mkdir -p /home/harmony/.config/rclone
+   chown -R harmony.harmony /home/harmony
+
+   systemctl enable harmony
+   systemctl start harmony
 }
 
 after_upgrade() {
-   :
-# systemctl restart harmony
+   systemctl enable harmony
+   systemctl restart harmony
 }
 
 
 # Setup system users and groups
-addgroup --quiet --system harmony
-adduser --quiet --system --ingroup harmony --gecos "harmony validator account" harmony
+getent group harmony >/dev/null || addgroup --quiet --system harmony
+getent passwd harmony >/dev/null || adduser --quiet --system --ingroup harmony --gecos "harmony validator account" harmony
 
 if [ "${1}" = "configure" -a -z "${2}" ] || \
    [ "${1}" = "abort-remove" ]
