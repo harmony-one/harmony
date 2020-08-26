@@ -427,7 +427,7 @@ func (s *BlockAPI) getBlock(
 		return nil, &common.BlockNotFoundError
 	}
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}

@@ -193,6 +193,7 @@ func getErrors() []*types.Error {
 		&common.BlockNotFoundError,
 		&common.TransactionNotFoundError,
 		&common.ReceiptNotFoundError,
+		&common.UnsupportedCurveTypeError,
 	}
 }
 

@@ -18,6 +18,7 @@ func TestErrorCodes(t *testing.T) {
 		BlockNotFoundError,
 		TransactionNotFoundError,
 		ReceiptNotFoundError,
+		UnsupportedCurveTypeError,
 	}
 
 	for i, err := range errors {
@@ -40,6 +41,7 @@ func TestRetryableError(t *testing.T) {
 		BlockNotFoundError,
 		TransactionNotFoundError,
 		ReceiptNotFoundError,
+		UnsupportedCurveTypeError,
 	}
 
 	for _, err := range retriableErrors {

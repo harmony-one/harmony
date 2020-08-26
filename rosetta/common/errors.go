@@ -63,6 +63,13 @@ var (
 		Message:   "receipt not found",
 		Retriable: false,
 	}
+
+	// UnsupportedCurveTypeError ..
+	UnsupportedCurveTypeError = types.Error{
+		Code:      8,
+		Message:   "unsupported curve type",
+		Retriable: false,
+	}
 )
 
 // NewError create a new error with a given detail structure
