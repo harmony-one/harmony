@@ -6,7 +6,8 @@ export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
 PKGNAME=harmony
-VERSION?=2.3.6
+VERSION?=$(shell git tag -l --sort=-v:refname | head -n 1 | tr -d v)
+RELEASE?=$(shell git describe | cut -f2 -d-)
 RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
@@ -88,19 +89,19 @@ arm_static:
 
 deb_init:
 	rm -rf $(DEBBUILD)
-	mkdir -p $(DEBBUILD)/$(PKGNAME)-$(VERSION)/{etc/systemd/system,usr/sbin,etc/sysctl.d,etc/harmony}
-	cp -f bin/harmony $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
-	bin/harmony dumpconfig $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/harmony/harmony.conf
-	cp -f scripts/package/rclone.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/harmony/
-	cp -f scripts/package/harmony.service $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/systemd/system/
-	cp -f scripts/package/harmony-setup.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
-	cp -f scripts/package/harmony-rclone.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)/usr/sbin/
-	cp -f scripts/package/harmony-sysctl.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)/etc/sysctl.d/99-harmony.conf
-	cp -r scripts/package/deb/DEBIAN $(DEBBUILD)/$(PKGNAME)-$(VERSION)
-	VER=$(VERSION) scripts/package/templater.sh scripts/package/deb/DEBIAN/control > $(DEBBUILD)/$(PKGNAME)-$(VERSION)/DEBIAN/control
+	mkdir -p $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/{etc/systemd/system,usr/sbin,etc/sysctl.d,etc/harmony}
+	cp -f bin/harmony $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	bin/harmony dumpconfig $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/harmony/harmony.conf
+	cp -f scripts/package/rclone.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/harmony/
+	cp -f scripts/package/harmony.service $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/systemd/system/
+	cp -f scripts/package/harmony-setup.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	cp -f scripts/package/harmony-rclone.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	cp -f scripts/package/harmony-sysctl.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/sysctl.d/99-harmony.conf
+	cp -r scripts/package/deb/DEBIAN $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)
+	VER=$(VERSION)-$(RELEASE) scripts/package/templater.sh scripts/package/deb/DEBIAN/control > $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/DEBIAN/control
 
 deb_build:
-	(cd $(DEBBUILD); dpkg-deb --build $(PKGNAME)-$(VERSION)/)
+	(cd $(DEBBUILD); dpkg-deb --build $(PKGNAME)-$(VERSION)-$(RELEASE)/)
 
 deb: deb_init deb_build
 
@@ -123,14 +124,14 @@ rpm_init:
 	cp -f scripts/package/harmony-rclone.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/package/rclone.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
 	cp -f scripts/package/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
-	VER=$(VERSION) scripts/package/templater.sh scripts/package/rpm/harmony.spec > $(RPMBUILD)/SPECS/harmony.spec
+	VER=$(VERSION) REL=$(RELEASE) scripts/package/templater.sh scripts/package/rpm/harmony.spec > $(RPMBUILD)/SPECS/harmony.spec
 	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
 
 rpm_build:
 	rpmbuild --target x86_64 -bb $(RPMBUILD)/SPECS/harmony.spec
 
 rpm: rpm_init rpm_build
-	rpm --addsign $(RPMBUILD)/RPMS/x86_64/$(PKGNAME)-$(VERSION)-0.x86_64.rpm
+	rpm --addsign $(RPMBUILD)/RPMS/x86_64/$(PKGNAME)-$(VERSION)-$(RELEASE).x86_64.rpm
 
 rpmpub_dev: rpm
 	./scripts/package/publish-repo.sh -p dev -n rpm -s $(RPMBUILD)

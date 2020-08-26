@@ -1,4 +1,5 @@
 {{VER=2.0.0}}
+{{REL=0}}
 # SPEC file overview:
 # https://docs.fedoraproject.org/en-US/quick-docs/creating-rpm-packages/#con_rpm-spec-file-overview
 # Fedora packaging guidelines:
@@ -6,14 +7,14 @@
 
 Name:		harmony
 Version:	{{ VER }}
-Release:	0
+Release:	{{ REL }}
 Summary:	harmony blockchain validator node program
 
 License:	MIT
 URL:		https://harmony.one
 Source0:	%{name}-%{version}.tar
 BuildArch: x86_64
-Packager: Leo Chen
+Packager: Leo Chen <leo@hamrony.one>
 Requires(pre): shadow-utils
 Requires: systemd-rpm-macros
 
