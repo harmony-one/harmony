@@ -77,8 +77,6 @@ function publish_deb() {
       aptly repo add harmony-$PROFILE $SRC
       aptly publish repo harmony-$PROFILE s3:harmony-$PROFILE:
    fi
-   # remove the local repo
-   aptly repo drop harmony-$PROFILE
 }
 
 ################## MAIN ##################
