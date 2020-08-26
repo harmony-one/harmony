@@ -5,7 +5,7 @@ go:
   - 1.14
 go_import_path: github.com/harmony-one/harmony
 env:
-  - TEST="go build -v ./..."
+  - TEST="make"
   - TEST="./scripts/travis_checker.sh"
   - TEST="./scripts/travis_node_checker.sh"
 install:
