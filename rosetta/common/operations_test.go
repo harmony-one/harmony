@@ -54,7 +54,7 @@ func TestPlainOperationTypes(t *testing.T) {
 		CrossShardTransferOperation,
 		ContractCreationOperation,
 		GenesisFundsOperation,
-		PreStakingEraBlockRewardsOperation,
+		PreStakingEraBlockRewardOperation,
 	}
 	sort.Strings(referenceOperationTypes)
 	sort.Strings(plainOperationTypes)
