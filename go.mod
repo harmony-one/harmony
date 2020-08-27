@@ -21,18 +21,16 @@ require (
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.4.0
 	github.com/golangci/golangci-lint v1.22.2
-	github.com/gorilla/handlers v1.4.0 // indirect
 	github.com/gorilla/mux v1.7.4
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/abool v1.0.1
 	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365
+	github.com/iancoleman/strcase v0.0.0-20190422225806-e506e3ef7365 // indirect
 	github.com/ipfs/go-ds-badger v0.2.4
-	github.com/jackpal/gateway v1.0.6 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/karalabe/hid v1.0.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -41,16 +39,15 @@ require (
 	github.com/libp2p/go-libp2p-core v0.6.1
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-host v0.1.0
+	github.com/libp2p/go-libp2p-host v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-kad-dht v0.8.3
-	github.com/libp2p/go-libp2p-net v0.1.0
-	github.com/libp2p/go-libp2p-peer v0.2.0
-	github.com/libp2p/go-libp2p-peerstore v0.2.6
+	github.com/libp2p/go-libp2p-net v0.1.0 // indirect
+	github.com/libp2p/go-libp2p-peer v0.2.0 // indirect
+	github.com/libp2p/go-libp2p-peerstore v0.2.6 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.3.3
 	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/otiai10/copy v1.2.0
 	github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml v1.2.0
 	github.com/pkg/errors v0.9.1
@@ -65,8 +62,6 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/uber/jaeger-client-go v2.20.1+incompatible // indirect
-	github.com/uber/jaeger-lib v2.2.0+incompatible // indirect
 	golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a
