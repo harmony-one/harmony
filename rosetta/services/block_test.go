@@ -322,7 +322,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -383,7 +383,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -444,7 +444,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -498,7 +498,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -559,7 +559,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -891,7 +891,7 @@ func TestNewOperations(t *testing.T) {
 	accountID := &types.AccountIdentifier{
 		Address: "test-address",
 	}
-	gasFee := uint64(1e18)
+	gasFee := big.NewInt(int64(1e18))
 	amount := &types.Amount{
 		Value:    fmt.Sprintf("-%v", gasFee),
 		Currency: &common.Currency,

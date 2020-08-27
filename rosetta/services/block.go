@@ -296,7 +296,7 @@ func formatCrossShardReceiverTransaction(
 				Status:  common.SuccessOperationStatus.Status,
 				Account: receiverAccountID,
 				Amount: &types.Amount{
-					Value:    fmt.Sprintf("%v", cxReceipt.Amount.Uint64()),
+					Value:    fmt.Sprintf("%v", cxReceipt.Amount),
 					Currency: &common.Currency,
 				},
 				Metadata: map[string]interface{}{"from_account": senderAccountID},
@@ -416,7 +416,7 @@ func getOperations(
 	}
 
 	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
+	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
 	gasOperations := newOperations(gasExpended, accountID)
 
 	// Handle different cases of plain transactions
@@ -453,7 +453,7 @@ func getStakingOperations(
 	}
 
 	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
+	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
 	gasOperations := newOperations(gasExpended, accountID)
 
 	// Format staking message for metadata
@@ -525,7 +525,7 @@ func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Err
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -544,7 +544,7 @@ func getAmountFromDelegateMessage(data []byte) (*types.Amount, *types.Error) {
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -563,7 +563,7 @@ func getAmountFromUndelegateMessage(data []byte) (*types.Amount, *types.Error) {
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -576,7 +576,7 @@ func getAmountFromCollectRewards(
 	for _, log := range logs {
 		if log.Address == senderAddress {
 			amount = &types.Amount{
-				Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data).Uint64()),
+				Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data)),
 				Currency: &common.Currency,
 			}
 			break
@@ -778,7 +778,7 @@ func newAccountIdentifier(
 // newOperations creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
 func newOperations(
-	gasFeeInATTO uint64, accountID *types.AccountIdentifier,
+	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{
 		{
