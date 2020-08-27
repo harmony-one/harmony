@@ -430,8 +430,8 @@ func getBlockSignerInfo(
 			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
 		}
 		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
-			totalSigners += 1
 			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
+			totalSigners++
 		}
 	}
 	return &blockSignerInfo{
