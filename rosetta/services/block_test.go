@@ -220,9 +220,14 @@ func testFormatPlainTransaction(
 
 func TestFormatGenesisTransaction(t *testing.T) {
 	genesisSpec := getGenesisSpec(0)
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
 	for acc := range genesisSpec.Alloc {
-		txID := &types.TransactionIdentifier{Hash: acc.String()}
-		tx, rosettaError := formatGenesisTransaction(txID, 0)
+		b32Addr, err := internalCommon.AddressToBech32(acc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txID := getSpecialCaseTransactionIdentifier(testBlkHash, b32Addr)
+		tx, rosettaError := formatGenesisTransaction(txID, b32Addr, 0)
 		if rosettaError != nil {
 			t.Fatal(rosettaError)
 		}
@@ -231,6 +236,9 @@ func TestFormatGenesisTransaction(t *testing.T) {
 		}
 		if len(tx.Operations) != 1 {
 			t.Error("expected exactly 1 operation")
+		}
+		if tx.Operations[0].Type != common.GenesisFundsOperation {
+			t.Error("expected operation to be genesis funds operations")
 		}
 	}
 }
@@ -1035,5 +1043,27 @@ func TestGetPseudoTransactionForGenesis(t *testing.T) {
 		if !found {
 			t.Error("unable to find genesis account in generated pseudo transactions")
 		}
+	}
+}
+
+func TestSpecialCaseTransactionIdentifier(t *testing.T) {
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
+	testB32Address := "one10g7kfque6ew2jjfxxa6agkdwk4wlyjuncp6gwz"
+	refTxID := &types.TransactionIdentifier{
+		Hash: fmt.Sprintf("%v_%v", testBlkHash.String(), testB32Address),
+	}
+	specialTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testB32Address)
+	if !reflect.DeepEqual(refTxID, specialTxID) {
+		t.Fatal("invalid for mate for special case TxID")
+	}
+	unpackedBlkHash, unpackedB32Address, rosettaError := unpackSpecialCaseTransactionIdentifier(specialTxID)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if unpackedB32Address != testB32Address {
+		t.Errorf("expected unpacked address to be %v not %v", testB32Address, unpackedB32Address)
+	}
+	if unpackedBlkHash.String() != testBlkHash.String() {
+		t.Errorf("expected blk hash to be %v not %v", unpackedBlkHash.String(), testBlkHash.String())
 	}
 }

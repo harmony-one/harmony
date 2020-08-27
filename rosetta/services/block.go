@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -24,6 +25,10 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+)
+
+const (
+	blockHashLen = 64
 )
 
 // BlockAPI implements the server.BlockAPIServicer interface.
@@ -72,9 +77,13 @@ func (s *BlockAPI) Block(
 		prevBlockID = currBlockID
 		genesisSpec := getGenesisSpec(block.ShardID())
 		for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
-			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
-				Hash: tx.To().String(), // use hex address as tx identifiers for genesis block only
-			})
+			b32Addr, err := internalCommon.AddressToBech32(*tx.To())
+			if err != nil {
+				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+					"message": err.Error(),
+				})
+			}
+			otherTransactions = append(otherTransactions, getSpecialCaseTransactionIdentifier(block.Hash(), b32Addr))
 		}
 	}
 
@@ -119,7 +128,20 @@ func (s *BlockAPI) BlockTransaction(
 
 	// Special case for genesis block
 	if request.BlockIdentifier.Index == 0 {
-		txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, s.hmy.ShardID)
+		genesisBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(0).EthBlockNumber())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		blkHash, b32Addr, rosettaError := unpackSpecialCaseTransactionIdentifier(request.TransactionIdentifier)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		if blkHash.String() != genesisBlock.Hash().String() {
+			return nil, &common.TransactionNotFoundError
+		}
+		txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, b32Addr, s.hmy.ShardID)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -252,6 +274,32 @@ func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction 
 	return txs
 }
 
+// getSpecialCaseTransactionIdentifier fetches 'transaction identifiers' for a given block-hash and suffix.
+// Special cases include genesis transactions & pre-staking era block rewards.
+// Must include block hash to guarantee uniqueness of tx identifiers.
+func getSpecialCaseTransactionIdentifier(
+	blockHash ethcommon.Hash, suffix string,
+) *types.TransactionIdentifier {
+	return &types.TransactionIdentifier{
+		Hash: fmt.Sprintf("%v_%v", blockHash.String(), suffix),
+	}
+}
+
+// unpackSpecialCaseTransactionIdentifier returns the suffix & blockHash if the txID is formatted correctly.
+func unpackSpecialCaseTransactionIdentifier(
+	txID *types.TransactionIdentifier,
+) (ethcommon.Hash, string, *types.Error) {
+	hash := txID.Hash
+	hash = strings.TrimPrefix(hash, "0x")
+	hash = strings.TrimPrefix(hash, "0X")
+	if len(hash) < blockHashLen+1 || string(hash[blockHashLen]) != "_" {
+		return ethcommon.Hash{}, "", common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown special case transaction ID format",
+		})
+	}
+	return ethcommon.HexToHash(hash[:blockHashLen]), hash[blockHashLen+1:], nil
+}
+
 // TransactionMetadata ..
 type TransactionMetadata struct {
 	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
@@ -307,11 +355,18 @@ func formatCrossShardReceiverTransaction(
 
 // formatGenesisTransaction for genesis block's initial balances
 func formatGenesisTransaction(
-	txID *types.TransactionIdentifier, shardID uint32,
+	txID *types.TransactionIdentifier, targetB32Addr string, shardID uint32,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
+	var b32Addr string
+	var err error
 	genesisSpec := getGenesisSpec(shardID)
 	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
-		if tx.To().String() == txID.Hash {
+		if b32Addr, err = internalCommon.AddressToBech32(*tx.To()); err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		if targetB32Addr == b32Addr {
 			accID, rosettaError := newAccountIdentifier(*tx.To())
 			if rosettaError != nil {
 				return nil, rosettaError
@@ -323,7 +378,7 @@ func formatGenesisTransaction(
 						OperationIdentifier: &types.OperationIdentifier{
 							Index: 0,
 						},
-						Type:    common.TransferOperation,
+						Type:    common.GenesisFundsOperation,
 						Status:  common.SuccessOperationStatus.Status,
 						Account: accID,
 						Amount: &types.Amount{
