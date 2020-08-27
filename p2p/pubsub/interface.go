@@ -50,8 +50,8 @@ type ValidateOptionProvider interface {
 	getValidateOptions(topic Topic) []libp2p_pubsub.ValidatorOpt
 }
 
-// pubSub is the interface used within the module to mock out the PubSub
-type pubSub interface {
+// rawPubSub is the interface for libp2p PubSub with the adapter
+type rawPubSub interface {
 	Join(topic Topic) (topicHandle, error)
 	RegisterTopicValidator(topic Topic, val interface{}, opts ...libp2p_pubsub.ValidatorOpt) error
 	UnregisterTopicValidator(topic Topic) error

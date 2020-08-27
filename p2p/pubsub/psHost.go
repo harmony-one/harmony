@@ -12,7 +12,7 @@ import (
 // pubSubHost is the host used for pub-sub message handling.
 // All requests in pubSubHost are handled single threaded.
 type pubSubHost struct {
-	pubSub         pubSub
+	pubSub         rawPubSub
 	optionProvider ValidateOptionProvider
 
 	// registered topic and handlers

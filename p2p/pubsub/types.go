@@ -17,7 +17,7 @@ type HandlerSpecifier string
 type Topic string
 
 // ValidateAction is an encapsulated libp2p_pubsub.ValidationResult which defines
-// The action to be taken for the validation of a pubSub message.
+// The action to be taken for the validation of a pub-sub message.
 type ValidateAction libp2p_pubsub.ValidationResult
 
 const (

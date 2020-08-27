@@ -16,7 +16,7 @@ import (
 //       one topic has only one handler.
 type topicRunner struct {
 	topic       Topic
-	pubSub      pubSub
+	pubSub      rawPubSub
 	topicHandle topicHandle
 	options     []libp2p_pubsub.ValidatorOpt
 

@@ -82,5 +82,5 @@ func (m *psMetric) writeLog(accept, ignore, reject uint64, duration time.Duratio
 		Uint64("accepted", accept).
 		Uint64("ignored", ignore).
 		Uint64("rejected", reject).
-		Msg(fmt.Sprintf("pubSub [%v] validation report", m.topic))
+		Msg(fmt.Sprintf("PubSub [%v] validation report", m.topic))
 }
