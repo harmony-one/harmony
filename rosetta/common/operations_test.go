@@ -53,6 +53,8 @@ func TestPlainOperationTypes(t *testing.T) {
 		TransferOperation,
 		CrossShardTransferOperation,
 		ContractCreationOperation,
+		GenesisFundsOperation,
+		PreStakingEraBlockRewardsOperation,
 	}
 	sort.Strings(referenceOperationTypes)
 	sort.Strings(plainOperationTypes)
