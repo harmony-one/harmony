@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	// BlockReward is the block reward, to be split evenly among block signers.
+	// BlockReward is the block reward, to be split evenly among block signers in pre-staking era.
 	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
 	// BaseStakedReward is the flat-rate block reward for epos staking launch.
 	// 28 ONE per block
