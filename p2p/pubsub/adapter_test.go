@@ -90,6 +90,10 @@ func (ft *fakeTopic) Subscribe() (subscription, error) {
 	return &fakeSubscription{ft, ft.msgCh, false}, nil
 }
 
+func (ft *fakeTopic) Publish(ctx context.Context, data []byte) error {
+	return nil
+}
+
 type fakeSubscription struct {
 	topic    *fakeTopic
 	msgCh    chan *libp2p_pubsub.Message

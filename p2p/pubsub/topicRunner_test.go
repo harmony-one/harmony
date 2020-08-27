@@ -154,7 +154,7 @@ func TestTopicRunner_dynamicHandler(t *testing.T) {
 	handler1, deliver1 := makeTestHandler(testTopic, 0, validateAcceptFn)
 	handler2, deliver2 := makeTestHandler(testTopic, 1, validateRejectFn)
 
-	tr, err := newTopicRunner(host, testTopic, []PubSubHandler{handler1}, nil)
+	tr, err := newTopicRunner(host, testTopic, []Handler{handler1}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestTopicRunner_StartStop(t *testing.T) {
 	handler, deliver := makeTestHandler(testTopic, 0, validateAcceptFn)
 	fps := host.pubSub.(*fakePubSub)
 
-	tr, err := newTopicRunner(host, testTopic, []PubSubHandler{handler}, nil)
+	tr, err := newTopicRunner(host, testTopic, []Handler{handler}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

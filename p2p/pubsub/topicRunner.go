@@ -12,7 +12,7 @@ import (
 
 // topicRunner runs the message handlers on a specific topic.
 // Currently, a topic runner is combined with multiple PubSubHandlers.
-// TODO: Redesign the topics and decouple the message usage according to PubSubHandler so that
+// TODO: Redesign the topics and decouple the message usage according to Handler so that
 //       one topic has only one handler.
 type topicRunner struct {
 	topic       Topic
@@ -21,7 +21,7 @@ type topicRunner struct {
 	options     []libp2p_pubsub.ValidatorOpt
 
 	// all active handlers in the topic; lock protected
-	handlers []PubSubHandler
+	handlers []Handler
 	lock     sync.RWMutex
 
 	baseCtx       context.Context
@@ -34,7 +34,7 @@ type topicRunner struct {
 	log      zerolog.Logger
 }
 
-func newTopicRunner(host *pubSubHost, topic Topic, handlers []PubSubHandler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
+func newTopicRunner(host *pubSubHost, topic Topic, handlers []Handler, options []libp2p_pubsub.ValidatorOpt) (*topicRunner, error) {
 	tr := &topicRunner{
 		topic:    topic,
 		pubSub:   host.pubSub,
@@ -125,7 +125,7 @@ func (tr *topicRunner) handleMessage(msg *message) {
 	}
 }
 
-func (tr *topicRunner) deliverMessageForHandler(msg *message, handler PubSubHandler) {
+func (tr *topicRunner) deliverMessageForHandler(msg *message, handler Handler) {
 	validationCache := msg.getHandlerCache(handler.Specifier())
 	handler.DeliverMsg(tr.baseCtx, msg.raw.GetData(), validationCache)
 }
@@ -155,11 +155,15 @@ func (tr *topicRunner) close() error {
 	return nil
 }
 
-func (tr *topicRunner) getHandlers() []PubSubHandler {
+func (tr *topicRunner) isRunning() bool {
+	return tr.running.IsSet()
+}
+
+func (tr *topicRunner) getHandlers() []Handler {
 	tr.lock.RLock()
 	defer tr.lock.RUnlock()
 
-	handlers := make([]PubSubHandler, len(tr.handlers))
+	handlers := make([]Handler, len(tr.handlers))
 	copy(handlers, tr.handlers)
 
 	return handlers
@@ -177,7 +181,7 @@ func (tr *topicRunner) isHandlerRunning(specifier HandlerSpecifier) bool {
 	return false
 }
 
-func (tr *topicRunner) addHandler(newHandler PubSubHandler) error {
+func (tr *topicRunner) addHandler(newHandler Handler) error {
 	tr.lock.Lock()
 	defer tr.lock.Unlock()
 
@@ -208,4 +212,8 @@ func (tr *topicRunner) removeHandler(spec HandlerSpecifier) error {
 func (tr *topicRunner) recordValidateResult(msg *message, action ValidateAction, err error) {
 	// log in metric non-block
 	go tr.metric.recordValidateResult(msg, action, err)
+}
+
+func (tr *topicRunner) sendMessage(ctx context.Context, msg []byte) (err error) {
+	return tr.topicHandle.Publish(ctx, msg)
 }

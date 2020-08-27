@@ -10,7 +10,7 @@ import (
 // PeerID is an alias to libp2p_peer.ID, basically a string
 type PeerID libp2p_peer.ID
 
-// HandlerSpecifier is a unique string for PubSubHandler
+// HandlerSpecifier is a unique string for Handler
 type HandlerSpecifier string
 
 // Topic is the pub-sub subscribed topic, basically a string
@@ -109,7 +109,7 @@ type ValidateCache struct {
 	HandlerCache interface{}
 }
 
-func mergeValidateResults(handlers []PubSubHandler, vrs []ValidateResult) (vData, ValidateAction, error) {
+func mergeValidateResults(handlers []Handler, vrs []ValidateResult) (vData, ValidateAction, error) {
 	var (
 		cache  = newVData()
 		action = MsgAccept

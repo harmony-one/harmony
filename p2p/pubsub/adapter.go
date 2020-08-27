@@ -1,6 +1,10 @@
 package pubsub
 
-import libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+import (
+	"context"
+
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+)
 
 // pubSubAdapter is the adapter for libp2p_pubsub.PubSub
 type pubSubAdapter struct {
@@ -38,4 +42,9 @@ type topicHandleAdapter struct {
 // Subscribe subscribe the topic.
 func (topic *topicHandleAdapter) Subscribe() (subscription, error) {
 	return topic.raw.Subscribe()
+}
+
+// Publish publish the data to pub sub network
+func (topic *topicHandleAdapter) Publish(ctx context.Context, data []byte) error {
+	return topic.raw.Publish(ctx, data)
 }

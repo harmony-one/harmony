@@ -37,8 +37,8 @@ func decodeTestMsg(b []byte) testMsg {
 	return testMsg(binary.LittleEndian.Uint64(b))
 }
 
-func makeFakeHandlers(topic Topic, num int, validates []validateFunc, delivers []deliverFunc) []PubSubHandler {
-	handlers := make([]PubSubHandler, 0, num)
+func makeFakeHandlers(topic Topic, num int, validates []validateFunc, delivers []deliverFunc) []Handler {
+	handlers := make([]Handler, 0, num)
 	for i := 0; i != num; i++ {
 		handler := &fakePubSubHandler{
 			topic: topic,

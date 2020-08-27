@@ -47,7 +47,7 @@ var (
 
 func TestMergeValidateResults(t *testing.T) {
 	tests := []struct {
-		handlers []PubSubHandler
+		handlers []Handler
 		vrs      []ValidateResult
 
 		expCache  vData

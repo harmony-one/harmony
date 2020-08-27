@@ -3,46 +3,32 @@ package pubsub
 import (
 	"context"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/p2p"
-	libp2p_host "github.com/libp2p/go-libp2p-core/host"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
-// Host is the client + server in p2p network.
-type host interface {
-	PubSubHost
+// PubSub is the interface for pubSubHost.
+type PubSub interface {
+	// handler management
+	AddHandler(psh Handler) error
+	StartHandler(spec HandlerSpecifier) error
+	StopHandler(spec HandlerSpecifier) error
+	RemoveHandler(spec HandlerSpecifier) error
+	RemoveTopic(topic Topic) error
 
-	GetSelfPeer() p2p.Peer
-	AddPeer(*p2p.Peer) error
-	GetID() libp2p_peer.ID
-	GetP2PHost() libp2p_host.Host
-	GetPeerCount() int
-	ConnectHostPeer(p2p.Peer) error
-	PubSub() *libp2p_pubsub.PubSub
-	C() (int, int, int)
-	ListPeer(topic string) []libp2p_peer.ID
-	ListTopic() []string
-	ListBlockedPeer() []libp2p_peer.ID
+	// message publish
+	// TODO: Add encode algorithm with protobuf. Change msg type raw bytes to encoded pb message.
+	SendMessageToTopic(ctx context.Context, topic Topic, msg []byte) error
+
+	// control
+	Start()
+	Close()
 }
 
-// PubSubHost is the interface for pubSubHost.
-type PubSubHost interface {
-	AddPubSubHandler(psh PubSubHandler) error
-	RemovePubSubHandler(spec HandlerSpecifier) error
-	StartPubSubHandler(spec HandlerSpecifier) error
-	StopPubSubHandler(spec HandlerSpecifier) error
-
-	// SendMessageToGroups sends a message to one or more multicast groups.
-	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
-}
-
-// PubSubHandler is the pub sub message handler of a certain topic
+// Handler is the pub sub message handler of a certain topic
 // TODO: Add version string to topic to enable compatibility
 // TODO: add decode algorithm with protobuf. Change arg in ValidateMsg and DeliverMsg from
 //       []byte to decoded message
-type PubSubHandler interface {
+type Handler interface {
 	// Topic is the topic the handler is subscribed to
 	Topic() Topic
 
@@ -74,6 +60,7 @@ type pubSub interface {
 // topicHandle is the interface for libp2p_pubsub.Topic
 type topicHandle interface {
 	Subscribe() (subscription, error)
+	Publish(ctx context.Context, data []byte) error
 }
 
 // subscription is the interface for libp2p_pubsub.Subscription
