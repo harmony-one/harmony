@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/harmony-one/harmony/common/herrors"
 	"github.com/rs/zerolog"
 )
 
@@ -221,7 +220,7 @@ func TestTopicRunner_StartStop(t *testing.T) {
 	}
 	// Cannot start topic runner twice
 	gotErr := tr.start()
-	if assErr := herrors.AssertError(gotErr, errTopicAlreadyRunning); assErr != nil {
+	if assErr := assertError(gotErr, errTopicAlreadyRunning); assErr != nil {
 		t.Fatal(err)
 	}
 
@@ -247,7 +246,7 @@ func TestTopicRunner_StartStop(t *testing.T) {
 		t.Fatalf("after closed: %v", err)
 	}
 	gotErr = tr.start()
-	if assErr := herrors.AssertError(gotErr, errTopicClosed); assErr != nil {
+	if assErr := assertError(gotErr, errTopicClosed); assErr != nil {
 		t.Fatal(assErr)
 	}
 	if err := assertTopicRunning(testTopic, fps, deliver, false); err != nil {

@@ -9,6 +9,34 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// psHost tasks. Each task represents a upper function call which is executed in a single
+// thread.
+type (
+	addHandlerTask struct {
+		handler Handler
+		errC    chan error
+	}
+	startHandlerTask struct {
+		spec HandlerSpecifier
+		errC chan error
+	}
+	stopHandlerTask struct {
+		spec HandlerSpecifier
+		errC chan error
+	}
+	removeHandlerTask struct {
+		spec HandlerSpecifier
+		errC chan error
+	}
+	removeTopicTask struct {
+		topic Topic
+		errC  chan error
+	}
+	closeTask struct {
+		closed chan struct{}
+	}
+)
+
 // pubSubHost is the host used for pub-sub message handling.
 // All requests in pubSubHost are handled single threaded.
 type pubSubHost struct {
@@ -50,34 +78,6 @@ func newPubSubHost(pubSub *libp2p_pubsub.PubSub, optionProvider ValidateOptionPr
 		log: log.With().Str("module", "pub-sub").Logger(),
 	}
 }
-
-// psHost tasks. Each task represents a upper function call which is executed in a single
-// thread.
-type (
-	addHandlerTask struct {
-		handler Handler
-		errC    chan error
-	}
-	startHandlerTask struct {
-		spec HandlerSpecifier
-		errC chan error
-	}
-	stopHandlerTask struct {
-		spec HandlerSpecifier
-		errC chan error
-	}
-	removeHandlerTask struct {
-		spec HandlerSpecifier
-		errC chan error
-	}
-	removeTopicTask struct {
-		topic Topic
-		errC  chan error
-	}
-	closeTask struct {
-		closed chan struct{}
-	}
-)
 
 // Start start the pubSubHost to handler requests (a.k.a. upper function calls).
 // All upper function calls are running in a single thread to ensure the race
@@ -221,6 +221,7 @@ func (psh *pubSubHost) startHandler(spec HandlerSpecifier) error {
 	}
 
 	if !tr.isRunning() {
+		psh.log.Info().Str("topic", string(tr.topic)).Msg("starting topic")
 		if err := tr.start(); err != nil {
 			return err
 		}
@@ -245,6 +246,7 @@ func (psh *pubSubHost) stopHandler(spec HandlerSpecifier) error {
 	}
 
 	if len(tr.getHandlers()) == 0 {
+		psh.log.Info().Str("topic", string(handler.Topic())).Msg("stopping topic")
 		if err := tr.stop(); err != nil {
 			return err
 		}
@@ -285,6 +287,8 @@ func (psh *pubSubHost) removeTopic(topic Topic) error {
 	if err != nil {
 		return err
 	}
+
+	psh.log.Info().Str("topic", string(topic)).Msg("closing topic")
 	if err := tr.close(); err != nil {
 		return err
 	}
@@ -313,12 +317,14 @@ func (psh *pubSubHost) addTopicRunnerIfNotExist(topic Topic) error {
 		return nil
 	}
 
+	psh.log.Info().Str("topic", string(topic)).Msg("adding topic")
 	options := psh.optionProvider.getValidateOptions(topic)
 	tr, err := newTopicRunner(psh, topic, nil, options)
 	if err != nil {
 		return err
 	}
 	psh.topicRunners[topic] = tr
+
 	return nil
 }
 
@@ -334,6 +340,8 @@ func (psh *pubSubHost) closeAndRemoveTopicRunner(topic Topic) error {
 		return err
 	}
 	delete(psh.topicRunners, topic)
+
+	psh.log.Info().Str("topic", string(topic)).Msg("topic closed")
 	return nil
 }
 

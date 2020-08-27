@@ -1,5 +1,7 @@
 package herrors
 
+import "errors"
+
 type multiError []error
 
 // Error indicates multiError implements error interface
@@ -19,6 +21,16 @@ func (errs multiError) Error() string {
 		errStr += err.Error()
 	}
 	return errStr
+}
+
+// multiError implements Is interface used at libexec/src/errors/wrap.go
+func (errs multiError) Is(target error) bool {
+	for _, err := range errs {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
 }
 
 // Join will join multiple errors to multiError.

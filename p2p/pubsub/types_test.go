@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/harmony-one/harmony/common/herrors"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 )
@@ -113,7 +112,7 @@ func TestMergeValidateResults(t *testing.T) {
 				handlerData: map[HandlerSpecifier]interface{}{makeSpecifier(0): testVal1, makeSpecifier(1): testVal2},
 			},
 			expAction: MsgReject,
-			expErr:    fmt.Errorf("%v: %v", makeSpecifier(1), errIntended),
+			expErr:    errIntended,
 		},
 	}
 
@@ -126,7 +125,7 @@ func TestMergeValidateResults(t *testing.T) {
 		if action != test.expAction {
 			t.Errorf("Test %v: unexpected action: %v / %v", i, action, test.expAction)
 		}
-		if err := herrors.AssertError(gotErr, test.expErr); err != nil {
+		if err := assertError(gotErr, test.expErr); err != nil {
 			t.Errorf("Test %v: unexpected error:\n\tgot:  \t%v\n\texpect: %v", i, err, test.expErr)
 		}
 	}
@@ -267,4 +266,17 @@ func TestContextParentCancel(t *testing.T) {
 	default:
 		t.Fatalf("child context should also be canceled")
 	}
+}
+
+func assertError(got, expect error) error {
+	if (got == nil) != (expect == nil) {
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
+	}
+	if (got == nil) || (expect == nil) {
+		return nil
+	}
+	if !errors.Is(got, expect) {
+		return fmt.Errorf("unexpected error [%v] / [%v]", got, expect)
+	}
+	return nil
 }

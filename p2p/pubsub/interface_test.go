@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 )
 
 type (
@@ -24,18 +26,6 @@ type (
 		field2 string
 	}
 )
-
-type testMsg uint64
-
-func (msg testMsg) encode() []byte {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(msg))
-	return b
-}
-
-func decodeTestMsg(b []byte) testMsg {
-	return testMsg(binary.LittleEndian.Uint64(b))
-}
 
 func makeFakeHandlers(topic Topic, num int, validates []validateFunc, delivers []deliverFunc) []Handler {
 	handlers := make([]Handler, 0, num)
@@ -83,4 +73,22 @@ func (handler *fakePubSubHandler) DeliverMsg(ctx context.Context, rawData []byte
 		handler.deliver(ctx, rawData, cache)
 	}
 	return
+}
+
+type testMsg uint64
+
+func (msg testMsg) encode() []byte {
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(msg))
+	return b
+}
+
+func decodeTestMsg(b []byte) testMsg {
+	return testMsg(binary.LittleEndian.Uint64(b))
+}
+
+type emptyValidateOptionProvider struct{}
+
+func (vop *emptyValidateOptionProvider) getValidateOptions(topic Topic) []libp2p_pubsub.ValidatorOpt {
+	return nil
 }
