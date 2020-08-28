@@ -28,6 +28,9 @@ var (
 	errFailFindingValidCommit = errors.New(
 		"explorer failed finding a valid committed message",
 	)
+	errAddressNotFound = errors.New(
+		"address not found",
+	)
 )
 
 // explorerMessageHandler passes received message in node_handler to explorer service
@@ -235,7 +238,7 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
+		return 0, errAddressNotFound
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
@@ -258,7 +261,7 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
+		return 0, errAddressNotFound
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
