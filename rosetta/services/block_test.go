@@ -13,6 +13,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
@@ -20,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/rpc"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/staking"
+	stakingNetwork "github.com/harmony-one/harmony/staking/network"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -220,9 +222,14 @@ func testFormatPlainTransaction(
 
 func TestFormatGenesisTransaction(t *testing.T) {
 	genesisSpec := getGenesisSpec(0)
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
 	for acc := range genesisSpec.Alloc {
-		txID := &types.TransactionIdentifier{Hash: acc.String()}
-		tx, rosettaError := formatGenesisTransaction(txID, 0)
+		b32Addr, err := internalCommon.AddressToBech32(acc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txID := getSpecialCaseTransactionIdentifier(testBlkHash, b32Addr)
+		tx, rosettaError := formatGenesisTransaction(txID, b32Addr, 0)
 		if rosettaError != nil {
 			t.Fatal(rosettaError)
 		}
@@ -232,6 +239,104 @@ func TestFormatGenesisTransaction(t *testing.T) {
 		if len(tx.Operations) != 1 {
 			t.Error("expected exactly 1 operation")
 		}
+		if tx.Operations[0].OperationIdentifier.Index != 0 {
+			t.Error("expected operational ID to be 0")
+		}
+		if tx.Operations[0].Type != common.GenesisFundsOperation {
+			t.Error("expected operation to be genesis funds operations")
+		}
+		if tx.Operations[0].Status != common.SuccessOperationStatus.Status {
+			t.Error("expected successful operation status")
+		}
+	}
+}
+
+func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
+	testKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+	testB32Addr, err := internalCommon.AddressToBech32(testAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testBlockSigInfo := &blockSignerInfo{
+		signers: map[ethcommon.Address][]bls.SerializedPublicKey{
+			testAddr: { // Only care about length for this test
+				bls.SerializedPublicKey{},
+				bls.SerializedPublicKey{},
+			},
+		},
+		totalKeysSigned: 150,
+		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
+	}
+	refTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testB32Addr)
+	tx, rosettaError := formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+
+	if !reflect.DeepEqual(tx.TransactionIdentifier, refTxID) {
+		t.Errorf("Expected TxID %v got %v", refTxID, tx.TransactionIdentifier)
+	}
+	if len(tx.Operations) != 1 {
+		t.Fatal("Expected exactly 1 operation")
+	}
+	if tx.Operations[0].OperationIdentifier.Index != 0 {
+		t.Error("expected operational ID to be 0")
+	}
+	if tx.Operations[0].Type != common.PreStakingEraBlockRewardOperation {
+		t.Error("expected operation type to be pre staking era block rewards")
+	}
+	if tx.Operations[0].Status != common.SuccessOperationStatus.Status {
+		t.Error("expected successful operation status")
+	}
+
+	// Expect: myNumberOfSigForBlock * (totalAmountOfRewardsPerBlock / numOfSigsForBlock) to be my block reward amount
+	refAmount := new(big.Int).Mul(new(big.Int).Quo(stakingNetwork.BlockReward, big.NewInt(150)), big.NewInt(2))
+	fmtRefAmount := fmt.Sprintf("%v", refAmount)
+	if tx.Operations[0].Amount.Value != fmtRefAmount {
+		t.Errorf("expected operation amount to be %v not %v", fmtRefAmount, tx.Operations[0].Amount.Value)
+	}
+}
+
+func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
+	testKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+	testB32Addr, err := internalCommon.AddressToBech32(testAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testBlockSigInfo := &blockSignerInfo{
+		signers: map[ethcommon.Address][]bls.SerializedPublicKey{
+			testAddr: {},
+		},
+		totalKeysSigned: 150,
+		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
+	}
+	_, rosettaError := formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	if rosettaError == nil {
+		t.Fatal("expected rosetta error")
+	}
+	if !reflect.DeepEqual(&common.TransactionNotFoundError, rosettaError) {
+		t.Error("expected transaction not found error")
+	}
+
+	testBlockSigInfo = &blockSignerInfo{
+		signers:         map[ethcommon.Address][]bls.SerializedPublicKey{},
+		totalKeysSigned: 150,
+		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
+	}
+	_, rosettaError = formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	if rosettaError == nil {
+		t.Fatal("expected rosetta error")
+	}
+	if !reflect.DeepEqual(&common.TransactionNotFoundError, rosettaError) {
+		t.Error("expected transaction not found error")
 	}
 }
 
@@ -322,7 +427,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -383,7 +488,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -444,7 +549,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -498,7 +603,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -559,7 +664,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	}
 
 	gasUsed := uint64(1e5)
-	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed))).Uint64()
+	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
@@ -891,7 +996,7 @@ func TestNewOperations(t *testing.T) {
 	accountID := &types.AccountIdentifier{
 		Address: "test-address",
 	}
-	gasFee := uint64(1e18)
+	gasFee := big.NewInt(int64(1e18))
 	amount := &types.Amount{
 		Value:    fmt.Sprintf("-%v", gasFee),
 		Currency: &common.Currency,
@@ -1035,5 +1140,37 @@ func TestGetPseudoTransactionForGenesis(t *testing.T) {
 		if !found {
 			t.Error("unable to find genesis account in generated pseudo transactions")
 		}
+	}
+}
+
+func TestSpecialCaseTransactionIdentifier(t *testing.T) {
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
+	testB32Address := "one10g7kfque6ew2jjfxxa6agkdwk4wlyjuncp6gwz"
+	refTxID := &types.TransactionIdentifier{
+		Hash: fmt.Sprintf("%v_%v", testBlkHash.String(), testB32Address),
+	}
+	specialTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testB32Address)
+	if !reflect.DeepEqual(refTxID, specialTxID) {
+		t.Fatal("invalid for mate for special case TxID")
+	}
+	unpackedBlkHash, unpackedB32Address, rosettaError := unpackSpecialCaseTransactionIdentifier(specialTxID)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if unpackedB32Address != testB32Address {
+		t.Errorf("expected unpacked address to be %v not %v", testB32Address, unpackedB32Address)
+	}
+	if unpackedBlkHash.String() != testBlkHash.String() {
+		t.Errorf("expected blk hash to be %v not %v", unpackedBlkHash.String(), testBlkHash.String())
+	}
+
+	_, _, rosettaError = unpackSpecialCaseTransactionIdentifier(
+		&types.TransactionIdentifier{Hash: ""},
+	)
+	if rosettaError == nil {
+		t.Fatal("expected rosetta error")
+	}
+	if rosettaError.Code != common.CatchAllError.Code {
+		t.Error("expected error code to be catch call error")
 	}
 }

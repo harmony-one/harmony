@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -13,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -23,7 +25,12 @@ import (
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking"
+	stakingNetwork "github.com/harmony-one/harmony/staking/network"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+)
+
+const (
+	blockHashLen = 64
 )
 
 // BlockAPI implements the server.BlockAPIServicer interface.
@@ -46,61 +53,117 @@ func (s *BlockAPI) Block(
 		return nil, err
 	}
 
-	var block *hmytypes.Block
+	var blk *hmytypes.Block
 	var currBlockID, prevBlockID *types.BlockIdentifier
-	if block, rosettaError = s.getBlock(ctx, request); rosettaError != nil {
+	if blk, rosettaError = s.getBlock(ctx, request.BlockIdentifier); rosettaError != nil {
 		return nil, rosettaError
 	}
-	currBlockID = &types.BlockIdentifier{
-		Index: block.Number().Int64(),
-		Hash:  block.Hash().String(),
+
+	// Format genesis block if it is requested.
+	if blk.Number().Uint64() == 0 {
+		return s.genesisBlock(ctx, request, blk)
 	}
 
-	otherTransactions := []*types.TransactionIdentifier{}
-	if block.Number().Int64() > 0 {
-		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(block.Number().Int64()-1).EthBlockNumber())
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": err.Error(),
-			})
-		}
-		prevBlockID = &types.BlockIdentifier{
-			Index: prevBlock.Number().Int64(),
-			Hash:  prevBlock.Hash().String(),
-		}
-	} else {
-		prevBlockID = currBlockID
-		genesisSpec := getGenesisSpec(block.ShardID())
-		for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
-			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
-				Hash: tx.To().String(), // use hex address as tx identifiers for genesis block only
-			})
-		}
+	currBlockID = &types.BlockIdentifier{
+		Index: blk.Number().Int64(),
+		Hash:  blk.Hash().String(),
+	}
+	prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	prevBlockID = &types.BlockIdentifier{
+		Index: prevBlock.Number().Int64(),
+		Hash:  prevBlock.Hash().String(),
 	}
 
 	responseBlock := &types.Block{
 		BlockIdentifier:       currBlockID,
 		ParentBlockIdentifier: prevBlockID,
-		Timestamp:             block.Time().Int64() * 1e3, // Timestamp must be in ms.
-		Transactions:          []*types.Transaction{},     // Do not return tx details as it is optional.
+		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
+		Transactions:          []*types.Transaction{},   // Do not return tx details as it is optional.
 	}
 
-	for _, tx := range block.Transactions() {
+	otherTransactions := []*types.TransactionIdentifier{}
+	for _, tx := range blk.Transactions() {
 		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 			Hash: tx.Hash().String(),
 		})
 	}
-	for _, tx := range block.StakingTransactions() {
+	for _, tx := range blk.StakingTransactions() {
 		otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 			Hash: tx.Hash().String(),
 		})
 	}
-	for _, cxReceipts := range block.IncomingReceipts() {
+	// Report cross-shard transaction payouts.
+	for _, cxReceipts := range blk.IncomingReceipts() {
 		for _, cxReceipt := range cxReceipts.Receipts {
 			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 				Hash: cxReceipt.TxHash.String(),
 			})
 		}
+	}
+	// Report pre-staking era block rewards as transactions to fit API.
+	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
+		blockSigInfo, rosettaError := getBlockSignerInfo(ctx, s.hmy, blk)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		for acc, signedBlsKeys := range blockSigInfo.signers {
+			if len(signedBlsKeys) > 0 {
+				b32Addr, err := internalCommon.AddressToBech32(acc)
+				if err != nil {
+					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+						"message": err.Error(),
+					})
+				}
+				otherTransactions = append(otherTransactions, getSpecialCaseTransactionIdentifier(blk.Hash(), b32Addr))
+			}
+		}
+	}
+
+	return &types.BlockResponse{
+		Block:             responseBlock,
+		OtherTransactions: otherTransactions,
+	}, nil
+}
+
+// genesisBlock is a special handler for the genesis block.
+func (s *BlockAPI) genesisBlock(
+	ctx context.Context, request *types.BlockRequest, blk *hmytypes.Block,
+) (response *types.BlockResponse, rosettaError *types.Error) {
+	if blk.Number().Uint64() != 0 {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": "tried to format response as genesis block on non-genesis block",
+		})
+	}
+
+	var currBlockID, prevBlockID *types.BlockIdentifier
+	currBlockID = &types.BlockIdentifier{
+		Index: blk.Number().Int64(),
+		Hash:  blk.Hash().String(),
+	}
+	prevBlockID = currBlockID
+
+	responseBlock := &types.Block{
+		BlockIdentifier:       currBlockID,
+		ParentBlockIdentifier: prevBlockID,
+		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
+		Transactions:          []*types.Transaction{},   // Do not return tx details as it is optional.
+	}
+
+	otherTransactions := []*types.TransactionIdentifier{}
+	// Report initial genesis funds as transactions to fit API.
+	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(blk.ShardID())) {
+		b32Addr, err := internalCommon.AddressToBech32(*tx.To())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		otherTransactions = append(otherTransactions, getSpecialCaseTransactionIdentifier(blk.Hash(), b32Addr))
 	}
 
 	return &types.BlockResponse{
@@ -117,20 +180,26 @@ func (s *BlockAPI) BlockTransaction(
 		return nil, err
 	}
 
-	// Special case for genesis block
+	// Format genesis block transaction request
 	if request.BlockIdentifier.Index == 0 {
-		txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, s.hmy.ShardID)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		return &types.BlockTransactionResponse{Transaction: txs}, nil
+		return s.genesisBlockTransaction(ctx, request)
 	}
 
 	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
 	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
 	if rosettaError != nil {
-		return nil, rosettaError
+		blk, rosettaError2 := s.getBlock(ctx, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
+		if rosettaError2 != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"error":      rosettaError2,
+				"base_error": rosettaError,
+			})
+		}
+		if s.hmy.IsStakingEpoch(blk.Epoch()) {
+			return nil, rosettaError
+		}
+		return s.preStakingEraBlockRewardTransaction(ctx, request.TransactionIdentifier, blk)
 	}
 
 	var transaction *types.Transaction
@@ -150,15 +219,66 @@ func (s *BlockAPI) BlockTransaction(
 	return &types.BlockTransactionResponse{Transaction: transaction}, nil
 }
 
+// genesisBlockTransaction is a special handler for genesis block transactions
+func (s *BlockAPI) genesisBlockTransaction(
+	ctx context.Context, request *types.BlockTransactionRequest,
+) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
+	genesisBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(0).EthBlockNumber())
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	blkHash, b32Addr, rosettaError := unpackSpecialCaseTransactionIdentifier(request.TransactionIdentifier)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if blkHash.String() != genesisBlock.Hash().String() {
+		return nil, &common.TransactionNotFoundError
+	}
+	txs, rosettaError := formatGenesisTransaction(request.TransactionIdentifier, b32Addr, s.hmy.ShardID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	return &types.BlockTransactionResponse{Transaction: txs}, nil
+}
+
+// preStakingEraBlockRewardTransaction is a special handler for pre-staking era block reward transactions
+func (s *BlockAPI) preStakingEraBlockRewardTransaction(
+	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
+) (*types.BlockTransactionResponse, *types.Error) {
+	blkHash, b32Address, rosettaError := unpackSpecialCaseTransactionIdentifier(txID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if blkHash.String() != blk.Hash().String() {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": fmt.Sprintf(
+				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
+			),
+		})
+	}
+	blockSignerInfo, rosettaError := getBlockSignerInfo(ctx, s.hmy, blk)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	transactions, rosettaError := formatPreStakingBlockRewardsTransaction(b32Address, blockSignerInfo)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	return &types.BlockTransactionResponse{Transaction: transactions}, nil
+}
+
+// getBlock ..
 func (s *BlockAPI) getBlock(
-	ctx context.Context, request *types.BlockRequest,
-) (block *hmytypes.Block, rosettaError *types.Error) {
+	ctx context.Context, request *types.PartialBlockIdentifier,
+) (blk *hmytypes.Block, rosettaError *types.Error) {
 	var err error
-	if request.BlockIdentifier.Hash != nil {
-		requestBlockHash := ethcommon.HexToHash(*request.BlockIdentifier.Hash)
-		block, err = s.hmy.GetBlock(ctx, requestBlockHash)
-	} else if request.BlockIdentifier.Index != nil {
-		block, err = s.hmy.BlockByNumber(ctx, rpc.BlockNumber(*request.BlockIdentifier.Index).EthBlockNumber())
+	if request.Hash != nil {
+		requestBlockHash := ethcommon.HexToHash(*request.Hash)
+		blk, err = s.hmy.GetBlock(ctx, requestBlockHash)
+	} else if request.Index != nil {
+		blk, err = s.hmy.BlockByNumber(ctx, rpc.BlockNumber(*request.Index).EthBlockNumber())
 	} else {
 		return nil, &common.BlockNotFoundError
 	}
@@ -167,7 +287,7 @@ func (s *BlockAPI) getBlock(
 			"message": err.Error(),
 		})
 	}
-	return block, nil
+	return blk, nil
 }
 
 // transactionInfo stores all related information for any transaction on the Harmony chain
@@ -252,6 +372,76 @@ func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction 
 	return txs
 }
 
+// getSpecialCaseTransactionIdentifier fetches 'transaction identifiers' for a given block-hash and suffix.
+// Special cases include genesis transactions & pre-staking era block rewards.
+// Must include block hash to guarantee uniqueness of tx identifiers.
+func getSpecialCaseTransactionIdentifier(
+	blockHash ethcommon.Hash, suffix string,
+) *types.TransactionIdentifier {
+	return &types.TransactionIdentifier{
+		Hash: fmt.Sprintf("%v_%v", blockHash.String(), suffix),
+	}
+}
+
+// unpackSpecialCaseTransactionIdentifier returns the suffix & blockHash if the txID is formatted correctly.
+func unpackSpecialCaseTransactionIdentifier(
+	txID *types.TransactionIdentifier,
+) (ethcommon.Hash, string, *types.Error) {
+	hash := txID.Hash
+	hash = strings.TrimPrefix(hash, "0x")
+	hash = strings.TrimPrefix(hash, "0X")
+	if len(hash) < blockHashLen+1 || string(hash[blockHashLen]) != "_" {
+		return ethcommon.Hash{}, "", common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown special case transaction ID format",
+		})
+	}
+	return ethcommon.HexToHash(hash[:blockHashLen]), hash[blockHashLen+1:], nil
+}
+
+// blockSignerInfo contains all of the block singing information
+type blockSignerInfo struct {
+	// signers is a map of addresses in the signers for the block to
+	// all of the serialized BLS keys that signed said block.
+	signers map[ethcommon.Address][]bls.SerializedPublicKey
+	// totalKeysSigned is the total number of bls keys that signed the block.
+	totalKeysSigned uint
+	// mask is the bitmap mask for the block.
+	mask      *bls.Mask
+	blockHash ethcommon.Hash
+}
+
+// getBlockSignerInfo fetches the block signer information for any non-genesis block
+func getBlockSignerInfo(
+	ctx context.Context, hmy *hmy.Harmony, blk *hmytypes.Block,
+) (*blockSignerInfo, *types.Error) {
+	slotList, mask, err := hmy.GetBlockSigners(
+		ctx, rpc.BlockNumber(blk.Number().Uint64()).EthBlockNumber(),
+	)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	totalSigners := uint(0)
+	sigInfos := map[ethcommon.Address][]bls.SerializedPublicKey{}
+	for _, slot := range slotList {
+		if _, ok := sigInfos[slot.EcdsaAddress]; !ok {
+			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
+		}
+		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
+			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
+			totalSigners++
+		}
+	}
+	return &blockSignerInfo{
+		signers:         sigInfos,
+		totalKeysSigned: totalSigners,
+		mask:            mask,
+		blockHash:       blk.Hash(),
+	}, nil
+}
+
 // TransactionMetadata ..
 type TransactionMetadata struct {
 	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
@@ -296,7 +486,7 @@ func formatCrossShardReceiverTransaction(
 				Status:  common.SuccessOperationStatus.Status,
 				Account: receiverAccountID,
 				Amount: &types.Amount{
-					Value:    fmt.Sprintf("%v", cxReceipt.Amount.Uint64()),
+					Value:    fmt.Sprintf("%v", cxReceipt.Amount),
 					Currency: &common.Currency,
 				},
 				Metadata: map[string]interface{}{"from_account": senderAccountID},
@@ -307,11 +497,18 @@ func formatCrossShardReceiverTransaction(
 
 // formatGenesisTransaction for genesis block's initial balances
 func formatGenesisTransaction(
-	txID *types.TransactionIdentifier, shardID uint32,
+	txID *types.TransactionIdentifier, targetB32Addr string, shardID uint32,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
+	var b32Addr string
+	var err error
 	genesisSpec := getGenesisSpec(shardID)
 	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
-		if tx.To().String() == txID.Hash {
+		if b32Addr, err = internalCommon.AddressToBech32(*tx.To()); err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		if targetB32Addr == b32Addr {
 			accID, rosettaError := newAccountIdentifier(*tx.To())
 			if rosettaError != nil {
 				return nil, rosettaError
@@ -323,7 +520,7 @@ func formatGenesisTransaction(
 						OperationIdentifier: &types.OperationIdentifier{
 							Index: 0,
 						},
-						Type:    common.TransferOperation,
+						Type:    common.GenesisFundsOperation,
 						Status:  common.SuccessOperationStatus.Status,
 						Account: accID,
 						Amount: &types.Amount{
@@ -339,6 +536,71 @@ func formatGenesisTransaction(
 		}
 	}
 	return nil, &common.TransactionNotFoundError
+}
+
+// formatPreStakingBlockRewardsTransaction for block rewards in pre-staking era for a given Bech-32 address
+func formatPreStakingBlockRewardsTransaction(
+	b32Address string, blockSigInfo *blockSignerInfo,
+) (*types.Transaction, *types.Error) {
+	addr, err := internalCommon.Bech32ToAddress(b32Address)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	signatures, ok := blockSigInfo.signers[addr]
+	if !ok || len(signatures) == 0 {
+		return nil, &common.TransactionNotFoundError
+	}
+	accID, rosettaError := newAccountIdentifier(addr)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	// Calculate rewards exactly like `AccumulateRewardsAndCountSigs` but short circuit when possible.
+	var rewardsForThisBlock *big.Int
+	i := 0
+	last := big.NewInt(0)
+	count := big.NewInt(int64(blockSigInfo.totalKeysSigned))
+	for sigAddr, keys := range blockSigInfo.signers {
+		rewardsForThisAddr := big.NewInt(0)
+		for range keys {
+			cur := big.NewInt(0)
+			cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+			reward := big.NewInt(0).Sub(cur, last)
+			rewardsForThisAddr = new(big.Int).Add(reward, rewardsForThisAddr)
+			last = cur
+			i++
+		}
+		if sigAddr == addr {
+			rewardsForThisBlock = rewardsForThisAddr
+			if !(rewardsForThisAddr.Cmp(big.NewInt(0)) > 0) {
+				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+					"message": "expected non-zero block reward in pre-staking ear for block signer",
+				})
+			}
+			break
+		}
+	}
+
+	return &types.Transaction{
+		TransactionIdentifier: getSpecialCaseTransactionIdentifier(blockSigInfo.blockHash, b32Address),
+		Operations: []*types.Operation{
+			{
+				OperationIdentifier: &types.OperationIdentifier{
+					Index: 0,
+				},
+				Type:    common.PreStakingEraBlockRewardOperation,
+				Status:  common.SuccessOperationStatus.Status,
+				Account: accID,
+				Amount: &types.Amount{
+					Value:    fmt.Sprintf("%v", rewardsForThisBlock),
+					Currency: &common.Currency,
+				},
+			},
+		},
+	}, nil
 }
 
 // formatTransaction for staking, cross-shard sender, and plain transactions
@@ -416,7 +678,7 @@ func getOperations(
 	}
 
 	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
+	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
 	gasOperations := newOperations(gasExpended, accountID)
 
 	// Handle different cases of plain transactions
@@ -453,7 +715,7 @@ func getStakingOperations(
 	}
 
 	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := receipt.GasUsed * tx.GasPrice().Uint64()
+	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
 	gasOperations := newOperations(gasExpended, accountID)
 
 	// Format staking message for metadata
@@ -525,7 +787,7 @@ func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Err
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -544,7 +806,7 @@ func getAmountFromDelegateMessage(data []byte) (*types.Amount, *types.Error) {
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -563,7 +825,7 @@ func getAmountFromUndelegateMessage(data []byte) (*types.Amount, *types.Error) {
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("%v", stkMsg.Amount.Uint64()),
+		Value:    fmt.Sprintf("%v", stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -576,7 +838,7 @@ func getAmountFromCollectRewards(
 	for _, log := range logs {
 		if log.Address == senderAddress {
 			amount = &types.Amount{
-				Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data).Uint64()),
+				Value:    fmt.Sprintf("%v", big.NewInt(0).SetBytes(log.Data)),
 				Currency: &common.Currency,
 			}
 			break
@@ -778,7 +1040,7 @@ func newAccountIdentifier(
 // newOperations creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
 func newOperations(
-	gasFeeInATTO uint64, accountID *types.AccountIdentifier,
+	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{
 		{

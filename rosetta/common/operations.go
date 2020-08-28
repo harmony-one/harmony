@@ -17,6 +17,12 @@ const (
 
 	// ContractCreationOperation ..
 	ContractCreationOperation = "ContractCreation"
+
+	// GenesisFundsOperation ..
+	GenesisFundsOperation = "Genesis"
+
+	// PreStakingEraBlockRewardOperation ..
+	PreStakingEraBlockRewardOperation = "PreStakingBlockReward"
 )
 
 var (
@@ -26,6 +32,8 @@ var (
 		TransferOperation,
 		CrossShardTransferOperation,
 		ContractCreationOperation,
+		GenesisFundsOperation,
+		PreStakingEraBlockRewardOperation,
 	}
 
 	// StakingOperationTypes ..

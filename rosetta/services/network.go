@@ -73,7 +73,7 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 	targetHeight := int64(s.hmy.NodeAPI.GetMaxPeerHeight())
 	syncStatus := common.SyncingFinish
-	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain) {
+	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain) {
 		syncStatus = common.SyncingNewBlock
 	} else if targetHeight == 0 {
 		syncStatus = common.SyncingStartup
