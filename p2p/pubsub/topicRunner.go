@@ -24,9 +24,7 @@ type topicRunner struct {
 	handlers    []Handler
 	handlerLock sync.RWMutex
 
-	// ctx control
-	ctxCancel func()
-	ctxLock   sync.Mutex
+	ctxCancel func() // since upper function calls are single-threaded, there is no race here.
 
 	metric   *psMetric
 	running  abool.AtomicBool
@@ -79,9 +77,7 @@ func (tr *topicRunner) start() (err error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	tr.ctxLock.Lock()
 	tr.ctxCancel = cancel
-	tr.ctxLock.Unlock()
 
 	go tr.metric.run()
 	go tr.run(ctx, sub)
@@ -142,10 +138,7 @@ func (tr *topicRunner) stop() error {
 		return errTopicAlreadyStopped
 	}
 
-	tr.ctxLock.Lock()
 	tr.ctxCancel()
-	tr.ctxLock.Unlock()
-
 	tr.metric.stop()
 	<-tr.stoppedC
 	return nil
