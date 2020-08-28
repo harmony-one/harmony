@@ -111,7 +111,7 @@ func (s *BlockAPI) Block(
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
-		for acc, signedBlsKeys := range blockSigInfo.committee {
+		for acc, signedBlsKeys := range blockSigInfo.signers {
 			if len(signedBlsKeys) > 0 {
 				b32Addr, err := internalCommon.AddressToBech32(acc)
 				if err != nil {
@@ -400,9 +400,9 @@ func unpackSpecialCaseTransactionIdentifier(
 
 // blockSignerInfo contains all of the block singing information
 type blockSignerInfo struct {
-	// committee is a map of addresses in the committee for the block to
+	// signers is a map of addresses in the signers for the block to
 	// all of the serialized BLS keys that signed said block.
-	committee map[ethcommon.Address][]bls.SerializedPublicKey
+	signers map[ethcommon.Address][]bls.SerializedPublicKey
 	// totalKeysSigned is the total number of bls keys that signed the block.
 	totalKeysSigned uint
 	// mask is the bitmap mask for the block.
@@ -435,7 +435,7 @@ func getBlockSignerInfo(
 		}
 	}
 	return &blockSignerInfo{
-		committee:       sigInfos,
+		signers:         sigInfos,
 		totalKeysSigned: totalSigners,
 		mask:            mask,
 		blockHash:       blk.Hash(),
@@ -549,7 +549,7 @@ func formatPreStakingBlockRewardsTransaction(
 		})
 	}
 
-	signatures, ok := blockSigInfo.committee[addr]
+	signatures, ok := blockSigInfo.signers[addr]
 	if !ok || len(signatures) == 0 {
 		return nil, &common.TransactionNotFoundError
 	}
@@ -558,8 +558,26 @@ func formatPreStakingBlockRewardsTransaction(
 		return nil, rosettaError
 	}
 
-	rewardsPerSlot := new(big.Int).Quo(stakingNetwork.BlockReward, big.NewInt(int64(blockSigInfo.totalKeysSigned)))
-	rewardsForThisBlock := new(big.Int).Mul(rewardsPerSlot, big.NewInt(int64(len(signatures))))
+	// Calculate rewards exactly like `AccumulateRewardsAndCountSigs` but short circuit when possible.
+	var rewardsForThisBlock *big.Int
+	i := 0
+	last := big.NewInt(0)
+	count := big.NewInt(int64(blockSigInfo.totalKeysSigned))
+	for sigAddr, keys := range blockSigInfo.signers {
+		rewardsForThisAddr := big.NewInt(0)
+		for range keys {
+			cur := big.NewInt(0)
+			cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+			reward := big.NewInt(0).Sub(cur, last)
+			rewardsForThisAddr = new(big.Int).Add(reward, rewardsForThisAddr)
+			last = cur
+			i++
+		}
+		if sigAddr == addr {
+			rewardsForThisBlock = rewardsForThisAddr
+			break
+		}
+	}
 
 	return &types.Transaction{
 		TransactionIdentifier: getSpecialCaseTransactionIdentifier(blockSigInfo.blockHash, b32Address),

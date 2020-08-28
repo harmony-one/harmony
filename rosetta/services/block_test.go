@@ -262,7 +262,7 @@ func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	testBlockSigInfo := &blockSignerInfo{
-		committee: map[ethcommon.Address][]bls.SerializedPublicKey{
+		signers: map[ethcommon.Address][]bls.SerializedPublicKey{
 			testAddr: { // Only care about length for this test
 				bls.SerializedPublicKey{},
 				bls.SerializedPublicKey{},
@@ -312,7 +312,7 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	testBlockSigInfo := &blockSignerInfo{
-		committee: map[ethcommon.Address][]bls.SerializedPublicKey{
+		signers: map[ethcommon.Address][]bls.SerializedPublicKey{
 			testAddr: {},
 		},
 		totalKeysSigned: 150,
@@ -327,7 +327,7 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 	}
 
 	testBlockSigInfo = &blockSignerInfo{
-		committee:       map[ethcommon.Address][]bls.SerializedPublicKey{},
+		signers:         map[ethcommon.Address][]bls.SerializedPublicKey{},
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
