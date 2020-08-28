@@ -37,7 +37,7 @@ func (consensus *Consensus) populateMessageFields(
 	return request
 }
 
-// Populates the common basic fields for all consensus message and single sender.
+// Populates the common basic fields for the consensus message and senders bitmap.
 func (consensus *Consensus) populateMessageFieldsAndSendersBitmap(
 	request *msg_pb.ConsensusRequest, blockHash []byte, bitmap []byte,
 ) *msg_pb.ConsensusRequest {
@@ -47,7 +47,7 @@ func (consensus *Consensus) populateMessageFieldsAndSendersBitmap(
 	return request
 }
 
-// Populates the common basic fields for all consensus message and single sender.
+// Populates the common basic fields for the consensus message and single sender.
 func (consensus *Consensus) populateMessageFieldsAndSender(
 	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
 ) *msg_pb.ConsensusRequest {
