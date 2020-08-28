@@ -10,26 +10,28 @@ import (
 
 type fakePubSub struct {
 	topicValidators map[Topic]interface{}
-	topicMsg        map[Topic]chan *libp2p_pubsub.Message
+	topicHandles    map[Topic]*fakeTopic
 }
 
 func newFakePubSub() *fakePubSub {
 	return &fakePubSub{
 		topicValidators: make(map[Topic]interface{}),
-		topicMsg:        make(map[Topic]chan *libp2p_pubsub.Message),
+		topicHandles:    make(map[Topic]*fakeTopic),
 	}
 }
 
 func (ps *fakePubSub) Join(topic Topic) (topicHandle, error) {
-	if _, joined := ps.topicMsg[topic]; joined {
+	if _, joined := ps.topicHandles[topic]; joined {
 		return nil, errors.New("topic already joined")
 	}
-	msgCh := make(chan *libp2p_pubsub.Message, 100)
-	ps.topicMsg[topic] = msgCh
-	return &fakeTopic{
-		msgCh:      msgCh,
+	ft := &fakeTopic{
+		ps:         ps,
+		topic:      topic,
+		msgCh:      make(chan *libp2p_pubsub.Message, 100),
 		subscribed: false,
-	}, nil
+	}
+	ps.topicHandles[topic] = ft
+	return ft, nil
 }
 
 func (ps *fakePubSub) RegisterTopicValidator(topic Topic, val interface{}, opts ...libp2p_pubsub.ValidatorOpt) error {
@@ -46,27 +48,17 @@ func (ps *fakePubSub) UnregisterTopicValidator(topic Topic) error {
 }
 
 func (ps *fakePubSub) addMessage(topic Topic, msg testMsg) error {
-	msgCh, exist := ps.topicMsg[topic]
+	ft, exist := ps.topicHandles[topic]
 	if !exist {
 		return errors.New("topic not joined")
 	}
-
-	p2pMsg := &libp2p_pubsub.Message{Message: &libp2p_pb.Message{Data: msg.encode()}}
-
-	val, exist := ps.topicValidators[topic]
-	if exist {
-		valFunc := val.(func(ctx context.Context, peer PeerID, raw *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult)
-		result := valFunc(context.Background(), "", p2pMsg)
-		if result != libp2p_pubsub.ValidationAccept {
-			return nil
-		}
-	}
-
-	msgCh <- p2pMsg
+	ft.Publish(context.Background(), msg.encode())
 	return nil
 }
 
 type fakeTopic struct {
+	ps         *fakePubSub
+	topic      Topic
 	msgCh      chan *libp2p_pubsub.Message
 	subscribed bool
 }
@@ -91,6 +83,21 @@ func (ft *fakeTopic) Subscribe() (subscription, error) {
 }
 
 func (ft *fakeTopic) Publish(ctx context.Context, data []byte) error {
+	p2pMsg := &libp2p_pubsub.Message{Message: &libp2p_pb.Message{Data: data}}
+
+	val, exist := ft.ps.topicValidators[ft.topic]
+	if exist {
+		valFunc := val.(func(ctx context.Context, peer PeerID, raw *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult)
+		result := valFunc(context.Background(), "", p2pMsg)
+		if result != libp2p_pubsub.ValidationAccept {
+			return nil
+		}
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case ft.msgCh <- p2pMsg:
+	}
 	return nil
 }
 

@@ -20,16 +20,18 @@ type topicRunner struct {
 	topicHandle topicHandle
 	options     []libp2p_pubsub.ValidatorOpt
 
-	// all active handlers in the topic; lock protected
-	handlers []Handler
-	lock     sync.RWMutex
+	// all active handlers in the topic; handlerLock protected
+	handlers    []Handler
+	handlerLock sync.RWMutex
 
-	baseCtx       context.Context
-	baseCtxCancel func()
+	// ctx control
+	ctxCancel func()
+	ctxLock   sync.Mutex
 
 	metric   *psMetric
 	running  abool.AtomicBool
 	closed   abool.AtomicBool
+	stopC    chan struct{}
 	stoppedC chan struct{}
 	log      zerolog.Logger
 }
@@ -76,10 +78,13 @@ func (tr *topicRunner) start() (err error) {
 		return errors.Wrapf(err, "cannot subscribe topic [%v]", tr.topic)
 	}
 
-	tr.baseCtx, tr.baseCtxCancel = context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	tr.ctxLock.Lock()
+	tr.ctxCancel = cancel
+	tr.ctxLock.Unlock()
 
 	go tr.metric.run()
-	go tr.run(sub)
+	go tr.run(ctx, sub)
 
 	return
 }
@@ -100,41 +105,47 @@ func (tr *topicRunner) validateMsg(ctx context.Context, peer PeerID, raw *libp2p
 	return libp2p_pubsub.ValidationResult(action)
 }
 
-func (tr *topicRunner) run(sub subscription) {
+func (tr *topicRunner) run(ctx context.Context, sub subscription) {
 	defer func() {
 		sub.Cancel()
 		tr.stoppedC <- struct{}{}
 	}()
 
 	for {
-		msg, err := sub.Next(tr.baseCtx)
+		msg, err := sub.Next(ctx)
 		if err != nil {
 			// baseCtx has been canceled
 			return
 		}
-		tr.handleMessage(newMessage(msg))
+		tr.handleMessage(ctx, newMessage(msg))
 	}
 }
 
-func (tr *topicRunner) handleMessage(msg *message) {
+func (tr *topicRunner) handleMessage(ctx context.Context, msg *message) {
 	handlers := tr.getHandlers()
 
 	for _, handler := range handlers {
-		// deliver non-block
-		go tr.deliverMessageForHandler(msg, handler)
+		tr.deliverMessageForHandler(ctx, msg, handler)
 	}
 }
 
-func (tr *topicRunner) deliverMessageForHandler(msg *message, handler Handler) {
+func (tr *topicRunner) deliverMessageForHandler(ctx context.Context, msg *message, handler Handler) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	validationCache := msg.getHandlerCache(handler.Specifier())
-	handler.DeliverMsg(tr.baseCtx, msg.raw.GetData(), validationCache)
+	go handler.DeliverMsg(ctx, msg.raw.GetData(), validationCache)
 }
 
 func (tr *topicRunner) stop() error {
 	if changed := tr.running.SetToIf(true, false); !changed {
 		return errTopicAlreadyStopped
 	}
-	tr.baseCtxCancel()
+
+	tr.ctxLock.Lock()
+	tr.ctxCancel()
+	tr.ctxLock.Unlock()
+
 	tr.metric.stop()
 	<-tr.stoppedC
 	return nil
@@ -160,8 +171,8 @@ func (tr *topicRunner) isRunning() bool {
 }
 
 func (tr *topicRunner) getHandlers() []Handler {
-	tr.lock.RLock()
-	defer tr.lock.RUnlock()
+	tr.handlerLock.RLock()
+	defer tr.handlerLock.RUnlock()
 
 	handlers := make([]Handler, len(tr.handlers))
 	copy(handlers, tr.handlers)
@@ -170,8 +181,8 @@ func (tr *topicRunner) getHandlers() []Handler {
 }
 
 func (tr *topicRunner) isHandlerRunning(specifier HandlerSpecifier) bool {
-	tr.lock.RLock()
-	defer tr.lock.RUnlock()
+	tr.handlerLock.RLock()
+	defer tr.handlerLock.RUnlock()
 
 	for _, handler := range tr.handlers {
 		if handler.Specifier() == specifier {
@@ -182,8 +193,8 @@ func (tr *topicRunner) isHandlerRunning(specifier HandlerSpecifier) bool {
 }
 
 func (tr *topicRunner) addHandler(newHandler Handler) error {
-	tr.lock.Lock()
-	defer tr.lock.Unlock()
+	tr.handlerLock.Lock()
+	defer tr.handlerLock.Unlock()
 
 	for _, handler := range tr.handlers {
 		if handler.Specifier() == newHandler.Specifier() {
@@ -196,8 +207,8 @@ func (tr *topicRunner) addHandler(newHandler Handler) error {
 }
 
 func (tr *topicRunner) removeHandler(spec HandlerSpecifier) error {
-	tr.lock.Lock()
-	defer tr.lock.Unlock()
+	tr.handlerLock.Lock()
+	defer tr.handlerLock.Unlock()
 
 	for i, handler := range tr.handlers {
 		if handler.Specifier() == spec {

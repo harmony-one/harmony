@@ -56,7 +56,7 @@ type pubSubHost struct {
 	closeTaskC     chan closeTask
 
 	// utils
-	topicLock sync.RWMutex // lock to protect topicRunners
+	topicLock sync.RWMutex // handlerLock to protect topicRunners
 	log       zerolog.Logger
 }
 
@@ -240,11 +240,9 @@ func (psh *pubSubHost) stopHandler(spec HandlerSpecifier) error {
 	if err != nil {
 		return err
 	}
-
 	if err := tr.removeHandler(spec); err != nil {
 		return err
 	}
-
 	if len(tr.getHandlers()) == 0 {
 		psh.log.Info().Str("topic", string(handler.Topic())).Msg("stopping topic")
 		if err := tr.stop(); err != nil {
@@ -278,6 +276,12 @@ func (psh *pubSubHost) removeHandler(spec HandlerSpecifier) error {
 	if psh.haveNoHandlerOnTopic(topic) {
 		return psh.closeAndRemoveTopicRunner(topic)
 	}
+	if len(tr.getHandlers()) == 0 {
+		psh.log.Info().Str("topic", string(handler.Topic())).Msg("stopping topic")
+		if err := tr.stop(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -292,6 +296,7 @@ func (psh *pubSubHost) removeTopic(topic Topic) error {
 	if err := tr.close(); err != nil {
 		return err
 	}
+	delete(psh.topicRunners, topic)
 	for spec, handler := range psh.handlers {
 		if handler.Topic() == topic {
 			delete(psh.handlers, spec)
@@ -332,9 +337,9 @@ func (psh *pubSubHost) closeAndRemoveTopicRunner(topic Topic) error {
 	psh.topicLock.Lock()
 	defer psh.topicLock.Unlock()
 
-	tr, err := psh.getTopicRunner(topic)
-	if err != nil {
-		return err
+	tr, exist := psh.topicRunners[topic]
+	if !exist {
+		return errTopicNotRegistered
 	}
 	if err := tr.close(); err != nil {
 		return err

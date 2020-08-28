@@ -54,7 +54,7 @@ func (handler *fakePubSubHandler) Specifier() HandlerSpecifier {
 }
 
 func makeSpecifier(index int) HandlerSpecifier {
-	return HandlerSpecifier(fmt.Sprintf("testHandler [%v]", index))
+	return HandlerSpecifier(fmt.Sprintf("testHandler%v", index))
 }
 
 func (handler *fakePubSubHandler) ValidateMsg(ctx context.Context, peer PeerID, rawData []byte) ValidateResult {

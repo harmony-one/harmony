@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"os"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 const timeBulletFly = 10 * time.Millisecond
@@ -21,7 +18,7 @@ var (
 
 // TestTopicRunner_accept test the scenario of handlers accept all messages
 func TestTopicRunner_accept(t *testing.T) {
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 
 	delivers, deliverChs := makeDelivers(3)
 	validates := makeValidateAcceptFuncs(3)
@@ -47,10 +44,10 @@ func TestTopicRunner_accept(t *testing.T) {
 			case cache := <-deliverCh:
 				tm, ok := cache.HandlerCache.(testMsg)
 				if !ok || !reflect.DeepEqual(tm, sendTm) {
-					t.Errorf("%v/%v message unexpected, %+v / %+v", i, di, cache.HandlerCache, sendTm)
+					t.Fatalf("%v/%v message unexpected, %+v / %+v", i, di, cache.HandlerCache, sendTm)
 				}
 			default:
-				t.Errorf("%v/%v message not delivered", i, di)
+				t.Fatalf("%v/%v message not delivered", i, di)
 			}
 		}
 	}
@@ -61,7 +58,7 @@ func TestTopicRunner_accept(t *testing.T) {
 
 // TestTopicRunner_reject test scenario that one of the handlers are rejecting messages
 func TestTopicRunner_reject(t *testing.T) {
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 
 	delivers, deliverChs := makeDelivers(2)
 	validates := []validateFunc{validateAcceptFn, validateRejectFn}
@@ -97,7 +94,7 @@ func TestTopicRunner_reject(t *testing.T) {
 
 // TestTopicRunner_halfAccept test scenario that half of the message are rejected
 func TestTopicRunner_halfAccept(t *testing.T) {
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 
 	delivers, deliverChs := makeDelivers(2)
 	validates := []validateFunc{validateAcceptFn, validateAcceptHalfFunc}
@@ -148,7 +145,7 @@ func TestTopicRunner_halfAccept(t *testing.T) {
 
 // TestTopicRunner_dynamicHandler test the scenario of dynamically add or remove handlers
 func TestTopicRunner_dynamicHandler(t *testing.T) {
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 	// Create 2 handlers: 1 accept, 2 reject
 	handler1, deliver1 := makeTestHandler(testTopic, 0, validateAcceptFn)
 	handler2, deliver2 := makeTestHandler(testTopic, 1, validateRejectFn)
@@ -203,7 +200,7 @@ func TestTopicRunner_dynamicHandler(t *testing.T) {
 }
 
 func TestTopicRunner_StartStop(t *testing.T) {
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 	handler, deliver := makeTestHandler(testTopic, 0, validateAcceptFn)
 	fps := host.pubSub.(*fakePubSub)
 
@@ -256,9 +253,9 @@ func TestTopicRunner_StartStop(t *testing.T) {
 
 // TestTopicRunner_race test the race condition of the topicRunner
 func TestTopicRunner_race(t *testing.T) {
-	t.SkipNow()
+	//t.Skip("skipping race tests that takes some time")
 
-	host := makeTestPubSubHost()
+	host := makeEmptyTestHost()
 
 	numHandlers := 10
 	delivers, _ := makeDelivers(numHandlers)
@@ -276,7 +273,6 @@ func TestTopicRunner_race(t *testing.T) {
 	// Spawn several goroutines:
 	// 3 to feed messages
 	// 1 for Add and remove handler
-
 	var (
 		stop = make(chan struct{})
 		wg   sync.WaitGroup
@@ -400,16 +396,6 @@ func makeTestHandler(topic Topic, index int, validate validateFunc) (*fakePubSub
 		validate: validate,
 		deliver:  deliver,
 	}, deliverCh
-}
-
-func makeTestPubSubHost() *pubSubHost {
-	ps := newFakePubSub()
-	log := zerolog.New(os.Stdout)
-
-	return &pubSubHost{
-		pubSub: ps,
-		log:    log,
-	}
 }
 
 // assertTopicRunning send a probe message to see whether message handling is action

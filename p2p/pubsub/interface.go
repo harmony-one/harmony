@@ -65,6 +65,7 @@ type topicHandle interface {
 
 // subscription is the interface for libp2p_pubsub.Subscription
 type subscription interface {
+	//MsgChan()
 	Next(ctx context.Context) (*libp2p_pubsub.Message, error)
 	Cancel()
 }
