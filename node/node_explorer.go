@@ -31,6 +31,9 @@ var (
 	errAddressNotFound = errors.New(
 		"address not found",
 	)
+	errRetrievingHistory = errors.New(
+		"explorer failed to retrieve history",
+	)
 )
 
 // explorerMessageHandler passes received message in node_handler to explorer service
@@ -173,7 +176,7 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 	if err != nil {
 		utils.Logger().Debug().Err(err).
 			Msgf("[Explorer] Error retrieving transaction history for address %s", address)
-		return make([]common.Hash, 0), nil
+		return make([]common.Hash, 0), errRetrievingHistory
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
@@ -206,7 +209,7 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 	if err != nil {
 		utils.Logger().Debug().Err(err).
 			Msgf("[Explorer] Staking transaction history for address %s not found", address)
-		return make([]common.Hash, 0), nil
+		return make([]common.Hash, 0), errRetrievingHistory
 	}
 	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
