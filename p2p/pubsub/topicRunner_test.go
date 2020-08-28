@@ -253,7 +253,7 @@ func TestTopicRunner_StartStop(t *testing.T) {
 
 // TestTopicRunner_race test the race condition of the topicRunner
 func TestTopicRunner_race(t *testing.T) {
-	//t.Skip("skipping race tests that takes some time")
+	t.Skip("skipping race tests that takes some time")
 
 	host := makeEmptyTestHost()
 

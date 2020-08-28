@@ -355,7 +355,7 @@ func TestPubSubHost_RemoveTopic(t *testing.T) {
 
 // TestPubSubHost_Race test the race condition of the pubSubHost
 func TestPubSubHost_Race(t *testing.T) {
-	//t.Skip("skipping race tests that takes some time")
+	t.Skip("skipping race tests that takes some time")
 
 	testDuration := 10 * time.Second
 
