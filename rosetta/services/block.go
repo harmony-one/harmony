@@ -575,6 +575,11 @@ func formatPreStakingBlockRewardsTransaction(
 		}
 		if sigAddr == addr {
 			rewardsForThisBlock = rewardsForThisAddr
+			if !(rewardsForThisAddr.Cmp(big.NewInt(0)) > 0) {
+				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+					"message": "expected non-zero block reward in pre-staking ear for block signer",
+				})
+			}
 			break
 		}
 	}
