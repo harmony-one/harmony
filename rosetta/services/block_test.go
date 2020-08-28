@@ -1163,4 +1163,14 @@ func TestSpecialCaseTransactionIdentifier(t *testing.T) {
 	if unpackedBlkHash.String() != testBlkHash.String() {
 		t.Errorf("expected blk hash to be %v not %v", unpackedBlkHash.String(), testBlkHash.String())
 	}
+
+	_, _, rosettaError = unpackSpecialCaseTransactionIdentifier(
+		&types.TransactionIdentifier{Hash: ""},
+	)
+	if rosettaError == nil {
+		t.Fatal("expected rosetta error")
+	}
+	if rosettaError.Code != common.CatchAllError.Code {
+		t.Error("expected error code to be catch call error")
+	}
 }
