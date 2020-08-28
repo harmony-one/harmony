@@ -26,6 +26,7 @@ func NewAccountAPI(hmy *hmy.Harmony) server.AccountAPIServicer {
 	}
 }
 
+// AccountBalance ...
 func (s *AccountAPI) AccountBalance(
 	ctx context.Context, req *types.AccountBalanceRequest,
 ) (*types.AccountBalanceResponse, *types.Error) {
@@ -67,17 +68,17 @@ func (s *AccountAPI) AccountBalance(
 	}
 
 	amount := types.Amount{
-		Value: balance.String(),
+		Value:    balance.String(),
 		Currency: &common.Currency,
 	}
 
 	respBlock := types.BlockIdentifier{
 		Index: blockNum.Int64(),
-		Hash: block.Header().Hash().String(),
+		Hash:  block.Header().Hash().String(),
 	}
 
 	return &types.AccountBalanceResponse{
 		BlockIdentifier: &respBlock,
-		Balances: []*types.Amount{&amount},
+		Balances:        []*types.Amount{&amount},
 	}, nil
 }
