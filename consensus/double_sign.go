@@ -98,6 +98,8 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 										Moment: slash.Moment{
 											Epoch:   curHeader.Epoch(),
 											ShardID: consensus.ShardID,
+											Height:  recvMsg.BlockNum,
+											ViewID:  recvMsg.ViewID,
 										},
 										Offender: *addr,
 									}
