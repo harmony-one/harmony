@@ -3,6 +3,7 @@ package votepower
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -24,23 +25,23 @@ var (
 
 // Ballot is a vote cast by a validator
 type Ballot struct {
-	SignerPubKey    bls.SerializedPublicKey `json:"bls-public-key"`
-	BlockHeaderHash common.Hash             `json:"block-header-hash"`
-	Signature       []byte                  `json:"bls-signature"`
-	Height          uint64                  `json:"block-height"`
-	ViewID          uint64                  `json:"view-id"`
+	SignerPubKeys   []bls.SerializedPublicKey `json:"bls-public-keys"`
+	BlockHeaderHash common.Hash               `json:"block-header-hash"`
+	Signature       []byte                    `json:"bls-signature"`
+	Height          uint64                    `json:"block-height"`
+	ViewID          uint64                    `json:"view-id"`
 }
 
 // MarshalJSON ..
 func (b Ballot) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		A string `json:"bls-public-key"`
+		A string `json:"bls-public-keys"`
 		B string `json:"block-header-hash"`
 		C string `json:"bls-signature"`
 		E uint64 `json:"block-height"`
 		F uint64 `json:"view-id"`
 	}{
-		b.SignerPubKey.Hex(),
+		fmt.Sprint(b.SignerPubKeys),
 		b.BlockHeaderHash.Hex(),
 		hex.EncodeToString(b.Signature),
 		b.Height,
