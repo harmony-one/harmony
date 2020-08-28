@@ -23,7 +23,7 @@ type ValidateAction libp2p_pubsub.ValidationResult
 const (
 	// MsgAccept is an alias to libp2p_pubsub.ValidationAccept
 	MsgAccept = ValidateAction(libp2p_pubsub.ValidationAccept)
-	// ValidaMsgRejecttionReject is an alias to libp2p_pubsub.ValidationReject.
+	// MsgReject is an alias to libp2p_pubsub.ValidationReject.
 	// The action indicates an invalid message that should not be delivered to
 	// the application or forwarded to the application. Furthermore the peer that
 	// forwarded the message should be penalized by peer scoring routers.
