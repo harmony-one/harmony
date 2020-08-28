@@ -1,0 +1,14 @@
+{{VER=2.0.0}}
+Package: harmony
+Version: {{ VER }}
+License: MIT
+Vendor: Harmony blockchain
+Architecture: amd64
+Source: https://github.com/harmony-one/harmony
+Maintainer: Leo Chen <leo@harmony.one>
+Section: net
+Priority: extra
+Homepage: https://harmony.one
+Description: Harmony is a sharded, fast finality, low fee, PoS public blockchain. This package contains the validator node program for harmony blockchain.
+Build-Dep: dh-systemd
+Recommends: jq, rclone (>= 1.52.3)

@@ -1,10 +1,11 @@
 # Harmony
 
-[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?token=DnoYvYiTAk7pqTo9XsTi&branch=master)](https://travis-ci.com/harmony-one/harmony)
+[![Build Status](https://travis-ci.com/harmony-one/harmony.svg?branch=main)](https://travis-ci.com/harmony-one/harmony)
 ![gopherbadger-tag-do-not-edit](https://img.shields.io/badge/Go%20Coverage-45%25-brightgreen.svg?longCache=true&style=flat)
 ![Discord](https://img.shields.io/discord/532383335348043777.svg)
 [![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=main)](https://coveralls.io/github/harmony-one/harmony?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/harmony-one/harmony)](https://goreportcard.com/report/github.com/harmony-one/harmony)
+[![codecov](https://codecov.io/gh/harmony-one/harmony/branch/main/graph/badge.svg)](https://codecov.io/gh/harmony-one/harmony)
 
 ## General Documentation
 
@@ -16,13 +17,14 @@ http://api.hmny.io/
 
 ## Requirements
 
-### **Go 1.14.1**
+### **Go 1.14.7**
 ### **GMP and OpenSSL**
 
 On macOS:
 ```bash
 brew install gmp
 brew install openssl
+sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
 ```
 On Linux (Ubuntu)
 ```bash

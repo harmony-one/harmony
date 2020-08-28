@@ -1,0 +1,50 @@
+#!/bin/sh
+
+set -e
+
+after_remove() {
+   :
+   #rm -rf /data/harmony/latest
+   #rm -rf /data/harmony/.dht*
+   #rm -rf /data/harmony/transactions.rlp
+}
+
+after_purge() {
+	systemctl disable harmony
+	userdel harmony || true
+	groupdel harmony || true
+	rm -rf /etc/harmony
+}
+
+dummy() {
+    :
+}
+
+
+if [ "${1}" = "remove" -o "${1}" = "abort-install" ]
+then
+    # "after remove" goes here
+    # "abort-install" happens when the pre-installation script failed.
+    #   In that case, this script, which should be idemptoent, is run
+    #   to ensure a clean roll-back of the installation.
+    after_remove
+elif [ "${1}" = "purge" -a -z "${2}" ]
+then
+    # like "on remove", but executes after dpkg deletes config files
+    # 'apt-get purge' runs 'on remove' section, then this section.
+    # There is no equivalent in RPM or ARCH.
+    after_purge
+elif [ "${1}" = "upgrade" ]
+then
+    # This represents the case where the old package's postrm is called after
+    # the 'preinst' script is called.
+    # We should ignore this and just use 'preinst upgrade' and
+    # 'postinst configure'. The newly installed package should do the
+    # upgrade, not the uninstalled one, since it can't anticipate what new
+    # things it will have to do to upgrade for the new version.
+    dummy
+elif echo "${1}" | grep -E -q '(fail|abort)'
+then
+    echo "Failed to install before the post-removal script was run." >&2
+    exit 1
+fi

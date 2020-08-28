@@ -364,16 +364,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		collectedRewards, tempErr := st.verifyAndApplyCollectRewards(stkMsg)
-		err = tempErr
-		if err == nil {
-			st.state.AddLog(&types.Log{
-				Address:     stkMsg.DelegatorAddress,
-				Topics:      []common.Hash{staking2.CollectRewardsTopic},
-				Data:        collectedRewards.Bytes(),
-				BlockNumber: st.evm.BlockNumber.Uint64(),
-			})
-		}
+		_, err = st.verifyAndApplyCollectRewards(stkMsg)
 	default:
 		return 0, staking.ErrInvalidStakingKind
 	}
@@ -420,7 +411,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 	if err != nil {
 		return err
 	}
-	updatedValidatorWrappers, balanceToBeDeducted, err := VerifyAndDelegateFromMsg(
+	updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
 		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig().IsRedelegation(st.evm.EpochNumber))
 	if err != nil {
 		return err
@@ -434,6 +425,22 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
+	// Add log if everything is good
+	for valAddr, redelegatedToken := range fromLockedTokens {
+		encodedRedelegationData := []byte{}
+		addrBytes := valAddr.Bytes()
+		encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+		encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+		// The data field format is:
+		// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
+		// [rest of the bytes]: the bigInt serialized bytes for the token amount.
+		st.state.AddLog(&types.Log{
+			Address:     delegate.DelegatorAddress,
+			Topics:      []common.Hash{staking2.DelegateTopic},
+			Data:        encodedRedelegationData,
+			BlockNumber: st.evm.BlockNumber.Uint64(),
+		})
+	}
 	return nil
 }
 
@@ -467,5 +474,14 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 		}
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)
+
+	// Add log if everything is good
+	st.state.AddLog(&types.Log{
+		Address:     collectRewards.DelegatorAddress,
+		Topics:      []common.Hash{staking2.CollectRewardsTopic},
+		Data:        totalRewards.Bytes(),
+		BlockNumber: st.evm.BlockNumber.Uint64(),
+	})
+
 	return totalRewards, nil
 }

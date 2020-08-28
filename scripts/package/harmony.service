@@ -1,0 +1,20 @@
+[Unit]
+Description=harmony validator node service
+After=network.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=1
+User=harmony
+Group=harmony
+WorkingDirectory=~
+ExecStart=/usr/sbin/harmony -c /etc/harmony/harmony.conf
+StandardError=syslog
+SyslogIdentifier=harmony
+StartLimitInterval=0
+LimitNOFILE=65536
+LimitNPROC=65536
+
+[Install]
+WantedBy=multi-user.target

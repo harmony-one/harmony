@@ -35,7 +35,7 @@ func TestV1_0_0Config(t *testing.T) {
 [BLSKeys]
   KMSConfigFile = ""
   KMSConfigSrcType = "shared"
-  KMSEnabled = true
+  KMSEnabled = false
   KeyDir = "./.hmy/blskeys"
   KeyFiles = []
   MaxKeys = 10

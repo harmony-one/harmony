@@ -1,0 +1,6 @@
+[harmony-dev]
+name=Development Packages - $basearch
+baseurl=http://haochen-harmony-pub.s3.amazonaws.com/pub/yum/$basearch/
+enabled=1
+gpgkey=https://raw.githubusercontent.com/harmony-one/harmony-open/master/harmony-release/harmony-pub.key
+gpgcheck=1

@@ -48,10 +48,14 @@ func (hmy *Harmony) GetBlockSigners(
 		return nil, nil, err
 	}
 	pubKeys := make([]internal_bls.PublicKeyWrapper, len(committee.Slots))
-	for _, validator := range committee.Slots {
-		wrapper := internal_bls.PublicKeyWrapper{Bytes: validator.BLSPublicKey}
-		if wrapper.Object, err = bls.BytesToBLSPublicKey(wrapper.Bytes[:]); err != nil {
+	for i, validator := range committee.Slots {
+		key, err := bls.BytesToBLSPublicKey(validator.BLSPublicKey[:])
+		if err != nil {
 			return nil, nil, err
+		}
+		pubKeys[i] = internal_bls.PublicKeyWrapper{
+			Bytes:  validator.BLSPublicKey,
+			Object: key,
 		}
 	}
 	mask, err := internal_bls.NewMask(pubKeys, nil)

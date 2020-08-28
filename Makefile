@@ -5,8 +5,14 @@ export LD_LIBRARY_PATH:=$(TOP)/bls/lib:$(TOP)/mcl/lib:/usr/local/opt/openssl/lib
 export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
+PKGNAME=harmony
+VERSION?=$(shell git tag -l --sort=-v:refname | head -n 1 | tr -d v)
+RELEASE?=$(shell git describe --long | cut -f2 -d-)
+RPMBUILD=$(HOME)/rpmbuild
+DEBBUILD=$(HOME)/debbuild
+SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -25,6 +31,9 @@ help:
 	@echo "test-api - run the Node API test"
 	@echo "test-api-attach - attach onto the Node API testing docker container for inspection"
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
+	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
+	@echo "rpm - build a harmony RPM pacakge"
+	@echo "deb - build a harmony Debian pacakge"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -51,6 +60,11 @@ clean:
 	rm -rf ./db-*
 	rm -rf ./latest
 	rm -f ./*.rlp
+	rm -rf ~/rpmbuild
+
+go-get:
+	source ./scripts/setup_bls_build_flags.sh
+	go get -v ./...
 
 test:
 	bash ./test/all.sh
@@ -76,3 +90,55 @@ arm_static:
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -a arm64 -s
 	git checkout go.mod
+
+deb_init:
+	rm -rf $(DEBBUILD)
+	mkdir -p $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/{etc/systemd/system,usr/sbin,etc/sysctl.d,etc/harmony}
+	cp -f bin/harmony $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	bin/harmony dumpconfig $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/harmony/harmony.conf
+	cp -f scripts/package/rclone.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/harmony/
+	cp -f scripts/package/harmony.service $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/systemd/system/
+	cp -f scripts/package/harmony-setup.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	cp -f scripts/package/harmony-rclone.sh $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/usr/sbin/
+	cp -f scripts/package/harmony-sysctl.conf $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/etc/sysctl.d/99-harmony.conf
+	cp -r scripts/package/deb/DEBIAN $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)
+	VER=$(VERSION)-$(RELEASE) scripts/package/templater.sh scripts/package/deb/DEBIAN/control > $(DEBBUILD)/$(PKGNAME)-$(VERSION)-$(RELEASE)/DEBIAN/control
+
+deb_build:
+	(cd $(DEBBUILD); dpkg-deb --build $(PKGNAME)-$(VERSION)-$(RELEASE)/)
+
+deb: deb_init deb_build
+
+debpub_dev: deb
+	cp scripts/package/deb/dev.aptly.conf ~/.aptly.conf
+	./scripts/package/publish-repo.sh -p dev -n deb -s $(DEBBUILD)
+
+debpub_prod: deb
+	cp scripts/package/deb/prod.aptly.conf ~/.aptly.conf
+	./scripts/package/publish-repo.sh -p prod -n deb -s $(DEBBUILD)
+
+rpm_init:
+	rm -rf $(RPMBUILD)
+	mkdir -p $(RPMBUILD)/{SOURCES,SPECS,BUILD,RPMS,BUILDROOT,SRPMS}
+	mkdir -p $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f bin/harmony $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	bin/harmony dumpconfig $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)/harmony.conf
+	cp -f scripts/package/harmony.service $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-setup.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-rclone.sh $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/rclone.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	cp -f scripts/package/harmony-sysctl.conf $(RPMBUILD)/SOURCES/$(PKGNAME)-$(VERSION)
+	VER=$(VERSION) REL=$(RELEASE) scripts/package/templater.sh scripts/package/rpm/harmony.spec > $(RPMBUILD)/SPECS/harmony.spec
+	(cd $(RPMBUILD)/SOURCES; tar cvf $(PKGNAME)-$(VERSION).tar $(PKGNAME)-$(VERSION))
+
+rpm_build:
+	rpmbuild --target x86_64 -bb $(RPMBUILD)/SPECS/harmony.spec
+
+rpm: rpm_init rpm_build
+	rpm --addsign $(RPMBUILD)/RPMS/x86_64/$(PKGNAME)-$(VERSION)-$(RELEASE).x86_64.rpm
+
+rpmpub_dev: rpm
+	./scripts/package/publish-repo.sh -p dev -n rpm -s $(RPMBUILD)
+
+rpmpub_prod: rpm
+	./scripts/package/publish-repo.sh -p prod -n rpm -s $(RPMBUILD)

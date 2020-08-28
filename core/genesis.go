@@ -18,25 +18,30 @@ package core
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/staking/slash"
 
+	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -49,6 +54,17 @@ var errGenesisNoConfig = errors.New("genesis has no chain configuration")
 const (
 	// GenesisEpoch is the number of the genesis epoch.
 	GenesisEpoch = 0
+	// GenesisONEToken is the initial total number of ONE in the genesis block for mainnet.
+	GenesisONEToken = 12600000000
+	// ContractDeployerInitFund is the initial fund for the contract deployer account in testnet/devnet.
+	ContractDeployerInitFund = 10000000000
+	// InitFreeFund is the initial fund for permissioned accounts for testnet/devnet/
+	InitFreeFund = 100
+)
+
+var (
+	// GenesisFund is the initial total number of ONE (in atto) in the genesis block for mainnet.
+	GenesisFund = new(big.Int).Mul(big.NewInt(GenesisONEToken), big.NewInt(denominations.One))
 )
 
 // Genesis specifies the header fields, state of a genesis block. It also defines hard
@@ -72,6 +88,57 @@ type Genesis struct {
 	Number     uint64      `json:"number"`
 	GasUsed    uint64      `json:"gasUsed"`
 	ParentHash common.Hash `json:"parentHash"`
+}
+
+// NewGenesisSpec creates a new genesis spec for the given network type and shard ID.
+// Note that the shard state is NOT initialized.
+func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
+	genesisAlloc := make(GenesisAlloc)
+	chainConfig := params.ChainConfig{}
+	gasLimit := params.GenesisGasLimit
+
+	switch netType {
+	case nodeconfig.Mainnet:
+		chainConfig = *params.MainnetChainConfig
+		if shardID == 0 {
+			foundationAddress := common.HexToAddress("0xE25ABC3f7C3d5fB7FB81EAFd421FF1621A61107c")
+			genesisAlloc[foundationAddress] = GenesisAccount{Balance: GenesisFund}
+		}
+	case nodeconfig.Pangaea:
+		chainConfig = *params.PangaeaChainConfig
+	case nodeconfig.Partner:
+		chainConfig = *params.PartnerChainConfig
+	case nodeconfig.Stressnet:
+		chainConfig = *params.StressnetChainConfig
+	default: // all other types share testnet config
+		chainConfig = *params.TestChainConfig
+	}
+
+	// All non-mainnet chains get test accounts
+	if netType != nodeconfig.Mainnet {
+		gasLimit = params.TestGenesisGasLimit
+		// Smart contract deployer account used to deploy initial smart contract
+		contractDeployerKey, _ := ecdsa.GenerateKey(
+			crypto.S256(),
+			strings.NewReader("Test contract key string stream that is fixed so that generated test key are deterministic every time"),
+		)
+		contractDeployerAddress := crypto.PubkeyToAddress(contractDeployerKey.PublicKey)
+		contractDeployerFunds := big.NewInt(ContractDeployerInitFund)
+		contractDeployerFunds = contractDeployerFunds.Mul(
+			contractDeployerFunds, big.NewInt(denominations.One),
+		)
+		genesisAlloc[contractDeployerAddress] = GenesisAccount{Balance: contractDeployerFunds}
+	}
+
+	return &Genesis{
+		Config:    &chainConfig,
+		Factory:   blockfactory.NewFactory(&chainConfig),
+		Alloc:     genesisAlloc,
+		ShardID:   shardID,
+		GasLimit:  gasLimit,
+		Timestamp: 1561734000, // GMT: Friday, June 28, 2019 3:00:00 PM. PST: Friday, June 28, 2019 8:00:00 AM
+		ExtraData: []byte("Harmony for One and All. Open Consensus for 10B."),
+	}
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.

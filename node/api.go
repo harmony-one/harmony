@@ -86,6 +86,11 @@ func (node *Node) StartRosetta() error {
 	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer)
 }
 
+// StopRosetta stops rosetta service
+func (node *Node) StopRosetta() error {
+	return rosetta.StopServers()
+}
+
 // APIs return the collection of local RPC services.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
