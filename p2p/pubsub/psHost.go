@@ -243,7 +243,7 @@ func (psh *pubSubHost) stopHandler(spec HandlerSpecifier) error {
 	if err := tr.removeHandler(spec); err != nil {
 		return err
 	}
-	if len(tr.getHandlers()) == 0 {
+	if tr.hasNoHandlerRunning() {
 		psh.log.Info().Str("topic", string(handler.Topic())).Msg("stopping topic")
 		if err := tr.stop(); err != nil {
 			return err
@@ -276,7 +276,7 @@ func (psh *pubSubHost) removeHandler(spec HandlerSpecifier) error {
 	if psh.haveNoHandlerOnTopic(topic) {
 		return psh.closeAndRemoveTopicRunner(topic)
 	}
-	if len(tr.getHandlers()) == 0 {
+	if tr.hasNoHandlerRunning() {
 		psh.log.Info().Str("topic", string(handler.Topic())).Msg("stopping topic")
 		if err := tr.stop(); err != nil {
 			return err
@@ -297,11 +297,7 @@ func (psh *pubSubHost) removeTopic(topic Topic) error {
 		return err
 	}
 	delete(psh.topicRunners, topic)
-	for spec, handler := range psh.handlers {
-		if handler.Topic() == topic {
-			delete(psh.handlers, spec)
-		}
-	}
+	psh.deleteHandlersWithTopic(topic)
 	return nil
 }
 
@@ -312,6 +308,14 @@ func (psh *pubSubHost) haveNoHandlerOnTopic(topic Topic) bool {
 		}
 	}
 	return true
+}
+
+func (psh *pubSubHost) deleteHandlersWithTopic(topic Topic) {
+	for spec, handler := range psh.handlers {
+		if handler.Topic() == topic {
+			delete(psh.handlers, spec)
+		}
+	}
 }
 
 func (psh *pubSubHost) addTopicRunnerIfNotExist(topic Topic) error {

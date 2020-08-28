@@ -221,3 +221,7 @@ func (tr *topicRunner) recordValidateResult(msg *message, action ValidateAction,
 func (tr *topicRunner) sendMessage(ctx context.Context, msg []byte) (err error) {
 	return tr.topicHandle.Publish(ctx, msg)
 }
+
+func (tr *topicRunner) hasNoHandlerRunning() bool {
+	return len(tr.getHandlers()) == 0
+}
