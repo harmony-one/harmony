@@ -2,9 +2,10 @@ package chain
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/internal/params"
 	"math/big"
 	"sort"
+
+	"github.com/harmony-one/harmony/internal/params"
 
 	lru "github.com/hashicorp/golang-lru"
 
