@@ -43,6 +43,10 @@ type Handler interface {
 	// Note: For the same handler under a topic, DeliverMsg are executed concurrently.
 	// And the error should be handled in HandleMsg for each handler.
 	DeliverMsg(ctx context.Context, rawData []byte, cache ValidateCache)
+
+	// Report reports the statistics and write to logger. The Report is called
+	// every defaultMetricInterval (30 seconds).
+	Report()
 }
 
 // ValidateOptionProvider is the interface to provide pub-sub option with respect to the topic

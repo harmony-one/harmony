@@ -44,7 +44,7 @@ func newTopicRunner(host *pubSubHost, topic Topic, handlers []Handler, options [
 		log:      host.log.With().Str("pubSubTopic", string(topic)).Logger(),
 	}
 
-	tr.metric = newPsMetric(topic, defaultMetricInterval, tr.log)
+	tr.metric = newPsMetric(tr, defaultMetricInterval)
 
 	var err error
 	tr.topicHandle, err = tr.pubSub.Join(tr.topic)

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -14,7 +12,7 @@ const (
 
 // psMetric is the metric for p2p pub-sub validation.
 type psMetric struct {
-	topic       Topic
+	tr          *topicRunner
 	logInterval time.Duration
 
 	numAccepted uint64
@@ -23,12 +21,11 @@ type psMetric struct {
 
 	resetC chan struct{}
 	stopC  chan struct{}
-	log    zerolog.Logger
 }
 
-func newPsMetric(topic Topic, interval time.Duration, log zerolog.Logger) *psMetric {
+func newPsMetric(tr *topicRunner, interval time.Duration) *psMetric {
 	return &psMetric{
-		topic:       topic,
+		tr:          tr,
 		logInterval: interval,
 
 		numAccepted: 0,
@@ -37,7 +34,6 @@ func newPsMetric(topic Topic, interval time.Duration, log zerolog.Logger) *psMet
 
 		resetC: make(chan struct{}, 1),
 		stopC:  make(chan struct{}),
-		log:    log,
 	}
 }
 
@@ -54,6 +50,10 @@ func (m *psMetric) run() {
 			reject := atomic.SwapUint64(&m.numRejected, 0)
 			duration := time.Since(timeStart)
 			m.writeLog(accept, ignore, reject, duration)
+
+			for _, handler := range m.tr.getHandlers() {
+				handler.Report()
+			}
 
 		case <-m.stopC:
 			return
@@ -78,9 +78,9 @@ func (m *psMetric) recordValidateResult(msg *message, action ValidateAction, err
 }
 
 func (m *psMetric) writeLog(accept, ignore, reject uint64, duration time.Duration) {
-	m.log.Info().Str("duration", duration.String()).
+	m.tr.log.Info().Str("duration", duration.String()).
 		Uint64("accepted", accept).
 		Uint64("ignored", ignore).
 		Uint64("rejected", reject).
-		Msg(fmt.Sprintf("PubSub [%v] validation report", m.topic))
+		Msg(fmt.Sprintf("PubSub [%v] validation report", m.tr.topic))
 }

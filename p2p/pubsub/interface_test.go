@@ -75,6 +75,10 @@ func (handler *fakePubSubHandler) DeliverMsg(ctx context.Context, rawData []byte
 	return
 }
 
+func (handler *fakePubSubHandler) Report() {
+	return
+}
+
 type testMsg uint64
 
 func (msg testMsg) encode() []byte {
