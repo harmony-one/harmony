@@ -143,6 +143,12 @@ func AccumulateRewardsAndCountSigs(
 			// This is testnet requiring the one-off forking logic
 			if blockNum > 634644 {
 				defaultReward = network.FiveSecondsBaseStakedReward
+				if blockNum > 636507 {
+					defaultReward = network.BaseStakedReward
+					if blockNum > 639341 {
+						defaultReward = network.FiveSecondsBaseStakedReward
+					}
+				}
 			}
 		} else if bc.Config().IsFiveSeconds(header.Epoch()) {
 			defaultReward = network.FiveSecondsBaseStakedReward
