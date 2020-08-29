@@ -350,12 +350,11 @@ type withError struct {
 }
 
 var (
-	errNotRightKeySize   = errors.New("key received over wire is wrong size")
-	errNoSenderPubKey    = errors.New("no sender public BLS key in message")
-	errWrongSizeOfBitmap = errors.New("wrong size of sender bitmap")
-	errWrongShardID      = errors.New("wrong shard id")
-	errInvalidNodeMsg    = errors.New("invalid node message")
-	errIgnoreBeaconMsg   = errors.New("ignore beacon sync block")
+	errNotRightKeySize = errors.New("key received over wire is wrong size")
+	errNoSenderPubKey  = errors.New("no sender public BLS key in message")
+	errWrongShardID    = errors.New("wrong shard id")
+	errInvalidNodeMsg  = errors.New("invalid node message")
+	errIgnoreBeaconMsg = errors.New("ignore beacon sync block")
 )
 
 // validateNodeMessage validate node message
@@ -468,30 +467,29 @@ func (node *Node) validateShardBoundMessage(
 	}
 
 	maybeCon, maybeVC := m.GetConsensus(), m.GetViewchange()
-	senderKey := []byte{}
-	senderBitmap := []byte{}
+	senderKey := bls.SerializedPublicKey{}
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
-		senderKey = maybeCon.SenderPubkey
-
-		if len(maybeCon.SenderPubkeyBitmap) > 0 {
-			senderBitmap = maybeCon.SenderPubkeyBitmap
-		}
+		copy(senderKey[:], maybeCon.SenderPubkey[:])
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			atomic.AddUint32(&node.NumInvalidMessages, 1)
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
-		senderKey = maybeVC.SenderPubkey
+		copy(senderKey[:], maybeVC.SenderPubkey)
 	} else {
 		atomic.AddUint32(&node.NumInvalidMessages, 1)
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
+	if len(senderKey) != bls.PublicKeySizeInBytes {
+		atomic.AddUint32(&node.NumInvalidMessages, 1)
+		return nil, nil, true, errors.WithStack(errNotRightKeySize)
+	}
 	// ignore mesage not intended for validator
 	// but still forward them to the network
 	if !node.Consensus.IsLeader() {
@@ -502,29 +500,13 @@ func (node *Node) validateShardBoundMessage(
 		}
 	}
 
-	serializedKey := bls.SerializedPublicKey{}
-	if len(senderKey) > 0 {
-		if len(senderKey) != bls.PublicKeySizeInBytes {
-			atomic.AddUint32(&node.NumInvalidMessages, 1)
-			return nil, nil, true, errors.WithStack(errNotRightKeySize)
-		}
-
-		copy(serializedKey[:], senderKey)
-		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
-			atomic.AddUint32(&node.NumSlotMessages, 1)
-			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
-		}
-	} else {
-		count := node.Consensus.Decider.ParticipantsCount()
-		if (count+7)>>3 != int64(len(senderBitmap)) {
-			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
-		}
+	if !node.Consensus.IsValidatorInCommittee(senderKey) {
+		atomic.AddUint32(&node.NumSlotMessages, 1)
+		return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 	}
 
 	atomic.AddUint32(&node.NumValidMessages, 1)
-
-	// serializedKey will be empty for multiSig sender
-	return &m, &serializedKey, false, nil
+	return &m, &senderKey, false, nil
 }
 
 var (
