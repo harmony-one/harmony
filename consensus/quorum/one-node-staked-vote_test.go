@@ -114,7 +114,7 @@ func sign(d Decider, k secretKeyMap, p Phase) {
 	for k, v := range k {
 		sig := v.Sign(msg)
 		// TODO Make upstream test provide meaningful test values
-		d.AddNewVote(p, []*bls.PublicKeyWrapper{{Bytes: k}}, sig, common.Hash{}, 0, 0)
+		d.AddNewVote(p, k, sig, common.Hash{}, 0, 0)
 	}
 }
 

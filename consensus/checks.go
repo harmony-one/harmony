@@ -62,7 +62,7 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Interface("ValidatorPubKey", recvMsg.SenderPubkeys).
+			Str("ValidatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
 			Msg("BlockNum/viewID not match")
 		return false
 	}
@@ -74,18 +74,12 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
 	if len(logMsgs) > 0 {
-		if len(logMsgs[0].SenderPubkeys) != 1 || len(recvMsg.SenderPubkeys) != 1 {
-			consensus.getLogger().Debug().
-				Interface("signers", recvMsg.SenderPubkeys).
-				Msg("[OnAnnounce] Announce message have 0 or more than 1 signers")
-			return false
-		}
 		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
-			bytes.Equal(logMsgs[0].SenderPubkeys[0].Bytes[:], recvMsg.SenderPubkeys[0].Bytes[:]) {
+			bytes.Equal(logMsgs[0].SenderPubkey.Bytes[:], recvMsg.SenderPubkey.Bytes[:]) {
 			consensus.getLogger().Debug().
-				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys[0].Bytes.Hex()).
+				Str("logMsgSenderKey", logMsgs[0].SenderPubkey.Bytes.Hex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkeys", recvMsg.SenderPubkeys[0].Bytes.Hex()).
+				Str("recvMsg.SenderPubkey", recvMsg.SenderPubkey.Bytes.Hex()).
 				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
 				Uint64("recvMsg.ViewID", recvMsg.ViewID).
 				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
