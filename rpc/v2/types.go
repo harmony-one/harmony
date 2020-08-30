@@ -299,11 +299,11 @@ func NewReceipt(
 ) (interface{}, error) {
 	plainTx, ok := tx.(*types.Transaction)
 	if ok {
-		return NewTxReceipt(plainTx, blockHash, blockIndex, blockNumber, receipt)
+		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt)
 	}
 	stakingTx, ok := tx.(*staking.StakingTransaction)
 	if ok {
-		return NewStakingTxReceipt(stakingTx, blockHash, blockIndex, blockNumber, receipt)
+		return NewStakingTxReceipt(stakingTx, blockHash, blockNumber, blockIndex, receipt)
 	}
 	return nil, fmt.Errorf("unknown transaction type for RPC receipt")
 }
