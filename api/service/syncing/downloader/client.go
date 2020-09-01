@@ -21,8 +21,11 @@ type Client struct {
 func ClientSetup(ip, port string) *Client {
 	client := Client{}
 	client.opts = append(client.opts, grpc.WithInsecure())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	var err error
-	client.conn, err = grpc.Dial(fmt.Sprintf(ip+":"+port), client.opts...)
+	client.conn, err = grpc.DialContext(ctx, fmt.Sprintf(ip+":"+port), client.opts...)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("ip", ip).Msg("[SYNC] client.go:ClientSetup fail to dial")
 		return nil
