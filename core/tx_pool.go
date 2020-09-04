@@ -967,6 +967,9 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		pool.priced.Put(tx)
 		pool.journalTx(from, tx)
 
+		// Set or refresh beat for account timeout eviction
+		pool.beats[from] = time.Now()
+
 		logger.Info().
 			Str("hash", tx.Hash().Hex()).
 			Interface("from", from).
@@ -992,6 +995,9 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		}
 	}
 	pool.journalTx(from, tx)
+
+	// Set or refresh beat for account timeout eviction
+	pool.beats[from] = time.Now()
 
 	logger.Info().
 		Str("hash", hash.Hex()).
