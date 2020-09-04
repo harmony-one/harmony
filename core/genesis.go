@@ -128,6 +128,13 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 			contractDeployerFunds, big.NewInt(denominations.One),
 		)
 		genesisAlloc[contractDeployerAddress] = GenesisAccount{Balance: contractDeployerFunds}
+
+		// Localnet only testing account
+		if netType == nodeconfig.Localnet {
+			// PK: 1f84c95ac16e6a50f08d44c7bde7aff8742212fda6e4321fde48bf83bef266dc
+			testAddress := common.HexToAddress("0xA5241513DA9F4463F1d4874b548dFBAC29D91f34")
+			genesisAlloc[testAddress] = GenesisAccount{Balance: contractDeployerFunds}
+		}
 	}
 
 	return &Genesis{
