@@ -149,17 +149,17 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		logs []*types.Log
 		err  error
 	)
-	size, sections := f.backend.BloomStatus()
-	if indexed := sections * size; indexed > uint64(f.begin) {
-		if indexed > end {
-			logs, err = f.indexedLogs(ctx, end)
-		} else {
-			logs, err = f.indexedLogs(ctx, indexed-1)
-		}
-		if err != nil {
-			return logs, err
-		}
-	}
+	// size, sections := f.backend.BloomStatus()
+	// if indexed := sections * size; indexed > uint64(f.begin) {
+	// 	if indexed > end {
+	// 		logs, err = f.indexedLogs(ctx, end)
+	// 	} else {
+	// 		logs, err = f.indexedLogs(ctx, indexed-1)
+	// 	}
+	// 	if err != nil {
+	// 		return logs, err
+	// 	}
+	// }
 	rest, err := f.unindexedLogs(ctx, end)
 	logs = append(logs, rest...)
 	return logs, err
