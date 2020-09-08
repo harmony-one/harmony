@@ -591,6 +591,10 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 		if stx == nil {
 			return nil, nil
 		}
+		// if there both normal and staking transactions, add to index
+		if block, _ := s.hmy.GetBlock(ctx, blockHash); block != nil {
+			index = index + uint64(block.Transactions().Len())
+		}
 	}
 	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
 	if err != nil {
