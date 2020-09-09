@@ -271,8 +271,9 @@ func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	refTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testB32Addr)
-	tx, rosettaError := formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingBlockRewardTxIDSuffix)
+	refTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testSuffix)
+	tx, rosettaError := formatPreStakingBlockRewardsTransaction(refTxID, testBlockSigInfo)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -318,7 +319,9 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	_, rosettaError := formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingBlockRewardTxIDSuffix)
+	testTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testSuffix)
+	_, rosettaError := formatPreStakingBlockRewardsTransaction(testTxID, testBlockSigInfo)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}
@@ -331,7 +334,7 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	_, rosettaError = formatPreStakingBlockRewardsTransaction(testB32Addr, testBlockSigInfo)
+	_, rosettaError = formatPreStakingBlockRewardsTransaction(testTxID, testBlockSigInfo)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}
