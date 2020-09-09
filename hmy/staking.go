@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -124,6 +125,11 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 // IsStakingEpoch ...
 func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
 	return hmy.BlockChain.Config().IsStaking(epoch)
+}
+
+// IsPreStakingEpoch ...
+func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
+	return hmy.BlockChain.Config().IsPreStaking(epoch)
 }
 
 // SendStakingTx adds a staking transaction
@@ -472,6 +478,48 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	return addresses, delegations
 }
 
+// GetAllUndelegatedDelegators returns all of the delegators that undelegated for the given epoch
+func (hmy *Harmony) GetAllUndelegatedDelegators(
+	ctx context.Context, epoch *big.Int,
+) (map[common.Address]interface{}, error) {
+	if !hmy.IsPreStakingEpoch(epoch) {
+		return nil, fmt.Errorf("not pre-staking epoch or later")
+	}
+
+	currBlockNum := core.EpochFirstBlock(epoch)
+	if hmy.IsPreStakingEpoch(new(big.Int).Sub(epoch, big.NewInt(1))) {
+		// undelegations for the last block of an epoch do not get applied until the end of the following epoch.
+		currBlockNum = new(big.Int).Sub(currBlockNum, big.NewInt(1))
+	}
+
+	delegators := map[common.Address]interface{}{}
+	currBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(currBlockNum.Uint64()))
+	if err != nil || currBlock == nil {
+		// Block not found, so return all delegators found so far
+		return delegators, nil
+	}
+	for currBlock.Epoch().Cmp(epoch) != 1 {
+		for _, stx := range currBlock.StakingTransactions() {
+			if stx.StakingType() != staking.DirectiveUndelegate {
+				continue
+			}
+			sender, err := stx.SenderAddress()
+			if err != nil {
+				return nil, err
+			}
+			if _, ok := delegators[sender]; !ok {
+				delegators[sender] = struct{}{}
+			}
+		}
+		currBlock, err = hmy.BlockByNumber(ctx, rpc.BlockNumber(currBlock.NumberU64()+1))
+		if err != nil || currBlock == nil {
+			// Block not found, so return all delegators found so far
+			break
+		}
+	}
+	return delegators, nil
+}
+
 type undelegationChanges struct {
 	// Changes map of all undelegation amount (in Atto) changes per validator
 	Changes map[common.Address]*big.Int
@@ -481,14 +529,14 @@ type undelegationChanges struct {
 
 // GetUndelegationChange gets all of the undelegation deltas from block initBlockNum to block resultBlockNum
 func (hmy *Harmony) GetUndelegationChange(
-	context context.Context, delegator common.Address,
+	ctx context.Context, delegator common.Address,
 	initBlockNum rpc.BlockNumber, resultBlockNum rpc.BlockNumber,
 ) (*undelegationChanges, error) {
-	initBlk, err := hmy.BlockByNumber(context, initBlockNum)
+	initBlk, err := hmy.BlockByNumber(ctx, initBlockNum)
 	if err != nil {
 		return nil, err
 	}
-	resultBlk, err := hmy.BlockByNumber(context, resultBlockNum)
+	resultBlk, err := hmy.BlockByNumber(ctx, resultBlockNum)
 	if err != nil {
 		return nil, err
 	}
