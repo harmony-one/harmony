@@ -124,12 +124,20 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 
 // IsStakingEpoch ...
 func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
-	return hmy.BlockChain.Config().IsStaking(epoch)
+	return hmy.BeaconChain.Config().IsStaking(epoch)
 }
 
 // IsPreStakingEpoch ...
 func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
-	return hmy.BlockChain.Config().IsPreStaking(epoch)
+	return hmy.BeaconChain.Config().IsPreStaking(epoch)
+}
+
+// GetDelegationLockingPeriodInEpoch ...
+func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
+	if hmy.BeaconChain.Config().IsQuickUnlock(epoch) {
+		return staking.LockPeriodInEpochV2
+	}
+	return staking.LockPeriodInEpoch
 }
 
 // SendStakingTx adds a staking transaction
@@ -486,9 +494,10 @@ func (hmy *Harmony) GetAllUndelegatedDelegators(
 		return nil, fmt.Errorf("not pre-staking epoch or later")
 	}
 
+	// Set the correct first block to consider for all undelegations
 	currBlockNum := core.EpochFirstBlock(epoch)
 	if hmy.IsPreStakingEpoch(new(big.Int).Sub(epoch, big.NewInt(1))) {
-		// undelegations for the last block of an epoch do not get applied until the end of the following epoch.
+		// undelegations processed at the last block of an epoch do not get applied until the end of the following epoch.
 		currBlockNum = new(big.Int).Sub(currBlockNum, big.NewInt(1))
 	}
 
@@ -499,6 +508,10 @@ func (hmy *Harmony) GetAllUndelegatedDelegators(
 		return delegators, nil
 	}
 	for currBlock.Epoch().Cmp(epoch) != 1 {
+		if currBlock.Epoch().Cmp(epoch) == 0 && shard.Schedule.IsLastBlock(currBlock.NumberU64()) {
+			// undelegations processed at the last block of an epoch do not get applied until the end of the following epoch.
+			break
+		}
 		for _, stx := range currBlock.StakingTransactions() {
 			if stx.StakingType() != staking.DirectiveUndelegate {
 				continue
