@@ -47,7 +47,7 @@ var (
 		PreStakingEpoch:   big.NewInt(1),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(16500),
-		RedelegationEpoch: big.NewInt(10000000),
+		RedelegationEpoch: big.NewInt(36500),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
 		ReceiptLogEpoch:   big.NewInt(0),
