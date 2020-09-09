@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -469,6 +470,58 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+type undelegationChanges struct {
+	// Changes map of all undelegation amount (in Atto) changes per validator
+	Changes map[common.Address]*big.Int
+	// Total amount (in Atto) of undelegation changes for all validators
+	Total *big.Int
+}
+
+// GetUndelegationChange gets all of the undelegation deltas from block initBlockNum to block resultBlockNum
+func (hmy *Harmony) GetUndelegationChange(
+	context context.Context, delegator common.Address,
+	initBlockNum rpc.BlockNumber, resultBlockNum rpc.BlockNumber,
+) (*undelegationChanges, error) {
+	initBlk, err := hmy.BlockByNumber(context, initBlockNum)
+	if err != nil {
+		return nil, err
+	}
+	resultBlk, err := hmy.BlockByNumber(context, resultBlockNum)
+	if err != nil {
+		return nil, err
+	}
+
+	initVals, initDels := hmy.GetDelegationsByDelegatorByBlock(delegator, initBlk)
+	if len(initVals) != len(initDels) {
+		return nil, fmt.Errorf("validator & delegation slice length miss-match for delegation info")
+	}
+	resultVals, resultDels := hmy.GetDelegationsByDelegatorByBlock(delegator, resultBlk)
+	if len(resultVals) != len(resultDels) {
+		return nil, fmt.Errorf("validator & delegation slice length miss-match for delegation info")
+	}
+	resultDelsByVals := map[common.Address]*staking.Delegation{}
+	for i := range resultVals {
+		resultDelsByVals[resultVals[i]] = resultDels[i]
+	}
+
+	deltas := &undelegationChanges{
+		Changes: map[common.Address]*big.Int{},
+		Total:   big.NewInt(0),
+	}
+	for i := range initVals {
+		valAddr := initVals[i]
+		initDel := initDels[i]
+		resultDel, ok := resultDelsByVals[valAddr]
+		if !ok {
+			deltas.Changes[valAddr] = initDel.Amount
+		} else {
+			deltas.Changes[valAddr] = new(big.Int).Sub(initDel.Amount, resultDel.Amount)
+		}
+		deltas.Total = new(big.Int).Add(deltas.Total, deltas.Changes[valAddr])
+	}
+	return deltas, nil
 }
 
 // GetTotalStakingSnapshot ..
