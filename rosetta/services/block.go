@@ -732,7 +732,7 @@ func getStakingOperations(
 		})
 	}
 
-	// Set correct amount depending on staking message directive
+	// Set correct amount depending on staking message directive that apply balance changes INSTANTLY
 	var amount *types.Amount
 	switch tx.StakingType() {
 	case stakingTypes.DirectiveCreateValidator:
@@ -740,11 +740,7 @@ func getStakingOperations(
 			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveDelegate:
-		if amount, rosettaError = getAmountFromDelegateMessage(tx.Data()); rosettaError != nil {
-			return nil, rosettaError
-		}
-	case stakingTypes.DirectiveUndelegate:
-		if amount, rosettaError = getAmountFromUndelegateMessage(tx.Data()); rosettaError != nil {
+		if amount, rosettaError = getAmountFromDelegateMessage(receipt, tx.Data()); rosettaError != nil {
 			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveCollectRewards:
@@ -753,7 +749,7 @@ func getStakingOperations(
 		}
 	default:
 		amount = &types.Amount{
-			Value:    fmt.Sprintf("-%v", tx.Value()),
+			Value:    "0", // All other staking transactions do not apply balance changes instantly or at all
 			Currency: &common.Currency,
 		}
 	}
@@ -792,7 +788,7 @@ func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Err
 	}, nil
 }
 
-func getAmountFromDelegateMessage(data []byte) (*types.Amount, *types.Error) {
+func getAmountFromDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*types.Amount, *types.Error) {
 	msg, err := stakingTypes.RLPDecodeStakeMsg(data, stakingTypes.DirectiveDelegate)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -805,8 +801,21 @@ func getAmountFromDelegateMessage(data []byte) (*types.Amount, *types.Error) {
 			"message": "unable to parse staking message for delegate tx",
 		})
 	}
+
+	stkAmount := stkMsg.Amount
+	logs := findLogsWithTopic(receipt, staking.DelegateTopic)
+	for _, log := range logs {
+		if len(log.Data) > ethcommon.AddressLength {
+			validatorAddress := ethcommon.BytesToAddress(log.Data[:ethcommon.AddressLength])
+			if log.Address == stkMsg.DelegatorAddress && stkMsg.ValidatorAddress == validatorAddress {
+				// Remove re-delegation amount as funds were never credited to account's balance.
+				stkAmount = new(big.Int).Sub(stkAmount, new(big.Int).SetBytes(log.Data[ethcommon.AddressLength:]))
+				break
+			}
+		}
+	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
+		Value:    fmt.Sprintf("-%v", stkAmount),
 		Currency: &common.Currency,
 	}, nil
 }
