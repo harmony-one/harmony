@@ -88,11 +88,11 @@ func (s *NetworkAPI) NetworkStatus(
 	// Only applicable to non-archival nodes
 	var oldestBlockIdentifier *types.BlockIdentifier
 	if !nodeconfig.GetDefaultConfig().GetArchival() {
-		lastGarbCollectedBlockNum := s.hmy.BlockChain.GetLastGarbageCollectedBlockNumber()
-		if lastGarbCollectedBlockNum == -1 {
+		maxGarbCollectedBlockNum := s.hmy.BlockChain.GetMaxGarbageCollectedBlockNumber()
+		if maxGarbCollectedBlockNum == -1 || maxGarbCollectedBlockNum >= currentHeader.Number().Int64() {
 			oldestBlockIdentifier = currentBlockIdentifier
 		} else {
-			oldestBlockHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(lastGarbCollectedBlockNum+1))
+			oldestBlockHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(maxGarbCollectedBlockNum+1))
 			if err != nil {
 				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 					"message": fmt.Sprintf("unable to get oldest block header: %v", err.Error()),

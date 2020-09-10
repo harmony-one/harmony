@@ -161,14 +161,14 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine                  consensus_engine.Engine
-	processor               Processor // block processor interface
-	validator               Validator // block and state validator interface
-	vmConfig                vm.Config
-	badBlocks               *lru.Cache              // Bad block cache
-	shouldPreserve          func(*types.Block) bool // Function used to determine whether should preserve the given block.
-	pendingSlashes          slash.Records
-	lastGarbCollectedBlkNum int64
+	engine                 consensus_engine.Engine
+	processor              Processor // block processor interface
+	validator              Validator // block and state validator interface
+	vmConfig               vm.Config
+	badBlocks              *lru.Cache              // Bad block cache
+	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
+	pendingSlashes         slash.Records
+	maxGarbCollectedBlkNum int64
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -229,7 +229,7 @@ func NewBlockChain(
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
-		lastGarbCollectedBlkNum:       -1,
+		maxGarbCollectedBlkNum:        -1,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1170,8 +1170,8 @@ func (bc *BlockChain) WriteBlockWithState(
 						bc.triegc.Push(root, number)
 						break
 					}
-					if -number > bc.lastGarbCollectedBlkNum {
-						bc.lastGarbCollectedBlkNum = -number
+					if -number > bc.maxGarbCollectedBlkNum {
+						bc.maxGarbCollectedBlkNum = -number
 					}
 					triedb.Dereference(root.(common.Hash))
 				}
@@ -1207,9 +1207,9 @@ func (bc *BlockChain) WriteBlockWithState(
 	return CanonStatTy, nil
 }
 
-// GetLastGarbageCollectedBlockNumber ..
-func (bc *BlockChain) GetLastGarbageCollectedBlockNumber() int64 {
-	return bc.lastGarbCollectedBlkNum
+// GetMaxGarbageCollectedBlockNumber ..
+func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
+	return bc.maxGarbCollectedBlkNum
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
