@@ -21,8 +21,11 @@ const (
 	// GenesisFundsOperation ..
 	GenesisFundsOperation = "Genesis"
 
-	// PreStakingEraBlockRewardOperation ..
-	PreStakingEraBlockRewardOperation = "PreStakingBlockReward"
+	// PreStakingBlockRewardOperation ..
+	PreStakingBlockRewardOperation = "PreOpenStakingBlockReward"
+
+	// UndelegationPayoutOperation ..
+	UndelegationPayoutOperation = "UndelegationPayout"
 )
 
 var (
@@ -33,7 +36,8 @@ var (
 		CrossShardTransferOperation,
 		ContractCreationOperation,
 		GenesisFundsOperation,
-		PreStakingEraBlockRewardOperation,
+		PreStakingBlockRewardOperation,
+		UndelegationPayoutOperation,
 	}
 
 	// StakingOperationTypes ..
