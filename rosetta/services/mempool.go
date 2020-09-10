@@ -1,0 +1,84 @@
+package services
+
+import (
+	"context"
+
+	"github.com/coinbase/rosetta-sdk-go/server"
+	"github.com/coinbase/rosetta-sdk-go/types"
+	ethCommon "github.com/ethereum/go-ethereum/common"
+	hmyTypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/rosetta/common"
+)
+
+// MempoolAPI implements the server.MempoolAPIServicer interface
+type MempoolAPI struct {
+	hmy *hmy.Harmony
+}
+
+// NewMempoolAPI creates a new instance of MempoolAPI
+func NewMempoolAPI(hmy *hmy.Harmony) server.MempoolAPIServicer {
+	return &MempoolAPI{
+		hmy: hmy,
+	}
+}
+
+func (s *MempoolAPI) Mempool (
+	ctx context.Context, req *types.NetworkRequest,
+) (*types.MempoolResponse, *types.Error) {
+	if err := assertValidNetworkIdentifier(req.NetworkIdentifier, s.hmy.ShardID); err != nil {
+		return nil, err
+	}
+
+	pool, err := s.hmy.GetPoolTransactions()
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unable to fetch pool transactions",
+		})
+	}
+	txIDs := make([]*types.TransactionIdentifier, pool.Len())
+	for i, tx := range pool {
+		txIDs[i] = &types.TransactionIdentifier{
+			Hash: tx.Hash().String(),
+		}
+	}
+	return &types.MempoolResponse{
+		TransactionIdentifiers: txIDs,
+	}, nil
+}
+
+func (s *MempoolAPI) MempoolTransaction (
+	ctx context.Context, req *types.MempoolTransactionRequest,
+) (*types.MempoolTransactionResponse, *types.Error) {
+	if err := assertValidNetworkIdentifier(req.NetworkIdentifier, s.hmy.ShardID); err != nil {
+		return nil, err
+	}
+
+	var hash ethCommon.Hash
+	hash.SetBytes([]byte(req.TransactionIdentifier.Hash))
+	poolTx := s.hmy.GetPoolTransaction(hash)
+	if poolTx == nil {
+		return nil, &common.TransactionNotFoundError
+	}
+
+	var nilAddress ethCommon.Address
+	estReceipt := &hmyTypes.Receipt{
+		PostState:         []byte{},
+		Status:            1,
+		CumulativeGasUsed: poolTx.Gas(),
+		Bloom:             [256]byte{},
+		Logs:              []*hmyTypes.Log{},
+		TxHash:            poolTx.Hash(),
+		ContractAddress:   nilAddress,
+		GasUsed:           poolTx.Gas(),
+	}
+
+	respTx, err := FormatTransaction(poolTx, estReceipt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.MempoolTransactionResponse{
+		Transaction: respTx,
+	}, nil
+}

@@ -204,7 +204,7 @@ func (s *BlockAPI) BlockTransaction(
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		transaction, rosettaError = formatTransaction(txInfo.tx, txInfo.receipt)
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -603,8 +603,8 @@ func formatPreStakingBlockRewardsTransaction(
 	}, nil
 }
 
-// formatTransaction for staking, cross-shard sender, and plain transactions
-func formatTransaction(
+// FormatTransaction for staking, cross-shard sender, and plain transactions
+func FormatTransaction(
 	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
