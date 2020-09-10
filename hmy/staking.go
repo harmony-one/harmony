@@ -498,10 +498,13 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	return addresses, delegations
 }
 
+// UndelegationPayouts ..
+type UndelegationPayouts map[common.Address]*big.Int
+
 // GetUndelegationPayouts returns the undelegation payouts for each delegator
 func (hmy *Harmony) GetUndelegationPayouts(
 	ctx context.Context, epoch *big.Int,
-) (map[common.Address]*big.Int, error) {
+) (UndelegationPayouts, error) {
 	if !hmy.IsPreStakingEpoch(epoch) {
 		return nil, fmt.Errorf("not pre-staking epoch or later")
 	}
