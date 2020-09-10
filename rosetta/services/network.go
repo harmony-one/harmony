@@ -80,12 +80,31 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 	stage := syncStatus.String()
 
+	currentBlockIdentifier := &types.BlockIdentifier{
+		Index: currentHeader.Number().Int64(),
+		Hash:  currentHeader.Hash().String(),
+	}
+
+	// Only applicable to non-archival nodes
+	var oldestBlockIdentifier *types.BlockIdentifier
+	if !nodeconfig.GetDefaultConfig().GetArchival() {
+		oldestBlockInMemory := s.hmy.BlockChain.GetLastGarbageCollectedBlockNumber() + 1
+		oldestBlockHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(oldestBlockInMemory))
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": fmt.Sprintf("unable to get oldest block header: %v", err.Error()),
+			})
+		}
+		oldestBlockIdentifier = &types.BlockIdentifier{
+			Index: oldestBlockHeader.Number().Int64(),
+			Hash:  oldestBlockHeader.Hash().String(),
+		}
+	}
+
 	return &types.NetworkStatusResponse{
-		CurrentBlockIdentifier: &types.BlockIdentifier{
-			Index: currentHeader.Number().Int64(),
-			Hash:  currentHeader.Hash().String(),
-		},
-		CurrentBlockTimestamp: currentHeader.Time().Int64() * 1e3, // Timestamp must be in ms.
+		CurrentBlockIdentifier: currentBlockIdentifier,
+		OldestBlockIdentifier:  oldestBlockIdentifier,
+		CurrentBlockTimestamp:  currentHeader.Time().Int64() * 1e3, // Timestamp must be in ms.
 		GenesisBlockIdentifier: &types.BlockIdentifier{
 			Index: genesisHeader.Number().Int64(),
 			Hash:  genesisHeader.Hash().String(),
