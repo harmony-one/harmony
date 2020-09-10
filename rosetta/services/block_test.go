@@ -138,7 +138,7 @@ func testFormatStakingTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := formatTransaction(tx, receipt)
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -190,7 +190,7 @@ func testFormatPlainTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := formatTransaction(tx, receipt)
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -364,7 +364,7 @@ func testFormatCrossShardSenderTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := formatTransaction(tx, receipt)
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
