@@ -64,12 +64,13 @@ func (s *MempoolAPI) MempoolTransaction (
 	var nilAddress ethCommon.Address
 	estReceipt := &hmyTypes.Receipt{
 		PostState:         []byte{},
-		Status:            1,
+		Status:            1,                 // Assume transaction will succeed
 		CumulativeGasUsed: poolTx.Gas(),
 		Bloom:             [256]byte{},
 		Logs:              []*hmyTypes.Log{},
 		TxHash:            poolTx.Hash(),
-		ContractAddress:   nilAddress,
+		ContractAddress:   nilAddress,        // ContractAddress is only for smart contract creation
+		                                      // & can not be determined until transaction is finalized
 		GasUsed:           poolTx.Gas(),
 	}
 
