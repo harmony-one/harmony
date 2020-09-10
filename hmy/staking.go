@@ -11,7 +11,8 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/chain"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
@@ -133,10 +134,7 @@ func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
 
 // GetDelegationLockingPeriodInEpoch ...
 func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
-	if hmy.BlockChain.Config().IsQuickUnlock(epoch) {
-		return staking.LockPeriodInEpochV2
-	}
-	return staking.LockPeriodInEpoch
+	return chain.GetLockPeriodInEpoch(hmy.BlockChain, epoch)
 }
 
 // SendStakingTx adds a staking transaction
@@ -266,7 +264,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	bc := hmy.BlockChain
 	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
-		s, _ := internal_common.AddressToBech32(addr)
+		s, _ := internalCommon.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
 
