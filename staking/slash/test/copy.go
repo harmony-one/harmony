@@ -47,7 +47,7 @@ func CopyConflictingVotes(cv slash.ConflictingVotes) slash.ConflictingVotes {
 // CopyVote makes a deep copy of slash.Vote
 func CopyVote(v slash.Vote) slash.Vote {
 	cp := slash.Vote{
-		SignerPubKey:    v.SignerPubKey,
+		SignerPubKeys:   v.SignerPubKeys,
 		BlockHeaderHash: v.BlockHeaderHash,
 	}
 	if v.Signature != nil {

@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -97,6 +99,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
+	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
@@ -111,7 +114,8 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Sign on the hash of the message
+// Sign on the hash of the message with the private keys and return the signature.
+// If multiple keys are provided, the aggregated signature will be returned.
 func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
 	signature := priKey.SignHash(hash[:])
@@ -158,8 +162,12 @@ func (consensus *Consensus) UpdateBitmaps() {
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.multiSigMutex.Lock()
+	consensus.multiSigBitmap = multiSigBitmap
+	consensus.multiSigMutex.Unlock()
 }
 
 // ResetState resets the state of the consensus
@@ -226,7 +234,10 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.current.SetMode(Normal)
 		consensus.viewID = msg.ViewID
 		consensus.current.SetViewID(msg.ViewID)
-		consensus.LeaderPubKey = msg.SenderPubkey
+		if len(msg.SenderPubkeys) != 1 {
+			return errors.New("Leader message can not have multiple sender keys")
+		}
+		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().
@@ -348,6 +359,11 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.BlockPeriod = 5 * time.Second
+
+	// TODO: remove once multisig is fully upgraded in the network
+	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
+		consensus.MultiSig = true
+	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
