@@ -88,16 +88,20 @@ func (s *NetworkAPI) NetworkStatus(
 	// Only applicable to non-archival nodes
 	var oldestBlockIdentifier *types.BlockIdentifier
 	if !nodeconfig.GetDefaultConfig().GetArchival() {
-		oldestBlockInMemory := s.hmy.BlockChain.GetLastGarbageCollectedBlockNumber() + 1
-		oldestBlockHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(oldestBlockInMemory))
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": fmt.Sprintf("unable to get oldest block header: %v", err.Error()),
-			})
-		}
-		oldestBlockIdentifier = &types.BlockIdentifier{
-			Index: oldestBlockHeader.Number().Int64(),
-			Hash:  oldestBlockHeader.Hash().String(),
+		lastGarbCollectedBlockNum := s.hmy.BlockChain.GetLastGarbageCollectedBlockNumber()
+		if lastGarbCollectedBlockNum == -1 {
+			oldestBlockIdentifier = currentBlockIdentifier
+		} else {
+			oldestBlockHeader, err := s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(lastGarbCollectedBlockNum+1))
+			if err != nil {
+				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+					"message": fmt.Sprintf("unable to get oldest block header: %v", err.Error()),
+				})
+			}
+			oldestBlockIdentifier = &types.BlockIdentifier{
+				Index: oldestBlockHeader.Number().Int64(),
+				Hash:  oldestBlockHeader.Hash().String(),
+			}
 		}
 	}
 
