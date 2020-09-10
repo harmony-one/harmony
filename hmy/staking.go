@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -124,17 +123,17 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 
 // IsStakingEpoch ...
 func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
-	return hmy.BeaconChain.Config().IsStaking(epoch)
+	return hmy.BlockChain.Config().IsStaking(epoch)
 }
 
 // IsPreStakingEpoch ...
 func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
-	return hmy.BeaconChain.Config().IsPreStaking(epoch)
+	return hmy.BlockChain.Config().IsPreStaking(epoch)
 }
 
 // GetDelegationLockingPeriodInEpoch ...
 func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
-	if hmy.BeaconChain.Config().IsQuickUnlock(epoch) {
+	if hmy.BlockChain.Config().IsQuickUnlock(epoch) {
 		return staking.LockPeriodInEpochV2
 	}
 	return staking.LockPeriodInEpoch
@@ -448,6 +447,21 @@ func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []*staki
 	return delegations
 }
 
+// GetDelegationsByValidatorAtBlock returns all delegation information of a validator at the given block
+func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
+	validator common.Address, block *types.Block,
+) []*staking.Delegation {
+	wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, block.Root())
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	delegations := []*staking.Delegation{}
+	for i := range wrapper.Delegations {
+		delegations = append(delegations, &wrapper.Delegations[i])
+	}
+	return delegations
+}
+
 // GetDelegationsByDelegator returns all delegation information of a delegator
 func (hmy *Harmony) GetDelegationsByDelegator(
 	delegator common.Address,
@@ -486,103 +500,42 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	return addresses, delegations
 }
 
-// GetAllUndelegatedDelegators returns all of the delegators that undelegated for the given epoch
-func (hmy *Harmony) GetAllUndelegatedDelegators(
+// GetUndelegationPayouts returns the undelegation payouts for each delegator
+func (hmy *Harmony) GetUndelegationPayouts(
 	ctx context.Context, epoch *big.Int,
-) (map[common.Address]interface{}, error) {
+) (map[common.Address]*big.Int, error) {
 	if !hmy.IsPreStakingEpoch(epoch) {
 		return nil, fmt.Errorf("not pre-staking epoch or later")
 	}
 
-	// Set the correct first block to consider for all undelegations
-	currBlockNum := core.EpochFirstBlock(epoch)
-	if hmy.IsPreStakingEpoch(new(big.Int).Sub(epoch, big.NewInt(1))) {
-		// undelegations processed at the last block of an epoch do not get applied until the end of the following epoch.
-		currBlockNum = new(big.Int).Sub(currBlockNum, big.NewInt(1))
+	undelegationPayouts := map[common.Address]*big.Int{}
+	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
+	fmt.Printf("block num: %v\n", blockNumber)
+	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
+	if err != nil || undelegationPayoutBlock == nil {
+		// Block not found, so no undelegated undelegationPayouts (not an error)
+		return undelegationPayouts, nil
 	}
 
-	delegators := map[common.Address]interface{}{}
-	currBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(currBlockNum.Uint64()))
-	if err != nil || currBlock == nil {
-		// Block not found, so return all delegators found so far
-		return delegators, nil
-	}
-	for currBlock.Epoch().Cmp(epoch) != 1 {
-		if currBlock.Epoch().Cmp(epoch) == 0 && shard.Schedule.IsLastBlock(currBlock.NumberU64()) {
-			// undelegations processed at the last block of an epoch do not get applied until the end of the following epoch.
-			break
+	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
+	for _, validator := range hmy.GetAllValidatorAddresses() {
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, undelegationPayoutBlock.Root())
+		if err != nil || wrapper == nil {
+			continue // Not a validator at this epoch or unable to fetch validator info because of non-archival DB.
 		}
-		for _, stx := range currBlock.StakingTransactions() {
-			if stx.StakingType() != staking.DirectiveUndelegate {
-				continue
-			}
-			sender, err := stx.SenderAddress()
-			if err != nil {
-				return nil, err
-			}
-			if _, ok := delegators[sender]; !ok {
-				delegators[sender] = struct{}{}
+		for _, delegation := range wrapper.Delegations {
+			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod)
+			if withdraw.Cmp(big.NewInt(0)) == 1 {
+				totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]
+				if ok {
+					undelegationPayouts[delegation.DelegatorAddress] = new(big.Int).Add(totalPayout, withdraw)
+				} else {
+					undelegationPayouts[delegation.DelegatorAddress] = withdraw
+				}
 			}
 		}
-		currBlock, err = hmy.BlockByNumber(ctx, rpc.BlockNumber(currBlock.NumberU64()+1))
-		if err != nil || currBlock == nil {
-			// Block not found, so return all delegators found so far
-			break
-		}
 	}
-	return delegators, nil
-}
-
-type undelegationChanges struct {
-	// Changes map of all undelegation amount (in Atto) changes per validator
-	Changes map[common.Address]*big.Int
-	// Total amount (in Atto) of undelegation changes for all validators
-	Total *big.Int
-}
-
-// GetUndelegationChange gets all of the undelegation deltas from block initBlockNum to block resultBlockNum
-func (hmy *Harmony) GetUndelegationChange(
-	ctx context.Context, delegator common.Address,
-	initBlockNum rpc.BlockNumber, resultBlockNum rpc.BlockNumber,
-) (*undelegationChanges, error) {
-	initBlk, err := hmy.BlockByNumber(ctx, initBlockNum)
-	if err != nil {
-		return nil, err
-	}
-	resultBlk, err := hmy.BlockByNumber(ctx, resultBlockNum)
-	if err != nil {
-		return nil, err
-	}
-
-	initVals, initDels := hmy.GetDelegationsByDelegatorByBlock(delegator, initBlk)
-	if len(initVals) != len(initDels) {
-		return nil, fmt.Errorf("validator & delegation slice length miss-match for delegation info")
-	}
-	resultVals, resultDels := hmy.GetDelegationsByDelegatorByBlock(delegator, resultBlk)
-	if len(resultVals) != len(resultDels) {
-		return nil, fmt.Errorf("validator & delegation slice length miss-match for delegation info")
-	}
-	resultDelsByVals := map[common.Address]*staking.Delegation{}
-	for i := range resultVals {
-		resultDelsByVals[resultVals[i]] = resultDels[i]
-	}
-
-	deltas := &undelegationChanges{
-		Changes: map[common.Address]*big.Int{},
-		Total:   big.NewInt(0),
-	}
-	for i := range initVals {
-		valAddr := initVals[i]
-		initDel := initDels[i]
-		resultDel, ok := resultDelsByVals[valAddr]
-		if !ok {
-			deltas.Changes[valAddr] = initDel.Amount
-		} else {
-			deltas.Changes[valAddr] = new(big.Int).Sub(initDel.Amount, resultDel.Amount)
-		}
-		deltas.Total = new(big.Int).Add(deltas.Total, deltas.Changes[valAddr])
-	}
-	return deltas, nil
+	return undelegationPayouts, nil
 }
 
 // GetTotalStakingSnapshot ..
