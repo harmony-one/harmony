@@ -509,8 +509,8 @@ func (hmy *Harmony) GetUndelegationPayouts(
 	}
 
 	undelegationPayouts := map[common.Address]*big.Int{}
+	// require second to last block as saved undelegations are AFTER undelegations are payed out
 	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
-	fmt.Printf("block num: %v\n", blockNumber)
 	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
 	if err != nil || undelegationPayoutBlock == nil {
 		// Block not found, so no undelegated undelegationPayouts (not an error)
@@ -521,7 +521,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 	for _, validator := range hmy.GetAllValidatorAddresses() {
 		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, undelegationPayoutBlock.Root())
 		if err != nil || wrapper == nil {
-			continue // Not a validator at this epoch or unable to fetch validator info because of non-archival DB.
+			continue // Not a validator at this epoch or unable to fetch validator info because of pruned state.
 		}
 		for _, delegation := range wrapper.Delegations {
 			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod)
