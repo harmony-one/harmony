@@ -72,7 +72,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		if i == 0 {
 			signerAddr = voter.EarningAccount
 		} else {
-			if bytes.Compare(signerAddr.Bytes(), voter.EarningAccount[:]) != 0 {
+			if bytes.Compare(signerAddr.Bytes(), voter.EarningAccount[:]) != 0 && !voter.IsHarmonyNode {
 				return nil, errors.Errorf("Multiple signer accounts used in multi-sig: %x, %x", signerAddr.Bytes(), voter.EarningAccount)
 			}
 		}
