@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -22,7 +23,7 @@ func NewMempoolAPI(hmy *hmy.Harmony) server.MempoolAPIServicer {
 	}
 }
 
-func (s *MempoolAPI) Mempool (
+func (s *MempoolAPI) Mempool(
 	ctx context.Context, req *types.NetworkRequest,
 ) (*types.MempoolResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(req.NetworkIdentifier, s.hmy.ShardID); err != nil {
@@ -46,7 +47,7 @@ func (s *MempoolAPI) Mempool (
 	}, nil
 }
 
-func (s *MempoolAPI) MempoolTransaction (
+func (s *MempoolAPI) MempoolTransaction(
 	ctx context.Context, req *types.MempoolTransactionRequest,
 ) (*types.MempoolTransactionResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(req.NetworkIdentifier, s.hmy.ShardID); err != nil {
@@ -67,8 +68,7 @@ func (s *MempoolAPI) MempoolTransaction (
 		Bloom:             [256]byte{},
 		Logs:              []*hmyTypes.Log{},
 		TxHash:            poolTx.Hash(),
-		ContractAddress:   nilAddress,                      // ContractAddress is only for smart contract creation
-		                                                    // & can not be determined until transaction is finalized
+		ContractAddress:   nilAddress, // ContractAddress is only for smart contract creation & can not be determined until transaction is finalized
 		GasUsed:           poolTx.Gas(),
 	}
 
