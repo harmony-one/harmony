@@ -522,7 +522,7 @@ func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction 
 // SpecialTransactionSuffix ..
 type SpecialTransactionSuffix uint
 
-// Special transaction suffixes that are specific to the Rosetta Implementation
+// Special transaction suffixes that are specific to the rosetta package
 const (
 	SpecialGenesisTxID SpecialTransactionSuffix = iota
 	SpecialPreStakingRewardTxID
