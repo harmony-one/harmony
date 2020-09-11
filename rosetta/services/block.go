@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	blockHashLen                    = 64
-	preStakingBlockRewardTxIDSuffix = "_block_reward"
+	blockHashStrLen = 64
+	// preStakingRewardTxIDSuffix is a unique suffix for pre-staking era rewards overlap with undelegation payouts
+	preStakingRewardTxIDSuffix = "_block_reward"
 )
 
 // BlockAPI implements the server.BlockAPIServicer interface.
@@ -80,11 +81,18 @@ func (s *BlockAPI) Block(
 		Hash:  prevBlock.Hash().String(),
 	}
 
+	// Report undelegation payouts as transactions to fit API.
+	// Report all transactions here since all undelegation payout amounts are known after fetching payouts.
+	transactions, rosettaError := s.getAllUndelegationPayoutTransactions(ctx, blk)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
 	responseBlock := &types.Block{
 		BlockIdentifier:       currBlockID,
 		ParentBlockIdentifier: prevBlockID,
 		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
-		Transactions:          []*types.Transaction{},   // Do not return tx details as it is optional.
+		Transactions:          transactions,
 	}
 
 	otherTransactions := []*types.TransactionIdentifier{}
@@ -109,18 +117,11 @@ func (s *BlockAPI) Block(
 	}
 	// Report pre-staking era block rewards as transactions to fit API.
 	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
-		// Report pre-staking era block rewards as transactions to fit API.
-		blockSigInfo, rosettaError := getBlockSignerInfo(ctx, s.hmy, blk)
+		preStakingRewardTxIDs, rosettaError := s.getAllPreStakingRewardTransactionIdentifiers(ctx, blk)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
-		for acc, signedBlsKeys := range blockSigInfo.signers {
-			if len(signedBlsKeys) > 0 {
-				b32Addr, _ := internalCommon.AddressToBech32(acc)
-				suffix := fmt.Sprintf("%v%v", b32Addr, preStakingBlockRewardTxIDSuffix)
-				otherTransactions = append(otherTransactions, getSpecialCaseTransactionIdentifier(blk.Hash(), suffix))
-			}
-		}
+		otherTransactions = append(otherTransactions, preStakingRewardTxIDs...)
 	}
 
 	return &types.BlockResponse{
@@ -166,10 +167,112 @@ func (s *BlockAPI) genesisBlock(
 	}, nil
 }
 
+// getAllPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
+func (s *BlockAPI) getAllPreStakingRewardTransactionIdentifiers(
+	ctx context.Context, blk *hmytypes.Block,
+) ([]*types.TransactionIdentifier, *types.Error) {
+	txIDs := []*types.TransactionIdentifier{}
+	blockSigInfo, rosettaError := s.getBlockSignerInfo(ctx, blk)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	for acc, signedBlsKeys := range blockSigInfo.signers {
+		if len(signedBlsKeys) > 0 {
+			b32Addr, _ := internalCommon.AddressToBech32(acc)
+			suffix := fmt.Sprintf("%v%v", b32Addr, preStakingRewardTxIDSuffix)
+			txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(blk.Hash(), suffix))
+		}
+	}
+	return txIDs, nil
+}
+
+// isCommitteeSelectionBlock ..
+func (s *BlockAPI) isCommitteeSelectionBlock(blk *hmytypes.Block) bool {
+	isBeaconChain := blk.ShardID() == shard.BeaconChainShardID
+	isNewEpoch := len(blk.Header().ShardState()) > 0
+	inPreStakingEra := s.hmy.IsPreStakingEpoch(blk.Epoch())
+	return isBeaconChain && isNewEpoch && inPreStakingEra
+}
+
+// getAllUndelegationPayoutTransactions is only used for the /block endpoint
+func (s *BlockAPI) getAllUndelegationPayoutTransactions(
+	ctx context.Context, blk *hmytypes.Block,
+) ([]*types.Transaction, *types.Error) {
+	if !s.isCommitteeSelectionBlock(blk) {
+		return []*types.Transaction{}, nil
+	}
+
+	delegatorPayouts, err := s.hmy.GetUndelegationPayouts(ctx, blk.Epoch())
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	transactions := []*types.Transaction{}
+	for delegator, payout := range delegatorPayouts {
+		b32Address, _ := internalCommon.AddressToBech32(delegator)
+		accID, rosettaError := newAccountIdentifier(delegator)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		transactions = append(transactions, &types.Transaction{
+			TransactionIdentifier: getSpecialCaseTransactionIdentifier(blk.Hash(), b32Address),
+			Operations: []*types.Operation{
+				{
+					OperationIdentifier: &types.OperationIdentifier{
+						Index: 0, // There is no gas expenditure for undelegation payout
+					},
+					Type:    common.UndelegationPayoutOperation,
+					Status:  common.SuccessOperationStatus.Status,
+					Account: accID,
+					Amount: &types.Amount{
+						Value:    fmt.Sprintf("%v", payout),
+						Currency: &common.Currency,
+					},
+				},
+			},
+		})
+	}
+	return transactions, nil
+}
+
+// getBlockSignerInfo fetches the block signer information for any non-genesis block
+func (s *BlockAPI) getBlockSignerInfo(
+	ctx context.Context, blk *hmytypes.Block,
+) (*blockSignerInfo, *types.Error) {
+	slotList, mask, err := s.hmy.GetBlockSigners(
+		ctx, rpc.BlockNumber(blk.Number().Uint64()).EthBlockNumber(),
+	)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	totalSigners := uint(0)
+	sigInfos := map[ethcommon.Address][]bls.SerializedPublicKey{}
+	for _, slot := range slotList {
+		if _, ok := sigInfos[slot.EcdsaAddress]; !ok {
+			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
+		}
+		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
+			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
+			totalSigners++
+		}
+	}
+	return &blockSignerInfo{
+		signers:         sigInfos,
+		totalKeysSigned: totalSigners,
+		mask:            mask,
+		blockHash:       blk.Hash(),
+	}, nil
+}
+
 // BlockTransaction implements the /block/transaction endpoint
 func (s *BlockAPI) BlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
-) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
+) (*types.BlockTransactionResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
@@ -183,17 +286,14 @@ func (s *BlockAPI) BlockTransaction(
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
 	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
 	if rosettaError != nil {
-		blk, rosettaError2 := s.getBlock(ctx, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
-		if rosettaError2 != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"error":      rosettaError2,
-				"base_error": rosettaError,
+		// If no transaction info is found, check for special case transactions.
+		response, rosettaError2 := s.specialBlockTransaction(ctx, request)
+		if rosettaError2 != nil && rosettaError2.Code != common.TransactionNotFoundError.Code {
+			return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
+				"from_error": rosettaError2,
 			})
 		}
-		if s.hmy.IsStakingEpoch(blk.Epoch()) {
-			return nil, rosettaError
-		}
-		return s.preStakingEraBlockRewardTransaction(ctx, request.TransactionIdentifier, blk)
+		return response, rosettaError2
 	}
 
 	var transaction *types.Transaction
@@ -237,8 +337,32 @@ func (s *BlockAPI) genesisBlockTransaction(
 	return &types.BlockTransactionResponse{Transaction: txs}, nil
 }
 
-// preStakingEraBlockRewardTransaction is a special handler for pre-staking era block reward transactions
-func (s *BlockAPI) preStakingEraBlockRewardTransaction(
+// specialBlockTransaction is a formatter for special, non-genesis, transactions
+func (s *BlockAPI) specialBlockTransaction(
+	ctx context.Context, request *types.BlockTransactionRequest,
+) (*types.BlockTransactionResponse, *types.Error) {
+	// If no transaction info is found, check for special case transactions.
+	blk, rosettaError := s.getBlock(ctx, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if s.isCommitteeSelectionBlock(blk) {
+		// Note that undelegation payout MUST be checked before reporting error in pre-staking & staking era.
+		response, rosettaError := s.undelegationPayoutBlockTransaction(ctx, request.TransactionIdentifier, blk)
+		if rosettaError != nil && !s.hmy.IsStakingEpoch(blk.Epoch()) && s.hmy.IsPreStakingEpoch(blk.Epoch()) {
+			// Handle edge case special transaction for pre-staking era
+			return s.preStakingRewardBlockTransaction(ctx, request.TransactionIdentifier, blk)
+		}
+		return response, rosettaError
+	}
+	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
+		return s.preStakingRewardBlockTransaction(ctx, request.TransactionIdentifier, blk)
+	}
+	return nil, &common.TransactionNotFoundError
+}
+
+// preStakingRewardBlockTransaction is a special handler for pre-staking era
+func (s *BlockAPI) preStakingRewardBlockTransaction(
 	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
 ) (*types.BlockTransactionResponse, *types.Error) {
 	blkHash, _, rosettaError := unpackSpecialCaseTransactionIdentifier(txID)
@@ -252,11 +376,41 @@ func (s *BlockAPI) preStakingEraBlockRewardTransaction(
 			),
 		})
 	}
-	blockSignerInfo, rosettaError := getBlockSignerInfo(ctx, s.hmy, blk)
+	blockSignerInfo, rosettaError := s.getBlockSignerInfo(ctx, blk)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	transactions, rosettaError := formatPreStakingBlockRewardsTransaction(txID, blockSignerInfo)
+	transactions, rosettaError := formatPreStakingRewardTransaction(txID, blockSignerInfo)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	return &types.BlockTransactionResponse{Transaction: transactions}, nil
+}
+
+// undelegationPayoutBlockTransaction is a special handler for undelegation payout transactions
+func (s *BlockAPI) undelegationPayoutBlockTransaction(
+	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
+) (*types.BlockTransactionResponse, *types.Error) {
+	blkHash, _, rosettaError := unpackSpecialCaseTransactionIdentifier(txID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if blkHash.String() != blk.Hash().String() {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": fmt.Sprintf(
+				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
+			),
+		})
+	}
+
+	delegatorPayouts, err := s.hmy.GetUndelegationPayouts(ctx, blk.Epoch())
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	transactions, rosettaError := formatUndelegationPayoutTransaction(txID, delegatorPayouts)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -367,7 +521,7 @@ func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction 
 }
 
 // getSpecialCaseTransactionIdentifier fetches 'transaction identifiers' for a given block-hash and suffix.
-// Special cases include genesis transactions & pre-staking era block rewards.
+// Special cases include genesis transactions, pre-staking era block rewards, and undelegation payouts.
 // Must include block hash to guarantee uniqueness of tx identifiers.
 func getSpecialCaseTransactionIdentifier(
 	blockHash ethcommon.Hash, suffix string,
@@ -384,12 +538,12 @@ func unpackSpecialCaseTransactionIdentifier(
 	hash := txID.Hash
 	hash = strings.TrimPrefix(hash, "0x")
 	hash = strings.TrimPrefix(hash, "0X")
-	if len(hash) < blockHashLen+1 || string(hash[blockHashLen]) != "_" {
+	if len(hash) < blockHashStrLen+1 || string(hash[blockHashStrLen]) != "_" {
 		return ethcommon.Hash{}, "", common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "unknown special case transaction ID format",
 		})
 	}
-	return ethcommon.HexToHash(hash[:blockHashLen]), hash[blockHashLen+1:], nil
+	return ethcommon.HexToHash(hash[:blockHashStrLen]), hash[blockHashStrLen+1:], nil
 }
 
 // blockSignerInfo contains all of the block singing information
@@ -402,38 +556,6 @@ type blockSignerInfo struct {
 	// mask is the bitmap mask for the block.
 	mask      *bls.Mask
 	blockHash ethcommon.Hash
-}
-
-// getBlockSignerInfo fetches the block signer information for any non-genesis block
-func getBlockSignerInfo(
-	ctx context.Context, hmy *hmy.Harmony, blk *hmytypes.Block,
-) (*blockSignerInfo, *types.Error) {
-	slotList, mask, err := hmy.GetBlockSigners(
-		ctx, rpc.BlockNumber(blk.Number().Uint64()).EthBlockNumber(),
-	)
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-
-	totalSigners := uint(0)
-	sigInfos := map[ethcommon.Address][]bls.SerializedPublicKey{}
-	for _, slot := range slotList {
-		if _, ok := sigInfos[slot.EcdsaAddress]; !ok {
-			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
-		}
-		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
-			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
-			totalSigners++
-		}
-	}
-	return &blockSignerInfo{
-		signers:         sigInfos,
-		totalKeysSigned: totalSigners,
-		mask:            mask,
-		blockHash:       blk.Hash(),
-	}, nil
 }
 
 // TransactionMetadata ..
@@ -527,15 +649,15 @@ func formatGenesisTransaction(
 	return nil, &common.TransactionNotFoundError
 }
 
-// formatPreStakingBlockRewardsTransaction for block rewards in pre-staking era for a given Bech-32 address
-func formatPreStakingBlockRewardsTransaction(
+// formatPreStakingRewardTransaction for block rewards in pre-staking era for a given Bech-32 address.
+func formatPreStakingRewardTransaction(
 	txID *types.TransactionIdentifier, blockSigInfo *blockSignerInfo,
 ) (*types.Transaction, *types.Error) {
 	_, suffix, rosettaError := unpackSpecialCaseTransactionIdentifier(txID)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	b32Address := strings.Replace(suffix, preStakingBlockRewardTxIDSuffix, "", 1)
+	b32Address := strings.Replace(suffix, preStakingRewardTxIDSuffix, "", 1)
 	addr, err := internalCommon.Bech32ToAddress(b32Address)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -571,7 +693,7 @@ func formatPreStakingBlockRewardsTransaction(
 			rewardsForThisBlock = rewardsForThisAddr
 			if !(rewardsForThisAddr.Cmp(big.NewInt(0)) > 0) {
 				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-					"message": "expected non-zero block reward in pre-staking ear for block signer",
+					"message": "expected non-zero block reward in pre-staking era for block signer",
 				})
 			}
 			break
@@ -585,7 +707,7 @@ func formatPreStakingBlockRewardsTransaction(
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: 0,
 				},
-				Type:    common.PreStakingEraBlockRewardOperation,
+				Type:    common.PreStakingBlockRewardOperation,
 				Status:  common.SuccessOperationStatus.Status,
 				Account: accID,
 				Amount: &types.Amount{
@@ -595,6 +717,48 @@ func formatPreStakingBlockRewardsTransaction(
 			},
 		},
 	}, nil
+}
+
+// formatUndelegationPayoutTransaction for undelegation payouts at committee selection block
+func formatUndelegationPayoutTransaction(
+	txID *types.TransactionIdentifier, delegatorPayouts hmy.UndelegationPayouts,
+) (*types.Transaction, *types.Error) {
+	_, b32Address, rosettaError := unpackSpecialCaseTransactionIdentifier(txID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	ethAddress, err := internalCommon.Bech32ToAddress(b32Address)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	accID, rosettaError := newAccountIdentifier(ethAddress)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	payout, ok := delegatorPayouts[ethAddress]
+	if !ok {
+		return nil, &common.TransactionNotFoundError
+	}
+	return &types.Transaction{
+		TransactionIdentifier: txID,
+		Operations: []*types.Operation{
+			{
+				OperationIdentifier: &types.OperationIdentifier{
+					Index: 0,
+				},
+				Type:    common.UndelegationPayoutOperation,
+				Status:  common.SuccessOperationStatus.Status,
+				Account: accID,
+				Amount: &types.Amount{
+					Value:    fmt.Sprintf("%v", payout),
+					Currency: &common.Currency,
+				},
+			},
+		},
+	}, nil
+
 }
 
 // formatTransaction for staking, cross-shard sender, and plain transactions

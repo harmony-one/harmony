@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
@@ -251,7 +252,7 @@ func TestFormatGenesisTransaction(t *testing.T) {
 	}
 }
 
-func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
+func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	testKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -271,9 +272,9 @@ func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingBlockRewardTxIDSuffix)
+	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingRewardTxIDSuffix)
 	refTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testSuffix)
-	tx, rosettaError := formatPreStakingBlockRewardsTransaction(refTxID, testBlockSigInfo)
+	tx, rosettaError := formatPreStakingRewardTransaction(refTxID, testBlockSigInfo)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -287,8 +288,8 @@ func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
 		t.Error("expected operational ID to be 0")
 	}
-	if tx.Operations[0].Type != common.PreStakingEraBlockRewardOperation {
-		t.Error("expected operation type to be pre staking era block rewards")
+	if tx.Operations[0].Type != common.PreStakingBlockRewardOperation {
+		t.Error("expected operation type to be pre-staking era block rewards")
 	}
 	if tx.Operations[0].Status != common.SuccessOperationStatus.Status {
 		t.Error("expected successful operation status")
@@ -302,7 +303,7 @@ func TestFormatPreStakingBlockRewardsTransactionSuccess(t *testing.T) {
 	}
 }
 
-func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
+func TestFormatPreStakingRewardTransactionFail(t *testing.T) {
 	testKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -319,9 +320,9 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingBlockRewardTxIDSuffix)
+	testSuffix := fmt.Sprintf("%v%v", testB32Addr, preStakingRewardTxIDSuffix)
 	testTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.blockHash, testSuffix)
-	_, rosettaError := formatPreStakingBlockRewardsTransaction(testTxID, testBlockSigInfo)
+	_, rosettaError := formatPreStakingRewardTransaction(testTxID, testBlockSigInfo)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}
@@ -334,12 +335,58 @@ func TestFormatPreStakingBlockRewardsTransactionFail(t *testing.T) {
 		totalKeysSigned: 150,
 		blockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
 	}
-	_, rosettaError = formatPreStakingBlockRewardsTransaction(testTxID, testBlockSigInfo)
+	_, rosettaError = formatPreStakingRewardTransaction(testTxID, testBlockSigInfo)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}
 	if !reflect.DeepEqual(&common.TransactionNotFoundError, rosettaError) {
 		t.Error("expected transaction not found error")
+	}
+}
+
+func TestFormatUndelegationPayoutTransaction(t *testing.T) {
+	testKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
+	testB32Addr, err := internalCommon.AddressToBech32(testAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testPayout := big.NewInt(1e10)
+	testDelegatorPayouts := hmy.UndelegationPayouts{
+		testAddr: testPayout,
+	}
+	testBlockHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
+	testTxID := getSpecialCaseTransactionIdentifier(testBlockHash, testB32Addr)
+
+	tx, rosettaError := formatUndelegationPayoutTransaction(testTxID, testDelegatorPayouts)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if len(tx.Operations) != 1 {
+		t.Fatal("expected tx operations to be of length 1")
+	}
+	if tx.Operations[0].OperationIdentifier.Index != 0 {
+		t.Error("Expect first operation to be index 0")
+	}
+	if tx.Operations[0].Type != common.UndelegationPayoutOperation {
+		t.Errorf("Expect operation type to be: %v", common.UndelegationPayoutOperation)
+	}
+	if tx.Operations[0].Status != common.SuccessOperationStatus.Status {
+		t.Error("expected successful operation status")
+	}
+	if tx.Operations[0].Amount.Value != fmt.Sprintf("%v", testPayout) {
+		t.Errorf("expect payout to be %v", testPayout)
+	}
+
+	_, rosettaError = formatUndelegationPayoutTransaction(testTxID, hmy.UndelegationPayouts{})
+	if rosettaError == nil {
+		t.Fatal("Expect error for no payouts found")
+	}
+	if rosettaError.Code != common.TransactionNotFoundError.Code {
+		t.Errorf("expect error code %v", common.TransactionNotFoundError.Code)
 	}
 }
 
@@ -567,7 +614,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
+			Value:    fmt.Sprintf("0"),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
@@ -682,7 +729,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", 0),
+			Value:    fmt.Sprintf("0"),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
