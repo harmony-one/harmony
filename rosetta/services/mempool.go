@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -54,8 +53,7 @@ func (s *MempoolAPI) MempoolTransaction (
 		return nil, err
 	}
 
-	var hash ethCommon.Hash
-	hash.SetBytes([]byte(req.TransactionIdentifier.Hash))
+	hash := ethCommon.HexToHash(req.TransactionIdentifier.Hash)
 	poolTx := s.hmy.GetPoolTransaction(hash)
 	if poolTx == nil {
 		return nil, &common.TransactionNotFoundError
