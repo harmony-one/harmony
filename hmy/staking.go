@@ -522,7 +522,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
 	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
 	if err != nil || undelegationPayoutBlock == nil {
-		// Block not found, so no undelegated undelegationPayouts (not an error)
+		// Block not found, so no undelegationPayouts (not an error)
 		return undelegationPayouts, nil
 	}
 
