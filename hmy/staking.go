@@ -502,6 +502,10 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 type UndelegationPayouts map[common.Address]*big.Int
 
 // GetUndelegationPayouts returns the undelegation payouts for each delegator
+//
+// Due to in-memory caching, it is possible to get undelegation payouts for a state / epoch
+// that has been pruned but have it be lost (and unable to recompute) after the node restarts.
+// This not a problem if a full (archival) DB is used.
 func (hmy *Harmony) GetUndelegationPayouts(
 	ctx context.Context, epoch *big.Int,
 ) (UndelegationPayouts, error) {
@@ -509,7 +513,11 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		return nil, fmt.Errorf("not pre-staking epoch or later")
 	}
 
-	undelegationPayouts := map[common.Address]*big.Int{}
+	payouts, ok := hmy.undelegationPayoutsCache.Get(epoch.Uint64())
+	if ok {
+		return payouts.(UndelegationPayouts), nil
+	}
+	undelegationPayouts := UndelegationPayouts{}
 	// require second to last block as saved undelegations are AFTER undelegations are payed out
 	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
 	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
@@ -536,6 +544,8 @@ func (hmy *Harmony) GetUndelegationPayouts(
 			}
 		}
 	}
+
+	hmy.undelegationPayoutsCache.Add(epoch.Uint64(), undelegationPayouts)
 	return undelegationPayouts, nil
 }
 
