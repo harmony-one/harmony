@@ -298,7 +298,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 	// NOTE let it handle its own logs
-	if !consensus.isRightBlockNumCheck(recvMsg) {
+	if !consensus.onCommittedIsRightBlockNumberCheck(recvMsg) {
 		return
 	}
 
@@ -341,7 +341,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
-	if recvMsg.BlockNum > consensus.blockNum && recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
+	if recvMsg.BlockNum > consensus.blockNum+consensusBlockNumBuffer {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
 		go func() {
 			select {
@@ -369,4 +369,14 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
+}
+
+func (consensus *Consensus) onCommittedIsRightBlockNumberCheck(recvMsg *FBFTMessage) bool {
+	if recvMsg.BlockNum < consensus.blockNum {
+		consensus.getLogger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("Wrong BlockNum Received, ignoring!")
+		return false
+	}
+	return true
 }
