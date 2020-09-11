@@ -435,6 +435,9 @@ func (s *BlockAPI) getBlock(
 			"message": err.Error(),
 		})
 	}
+	if blk == nil {
+		return nil, &common.BlockNotFoundError
+	}
 	return blk, nil
 }
 
