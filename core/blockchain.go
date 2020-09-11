@@ -161,13 +161,14 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine         consensus_engine.Engine
-	processor      Processor // block processor interface
-	validator      Validator // block and state validator interface
-	vmConfig       vm.Config
-	badBlocks      *lru.Cache              // Bad block cache
-	shouldPreserve func(*types.Block) bool // Function used to determine whether should preserve the given block.
-	pendingSlashes slash.Records
+	engine                 consensus_engine.Engine
+	processor              Processor // block processor interface
+	validator              Validator // block and state validator interface
+	vmConfig               vm.Config
+	badBlocks              *lru.Cache              // Bad block cache
+	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
+	pendingSlashes         slash.Records
+	maxGarbCollectedBlkNum int64
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -228,6 +229,7 @@ func NewBlockChain(
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
+		maxGarbCollectedBlkNum:        -1,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1168,6 +1170,9 @@ func (bc *BlockChain) WriteBlockWithState(
 						bc.triegc.Push(root, number)
 						break
 					}
+					if -number > bc.maxGarbCollectedBlkNum {
+						bc.maxGarbCollectedBlkNum = -number
+					}
 					triedb.Dereference(root.(common.Hash))
 				}
 			}
@@ -1200,6 +1205,11 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	bc.futureBlocks.Remove(block.Hash())
 	return CanonStatTy, nil
+}
+
+// GetMaxGarbageCollectedBlockNumber ..
+func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
+	return bc.maxGarbCollectedBlkNum
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -2021,10 +2031,10 @@ func (bc *BlockChain) ReadPendingCrossLinks() ([]types.CrossLink, error) {
 // WritePendingCrossLinks saves the pending crosslinks
 func (bc *BlockChain) WritePendingCrossLinks(crossLinks []types.CrossLink) error {
 	// deduplicate crosslinks if any
-	m := map[uint32]map[uint64](types.CrossLink){}
+	m := map[uint32]map[uint64]types.CrossLink{}
 	for _, cl := range crossLinks {
 		if _, ok := m[cl.ShardID()]; !ok {
-			m[cl.ShardID()] = map[uint64](types.CrossLink){}
+			m[cl.ShardID()] = map[uint64]types.CrossLink{}
 		}
 		m[cl.ShardID()][cl.BlockNum()] = cl
 	}
@@ -2111,10 +2121,10 @@ func (bc *BlockChain) DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) 
 		return 0, err
 	}
 
-	m := map[uint32]map[uint64](struct{}){}
+	m := map[uint32]map[uint64]struct{}{}
 	for _, cl := range crossLinks {
 		if _, ok := m[cl.ShardID()]; !ok {
-			m[cl.ShardID()] = map[uint64](struct{}){}
+			m[cl.ShardID()] = map[uint64]struct{}{}
 		}
 		m[cl.ShardID()][cl.BlockNum()] = struct{}{}
 	}

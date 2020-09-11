@@ -7,10 +7,12 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
-	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/chain"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/numeric"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
@@ -22,7 +24,8 @@ import (
 )
 
 var (
-	zero = numeric.ZeroDec()
+	zero    = numeric.ZeroDec()
+	bigZero = big.NewInt(0)
 )
 
 func (hmy *Harmony) readAndUpdateRawStakes(
@@ -123,6 +126,16 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 // IsStakingEpoch ...
 func (hmy *Harmony) IsStakingEpoch(epoch *big.Int) bool {
 	return hmy.BlockChain.Config().IsStaking(epoch)
+}
+
+// IsPreStakingEpoch ...
+func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
+	return hmy.BlockChain.Config().IsPreStaking(epoch)
+}
+
+// GetDelegationLockingPeriodInEpoch ...
+func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
+	return chain.GetLockPeriodInEpoch(hmy.BlockChain, epoch)
 }
 
 // SendStakingTx adds a staking transaction
@@ -252,7 +265,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	bc := hmy.BlockChain
 	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
 	if err != nil {
-		s, _ := internal_common.AddressToBech32(addr)
+		s, _ := internalCommon.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
 	}
 
@@ -433,6 +446,21 @@ func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []*staki
 	return delegations
 }
 
+// GetDelegationsByValidatorAtBlock returns all delegation information of a validator at the given block
+func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
+	validator common.Address, block *types.Block,
+) []*staking.Delegation {
+	wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, block.Root())
+	if err != nil || wrapper == nil {
+		return nil
+	}
+	delegations := []*staking.Delegation{}
+	for i := range wrapper.Delegations {
+		delegations = append(delegations, &wrapper.Delegations[i])
+	}
+	return delegations
+}
+
 // GetDelegationsByDelegator returns all delegation information of a delegator
 func (hmy *Harmony) GetDelegationsByDelegator(
 	delegator common.Address,
@@ -469,6 +497,56 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations
+}
+
+// UndelegationPayouts ..
+type UndelegationPayouts map[common.Address]*big.Int
+
+// GetUndelegationPayouts returns the undelegation payouts for each delegator
+//
+// Due to in-memory caching, it is possible to get undelegation payouts for a state / epoch
+// that has been pruned but have it be lost (and unable to recompute) after the node restarts.
+// This not a problem if a full (archival) DB is used.
+func (hmy *Harmony) GetUndelegationPayouts(
+	ctx context.Context, epoch *big.Int,
+) (UndelegationPayouts, error) {
+	if !hmy.IsPreStakingEpoch(epoch) {
+		return nil, fmt.Errorf("not pre-staking epoch or later")
+	}
+
+	payouts, ok := hmy.undelegationPayoutsCache.Get(epoch.Uint64())
+	if ok {
+		return payouts.(UndelegationPayouts), nil
+	}
+	undelegationPayouts := UndelegationPayouts{}
+	// require second to last block as saved undelegations are AFTER undelegations are payed out
+	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
+	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
+	if err != nil || undelegationPayoutBlock == nil {
+		// Block not found, so no undelegationPayouts (not an error)
+		return undelegationPayouts, nil
+	}
+
+	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
+	for _, validator := range hmy.GetAllValidatorAddresses() {
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, undelegationPayoutBlock.Root())
+		if err != nil || wrapper == nil {
+			continue // Not a validator at this epoch or unable to fetch validator info because of pruned state.
+		}
+		for _, delegation := range wrapper.Delegations {
+			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod)
+			if withdraw.Cmp(bigZero) == 1 {
+				if totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]; ok {
+					undelegationPayouts[delegation.DelegatorAddress] = new(big.Int).Add(totalPayout, withdraw)
+				} else {
+					undelegationPayouts[delegation.DelegatorAddress] = withdraw
+				}
+			}
+		}
+	}
+
+	hmy.undelegationPayoutsCache.Add(epoch.Uint64(), undelegationPayouts)
+	return undelegationPayouts, nil
 }
 
 // GetTotalStakingSnapshot ..

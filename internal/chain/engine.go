@@ -292,12 +292,7 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
-		lockPeriod := staking.LockPeriodInEpoch
-		if chain.Config().IsRedelegation(header.Epoch()) {
-			lockPeriod = staking.LockPeriodInEpoch
-		} else if chain.Config().IsQuickUnlock(header.Epoch()) {
-			lockPeriod = staking.LockPeriodInEpochV2
-		}
+		lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
@@ -546,4 +541,15 @@ func GetPublicKeys(
 		)
 	}
 	return subCommittee.BLSPublicKeys()
+}
+
+// GetLockPeriodInEpoch returns the delegation lock period for the given chain
+func GetLockPeriodInEpoch(chain engine.ChainReader, epoch *big.Int) int {
+	lockPeriod := staking.LockPeriodInEpoch
+	if chain.Config().IsRedelegation(epoch) {
+		lockPeriod = staking.LockPeriodInEpoch
+	} else if chain.Config().IsQuickUnlock(epoch) {
+		lockPeriod = staking.LockPeriodInEpochV2
+	}
+	return lockPeriod
 }
