@@ -24,7 +24,8 @@ import (
 )
 
 var (
-	zero = numeric.ZeroDec()
+	zero    = numeric.ZeroDec()
+	bigZero = big.NewInt(0)
 )
 
 func (hmy *Harmony) readAndUpdateRawStakes(
@@ -534,9 +535,8 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		}
 		for _, delegation := range wrapper.Delegations {
 			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod)
-			if withdraw.Cmp(big.NewInt(0)) == 1 {
-				totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]
-				if ok {
+			if withdraw.Cmp(bigZero) == 1 {
+				if totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]; ok {
 					undelegationPayouts[delegation.DelegatorAddress] = new(big.Int).Add(totalPayout, withdraw)
 				} else {
 					undelegationPayouts[delegation.DelegatorAddress] = withdraw
