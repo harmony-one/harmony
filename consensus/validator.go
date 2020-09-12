@@ -377,3 +377,14 @@ func (consensus *Consensus) spinUpStateSync() {
 	case <-time.After(1 * time.Second):
 	}
 }
+
+func (consensus *Consensus) spinUpStateSync() {
+	select {
+	case consensus.BlockNumLowChan <- struct{}{}:
+		consensus.current.SetMode(Syncing)
+		for _, v := range consensus.consensusTimeout {
+			v.Stop()
+		}
+	case <-time.After(1 * time.Second):
+	}
+}
