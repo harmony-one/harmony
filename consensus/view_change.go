@@ -28,38 +28,39 @@ const MaxViewIDDiff = 100
 
 // State contains current mode and current viewID
 type State struct {
-	mode   Mode
-	viewID uint64
-	mux    sync.Mutex
+	mode    Mode
+	modeMux sync.RWMutex
+
+	viewID    uint64
+	viewIDMux sync.RWMutex
 }
 
 // Mode return the current node mode
 func (pm *State) Mode() Mode {
+	pm.modeMux.RLock()
+	defer pm.modeMux.RUnlock()
 	return pm.mode
 }
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
+	pm.modeMux.Lock()
+	defer pm.modeMux.Unlock()
 	pm.mode = s
 }
 
-// ViewID return the current viewchanging id
-func (pm *State) ViewID() uint64 {
+// GetViewID return the current viewchanging id
+func (pm *State) GetViewID() uint64 {
+	pm.viewIDMux.RLock()
+	defer pm.viewIDMux.RUnlock()
 	return pm.viewID
 }
 
 // SetViewID sets the viewchanging id accordingly
 func (pm *State) SetViewID(viewID uint64) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
+	pm.viewIDMux.Lock()
+	defer pm.viewIDMux.Unlock()
 	pm.viewID = viewID
-}
-
-// GetViewID returns the current viewchange viewID
-func (pm *State) GetViewID() uint64 {
-	return pm.viewID
 }
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
@@ -126,10 +127,10 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	consensus.current.SetViewID(viewID)
+	consensus.SetViewID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 
-	diff := int64(viewID - consensus.viewID)
+	diff := int64(viewID - consensus.GetViewID())
 	duration := time.Duration(diff * diff * int64(viewChangeDuration))
 	consensus.getLogger().Info().
 		Uint64("ViewChangingID", viewID).
@@ -152,7 +153,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
 	consensus.getLogger().Info().
-		Uint64("ViewChangingID", consensus.current.ViewID()).
+		Uint64("ViewChangingID", consensus.GetViewID()).
 		Msg("[startViewChange] start view change timer")
 }
 
@@ -396,7 +397,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			// Make sure the newly proposed block have the correct view ID
-			consensus.viewID = recvMsg.ViewID
+			consensus.SetViewID(recvMsg.ViewID)
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -447,7 +448,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		}
 
-		consensus.current.SetViewID(recvMsg.ViewID)
+		consensus.SetViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
 			recvMsg.ViewID, newLeaderPriKey,
 		)
@@ -467,16 +468,16 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("could not send out the NEWVIEW message")
 		}
 
-		consensus.viewID = recvMsg.ViewID
+		consensus.SetViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Debug().
-			Uint64("viewChangingID", consensus.current.ViewID()).
+			Uint64("viewChangingID", consensus.GetViewID()).
 			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
 		consensus.getLogger().Info().
 			Str("myKey", newLeaderKey.Bytes.Hex()).
-			Uint64("viewID", consensus.viewID).
+			Uint64("viewID", consensus.GetViewID()).
 			Uint64("block", consensus.blockNum).
 			Msg("[onViewChange] I am the New Leader")
 	}
@@ -612,8 +613,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// newView message verified success, override my state
-	consensus.viewID = recvMsg.ViewID
-	consensus.current.SetViewID(recvMsg.ViewID)
+	consensus.SetViewID(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 

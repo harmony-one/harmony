@@ -57,7 +57,7 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
-	if recvMsg.ViewID != consensus.viewID || recvMsg.BlockNum != consensus.blockNum {
+	if recvMsg.ViewID != consensus.GetViewID() || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -96,7 +96,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
 			} else {
-				consensus.startViewChange(consensus.viewID + 1)
+				consensus.startViewChange(consensus.GetViewID() + 1)
 			}
 		}
 		consensus.getLogger().Debug().
@@ -178,17 +178,17 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 	if consensus.IsViewChangingMode() &&
-		consensus.current.ViewID() > recvMsg.ViewID {
+		consensus.GetViewID() > recvMsg.ViewID {
 		consensus.getLogger().Warn().
-			Uint64("MyViewChangingID", consensus.current.ViewID()).
+			Uint64("MyViewChangingID", consensus.GetViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onViewChange] ViewChanging ID Is Low")
 		return false
 	}
-	if recvMsg.ViewID-consensus.current.ViewID() > MaxViewIDDiff {
+	if recvMsg.ViewID-consensus.GetViewID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("CurrentViewID", consensus.current.ViewID()).
+			Uint64("CurrentViewID", consensus.GetViewID()).
 			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
 		return false
 	}
@@ -196,9 +196,9 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 }
 
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.ViewID < consensus.viewID {
+	if recvMsg.ViewID < consensus.GetViewID() {
 		consensus.getLogger().Warn().
-			Uint64("LastSuccessfulConsensusViewID", consensus.viewID).
+			Uint64("LastSuccessfulConsensusViewID", consensus.GetViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false

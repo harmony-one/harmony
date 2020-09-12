@@ -72,9 +72,14 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 	return marshaledMessage, nil
 }
 
-// GetViewID returns the consensus ID
+// GetViewID returns the view ID
 func (consensus *Consensus) GetViewID() uint64 {
-	return consensus.viewID
+	return consensus.current.GetViewID()
+}
+
+// SetViewID set the current view ID
+func (consensus *Consensus) SetViewID(viewID uint64) {
+	consensus.current.SetViewID(viewID)
 }
 
 // UpdatePublicKeys updates the PublicKeys for
@@ -199,12 +204,6 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// SetViewID set the viewID to the height of the blockchain
-func (consensus *Consensus) SetViewID(height uint64) {
-	consensus.viewID = height
-	consensus.current.viewID = height
-}
-
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
 	consensus.current.SetMode(m)
@@ -232,8 +231,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
-		consensus.viewID = msg.ViewID
-		consensus.current.SetViewID(msg.ViewID)
+		consensus.SetViewID(msg.ViewID)
 		if len(msg.SenderPubkeys) != 1 {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
@@ -241,17 +239,14 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
+			Uint64("viewID", consensus.GetViewID()).
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("viewID and leaderKey override")
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
 			Uint64("block", consensus.blockNum).
 			Msg("Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.viewID {
+	} else if msg.ViewID > consensus.GetViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.viewID {
+	} else if msg.ViewID < consensus.GetViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -282,7 +277,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
 		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.viewID).
+		Uint64("myViewID", consensus.GetViewID()).
 		Interface("phase", consensus.phase).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
@@ -496,7 +491,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 				go func() {
 					utils.Logger().Debug().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
-						Uint64("viewID", consensus.viewID).
+						Uint64("viewID", consensus.GetViewID()).
 						Uint64("block", consensus.blockNum).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
 					consensus.ReadySignal <- struct{}{}

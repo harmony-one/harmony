@@ -281,7 +281,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
 		atomic.AddUint64(&consensus.blockNum, 1)
-		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
+		consensus.SetViewID(committedMsg.ViewID + 1)
 
 		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 
@@ -345,7 +345,7 @@ func (consensus *Consensus) Start(
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Debug().
-			Uint64("viewID", consensus.viewID).
+			Uint64("viewID", consensus.GetViewID()).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
@@ -372,11 +372,11 @@ func (consensus *Consensus) Start(
 					}
 					if k != timeoutViewChange {
 						consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-						consensus.startViewChange(consensus.viewID + 1)
+						consensus.startViewChange(consensus.GetViewID() + 1)
 						break
 					} else {
 						consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-						viewID := consensus.current.ViewID()
+						viewID := consensus.GetViewID()
 						consensus.startViewChange(viewID + 1)
 						break
 					}
@@ -491,7 +491,7 @@ func (consensus *Consensus) Start(
 				func() {
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
-					if viewID == consensus.viewID {
+					if viewID == consensus.GetViewID() {
 						consensus.finalizeCommits()
 					}
 				}()
