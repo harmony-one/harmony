@@ -188,6 +188,10 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
 	consensus.tryCatchup()
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnPrepared] OUT OF SYNC")
+		go consensus.spinUpStateSync()
+	}
 
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
@@ -345,16 +349,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
-		go func() {
-			select {
-			case consensus.BlockNumLowChan <- struct{}{}:
-				consensus.current.SetMode(Syncing)
-				for _, v := range consensus.consensusTimeout {
-					v.Stop()
-				}
-			case <-time.After(1 * time.Second):
-			}
-		}()
+		go consensus.spinUpStateSync()
 		return
 	}
 
@@ -380,4 +375,15 @@ func (consensus *Consensus) onCommittedIsRightBlockNumberCheck(recvMsg *FBFTMess
 		return false
 	}
 	return true
+}
+
+func (consensus *Consensus) spinUpStateSync() {
+	select {
+	case consensus.BlockNumLowChan <- struct{}{}:
+		consensus.current.SetMode(Syncing)
+		for _, v := range consensus.consensusTimeout {
+			v.Stop()
+		}
+	case <-time.After(1 * time.Second):
+	}
 }
