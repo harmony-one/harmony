@@ -67,9 +67,9 @@ func (s *MempoolAPI) MempoolTransaction(
 	var nilAddress ethCommon.Address
 	senderAddr, _ := poolTx.SenderAddress()
 	estLog := &hmyTypes.Log{
-		Address: senderAddr,
-		Topics: []ethCommon.Hash{staking.CollectRewardsTopic},
-		Data: big.NewInt(0).Bytes(),
+		Address:     senderAddr,
+		Topics:      []ethCommon.Hash{staking.CollectRewardsTopic},
+		Data:        big.NewInt(0).Bytes(),
 		BlockNumber: s.hmy.CurrentBlock().NumberU64(),
 	}
 
