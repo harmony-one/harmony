@@ -615,6 +615,26 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 	return nil, nil
 }
 
+// GetUndelegationPool returns the amount of locked undelegated tokens
+func (s *PublicStakingService) GetUndelegationPool(
+	ctx context.Context, address string,
+) (*big.Int, error) {
+	if !isBeaconShard(s.hmy) {
+		return nil, ErrNotBeaconShard
+	}
+
+	delegatorAddr := internal_common.ParseAddr(address)
+	_, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddr)
+
+	undelegationTotal := big.NewInt(0)
+	for _, d := range delegations {
+		for _, u := range d.Undelegations {
+			undelegationTotal.Add(undelegationTotal, u.Amount)
+		}
+	}
+	return undelegationTotal, nil
+}
+
 func isBeaconShard(hmy *hmy.Harmony) bool {
 	return hmy.ShardID == shard.BeaconChainShardID
 }
