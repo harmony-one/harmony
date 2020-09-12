@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -9,6 +10,7 @@ import (
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
+	"github.com/harmony-one/harmony/staking"
 )
 
 // MempoolAPI implements the server.MempoolAPIServicer interface
@@ -63,12 +65,20 @@ func (s *MempoolAPI) MempoolTransaction(
 	}
 
 	var nilAddress ethCommon.Address
+	senderAddr, _ := poolTx.SenderAddress()
+	estLog := &hmyTypes.Log{
+		Address: senderAddr,
+		Topics: []ethCommon.Hash{staking.CollectRewardsTopic},
+		Data: big.NewInt(0).Bytes(),
+		BlockNumber: s.hmy.CurrentBlock().NumberU64(),
+	}
+
 	estReceipt := &hmyTypes.Receipt{
 		PostState:         []byte{},
 		Status:            hmyTypes.ReceiptStatusSuccessful, // Assume transaction will succeed
 		CumulativeGasUsed: poolTx.Gas(),
 		Bloom:             [256]byte{},
-		Logs:              []*hmyTypes.Log{},
+		Logs:              []*hmyTypes.Log{ estLog },
 		TxHash:            poolTx.Hash(),
 		ContractAddress:   nilAddress, // ContractAddress is only for smart contract creation & can not be determined until transaction is finalized
 		GasUsed:           poolTx.Gas(),
