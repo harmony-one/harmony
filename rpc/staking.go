@@ -615,6 +615,30 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 	return nil, nil
 }
 
+// GetAvailableRedelegationBalance returns the amount of locked undelegated tokens
+func (s *PublicStakingService) GetAvailableRedelegationBalance(
+	ctx context.Context, address string,
+) (*big.Int, error) {
+	if !isBeaconShard(s.hmy) {
+		return nil, ErrNotBeaconShard
+	}
+
+	currEpoch := s.hmy.BlockChain.CurrentHeader().Epoch()
+
+	delegatorAddr := internal_common.ParseAddr(address)
+	_, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddr)
+
+	redelegationTotal := big.NewInt(0)
+	for _, d := range delegations {
+		for _, u := range d.Undelegations {
+			if u.Epoch.Cmp(currEpoch) < 1 { // Undelegation.Epoch < currentEpoch
+				redelegationTotal.Add(redelegationTotal, u.Amount)
+			}
+		}
+	}
+	return redelegationTotal, nil
+}
+
 func isBeaconShard(hmy *hmy.Harmony) bool {
 	return hmy.ShardID == shard.BeaconChainShardID
 }
