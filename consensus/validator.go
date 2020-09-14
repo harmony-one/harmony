@@ -302,7 +302,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 	// NOTE let it handle its own logs
-	if !consensus.onCommittedIsRightBlockNumberCheck(recvMsg) {
+	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
 
@@ -365,16 +365,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
-}
-
-func (consensus *Consensus) onCommittedIsRightBlockNumberCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Debug().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("Wrong BlockNum Received, ignoring!")
-		return false
-	}
-	return true
 }
 
 func (consensus *Consensus) spinUpStateSync() {
