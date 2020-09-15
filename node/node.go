@@ -919,7 +919,7 @@ func New(
 		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
-		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		chain.Engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block

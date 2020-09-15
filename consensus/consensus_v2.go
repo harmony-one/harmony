@@ -7,12 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
@@ -222,101 +221,100 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 	return aggSig, bitmap, nil
 }
 
-// try to catch up if fall behind
-func (consensus *Consensus) tryCatchup() {
-	consensus.getLogger().Info().Msg("[TryCatchup] commit new blocks")
-	currentBlockNum := consensus.blockNum
-	for {
-		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_COMMITTED, consensus.blockNum,
-		)
-		if len(msgs) == 0 {
-			break
-		}
-		if len(msgs) > 1 {
-			consensus.getLogger().Error().
-				Int("numMsgs", len(msgs)).
-				Msg("[TryCatchup] DANGER!!! we should only get one committed message for a given blockNum")
-		}
+var (
+	errMultipleSenderInCommitted = errors.New("leader message can not have multiple sender keys")
+)
 
-		var committedMsg *FBFTMessage
-		var block *types.Block
-		for i := range msgs {
-			tmpBlock := consensus.FBFTLog.GetBlockByHash(msgs[i].BlockHash)
-			if tmpBlock == nil {
-				blksRepr, msgsRepr, incomingMsg :=
-					consensus.FBFTLog.Blocks().String(),
-					consensus.FBFTLog.Messages().String(),
-					msgs[i].String()
-				consensus.getLogger().Debug().
-					Str("FBFT-log-blocks", blksRepr).
-					Str("FBFT-log-messages", msgsRepr).
-					Str("incoming-message", incomingMsg).
-					Uint64("blockNum", msgs[i].BlockNum).
-					Uint64("viewID", msgs[i].ViewID).
-					Str("blockHash", msgs[i].BlockHash.Hex()).
-					Msg("[TryCatchup] Failed finding a matching block for committed message")
-				continue
+// AddLastMileBlock add the last mile block in consensus memory cache (PBFT log)
+func (consensus *Consensus) GetLastMileBlocks(bnStart uint64) ([]*types.Block, error) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
+	return blocks, err
+}
+
+func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Block, []*FBFTMessage, error) {
+	var (
+		blocks []*types.Block
+		msgs   []*FBFTMessage
+	)
+	blockNum := bnStart
+	for ; ; blockNum++ {
+		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgByNumber(blockNum, consensus.getLogger())
+		if err != nil {
+			if err == errPBFTLogNotFound {
+				break
 			}
-
-			committedMsg = msgs[i]
-			block = tmpBlock
-			break
+			return nil, nil, err
 		}
-		if block == nil || committedMsg == nil {
-			consensus.getLogger().Error().Msg("[TryCatchup] Failed finding a valid committed message.")
-			break
-		}
+		blocks = append(blocks, blk)
+		msgs = append(msgs, msg)
+	}
+	return blocks, msgs, nil
+}
 
-		if block.ParentHash() != consensus.ChainReader.CurrentHeader().Hash() {
-			consensus.getLogger().Debug().Msg("[TryCatchup] parent block hash not match")
-			break
-		}
-		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
+// tryCatchup add the last mile block in PBFT log memory cache to blockchain.
+func (consensus *Consensus) tryCatchup() error {
+	initBN := consensus.blockNum
+	defer consensus.postTryCatchup(initBN)
 
-		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
-			msg_pb.MessageType_PREPARED, committedMsg.BlockNum, committedMsg.BlockHash,
-		)
-		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
-		if msg == nil {
-			break
-		}
-		consensus.getLogger().Info().Msg("[TryCatchup] prepared message found to commit")
-
-		atomic.AddUint64(&consensus.blockNum, 1)
-		consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
-		consensus.LeaderPubKey = committedMsg.SenderPubkey
-
+	blks, msgs, err := consensus.getLastMileBlocksAndMsg(initBN)
+	if err != nil {
+		return errors.Wrapf(err, "[TryCatchup] Failed to get last mile blocks: %v", err)
+	}
+	for i := range blks {
+		blk := blks[i]
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
-
-		// Fill in the commit signatures
-		block.SetCurrentCommitSig(committedMsg.Payload)
-		consensus.OnConsensusDone(block)
-		consensus.ResetState()
-
+		if err := consensus.commitBlock(blk, msgs[i]); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
+			return err
+		}
 		select {
-		case consensus.VerifiedNewBlock <- block:
+		case consensus.VerifiedNewBlock <- blk:
 		default:
 			consensus.getLogger().Info().
-				Str("blockHash", block.Hash().String()).
+				Str("blockHash", blk.Hash().String()).
 				Msg("[TryCatchup] consensus verified block send to chan failed")
 			continue
 		}
-
-		break
 	}
+	return nil
+}
+
+func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
+	blk.SetCurrentCommitSig(committedMsg.Payload)
+	if err := consensus.OnConsensusDone(blk); err != nil {
+		return err
+	}
+<<<<<<< HEAD
 	if currentBlockNum < consensus.blockNum {
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
+=======
+
+	atomic.AddUint64(&consensus.blockNum, 1)
+	consensus.SetCurViewID(committedMsg.ViewID + 1)
+	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+	consensus.ResetState()
+	return nil
+}
+
+func (consensus *Consensus) postTryCatchup(initBN uint64) {
+	if initBN < consensus.blockNum {
+		consensus.getLogger().Info().
+			Uint64("From", initBN).
+			Uint64("To", consensus.blockNum).
+			Msg("[TryCatchup] Caught up!")
+		consensus.switchPhase(FBFTAnnounce, true)
+>>>>>>> [consensus] refactored and optimized tryCatchup logic
 	}
-	// catup up and skip from view change trap
-	if currentBlockNum < consensus.blockNum &&
-		consensus.IsViewChangingMode() {
+	// catch up and skip from view change trap
+	if initBN < consensus.blockNum && consensus.IsViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
 	// clean up old log
-	consensus.FBFTLog.DeleteBlocksLessThan(consensus.blockNum - 1)
-	consensus.FBFTLog.DeleteMessagesLessThan(consensus.blockNum - 1)
+	consensus.FBFTLog.PruneCacheBeforeBlock(consensus.blockNum)
 }
 
 // Start waits for the next new block and run consensus

@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -247,6 +248,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
+	if err := checkCommittedMsgSanity(recvMsg); err != nil {
+		consensus.getLogger().Warn().Msg(fmt.Sprintf("[OnCommitted] %v", err))
+		return
+	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
@@ -315,4 +320,33 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
+}
+
+func (consensus *Consensus) spinUpStateSync() {
+	select {
+	case consensus.BlockNumLowChan <- struct{}{}:
+		consensus.current.SetMode(Syncing)
+		for _, v := range consensus.consensusTimeout {
+			v.Stop()
+		}
+	case <-time.After(1 * time.Second):
+	}
+}
+
+func (consensus *Consensus) spinUpStateSync() {
+	select {
+	case consensus.BlockNumLowChan <- struct{}{}:
+		consensus.current.SetMode(Syncing)
+		for _, v := range consensus.consensusTimeout {
+			v.Stop()
+		}
+	case <-time.After(1 * time.Second):
+	}
+}
+
+func checkCommittedMsgSanity(committedMsg *FBFTMessage) error {
+	if len(committedMsg.SenderPubkeys) != 1 {
+		return errMultipleSenderInCommitted
+	}
+	return nil
 }
