@@ -964,6 +964,7 @@ func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consen
 	if _, err := bc.InsertChain(blocks, true); err != nil {
 		return errors.Wrap(err, "failed to InsertChain")
 	}
+	consensus.FBFTLog.PruneCacheBeforeBlock(bc.CurrentBlock().NumberU64() + 1)
 	return nil
 }
 
