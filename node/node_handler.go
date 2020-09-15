@@ -402,11 +402,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
-					return
+					return err
 				}
 				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
-					return
+					return err
 				}
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,

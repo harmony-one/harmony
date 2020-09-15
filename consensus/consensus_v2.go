@@ -239,8 +239,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 		blocks []*types.Block
 		msgs   []*FBFTMessage
 	)
-	blockNum := bnStart
-	for ; ; blockNum++ {
+	for blockNum := bnStart; ; blockNum++ {
 		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgsFromNumber(blockNum, consensus.getLogger())
 		if err != nil {
 			if err == errPBFTLogNotFound {
