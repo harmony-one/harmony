@@ -927,7 +927,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-			return
+			break
 		}
 		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
@@ -945,11 +945,26 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 		}
 		ss.purgeOldBlocksFromCache()
-		if consensus != nil {
-			consensus.SetMode(consensus.UpdateConsensusInformation())
+	}
+	if consensus != nil {
+		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
+			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
 		}
+		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
 	ss.purgeAllBlocksFromCache()
+}
+
+func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
+	curNumber := bc.CurrentBlock().Number()
+	blocks, err := consensus.GetLastMileBlocks(curNumber.Uint64())
+	if err != nil {
+		return err
+	}
+	if _, err := bc.InsertChain(blocks, true); err != nil {
+		return errors.Wrap(err, "failed to InsertChain")
+	}
+	return nil
 }
 
 // GetSyncingPort returns the syncing port.
