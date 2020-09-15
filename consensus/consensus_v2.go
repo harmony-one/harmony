@@ -225,7 +225,7 @@ var (
 	errMultipleSenderInCommitted = errors.New("leader message can not have multiple sender keys")
 )
 
-// AddLastMileBlock add the last mile block in consensus memory cache (PBFT log)
+// GetLastMileBlocks get the last mile block from consensus memory cache (PBFT log)
 func (consensus *Consensus) GetLastMileBlocks(bnStart uint64) ([]*types.Block, error) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()

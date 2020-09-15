@@ -404,6 +404,7 @@ var (
 	errPBFTBlockHashNotFound = errors.New("failed finding a matching block for committed message")
 )
 
+// GetCommittedBlockAndMsgsFromNumber get committed block and message starting from block number bn.
 func (log *FBFTLog) GetCommittedBlockAndMsgsFromNumber(bn uint64, logger *zerolog.Logger) (*types.Block, *FBFTMessage, error) {
 	msgs := log.GetMessagesByTypeSeq(
 		msg_pb.MessageType_COMMITTED, bn,
@@ -429,6 +430,7 @@ func (log *FBFTLog) GetCommittedBlockAndMsgsFromNumber(bn uint64, logger *zerolo
 	return nil, nil, errPBFTLogNotFound
 }
 
+// PruneCacheBeforeBlock prune all blocks before bn
 func (log *FBFTLog) PruneCacheBeforeBlock(bn uint64) {
 	log.DeleteBlocksLessThan(bn - 1)
 	log.DeleteMessagesLessThan(bn - 1)
