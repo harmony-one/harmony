@@ -18,6 +18,7 @@ package core
 
 import (
 	"container/heap"
+	staking "github.com/harmony-one/harmony/staking/types"
 	"math"
 	"math/big"
 	"sort"
@@ -283,16 +284,13 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 	return l.txs.Forward(threshold)
 }
 
-// FilterCost removes all transactions from the list with a cost or gas limit higher
-// than the provided thresholds. Every removed transaction is returned for any
-// post-removal maintenance. Strict-mode invalidated transactions are also
-// returned.
-//
-// This method uses the cached costcap and gascap to quickly decide if there's even
-// a point in calculating all the costs or if the balance covers all. If the threshold
-// is lower than the costgas cap, the caps will be reset to a new high after removing
-// the newly invalidated transactions.
-func (l *txList) FilterCost(costLimit *big.Int, gasLimit uint64) (types.PoolTransactions, types.PoolTransactions) {
+// FilterValid returns all regular transactions from the list with a cost or gas limit higher
+// than the provided thresholds and all staking transactions that can not be validated.
+func (l *txList) FilterValid(
+	txPool *TxPool, address common.Address,
+) (types.PoolTransactions, types.PoolTransactions) {
+	costLimit := txPool.currentState.GetBalance(address)
+	gasLimit := txPool.currentMaxGas
 	// If all transactions are below the threshold, short circuit
 	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
 		return nil, nil
@@ -305,7 +303,11 @@ func (l *txList) FilterCost(costLimit *big.Int, gasLimit uint64) (types.PoolTran
 		if err != nil {
 			return true // failure should lead to removal of the tx
 		}
-		return cost.Cmp(costLimit) > 0 || tx.Gas() > gasLimit
+		if _, ok := tx.(*staking.StakingTransaction); ok {
+			err := txPool.validateTx(tx, false)
+			return err != nil
+		}
+		return cost.Cmp(costLimit) == 1 || tx.Gas() > gasLimit
 	})
 }
 
