@@ -135,6 +135,9 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy),
 		v2.NewPublicLegacyAPI(hmy),
+		// TestInjection
+		NewPublicTestInjectionAPI(hmy, V1),
+		NewPublicTestInjectionAPI(hmy, V2),
 	}
 
 	privateAPIs := []rpc.API{
