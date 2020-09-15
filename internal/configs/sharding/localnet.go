@@ -19,8 +19,8 @@ type localnetSchedule struct{}
 const (
 	localnetV1Epoch = 1
 
-	localnetEpochBlock1 = 10
-	twoOne              = 5
+	localnetEpochBlock1    = 10
+	localnetBlocksPerEpoch = 5
 
 	localnetVdfDifficulty  = 5000 // This takes about 10s to finish the vdf
 	localnetConsensusRatio = float64(0.1)
@@ -40,7 +40,7 @@ func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 }
 
 func (ls localnetSchedule) BlocksPerEpoch() uint64 {
-	return twoOne
+	return localnetBlocksPerEpoch
 }
 
 func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
