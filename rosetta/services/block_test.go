@@ -159,8 +159,8 @@ func testFormatStakingTransaction(
 	if reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
 		t.Error("Expected staking operation to have some metadata")
 	}
-	if !reflect.DeepEqual(rosettaTx.Metadata, map[string]interface{}{}) {
-		t.Error("Expected transaction to have no metadata")
+	if rosettaTx.Metadata == nil || rosettaTx.Metadata["from_account"] == nil {
+		t.Error("Expected transaction metadata to have from_account")
 	}
 	if !reflect.DeepEqual(rosettaTx.Operations[0].Account, senderAccID) {
 		t.Error("Expected sender to pay gas fee")
@@ -207,10 +207,10 @@ func testFormatPlainTransaction(
 	if rosettaTx.Operations[1].Type != common.TransferOperation {
 		t.Error("Expected 2nd operation to transfer related")
 	}
-	if !reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
+	if rosettaTx.Operations[1].Metadata != nil {
 		t.Error("Expected 1st operation to have no metadata")
 	}
-	if !reflect.DeepEqual(rosettaTx.Operations[2].Metadata, map[string]interface{}{}) {
+	if rosettaTx.Operations[2].Metadata != nil {
 		t.Error("Expected 2nd operation to have no metadata")
 	}
 	if reflect.DeepEqual(rosettaTx.Metadata, map[string]interface{}{}) {
@@ -765,7 +765,6 @@ func TestNewTransferOperations(t *testing.T) {
 				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{},
 		},
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -783,7 +782,6 @@ func TestNewTransferOperations(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{},
 		},
 	}
 	receipt := &hmytypes.Receipt{
@@ -826,10 +824,6 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
-	receiverAccID, rosettaError := newAccountIdentifier(*tx.To())
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
 	startingOpID := &types.OperationIdentifier{}
 
 	refOperations := []*types.Operation{
@@ -846,9 +840,6 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
-			},
-			Metadata: map[string]interface{}{
-				"to_account": receiverAccID,
 			},
 		},
 	}
@@ -903,15 +894,16 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{
-				"from_account": senderAccID,
-			},
 		},
 	}
+	to := tx.ToShardID()
+	from := tx.ShardID()
 	refMetadata, err := rpc.NewStructuredResponse(TransactionMetadata{
-		CrossShardIdentifier: refCxID,
-		ToShardID:            tx.ToShardID(),
-		FromShardID:          tx.ShardID(),
+		CrossShardIdentifier:  refCxID,
+		ToShardID:             &to,
+		FromShardID:           &from,
+		FromAccountIdentifier: senderAccID,
+		ToAccountIdentifier:   receiverAccID,
 	})
 	refRosettaTx := &types.Transaction{
 		TransactionIdentifier: refCxID,
@@ -952,6 +944,10 @@ func TestNewContractCreationOperations(t *testing.T) {
 
 	// Test failed contract creation
 	contractAddr := crypto.PubkeyToAddress(dummyContractKey.PublicKey)
+	contractAddressID, rosettaError := newAccountIdentifier(contractAddr)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
 	refOperations := []*types.Operation{
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -968,7 +964,7 @@ func TestNewContractCreationOperations(t *testing.T) {
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
-				"contract_address": contractAddr.String(),
+				"contract_address": contractAddressID,
 			},
 		},
 	}

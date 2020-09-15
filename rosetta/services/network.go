@@ -194,6 +194,7 @@ func getErrors() []*types.Error {
 		&common.TransactionNotFoundError,
 		&common.ReceiptNotFoundError,
 		&common.UnsupportedCurveTypeError,
+		&common.InvalidTransactionConstructionError,
 	}
 }
 

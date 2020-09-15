@@ -22,6 +22,7 @@ func TestErrors(t *testing.T) {
 		&common.TransactionNotFoundError,
 		&common.ReceiptNotFoundError,
 		&common.UnsupportedCurveTypeError,
+		&common.InvalidTransactionConstructionError,
 	}
 	refBeaconErrors := []*types.Error{
 		&common.StakingTransactionSubmissionError,

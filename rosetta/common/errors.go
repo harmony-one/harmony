@@ -70,6 +70,13 @@ var (
 		Message:   "unsupported curve type",
 		Retriable: false,
 	}
+
+	// InvalidTransactionConstructionError ..
+	InvalidTransactionConstructionError = types.Error{
+		Code:      9,
+		Message:   "invalid transaction construction",
+		Retriable: false,
+	}
 )
 
 // NewError create a new error with a given detail structure
