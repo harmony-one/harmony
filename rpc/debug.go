@@ -38,3 +38,29 @@ func (*PrivateDebugService) SetLogVerbosity(ctx context.Context, level int) (map
 	utils.SetLogVerbosity(verbosity)
 	return map[string]interface{}{"verbosity": verbosity.String()}, nil
 }
+
+func (s *PrivateDebugService) ConsensusViewID(
+	ctx context.Context,
+) uint64 {
+	return s.hmy.NodeAPI.GetConsensusViewID()
+}
+
+func (s *PrivateDebugService) ConsensusCurViewID(
+	ctx context.Context,
+) uint64 {
+	return s.hmy.NodeAPI.GetConsensusCurViewID()
+}
+
+// GetConsensusMode return the current consensus mode
+func (s *PrivateDebugService) GetConsensusMode(
+	ctx context.Context,
+) string {
+	return s.hmy.NodeAPI.GetConsensusMode()
+}
+
+// GetConsensusPhase return the current consensus mode
+func (s *PrivateDebugService) GetConsensusPhase(
+	ctx context.Context,
+) string {
+	return s.hmy.NodeAPI.GetConsensusPhase()
+}

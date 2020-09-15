@@ -92,6 +92,13 @@ type NodeAPI interface {
 	ListPeer(topic string) []peer.ID
 	ListTopic() []string
 	ListBlockedPeer() []peer.ID
+
+	// debug API
+	GetConsensusMode() string
+	GetConsensusPhase() string
+	GetConsensusViewID() uint64
+	GetConsensusCurViewID() uint64
+	ShutDown()
 }
 
 // New creates a new Harmony object (including the
