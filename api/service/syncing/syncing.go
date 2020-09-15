@@ -914,10 +914,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
-	// remove SyncLoopFrequency
-	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
+	for {
 		otherHeight := ss.getMaxPeerHeight(isBeacon)
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
