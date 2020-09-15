@@ -206,10 +206,5 @@ func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false
 	}
-	if !consensus.IsViewChangingMode() {
-		consensus.getLogger().Warn().
-			Msg("[onNewView] Not in ViewChanging mode, ignoring the new view message")
-		return false
-	}
 	return true
 }
