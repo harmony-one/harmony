@@ -241,7 +241,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 	)
 	blockNum := bnStart
 	for ; ; blockNum++ {
-		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgByNumber(blockNum, consensus.getLogger())
+		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgsFromNumber(blockNum, consensus.getLogger())
 		if err != nil {
 			if err == errPBFTLogNotFound {
 				break
@@ -257,14 +257,16 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 // tryCatchup add the last mile block in PBFT log memory cache to blockchain.
 func (consensus *Consensus) tryCatchup() error {
 	initBN := consensus.blockNum
-	defer consensus.postTryCatchup(initBN)
+	defer consensus.postCatchup(initBN)
 
 	blks, msgs, err := consensus.getLastMileBlocksAndMsg(initBN)
 	if err != nil {
 		return errors.Wrapf(err, "[TryCatchup] Failed to get last mile blocks: %v", err)
 	}
 	for i := range blks {
-		blk := blks[i]
+		blk, msg := blks[i], msgs[i]
+		blk.SetCurrentCommitSig(msg.Payload)
+
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
 		if err := consensus.commitBlock(blk, msgs[i]); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
@@ -283,7 +285,6 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
-	blk.SetCurrentCommitSig(committedMsg.Payload)
 	if err := consensus.OnConsensusDone(blk); err != nil {
 		return err
 	}
@@ -295,7 +296,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
-func (consensus *Consensus) postTryCatchup(initBN uint64) {
+func (consensus *Consensus) postCatchup(initBN uint64) {
 	if initBN < consensus.blockNum {
 		consensus.getLogger().Info().
 			Uint64("From", initBN).

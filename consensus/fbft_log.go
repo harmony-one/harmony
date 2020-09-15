@@ -404,7 +404,7 @@ var (
 	errPBFTBlockHashNotFound = errors.New("failed finding a matching block for committed message")
 )
 
-func (log *FBFTLog) GetCommittedBlockAndMsgByNumber(bn uint64, logger *zerolog.Logger) (*types.Block, *FBFTMessage, error) {
+func (log *FBFTLog) GetCommittedBlockAndMsgsFromNumber(bn uint64, logger *zerolog.Logger) (*types.Block, *FBFTMessage, error) {
 	msgs := log.GetMessagesByTypeSeq(
 		msg_pb.MessageType_COMMITTED, bn,
 	)
