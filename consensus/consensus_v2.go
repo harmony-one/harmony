@@ -382,8 +382,7 @@ func (consensus *Consensus) Start(
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-				consensus.SetCurViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
-				consensus.SetViewChangingID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+				consensus.SetViewIDs(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")

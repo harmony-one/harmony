@@ -221,7 +221,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
-		consensus.SetViewID(msg.ViewID)
+		consensus.SetViewIDs(msg.ViewID)
 		if len(msg.SenderPubkeys) != 1 {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
@@ -535,9 +535,9 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 	}
 }
 
-// SetViewID set both current view ID and view changing ID to the height
+// SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
-func (consensus *Consensus) SetViewID(height uint64) {
+func (consensus *Consensus) SetViewIDs(height uint64) {
 	consensus.SetCurViewID(height)
 	consensus.SetViewChangingID(height)
 }
