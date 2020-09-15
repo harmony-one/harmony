@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -305,6 +306,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
+	if err := checkCommittedMsgSanity(recvMsg); err != nil {
+		consensus.getLogger().Warn().Msg(fmt.Sprintf("[OnCommitted] %v", err))
+		return
+	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
@@ -387,4 +392,11 @@ func (consensus *Consensus) spinUpStateSync() {
 		}
 	case <-time.After(1 * time.Second):
 	}
+}
+
+func checkCommittedMsgSanity(committedMsg *FBFTMessage) error {
+	if len(committedMsg.SenderPubkeys) != 1 {
+		return errMultipleSenderInCommitted
+	}
+	return nil
 }

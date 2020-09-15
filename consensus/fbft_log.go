@@ -3,13 +3,15 @@ package consensus
 import (
 	"fmt"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
@@ -394,4 +396,40 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 	}
 
 	return &FBFTMsg, nil
+}
+
+var (
+	errMultipleCommittedMsg  = errors.New("DANGER!!! multiple COMMITTED message in PBFT log observed")
+	errPBFTLogNotFound       = errors.New("PBFT log not found")
+	errPBFTBlockHashNotFound = errors.New("failed finding a matching block for committed message")
+)
+
+func (log *FBFTLog) GetCommittedBlockAndMsgByNumber(bn uint64, logger *zerolog.Logger) (*types.Block, *FBFTMessage, error) {
+	msgs := log.GetMessagesByTypeSeq(
+		msg_pb.MessageType_COMMITTED, bn,
+	)
+	if len(msgs) == 0 {
+		return nil, nil, errPBFTLogNotFound
+	}
+	if len(msgs) > 1 {
+		logger.Error().Int("numMsgs", len(msgs)).Err(errMultipleCommittedMsg)
+	}
+	for i := range msgs {
+		block := log.GetBlockByHash(msgs[i].BlockHash)
+		if block == nil {
+			logger.Debug().
+				Uint64("blockNum", msgs[i].BlockNum).
+				Uint64("viewID", msgs[i].ViewID).
+				Str("blockHash", msgs[i].BlockHash.Hex()).
+				Err(errPBFTBlockHashNotFound)
+			continue
+		}
+		return block, msgs[i], nil
+	}
+	return nil, nil, errPBFTLogNotFound
+}
+
+func (log *FBFTLog) PruneCacheBeforeBlock(bn uint64) {
+	log.DeleteBlocksLessThan(bn - 1)
+	log.DeleteMessagesLessThan(bn - 1)
 }
