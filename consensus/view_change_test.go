@@ -27,13 +27,13 @@ func TestBasicViewChanging(t *testing.T) {
 	// Change ViewID
 	assert.Equal(t, state.viewID, consensus.current.viewID)
 	assert.Equal(t, state.ViewID(), consensus.current.ViewID())
-	assert.Equal(t, state.GetViewID(), consensus.current.GetViewID()) // Why are there two methods to retrieve the ViewID?
+	assert.Equal(t, state.GetViewID(), consensus.GetViewID()) // Why are there two methods to retrieve the ViewID?
 
 	newViewID := consensus.current.ViewID() + 1
 	consensus.current.SetViewID(newViewID)
 	assert.Equal(t, newViewID, consensus.current.viewID)
 	assert.Equal(t, newViewID, consensus.current.ViewID())
-	assert.Equal(t, newViewID, consensus.current.GetViewID())
+	assert.Equal(t, newViewID, consensus.GetViewID())
 }
 
 func TestPhaseSwitching(t *testing.T) {

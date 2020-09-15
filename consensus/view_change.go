@@ -28,38 +28,74 @@ const MaxViewIDDiff = 100
 
 // State contains current mode and current viewID
 type State struct {
-	mode   Mode
-	viewID uint64
-	mux    sync.Mutex
+	mode    Mode
+	modeMux sync.RWMutex
+
+	// current view id in normal mode
+	// it changes per successful consensus
+	curViewID uint64
+	cViewMux  sync.RWMutex
+
+	// view changing id is used during view change mode
+	// it is the next view id
+	viewChangingID uint64
+
+	viewMux sync.RWMutex
 }
 
 // Mode return the current node mode
 func (pm *State) Mode() Mode {
+	pm.modeMux.RLock()
+	defer pm.modeMux.RUnlock()
 	return pm.mode
 }
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
+	pm.modeMux.Lock()
+	defer pm.modeMux.Unlock()
 	pm.mode = s
 }
 
-// ViewID return the current viewchanging id
-func (pm *State) ViewID() uint64 {
-	return pm.viewID
+// GetCurViewID return the current view id
+func (pm *State) GetCurViewID() uint64 {
+	pm.cViewMux.RLock()
+	defer pm.cViewMux.RUnlock()
+	return pm.curViewID
 }
 
-// SetViewID sets the viewchanging id accordingly
-func (pm *State) SetViewID(viewID uint64) {
-	pm.mux.Lock()
-	defer pm.mux.Unlock()
-	pm.viewID = viewID
+// SetCurViewID sets the current view id
+func (pm *State) SetCurViewID(viewID uint64) {
+	pm.cViewMux.Lock()
+	defer pm.cViewMux.Unlock()
+	pm.curViewID = viewID
 }
 
-// GetViewID returns the current viewchange viewID
-func (pm *State) GetViewID() uint64 {
-	return pm.viewID
+// GetViewChangingID return the current view changing id
+// It is meaningful during view change mode
+func (pm *State) GetViewChangingID() uint64 {
+	pm.viewMux.RLock()
+	defer pm.viewMux.RUnlock()
+	return pm.viewChangingID
+}
+
+// SetViewChangingID set the current view changing id
+// It is meaningful during view change mode
+func (pm *State) SetViewChangingID(id uint64) {
+	pm.viewMux.Lock()
+	defer pm.viewMux.Unlock()
+	pm.viewChangingID = id
+}
+
+// GetViewChangeDuraion return the duration of the current view change
+// It increase in the power of difference betweeen view changing ID and current view ID
+func (pm *State) GetViewChangeDuraion() time.Duration {
+	pm.viewMux.RLock()
+	pm.cViewMux.RLock()
+	defer pm.viewMux.RUnlock()
+	defer pm.cViewMux.RUnlock()
+	diff := int64(pm.viewChangingID - pm.curViewID)
+	return time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
@@ -126,13 +162,12 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	consensus.current.SetViewID(viewID)
+	consensus.SetViewChangingID(viewID)
 	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 
-	diff := int64(viewID - consensus.viewID)
-	duration := time.Duration(diff * diff * int64(viewChangeDuration))
-	consensus.getLogger().Info().
-		Uint64("ViewChangingID", viewID).
+	duration := consensus.current.GetViewChangeDuraion()
+	consensus.getLogger().Warn().
+		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
@@ -152,7 +187,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
 	consensus.getLogger().Info().
-		Uint64("ViewChangingID", consensus.current.ViewID()).
+		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Msg("[startViewChange] start view change timer")
 }
 
@@ -396,7 +431,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			// Make sure the newly proposed block have the correct view ID
-			consensus.viewID = recvMsg.ViewID
+			consensus.SetCurViewID(recvMsg.ViewID)
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -447,7 +482,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		}
 
-		consensus.current.SetViewID(recvMsg.ViewID)
+		consensus.SetCurViewID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
 			recvMsg.ViewID, newLeaderPriKey,
 		)
@@ -467,18 +502,11 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("could not send out the NEWVIEW message")
 		}
 
-		consensus.viewID = recvMsg.ViewID
+		consensus.SetCurViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug().
-			Uint64("viewChangingID", consensus.current.ViewID()).
-			Msg("[onViewChange] New Leader Start Consensus Timer and Stop View Change Timer")
-		consensus.getLogger().Info().
-			Str("myKey", newLeaderKey.Bytes.Hex()).
-			Uint64("viewID", consensus.viewID).
-			Uint64("block", consensus.blockNum).
-			Msg("[onViewChange] I am the New Leader")
+		consensus.getLogger().Info().Str("myKey", newLeaderKey.Bytes.Hex()).Msg("[onViewChange] I am the New Leader")
 	}
 }
 
@@ -612,8 +640,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// newView message verified success, override my state
-	consensus.viewID = recvMsg.ViewID
-	consensus.current.SetViewID(recvMsg.ViewID)
+	consensus.SetCurViewID(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 

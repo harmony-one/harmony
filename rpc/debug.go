@@ -39,10 +39,10 @@ func (*PrivateDebugService) SetLogVerbosity(ctx context.Context, level int) (map
 	return map[string]interface{}{"verbosity": verbosity.String()}, nil
 }
 
-func (s *PrivateDebugService) ConsensusViewID(
+func (s *PrivateDebugService) ConsensusViewChangingID(
 	ctx context.Context,
 ) uint64 {
-	return s.hmy.NodeAPI.GetConsensusViewID()
+	return s.hmy.NodeAPI.GetConsensusViewChangingID()
 }
 
 func (s *PrivateDebugService) ConsensusCurViewID(

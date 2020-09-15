@@ -24,7 +24,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.current.ViewID()
+	vcMsg.ViewId = consensus.GetViewChangingID()
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address
@@ -82,7 +82,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	viewIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
+	binary.LittleEndian.PutUint64(viewIDBytes, consensus.GetViewChangingID())
 	sign1 := priKey.Pri.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
@@ -109,7 +109,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.current.ViewID()
+	vcMsg.ViewId = consensus.GetViewChangingID()
 	vcMsg.BlockNum = consensus.blockNum
 	vcMsg.ShardId = consensus.ShardID
 	// sender address

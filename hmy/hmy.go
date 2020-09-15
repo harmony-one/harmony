@@ -96,7 +96,7 @@ type NodeAPI interface {
 	// debug API
 	GetConsensusMode() string
 	GetConsensusPhase() string
-	GetConsensusViewID() uint64
+	GetConsensusViewChangingID() uint64
 	GetConsensusCurViewID() uint64
 	ShutDown()
 }

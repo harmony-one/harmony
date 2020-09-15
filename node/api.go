@@ -117,12 +117,12 @@ func (node *Node) GetConsensusPhase() string {
 	return node.Consensus.GetConsensusPhase()
 }
 
-// GetConsensusViewID returns the consensus.viewID
-func (node *Node) GetConsensusViewID() uint64 {
-	return node.Consensus.GetConsensusViewID()
+// GetConsensusViewChangingID returns the view changing ID
+func (node *Node) GetConsensusViewChangingID() uint64 {
+	return node.Consensus.GetViewChangingID()
 }
 
-// GetConsensusCurViewID returns the consensus.current.viewID
+// GetConsensusCurViewID returns the current view ID
 func (node *Node) GetConsensusCurViewID() uint64 {
-	return node.Consensus.GetConsensusCurViewID()
+	return node.Consensus.GetCurViewID()
 }

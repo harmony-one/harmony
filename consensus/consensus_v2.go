@@ -163,9 +163,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
+		consensus.getLogger().Info().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Debug().Msg("[finalizeCommits] Start consensus timer")
+		consensus.getLogger().Info().Msg("[finalizeCommits] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -179,7 +179,7 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
 	// Sleep to wait for the full block time
-	consensus.getLogger().Debug().Msg("[finalizeCommits] Waiting for Block Time")
+	consensus.getLogger().Info().Msg("[finalizeCommits] Waiting for Block Time")
 	<-time.After(time.Until(consensus.NextBlockDue))
 
 	// Send signal to Node to propose the new block for consensus
@@ -281,7 +281,7 @@ func (consensus *Consensus) tryCatchup() {
 		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
 		atomic.AddUint64(&consensus.blockNum, 1)
-		atomic.StoreUint64(&consensus.viewID, committedMsg.ViewID+1)
+		consensus.SetCurViewID(committedMsg.ViewID + 1)
 
 		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 
@@ -344,10 +344,7 @@ func (consensus *Consensus) Start(
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
-		consensus.getLogger().Debug().
-			Uint64("viewID", consensus.viewID).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
+		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 
 		vdfInProgress := false
 		// Set up next block due time.
@@ -358,7 +355,7 @@ func (consensus *Consensus) Start(
 			case <-toStart:
 				start = true
 			case <-ticker.C:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ticker")
 				if !start && isInitialLeader {
 					continue
 				}
@@ -371,26 +368,28 @@ func (consensus *Consensus) Start(
 						continue
 					}
 					if k != timeoutViewChange {
-						consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-						consensus.startViewChange(consensus.viewID + 1)
+						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
+						viewID := consensus.GetCurViewID()
+						consensus.startViewChange(viewID + 1)
 						break
 					} else {
-						consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-						viewID := consensus.current.ViewID()
+						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
+						viewID := consensus.GetViewChangingID()
 						consensus.startViewChange(viewID + 1)
 						break
 					}
 				}
 			case <-consensus.syncReadyChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncReadyChan")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-				consensus.SetViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+				consensus.SetCurViewID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+				consensus.SetViewChangingID(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] syncNotReadyChan")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
@@ -476,7 +475,7 @@ func (consensus *Consensus) Start(
 				startTime = time.Now()
 				consensus.msgSender.Reset(newBlock.NumberU64())
 
-				consensus.getLogger().Debug().
+				consensus.getLogger().Info().
 					Int("numTxs", len(newBlock.Transactions())).
 					Int("numStakingTxs", len(newBlock.StakingTransactions())).
 					Time("startTime", startTime).
@@ -485,23 +484,23 @@ func (consensus *Consensus) Start(
 				consensus.announce(newBlock)
 
 			case viewID := <-consensus.commitFinishChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] commitFinishChan")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] commitFinishChan")
 
 				// Only Leader execute this condition
 				func() {
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
-					if viewID == consensus.viewID {
+					if viewID == consensus.GetCurViewID() {
 						consensus.finalizeCommits()
 					}
 				}()
 
 			case <-stopChan:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] stopChan")
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] stopChan")
 				return
 			}
 		}
-		consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ended.")
+		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
 }
 

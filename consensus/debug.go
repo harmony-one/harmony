@@ -10,12 +10,12 @@ func (c *Consensus) GetConsensusMode() string {
 	return c.current.mode.String()
 }
 
-// GetConsensusCurViewID ..
-func (c *Consensus) GetConsensusCurViewID() uint64 {
-	return c.current.GetViewID()
+// GetCurViewID ..
+func (c *Consensus) GetCurViewID() uint64 {
+	return c.current.GetCurViewID()
 }
 
-// GetConsensusViewID ..
-func (c *Consensus) GetConsensusViewID() uint64 {
-	return c.viewID
+// GetViewID ..
+func (c *Consensus) GetViewChangingID() uint64 {
+	return c.current.GetViewChangingID()
 }

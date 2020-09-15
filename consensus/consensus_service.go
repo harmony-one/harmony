@@ -72,11 +72,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 	return marshaledMessage, nil
 }
 
-// GetViewID returns the consensus ID
-func (consensus *Consensus) GetViewID() uint64 {
-	return consensus.viewID
-}
-
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper) int64 {
@@ -199,12 +194,6 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
-// SetViewID set the viewID to the height of the blockchain
-func (consensus *Consensus) SetViewID(height uint64) {
-	consensus.viewID = height
-	consensus.current.viewID = height
-}
-
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
 	consensus.current.SetMode(m)
@@ -232,26 +221,20 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
-		consensus.viewID = msg.ViewID
-		consensus.current.SetViewID(msg.ViewID)
+		consensus.SetViewID(msg.ViewID)
 		if len(msg.SenderPubkeys) != 1 {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
+		consensus.getLogger().Debug().
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("viewID and leaderKey override")
-		utils.Logger().Debug().
-			Uint64("viewID", consensus.viewID).
-			Uint64("block", consensus.blockNum).
 			Msg("Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.viewID {
+	} else if msg.ViewID > consensus.GetCurViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.viewID {
+	} else if msg.ViewID < consensus.GetCurViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -282,7 +265,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
 		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.viewID).
+		Uint64("myViewID", consensus.GetCurViewID()).
 		Interface("phase", consensus.phase).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
@@ -470,12 +453,12 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if len(curHeader.ShardState()) == 0 && curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
-			consensus.getLogger().Debug().Err(err).
+			consensus.getLogger().Error().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
 			consensus.IgnoreViewIDCheck.Set()
 			hasError = true
 		} else {
-			consensus.getLogger().Debug().
+			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
@@ -494,10 +477,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
 				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
 				go func() {
-					utils.Logger().Debug().
+					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
-						Uint64("viewID", consensus.viewID).
-						Uint64("block", consensus.blockNum).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
 					consensus.ReadySignal <- struct{}{}
 				}()
@@ -552,4 +533,21 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
 		consensus.viewIDBitmap[viewID] = viewIDBitmap
 	}
+}
+
+// SetViewID set both current view ID and view changing ID to the height
+// of the blockchain. It is used during client startup to recover the state
+func (consensus *Consensus) SetViewID(height uint64) {
+	consensus.SetCurViewID(height)
+	consensus.SetViewChangingID(height)
+}
+
+// SetCurViewID set the current view ID
+func (consensus *Consensus) SetCurViewID(viewID uint64) {
+	consensus.current.SetCurViewID(viewID)
+}
+
+// SetViewChangingID set the current view change ID
+func (consensus *Consensus) SetViewChangingID(viewID uint64) {
+	consensus.current.SetViewChangingID(viewID)
 }
