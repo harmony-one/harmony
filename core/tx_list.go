@@ -18,15 +18,14 @@ package core
 
 import (
 	"container/heap"
-	staking "github.com/harmony-one/harmony/staking/types"
 	"math"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for
