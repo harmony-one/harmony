@@ -179,7 +179,7 @@ func New(
 	consensus.Decider = Decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{})
+	consensus.BlockNumLowChan = make(chan struct{}, 1)
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce

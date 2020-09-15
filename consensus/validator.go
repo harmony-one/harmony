@@ -191,7 +191,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnPrepared] OUT OF SYNC")
-		go consensus.spinUpStateSync()
+		consensus.spinUpStateSync()
 	}
 
 	if consensus.current.Mode() != Normal {
@@ -354,7 +354,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
-		go consensus.spinUpStateSync()
+		consensus.spinUpStateSync()
 		return
 	}
 
@@ -379,7 +379,7 @@ func (consensus *Consensus) spinUpStateSync() {
 		for _, v := range consensus.consensusTimeout {
 			v.Stop()
 		}
-	case <-time.After(1 * time.Second):
+	default:
 	}
 }
 
