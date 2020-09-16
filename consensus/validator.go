@@ -205,6 +205,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
 		return
 	}
+	consensus.FBFTLog.MarkBlockVerified(&blockObj)
 
 	if consensus.checkViewID(recvMsg) != nil {
 		if consensus.current.Mode() == Normal {

@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
 )
 
@@ -139,13 +138,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Str("blockObjHash", blockObj.Header().Hash().Hex()).
 			Msg("[OnPrepared] BlockHash not match")
-		return false
-	}
-	if err := chain.Engine.VerifySeal(consensus.ChainReader, blockObj.Header()); err != nil {
-		consensus.getLogger().Error().Err(err).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
-			Msg("[OnPrepared] Verify seal failed")
 		return false
 	}
 	return true

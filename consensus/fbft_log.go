@@ -18,9 +18,10 @@ import (
 
 // FBFTLog represents the log stored by a node during FBFT process
 type FBFTLog struct {
-	blocks     mapset.Set //store blocks received in FBFT
-	messages   mapset.Set // store messages received in FBFT
-	maxLogSize uint32
+	blocks         mapset.Set //store blocks received in FBFT
+	messages       mapset.Set // store messages received in FBFT
+	verifiedBlocks mapset.Set // store block hashes for blocks that has already been verified
+	maxLogSize     uint32
 }
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
@@ -91,6 +92,14 @@ func (log *FBFTLog) AddBlock(block *types.Block) {
 	log.blocks.Add(block)
 }
 
+func (log *FBFTLog) MarkBlockVerified(block *types.Block) {
+	log.verifiedBlocks.Add(block.Hash())
+}
+
+func (log *FBFTLog) IsBlockVerified(block *types.Block) bool {
+	return log.verifiedBlocks.Contains(block.Hash())
+}
+
 // GetBlockByHash returns the block matches the given block hash
 func (log *FBFTLog) GetBlockByHash(hash common.Hash) *types.Block {
 	var found *types.Block
@@ -120,9 +129,10 @@ func (log *FBFTLog) GetBlocksByNumber(number uint64) []*types.Block {
 func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
 	found := mapset.NewSet()
 	it := log.Blocks().Iterator()
-	for block := range it.C {
-		if block.(*types.Block).NumberU64() < number {
-			found.Add(block)
+	for item := range it.C {
+		if block := item.(*types.Block); block.NumberU64() < number {
+			found.Add(item)
+			log.verifiedBlocks.Remove(block.Hash())
 		}
 	}
 	log.blocks = log.blocks.Difference(found)
@@ -132,9 +142,10 @@ func (log *FBFTLog) DeleteBlocksLessThan(number uint64) {
 func (log *FBFTLog) DeleteBlockByNumber(number uint64) {
 	found := mapset.NewSet()
 	it := log.Blocks().Iterator()
-	for block := range it.C {
-		if block.(*types.Block).NumberU64() == number {
-			found.Add(block)
+	for item := range it.C {
+		if block := item.(*types.Block); block.NumberU64() == number {
+			found.Add(item)
+			log.verifiedBlocks.Remove(block.Hash())
 		}
 	}
 	log.blocks = log.blocks.Difference(found)
