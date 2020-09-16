@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -193,10 +192,17 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnPrepared] OUT OF SYNC")
 		consensus.spinUpStateSync()
 	}
-
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
 		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
+		return
+	}
+	if consensus.BlockVerifier == nil {
+		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
+		return
+	}
+	if err := consensus.BlockVerifier(&blockObj); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
 		return
 	}
 
@@ -306,8 +312,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
-	if err := checkCommittedMsgSanity(recvMsg); err != nil {
-		consensus.getLogger().Warn().Msg(fmt.Sprintf("[OnCommitted] %v", err))
+	if len(recvMsg.SenderPubkeys) != 1 {
+		consensus.getLogger().Warn().Msg("[OnCommitted] leader message can not have multiple sender keys")
 		return
 	}
 
@@ -381,11 +387,4 @@ func (consensus *Consensus) spinUpStateSync() {
 		}
 	default:
 	}
-}
-
-func checkCommittedMsgSanity(committedMsg *FBFTMessage) error {
-	if len(committedMsg.SenderPubkeys) != 1 {
-		return errMultipleSenderInCommitted
-	}
-	return nil
 }

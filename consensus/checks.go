@@ -141,24 +141,13 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Msg("[OnPrepared] BlockHash not match")
 		return false
 	}
-	if consensus.current.Mode() == Normal {
-		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
-				Str("MsgBlockNum", blockObj.Header().Number().String()).
-				Msg("[OnPrepared] Block header is not verified successfully")
-			return false
-		}
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(blockObj); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-			return false
-		}
+	if err := chain.Engine.VerifySeal(consensus.ChainReader, blockObj.Header()); err != nil {
+		consensus.getLogger().Error().Err(err).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Msg("[OnPrepared] Verify seal failed")
+		return false
 	}
-
 	return true
 }
 
