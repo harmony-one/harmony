@@ -221,10 +221,6 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 	return aggSig, bitmap, nil
 }
 
-var (
-	errMultipleSenderInCommitted = errors.New("leader message can not have multiple sender keys")
-)
-
 // GetLastMileBlocks get the last mile block from consensus memory cache (PBFT log)
 func (consensus *Consensus) GetLastMileBlocks(bnStart uint64) ([]*types.Block, error) {
 	consensus.mutex.Lock()
