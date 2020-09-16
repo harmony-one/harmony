@@ -586,6 +586,7 @@ type blockSignerInfo struct {
 
 // TransactionMetadata ..
 type TransactionMetadata struct {
+	// CrossShardIdentifier is the transaction identifier on the from/source shard
 	CrossShardIdentifier  *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
 	FromAccountIdentifier *types.AccountIdentifier     `json:"from_account,omitempty"`
 	ToAccountIdentifier   *types.AccountIdentifier     `json:"to_account,omitempty"`
@@ -621,7 +622,7 @@ func formatCrossShardReceiverTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	metadata, err := rpc.NewStructuredResponse(TransactionMetadata{
+	metadata, err := types.MarshalMap(TransactionMetadata{
 		CrossShardIdentifier:  ctxID,
 		ToShardID:             &cxReceipt.ToShardID,
 		FromShardID:           &cxReceipt.ShardID,
@@ -843,7 +844,7 @@ func formatTransaction(
 		hexData := hex.EncodeToString(tx.Data())
 		txMetadata.Data = &hexData
 	}
-	metadata, err := rpc.NewStructuredResponse(txMetadata)
+	metadata, err := types.MarshalMap(txMetadata)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -921,7 +922,7 @@ func getStakingOperations(
 			"message": err.Error(),
 		})
 	}
-	metadata, err := rpc.NewStructuredResponse(rpcStakingTx.Msg)
+	metadata, err := types.MarshalMap(rpcStakingTx.Msg)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -1204,7 +1205,7 @@ func newAccountIdentifier(
 			"message": err.Error(),
 		})
 	}
-	metadata, err := rpc.NewStructuredResponse(AccountMetadata{Address: address.String()})
+	metadata, err := types.MarshalMap(AccountMetadata{Address: address.String()})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),

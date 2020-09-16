@@ -23,6 +23,8 @@ import (
 const (
 	// DefaultGasPrice ..
 	DefaultGasPrice = denominations.Nano
+	// maxNumOfConstructionOps ..
+	maxNumOfConstructionOps = 2
 )
 
 // ConstructAPI implements the server.ConstructAPIServicer interface.
@@ -65,8 +67,8 @@ func (s *ConstructAPI) ConstructionDerive(
 
 // ConstructMetadataOptions is constructed by ConstructionPreprocess for ConstructionMetadata options
 type ConstructMetadataOptions struct {
-	// TxMetadata ..
-	TxMetadata *TransactionMetadata `json:"transaction_metadata"`
+	// TransactionMetadata ..
+	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
 	// SenderAddressIdentifier ..
 	SenderAddressIdentifier *types.AccountIdentifier `json:"sender"`
 	// GasPriceMultiplier to determine transaction urgency; higher = faster = more gas expenditure.
@@ -111,9 +113,31 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": fmt.Sprintf("expect from shard ID to be %v", s.hmy.ShardID),
 		})
 	}
+	if txMetadata.FromAccountIdentifier == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "require sender/from account identifier in metadata",
+		})
+	}
+	if types.Hash(txMetadata.FromAccountIdentifier) != types.Hash(txAccounts.sender) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "sender/from account identifier in metadata does not match sender for given operations",
+		})
+	}
+	if (txMetadata.ToAccountIdentifier == nil && txAccounts.receiver != nil) ||
+		(txMetadata.ToAccountIdentifier != nil && txAccounts.receiver == nil) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "receiver/to account is missing or invalid for given operations",
+		})
+	}
+	if txMetadata.ToAccountIdentifier != nil && txAccounts.receiver != nil &&
+		types.Hash(txMetadata.ToAccountIdentifier) != types.Hash(txAccounts.receiver) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "receiver/to account identifier in metadata does not match receiver for given operations",
+		})
+	}
 
-	options, err := rpc.NewStructuredResponse(ConstructMetadataOptions{
-		TxMetadata:              txMetadata,
+	options, err := types.MarshalMap(ConstructMetadataOptions{
+		TransactionMetadata:     txMetadata,
 		SenderAddressIdentifier: txAccounts.sender,
 		GasPriceMultiplier:      request.SuggestedFeeMultiplier,
 	})
@@ -130,12 +154,9 @@ func (s *ConstructAPI) ConstructionPreprocess(
 // ConstructMetadata contains all data to construct a valid transaction that cannot be
 // extracted from a transaction's operation(s).
 type ConstructMetadata struct {
-	// Nonce ..
-	Nonce uint64 `json:"nonce"`
-	// GasPrice ..
-	GasPrice *big.Int `json:"gas_price"`
-	// TxMetadata ..
-	TxMetadata *TransactionMetadata `json:"transaction_metadata"`
+	Nonce               uint64               `json:"nonce"`
+	GasPrice            *big.Int             `json:"gas_price"`
+	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
 }
 
 // UnmarshalFromInterface ..
@@ -181,9 +202,9 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}
 
 	data := hexutil.Bytes{}
-	if options.TxMetadata.Data != nil {
+	if options.TransactionMetadata.Data != nil {
 		var err error
-		if data, err = hexutil.Decode(*options.TxMetadata.Data); err != nil {
+		if data, err = hexutil.Decode(*options.TransactionMetadata.Data); err != nil {
 			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 				"message": errors.WithMessage(err, "invalid tx data format"),
 			})
@@ -201,10 +222,10 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}
 	suggestedFee, suggestedGasPrice := getSuggestedFeeAndPrice(gasMul, new(big.Int).SetUint64(estGasUsed))
 
-	metadata, err := rpc.NewStructuredResponse(ConstructMetadata{
-		Nonce:      nonce,
-		GasPrice:   suggestedGasPrice,
-		TxMetadata: options.TxMetadata,
+	metadata, err := types.MarshalMap(ConstructMetadata{
+		Nonce:               nonce,
+		GasPrice:            suggestedGasPrice,
+		TransactionMetadata: options.TransactionMetadata,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -305,8 +326,117 @@ type txAccounts struct {
 
 // assertValidOperationsAndGetTxAccounts ensures the provided operations creates a valid transaction and returns
 // the txAccounts of the resulting transaction. Note that providing a gas expenditure operation is INVALID.
+//
+// Note that all staking operations require metadata matching the operation type to be a valid. All other
+// operations do not require metadata.
 func assertValidOperationsAndGetTxAccounts(
 	operations []*types.Operation,
+) (*txAccounts, *types.Error) {
+	if len(operations) > maxNumOfConstructionOps || len(operations) == 0 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("invalid number of operations, must <= %v & > 0", maxNumOfConstructionOps),
+		})
+	}
+
+	if len(operations) == 2 {
+		return assertValidTransferOperationsAndGetTxAccounts(operations)
+	}
+	switch operations[0].Type {
+	case common.CrossShardTransferOperation:
+		return assertValidCrossShardOperationAndGetTxAccounts(operations[0])
+	case common.ContractCreationOperation:
+		return assertValidContractCreationOperationAndGetTxAccounts(operations[0])
+	default:
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "unsupported/invalid operation type",
+		})
+	}
+}
+
+// assertValidTransferOperationsAndGetTxAccounts ..
+func assertValidTransferOperationsAndGetTxAccounts(
+	operations []*types.Operation,
+) (*txAccounts, *types.Error) {
+	if len(operations) != 2 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "same shard transfers must be exactly 2 operations",
+		})
+	}
+	op0, op1 := operations[0], operations[1]
+
+	if op0.Type != common.TransferOperation || op1.Type != common.TransferOperation {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid operation type(s) for same shard transfer",
+		})
+	}
+	if types.Hash(op0.Amount.Currency) != common.CurrencyHash ||
+		types.Hash(op1.Amount.Currency) != common.CurrencyHash {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid currency for provided amounts",
+		})
+	}
+
+	val0, err := types.AmountValue(op0.Amount)
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	val1, err := types.AmountValue(op1.Amount)
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if new(big.Int).Add(val0, val1).Cmp(big.NewInt(0)) == 0 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "amount taken from sender is not exactly paid out to receiver for same shard transfer",
+		})
+	}
+
+	if len(op1.RelatedOperations) == 1 &&
+		op1.RelatedOperations[0].Index != op0.OperationIdentifier.Index {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "second operation is not related to the first operation for same shard transfer",
+		})
+	} else if len(op0.RelatedOperations) == 1 &&
+		op0.RelatedOperations[0].Index != op1.OperationIdentifier.Index {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "first operation is not related to the second operation for same shard transfer",
+		})
+	} else if len(op0.RelatedOperations) > 1 || len(op1.RelatedOperations) > 1 ||
+		len(op0.RelatedOperations)^len(op1.RelatedOperations) != 1 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operations must only relate to one another in one direction for same shard transfers",
+		})
+	}
+
+	txAccs := &txAccounts{}
+	if val0.Sign() != -1 {
+		txAccs.sender = op0.Account
+		txAccs.receiver = op1.Account
+	} else {
+		txAccs.sender = op1.Account
+		txAccs.receiver = op0.Account
+	}
+	if txAccs.sender == nil || txAccs.receiver == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "both operations must have account identifiers for same shard transfer",
+		})
+	}
+	return txAccs, nil
+}
+
+// assertValidCrossShardOperationAndGetTxAccounts ..
+func assertValidCrossShardOperationAndGetTxAccounts(
+	operation *types.Operation,
+) (*txAccounts, *types.Error) {
+	return nil, nil
+}
+
+// assertValidContractCreationOperationAndGetTxAccounts ..
+func assertValidContractCreationOperationAndGetTxAccounts(
+	operation *types.Operation,
 ) (*txAccounts, *types.Error) {
 	return nil, nil
 }

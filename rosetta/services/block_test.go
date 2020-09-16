@@ -19,7 +19,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rpc"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/staking"
 	stakingNetwork "github.com/harmony-one/harmony/staking/network"
@@ -55,7 +54,7 @@ func getMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]in
 	if err != nil {
 		return nil, err
 	}
-	return rpc.NewStructuredResponse(rpcStakingTx.Msg)
+	return types.MarshalMap(rpcStakingTx.Msg)
 }
 
 func createTestTransaction(
@@ -898,7 +897,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 	}
 	to := tx.ToShardID()
 	from := tx.ShardID()
-	refMetadata, err := rpc.NewStructuredResponse(TransactionMetadata{
+	refMetadata, err := types.MarshalMap(TransactionMetadata{
 		CrossShardIdentifier:  refCxID,
 		ToShardID:             &to,
 		FromShardID:           &from,
@@ -1002,7 +1001,7 @@ func TestNewAccountIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	metadata, err := rpc.NewStructuredResponse(AccountMetadata{Address: addr.String()})
+	metadata, err := types.MarshalMap(AccountMetadata{Address: addr.String()})
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
