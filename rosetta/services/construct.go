@@ -316,6 +316,11 @@ func getOperationComponents(
 		})
 	}
 
+	if len(operations) > 2 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "unsupported number of operations",
+		})
+	}
 	if len(operations) == 2 {
 		return getTransferOperationComponents(operations)
 	}
@@ -326,7 +331,7 @@ func getOperationComponents(
 		return getContractCreationOperationComponents(operations[0])
 	default:
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "unsupported/invalid operation type",
+			"message": "unsupported or invalid operation type",
 		})
 	}
 }
