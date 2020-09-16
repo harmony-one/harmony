@@ -39,12 +39,14 @@ func (*PrivateDebugService) SetLogVerbosity(ctx context.Context, level int) (map
 	return map[string]interface{}{"verbosity": verbosity.String()}, nil
 }
 
+// ConsensusViewChangingID return the current view changing ID to RPC
 func (s *PrivateDebugService) ConsensusViewChangingID(
 	ctx context.Context,
 ) uint64 {
 	return s.hmy.NodeAPI.GetConsensusViewChangingID()
 }
 
+// ConsensusCurViewID return the current view ID to RPC
 func (s *PrivateDebugService) ConsensusCurViewID(
 	ctx context.Context,
 ) uint64 {
