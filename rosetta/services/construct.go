@@ -106,7 +106,7 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": fmt.Sprintf("expect from shard ID to be %v", s.hmy.ShardID),
 		})
 	}
-	opComponents, rosettaError := getOperationComponents(request.Operations)
+	opComponents, rosettaError := GetOperationComponents(request.Operations)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -302,12 +302,13 @@ type OperationComponents struct {
 	StakingMessage interface{}              `json:"staking_message,omitempty"`
 }
 
-// getOperationComponents ensures the provided operations creates a valid transaction and returns
-// the OperationComponents of the resulting transaction. Note that providing a gas expenditure operation is INVALID.
+// GetOperationComponents ensures the provided operations creates a valid transaction and returns
+// the OperationComponents of the resulting transaction.
 //
-// Note that all staking operations require metadata matching the operation type to be a valid. All other
-// operations do not require metadata.
-func getOperationComponents(
+// Providing a gas expenditure operation is INVALID.
+// All staking operations require metadata matching the operation type to be a valid.
+// All non-staking operations do not require metadata.
+func GetOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
 	if len(operations) > maxNumOfConstructionOps || len(operations) == 0 {
@@ -340,11 +341,6 @@ func getOperationComponents(
 func getTransferOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
-	if len(operations) != 2 {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "same shard transfers must be exactly 2 operations",
-		})
-	}
 	op0, op1 := operations[0], operations[1]
 
 	if op0.Type != common.TransferOperation || op1.Type != common.TransferOperation {
