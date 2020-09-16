@@ -43,7 +43,7 @@ func TestConsensusInitialization(t *testing.T) {
 
 	// State / consensus.current
 	assert.Equal(t, state.mode, consensus.current.mode)
-	assert.Equal(t, state.viewID, consensus.current.viewID)
+	assert.Equal(t, state.GetViewChangingID(), consensus.current.GetViewChangingID())
 
 	// FBFT timeout
 	assert.IsType(t, make(map[TimeoutType]*utils.Timeout), consensus.consensusTimeout)
@@ -58,7 +58,7 @@ func TestConsensusInitialization(t *testing.T) {
 	assert.Equal(t, multiBLSPrivateKey.GetPublicKeys(), consensus.GetPublicKeys())
 
 	// Misc
-	assert.Equal(t, uint64(0), consensus.viewID)
+	assert.Equal(t, uint64(0), consensus.GetViewChangingID())
 	assert.Equal(t, uint32(shard.BeaconChainShardID), consensus.ShardID)
 
 	assert.IsType(t, make(chan struct{}), consensus.syncReadyChan)

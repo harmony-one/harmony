@@ -355,7 +355,7 @@ func (consensus *Consensus) Start(
 			case <-toStart:
 				start = true
 			case <-ticker.C:
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ticker")
+				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
 				if !start && isInitialLeader {
 					continue
 				}

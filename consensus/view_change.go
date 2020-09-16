@@ -186,9 +186,6 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	consensus.consensusTimeout[timeoutViewChange].Start()
-	consensus.getLogger().Info().
-		Uint64("viewChangingID", consensus.GetViewChangingID()).
-		Msg("[startViewChange] start view change timer")
 }
 
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
