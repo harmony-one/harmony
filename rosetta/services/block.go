@@ -1198,7 +1198,12 @@ type AccountMetadata struct {
 func newAccountIdentifier(
 	address ethcommon.Address,
 ) (*types.AccountIdentifier, *types.Error) {
-	b32Address, _ := internalCommon.AddressToBech32(address)
+	b32Address, err := internalCommon.AddressToBech32(address)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 	metadata, err := rpc.NewStructuredResponse(AccountMetadata{Address: address.String()})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
