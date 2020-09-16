@@ -194,6 +194,10 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
 		return false
 	}
+	if len(recvMsg.SenderPubkeys) != 1 {
+		consensus.getLogger().Error().Msg("[onViewChange] multiple signers in view change message.")
+		return false
+	}
 	return true
 }
 

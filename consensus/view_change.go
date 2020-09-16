@@ -214,10 +214,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	if len(recvMsg.SenderPubkeys) != 1 {
-		consensus.getLogger().Error().Msg("[onViewChange] multiple signers in view change message.")
-		return
-	}
+	// already checked the length of SenderPubkeys in onViewChangeSanityCheck
 	senderKey := recvMsg.SenderPubkeys[0]
 
 	consensus.vcLock.Lock()
