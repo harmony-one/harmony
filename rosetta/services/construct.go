@@ -67,12 +67,9 @@ func (s *ConstructAPI) ConstructionDerive(
 
 // ConstructMetadataOptions is constructed by ConstructionPreprocess for ConstructionMetadata options
 type ConstructMetadataOptions struct {
-	// TransactionMetadata ..
 	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
-	// SenderAddressIdentifier ..
-	SenderAddressIdentifier *types.AccountIdentifier `json:"sender"`
-	// GasPriceMultiplier to determine transaction urgency; higher = faster = more gas expenditure.
-	GasPriceMultiplier *float64 `json:"gas_price_multiplier,omitempty"`
+	OperationComponents *OperationComponents `json:"operation_components"`
+	GasPriceMultiplier  *float64             `json:"gas_price_multiplier,omitempty"`
 }
 
 // UnmarshalFromInterface ..
@@ -98,10 +95,6 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	txAccounts, rosettaError := assertValidOperationsAndGetTxAccounts(request.Operations)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
 	txMetadata := &TransactionMetadata{}
 	if err := txMetadata.UnmarshalFromInterface(request.Metadata); err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
@@ -113,33 +106,14 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": fmt.Sprintf("expect from shard ID to be %v", s.hmy.ShardID),
 		})
 	}
-	if txMetadata.FromAccountIdentifier == nil {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "require sender/from account identifier in metadata",
-		})
+	opComponents, rosettaError := getOperationComponents(request.Operations)
+	if rosettaError != nil {
+		return nil, rosettaError
 	}
-	if types.Hash(txMetadata.FromAccountIdentifier) != types.Hash(txAccounts.sender) {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "sender/from account identifier in metadata does not match sender for given operations",
-		})
-	}
-	if (txMetadata.ToAccountIdentifier == nil && txAccounts.receiver != nil) ||
-		(txMetadata.ToAccountIdentifier != nil && txAccounts.receiver == nil) {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "receiver/to account is missing or invalid for given operations",
-		})
-	}
-	if txMetadata.ToAccountIdentifier != nil && txAccounts.receiver != nil &&
-		types.Hash(txMetadata.ToAccountIdentifier) != types.Hash(txAccounts.receiver) {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "receiver/to account identifier in metadata does not match receiver for given operations",
-		})
-	}
-
 	options, err := types.MarshalMap(ConstructMetadataOptions{
-		TransactionMetadata:     txMetadata,
-		SenderAddressIdentifier: txAccounts.sender,
-		GasPriceMultiplier:      request.SuggestedFeeMultiplier,
+		TransactionMetadata: txMetadata,
+		OperationComponents: opComponents,
+		GasPriceMultiplier:  request.SuggestedFeeMultiplier,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -151,12 +125,12 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	}, nil
 }
 
-// ConstructMetadata contains all data to construct a valid transaction that cannot be
-// extracted from a transaction's operation(s).
+// ConstructMetadata contains all data to construct a valid transaction
 type ConstructMetadata struct {
 	Nonce               uint64               `json:"nonce"`
 	GasPrice            *big.Int             `json:"gas_price"`
 	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
+	OperationComponents *OperationComponents `json:"operation_components"`
 }
 
 // UnmarshalFromInterface ..
@@ -188,7 +162,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 		})
 	}
 
-	senderAddr, err := internalCommon.Bech32ToAddress(options.SenderAddressIdentifier.Address)
+	senderAddr, err := internalCommon.Bech32ToAddress(options.OperationComponents.From.Address)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": errors.WithMessage(err, "invalid sender address identifier"),
@@ -226,6 +200,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 		Nonce:               nonce,
 		GasPrice:            suggestedGasPrice,
 		TransactionMetadata: options.TransactionMetadata,
+		OperationComponents: options.OperationComponents,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -318,20 +293,23 @@ func getSuggestedFeeAndPrice(
 	}, gasPrice
 }
 
-// txAccounts is the sender and receiver of a single transaction
-type txAccounts struct {
-	sender   *types.AccountIdentifier
-	receiver *types.AccountIdentifier
+// OperationComponents are components from a set of operations to construct a valid transaction
+type OperationComponents struct {
+	Type           string                   `json:"type"`
+	From           *types.AccountIdentifier `json:"from"`
+	To             *types.AccountIdentifier `json:"to"`
+	Amount         *big.Int                 `json:"amount"`
+	StakingMessage interface{}              `json:"staking_message,omitempty"`
 }
 
-// assertValidOperationsAndGetTxAccounts ensures the provided operations creates a valid transaction and returns
-// the txAccounts of the resulting transaction. Note that providing a gas expenditure operation is INVALID.
+// getOperationComponents ensures the provided operations creates a valid transaction and returns
+// the OperationComponents of the resulting transaction. Note that providing a gas expenditure operation is INVALID.
 //
 // Note that all staking operations require metadata matching the operation type to be a valid. All other
 // operations do not require metadata.
-func assertValidOperationsAndGetTxAccounts(
+func getOperationComponents(
 	operations []*types.Operation,
-) (*txAccounts, *types.Error) {
+) (*OperationComponents, *types.Error) {
 	if len(operations) > maxNumOfConstructionOps || len(operations) == 0 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": fmt.Sprintf("invalid number of operations, must <= %v & > 0", maxNumOfConstructionOps),
@@ -339,13 +317,13 @@ func assertValidOperationsAndGetTxAccounts(
 	}
 
 	if len(operations) == 2 {
-		return assertValidTransferOperationsAndGetTxAccounts(operations)
+		return getTransferOperationComponents(operations)
 	}
 	switch operations[0].Type {
 	case common.CrossShardTransferOperation:
-		return assertValidCrossShardOperationAndGetTxAccounts(operations[0])
+		return getCrossShardOperationComponents(operations[0])
 	case common.ContractCreationOperation:
-		return assertValidContractCreationOperationAndGetTxAccounts(operations[0])
+		return getContractCreationOperationComponents(operations[0])
 	default:
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "unsupported/invalid operation type",
@@ -353,10 +331,10 @@ func assertValidOperationsAndGetTxAccounts(
 	}
 }
 
-// assertValidTransferOperationsAndGetTxAccounts ..
-func assertValidTransferOperationsAndGetTxAccounts(
+// getTransferOperationComponents ..
+func getTransferOperationComponents(
 	operations []*types.Operation,
-) (*txAccounts, *types.Error) {
+) (*OperationComponents, *types.Error) {
 	if len(operations) != 2 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "same shard transfers must be exactly 2 operations",
@@ -411,15 +389,18 @@ func assertValidTransferOperationsAndGetTxAccounts(
 		})
 	}
 
-	txAccs := &txAccounts{}
-	if val0.Sign() != -1 {
-		txAccs.sender = op0.Account
-		txAccs.receiver = op1.Account
-	} else {
-		txAccs.sender = op1.Account
-		txAccs.receiver = op0.Account
+	txAccs := &OperationComponents{
+		Type:   op0.Type,
+		Amount: new(big.Int).Abs(val0),
 	}
-	if txAccs.sender == nil || txAccs.receiver == nil {
+	if val0.Sign() != -1 {
+		txAccs.From = op0.Account
+		txAccs.To = op1.Account
+	} else {
+		txAccs.From = op1.Account
+		txAccs.To = op0.Account
+	}
+	if txAccs.From == nil || txAccs.To == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "both operations must have account identifiers for same shard transfer",
 		})
@@ -427,16 +408,18 @@ func assertValidTransferOperationsAndGetTxAccounts(
 	return txAccs, nil
 }
 
-// assertValidCrossShardOperationAndGetTxAccounts ..
-func assertValidCrossShardOperationAndGetTxAccounts(
+// getCrossShardOperationComponents ..
+func getCrossShardOperationComponents(
 	operation *types.Operation,
-) (*txAccounts, *types.Error) {
+) (*OperationComponents, *types.Error) {
+	// TODO: implement
 	return nil, nil
 }
 
-// assertValidContractCreationOperationAndGetTxAccounts ..
-func assertValidContractCreationOperationAndGetTxAccounts(
+// getContractCreationOperationComponents ..
+func getContractCreationOperationComponents(
 	operation *types.Operation,
-) (*txAccounts, *types.Error) {
+) (*OperationComponents, *types.Error) {
+	// TODO: implement
 	return nil, nil
 }

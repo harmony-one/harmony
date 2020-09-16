@@ -587,12 +587,11 @@ type blockSignerInfo struct {
 // TransactionMetadata ..
 type TransactionMetadata struct {
 	// CrossShardIdentifier is the transaction identifier on the from/source shard
-	CrossShardIdentifier  *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
-	FromAccountIdentifier *types.AccountIdentifier     `json:"from_account,omitempty"`
-	ToAccountIdentifier   *types.AccountIdentifier     `json:"to_account,omitempty"`
-	ToShardID             *uint32                      `json:"to_shard,omitempty"`
-	FromShardID           *uint32                      `json:"from_shard,omitempty"`
-	Data                  *string                      `json:"data,omitempty"`
+	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
+	ToShardID            *uint32                      `json:"to_shard,omitempty"`
+	FromShardID          *uint32                      `json:"from_shard,omitempty"`
+	Data                 *string                      `json:"data,omitempty"`
+	Logs                 []*hmytypes.Log              `json:"logs,omitempty"`
 }
 
 // UnmarshalFromInterface ..
@@ -623,11 +622,9 @@ func formatCrossShardReceiverTransaction(
 		return nil, rosettaError
 	}
 	metadata, err := types.MarshalMap(TransactionMetadata{
-		CrossShardIdentifier:  ctxID,
-		ToShardID:             &cxReceipt.ToShardID,
-		FromShardID:           &cxReceipt.ShardID,
-		FromAccountIdentifier: senderAccountID,
-		ToAccountIdentifier:   receiverAccountID,
+		CrossShardIdentifier: ctxID,
+		ToShardID:            &cxReceipt.ToShardID,
+		FromShardID:          &cxReceipt.ShardID,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -649,6 +646,9 @@ func formatCrossShardReceiverTransaction(
 				Amount: &types.Amount{
 					Value:    fmt.Sprintf("%v", cxReceipt.Amount),
 					Currency: &common.Currency,
+				},
+				Metadata: map[string]interface{}{
+					"from_account": senderAccountID,
 				},
 			},
 		},
@@ -817,24 +817,6 @@ func formatTransaction(
 
 	// Set all possible metadata
 	var txMetadata TransactionMetadata
-	senderAddr, err := tx.SenderAddress()
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	senderAccountID, rosettaError := newAccountIdentifier(senderAddr)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	txMetadata.FromAccountIdentifier = senderAccountID
-	if tx.To() != nil {
-		receiverAccountID, rosettaError := newAccountIdentifier(*tx.To())
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		txMetadata.ToAccountIdentifier = receiverAccountID
-	}
 	if isCrossShard {
 		txMetadata.CrossShardIdentifier = txID
 		txMetadata.ToShardID = &toShard
@@ -843,6 +825,7 @@ func formatTransaction(
 	if len(tx.Data()) > 0 && !isStaking {
 		hexData := hex.EncodeToString(tx.Data())
 		txMetadata.Data = &hexData
+		txMetadata.Logs = receipt.Logs
 	}
 	metadata, err := types.MarshalMap(txMetadata)
 	if err != nil {

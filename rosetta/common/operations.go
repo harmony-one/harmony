@@ -5,6 +5,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
 const (
 	// ExpendGasOperation ..
 	ExpendGasOperation = "Gas"

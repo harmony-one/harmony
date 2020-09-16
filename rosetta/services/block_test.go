@@ -93,6 +93,23 @@ func createTestContractCreationTransaction(
 	return hmytypes.SignTx(tx, signer, fromKey)
 }
 
+// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
+func assertOperationTypeUniquenessInvariant(operations []*types.Operation) error {
+	foundType := ""
+	for _, op := range operations {
+		if op.Type == common.ExpendGasOperation {
+			continue
+		}
+		if foundType == "" {
+			foundType = op.Type
+		}
+		if op.Type != foundType {
+			return fmt.Errorf("found more than 1 type in given set of operations")
+		}
+	}
+	return nil
+}
+
 // Note that this test only checks the general format of each type transaction on Harmony.
 // The detailed operation checks for each type of transaction is done in separate unit tests.
 func TestFormatTransactionIntegration(t *testing.T) {
@@ -146,6 +163,9 @@ func testFormatStakingTransaction(
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
 	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
+	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
 	}
@@ -158,8 +178,8 @@ func testFormatStakingTransaction(
 	if reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
 		t.Error("Expected staking operation to have some metadata")
 	}
-	if rosettaTx.Metadata == nil || rosettaTx.Metadata["from_account"] == nil {
-		t.Error("Expected transaction metadata to have from_account")
+	if !reflect.DeepEqual(rosettaTx.Metadata, map[string]interface{}{}) {
+		t.Error("Expected transaction to have no metadata")
 	}
 	if !reflect.DeepEqual(rosettaTx.Operations[0].Account, senderAccID) {
 		t.Error("Expected sender to pay gas fee")
@@ -196,6 +216,9 @@ func testFormatPlainTransaction(
 	}
 	if len(rosettaTx.Operations) != 3 {
 		t.Error("Expected 3 operations")
+	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
@@ -234,6 +257,9 @@ func TestFormatGenesisTransaction(t *testing.T) {
 		}
 		if len(tx.Operations) != 1 {
 			t.Error("expected exactly 1 operation")
+		}
+		if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+			t.Error(err)
 		}
 		if tx.Operations[0].OperationIdentifier.Index != 0 {
 			t.Error("expected operational ID to be 0")
@@ -274,6 +300,9 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	}
 	if len(tx.Operations) != 1 {
 		t.Fatal("Expected exactly 1 operation")
+	}
+	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+		t.Error(err)
 	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
 		t.Error("expected operational ID to be 0")
@@ -349,6 +378,9 @@ func TestFormatUndelegationPayoutTransaction(t *testing.T) {
 	if len(tx.Operations) != 1 {
 		t.Fatal("expected tx operations to be of length 1")
 	}
+	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+		t.Error(err)
+	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
 		t.Error("Expect first operation to be index 0")
 	}
@@ -401,6 +433,9 @@ func testFormatCrossShardSenderTransaction(
 	}
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
+	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
@@ -485,6 +520,9 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestGetStakingOperationsFromDelegate(t *testing.T) {
@@ -545,6 +583,9 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -607,6 +648,9 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
@@ -668,6 +712,9 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestGetStakingOperationsFromEditValidator(t *testing.T) {
@@ -721,6 +768,9 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -793,6 +843,9 @@ func TestNewTransferOperations(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 
 	// Test successful plain / contract transaction
 	refOperations[0].Status = common.SuccessOperationStatus.Status
@@ -804,6 +857,9 @@ func TestNewTransferOperations(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -849,6 +905,9 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestFormatCrossShardReceiverTransaction(t *testing.T) {
@@ -893,16 +952,17 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
+			Metadata: map[string]interface{}{
+				"from_account": senderAccID,
+			},
 		},
 	}
 	to := tx.ToShardID()
 	from := tx.ShardID()
 	refMetadata, err := types.MarshalMap(TransactionMetadata{
-		CrossShardIdentifier:  refCxID,
-		ToShardID:             &to,
-		FromShardID:           &from,
-		FromAccountIdentifier: senderAccID,
-		ToAccountIdentifier:   receiverAccID,
+		CrossShardIdentifier: refCxID,
+		ToShardID:            &to,
+		FromShardID:          &from,
 	})
 	refRosettaTx := &types.Transaction{
 		TransactionIdentifier: refCxID,
@@ -915,6 +975,9 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 	}
 	if !reflect.DeepEqual(rosettaTx, refRosettaTx) {
 		t.Errorf("Expected transaction to be %v not %v", refRosettaTx, rosettaTx)
+	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -978,6 +1041,9 @@ func TestNewContractCreationOperations(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 
 	// Test successful contract creation
 	refOperations[0].Status = common.SuccessOperationStatus.Status
@@ -988,6 +1054,9 @@ func TestNewContractCreationOperations(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
