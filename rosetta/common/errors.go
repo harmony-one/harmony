@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/harmony-one/harmony/rpc"
 )
 
 var (
@@ -82,7 +81,7 @@ var (
 // NewError create a new error with a given detail structure
 func NewError(rosettaError types.Error, detailStructure interface{}) *types.Error {
 	newError := rosettaError
-	details, err := rpc.NewStructuredResponse(detailStructure)
+	details, err := types.MarshalMap(detailStructure)
 	if err != nil {
 		newError.Details = map[string]interface{}{
 			"message": fmt.Sprintf("unable to get error details: %v", err.Error()),

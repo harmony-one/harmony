@@ -70,19 +70,3 @@ var (
 		Successful: false,
 	}
 )
-
-// GetValidConstructionOperations ..
-func GetValidConstructionOperations() map[string]interface{} {
-	var valid struct{}
-	return map[string]interface{}{
-		TransferOperation:           valid,
-		CrossShardTransferOperation: valid,
-		ContractCreationOperation:   valid,
-		// TODO (dm): Implement staking tx construction
-		//staking.DirectiveCreateValidator.String(): valid,
-		//staking.DirectiveEditValidator.String(): valid,
-		//staking.DirectiveDelegate.String(): valid,
-		//staking.DirectiveUndelegate.String(): valid,
-		//staking.DirectiveCollectRewards.String(): valid,
-	}
-}

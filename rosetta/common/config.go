@@ -7,7 +7,6 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -43,6 +42,9 @@ var (
 		Symbol:   Symbol,
 		Decimals: Decimals,
 	}
+
+	// CurrencyHash for quick equivalent checks
+	CurrencyHash = types.Hash(Currency)
 )
 
 // SyncStatus ..
@@ -81,7 +83,7 @@ func (s *SubNetworkMetadata) UnmarshalFromInterface(metadata interface{}) error 
 
 // GetNetwork fetches the networking identifier for the given shard
 func GetNetwork(shardID uint32) (*types.NetworkIdentifier, error) {
-	metadata, err := rpc.NewStructuredResponse(SubNetworkMetadata{
+	metadata, err := types.MarshalMap(SubNetworkMetadata{
 		IsBeacon: shardID == shard.BeaconChainShardID,
 	})
 	if err != nil {
