@@ -501,6 +501,13 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Info().Str("myKey", newLeaderKey.Bytes.Hex()).Msg("[onViewChange] I am the New Leader")
+	} else {
+		// based on PBFT paper 4.5.2, reset my own view changing ID to the lowest view changing ID in the view change message
+		// and restart the view change again
+		if recvMsg.ViewID < consensus.GetViewChangingID() {
+			consensus.SetViewChangingID(recvMsg.ViewID)
+			consensus.startViewChange(recvMsg.ViewID)
+		}
 	}
 }
 
