@@ -66,8 +66,14 @@ func (m *FBFTMessage) String() string {
 func NewFBFTLog() *FBFTLog {
 	blocks := mapset.NewSet()
 	messages := mapset.NewSet()
+	verified := mapset.NewSet()
 	logSize := maxLogSize
-	pbftLog := FBFTLog{blocks: blocks, messages: messages, maxLogSize: logSize}
+	pbftLog := FBFTLog{
+		blocks:         blocks,
+		messages:       messages,
+		verifiedBlocks: verified,
+		maxLogSize:     logSize,
+	}
 	return &pbftLog
 }
 
