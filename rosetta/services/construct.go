@@ -98,7 +98,7 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	txMetadata := &TransactionMetadata{}
 	if err := txMetadata.UnmarshalFromInterface(request.Metadata); err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid transaction metadata"),
+			"message": errors.WithMessage(err, "invalid transaction metadata").Error(),
 		})
 	}
 	if txMetadata.FromShardID != nil && *txMetadata.FromShardID != s.hmy.ShardID {
@@ -158,14 +158,14 @@ func (s *ConstructAPI) ConstructionMetadata(
 	options := &ConstructMetadataOptions{}
 	if err := options.UnmarshalFromInterface(request.Options); err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid metadata option(s)"),
+			"message": errors.WithMessage(err, "invalid metadata option(s)").Error(),
 		})
 	}
 
 	senderAddr, err := internalCommon.Bech32ToAddress(options.OperationComponents.From.Address)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid sender address identifier"),
+			"message": errors.WithMessage(err, "invalid sender address identifier").Error(),
 		})
 	}
 	nonce, err := s.hmy.GetPoolNonce(ctx, senderAddr)
@@ -180,14 +180,14 @@ func (s *ConstructAPI) ConstructionMetadata(
 		var err error
 		if data, err = hexutil.Decode(*options.TransactionMetadata.Data); err != nil {
 			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-				"message": errors.WithMessage(err, "invalid tx data format"),
+				"message": errors.WithMessage(err, "invalid tx data format").Error(),
 			})
 		}
 	}
 	estGasUsed, err := rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{Data: &data}, nil)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid tx data"),
+			"message": errors.WithMessage(err, "invalid tx data").Error(),
 		})
 	}
 	gasMul := float64(1)
@@ -306,7 +306,7 @@ type OperationComponents struct {
 // the OperationComponents of the resulting transaction.
 //
 // Providing a gas expenditure operation is INVALID.
-// All staking operations require metadata matching the operation type to be a valid.
+// All staking & cross-shard operations require metadata matching the operation type to be a valid.
 // All non-staking operations do not require metadata.
 func GetOperationComponents(
 	operations []*types.Operation,
@@ -342,16 +342,9 @@ func getTransferOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
 	op0, op1 := operations[0], operations[1]
-
 	if op0.Type != common.TransferOperation || op1.Type != common.TransferOperation {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid operation type(s) for same shard transfer",
-		})
-	}
-	if types.Hash(op0.Amount.Currency) != common.CurrencyHash ||
-		types.Hash(op1.Amount.Currency) != common.CurrencyHash {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "invalid currency for provided amounts",
 		})
 	}
 
@@ -372,7 +365,19 @@ func getTransferOperationComponents(
 			"message": "amount taken from sender is not exactly paid out to receiver for same shard transfer",
 		})
 	}
+	if types.Hash(op0.Amount.Currency) != common.CurrencyHash ||
+		types.Hash(op1.Amount.Currency) != common.CurrencyHash {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid currency for provided amounts",
+		})
+	}
 
+	if op0.RelatedOperations == nil {
+		op0.RelatedOperations = []*types.OperationIdentifier{}
+	}
+	if op1.RelatedOperations == nil {
+		op1.RelatedOperations = []*types.OperationIdentifier{}
+	}
 	if len(op1.RelatedOperations) == 1 &&
 		op1.RelatedOperations[0].Index != op0.OperationIdentifier.Index {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
@@ -390,37 +395,101 @@ func getTransferOperationComponents(
 		})
 	}
 
-	txAccs := &OperationComponents{
+	components := &OperationComponents{
 		Type:   op0.Type,
 		Amount: new(big.Int).Abs(val0),
 	}
 	if val0.Sign() != -1 {
-		txAccs.From = op0.Account
-		txAccs.To = op1.Account
+		components.From = op0.Account
+		components.To = op1.Account
 	} else {
-		txAccs.From = op1.Account
-		txAccs.To = op0.Account
+		components.From = op1.Account
+		components.To = op0.Account
 	}
-	if txAccs.From == nil || txAccs.To == nil {
+	if components.From == nil || components.To == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "both operations must have account identifiers for same shard transfer",
 		})
 	}
-	return txAccs, nil
+	return components, nil
 }
 
 // getCrossShardOperationComponents ..
 func getCrossShardOperationComponents(
 	operation *types.Operation,
 ) (*OperationComponents, *types.Error) {
-	// TODO: implement
-	return nil, nil
+	metadata := common.CrossShardTransactionOperationMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+	amount, err := types.AmountValue(operation.Amount)
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if amount.Sign() == 1 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "sender amount must not be positive for cross shard transfer",
+		})
+	}
+	if types.Hash(operation.Amount.Currency) != common.CurrencyHash {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid currency for provided amounts",
+		})
+	}
+
+	components := &OperationComponents{
+		Type:   operation.Type,
+		To:     metadata.To,
+		From:   metadata.From,
+		Amount: new(big.Int).Abs(amount),
+	}
+	if components.From == nil || components.To == nil || operation.Account == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from & receiver/to identifiers for cross shard transfer",
+		})
+	}
+	if types.Hash(operation.Account) != types.Hash(components.From) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation account identifier does not match sender/from identifiers for cross shard transfer",
+		})
+	}
+	return components, nil
 }
 
 // getContractCreationOperationComponents ..
 func getContractCreationOperationComponents(
 	operation *types.Operation,
 ) (*OperationComponents, *types.Error) {
-	// TODO: implement
-	return nil, nil
+	amount, err := types.AmountValue(operation.Amount)
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if amount.Sign() == 1 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "sender amount must not be positive for contract creation",
+		})
+	}
+	if types.Hash(operation.Amount.Currency) != common.CurrencyHash {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid currency for provided amounts",
+		})
+	}
+
+	components := &OperationComponents{
+		Type:   operation.Type,
+		From:   operation.Account,
+		Amount: new(big.Int).Abs(amount),
+	}
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for contract creation",
+		})
+	}
+	return components, nil
 }

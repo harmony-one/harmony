@@ -631,6 +631,15 @@ func formatCrossShardReceiverTransaction(
 			"message": err.Error(),
 		})
 	}
+	opMetadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccountID,
+		To:   receiverAccountID,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 
 	return &types.Transaction{
 		TransactionIdentifier: ctxID,
@@ -647,9 +656,7 @@ func formatCrossShardReceiverTransaction(
 					Value:    fmt.Sprintf("%v", cxReceipt.Amount),
 					Currency: &common.Currency,
 				},
-				Metadata: map[string]interface{}{
-					"from_account": senderAccountID,
-				},
+				Metadata: opMetadata,
 			},
 		},
 	}, nil
@@ -1109,6 +1116,19 @@ func newCrossShardSenderTransferOperations(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
+	receiverAccountID, rosettaError := newAccountIdentifier(*tx.To())
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	metadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccountID,
+		To:   receiverAccountID,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 
 	return []*types.Operation{
 		{
@@ -1125,6 +1145,7 @@ func newCrossShardSenderTransferOperations(
 				Value:    fmt.Sprintf("-%v", tx.Value()),
 				Currency: &common.Currency,
 			},
+			Metadata: metadata,
 		},
 	}, nil
 }

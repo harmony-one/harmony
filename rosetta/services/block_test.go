@@ -880,6 +880,17 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 	startingOpID := &types.OperationIdentifier{}
+	receiverAccID, rosettaError := newAccountIdentifier(*tx.To())
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	metadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccID,
+		To:   receiverAccID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	refOperations := []*types.Operation{
 		{
@@ -896,6 +907,7 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
+			Metadata: metadata,
 		},
 	}
 	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx)
@@ -938,6 +950,13 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 		ToShardID: 1,
 		Amount:    tx.Value(),
 	}
+	opMetadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccID,
+		To:   receiverAccID,
+	})
+	if err != nil {
+		t.Error(err)
+	}
 
 	refCxID := &types.TransactionIdentifier{Hash: tx.Hash().String()}
 	refOperations := []*types.Operation{
@@ -952,9 +971,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{
-				"from_account": senderAccID,
-			},
+			Metadata: opMetadata,
 		},
 	}
 	to := tx.ToShardID()
