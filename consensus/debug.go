@@ -19,3 +19,8 @@ func (c *Consensus) GetCurViewID() uint64 {
 func (c *Consensus) GetViewChangingID() uint64 {
 	return c.current.GetViewChangingID()
 }
+
+// GetBlockNum return the current blockNum of the consensus struct
+func (c *Consensus) GetBlockNum() uint64 {
+	return c.blockNum
+}

@@ -121,6 +121,14 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
+	// Temporary flag to control whether multi-sig signing is enabled
+	MultiSig bool
+
+	// TODO (leo): an new metrics system to keep track of the consensus/viewchange
+	// finality of previous consensus in the unit of milliseconds
+	finality int64
+	// finalityCounter keep tracks of the finality time
+	finalityCounter int64
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

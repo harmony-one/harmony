@@ -93,6 +93,8 @@ type NodeAPI interface {
 	ListTopic() []string
 	ListBlockedPeer() []peer.ID
 
+	GetConsensusInternal() commonRPC.ConsensusInternal
+
 	// debug API
 	GetConsensusMode() string
 	GetConsensusPhase() string
@@ -176,6 +178,8 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 	c := commonRPC.C{}
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
 
+	consensusInternal := hmy.NodeAPI.GetConsensusInternal()
+
 	return commonRPC.NodeMetadata{
 		BLSPublicKey:   blsKeys,
 		Version:        nodeconfig.GetVersion(),
@@ -190,6 +194,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		Archival:       cfg.GetArchival(),
 		NodeBootTime:   hmy.NodeAPI.GetNodeBootTime(),
 		PeerID:         nodeconfig.GetPeerID(),
+		Consensus:      consensusInternal,
 		C:              c,
 	}
 }

@@ -54,6 +54,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 		return
 	}
+	consensus.StartFinalityCount()
 	consensus.prepare()
 }
 
