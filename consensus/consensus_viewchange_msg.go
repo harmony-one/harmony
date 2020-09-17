@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // construct the view change message
@@ -19,19 +18,15 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
 		Request: &msg_pb.Message_Viewchange{
-			Viewchange: &msg_pb.ViewChangeRequest{},
+			Viewchange: &msg_pb.ViewChangeRequest{
+				ViewId:       consensus.GetViewChangingID(),
+				BlockNum:     consensus.blockNum,
+				ShardId:      consensus.ShardID,
+				SenderPubkey: priKey.Pub.Bytes[:],
+				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
+			},
 		},
 	}
-
-	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.current.ViewID()
-	vcMsg.BlockNum = consensus.blockNum
-	vcMsg.ShardId = consensus.ShardID
-	// sender address
-	vcMsg.SenderPubkey = priKey.Pub.Bytes[:]
-
-	// next leader key already updated
-	vcMsg.LeaderPubkey = consensus.LeaderPubKey.Bytes[:]
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 		msg_pb.MessageType_PREPARED, consensus.blockNum,
@@ -41,7 +36,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	var encodedBlock []byte
 	if preparedMsg != nil {
 		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
-		utils.Logger().Debug().
+		consensus.getLogger().Debug().
 			Interface("Block", block).
 			Interface("preparedMsg", preparedMsg).
 			Msg("[constructViewChangeMessage] found prepared msg")
@@ -58,6 +53,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		}
 	}
 
+	vcMsg := message.GetViewchange()
 	var msgToSign []byte
 	if len(encodedBlock) == 0 {
 		msgToSign = NIL // m2 type message
@@ -69,7 +65,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		vcMsg.PreparedBlock = encodedBlock
 	}
 
-	utils.Logger().Debug().
+	consensus.getLogger().Debug().
 		Hex("m1Payload", vcMsg.Payload).
 		Str("pubKey", consensus.GetPublicKeys().SerializeToHexStr()).
 		Msg("[constructViewChangeMessage]")
@@ -78,21 +74,21 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	if sign != nil {
 		vcMsg.ViewchangeSig = sign.Serialize()
 	} else {
-		utils.Logger().Error().Msg("unable to serialize m1/m2 view change message signature")
+		consensus.getLogger().Error().Msg("unable to serialize m1/m2 view change message signature")
 	}
 
 	viewIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(viewIDBytes, consensus.current.ViewID())
+	binary.LittleEndian.PutUint64(viewIDBytes, consensus.GetViewChangingID())
 	sign1 := priKey.Pri.SignHash(viewIDBytes)
 	if sign1 != nil {
 		vcMsg.ViewidSig = sign1.Serialize()
 	} else {
-		utils.Logger().Error().Msg("unable to serialize viewID signature")
+		consensus.getLogger().Error().Msg("unable to serialize viewID signature")
 	}
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
 	if err != nil {
-		utils.Logger().Error().Err(err).
+		consensus.getLogger().Err(err).
 			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)
@@ -104,16 +100,16 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
 		Request: &msg_pb.Message_Viewchange{
-			Viewchange: &msg_pb.ViewChangeRequest{},
+			Viewchange: &msg_pb.ViewChangeRequest{
+				ViewId:       consensus.GetViewChangingID(),
+				BlockNum:     consensus.blockNum,
+				ShardId:      consensus.ShardID,
+				SenderPubkey: priKey.Pub.Bytes[:],
+			},
 		},
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.ViewId = consensus.current.ViewID()
-	vcMsg.BlockNum = consensus.blockNum
-	vcMsg.ShardId = consensus.ShardID
-	// sender address
-	vcMsg.SenderPubkey = priKey.Pub.Bytes[:]
 	vcMsg.Payload = consensus.m1Payload
 	if len(consensus.m1Payload) != 0 {
 		block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
@@ -129,7 +125,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 	}
 
 	sig2arr := consensus.GetNilSigsArray(viewID)
-	utils.Logger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
+	consensus.getLogger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
 	if len(sig2arr) > 0 {
 		m2Sig := bls_cosi.AggregateSig(sig2arr)
 		vcMsg.M2Aggsigs = m2Sig.Serialize()
@@ -147,7 +143,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
 	if err != nil {
-		utils.Logger().Error().Err(err).
+		consensus.getLogger().Err(err).
 			Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
 	}
 	return proto.ConstructConsensusMessage(marshaledMessage)

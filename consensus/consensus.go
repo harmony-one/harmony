@@ -77,7 +77,6 @@ type Consensus struct {
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
-	viewID   uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
@@ -199,7 +198,7 @@ func New(
 	// viewID has to be initialized as the height of
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
-	consensus.viewID = 0
+	consensus.SetCurViewID(0)
 	consensus.ShardID = shard
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})

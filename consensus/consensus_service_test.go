@@ -31,7 +31,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	consensus.viewID = 2
+	consensus.SetCurViewID(2)
 	blockHash := [32]byte{}
 	consensus.blockHash = blockHash
 
@@ -72,7 +72,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	consensus.viewID = 2
+	consensus.SetCurViewID(2)
 	consensus.blockHash = [32]byte{}
 
 	msg := &msg_pb.Message{}
@@ -105,8 +105,8 @@ func TestSetViewID(t *testing.T) {
 	}
 
 	height := uint64(1000)
-	consensus.SetViewID(height)
-	if consensus.viewID != height {
-		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.viewID, height)
+	consensus.SetViewIDs(height)
+	if consensus.GetCurViewID() != height {
+		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.GetCurViewID(), height)
 	}
 }

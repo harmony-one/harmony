@@ -456,6 +456,12 @@ func (node *Node) validateShardBoundMessage(
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
 			return nil, nil, true, nil
 		}
+	} else {
+		// ignore newview message if the node is not in viewchanging mode
+		switch m.Type {
+		case msg_pb.MessageType_NEWVIEW:
+			return nil, nil, true, nil
+		}
 	}
 
 	// ignore message not intended for leader, but still forward them to the network
