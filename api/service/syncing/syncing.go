@@ -959,7 +959,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 
 func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIt(curNumber + 1)
+	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
 	if err != nil {
 		return err
 	}
