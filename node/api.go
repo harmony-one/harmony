@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/rpc/filters"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -125,4 +126,21 @@ func (node *Node) GetConsensusViewChangingID() uint64 {
 // GetConsensusCurViewID returns the current view ID
 func (node *Node) GetConsensusCurViewID() uint64 {
 	return node.Consensus.GetCurViewID()
+}
+
+// GetConsensusBlockNum returns the current block number of the consensus
+func (node *Node) GetConsensusBlockNum() uint64 {
+	return node.Consensus.GetBlockNum()
+}
+
+// GetConsensusInternal returns consensus internal data
+func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
+	return rpc_common.ConsensusInternal{
+		ViewID:        node.GetConsensusCurViewID(),
+		ViewChangeID:  node.GetConsensusViewChangingID(),
+		Mode:          node.GetConsensusMode(),
+		Phase:         node.GetConsensusPhase(),
+		BlockNum:      node.GetConsensusBlockNum(),
+		ConsensusTime: node.Consensus.GetFinality(),
+	}
 }

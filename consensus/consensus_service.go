@@ -535,3 +535,19 @@ func (consensus *Consensus) SetCurViewID(viewID uint64) {
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
 }
+
+// StartFinalityCount set the finality counter to current time
+func (consensus *Consensus) StartFinalityCount() {
+	consensus.finalityCounter = time.Now().UnixNano()
+}
+
+// FinishFinalityCount calculate the current finality
+func (consensus *Consensus) FinishFinalityCount() {
+	d := time.Now().UnixNano()
+	consensus.finality = (d - consensus.finalityCounter) / 1000000
+}
+
+// GetFinality returns the finality time in milliseconds of previous consensus
+func (consensus *Consensus) GetFinality() int64 {
+	return consensus.finality
+}

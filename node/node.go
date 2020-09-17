@@ -43,6 +43,8 @@ import (
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -119,6 +121,9 @@ type Node struct {
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
+
+	Metrics metrics.Registry
+
 	// metrics of p2p messages
 	NumP2PMessages     uint32
 	NumTotalMessages   uint32
