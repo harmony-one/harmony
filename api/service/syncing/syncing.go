@@ -943,6 +943,8 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Error().Err(err).
 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
+			ss.purgeOldBlocksFromCache()
+			break
 		}
 		ss.purgeOldBlocksFromCache()
 	}
@@ -956,13 +958,19 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 }
 
 func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
-	curNumber := bc.CurrentBlock().Number()
-	blocks, err := consensus.GetLastMileBlocks(curNumber.Uint64())
+	curNumber := bc.CurrentBlock().NumberU64()
+	blockIter, err := consensus.GetLastMileBlockIt(curNumber + 1)
 	if err != nil {
 		return err
 	}
-	if _, err := bc.InsertChain(blocks, true); err != nil {
-		return errors.Wrap(err, "failed to InsertChain")
+	for {
+		block := blockIter.Next()
+		if block == nil {
+			break
+		}
+		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			return errors.Wrap(err, "failed to InsertChain")
+		}
 	}
 	consensus.FBFTLog.PruneCacheBeforeBlock(bc.CurrentBlock().NumberU64() + 1)
 	return nil

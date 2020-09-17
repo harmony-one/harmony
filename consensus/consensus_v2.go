@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -296,26 +298,17 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	if err := consensus.OnConsensusDone(blk); err != nil {
 		return err
 	}
-<<<<<<< HEAD
-	if currentBlockNum < consensus.blockNum {
-		consensus.switchPhase("TryCatchup", FBFTAnnounce)
-=======
 
 	atomic.AddUint64(&consensus.blockNum, 1)
-	consensus.SetCurViewID(committedMsg.ViewID + 1)
-	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.LeaderPubKey = committedMsg.SenderPubkey
 	consensus.ResetState()
 	return nil
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
 	if initBN < consensus.blockNum {
-		consensus.getLogger().Info().
-			Uint64("From", initBN).
-			Uint64("To", consensus.blockNum).
-			Msg("[TryCatchup] Caught up!")
-		consensus.switchPhase(FBFTAnnounce, true)
->>>>>>> [consensus] refactored and optimized tryCatchup logic
+		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
 	if initBN < consensus.blockNum && consensus.IsViewChangingMode() {
@@ -506,6 +499,54 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
+}
+
+// LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
+// All blocks returned are guaranteed to pass the verification.
+type LastMileBlockIter struct {
+	blockCandidates []*types.Block
+	fbftLog         FBFTLog
+	verify          func(*types.Block) error
+	curIndex        int
+	logger          *zerolog.Logger
+}
+
+// GetLastMileBlockIt get the iterator of the last mile blocks starting from number bnStart
+func (consensus *Consensus) GetLastMileBlockIt(bnStart uint64) (*LastMileBlockIter, error) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	if consensus.BlockVerifier == nil {
+		return nil, errors.New("consensus haven't initialized yet")
+	}
+	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
+	if err != nil {
+		return nil, err
+	}
+	return &LastMileBlockIter{
+		blockCandidates: blocks,
+		verify:          consensus.BlockVerifier,
+		curIndex:        0,
+		logger:          consensus.getLogger(),
+	}, nil
+}
+
+// Next iterate to the next last mile block
+func (iter *LastMileBlockIter) Next() *types.Block {
+	if iter.curIndex >= len(iter.blockCandidates) {
+		return nil
+	}
+	block := iter.blockCandidates[iter.curIndex]
+	iter.curIndex++
+
+	if !iter.fbftLog.IsBlockVerified(block) {
+		if err := iter.verify(block); err != nil {
+			iter.logger.Debug().Err(err).Msg("block verification failed in consensus last mile block")
+			return nil
+		}
+		iter.fbftLog.MarkBlockVerified(block)
+	}
+	return block
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
