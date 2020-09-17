@@ -178,6 +178,19 @@ func (consensus *Consensus) finalizeCommits() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
+	// reset viewIDs for each epoch
+	isNewEpoch := len(block.Header().ShardState()) > 0
+	if isNewEpoch {
+		consensus.getLogger().Info().
+			Uint64("blockNum", block.NumberU64()).
+			Uint64("epochNum", block.Epoch().Uint64()).
+			Uint64("ViewId", block.Header().ViewID().Uint64()).
+			Uint64("MyCurViewId", consensus.GetCurViewID()).
+			Uint64("MyViewChangingId", consensus.GetViewChangingID()).
+			Msg("Reset View ID per epoch")
+		consensus.SetViewIDs(block.NumberU64() + 1)
+	}
+
 	// Sleep to wait for the full block time
 	consensus.getLogger().Info().Msg("[finalizeCommits] Waiting for Block Time")
 	<-time.After(time.Until(consensus.NextBlockDue))

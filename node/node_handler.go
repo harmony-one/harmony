@@ -385,6 +385,18 @@ func (node *Node) PostConsensusProcessing(
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
 				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
 				Msg("BINGO !!! Reached Consensus")
+			// reset viewIDs for each epoch
+			isNewEpoch := len(newBlock.Header().ShardState()) > 0
+			if isNewEpoch {
+				utils.Logger().Info().
+					Uint64("blockNum", newBlock.NumberU64()).
+					Uint64("epochNum", newBlock.Epoch().Uint64()).
+					Uint64("ViewId", newBlock.Header().ViewID().Uint64()).
+					Uint64("MyCurViewId", node.GetConsensusCurViewID()).
+					Uint64("MyViewChangingId", node.GetConsensusViewChangingID()).
+					Msg("Reset View ID per epoch")
+				node.Consensus.SetViewIDs(newBlock.NumberU64() + 1)
+			}
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
