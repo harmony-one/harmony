@@ -60,8 +60,7 @@ func (s *ConstructAPI) ConstructionDerive(
 		return nil, rosettaError
 	}
 	return &types.ConstructionDeriveResponse{
-		Address:  accountID.Address,
-		Metadata: accountID.Metadata,
+		AccountIdentifier: accountID,
 	}, nil
 }
 
@@ -128,6 +127,7 @@ func (s *ConstructAPI) ConstructionPreprocess(
 // ConstructMetadata contains all data to construct a valid transaction
 type ConstructMetadata struct {
 	Nonce               uint64               `json:"nonce"`
+	ChainID             uint64               `json:"chain_id"`
 	GasPrice            *big.Int             `json:"gas_price"`
 	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
 	OperationComponents *OperationComponents `json:"operation_components"`
@@ -199,6 +199,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 	metadata, err := types.MarshalMap(ConstructMetadata{
 		Nonce:               nonce,
 		GasPrice:            suggestedGasPrice,
+		ChainID:             s.hmy.ChainID,
 		TransactionMetadata: options.TransactionMetadata,
 		OperationComponents: options.OperationComponents,
 	})
