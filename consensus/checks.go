@@ -173,14 +173,9 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		Uint64("MsgViewChangingID", recvMsg.ViewID).
 		Msg("onViewChange")
 
-	if consensus.blockNum > recvMsg.BlockNum {
-		consensus.getLogger().Debug().
-			Msg("[onViewChange] Message BlockNum Is Low")
-		return false
-	}
-	if consensus.blockNum < recvMsg.BlockNum {
+	if consensus.blockNum != recvMsg.BlockNum {
 		consensus.getLogger().Warn().
-			Msg("[onViewChange] New Leader Has Lower Blocknum")
+			Msg("[onViewChange] MsgBlockNum is different from my BlockNumber")
 		return false
 	}
 	if consensus.IsViewChangingMode() &&
