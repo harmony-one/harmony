@@ -670,7 +670,7 @@ func formatGenesisTransaction(
 	targetB32Addr := internalCommon.MustAddressToBech32(targetAddr)
 	genesisSpec := getGenesisSpec(shardID)
 	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
-		b32Addr, _ = internalCommon.AddressToBech32(*tx.To())
+		b32Addr = internalCommon.MustAddressToBech32(*tx.To())
 		if targetB32Addr == b32Addr {
 			accID, rosettaError := newAccountIdentifier(*tx.To())
 			if rosettaError != nil {
@@ -793,31 +793,32 @@ func formatTransaction(
 	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
-	var isCrossShard bool
+	var isCrossShard, isStaking bool
 	var toShard uint32
 
-	// Fetch correct operations depending on transaction type
-	stakingTx, isStaking := tx.(*stakingTypes.StakingTransaction)
-	if !isStaking {
-		plainTx, ok := tx.(*hmytypes.Transaction)
-		if !ok {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": "unknown transaction type",
-			})
-		}
-		operations, rosettaError = getOperations(plainTx, receipt)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		isCrossShard = plainTx.ShardID() != plainTx.ToShardID()
-		toShard = plainTx.ToShardID()
-	} else {
+	switch tx.(type) {
+	case *stakingTypes.StakingTransaction:
+		isStaking = true
+		stakingTx := tx.(*stakingTypes.StakingTransaction)
 		operations, rosettaError = getStakingOperations(stakingTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
 		isCrossShard = false
 		toShard = stakingTx.ShardID()
+	case *hmytypes.Transaction:
+		isStaking = false
+		plainTx := tx.(*hmytypes.Transaction)
+		operations, rosettaError = getOperations(plainTx, receipt)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		isCrossShard = plainTx.ShardID() != plainTx.ToShardID()
+		toShard = plainTx.ToShardID()
+	default:
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown transaction type",
+		})
 	}
 	fromShard := tx.ShardID()
 	txID := &types.TransactionIdentifier{Hash: tx.Hash().String()}
@@ -848,7 +849,7 @@ func formatTransaction(
 	}, nil
 }
 
-// getOperations for correct one of the following transactions:
+// getOperations for one of the following transactions:
 // contract creation, cross-shard sender, same-shard transfer
 func getOperations(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,

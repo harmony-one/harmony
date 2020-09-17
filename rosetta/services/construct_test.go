@@ -4,17 +4,21 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func TestGetAddressFromPublicKeyBytes(t *testing.T) {
+func TestGetAddressFromPublicKey(t *testing.T) {
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
 	refAddr := crypto.PubkeyToAddress(key.PublicKey)
 	compressedPublicKey := crypto.CompressPubkey(&key.PublicKey)
-	addr, rosettaError := getAddressFromPublicKeyBytes(compressedPublicKey)
+	addr, rosettaError := getAddressFromPublicKey(&types.PublicKey{
+		Bytes:     compressedPublicKey,
+		CurveType: types.Secp256k1,
+	})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
