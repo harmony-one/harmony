@@ -27,7 +27,7 @@ const (
 	GenesisFundsOperation = "Genesis"
 
 	// PreStakingBlockRewardOperation ..
-	PreStakingBlockRewardOperation = "PreOpenStakingBlockReward"
+	PreStakingBlockRewardOperation = "PreStakingBlockReward"
 
 	// UndelegationPayoutOperation ..
 	UndelegationPayoutOperation = "UndelegationPayout"
