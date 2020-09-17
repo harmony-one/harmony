@@ -179,7 +179,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 	if consensus.IsViewChangingMode() &&
-		consensus.GetViewChangingID() > recvMsg.ViewID {
+		consensus.GetCurViewID() > recvMsg.ViewID {
 		consensus.getLogger().Warn().
 			Msg("[onViewChange] ViewChanging ID Is Low")
 		return false
