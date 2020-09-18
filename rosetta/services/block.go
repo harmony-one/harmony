@@ -1223,6 +1223,16 @@ func newAccountIdentifier(
 	}, nil
 }
 
+// getAddress ..
+func getAddress(
+	identifier *types.AccountIdentifier,
+) (ethcommon.Address, error) {
+	if identifier == nil {
+		return ethcommon.Address{}, fmt.Errorf("identifier cannot be nil")
+	}
+	return internalCommon.Bech32ToAddress(identifier.Address)
+}
+
 // newOperations creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
 func newOperations(
