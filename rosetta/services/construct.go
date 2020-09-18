@@ -71,16 +71,19 @@ type ConstructMetadataOptions struct {
 
 // UnmarshalFromInterface ..
 // TODO (dm): add unit tests as options are added
-func (m *ConstructMetadataOptions) UnmarshalFromInterface(blockArgs interface{}) error {
-	var args ConstructMetadataOptions
-	dat, err := json.Marshal(blockArgs)
+func (m *ConstructMetadataOptions) UnmarshalFromInterface(metadata interface{}) error {
+	var T ConstructMetadataOptions
+	dat, err := json.Marshal(metadata)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(dat, &args); err != nil {
+	if err := json.Unmarshal(dat, &T); err != nil {
 		return err
 	}
-	*m = args
+	if T.TransactionMetadata == nil {
+		return fmt.Errorf("transaction metadata is required")
+	}
+	*m = T
 	return nil
 }
 
@@ -134,25 +137,32 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	}, nil
 }
 
-// ConstructMetadata contains all data to construct a valid transaction
+// ConstructMetadata with a set of operations will construct a valid transaction
 type ConstructMetadata struct {
-	Nonce               uint64               `json:"nonce"`
-	GasPrice            *big.Int             `json:"gas_price"`
-	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
+	Nonce       uint64               `json:"nonce"`
+	GasLimit    uint64               `json:"gas_limit"`
+	GasPrice    *big.Int             `json:"gas_price"`
+	Transaction *TransactionMetadata `json:"transaction_metadata"`
 }
 
 // UnmarshalFromInterface ..
 // TODO (dm): add unit tests as options are added
 func (m *ConstructMetadata) UnmarshalFromInterface(blockArgs interface{}) error {
-	var args ConstructMetadata
+	var T ConstructMetadata
 	dat, err := json.Marshal(blockArgs)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(dat, &args); err != nil {
+	if err := json.Unmarshal(dat, &T); err != nil {
 		return err
 	}
-	*m = args
+	if T.GasPrice == nil {
+		return fmt.Errorf("gas price is required")
+	}
+	if T.Transaction == nil {
+		return fmt.Errorf("transaction metadat is required")
+	}
+	*m = T
 	return nil
 }
 
@@ -208,9 +218,10 @@ func (s *ConstructAPI) ConstructionMetadata(
 	suggestedFee, suggestedPrice := getSuggestedFeeAndPrice(gasMul, new(big.Int).SetUint64(estGasUsed))
 
 	metadata, err := types.MarshalMap(ConstructMetadata{
-		Nonce:               nonce,
-		GasPrice:            suggestedPrice,
-		TransactionMetadata: options.TransactionMetadata,
+		Nonce:       nonce,
+		GasPrice:    suggestedPrice,
+		GasLimit:    estGasUsed,
+		Transaction: options.TransactionMetadata,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -221,6 +232,12 @@ func (s *ConstructAPI) ConstructionMetadata(
 		Metadata:     metadata,
 		SuggestedFee: suggestedFee,
 	}, nil
+}
+
+// UnsignedTransaction is a wrapper for an unsigned transaction that includes its indented sender
+type UnsignedTransaction struct {
+	RLPBytes []byte                   `json:"rlp_bytes"`
+	From     *types.AccountIdentifier `json:"from"`
 }
 
 // ConstructionPayloads implements the /construction/payloads endpoint.
@@ -269,25 +286,9 @@ func (s *ConstructAPI) ConstructionPayloads(
 		})
 	}
 
-	payloads := []*types.SigningPayload{
-		{
-			AccountIdentifier: senderID,
-			SignatureType:     types.Ecdsa,
-		},
-	}
-	unsignedTx, rosettaError := constructTransaction(components, metadata)
+	unsignedTx, rosettaError := ConstructTransaction(components, metadata, s.hmy.ShardID)
 	if rosettaError != nil {
 		return nil, rosettaError
-	}
-	switch unsignedTx.(type) {
-	case *stakingTypes.StakingTransaction:
-		payloads[0].Bytes = s.stakingSigner.Hash(unsignedTx.(*stakingTypes.StakingTransaction)).Bytes()
-	case *hmyTypes.Transaction:
-		payloads[0].Bytes = s.signer.Hash(unsignedTx.(*hmyTypes.Transaction)).Bytes()
-	default:
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "constructed unknown or unsupported transaction",
-		})
 	}
 	rlpBytes, err := rlp.EncodeToBytes(unsignedTx)
 	if err != nil {
@@ -295,8 +296,21 @@ func (s *ConstructAPI) ConstructionPayloads(
 			"message": err.Error(),
 		})
 	}
+	marshalledBytes, err := json.Marshal(UnsignedTransaction{
+		RLPBytes: rlpBytes,
+		From:     components.From,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	payloads, rosettaError := s.getSigningPayload(unsignedTx, senderID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
 	return &types.ConstructionPayloadsResponse{
-		UnsignedTransaction: hexutil.Encode(rlpBytes),
+		UnsignedTransaction: string(marshalledBytes),
 		Payloads:            payloads,
 	}, nil
 }
@@ -318,7 +332,10 @@ func (s *ConstructAPI) ConstructionParse(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	if !request.Signed {
+		return parseUnsignedTransaction(ctx, request)
+	}
+	return parseSignedTransaction(ctx, request)
 }
 
 // ConstructionHash implements the /construction/hash endpoint.
@@ -339,6 +356,29 @@ func (s *ConstructAPI) ConstructionSubmit(
 		return nil, err
 	}
 	return nil, nil
+}
+
+// getSigningPayload ..
+func (s *ConstructAPI) getSigningPayload(
+	tx hmyTypes.PoolTransaction, senderAccountID *types.AccountIdentifier,
+) ([]*types.SigningPayload, *types.Error) {
+	payloads := []*types.SigningPayload{
+		{
+			AccountIdentifier: senderAccountID,
+			SignatureType:     types.Ecdsa,
+		},
+	}
+	switch tx.(type) {
+	case *stakingTypes.StakingTransaction:
+		payloads[0].Bytes = s.stakingSigner.Hash(tx.(*stakingTypes.StakingTransaction)).Bytes()
+	case *hmyTypes.Transaction:
+		payloads[0].Bytes = s.signer.Hash(tx.(*hmyTypes.Transaction)).Bytes()
+	default:
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "constructed unknown or unsupported transaction",
+		})
+	}
+	return payloads, nil
 }
 
 // getAddressFromPublicKey assumes that data is a compressed secp256k1 public key
@@ -376,10 +416,16 @@ func getSuggestedFeeAndPrice(
 	}, gasPrice
 }
 
-// constructTransaction ..
-// TODO (dm): implement staking transaction construction
-func constructTransaction(
-	components *OperationComponents, metadata *ConstructMetadata,
-) (hmyTypes.PoolTransaction, *types.Error) {
+// parseUnsignedTransaction ..
+func parseUnsignedTransaction(
+	ctx context.Context, request *types.ConstructionParseRequest,
+) (*types.ConstructionParseResponse, *types.Error) {
+	return nil, nil
+}
+
+// parseSignedTransaction ..
+func parseSignedTransaction(
+	ctx context.Context, request *types.ConstructionParseRequest,
+) (*types.ConstructionParseResponse, *types.Error) {
 	return nil, nil
 }
