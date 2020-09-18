@@ -103,10 +103,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnPrepared] Received prepared message")
 
-	if err := consensus.isSendByLeader(recvMsg); err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[onPrepared] message failed leader check")
-		return
-	}
 	if recvMsg.BlockNum < consensus.blockNum {
 		consensus.getLogger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
@@ -259,10 +255,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 	// NOTE let it handle its own logs
 	if !consensus.isRightBlockNumCheck(recvMsg) {
-		return
-	}
-	if err := consensus.isSendByLeader(recvMsg); err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[onCommitted] message failed leader check")
 		return
 	}
 	if len(recvMsg.SenderPubkeys) != 1 {
