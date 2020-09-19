@@ -81,6 +81,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 	}()
 }
 
+// ProposeNewBlock proposes a new block...
 func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()

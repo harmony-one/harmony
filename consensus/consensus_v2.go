@@ -189,7 +189,7 @@ func (consensus *Consensus) finalizeCommits() {
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 }
 
-// BlockCommitSig returns the byte array of aggregated
+// BlockCommitSigs returns the byte array of aggregated
 // commit signature and bitmap signed on the block
 func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	if consensus.blockNum <= 1 {
