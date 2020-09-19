@@ -191,9 +191,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 // BlockCommitSig returns the byte array of aggregated
 // commit signature and bitmap signed on the block
-func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, error) {
+func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	if consensus.blockNum <= 1 {
-		return nil, nil, nil
+		return nil, nil
 	}
 	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
 	if err != nil ||
@@ -205,21 +205,14 @@ func (consensus *Consensus) BlockCommitSig(blockNum uint64) ([]byte, []byte, err
 			consensus.getLogger().Error().
 				Int("numCommittedMsg", len(msgs)).
 				Msg("GetLastCommitSig failed with wrong number of committed message")
-			return nil, nil, errors.Errorf(
+			return nil, errors.Errorf(
 				"GetLastCommitSig failed with wrong number of committed message %d", len(msgs),
 			)
 		}
 		lastCommits = msgs[0].Payload
 	}
-	//#### Read payload data from committed msg
-	aggSig := make([]byte, bls.BLSSignatureSizeInBytes)
-	bitmap := make([]byte, len(lastCommits)-bls.BLSSignatureSizeInBytes)
-	offset := 0
-	copy(aggSig[:], lastCommits[offset:offset+bls.BLSSignatureSizeInBytes])
-	offset += bls.BLSSignatureSizeInBytes
-	copy(bitmap[:], lastCommits[offset:])
-	//#### END Read payload data from committed msg
-	return aggSig, bitmap, nil
+
+	return lastCommits, nil
 }
 
 // try to catch up if fall behind

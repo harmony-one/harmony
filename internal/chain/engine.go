@@ -208,7 +208,7 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-	doubleSigners slash.Records,
+	doubleSigners slash.Records, sigsReady chan bool,
 ) (*types.Block, reward.Reader, error) {
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
@@ -249,10 +249,10 @@ func (e *engineImpl) Finalize(
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, e.Beaconchain(),
+		chain, state, header, e.Beaconchain(), sigsReady,
 	)
 	if err != nil {
-		return nil, nil, errors.New("cannot pay block reward")
+		return nil, nil, err
 	}
 
 	// Apply slashes

@@ -205,6 +205,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
+	if consensus.viewID == 10 {
+		return
+	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
@@ -308,7 +311,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {
-			time.Sleep(2500 * time.Millisecond)
+			time.Sleep(1500 * time.Millisecond)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 			consensus.commitFinishChan <- viewID
 		}(viewID)

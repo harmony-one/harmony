@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/params"
 
@@ -116,27 +117,25 @@ func lookupDelegatorShares(
 // This func also do IncrementValidatorSigningCounts for validators
 func AccumulateRewardsAndCountSigs(
 	bc engine.ChainReader, state *state.DB,
-	header *block.Header, beaconChain engine.ChainReader,
+	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
 ) (reward.Reader, error) {
 	blockNum := header.Number().Uint64()
 	currentHeader := beaconChain.CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 
-	if blockNum == 0 {
-		// genesis block has no parent to reward.
+	if blockNum == 0 || (bc.Config().IsStaking(header.Epoch()) &&
+		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID) {
+		// Block here until the commit sigs are ready or timeout.
+		// sigsReady signal indicates that the commit sigs are already populated in the header object.
+		if err := waitForCommitSigs(sigsReady); err != nil {
+			return network.EmptyPayout, err
+		}
 		return network.EmptyPayout, nil
-	}
-
-	if bc.Config().IsStaking(header.Epoch()) &&
-		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID {
-		return network.EmptyPayout, nil
-
 	}
 
 	// After staking
 	if headerE := header.Epoch(); bc.Config().IsStaking(headerE) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
 		defaultReward := network.BaseStakedReward
 
 		// After block time is reduced to 5 seconds, the block reward is adjusted accordingly
@@ -182,72 +181,9 @@ func AccumulateRewardsAndCountSigs(
 		newRewards, beaconP, shardP :=
 			big.NewInt(0), []reward.Payout{}, []reward.Payout{}
 
-		// Take care of my own beacon chain committee, _ is missing, for slashing
-		parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
-		if err != nil {
-			return network.EmptyPayout, err
-		}
-		subComm := shard.Committee{shard.BeaconChainShardID, members}
-
-		if err := availability.IncrementValidatorSigningCounts(
-			beaconChain,
-			subComm.StakedValidators(),
-			state,
-			payable,
-			missing,
-		); err != nil {
-			return network.EmptyPayout, err
-		}
-		votingPower, err := lookupVotingPower(
-			parentE, &subComm,
-		)
-		if err != nil {
-			return network.EmptyPayout, err
-		}
-
-		allSignersShare := numeric.ZeroDec()
-		for j := range payable {
-			voter := votingPower.Voters[payable[j].BLSPublicKey]
-			if !voter.IsHarmonyNode {
-				voterShare := voter.OverallPercent
-				allSignersShare = allSignersShare.Add(voterShare)
-			}
-		}
-		for beaconMember := range payable {
-			// TODO Give out whatever leftover to the last voter/handle
-			// what to do about share of those that didn't sign
-			blsKey := payable[beaconMember].BLSPublicKey
-			voter := votingPower.Voters[blsKey]
-			if !voter.IsHarmonyNode {
-				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
-				if err != nil {
-					return network.EmptyPayout, err
-				}
-				due := defaultReward.Mul(
-					voter.OverallPercent.Quo(allSignersShare),
-				).RoundInt()
-				newRewards.Add(newRewards, due)
-
-				shares, err := lookupDelegatorShares(snapshot)
-				if err != nil {
-					return network.EmptyPayout, err
-				}
-				if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
-					return network.EmptyPayout, err
-				}
-				beaconP = append(beaconP, reward.Payout{
-					ShardID:     shard.BeaconChainShardID,
-					Addr:        voter.EarningAccount,
-					NewlyEarned: due,
-					EarningKey:  voter.Identity,
-				})
-			}
-		}
-		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
-
-		utils.AnalysisStart("accumulateRewardShardchainPayout", nowEpoch, blockNow)
 		// Handle rewards for shardchain
 		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
+			utils.AnalysisStart("accumulateRewardShardchainPayout", nowEpoch, blockNow)
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return network.EmptyPayout, err
@@ -391,11 +327,81 @@ func AccumulateRewardsAndCountSigs(
 				}
 			}
 			utils.AnalysisEnd("accumulateRewardShardchainPayout", nowEpoch, blockNow)
-			return network.NewStakingEraRewardForRound(
-				newRewards, missing, beaconP, shardP,
-			), nil
 		}
-		return network.EmptyPayout, nil
+
+		// Block here until the commit sigs are ready or timeout.
+		// sigsReady signal indicates that the commit sigs are already populated in the header object.
+		if err := waitForCommitSigs(sigsReady); err != nil {
+			return network.EmptyPayout, err
+		}
+
+		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
+		// Take care of my own beacon chain committee, _ is missing, for slashing
+		parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
+		if err != nil {
+			return network.EmptyPayout, err
+		}
+		subComm := shard.Committee{shard.BeaconChainShardID, members}
+
+		if err := availability.IncrementValidatorSigningCounts(
+			beaconChain,
+			subComm.StakedValidators(),
+			state,
+			payable,
+			missing,
+		); err != nil {
+			return network.EmptyPayout, err
+		}
+		votingPower, err := lookupVotingPower(
+			parentE, &subComm,
+		)
+		if err != nil {
+			return network.EmptyPayout, err
+		}
+
+		allSignersShare := numeric.ZeroDec()
+		for j := range payable {
+			voter := votingPower.Voters[payable[j].BLSPublicKey]
+			if !voter.IsHarmonyNode {
+				voterShare := voter.OverallPercent
+				allSignersShare = allSignersShare.Add(voterShare)
+			}
+		}
+		for beaconMember := range payable {
+			// TODO Give out whatever leftover to the last voter/handle
+			// what to do about share of those that didn't sign
+			blsKey := payable[beaconMember].BLSPublicKey
+			voter := votingPower.Voters[blsKey]
+			if !voter.IsHarmonyNode {
+				snapshot, err := bc.ReadValidatorSnapshot(voter.EarningAccount)
+				if err != nil {
+					return network.EmptyPayout, err
+				}
+				due := defaultReward.Mul(
+					voter.OverallPercent.Quo(allSignersShare),
+				).RoundInt()
+				newRewards.Add(newRewards, due)
+
+				shares, err := lookupDelegatorShares(snapshot)
+				if err != nil {
+					return network.EmptyPayout, err
+				}
+				if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
+					return network.EmptyPayout, err
+				}
+				beaconP = append(beaconP, reward.Payout{
+					ShardID:     shard.BeaconChainShardID,
+					Addr:        voter.EarningAccount,
+					NewlyEarned: due,
+					EarningKey:  voter.Identity,
+				})
+			}
+		}
+		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
+
+		return network.NewStakingEraRewardForRound(
+			newRewards, missing, beaconP, shardP,
+		), nil
 	}
 
 	// Before staking
@@ -417,6 +423,13 @@ func AccumulateRewardsAndCountSigs(
 			err, "cannot read shard state at epoch %v", parentHeader.Epoch(),
 		)
 	}
+
+	// Block here until the commit sigs are ready or timeout.
+	// sigsReady signal indicates that the commit sigs are already populated in the header object.
+	if err := waitForCommitSigs(sigsReady); err != nil {
+		return network.EmptyPayout, err
+	}
+
 	_, signers, _, err := availability.BallotResult(
 		parentHeader, header, parentShardState, header.ShardID(),
 	)
@@ -451,4 +464,17 @@ func AccumulateRewardsAndCountSigs(
 	}
 
 	return network.NewPreStakingEraRewarded(totalAmount), nil
+}
+
+func waitForCommitSigs(sigsReady chan bool) error {
+	select {
+	case success := <-sigsReady:
+		if !success {
+			return errors.New("Failed to get commit sigs")
+		}
+		utils.Logger().Info().Msg("Commit sigs are ready")
+	case <-time.After(10 * time.Second):
+		return errors.New("Timeout waiting for commit sigs for reward calculation")
+	}
+	return nil
 }

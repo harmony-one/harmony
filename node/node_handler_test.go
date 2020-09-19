@@ -42,8 +42,12 @@ func TestAddNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
+	commitSigs := make(chan []byte)
+	go func() {
+		commitSigs <- []byte{}
+	}()
 	block, _ := node.Worker.FinalizeNewBlock(
-		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
+		commitSigs, 0, common.Address{}, nil, nil,
 	)
 
 	_, err = node.Blockchain().InsertChain([]*types.Block{block}, true)
@@ -81,8 +85,12 @@ func TestVerifyNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
+	commitSigs := make(chan []byte)
+	go func() {
+		commitSigs <- []byte{}
+	}()
 	block, _ := node.Worker.FinalizeNewBlock(
-		[]byte{}, []byte{}, 0, common.Address{}, nil, nil,
+		commitSigs, 0, common.Address{}, nil, nil,
 	)
 
 	if err := node.VerifyNewBlock(block); err != nil {

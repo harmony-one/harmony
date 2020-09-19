@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -422,18 +424,9 @@ func (w *Worker) verifySlashes(
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
-	sig []byte, signers []byte, viewID uint64, coinbase common.Address,
+	commitSigs chan []byte, viewID uint64, coinbase common.Address,
 	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
-	// Put sig, signers, viewID, coinbase into header
-	if len(sig) > 0 && len(signers) > 0 {
-		// TODO: directly set signature into lastCommitSignature
-		sig2 := w.current.header.LastCommitSignature()
-		copy(sig2[:], sig[:])
-		w.current.header.SetLastCommitSignature(sig2)
-		w.current.header.SetLastCommitBitmap(signers)
-	}
-
 	w.current.header.SetCoinbase(coinbase)
 	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
@@ -491,15 +484,39 @@ func (w *Worker) FinalizeNewBlock(
 	}
 	state := w.current.state.Copy()
 	copyHeader := types.CopyHeader(w.current.header)
+
+	sigsReady := make(chan bool)
+	go func() {
+		select {
+		case sigs := <-commitSigs:
+			sig, signers, err := bls.SeparateSigAndMask(sigs)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("Failed to parse commit sigs")
+				sigsReady <- false
+			}
+			// Put sig, signers, viewID, coinbase into header
+			if len(sig) > 0 && len(signers) > 0 {
+				sig2 := copyHeader.LastCommitSignature()
+				copy(sig2[:], sig[:])
+				utils.Logger().Info().Hex("sigs", sig).Hex("bitmap", signers).Msg("Setting commit sigs")
+				copyHeader.SetLastCommitSignature(sig2)
+				copyHeader.SetLastCommitBitmap(signers)
+			}
+			sigsReady <- true
+		case <-time.After(10 * time.Second):
+			// Exit goroutine
+			utils.Logger().Warn().Msg("Timeout waiting for commit sigs")
+		}
+	}()
+
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
-		w.current.slashes,
+		w.current.slashes, sigsReady,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
-
 	return block, nil
 }
 

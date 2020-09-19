@@ -47,12 +47,18 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-					newBlock, err := node.proposeNewBlock()
+					// Prepare last commit signatures
+					commitSigs := make(chan []byte)
+					sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 					if err != nil {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
+						break
 					}
+					go func() {
+						commitSigs <- sigs
+					}()
+					newBlock, err := node.ProposeNewBlock(commitSigs)
 
-					err = node.Blockchain().Validator().ValidateHeader(newBlock, true)
 					if err == nil {
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
@@ -67,7 +73,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Verifying New Block Header!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 					}
 				}
 			}
@@ -75,7 +81,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 	}()
 }
 
-func (node *Node) proposeNewBlock() (*types.Block, error) {
+func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("proposeNewBlock", nowEpoch, blockNow)
@@ -224,17 +230,22 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	// Prepare last commit signatures
-	sig, mask, err := node.Consensus.BlockCommitSig(header.Number().Uint64() - 1)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
-		return nil, err
-	}
-
-	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetViewID(),
+	finalizedBlock, err := node.Worker.FinalizeNewBlock(
+		commitSigs, node.Consensus.GetViewID(),
 		coinbase, crossLinksToPropose, shardState,
 	)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Failed finalizing the new block")
+		return nil, err
+	}
+	utils.Logger().Info().Msg("[proposeNewBlock] verifying the new block header")
+	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Failed verifying the new block header")
+		return nil, err
+	}
+	return finalizedBlock, nil
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {

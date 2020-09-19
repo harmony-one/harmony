@@ -95,3 +95,18 @@ func (pk *SerializedPublicKey) FromLibBLSPublicKey(key *bls.PublicKey) error {
 	copy(pk[:], bytes)
 	return nil
 }
+
+func SeparateSigAndMask(commitSigs []byte) ([]byte, []byte, error) {
+	if len(commitSigs) < BLSSignatureSizeInBytes {
+		return nil, nil, errors.New("no mask data found in commit sigs")
+	}
+	//#### Read payload data from committed msg
+	aggSig := make([]byte, BLSSignatureSizeInBytes)
+	bitmap := make([]byte, len(commitSigs)-BLSSignatureSizeInBytes)
+	offset := 0
+	copy(aggSig[:], commitSigs[offset:offset+BLSSignatureSizeInBytes])
+	offset += BLSSignatureSizeInBytes
+	copy(bitmap[:], commitSigs[offset:])
+	//#### END Read payload data from committed msg
+	return aggSig, bitmap, nil
+}
