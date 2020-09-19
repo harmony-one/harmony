@@ -441,9 +441,6 @@ func (iter *LastMileBlockIter) Next() *types.Block {
 		return nil
 	}
 	block := iter.blockCandidates[iter.curIndex]
-	if block == nil {
-		return nil
-	}
 	iter.curIndex++
 
 	if !iter.fbftLog.IsBlockVerified(block) {
@@ -464,7 +461,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 	for blockNum := bnStart; ; blockNum++ {
 		blk, msg, err := consensus.FBFTLog.GetCommittedBlockAndMsgsFromNumber(blockNum, consensus.getLogger())
 		if err != nil {
-			if err == errPBFTLogNotFound {
+			if err == errFBFTLogNotFound {
 				break
 			}
 			return nil, nil, err
