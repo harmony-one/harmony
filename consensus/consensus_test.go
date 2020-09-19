@@ -37,7 +37,6 @@ func TestConsensusInitialization(t *testing.T) {
 
 	// FBFTLog
 	assert.Equal(t, fbtLog, consensus.FBFTLog)
-	assert.Equal(t, maxLogSize, consensus.FBFTLog.maxLogSize)
 
 	assert.Equal(t, FBFTAnnounce, consensus.phase)
 
