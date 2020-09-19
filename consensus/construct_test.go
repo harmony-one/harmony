@@ -77,7 +77,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
-		consensus.viewID,
+		consensus.GetCurViewID(),
 	)
 	if _, err := consensus.Decider.SubmitVote(
 		quorum.Prepare,
@@ -85,7 +85,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
-		consensus.viewID,
+		consensus.GetCurViewID(),
 	); err != nil {
 		test.Log(err)
 	}

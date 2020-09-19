@@ -106,3 +106,23 @@ func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
 		},
 	}
 }
+
+// GetConsensusMode returns the current consensus mode
+func (node *Node) GetConsensusMode() string {
+	return node.Consensus.GetConsensusMode()
+}
+
+// GetConsensusPhase returns the current consensus phase
+func (node *Node) GetConsensusPhase() string {
+	return node.Consensus.GetConsensusPhase()
+}
+
+// GetConsensusViewChangingID returns the view changing ID
+func (node *Node) GetConsensusViewChangingID() uint64 {
+	return node.Consensus.GetViewChangingID()
+}
+
+// GetConsensusCurViewID returns the current view ID
+func (node *Node) GetConsensusCurViewID() uint64 {
+	return node.Consensus.GetCurViewID()
+}

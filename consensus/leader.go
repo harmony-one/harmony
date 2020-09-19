@@ -110,12 +110,11 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.blockNum, consensus.viewID, recvMsg.BlockHash,
+		consensus.blockNum, consensus.GetCurViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 	}
 
@@ -291,7 +290,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	//// Write - End
 
 	//// Read - Start
-	viewID := consensus.viewID
+	viewID := consensus.GetCurViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
 		go func(viewID uint64) {

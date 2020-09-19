@@ -231,7 +231,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	}
 
 	finalizedBlock, err := node.Worker.FinalizeNewBlock(
-		commitSigs, node.Consensus.GetViewID(),
+		commitSigs, node.Consensus.GetCurViewID(),
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {

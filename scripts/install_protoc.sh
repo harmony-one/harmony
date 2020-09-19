@@ -58,4 +58,5 @@ curl -s -S -L -o "${filename}" "${url}"
 echo "Downloaded as ${filename}; unzipping into ${destdir}..."
 sudo unzip -o -d "${destdir}" "${filename}"
 echo "protoc v${version} has been installed in ${destdir}."
+sudo chmod +x "${destdir}/bin/protoc"
 exit 0
