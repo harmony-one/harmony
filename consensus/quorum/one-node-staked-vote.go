@@ -21,6 +21,7 @@ import (
 
 var (
 	twoThird = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	oneThird = numeric.NewDec(1).Quo(numeric.NewDec(3))
 )
 
 // TallyResult is the result of when we calculate voting power,
@@ -160,6 +161,11 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 	return twoThird
+}
+
+// OneThirdQuorum ..
+func (v *stakedVoteWeight) OneThirdQuorum() numeric.Dec {
+	return oneThird
 }
 
 // IsAllSigsCollected ..

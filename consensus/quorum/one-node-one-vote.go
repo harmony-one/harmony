@@ -67,6 +67,11 @@ func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
+// OneThirdQuorum ..
+func (v *uniformVoteWeight) OneThirdQuorum() numeric.Dec {
+	return numeric.NewDec(v.OneThirdSignersCount())
+}
+
 // IsAllSigsCollected ..
 func (v *uniformVoteWeight) IsAllSigsCollected() bool {
 	return v.SignersCount(Commit) == v.ParticipantsCount()

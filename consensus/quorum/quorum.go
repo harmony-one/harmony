@@ -95,6 +95,7 @@ type SignatureReader interface {
 	ReadAllBallots(Phase) []*votepower.Ballot
 	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
+	OneThirdSignersCount() int64
 	// 96 bytes aggregated signature
 	AggregateVotes(p Phase) *bls_core.Sign
 }
@@ -124,6 +125,7 @@ type Decider interface {
 	IsQuorumAchieved(Phase) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
+	OneThirdQuorum() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
@@ -273,6 +275,10 @@ func (s *cIdentities) reset(ps []Phase) {
 
 func (s *cIdentities) TwoThirdsSignersCount() int64 {
 	return s.ParticipantsCount()*2/3 + 1
+}
+
+func (s *cIdentities) OneThirdSignersCount() int64 {
+	return s.ParticipantsCount()*1/3 + 1
 }
 
 func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot {
