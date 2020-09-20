@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -37,7 +39,7 @@ var (
 	blockFactory    = blockfactory.ForTest
 	// Test transactions
 	pendingTxs []*types.Transaction
-	database   = ethdb.NewMemDatabase()
+	database   = rawdb.NewMemoryDatabase()
 	gspec      = core.Genesis{
 		Config:  chainConfig,
 		Factory: blockFactory,

@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
@@ -1559,7 +1560,7 @@ func makeVWrapperByIndex(index int) staking.ValidatorWrapper {
 }
 
 func newTestStateDB() (*state.DB, error) {
-	return state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
 }
 
 // makeVWrappersForStake makes the default staking.ValidatorWrappers for

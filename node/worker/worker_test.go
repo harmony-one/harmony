@@ -5,9 +5,10 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
@@ -30,7 +31,7 @@ var (
 func TestNewWorker(t *testing.T) {
 	// Setup a new blockchain with genesis block containing test token on test address
 	var (
-		database = ethdb.NewMemDatabase()
+		database = rawdb.NewMemoryDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Factory: blockFactory,
@@ -41,8 +42,11 @@ func TestNewWorker(t *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	chain, err := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
 
+	if err != nil {
+		t.Error(err)
+	}
 	// Create a new worker
 	worker := New(params.TestChainConfig, chain, chain2.Engine)
 
@@ -54,7 +58,7 @@ func TestNewWorker(t *testing.T) {
 func TestCommitTransactions(t *testing.T) {
 	// Setup a new blockchain with genesis block containing test token on test address
 	var (
-		database = ethdb.NewMemDatabase()
+		database = rawdb.NewMemoryDatabase()
 		gspec    = core.Genesis{
 			Config:  chainConfig,
 			Factory: blockFactory,

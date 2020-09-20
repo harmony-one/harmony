@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
@@ -991,7 +992,7 @@ func defaultTestStateDB() *state.DB {
 }
 
 func makeTestStateDB() *state.DB {
-	db := state.NewDatabase(ethdb.NewMemDatabase())
+	db := state.NewDatabase(rawdb.NewMemoryDatabase())
 	sdb, err := state.New(common.Hash{}, db)
 	if err != nil {
 		panic(err)
