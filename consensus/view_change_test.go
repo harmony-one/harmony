@@ -111,7 +111,7 @@ func TestGetNextLeaderKeyShouldFailForStandardGeneratedConsensus(t *testing.T) {
 
 	// The below results in: "panic: runtime error: integer divide by zero"
 	// This happens because there's no check for if there are any participants or not in https://github.com/harmony-one/harmony/blob/main/consensus/quorum/quorum.go#L188-L197
-	assert.Panics(t, func() { consensus.GetNextLeaderKey() })
+	assert.Panics(t, func() { consensus.GetNextLeaderKey(uint64(1)) })
 }
 
 func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
@@ -139,7 +139,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
 
 	consensus.LeaderPubKey = &wrappedBLSKeys[0]
-	nextKey := consensus.GetNextLeaderKey()
+	nextKey := consensus.GetNextLeaderKey(uint64(1))
 
 	assert.Equal(t, nextKey, &wrappedBLSKeys[1])
 }
