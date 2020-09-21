@@ -12,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/multibls"
 )
 
 // FBFTLog represents the log stored by a node during FBFT process
@@ -155,7 +156,10 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNu
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).ViewID == viewID && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).ViewID == viewID &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -167,7 +171,8 @@ func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -179,7 +184,9 @@ func (log *FBFTLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -224,6 +231,7 @@ func (log *FBFTLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum ui
 }
 
 // FindMessageByMaxViewID returns the message that has maximum ViewID
+// TODO (leo): we shouldn't already go to highest view ID
 func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 	if len(msgs) == 0 {
 		return nil
@@ -237,6 +245,19 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 		}
 	}
 	return msgs[maxIdx]
+}
+
+// FindMessageByViewID returns the mesasge with matching view ID
+func (log *FBFTLog) FindMessageByViewID(msgs []*FBFTMessage, viewID uint64) *FBFTMessage {
+	if len(msgs) == 0 {
+		return nil
+	}
+	for k, v := range msgs {
+		if v.ViewID == viewID {
+			return msgs[k]
+		}
+	}
+	return nil
 }
 
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
@@ -314,7 +335,7 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 }
 
 // ParseNewViewMessage parses new view message into FBFTMessage structure
-func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
+func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBFTMessage, error) {
 	FBFTMsg := FBFTMessage{}
 	FBFTMsg.MessageType = msg.GetType()
 
@@ -332,24 +353,23 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 
 	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
+		utils.Logger().Warn().Err(err).Msg("ParseNewViewMessage failed to parse senderpubkey")
 		return nil, err
 	}
 
 	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
 	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
 
-	members := consensus.Decider.Participants()
 	if len(vcMsg.M3Aggsigs) > 0 {
 		m3Sig := bls_core.Sign{}
 		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
+			utils.Logger().Warn().Err(err).Msg("ParseNewViewMessage failed to deserialize the multi signature for M3 viewID signature")
 			return nil, err
 		}
 		m3mask, err := bls_cosi.NewMask(members, nil)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
+			utils.Logger().Warn().Err(err).Msg("ParseNewViewMessage failed to create mask for multi signature")
 			return nil, err
 		}
 		m3mask.SetMask(vcMsg.M3Bitmap)
@@ -361,12 +381,12 @@ func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessa
 		m2Sig := bls_core.Sign{}
 		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")
+			utils.Logger().Warn().Err(err).Msg("ParseNewViewMessage failed to deserialize the multi signature for M2 aggregated signature")
 			return nil, err
 		}
 		m2mask, err := bls_cosi.NewMask(members, nil)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
+			utils.Logger().Warn().Err(err).Msg("ParseNewViewMessage failed to create mask for multi signature")
 			return nil, err
 		}
 		m2mask.SetMask(vcMsg.M2Bitmap)

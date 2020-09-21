@@ -9,7 +9,6 @@ import (
 
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 )
 
 // construct the view change message
@@ -110,36 +109,9 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.Payload = consensus.m1Payload
-	if len(consensus.m1Payload) != 0 {
-		block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
-		if block != nil {
-			encodedBlock, err := rlp.EncodeToBytes(block)
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("[constructNewViewMessage] Failed encoding prepared block")
-			}
-			if len(encodedBlock) != 0 {
-				vcMsg.PreparedBlock = encodedBlock
-			}
-		}
-	}
-
-	sig2arr := consensus.GetNilSigsArray(viewID)
-	consensus.getLogger().Debug().Int("len", len(sig2arr)).Msg("[constructNewViewMessage] M2 (NIL) type signatures")
-	if len(sig2arr) > 0 {
-		m2Sig := bls_cosi.AggregateSig(sig2arr)
-		vcMsg.M2Aggsigs = m2Sig.Serialize()
-		vcMsg.M2Bitmap = consensus.nilBitmap[viewID].Bitmap
-	}
-
-	sig3arr := consensus.GetViewIDSigsArray(viewID)
-	consensus.getLogger().Debug().Int("len", len(sig3arr)).Msg("[constructNewViewMessage] M3 (ViewID) type signatures")
-	// even we check here for safty, m3 type signatures must >= 2f+1
-	if len(sig3arr) > 0 {
-		m3Sig := bls_cosi.AggregateSig(sig3arr)
-		vcMsg.M3Aggsigs = m3Sig.Serialize()
-		vcMsg.M3Bitmap = consensus.viewIDBitmap[viewID].Bitmap
-	}
+	vcMsg.Payload, vcMsg.PreparedBlock = consensus.VC.GetPreparedBlock(consensus.FBFTLog, consensus.blockHash)
+	vcMsg.M2Aggsigs, vcMsg.M2Bitmap = consensus.VC.GetM2Bitmap(viewID)
+	vcMsg.M3Aggsigs, vcMsg.M3Bitmap = consensus.VC.GetM3Bitmap(viewID)
 
 	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
 	if err != nil {

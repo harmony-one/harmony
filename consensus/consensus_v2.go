@@ -306,11 +306,7 @@ func (consensus *Consensus) tryCatchup() {
 		break
 	}
 	if currentBlockNum < consensus.blockNum {
-		consensus.getLogger().Info().
-			Uint64("From", currentBlockNum).
-			Uint64("To", consensus.blockNum).
-			Msg("[TryCatchup] Caught up!")
-		consensus.switchPhase(FBFTAnnounce, true)
+		consensus.switchPhase("TryCatchup", FBFTAnnounce, true)
 	}
 	// catup up and skip from view change trap
 	if currentBlockNum < consensus.blockNum &&
