@@ -53,6 +53,7 @@ var (
 	preimagePrefix               = []byte("secure-key-")      // preimagePrefix + hash -> preimage
 	configPrefix                 = []byte("ethereum-config-") // config prefix for the db
 	crosslinkPrefix              = []byte("cl")               // prefix for crosslink
+	crosslinkTempPrefix          = []byte("cl-2")             // prefix for crosslink
 	delegatorValidatorListPrefix = []byte("dvl")              // prefix for delegator's validator list
 	// TODO: shorten the key prefix so we don't waste db space
 	cxReceiptPrefix         = []byte("cxReceipt")          // prefix for cross shard transaction receipt
