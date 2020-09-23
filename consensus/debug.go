@@ -10,9 +10,9 @@ func (c *Consensus) GetConsensusMode() string {
 	return c.current.mode.String()
 }
 
-// GetCurViewID returns the current view ID of the consensus
-func (c *Consensus) GetCurViewID() uint64 {
-	return c.current.GetCurViewID()
+// GetCurBlockViewID returns the current view ID of the consensus
+func (c *Consensus) GetCurBlockViewID() uint64 {
+	return c.current.GetCurBlockViewID()
 }
 
 // GetViewChangingID returns the current view changing ID of the consensus

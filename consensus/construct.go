@@ -26,7 +26,7 @@ type NetworkMessage struct {
 func (consensus *Consensus) populateMessageFields(
 	request *msg_pb.ConsensusRequest, blockHash []byte, pubKey bls.SerializedPublicKey,
 ) *msg_pb.ConsensusRequest {
-	request.ViewId = consensus.GetCurViewID()
+	request.ViewId = consensus.GetCurBlockViewID()
 	request.BlockNum = consensus.blockNum
 	request.ShardId = consensus.ShardID
 	// 32 byte block hash

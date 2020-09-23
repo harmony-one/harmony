@@ -371,7 +371,7 @@ func (consensus *Consensus) Start(
 					}
 					if k != timeoutViewChange {
 						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-						viewID := consensus.GetCurViewID()
+						viewID := consensus.GetCurBlockViewID()
 						consensus.startViewChange(viewID + 1)
 						break
 					} else {
@@ -491,7 +491,7 @@ func (consensus *Consensus) Start(
 				func() {
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
-					if viewID == consensus.GetCurViewID() {
+					if viewID == consensus.GetCurBlockViewID() {
 						consensus.finalizeCommits()
 					}
 				}()

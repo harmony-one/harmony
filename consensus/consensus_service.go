@@ -221,9 +221,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.GetCurViewID() {
+	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurViewID() {
+	} else if msg.ViewID < consensus.GetCurBlockViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -254,7 +254,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
 		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.GetCurViewID()).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
 		Interface("phase", consensus.phase).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
