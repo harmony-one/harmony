@@ -479,7 +479,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		}
 
-		consensus.SetCurViewID(recvMsg.ViewID)
+		consensus.SetViewChangingID(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
 			recvMsg.ViewID, newLeaderPriKey,
 		)
@@ -632,7 +632,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	}
 
 	// newView message verified success, override my state
-	consensus.SetCurViewID(recvMsg.ViewID)
+	consensus.SetViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 
