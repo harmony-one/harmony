@@ -203,7 +203,7 @@ func New(
 	// viewID has to be initialized as the height of
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
-	consensus.SetCurViewID(0)
+	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})

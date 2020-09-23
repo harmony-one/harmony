@@ -522,13 +522,13 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
-	consensus.SetCurViewID(height)
+	consensus.SetCurBlockViewID(height)
 	consensus.SetViewChangingID(height)
 }
 
-// SetCurViewID set the current view ID
-func (consensus *Consensus) SetCurViewID(viewID uint64) {
-	consensus.current.SetCurViewID(viewID)
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) SetCurBlockViewID(viewID uint64) {
+	consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID

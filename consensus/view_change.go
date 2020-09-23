@@ -64,8 +64,8 @@ func (pm *State) GetCurViewID() uint64 {
 	return pm.curViewID
 }
 
-// SetCurViewID sets the current view id
-func (pm *State) SetCurViewID(viewID uint64) {
+// SetCurBlockViewID sets the current view id
+func (pm *State) SetCurBlockViewID(viewID uint64) {
 	pm.cViewMux.Lock()
 	defer pm.cViewMux.Unlock()
 	pm.curViewID = viewID
@@ -428,7 +428,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		if len(consensus.m1Payload) == 0 {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			// Make sure the newly proposed block have the correct view ID
-			consensus.SetCurViewID(recvMsg.ViewID)
+			consensus.SetCurBlockViewID(recvMsg.ViewID)
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
@@ -499,7 +499,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				Msg("could not send out the NEWVIEW message")
 		}
 
-		consensus.SetCurViewID(recvMsg.ViewID)
+		consensus.SetCurBlockViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
