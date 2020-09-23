@@ -57,8 +57,8 @@ func (pm *State) SetMode(s Mode) {
 	pm.mode = s
 }
 
-// GetCurViewID return the current view id
-func (pm *State) GetCurViewID() uint64 {
+// GetCurBlockViewID return the current view id
+func (pm *State) GetCurBlockViewID() uint64 {
 	pm.cViewMux.RLock()
 	defer pm.cViewMux.RUnlock()
 	return pm.curViewID
@@ -122,8 +122,8 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
 func (consensus *Consensus) GetNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
 	gap := 1
-	if viewID > consensus.GetCurViewID() {
-		gap = int(viewID - consensus.GetCurViewID())
+	if viewID > consensus.GetCurBlockViewID() {
+		gap = int(viewID - consensus.GetCurBlockViewID())
 	}
 	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey, gap)
 	if !wasFound {

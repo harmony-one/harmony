@@ -233,7 +233,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 	}
 
 	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetCurViewID(),
+		sig, mask, node.Consensus.GetCurBlockViewID(),
 		coinbase, crossLinksToPropose, shardState,
 	)
 }

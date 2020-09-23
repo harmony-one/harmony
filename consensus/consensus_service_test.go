@@ -106,7 +106,7 @@ func TestSetViewID(t *testing.T) {
 
 	height := uint64(1000)
 	consensus.SetViewIDs(height)
-	if consensus.GetCurViewID() != height {
-		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.GetCurViewID(), height)
+	if consensus.GetCurBlockViewID() != height {
+		t.Errorf("Cannot set consensus ID. Got: %v, Expected: %v", consensus.GetCurBlockViewID(), height)
 	}
 }

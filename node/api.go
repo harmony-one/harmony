@@ -125,7 +125,7 @@ func (node *Node) GetConsensusViewChangingID() uint64 {
 
 // GetConsensusCurViewID returns the current view ID
 func (node *Node) GetConsensusCurViewID() uint64 {
-	return node.Consensus.GetCurViewID()
+	return node.Consensus.GetCurBlockViewID()
 }
 
 // GetConsensusBlockNum returns the current block number of the consensus

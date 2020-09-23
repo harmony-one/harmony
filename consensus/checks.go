@@ -57,7 +57,7 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
-	if recvMsg.ViewID != consensus.GetCurViewID() || recvMsg.BlockNum != consensus.blockNum {
+	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -90,7 +90,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
 			} else {
-				consensus.startViewChange(consensus.GetCurViewID() + 1)
+				consensus.startViewChange(consensus.GetCurBlockViewID() + 1)
 			}
 		}
 		consensus.getLogger().Debug().
@@ -193,9 +193,9 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 // TODO: leo: move the sanity check to p2p message validation
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.ViewID < consensus.GetCurViewID() {
+	if recvMsg.ViewID < consensus.GetCurBlockViewID() {
 		consensus.getLogger().Warn().
-			Uint64("LastSuccessfulConsensusViewID", consensus.GetCurViewID()).
+			Uint64("LastSuccessfulConsensusViewID", consensus.GetCurBlockViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false
