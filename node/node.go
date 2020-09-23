@@ -885,16 +885,15 @@ func New(
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
-
-			shardID := node.NodeConfig.ShardID
-			// HACK get the real error reason
-			_, err := node.shardChains.ShardChain(shardID)
-
-			fmt.Fprintf(
-				os.Stderr,
-				"reason:%s beaconchain-is-nil:%t shardchain-is-nil:%t",
-				err.Error(), b1, b2,
-			)
+			var err error
+			if blockchain == nil {
+				shardID := node.NodeConfig.ShardID
+				// HACK get the real error reason
+				_, err = node.shardChains.ShardChain(shardID)
+			} else {
+				_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
+			}
+			fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
 			os.Exit(-1)
 		}
 
