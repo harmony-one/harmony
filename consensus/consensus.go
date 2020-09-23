@@ -47,8 +47,6 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
-	multiSigBitmap       *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-	multiSigMutex        sync.RWMutex
 	// Commits collected from view change
 	// for each viewID, we need keep track of corresponding sigs and bitmap
 	// until one of the viewID has enough votes (>=2f+1)
@@ -123,8 +121,6 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
-	// Temporary flag to control whether multi-sig signing is enabled
-	MultiSig bool
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -182,6 +178,7 @@ func New(
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
+	// TODO Refactor consensus.block* into State?
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
