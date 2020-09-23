@@ -33,8 +33,8 @@ type State struct {
 
 	// current view id in normal mode
 	// it changes per successful consensus
-	curViewID uint64
-	cViewMux  sync.RWMutex
+	blockViewID uint64
+	cViewMux    sync.RWMutex
 
 	// view changing id is used during view change mode
 	// it is the next view id
@@ -61,14 +61,14 @@ func (pm *State) SetMode(s Mode) {
 func (pm *State) GetCurBlockViewID() uint64 {
 	pm.cViewMux.RLock()
 	defer pm.cViewMux.RUnlock()
-	return pm.curViewID
+	return pm.blockViewID
 }
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) {
 	pm.cViewMux.Lock()
 	defer pm.cViewMux.Unlock()
-	pm.curViewID = viewID
+	pm.blockViewID = viewID
 }
 
 // GetViewChangingID return the current view changing id
@@ -94,7 +94,7 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 	pm.cViewMux.RLock()
 	defer pm.viewMux.RUnlock()
 	defer pm.cViewMux.RUnlock()
-	diff := int64(pm.viewChangingID - pm.curViewID)
+	diff := int64(pm.viewChangingID - pm.blockViewID)
 	return time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
