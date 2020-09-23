@@ -242,13 +242,13 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}, nil
 }
 
-// WrappedTransaction is a wrapper for a transactions that includes all relevant
-// data to parse the transaction in ConstructionParse
+// WrappedTransaction is a wrapper for a transaction that includes all relevant
+// data to parse a transaction.
 type WrappedTransaction struct {
 	RLPBytes         []byte                   `json:"rlp_bytes"`
+	IsStaking        bool                     `json:"is_staking"`
 	From             *types.AccountIdentifier `json:"from"`
 	EstimatedGasUsed uint64                   `json:"estimated_gas_used"`
-	IsStaking        bool                     `json:"is_staking"`
 }
 
 // unpackWrappedTransactionFromHexString ..
@@ -384,10 +384,14 @@ func (s *ConstructAPI) ConstructionParse(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	if !request.Signed {
-		return parseUnsignedTransaction(ctx, request.Transaction, s.tempSignerPrivateKey, s.signer, s.stakingSigner)
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(request.Transaction)
+	if rosettaError != nil {
+		return nil, rosettaError
 	}
-	return parseSignedTransaction(ctx, request.Transaction)
+	if !request.Signed {
+		return parseUnsignedTransaction(ctx, wrappedTransaction, tx, s.tempSignerPrivateKey, s.signer, s.stakingSigner)
+	}
+	return parseSignedTransaction(ctx, wrappedTransaction, tx)
 }
 
 // ConstructionHash implements the /construction/hash endpoint.
@@ -468,14 +472,9 @@ func getSuggestedFeeAndPrice(
 
 // parseUnsignedTransaction ..
 func parseUnsignedTransaction(
-	ctx context.Context, wrappedTransactionHex string,
+	ctx context.Context, wrappedTransaction *WrappedTransaction, tx hmyTypes.PoolTransaction,
 	tempPrivateKey *ecdsa.PrivateKey, signer hmyTypes.Signer, stakingSigner stakingTypes.Signer,
 ) (*types.ConstructionParseResponse, *types.Error) {
-	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(wrappedTransactionHex)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-
 	if stakingTx, ok := tx.(*stakingTypes.StakingTransaction); ok {
 		stakingTx, err := stakingTypes.Sign(stakingTx, stakingSigner, tempPrivateKey)
 		if err != nil {
@@ -494,7 +493,7 @@ func parseUnsignedTransaction(
 		tx = plainTx
 	} else {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "unknown transaction type when parsing unwrapped transaction",
+			"message": "unknown transaction type when parsing unwrapped & unsigned transaction",
 		})
 	}
 
@@ -506,20 +505,22 @@ func parseUnsignedTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-
+	tempAccID, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(tempPrivateKey.PublicKey))
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	foundSender := false
 	operations := formattedTx.Operations
 	for _, op := range operations {
-		if amount, _ := types.AmountValue(op.Amount); amount != nil && amount.Sign() == -1 {
-			op.Account = wrappedTransaction.From
-			break
-		}
-	}
-	tempB32Address := internalCommon.MustAddressToBech32(crypto.PubkeyToAddress(tempPrivateKey.PublicKey))
-	for _, op := range operations {
-		if op.Account.Address == tempB32Address {
-			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-				"message": "constructed operations has 0 or 2+ senders - only 1 account can loose funds",
-			})
+		if types.Hash(op.Account) == types.Hash(tempAccID) {
+			if foundSender {
+				return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": "constructed operations has 2+ senders - only 1 account can loose funds",
+				})
+			} else {
+				foundSender = true
+				op.Account = wrappedTransaction.From
+			}
 		}
 	}
 	return &types.ConstructionParseResponse{
@@ -529,7 +530,33 @@ func parseUnsignedTransaction(
 
 // parseSignedTransaction ..
 func parseSignedTransaction(
-	ctx context.Context, wrappedTransactionHex string,
+	ctx context.Context, wrappedTransaction *WrappedTransaction, tx hmyTypes.PoolTransaction,
 ) (*types.ConstructionParseResponse, *types.Error) {
-	return nil, nil
+	// TODO (dm): implement intended receipt for staking transactions
+	intendedReceipt := &hmyTypes.Receipt{
+		GasUsed: wrappedTransaction.EstimatedGasUsed,
+	}
+	formattedTx, rosettaError := formatTransaction(tx, intendedReceipt)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	sender, err := tx.SenderAddress()
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "unable to get sender address, invalid signed transaction"),
+		})
+	}
+	senderID, rosettaError := newAccountIdentifier(sender)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if types.Hash(senderID) != types.Hash(wrappedTransaction.From) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "wrapped transaction sender/from does not match transaction signer",
+		})
+	}
+	return &types.ConstructionParseResponse{
+		Operations:               formattedTx.Operations,
+		AccountIdentifierSigners: []*types.AccountIdentifier{senderID},
+	}, nil
 }

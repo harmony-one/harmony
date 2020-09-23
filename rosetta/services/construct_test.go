@@ -151,4 +151,26 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
+	// test invalid nil RLP
+	wrappedTransaction.RLPBytes = nil
+	marshalledBytesFail, err = json.Marshal(wrappedTransaction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	if rosettaError == nil {
+		t.Fatal("expected error")
+	}
+
+	// test invalid from address
+	wrappedTransaction.RLPBytes = buf.Bytes()
+	wrappedTransaction.From = nil
+	marshalledBytesFail, err = json.Marshal(wrappedTransaction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	if rosettaError == nil {
+		t.Fatal("expected error")
+	}
 }
