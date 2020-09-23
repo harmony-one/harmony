@@ -886,7 +886,7 @@ func New(
 		beaconChain := node.Beaconchain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
 			var err error
-			if blockchain == nil {
+			if b2 {
 				shardID := node.NodeConfig.ShardID
 				// HACK get the real error reason
 				_, err = node.shardChains.ShardChain(shardID)
