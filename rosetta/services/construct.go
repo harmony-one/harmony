@@ -1,7 +1,9 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -17,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
@@ -32,14 +35,19 @@ type ConstructAPI struct {
 	hmy           *hmy.Harmony
 	signer        hmyTypes.Signer
 	stakingSigner stakingTypes.Signer
+
+	// tempSignerPrivateKey for unsigned transactions to satisfy assumption of
+	// signed transaction for transaction processing/formatting
+	tempSignerPrivateKey *ecdsa.PrivateKey
 }
 
 // NewConstructionAPI creates a new instance of a ConstructAPI.
 func NewConstructionAPI(hmy *hmy.Harmony) server.ConstructionAPIServicer {
 	return &ConstructAPI{
-		hmy:           hmy,
-		signer:        hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
-		stakingSigner: stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		hmy:                  hmy,
+		signer:               hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		stakingSigner:        stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		tempSignerPrivateKey: internalCommon.MustGeneratePrivateKey(),
 	}
 }
 
@@ -234,10 +242,52 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}, nil
 }
 
-// UnsignedTransaction is a wrapper for an unsigned transaction that includes its indented sender
-type UnsignedTransaction struct {
-	RLPBytes []byte                   `json:"rlp_bytes"`
-	From     *types.AccountIdentifier `json:"from"`
+// WrappedTransaction is a wrapper for a transactions that includes all relevant
+// data to parse the transaction in ConstructionParse
+type WrappedTransaction struct {
+	RLPBytes         []byte                   `json:"rlp_bytes"`
+	From             *types.AccountIdentifier `json:"from"`
+	EstimatedGasUsed uint64                   `json:"estimated_gas_used"`
+	IsStaking        bool                     `json:"is_staking"`
+}
+
+// unpackWrappedTransactionFromHexString ..
+func unpackWrappedTransactionFromHexString(
+	hex string,
+) (*WrappedTransaction, hmyTypes.PoolTransaction, *types.Error) {
+	wrappedTransaction := &WrappedTransaction{}
+	wrappedTxBytes, err := hexutil.Decode(hex)
+	if err != nil {
+		return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if err := json.Unmarshal(wrappedTxBytes, wrappedTransaction); err != nil {
+		return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "unknown unsigned transaction format").Error(),
+		})
+	}
+
+	var tx hmyTypes.PoolTransaction
+	stream := rlp.NewStream(bytes.NewBuffer(wrappedTransaction.RLPBytes), 0)
+	if wrappedTransaction.IsStaking {
+		stakingTx := &stakingTypes.StakingTransaction{}
+		if err := stakingTx.DecodeRLP(stream); err != nil {
+			return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": errors.WithMessage(err, "rlp encoding error for staking transaction").Error(),
+			})
+		}
+		tx = stakingTx
+	} else {
+		plainTx := &hmyTypes.Transaction{}
+		if err := plainTx.DecodeRLP(stream); err != nil {
+			return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": errors.WithMessage(err, "rlp encoding error for plain transaction").Error(),
+			})
+		}
+		tx = plainTx
+	}
+	return wrappedTransaction, tx, nil
 }
 
 // ConstructionPayloads implements the /construction/payloads endpoint.
@@ -290,28 +340,30 @@ func (s *ConstructAPI) ConstructionPayloads(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	rlpBytes, err := rlp.EncodeToBytes(unsignedTx)
-	if err != nil {
+	payload, rosettaError := s.getSigningPayload(unsignedTx, senderID)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	buf := &bytes.Buffer{}
+	if err := unsignedTx.EncodeRLP(buf); err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
-	marshalledBytes, err := json.Marshal(UnsignedTransaction{
-		RLPBytes: rlpBytes,
-		From:     components.From,
+	marshalledBytes, err := json.Marshal(WrappedTransaction{
+		RLPBytes:         buf.Bytes(),
+		From:             senderID,
+		EstimatedGasUsed: metadata.GasLimit,
+		IsStaking:        components.IsStaking(),
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
-	payloads, rosettaError := s.getSigningPayload(unsignedTx, senderID)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
 	return &types.ConstructionPayloadsResponse{
 		UnsignedTransaction: string(marshalledBytes),
-		Payloads:            payloads,
+		Payloads:            []*types.SigningPayload{payload},
 	}, nil
 }
 
@@ -333,9 +385,9 @@ func (s *ConstructAPI) ConstructionParse(
 		return nil, err
 	}
 	if !request.Signed {
-		return parseUnsignedTransaction(ctx, request)
+		return parseUnsignedTransaction(ctx, request.Transaction, s.tempSignerPrivateKey, s.signer, s.stakingSigner)
 	}
-	return parseSignedTransaction(ctx, request)
+	return parseSignedTransaction(ctx, request.Transaction)
 }
 
 // ConstructionHash implements the /construction/hash endpoint.
@@ -361,24 +413,22 @@ func (s *ConstructAPI) ConstructionSubmit(
 // getSigningPayload ..
 func (s *ConstructAPI) getSigningPayload(
 	tx hmyTypes.PoolTransaction, senderAccountID *types.AccountIdentifier,
-) ([]*types.SigningPayload, *types.Error) {
-	payloads := []*types.SigningPayload{
-		{
-			AccountIdentifier: senderAccountID,
-			SignatureType:     types.Ecdsa,
-		},
+) (*types.SigningPayload, *types.Error) {
+	payload := &types.SigningPayload{
+		AccountIdentifier: senderAccountID,
+		SignatureType:     types.Ecdsa,
 	}
 	switch tx.(type) {
 	case *stakingTypes.StakingTransaction:
-		payloads[0].Bytes = s.stakingSigner.Hash(tx.(*stakingTypes.StakingTransaction)).Bytes()
+		payload.Bytes = s.stakingSigner.Hash(tx.(*stakingTypes.StakingTransaction)).Bytes()
 	case *hmyTypes.Transaction:
-		payloads[0].Bytes = s.signer.Hash(tx.(*hmyTypes.Transaction)).Bytes()
+		payload.Bytes = s.signer.Hash(tx.(*hmyTypes.Transaction)).Bytes()
 	default:
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "constructed unknown or unsupported transaction",
 		})
 	}
-	return payloads, nil
+	return payload, nil
 }
 
 // getAddressFromPublicKey assumes that data is a compressed secp256k1 public key
@@ -418,14 +468,68 @@ func getSuggestedFeeAndPrice(
 
 // parseUnsignedTransaction ..
 func parseUnsignedTransaction(
-	ctx context.Context, request *types.ConstructionParseRequest,
+	ctx context.Context, wrappedTransactionHex string,
+	tempPrivateKey *ecdsa.PrivateKey, signer hmyTypes.Signer, stakingSigner stakingTypes.Signer,
 ) (*types.ConstructionParseResponse, *types.Error) {
-	return nil, nil
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(wrappedTransactionHex)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	if stakingTx, ok := tx.(*stakingTypes.StakingTransaction); ok {
+		stakingTx, err := stakingTypes.Sign(stakingTx, stakingSigner, tempPrivateKey)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		tx = stakingTx
+	} else if plainTx, ok := tx.(*hmyTypes.Transaction); ok {
+		plainTx, err := hmyTypes.SignTx(plainTx, signer, tempPrivateKey)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		tx = plainTx
+	} else {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown transaction type when parsing unwrapped transaction",
+		})
+	}
+
+	// TODO (dm): implement intended receipt for staking transactions
+	intendedReceipt := &hmyTypes.Receipt{
+		GasUsed: wrappedTransaction.EstimatedGasUsed,
+	}
+	formattedTx, rosettaError := formatTransaction(tx, intendedReceipt)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	operations := formattedTx.Operations
+	for _, op := range operations {
+		if amount, _ := types.AmountValue(op.Amount); amount != nil && amount.Sign() == -1 {
+			op.Account = wrappedTransaction.From
+			break
+		}
+	}
+	tempB32Address := internalCommon.MustAddressToBech32(crypto.PubkeyToAddress(tempPrivateKey.PublicKey))
+	for _, op := range operations {
+		if op.Account.Address == tempB32Address {
+			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": "constructed operations has 0 or 2+ senders - only 1 account can loose funds",
+			})
+		}
+	}
+	return &types.ConstructionParseResponse{
+		Operations: operations,
+	}, nil
 }
 
 // parseSignedTransaction ..
 func parseSignedTransaction(
-	ctx context.Context, request *types.ConstructionParseRequest,
+	ctx context.Context, wrappedTransactionHex string,
 ) (*types.ConstructionParseResponse, *types.Error) {
 	return nil, nil
 }

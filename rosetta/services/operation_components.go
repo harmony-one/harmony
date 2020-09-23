@@ -24,6 +24,11 @@ type OperationComponents struct {
 	StakingMessage interface{}              `json:"staking_message,omitempty"`
 }
 
+// IsStaking ..
+func (s *OperationComponents) IsStaking() bool {
+	return s.StakingMessage != nil
+}
+
 // GetOperationComponents ensures the provided operations creates a valid transaction and returns
 // the OperationComponents of the resulting transaction.
 //
