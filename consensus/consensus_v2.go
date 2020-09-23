@@ -110,7 +110,7 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -272,18 +272,20 @@ func (consensus *Consensus) tryCatchup() {
 			consensus.getLogger().Debug().Msg("[TryCatchup] parent block hash not match")
 			break
 		}
+		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
 
-		if len(committedMsg.SenderPubkeys) != 1 {
-			consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
+		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeqHash(
+			msg_pb.MessageType_PREPARED, committedMsg.BlockNum, committedMsg.BlockHash,
+		)
+		msg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
+		if msg == nil {
 			break
 		}
-
-		consensus.getLogger().Info().Msg("[TryCatchup] block found to commit")
+		consensus.getLogger().Info().Msg("[TryCatchup] prepared message found to commit")
 
 		atomic.AddUint64(&consensus.blockNum, 1)
 		consensus.SetCurViewID(committedMsg.ViewID + 1)
-
-		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+		consensus.LeaderPubKey = committedMsg.SenderPubkey
 
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
 

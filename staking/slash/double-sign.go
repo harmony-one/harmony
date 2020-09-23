@@ -1,7 +1,6 @@
 package slash
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -74,9 +73,9 @@ type ConflictingVotes struct {
 
 // Vote is the vote of the double signer
 type Vote struct {
-	SignerPubKeys   []bls.SerializedPublicKey `json:"bls-public-keys"`
-	BlockHeaderHash common.Hash               `json:"block-header-hash"`
-	Signature       []byte                    `json:"bls-signature"`
+	SignerPubKey    bls.SerializedPublicKey `json:"bls-public-key"`
+	BlockHeaderHash common.Hash             `json:"block-header-hash"`
+	Signature       []byte                  `json:"bls-signature"`
 }
 
 // Record is an proof of a slashing made by a witness of a double-signing event
@@ -114,13 +113,13 @@ func (r Records) String() string {
 }
 
 var (
-	errNoMatchingDoubleSignKeys = errors.New("no matching double sign keys")
-	errReporterAndOffenderSame  = errors.New("reporter and offender cannot be same")
-	errAlreadyBannedValidator   = errors.New("cannot slash on already banned validator")
-	errSignerKeyNotRightSize    = errors.New("bls keys from slash candidate not right side")
-	errSlashFromFutureEpoch     = errors.New("cannot have slash from future epoch")
-	errSlashBeforeStakingEpoch  = errors.New("cannot have slash before staking epoch")
-	errSlashBlockNoConflict     = errors.New("cannot slash for signing on non-conflicting blocks")
+	errBallotSignerKeysNotSame = errors.New("conflicting ballots must have same signer key")
+	errReporterAndOffenderSame = errors.New("reporter and offender cannot be same")
+	errAlreadyBannedValidator  = errors.New("cannot slash on already banned validator")
+	errSignerKeyNotRightSize   = errors.New("bls keys from slash candidate not right side")
+	errSlashFromFutureEpoch    = errors.New("cannot have slash from future epoch")
+	errSlashBeforeStakingEpoch = errors.New("cannot have slash before staking epoch")
+	errSlashBlockNoConflict    = errors.New("cannot slash for signing on non-conflicting blocks")
 )
 
 // MarshalJSON ..
@@ -171,31 +170,23 @@ func Verify(
 	first, second :=
 		candidate.Evidence.FirstVote,
 		candidate.Evidence.SecondVote
-
-	for _, pubKey := range append(first.SignerPubKeys, second.SignerPubKeys...) {
-		if len(pubKey) != bls.PublicKeySizeInBytes {
-			return errors.Wrapf(
-				errSignerKeyNotRightSize, "double-signed key %x", pubKey,
-			)
-		}
+	k1, k2 := len(first.SignerPubKey), len(second.SignerPubKey)
+	if k1 != bls.PublicKeySizeInBytes ||
+		k2 != bls.PublicKeySizeInBytes {
+		return errors.Wrapf(
+			errSignerKeyNotRightSize, "cast key %d double-signed key %d", k1, k2,
+		)
 	}
 
 	if first.BlockHeaderHash == second.BlockHeaderHash {
 		return errors.Wrapf(errSlashBlockNoConflict, "first %v+ second %v+", first, second)
 	}
 
-	doubleSignKeys := []bls.SerializedPublicKey{}
-	for _, pubKey1 := range first.SignerPubKeys {
-		for _, pubKey2 := range second.SignerPubKeys {
-			if shard.CompareBLSPublicKey(pubKey1, pubKey2) == 0 {
-				doubleSignKeys = append(doubleSignKeys, pubKey1)
-				break
-			}
-		}
-	}
-
-	if len(doubleSignKeys) == 0 {
-		return errNoMatchingDoubleSignKeys
+	if shard.CompareBLSPublicKey(first.SignerPubKey, second.SignerPubKey) != 0 {
+		k1, k2 := first.SignerPubKey.Hex(), second.SignerPubKey.Hex()
+		return errors.Wrapf(
+			errBallotSignerKeysNotSame, "%s %s", k1, k2,
+		)
 	}
 	currentEpoch := chain.CurrentBlock().Epoch()
 	// the slash can't come from the future (shard chain's epoch can't be larger than beacon chain's)
@@ -221,25 +212,14 @@ func Verify(
 		)
 	}
 
-	signerFound := false
-	addrs := []common.Address{}
-	for _, pubKey := range doubleSignKeys {
-		addr, err := subCommittee.AddressForBLSKey(
-			pubKey,
-		)
-		if err != nil {
-			return err
-		}
-
-		if *addr == candidate.Evidence.Offender {
-			signerFound = true
-		}
-		addrs = append(addrs, *addr)
+	if addr, err := subCommittee.AddressForBLSKey(
+		second.SignerPubKey,
+	); err != nil {
+		return err
+	} else if *addr != candidate.Evidence.Offender {
+		return errors.Errorf("offender address (%x) does not match the signer's address (%x)", candidate.Evidence.Offender, addr)
 	}
 
-	if !signerFound {
-		return errors.Errorf("offender address (%x) does not match the signer's address (%x)", candidate.Evidence.Offender, addrs)
-	}
 	// last ditch check
 	if hash.FromRLPNew256(
 		candidate.Evidence.FirstVote,
@@ -249,8 +229,8 @@ func Verify(
 		return errors.Wrapf(
 			errBallotsNotDiff,
 			"%s %s",
-			candidate.Evidence.FirstVote.SignerPubKeys,
-			candidate.Evidence.SecondVote.SignerPubKeys,
+			candidate.Evidence.FirstVote.SignerPubKey.Hex(),
+			candidate.Evidence.SecondVote.SignerPubKey.Hex(),
 		)
 	}
 
@@ -266,13 +246,8 @@ func Verify(
 			return err
 		}
 
-		for _, pubKey := range ballot.SignerPubKeys {
-			publicKeyObj, err := bls.BytesToBLSPublicKey(pubKey[:])
-
-			if err != nil {
-				return err
-			}
-			publicKey.Add(publicKeyObj)
+		if publicKey, err = bls.BytesToBLSPublicKey(ballot.SignerPubKey[:]); err != nil {
+			return err
 		}
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
@@ -529,28 +504,15 @@ func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
 	rate := numeric.ZeroDec()
 
 	for i := range records {
-		doubleSignKeys := []bls.SerializedPublicKey{}
-		for _, pubKey1 := range records[i].Evidence.FirstVote.SignerPubKeys {
-			for _, pubKey2 := range records[i].Evidence.SecondVote.SignerPubKeys {
-				if shard.CompareBLSPublicKey(pubKey1, pubKey2) == 0 {
-					doubleSignKeys = append(doubleSignKeys, pubKey1)
-					break
-				}
-			}
+		key := records[i].Evidence.SecondVote.SignerPubKey
+		if card, exists := votingPower.Voters[key]; exists {
+			rate = rate.Add(card.GroupPercent)
+		} else {
+			utils.Logger().Debug().
+				RawJSON("roster", []byte(votingPower.String())).
+				RawJSON("double-sign-record", []byte(records[i].String())).
+				Msg("did not have offenders voter card in roster as expected")
 		}
-
-		for _, key := range doubleSignKeys {
-			if card, exists := votingPower.Voters[key]; exists &&
-				bytes.Equal(card.EarningAccount[:], records[i].Evidence.Offender[:]) {
-				rate = rate.Add(card.GroupPercent)
-			} else {
-				utils.Logger().Debug().
-					RawJSON("roster", []byte(votingPower.String())).
-					RawJSON("double-sign-record", []byte(records[i].String())).
-					Msg("did not have offenders voter card in roster as expected")
-			}
-		}
-
 	}
 
 	if rate.LT(oneDoubleSignerRate) {
