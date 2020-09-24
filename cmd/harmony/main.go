@@ -322,6 +322,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
+		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
 			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", publicListenIP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
