@@ -223,6 +223,9 @@ type Block struct {
 	commitSigAndBitmap []byte
 }
 
+// BlockVerifier is a function used to verify the block
+type BlockVerifier func(*Block) error
+
 func (b *Block) String() string {
 	m := b.Header()
 	return fmt.Sprintf(
