@@ -47,21 +47,6 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
-	// Commits collected from view change
-	// for each viewID, we need keep track of corresponding sigs and bitmap
-	// until one of the viewID has enough votes (>=2f+1)
-	// after one of viewID has enough votes, we can reset and clean the map
-	// honest nodes will never double votes on different viewID
-	// bhpSigs: blockHashPreparedSigs is the signature on m1 type message
-	bhpSigs map[uint64]map[string]*bls_core.Sign
-	// nilSigs: there is no prepared message when view change,
-	// it's signature on m2 type (i.e. nil) messages
-	nilSigs      map[uint64]map[string]*bls_core.Sign
-	viewIDSigs   map[uint64]map[string]*bls_core.Sign
-	bhpBitmap    map[uint64]*bls_cosi.Mask
-	nilBitmap    map[uint64]*bls_cosi.Mask
-	viewIDBitmap map[uint64]*bls_cosi.Mask
-	m1Payload    []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
 	// Minimal number of peers in the shard
@@ -85,15 +70,15 @@ type Consensus struct {
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
 	mutex sync.Mutex
-	// mutex for view change
-	vcLock sync.Mutex
+	// ViewChange struct
+	VC *ViewChange
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 	// The verifier func passed from Node object
-	BlockVerifier func(*types.Block) error
+	BlockVerifier types.BlockVerifier
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
@@ -213,5 +198,8 @@ func New(
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
+	// Make Sure Verifier is not null
+	consensus.VC = NewViewChange()
+
 	return &consensus, nil
 }

@@ -11,7 +11,6 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // FBFTLog represents the log stored by a node during FBFT process
@@ -155,7 +154,10 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNu
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).ViewID == viewID && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).ViewID == viewID &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -167,7 +169,8 @@ func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -179,7 +182,9 @@ func (log *FBFTLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 	found := []*FBFTMessage{}
 	it := log.Messages().Iterator()
 	for msg := range it.C {
-		if msg.(*FBFTMessage).MessageType == typ && msg.(*FBFTMessage).BlockNum == blockNum && msg.(*FBFTMessage).BlockHash == blockHash {
+		if msg.(*FBFTMessage).MessageType == typ &&
+			msg.(*FBFTMessage).BlockNum == blockNum &&
+			msg.(*FBFTMessage).BlockHash == blockHash {
 			found = append(found, msg.(*FBFTMessage))
 		}
 	}
@@ -239,6 +244,19 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 	return msgs[maxIdx]
 }
 
+// FindMessageByViewID returns the mesasge with matching view ID
+func (log *FBFTLog) FindMessageByViewID(msgs []*FBFTMessage, viewID uint64) *FBFTMessage {
+	if len(msgs) == 0 {
+		return nil
+	}
+	for k, v := range msgs {
+		if v.ViewID == viewID {
+			return msgs[k]
+		}
+	}
+	return nil
+}
+
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
 func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	// TODO Have this do sanity checks on the message please
@@ -261,118 +279,4 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(pbftMsg.SenderPubkey.Bytes[:], consensusMsg.SenderPubkey[:])
 
 	return &pbftMsg, nil
-}
-
-// ParseViewChangeMessage parses view change message into FBFTMessage structure
-func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
-	pbftMsg := FBFTMessage{}
-	pbftMsg.MessageType = msg.GetType()
-	if pbftMsg.MessageType != msg_pb.MessageType_VIEWCHANGE {
-		return nil, fmt.Errorf("ParseViewChangeMessage: incorrect message type %s", pbftMsg.MessageType)
-	}
-
-	vcMsg := msg.GetViewchange()
-	pbftMsg.ViewID = vcMsg.ViewId
-	pbftMsg.BlockNum = vcMsg.BlockNum
-	pbftMsg.Block = make([]byte, len(vcMsg.PreparedBlock))
-	copy(pbftMsg.Block[:], vcMsg.PreparedBlock[:])
-	pbftMsg.Payload = make([]byte, len(vcMsg.Payload))
-	copy(pbftMsg.Payload[:], vcMsg.Payload[:])
-
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
-		return nil, err
-	}
-	leaderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.LeaderPubkey)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse leaderpubkey")
-		return nil, err
-	}
-
-	vcSig := bls_core.Sign{}
-	err = vcSig.Deserialize(vcMsg.ViewchangeSig)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the viewchange signature")
-		return nil, err
-	}
-
-	vcSig1 := bls_core.Sign{}
-	err = vcSig1.Deserialize(vcMsg.ViewidSig)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the viewid signature")
-		return nil, err
-	}
-
-	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(pbftMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
-	pbftMsg.LeaderPubkey = &bls.PublicKeyWrapper{Object: leaderKey}
-	copy(pbftMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
-	pbftMsg.ViewchangeSig = &vcSig
-	pbftMsg.ViewidSig = &vcSig1
-	return &pbftMsg, nil
-}
-
-// ParseNewViewMessage parses new view message into FBFTMessage structure
-func (consensus *Consensus) ParseNewViewMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
-	FBFTMsg := FBFTMessage{}
-	FBFTMsg.MessageType = msg.GetType()
-
-	if FBFTMsg.MessageType != msg_pb.MessageType_NEWVIEW {
-		return nil, fmt.Errorf("ParseNewViewMessage: incorrect message type %s", FBFTMsg.MessageType)
-	}
-
-	vcMsg := msg.GetViewchange()
-	FBFTMsg.ViewID = vcMsg.ViewId
-	FBFTMsg.BlockNum = vcMsg.BlockNum
-	FBFTMsg.Payload = make([]byte, len(vcMsg.Payload))
-	copy(FBFTMsg.Payload[:], vcMsg.Payload[:])
-	FBFTMsg.Block = make([]byte, len(vcMsg.PreparedBlock))
-	copy(FBFTMsg.Block[:], vcMsg.PreparedBlock[:])
-
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to parse senderpubkey")
-		return nil, err
-	}
-
-	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
-
-	members := consensus.Decider.Participants()
-	if len(vcMsg.M3Aggsigs) > 0 {
-		m3Sig := bls_core.Sign{}
-		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M3 viewID signature")
-			return nil, err
-		}
-		m3mask, err := bls_cosi.NewMask(members, nil)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
-			return nil, err
-		}
-		m3mask.SetMask(vcMsg.M3Bitmap)
-		FBFTMsg.M3AggSig = &m3Sig
-		FBFTMsg.M3Bitmap = m3mask
-	}
-
-	if len(vcMsg.M2Aggsigs) > 0 {
-		m2Sig := bls_core.Sign{}
-		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to deserialize the multi signature for M2 aggregated signature")
-			return nil, err
-		}
-		m2mask, err := bls_cosi.NewMask(members, nil)
-		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("ParseViewChangeMessage failed to create mask for multi signature")
-			return nil, err
-		}
-		m2mask.SetMask(vcMsg.M2Bitmap)
-		FBFTMsg.M2AggSig = &m2Sig
-		FBFTMsg.M2Bitmap = m2mask
-	}
-
-	return &FBFTMsg, nil
 }
