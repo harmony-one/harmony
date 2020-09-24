@@ -96,7 +96,6 @@ type ConstructMetadata struct {
 }
 
 // UnmarshalFromInterface ..
-// TODO (dm): add unit tests as options are added
 func (m *ConstructMetadata) UnmarshalFromInterface(blockArgs interface{}) error {
 	var T ConstructMetadata
 	dat, err := json.Marshal(blockArgs)
@@ -188,6 +187,9 @@ func (s *ConstructAPI) ConstructionMetadata(
 func getSuggestedFeeAndPrice(
 	gasMul float64, estGasUsed *big.Int,
 ) ([]*types.Amount, *big.Int) {
+	if gasMul < 1 {
+		gasMul = 1
+	}
 	gasPriceFloat := big.NewFloat(0).Mul(big.NewFloat(DefaultGasPrice), big.NewFloat(gasMul))
 	gasPriceTruncated, _ := gasPriceFloat.Uint64()
 	gasPrice := new(big.Int).SetUint64(gasPriceTruncated)
