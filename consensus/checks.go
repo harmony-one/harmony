@@ -70,10 +70,6 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 }
 
 func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
-	if err := consensus.isSendByLeader(recvMsg); err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[onAnnounce] message failed leader check")
-		return false
-	}
 	logMsgs := consensus.FBFTLog.GetMessagesByTypeSeqView(
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
