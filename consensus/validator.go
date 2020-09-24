@@ -163,11 +163,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Msg("[OnPrepared] Prepared message and block added")
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
-	consensus.tryCatchup()
-	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnPrepared] OUT OF SYNC")
-		consensus.spinUpStateSync()
-	}
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
 		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
@@ -303,9 +298,8 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.commitBitmap = mask
 
 	consensus.tryCatchup()
-	if recvMsg.BlockNum > consensus.blockNum && recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
+	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
-		consensus.spinUpStateSync()
 		return
 	}
 
