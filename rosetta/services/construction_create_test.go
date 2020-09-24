@@ -4,35 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"math/big"
-	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
-
-func TestGetAddressFromPublicKey(t *testing.T) {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	refAddr := crypto.PubkeyToAddress(key.PublicKey)
-	compressedPublicKey := crypto.CompressPubkey(&key.PublicKey)
-	addr, rosettaError := getAddressFromPublicKey(&types.PublicKey{
-		Bytes:     compressedPublicKey,
-		CurveType: types.Secp256k1,
-	})
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	if !reflect.DeepEqual(refAddr, *addr) {
-		t.Errorf("expected adder %v, got %v", refAddr, *addr)
-	}
-}
 
 func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	key, err := crypto.GenerateKey()
