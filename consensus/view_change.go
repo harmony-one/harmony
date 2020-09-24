@@ -120,12 +120,8 @@ func (consensus *Consensus) switchPhase(desired FBFTPhase, override bool) {
 }
 
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
-func (consensus *Consensus) GetNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
-	gap := 1
-	if viewID > consensus.GetCurBlockViewID() {
-		gap = int(viewID - consensus.GetCurBlockViewID())
-	}
-	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey, gap)
+func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKeyWrapper {
+	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey)
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
@@ -167,20 +163,20 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
 	consensus.SetViewChangingID(viewID)
-	nextLeaderPubKey := consensus.GetNextLeaderKey(viewID)
+	consensus.LeaderPubKey = consensus.GetNextLeaderKey()
 
 	duration := consensus.current.GetViewChangeDuraion()
 	consensus.getLogger().Warn().
 		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
-		Str("NextLeader", nextLeaderPubKey.Bytes.Hex()).
+		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
 
 	for _, key := range consensus.priKey {
 		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
-		msgToSend := consensus.constructViewChangeMessage(&key, nextLeaderPubKey)
+		msgToSend := consensus.constructViewChangeMessage(&key)
 		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
@@ -684,6 +680,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.getLogger().Info().
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("new leader changed")
+	consensus.getLogger().Info().
+		Msg("validator start consensus timer and stop view change timer")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 }

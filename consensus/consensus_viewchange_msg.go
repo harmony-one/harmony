@@ -13,7 +13,7 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper, nextLeaderPubKey *bls.PublicKeyWrapper) []byte {
+func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -23,7 +23,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 				BlockNum:     consensus.blockNum,
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
-				LeaderPubkey: nextLeaderPubKey.Bytes[:],
+				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
 			},
 		},
 	}
