@@ -5,8 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -94,7 +92,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
-	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
@@ -109,8 +106,7 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Sign on the hash of the message with the private keys and return the signature.
-// If multiple keys are provided, the aggregated signature will be returned.
+// Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
 	signature := priKey.SignHash(hash[:])
@@ -157,12 +153,8 @@ func (consensus *Consensus) UpdateBitmaps() {
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
-	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
-	consensus.multiSigMutex.Lock()
-	consensus.multiSigBitmap = multiSigBitmap
-	consensus.multiSigMutex.Unlock()
 }
 
 // ResetState resets the state of the consensus
@@ -222,19 +214,16 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
-		if len(msg.SenderPubkeys) != 1 {
-			return errors.New("Leader message can not have multiple sender keys")
-		}
-		consensus.LeaderPubKey = msg.SenderPubkeys[0]
+		consensus.LeaderPubKey = msg.SenderPubkey
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Debug().
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.GetCurViewID() {
+	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurViewID() {
+	} else if msg.ViewID < consensus.GetCurBlockViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -265,7 +254,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
 		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.GetCurViewID()).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
 		Interface("phase", consensus.phase).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
@@ -342,11 +331,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.BlockPeriod = 5 * time.Second
-
-	// TODO: remove once multisig is fully upgraded in the network
-	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
-		consensus.MultiSig = true
-	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		len(curHeader.ShardState()) > 0 &&
@@ -538,16 +522,32 @@ func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
-	consensus.SetCurViewID(height)
+	consensus.SetCurBlockViewID(height)
 	consensus.SetViewChangingID(height)
 }
 
-// SetCurViewID set the current view ID
-func (consensus *Consensus) SetCurViewID(viewID uint64) {
-	consensus.current.SetCurViewID(viewID)
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) SetCurBlockViewID(viewID uint64) {
+	consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
+}
+
+// StartFinalityCount set the finality counter to current time
+func (consensus *Consensus) StartFinalityCount() {
+	consensus.finalityCounter = time.Now().UnixNano()
+}
+
+// FinishFinalityCount calculate the current finality
+func (consensus *Consensus) FinishFinalityCount() {
+	d := time.Now().UnixNano()
+	consensus.finality = (d - consensus.finalityCounter) / 1000000
+}
+
+// GetFinality returns the finality time in milliseconds of previous consensus
+func (consensus *Consensus) GetFinality() int64 {
+	return consensus.finality
 }

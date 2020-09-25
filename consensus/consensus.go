@@ -47,8 +47,6 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
-	multiSigBitmap       *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-	multiSigMutex        sync.RWMutex
 	// Commits collected from view change
 	// for each viewID, we need keep track of corresponding sigs and bitmap
 	// until one of the viewID has enough votes (>=2f+1)
@@ -125,6 +123,12 @@ type Consensus struct {
 	NextBlockDue time.Time
 	// Temporary flag to control whether multi-sig signing is enabled
 	MultiSig bool
+
+	// TODO (leo): an new metrics system to keep track of the consensus/viewchange
+	// finality of previous consensus in the unit of milliseconds
+	finality int64
+	// finalityCounter keep tracks of the finality time
+	finalityCounter int64
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -182,6 +186,7 @@ func New(
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
+	// TODO Refactor consensus.block* into State?
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
@@ -198,7 +203,7 @@ func New(
 	// viewID has to be initialized as the height of
 	// the blockchain during initialization as it was
 	// displayed on explorer as Height right now
-	consensus.SetCurViewID(0)
+	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})

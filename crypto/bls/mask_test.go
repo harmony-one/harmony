@@ -226,12 +226,6 @@ func TestEnableKeyFunctions(test *testing.T) {
 	if err := mask.SetKey(pubKey4.Bytes, true); err == nil {
 		test.Error("Expected key nout found error")
 	}
-
-	enabledKeysFromBitmap, _ := mask.GetSignedPubKeysFromBitmap(mask.Bitmap)
-
-	if len(enabledKeysFromBitmap) != 1 {
-		test.Error("Count of enabled keys from bitmap doesn't match")
-	}
 }
 
 func TestCopyParticipatingMask(test *testing.T) {

@@ -29,14 +29,11 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *uniformVoteWeight) AddNewVote(
-	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
+	p Phase, pubKeyBytes bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
-	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
-	for i, pubKey := range pubKeys {
-		pubKeysBytes[i] = pubKey.Bytes
-	}
-	return v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
+
+	return v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)
 }
 
 // IsQuorumAchieved ..

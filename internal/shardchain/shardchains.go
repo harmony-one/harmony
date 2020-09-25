@@ -77,7 +77,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		// NewChainDB may return incompletely initialized DB;
 		// avoid closing it.
 		db = nil
-		return nil, errors.New("cannot open chain database")
+		return nil, errors.Wrap(err, "cannot open chain database")
 	}
 	if rawdb.ReadCanonicalHash(db, 0) == (common.Hash{}) {
 		utils.Logger().Info().

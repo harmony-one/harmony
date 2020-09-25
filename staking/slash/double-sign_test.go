@@ -146,7 +146,7 @@ func TestVerify(t *testing.T) {
 			sdb:   defaultTestStateDB(),
 			chain: defaultFakeBlockChain(),
 
-			expErr: errNoMatchingDoubleSignKeys,
+			expErr: errBallotSignerKeysNotSame,
 		},
 		{
 			// block is in the future
@@ -693,9 +693,9 @@ func TestRate(t *testing.T) {
 				keyPairs[2].Pub(): numeric.NewDecWithPrec(3, 2),
 			}),
 			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[1].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[2].Pub()),
 			},
 			expRate: numeric.NewDecWithPrec(6, 2),
 		},
@@ -704,7 +704,7 @@ func TestRate(t *testing.T) {
 				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
 			}),
 			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
 			},
 			expRate: oneDoubleSignerRate,
 		},
@@ -720,9 +720,9 @@ func TestRate(t *testing.T) {
 				keyPairs[3].Pub(): numeric.NewDecWithPrec(3, 2),
 			}),
 			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[0].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[1].Pub()),
+				makeEmptyRecordWithSecondSignerKey(keyPairs[2].Pub()),
 			},
 			expRate: numeric.NewDecWithPrec(3, 2),
 		},
@@ -736,10 +736,9 @@ func TestRate(t *testing.T) {
 
 }
 
-func makeEmptyRecordWithSignerKey(pub bls.SerializedPublicKey) Record {
+func makeEmptyRecordWithSecondSignerKey(pub bls.SerializedPublicKey) Record {
 	var r Record
-	r.Evidence.SecondVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
-	r.Evidence.FirstVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
+	r.Evidence.SecondVote.SignerPubKey = pub
 	return r
 }
 
@@ -776,7 +775,7 @@ func defaultSlashRecord() Record {
 
 func makeVoteData(kp blsKeyPair, block *types.Block) Vote {
 	return Vote{
-		SignerPubKeys:   []bls.SerializedPublicKey{kp.Pub()},
+		SignerPubKey:    kp.Pub(),
 		BlockHeaderHash: block.Hash(),
 		Signature:       kp.Sign(block),
 	}
@@ -1063,7 +1062,7 @@ func copyConflictingVotes(cv ConflictingVotes) ConflictingVotes {
 // copyVote makes a deep copy of slash.Vote
 func copyVote(v Vote) Vote {
 	cp := Vote{
-		SignerPubKeys:   v.SignerPubKeys,
+		SignerPubKey:    v.SignerPubKey,
 		BlockHeaderHash: v.BlockHeaderHash,
 	}
 	if v.Signature != nil {

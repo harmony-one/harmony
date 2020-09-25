@@ -61,6 +61,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
+	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rjeczalik/notify v0.9.2
 	github.com/robertkrimen/otto v0.0.0-20170205013659-6a77b7cbc37d // indirect
 	github.com/rs/cors v1.7.0 // indirect
