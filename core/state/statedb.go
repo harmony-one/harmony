@@ -676,6 +676,7 @@ func (db *DB) GetRefund() uint64 {
 // and clears the journal as well as the refunds.
 func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// Commit validator changes in cache to stateObjects
+	// TODO: remove validator cache after commit
 	for addr, val := range db.stateValidators {
 		db.UpdateValidatorWrapper(addr, val)
 	}
