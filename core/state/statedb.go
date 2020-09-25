@@ -745,36 +745,31 @@ func (db *DB) clearJournalAndRefund() {
 
 // Commit writes the state to the underlying in-memory trie database.
 func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
-	defer db.clearJournalAndRefund()
+	// Finalize any pending changes and merge everything into the tries
+	db.IntermediateRoot(deleteEmptyObjects)
 
-	for addr := range db.journal.dirties {
-		db.stateObjectsDirty[addr] = struct{}{}
-	}
-	// Commit objects to the trie.
-	for addr, stateObject := range db.stateObjects {
-		_, isDirty := db.stateObjectsDirty[addr]
-		switch {
-		case stateObject.suicided || (isDirty && deleteEmptyObjects && stateObject.empty()):
-			// If the object has been removed, don't bother syncing it
-			// and just mark it for deletion in the trie.
-			db.deleteStateObject(stateObject)
-		case isDirty:
+	// Commit objects to the trie, measuring the elapsed time
+	for addr := range db.stateObjectsDirty {
+		if obj := db.stateObjects[addr]; !obj.deleted {
 			// Write any contract code associated with the state object
-			if stateObject.code != nil && stateObject.dirtyCode {
-				db.db.TrieDB().InsertBlob(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
-				stateObject.dirtyCode = false
+			if obj.code != nil && obj.dirtyCode {
+				db.db.TrieDB().InsertBlob(common.BytesToHash(obj.CodeHash()), obj.code)
+				obj.dirtyCode = false
 			}
-			// Write any storage changes in the state object to its storage trie.
-			if err := stateObject.CommitTrie(db.db); err != nil {
+			// Write any storage changes in the state object to its storage trie
+			if err := obj.CommitTrie(db.db); err != nil {
 				return common.Hash{}, err
 			}
-			// Update the object in the main account trie.
-			db.updateStateObject(stateObject)
 		}
-		delete(db.stateObjectsDirty, addr)
 	}
-	// Write trie changes.
-	root, err = db.trie.Commit(func(leaf []byte, parent common.Hash) error {
+	if len(db.stateObjectsDirty) > 0 {
+		db.stateObjectsDirty = make(map[common.Address]struct{})
+	}
+	// Write the account trie changes, measuing the amount of wasted time
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountCommits += time.Since(start) }(time.Now())
+	}
+	return db.trie.Commit(func(leaf []byte, parent common.Hash) error {
 		var account Account
 		if err := rlp.DecodeBytes(leaf, &account); err != nil {
 			return nil
@@ -788,8 +783,6 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 		}
 		return nil
 	})
-	//log.Debug("Trie cache stats after commit", "misses", trie.CacheMisses(), "unloads", trie.CacheUnloads())
-	return root, err
 }
 
 var (
