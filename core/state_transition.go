@@ -96,7 +96,7 @@ type Message interface {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead, isValidatorCreation bool) (uint64, error) {
+func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
@@ -116,10 +116,14 @@ func IntrinsicGas(data []byte, contractCreation, homestead, isValidatorCreation 
 			}
 		}
 		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-gas)/params.TxDataNonZeroGas < nz {
+		nonZeroGas := params.TxDataNonZeroGasFrontier
+		if istanbul {
+			nonZeroGas = params.TxDataNonZeroGasEIP2028
+		}
+		if (math.MaxUint64-gas)/nonZeroGas < nz {
 			return 0, vm.ErrOutOfGas
 		}
-		gas += nz * params.TxDataNonZeroGas
+		gas += nz * nonZeroGas
 
 		z := uint64(len(data)) - nz
 		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
@@ -219,10 +223,11 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
+	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead, false)
+	gas, err := IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -298,9 +303,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
+	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead, msg.Type() == types.StakeCreateVal)
+	gas, err := IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
 		return 0, err

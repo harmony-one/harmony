@@ -228,6 +228,7 @@ func (w *Worker) commitTransaction(
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
 	}
