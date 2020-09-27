@@ -437,9 +437,12 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 		})
 		// Add log if everything is good
 		for _, key := range sortedKeys {
-			valAddr, redelegatedToken := fromLockedTokens[key]
+			redelegatedToken, ok := fromLockedTokens[key]
+			if !ok {
+				return errors.New("Key missing for delegation receipt")
+			}
 			encodedRedelegationData := []byte{}
-			addrBytes := valAddr.Bytes()
+			addrBytes := key.Bytes()
 			encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
 			encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
 			// The data field format is:
