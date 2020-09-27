@@ -17,8 +17,10 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
+	"sort"
 
 	staking2 "github.com/harmony-one/harmony/staking"
 	"github.com/harmony-one/harmony/staking/network"
@@ -431,21 +433,34 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-	// Add log if everything is good
-	for valAddr, redelegatedToken := range fromLockedTokens {
-		encodedRedelegationData := []byte{}
-		addrBytes := valAddr.Bytes()
-		encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
-		encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
-		// The data field format is:
-		// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
-		// [rest of the bytes]: the bigInt serialized bytes for the token amount.
-		st.state.AddLog(&types.Log{
-			Address:     delegate.DelegatorAddress,
-			Topics:      []common.Hash{staking2.DelegateTopic},
-			Data:        encodedRedelegationData,
-			BlockNumber: st.evm.BlockNumber.Uint64(),
+	if len(fromLockedTokens) > 0 {
+		sortedKeys := []common.Address{}
+		for key := range fromLockedTokens {
+			sortedKeys = append(sortedKeys, key)
+		}
+		sort.SliceStable(sortedKeys, func(i, j int) bool {
+			return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
 		})
+		// Add log if everything is good
+		for _, key := range sortedKeys {
+			redelegatedToken, ok := fromLockedTokens[key]
+			if !ok {
+				return errors.New("Key missing for delegation receipt")
+			}
+			encodedRedelegationData := []byte{}
+			addrBytes := key.Bytes()
+			encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+			encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+			// The data field format is:
+			// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
+			// [rest of the bytes]: the bigInt serialized bytes for the token amount.
+			st.state.AddLog(&types.Log{
+				Address:     delegate.DelegatorAddress,
+				Topics:      []common.Hash{staking2.DelegateTopic},
+				Data:        encodedRedelegationData,
+				BlockNumber: st.evm.BlockNumber.Uint64(),
+			})
+		}
 	}
 	return nil
 }
