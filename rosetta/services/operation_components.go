@@ -45,11 +45,6 @@ func GetOperationComponents(
 		})
 	}
 
-	if len(operations) > 2 {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "unsupported number of operations",
-		})
-	}
 	if len(operations) == 2 {
 		return getTransferOperationComponents(operations)
 	}
@@ -88,7 +83,7 @@ func getTransferOperationComponents(
 			"message": err.Error(),
 		})
 	}
-	if new(big.Int).Add(val0, val1).Cmp(big.NewInt(0)) == 0 {
+	if new(big.Int).Add(val0, val1).Cmp(big.NewInt(0)) != 0 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "amount taken from sender is not exactly paid out to receiver for same shard transfer",
 		})
@@ -127,7 +122,7 @@ func getTransferOperationComponents(
 		Type:   op0.Type,
 		Amount: new(big.Int).Abs(val0),
 	}
-	if val0.Sign() != -1 {
+	if val0.Sign() != 1 {
 		components.From = op0.Account
 		components.To = op1.Account
 	} else {
