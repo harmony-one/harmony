@@ -3,10 +3,9 @@ package services
 import (
 	"context"
 	"crypto/ecdsa"
+	"github.com/pkg/errors"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pkg/errors"
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -65,7 +64,13 @@ func parseUnsignedTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	tempAccID, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(tempPrivateKey.PublicKey))
+	tempAddress, err := tx.SenderAddress()
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	tempAccID, rosettaError := newAccountIdentifier(tempAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -73,15 +78,14 @@ func parseUnsignedTransaction(
 	operations := formattedTx.Operations
 	for _, op := range operations {
 		if types.Hash(op.Account) == types.Hash(tempAccID) {
-			if foundSender {
-				return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-					"message": "constructed operations has 2+ senders - only 1 account can loose funds",
-				})
-			} else {
-				foundSender = true
-				op.Account = wrappedTransaction.From
-			}
+			foundSender = true
+			op.Account = wrappedTransaction.From
 		}
+	}
+	if !foundSender {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "temp sender not found in transaction operations",
+		})
 	}
 	return &types.ConstructionParseResponse{
 		Operations: operations,

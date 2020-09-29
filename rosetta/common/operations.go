@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 
@@ -98,15 +99,18 @@ type CrossShardTransactionOperationMetadata struct {
 }
 
 // UnmarshalFromInterface ..
-func (t *CrossShardTransactionOperationMetadata) UnmarshalFromInterface(metaData interface{}) error {
-	var args CrossShardTransactionOperationMetadata
-	dat, err := json.Marshal(metaData)
+func (s *CrossShardTransactionOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T CrossShardTransactionOperationMetadata
+	dat, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(dat, &args); err != nil {
+	if err := json.Unmarshal(dat, &T); err != nil {
 		return err
 	}
-	*t = args
+	if T.To == nil || T.From == nil {
+		return fmt.Errorf("expected to & from to be present for CrossShardTransactionOperationMetadata")
+	}
+	*s = T
 	return nil
 }

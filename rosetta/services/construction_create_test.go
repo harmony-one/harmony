@@ -15,11 +15,11 @@ import (
 )
 
 func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
-	key, err := crypto.GenerateKey()
+	refKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	refAddr := crypto.PubkeyToAddress(key.PublicKey)
+	refAddr := crypto.PubkeyToAddress(refKey.PublicKey)
 	refAddrID, rosettaError := newAccountIdentifier(refAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
@@ -70,7 +70,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 			ValidatorAddress: crypto.PubkeyToAddress(receiverKey.PublicKey),
 			Amount:           tenOnes,
 		}
-	}, key, 10, refEstGasUsed.Uint64())
+	}, refKey, 10, refEstGasUsed.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
