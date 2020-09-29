@@ -724,8 +724,8 @@ func doEstimateGas(
 	executable := func(gas uint64) bool {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		_, _, failed, err := doCall(ctx, hmy, args, blockNum, vm.Config{}, 0, big.NewInt(int64(max)))
-		if err != nil || failed {
+		result, err := doCall(ctx, hmy, args, blockNum, vm.Config{}, 0, big.NewInt(int64(max)))
+		if err != nil || result.VMErr == nil {
 			return false
 		}
 		return true
