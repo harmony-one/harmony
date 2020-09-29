@@ -6,6 +6,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -21,7 +22,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 	}
 	// Construct and broadcast prepared message
 	networkMessage, err := consensus.construct(
-		msg_pb.MessageType_PREPARED, nil, leaderPriKey,
+		msg_pb.MessageType_PREPARED, nil, []*bls.PrivateKeyWrapper{leaderPriKey},
 	)
 	if err != nil {
 		consensus.getLogger().Err(err).
@@ -58,7 +59,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 
 		if _, err := consensus.Decider.AddNewVote(
 			quorum.Commit,
-			key.Pub.Bytes,
+			[]*bls.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
 			blockObj.Hash(),
 			blockObj.NumberU64(),

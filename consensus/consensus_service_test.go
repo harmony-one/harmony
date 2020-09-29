@@ -43,7 +43,7 @@ func TestPopulateMessageFields(t *testing.T) {
 
 	keyBytes := bls.SerializedPublicKey{}
 	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
-	consensusMsg := consensus.populateMessageFields(msg.GetConsensus(), consensus.blockHash[:],
+	consensusMsg := consensus.populateMessageFieldsAndSender(msg.GetConsensus(), consensus.blockHash[:],
 		keyBytes)
 
 	if consensusMsg.ViewId != 2 {
