@@ -66,6 +66,14 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	); err != nil {
 		t.Error(err)
 	}
+
+	// test nil
+	_, rosettaError = parseUnsignedTransaction(context.Background(), nil, nil,
+		internalCommon.MustGeneratePrivateKey(), tempTestSigner, tempTestStakingSigner,
+	)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
 }
 
 func TestParseUnsignedTransactionStaking(t *testing.T) {
@@ -127,6 +135,12 @@ func TestParseSignedTransaction(t *testing.T) {
 		EstimatedGasUsed: testTx.Gas(),
 	}
 	_, rosettaError = parseSignedTransaction(context.Background(), wrappedTransaction, testTx)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil
+	_, rosettaError = parseSignedTransaction(context.Background(), nil, nil)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}

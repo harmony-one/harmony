@@ -90,6 +90,12 @@ func TestGetContractCreationOperationComponents(t *testing.T) {
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
+
+	// test nil operation
+	_, rosettaError = getContractCreationOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
 }
 
 func TestGetCrossShardOperationComponents(t *testing.T) {
@@ -223,6 +229,12 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 		Account:  refFrom,
 		Metadata: badMetadataMap,
 	})
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = getCrossShardOperationComponents(nil)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
@@ -470,6 +482,12 @@ func TestGetTransferOperationComponents(t *testing.T) {
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
+
+	// Test nil operations
+	_, rosettaError = getTransferOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
 }
 
 func TestGetOperationComponents(t *testing.T) {
@@ -578,6 +596,12 @@ func TestGetOperationComponents(t *testing.T) {
 			Type: common.ExpendGasOperation,
 		},
 	})
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = GetOperationComponents(nil)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}

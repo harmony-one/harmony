@@ -22,6 +22,11 @@ func (s *ConstructAPI) ConstructionHash(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
+	if tx == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil transaction",
+		})
+	}
 	return &types.TransactionIdentifierResponse{
 		TransactionIdentifier: &types.TransactionIdentifier{Hash: tx.Hash().String()},
 	}, nil
@@ -37,6 +42,11 @@ func (s *ConstructAPI) ConstructionSubmit(
 	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(request.SignedTransaction)
 	if rosettaError != nil {
 		return nil, rosettaError
+	}
+	if wrappedTransaction == nil || tx == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil wrapped transaction or nil unwrapped transaction",
+		})
 	}
 
 	wrappedSenderAddress, err := getAddress(wrappedTransaction.From)

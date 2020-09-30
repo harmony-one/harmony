@@ -16,6 +16,11 @@ import (
 func ConstructTransaction(
 	components *OperationComponents, metadata *ConstructMetadata, sourceShardID uint32,
 ) (response hmyTypes.PoolTransaction, rosettaError *types.Error) {
+	if components == nil || metadata == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil components or metadata",
+		})
+	}
 	if metadata.Transaction.FromShardID != nil && *metadata.Transaction.FromShardID != sourceShardID {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": fmt.Sprintf("intended source shard %v != tx metadata source shard %v",
@@ -63,6 +68,16 @@ func constructCrossShardTransaction(
 	if metadata.Transaction.FromShardID == nil || metadata.Transaction.ToShardID == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": errors.WithMessage(err, "cross shard transfer requires to & from shard IDs"),
+		})
+	}
+	if *metadata.Transaction.FromShardID != sourceShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("cannot send transaction for shard %v", *metadata.Transaction.FromShardID),
+		})
+	}
+	if *metadata.Transaction.FromShardID == *metadata.Transaction.ToShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "cross-shard transfer cannot be within same shard",
 		})
 	}
 	data := hexutil.Bytes{}

@@ -24,6 +24,11 @@ const (
 	DefaultGasPrice = denominations.Nano
 )
 
+var (
+	// DefaultGasLimit ..
+	DefaultGasLimit = big.NewInt(24000)
+)
+
 // ConstructAPI implements the server.ConstructAPIServicer interface.
 type ConstructAPI struct {
 	hmy           *hmy.Harmony
@@ -69,6 +74,11 @@ func (s *ConstructAPI) ConstructionDerive(
 func getAddressFromPublicKey(
 	key *types.PublicKey,
 ) (*ethCommon.Address, *types.Error) {
+	if key == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil key",
+		})
+	}
 	if key.CurveType != common.CurveType {
 		return nil, common.NewError(common.UnsupportedCurveTypeError, map[string]interface{}{
 			"message": fmt.Sprintf("currently only support %v", common.CurveType),

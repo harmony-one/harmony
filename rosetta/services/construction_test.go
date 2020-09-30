@@ -25,4 +25,17 @@ func TestGetAddressFromPublicKey(t *testing.T) {
 	if !reflect.DeepEqual(refAddr, *addr) {
 		t.Errorf("expected adder %v, got %v", refAddr, *addr)
 	}
+
+	_, rosettaError = getAddressFromPublicKey(&types.PublicKey{
+		Bytes:     compressedPublicKey,
+		CurveType: types.Edwards25519,
+	})
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	_, rosettaError = getAddressFromPublicKey(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
 }

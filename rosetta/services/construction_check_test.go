@@ -194,6 +194,12 @@ func TestGetSuggestedFeeAndPrice(t *testing.T) {
 			RefGasPrice:    big.NewInt(DefaultGasPrice * 2),
 			RefAmountValue: new(big.Int).Mul(big.NewInt(DefaultGasPrice*2), refEstGasUsed),
 		},
+		{
+			GasMul:         2,
+			EstGasUsed:     nil,
+			RefGasPrice:    big.NewInt(DefaultGasPrice * 2),
+			RefAmountValue: new(big.Int).Mul(big.NewInt(DefaultGasPrice*2), DefaultGasLimit),
+		},
 	}
 
 	for i, test := range cases {

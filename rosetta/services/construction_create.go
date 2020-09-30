@@ -203,7 +203,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if types.Hash(wrappedTransaction.From) != types.Hash(sigAccountID) {
+	if wrappedTransaction.From == nil || types.Hash(wrappedTransaction.From) != types.Hash(sigAccountID) {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "signer public key does not match unsigned transaction's sender",
 		})
@@ -212,7 +212,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if types.Hash(sig.SigningPayload) != types.Hash(txPayload) {
+	if sig.SigningPayload == nil || types.Hash(sig.SigningPayload) != types.Hash(txPayload) {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "transaction signing payload does not match given signing payload",
 		})

@@ -39,6 +39,11 @@ func (s *OperationComponents) IsStaking() bool {
 func GetOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
+	if operations == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operations",
+		})
+	}
 	if len(operations) > maxNumOfConstructionOps || len(operations) == 0 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": fmt.Sprintf("invalid number of operations, must <= %v & > 0", maxNumOfConstructionOps),
@@ -64,6 +69,11 @@ func GetOperationComponents(
 func getTransferOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
+	if operations == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operations",
+		})
+	}
 	op0, op1 := operations[0], operations[1]
 	if op0.Type != common.TransferOperation || op1.Type != common.TransferOperation {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
@@ -141,6 +151,11 @@ func getTransferOperationComponents(
 func getCrossShardOperationComponents(
 	operation *types.Operation,
 ) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
 	metadata := common.CrossShardTransactionOperationMetadata{}
 	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
@@ -187,6 +202,11 @@ func getCrossShardOperationComponents(
 func getContractCreationOperationComponents(
 	operation *types.Operation,
 ) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
 	amount, err := types.AmountValue(operation.Amount)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{

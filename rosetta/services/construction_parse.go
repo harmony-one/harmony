@@ -23,10 +23,10 @@ func (s *ConstructAPI) ConstructionParse(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if !request.Signed {
-		return parseUnsignedTransaction(ctx, wrappedTransaction, tx, s.tempSignerPrivateKey, s.signer, s.stakingSigner)
+	if request.Signed {
+		return parseSignedTransaction(ctx, wrappedTransaction, tx)
 	}
-	return parseSignedTransaction(ctx, wrappedTransaction, tx)
+	return parseUnsignedTransaction(ctx, wrappedTransaction, tx, s.tempSignerPrivateKey, s.signer, s.stakingSigner)
 }
 
 // parseUnsignedTransaction ..
@@ -34,6 +34,11 @@ func parseUnsignedTransaction(
 	ctx context.Context, wrappedTransaction *WrappedTransaction, tx hmyTypes.PoolTransaction,
 	tempPrivateKey *ecdsa.PrivateKey, signer hmyTypes.Signer, stakingSigner stakingTypes.Signer,
 ) (*types.ConstructionParseResponse, *types.Error) {
+	if wrappedTransaction == nil || tx == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil wrapped transaction or unwrapped transaction",
+		})
+	}
 	if stakingTx, ok := tx.(*stakingTypes.StakingTransaction); ok {
 		stakingTx, err := stakingTypes.Sign(stakingTx, stakingSigner, tempPrivateKey)
 		if err != nil {
@@ -96,6 +101,12 @@ func parseUnsignedTransaction(
 func parseSignedTransaction(
 	ctx context.Context, wrappedTransaction *WrappedTransaction, tx hmyTypes.PoolTransaction,
 ) (*types.ConstructionParseResponse, *types.Error) {
+	if wrappedTransaction == nil || tx == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil wrapped transaction or unwrapped transaction",
+		})
+	}
+
 	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: wrappedTransaction.EstimatedGasUsed,

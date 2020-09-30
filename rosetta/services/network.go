@@ -242,7 +242,7 @@ func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32
 		})
 	}
 
-	if types.Hash(currNetID) != types.Hash(netID) {
+	if netID == nil || types.Hash(currNetID) != types.Hash(netID) {
 		return &common.InvalidNetworkError
 	}
 	return nil

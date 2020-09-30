@@ -58,3 +58,18 @@ func TestRetryableError(t *testing.T) {
 		}
 	}
 }
+
+func TestNewError(t *testing.T) {
+	testErr := NewError(CatchAllError, map[string]interface{}{
+		"message": "boom",
+	})
+	if testErr == &CatchAllError {
+		t.Fatal("expected return of a copy of error")
+	}
+	if testErr.Details == nil {
+		t.Fatal("suppose to have details")
+	}
+	if testErr.Details["trace"] == nil {
+		t.Error("expect trace")
+	}
+}

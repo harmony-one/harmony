@@ -187,6 +187,9 @@ func (s *ConstructAPI) ConstructionMetadata(
 func getSuggestedFeeAndPrice(
 	gasMul float64, estGasUsed *big.Int,
 ) ([]*types.Amount, *big.Int) {
+	if estGasUsed == nil {
+		estGasUsed = DefaultGasLimit
+	}
 	if gasMul < 1 {
 		gasMul = 1
 	}
