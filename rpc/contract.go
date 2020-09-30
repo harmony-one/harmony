@@ -55,11 +55,7 @@ func (s *PublicContractService) Call(
 		return nil, err
 	}
 
-	// If VM returns error, return the VM error as an RPC error
-	if result.VMErr != nil {
-		return nil, result.VMErr
-	}
-
+	// If VM returns error, still return the ReturnData, which is the contract error message
 	return result.ReturnData, nil
 }
 
