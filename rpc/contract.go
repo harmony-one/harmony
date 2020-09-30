@@ -46,6 +46,8 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	mapString, _ := NewStructuredResponse(args)
+	fmt.Printf("%v", mapString)
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -57,7 +59,7 @@ func (s *PublicContractService) Call(
 
 	// If VM returns error, return the VM error as an RPC error
 	if result.VMErr != nil {
-		return nil, fmt.Errorf("VMError: %w", result.VMErr)
+		return nil, result.VMErr
 	}
 
 	return result.ReturnData, nil
