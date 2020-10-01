@@ -5,7 +5,6 @@
 ![Discord](https://img.shields.io/discord/532383335348043777.svg)
 [![Coverage Status](https://coveralls.io/repos/github/harmony-one/harmony/badge.svg?branch=main)](https://coveralls.io/github/harmony-one/harmony?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/harmony-one/harmony)](https://goreportcard.com/report/github.com/harmony-one/harmony)
-[![codecov](https://codecov.io/gh/harmony-one/harmony/branch/main/graph/badge.svg)](https://codecov.io/gh/harmony-one/harmony)
 
 ## General Documentation
 
