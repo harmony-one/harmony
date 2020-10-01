@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/common/fdlimit"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
