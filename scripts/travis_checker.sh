@@ -80,8 +80,6 @@ else
 fi
 
 echo "Running go test..."
-go test -race -coverprofile=coverage.txt -covermode=atomic ./...
-
 if go test -v -count=1 ./...
 then
 	echo "go test succeeded."
