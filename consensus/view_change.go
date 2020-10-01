@@ -296,7 +296,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 		}
 
-		consensus.SetViewChangingID(recvMsg.ViewID)
+		consensus.SetViewIDs(recvMsg.ViewID)
 		msgToSend := consensus.constructNewViewMessage(
 			recvMsg.ViewID, newLeaderPriKey,
 		)
@@ -316,7 +316,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Hex("M1Payload", consensus.vc.GetM1Payload()).
 			Msg("[onViewChange] Sent NewView Messge")
 
-		consensus.SetCurBlockViewID(recvMsg.ViewID)
 		consensus.ResetViewChangeState()
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -403,6 +402,11 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		if preparedBlock != nil {
 			consensus.FBFTLog.AddBlock(preparedBlock)
 		}
+	}
+
+	if !consensus.IsViewChangingMode() {
+		consensus.getLogger().Info().Msg("Not in ViewChanging Mode.")
+		return
 	}
 
 	// newView message verified success, override my state
