@@ -74,7 +74,7 @@ type Consensus struct {
 	// consensus mutex
 	mutex sync.Mutex
 	// ViewChange struct
-	VC *viewChange
+	vc *viewChange
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
@@ -161,6 +161,12 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
+// SetBlockVerifier sets the block verifier
+func (consensus *Consensus) SetBlockVerifier(verifier BlockVerifierFunc) {
+	consensus.BlockVerifier = verifier
+	consensus.vc.SetBlockVerifier(verifier)
+}
+
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
@@ -202,7 +208,7 @@ func New(
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
-	consensus.VC = NewViewChange()
+	consensus.vc = NewViewChange()
 
 	return &consensus, nil
 }
