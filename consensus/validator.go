@@ -86,7 +86,7 @@ func (consensus *Consensus) prepare() {
 			}
 		}
 	}
-	consensus.switchPhase("Announce", FBFTPrepare, true)
+	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 // if onPrepared accepts the prepared message from the leader, then
@@ -234,7 +234,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			}
 		}
 	}
-	consensus.switchPhase("onPrepared", FBFTCommit, true)
+	consensus.switchPhase("onPrepared", FBFTCommit)
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {

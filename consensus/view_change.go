@@ -253,7 +253,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.ReadySignal <- struct{}{}
 			}()
 		} else {
-			consensus.switchPhase("onViewChange", FBFTCommit, true)
+			consensus.switchPhase("onViewChange", FBFTCommit)
 			payload := consensus.vc.GetM1Payload()
 			copy(consensus.blockHash[:], payload[:32])
 			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
@@ -437,7 +437,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				p2p.ConstructMessage(msgToSend),
 			)
 		}
-		consensus.switchPhase("onNewView", FBFTCommit, true)
+		consensus.switchPhase("onNewView", FBFTCommit)
 	} else {
 		consensus.ResetState()
 		consensus.getLogger().Info().Msg("onNewView === announce")
