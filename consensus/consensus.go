@@ -74,7 +74,7 @@ type Consensus struct {
 	// consensus mutex
 	mutex sync.Mutex
 	// ViewChange struct
-	VC *ViewChange
+	VC *viewChange
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object

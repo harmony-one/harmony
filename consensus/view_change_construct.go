@@ -35,8 +35,8 @@ const (
 	ValidPayloadLength = 32 + bls.BLSSignatureSizeInBytes
 )
 
-// ViewChange encapsulate all the view change related data structure and functions
-type ViewChange struct {
+// viewChange encapsulate all the view change related data structure and functions
+type viewChange struct {
 	// Commits collected from view change
 	// for each viewID, we need keep track of corresponding sigs and bitmap
 	// until one of the viewID has enough votes (>=2f+1)
@@ -63,20 +63,20 @@ type ViewChange struct {
 	vcLock sync.RWMutex
 }
 
-// NewViewChange returns a new ViewChange object
-func NewViewChange() *ViewChange {
-	vc := ViewChange{}
+// NewViewChange returns a new viewChange object
+func NewViewChange() *viewChange {
+	vc := viewChange{}
 	vc.Reset()
 	return &vc
 }
 
 // SetBlockVerifier ..
-func (vc *ViewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
+func (vc *viewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
 	vc.blockVerifier = verifier
 }
 
 // AddViewIDKeyIfNotExist ..
-func (vc *ViewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.PublicKeys) {
+func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.PublicKeys) {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 	if _, ok := vc.bhpSigs[viewID]; !ok {
@@ -103,7 +103,7 @@ func (vc *ViewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 }
 
 // Reset reset the state for viewchange
-func (vc *ViewChange) Reset() {
+func (vc *viewChange) Reset() {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 
@@ -118,7 +118,7 @@ func (vc *ViewChange) Reset() {
 }
 
 // GetPreparedBlock returns the prepared block or nil if not found
-func (vc *ViewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte, []byte) {
+func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte, []byte) {
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
@@ -137,7 +137,7 @@ func (vc *ViewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte,
 }
 
 // GetM2Bitmap returns the nilBitmap as M2Bitmap
-func (vc *ViewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
+func (vc *viewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
@@ -156,7 +156,7 @@ func (vc *ViewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
 }
 
 // GetM3Bitmap returns the viewIDBitmap as M3Bitmap
-func (vc *ViewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
+func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
@@ -175,7 +175,7 @@ func (vc *ViewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
 }
 
 // VerifyNewViewMsg returns true if the new view message is valid
-func (vc *ViewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, error) {
+func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, error) {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 
@@ -239,7 +239,7 @@ func (vc *ViewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 }
 
 // VerifyViewChangeMsg returns the type of the view change message after verification
-func (vc *ViewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls.PublicKeys) (ViewChangeMsgType, *types.Block, error) {
+func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls.PublicKeys) (ViewChangeMsgType, *types.Block, error) {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 
@@ -319,7 +319,7 @@ func (vc *ViewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls
 
 // InitPayload do it once when validator received view change message
 // TODO: if I start the view change message, I should init my payload already
-func (vc *ViewChange) InitPayload(
+func (vc *viewChange) InitPayload(
 	fbftlog *FBFTLog,
 	viewID uint64,
 	blockNum uint64,
@@ -390,24 +390,24 @@ func (vc *ViewChange) InitPayload(
 }
 
 // IsM1PayloadEmpty returns true if m1Payload is not set
-func (vc *ViewChange) IsM1PayloadEmpty() bool {
+func (vc *viewChange) IsM1PayloadEmpty() bool {
 	return len(vc.m1Payload) == 0
 }
 
 // GetViewIDBitmap returns the viewIDBitmap
-func (vc *ViewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
+func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 	return vc.viewIDBitmap[viewID]
 }
 
 // GetM1Payload returns the m1Payload
-func (vc *ViewChange) GetM1Payload() []byte {
+func (vc *viewChange) GetM1Payload() []byte {
 	return vc.m1Payload
 }
 
 // getLogger returns logger for view change contexts added
-func (vc *ViewChange) getLogger() *zerolog.Logger {
+func (vc *viewChange) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
 		Str("context", "ViewChange").
 		Logger()
