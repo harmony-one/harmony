@@ -163,7 +163,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (*ExecutionResult, error) {
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
 }
 
@@ -224,9 +224,9 @@ func (st *StateTransition) preCheck() error {
 // TransitionDb will transition the state by applying the current message and
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
-func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
+func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	if err := st.preCheck(); err != nil {
-		return nil, err
+		return ExecutionResult{}, err
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
@@ -237,10 +237,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Pay intrinsic gas
 	gas, err := IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
 	if err != nil {
-		return nil, err
+		return ExecutionResult{}, err
 	}
 	if err = st.useGas(gas); err != nil {
-		return nil, err
+		return ExecutionResult{}, err
 	}
 
 	evm := st.evm
@@ -263,7 +263,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		// balance transfer may never fail.
 
 		if vmErr == vm.ErrInsufficientBalance {
-			return nil, vmErr
+			return ExecutionResult{}, vmErr
 		}
 	}
 	st.refundGas()
@@ -274,7 +274,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.state.AddBalance(st.evm.Coinbase, txFee)
 	}
 
-	return &ExecutionResult{
+	return ExecutionResult{
 		ReturnData: ret,
 		UsedGas:    st.gasUsed(),
 		VMErr:      vmErr,

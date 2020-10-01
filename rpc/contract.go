@@ -103,7 +103,7 @@ func (s *PublicContractService) GetStorageAt(
 func doCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int,
-) (*core.ExecutionResult, error) {
+) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
@@ -113,7 +113,7 @@ func doCall(
 	// Fetch state
 	state, header, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
-		return nil, err
+		return core.ExecutionResult{}, err
 	}
 
 	// Set sender address or use a default if none specified
@@ -171,7 +171,7 @@ func doCall(
 	// Get a new instance of the EVM.
 	evm, err := hmy.GetEVM(ctx, msg, state, header)
 	if err != nil {
-		return nil, err
+		return core.ExecutionResult{}, err
 	}
 
 	// Wait for the context to be done and cancel the evm. Even if the
@@ -186,12 +186,12 @@ func doCall(
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	result, err := core.ApplyMessage(evm, msg, gp)
 	if err != nil {
-		return nil, err
+		return core.ExecutionResult{}, err
 	}
 
 	// If the timer caused an abort, return an appropriate error message
 	if evm.Cancelled() {
-		return nil, fmt.Errorf("execution aborted (timeout = %v)", timeout)
+		return core.ExecutionResult{}, fmt.Errorf("execution aborted (timeout = %v)", timeout)
 	}
 
 	// Response output is the same for all versions
