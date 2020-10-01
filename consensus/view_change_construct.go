@@ -63,8 +63,8 @@ type viewChange struct {
 	vcLock sync.RWMutex
 }
 
-// NewViewChange returns a new viewChange object
-func NewViewChange() *viewChange {
+// newViewChange returns a new viewChange object
+func newViewChange() *viewChange {
 	vc := viewChange{}
 	vc.Reset()
 	return &vc

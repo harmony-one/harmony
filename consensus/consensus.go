@@ -27,7 +27,7 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
 
-// BlockVerifier is a function used to verify the block
+// BlockVerifierFunc is a function used to verify the block
 type BlockVerifierFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
@@ -208,7 +208,7 @@ func New(
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
-	consensus.vc = NewViewChange()
+	consensus.vc = newViewChange()
 
 	return &consensus, nil
 }
