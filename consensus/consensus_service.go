@@ -139,7 +139,7 @@ func (consensus *Consensus) UpdateBitmaps() {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.switchPhase("ResetState", FBFTAnnounce, true)
+	consensus.switchPhase("ResetState", FBFTAnnounce)
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
@@ -494,31 +494,14 @@ func (consensus *Consensus) GetFinality() int64 {
 }
 
 // switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
-// it can be override to force transition
-func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase, override bool) {
+func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 	consensus.getLogger().Info().
 		Str("from:", consensus.phase.String()).
 		Str("to:", desired.String()).
-		Bool("override:", override).
-		Msg(subject)
+		Str("switchPhase:", subject)
 
-	if override {
-		consensus.phase = desired
-		return
-	}
-
-	var nextPhase FBFTPhase
-	switch consensus.phase {
-	case FBFTAnnounce:
-		nextPhase = FBFTPrepare
-	case FBFTPrepare:
-		nextPhase = FBFTCommit
-	case FBFTCommit:
-		nextPhase = FBFTAnnounce
-	}
-	if nextPhase == desired {
-		consensus.phase = nextPhase
-	}
+	consensus.phase = desired
+	return
 }
 
 // getLogger returns logger for consensus contexts added

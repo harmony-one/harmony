@@ -92,7 +92,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Msg("[Announce] Sent Announce Message!!")
 	}
 
-	consensus.switchPhase("Announce", FBFTPrepare, true)
+	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
@@ -182,7 +182,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
 		}
-		consensus.switchPhase("onPrepare", FBFTCommit, true)
+		consensus.switchPhase("onPrepare", FBFTCommit)
 	}
 	//// Read - End
 }

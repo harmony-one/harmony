@@ -45,8 +45,6 @@ func TestPhaseSwitching(t *testing.T) {
 
 	assert.Equal(t, FBFTAnnounce, consensus.phase) // It's a new consensus, we should be at the FBFTAnnounce phase
 
-	override := false
-
 	switches := []phaseSwitch{
 		{start: FBFTAnnounce, end: FBFTPrepare},
 		{start: FBFTPrepare, end: FBFTCommit},
@@ -54,13 +52,11 @@ func TestPhaseSwitching(t *testing.T) {
 	}
 
 	for _, sw := range switches {
-		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end, override)
+		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end)
 	}
 
-	override = true
-
 	for _, sw := range switches {
-		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end, override)
+		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end)
 	}
 
 	switches = []phaseSwitch{
@@ -70,39 +66,19 @@ func TestPhaseSwitching(t *testing.T) {
 	}
 
 	for _, sw := range switches {
-		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end, override)
+		testPhaseGroupSwitching(t, consensus, phases, sw.start, sw.end)
 	}
 }
 
-func testPhaseGroupSwitching(t *testing.T, consensus *Consensus, phases []FBFTPhase, startPhase FBFTPhase, desiredPhase FBFTPhase, override bool) {
-	phaseMapping := make(map[FBFTPhase]bool)
-
-	if override {
-		for range phases {
-			consensus.switchPhase("test", desiredPhase, override)
-			assert.Equal(t, desiredPhase, consensus.phase)
-		}
-
+func testPhaseGroupSwitching(t *testing.T, consensus *Consensus, phases []FBFTPhase, startPhase FBFTPhase, desiredPhase FBFTPhase) {
+	for range phases {
+		consensus.switchPhase("test", desiredPhase)
 		assert.Equal(t, desiredPhase, consensus.phase)
-
-		return
-	}
-
-	phaseMapping[FBFTAnnounce] = false
-	phaseMapping[FBFTPrepare] = false
-	phaseMapping[FBFTCommit] = false
-	phaseMapping[startPhase] = false
-	phaseMapping[desiredPhase] = true
-
-	assert.Equal(t, startPhase, consensus.phase)
-
-	for _, phase := range phases {
-		consensus.switchPhase("test", desiredPhase, override)
-		expected := phaseMapping[phase]
-		assert.Equal(t, expected, (phase == consensus.phase))
 	}
 
 	assert.Equal(t, desiredPhase, consensus.phase)
+
+	return
 }
 
 func TestGetNextLeaderKeyShouldFailForStandardGeneratedConsensus(t *testing.T) {
