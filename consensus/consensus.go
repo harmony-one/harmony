@@ -27,6 +27,9 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
 
+// BlockVerifier is a function used to verify the block
+type BlockVerifierFunc func(*types.Block) error
+
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
@@ -78,7 +81,7 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block)
 	// The verifier func passed from Node object
-	BlockVerifier types.BlockVerifier
+	BlockVerifier BlockVerifierFunc
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low

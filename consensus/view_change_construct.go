@@ -56,7 +56,7 @@ type ViewChange struct {
 
 	m1Payload []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 
-	blockVerifier      types.BlockVerifier
+	blockVerifier      BlockVerifierFunc
 	viewChangeDuration time.Duration
 
 	// mutex for view change
@@ -71,7 +71,7 @@ func NewViewChange() *ViewChange {
 }
 
 // SetBlockVerifier ..
-func (vc *ViewChange) SetBlockVerifier(verifier types.BlockVerifier) {
+func (vc *ViewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
 	vc.blockVerifier = verifier
 }
 
