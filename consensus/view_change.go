@@ -193,10 +193,10 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	// update the dictionary key if the viewID is first time received
 	members := consensus.Decider.Participants()
-	consensus.VC.AddViewIDKeyIfNotExist(recvMsg.ViewID, members)
+	consensus.vc.AddViewIDKeyIfNotExist(recvMsg.ViewID, members)
 
 	// do it once only per viewID/Leader
-	if err := consensus.VC.InitPayload(consensus.FBFTLog,
+	if err := consensus.vc.InitPayload(consensus.FBFTLog,
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
 		newLeaderKey.Bytes.Hex(),
@@ -205,7 +205,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	msgType, preparedBlock, err := consensus.VC.VerifyViewChangeMsg(recvMsg, members)
+	msgType, preparedBlock, err := consensus.vc.VerifyViewChangeMsg(recvMsg, members)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -240,12 +240,12 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.VC.GetViewIDBitmap(recvMsg.ViewID)) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().Msg("[onViewChange] View Change Message Quorum Reached")
 		consensus.current.SetMode(Normal)
 		consensus.LeaderPubKey = newLeaderKey
 		consensus.ResetState()
-		if consensus.VC.IsM1PayloadEmpty() {
+		if consensus.vc.IsM1PayloadEmpty() {
 			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
 			// Make sure the newly proposed block have the correct view ID
 			consensus.SetCurBlockViewID(recvMsg.ViewID)
@@ -254,7 +254,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}()
 		} else {
 			consensus.switchPhase("onViewChange", FBFTCommit, true)
-			payload := consensus.VC.GetM1Payload()
+			payload := consensus.vc.GetM1Payload()
 			copy(consensus.blockHash[:], payload[:32])
 			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
 
@@ -313,7 +313,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		}
 		consensus.getLogger().Info().
 			Str("myKey", newLeaderKey.Bytes.Hex()).
-			Hex("M1Payload", consensus.VC.GetM1Payload()).
+			Hex("M1Payload", consensus.vc.GetM1Payload()).
 			Msg("[onViewChange] Sent NewView Messge")
 
 		consensus.SetCurBlockViewID(recvMsg.ViewID)
@@ -354,7 +354,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	if !consensus.onNewViewSanityCheck(recvMsg) {
 		return
 	}
-	preparedBlock, err := consensus.VC.VerifyNewViewMsg(recvMsg)
+	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Verify New View Msg Failed")
 		return
@@ -455,6 +455,6 @@ func (consensus *Consensus) ResetViewChangeState() {
 		Str("Phase", consensus.phase.String()).
 		Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
-	consensus.VC.Reset()
+	consensus.vc.Reset()
 	consensus.Decider.ResetViewChangeVotes()
 }
