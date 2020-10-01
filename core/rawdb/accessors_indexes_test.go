@@ -74,7 +74,12 @@ func TestLookupStorage(t *testing.T) {
 	}
 	// Insert all the transactions into the database, and verify contents
 	WriteBlock(db, block)
-	WriteTxLookupEntries(db, block)
+	if err := WriteBlockTxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockTxLookUpEntries: %v", err)
+	}
+	if err := WriteBlockStxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
 
 	for i, tx := range txs {
 		if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
@@ -126,8 +131,15 @@ func TestMixedLookupStorage(t *testing.T) {
 	header := blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header()
 	block := types.NewBlock(header, txs, types.Receipts{&types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
 
-	WriteBlock(db, block)
-	WriteTxLookupEntries(db, block)
+	if err := WriteBlock(db, block); err != nil {
+		t.Fatalf("WriteBlock: %v", err)
+	}
+	if err := WriteBlockTxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
+	if err := WriteBlockStxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
 
 	if recTx, _, _, _ := ReadStakingTransaction(db, tx.Hash()); recTx != nil {
 		t.Fatal("got staking transactions with plain tx hash")

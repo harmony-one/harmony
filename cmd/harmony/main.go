@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -109,10 +110,13 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}
 
-	prepareRootCmd(cmd)
+	if err := prepareRootCmd(cmd); err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(128)
+	}
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprint(os.Stderr, err)
 		cmd.Help()
 		os.Exit(128)
 	}
@@ -122,7 +126,7 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	setupNodeAndRun(cfg)
 }
 
-func prepareRootCmd(cmd *cobra.Command) {
+func prepareRootCmd(cmd *cobra.Command) error {
 	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
@@ -131,6 +135,20 @@ func prepareRootCmd(cmd *cobra.Command) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
+	// Raise fd limits
+	return raiseFdLimits()
+}
+
+func raiseFdLimits() error {
+	limit, err := fdlimit.Maximum()
+	if err != nil {
+		return errors.Wrap(err, "Failed to retrieve file descriptor allowance")
+	}
+	_, err = fdlimit.Raise(uint64(limit))
+	if err != nil {
+		return errors.Wrap(err, "Failed to raise file descriptor allowance")
+	}
+	return nil
 }
 
 func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
@@ -302,7 +320,10 @@ func setupNodeAndRun(hc harmonyConfig) {
 			for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
 				curBlock := chain.CurrentBlock()
 				rollbacks := []ethCommon.Hash{curBlock.Hash()}
-				chain.Rollback(rollbacks)
+				if err := chain.Rollback(rollbacks); err != nil {
+					fmt.Printf("Revert failed: %v\n", err)
+					os.Exit(1)
+				}
 				lastSig := curBlock.Header().LastCommitSignature()
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
 				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)

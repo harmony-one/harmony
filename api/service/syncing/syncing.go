@@ -703,7 +703,10 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 			if !verifyAllSig {
 				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-					bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
+					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
+						utils.Logger().Err(rbErr).Msg("[SYNC] UpdateBlockAndStatus: failed to rollback")
+						return err
+					}
 				}
 			}
 			return err

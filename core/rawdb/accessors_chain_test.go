@@ -313,7 +313,9 @@ func TestBlockReceiptStorage(t *testing.T) {
 		t.Fatalf("non existent receipts returned: %v", rs)
 	}
 	// Insert the receipt slice into the database and check presence
-	WriteReceipts(db, hash, 0, receipts)
+	if err := WriteReceipts(db, hash, 0, receipts); err != nil {
+		t.Fatalf("write receipts")
+	}
 	if rs := ReadReceipts(db, hash, 0); len(rs) == 0 {
 		t.Fatalf("no receipts returned")
 	} else {
