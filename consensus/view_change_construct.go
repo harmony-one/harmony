@@ -122,7 +122,7 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte,
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
-	if !vc.IsM1PayloadEmpty() {
+	if !vc.isM1PayloadEmpty() {
 		block := fbftlog.GetBlockByHash(hash)
 		if block != nil {
 			encodedBlock, err := rlp.EncodeToBytes(block)
@@ -380,7 +380,7 @@ func (vc *viewChange) InitPayload(
 					vc.bhpSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(msgToSign)
 				}
 				// if m1Payload is empty, we just add one
-				if vc.IsM1PayloadEmpty() {
+				if vc.isM1PayloadEmpty() {
 					vc.m1Payload = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 				}
 			}
@@ -389,9 +389,16 @@ func (vc *viewChange) InitPayload(
 	return nil
 }
 
+// isM1PayloadEmpty returns true if m1Payload is not set
+func (vc *viewChange) isM1PayloadEmpty() bool {
+	return len(vc.m1Payload) == 0
+}
+
 // IsM1PayloadEmpty returns true if m1Payload is not set
 func (vc *viewChange) IsM1PayloadEmpty() bool {
-	return len(vc.m1Payload) == 0
+	vc.vcLock.RLock()
+	defer vc.vcLock.RUnlock()
+	return vc.isM1PayloadEmpty()
 }
 
 // GetViewIDBitmap returns the viewIDBitmap
