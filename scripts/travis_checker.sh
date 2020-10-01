@@ -84,8 +84,6 @@ go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 if go test -v -count=1 ./...
 then
-	bash <(curl -s https://codecov.io/bash)
-	
 	echo "go test succeeded."
 else
 	echo "go test FAILED!"
