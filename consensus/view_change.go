@@ -216,6 +216,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
 		)
+		// search for local prepared msg and add one if not found
 		preparedMsg := consensus.FBFTLog.FindMessageByViewID(preparedMsgs, recvMsg.ViewID)
 		if preparedMsg == nil {
 			// create prepared message for new leader
