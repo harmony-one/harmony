@@ -93,9 +93,6 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 // GetNextLeaderKey uniquely determine who is the leader for given viewID
 func (consensus *Consensus) GetNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
 	gap := 1
-	if viewID > consensus.GetCurBlockViewID() {
-		gap = int(viewID - consensus.GetCurBlockViewID())
-	}
 	consensus.getLogger().Info().
 		Str("leaderPubKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Uint64("newViewID", viewID).
