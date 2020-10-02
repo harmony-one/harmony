@@ -57,7 +57,25 @@ func (m *FBFTMessage) String() string {
 
 // Hash return the hash of the FBFT message for the unique identifier for FBFT message
 func (m *FBFTMessage) Hash() common.Hash {
-	return hash.FromRLPNew256(m)
+	// TODO: verify with RJ whether this struct uniquely defines a FBFT message
+	hashData := struct {
+		MsgType   uint32
+		BlockHash common.Hash
+		SenderKey bls.SerializedPublicKey
+		LeaderKey bls.SerializedPublicKey
+		Payload   []byte
+	}{
+		MsgType:   uint32(m.MessageType),
+		BlockHash: m.BlockHash,
+		Payload:   m.Payload,
+	}
+	if m.SenderPubkey != nil {
+		hashData.SenderKey = m.SenderPubkey.Bytes
+	}
+	if m.LeaderPubkey != nil {
+		hashData.LeaderKey = m.LeaderPubkey.Bytes
+	}
+	return hash.FromRLPNew256(hashData)
 }
 
 // FBFTLog represents the log stored by a node during FBFT process
