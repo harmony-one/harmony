@@ -3016,6 +3016,18 @@ var (
 	tooManyOpenFilesErrStr = "Too many open files"
 )
 
+// isUnrecoverableErr check whether the input error is not recoverable.
+// When writing db, there could be some possible errors from storage level (leveldb).
+// Known possible leveldb errors are:
+//  1. Leveldb is already closed. (leveldb.ErrClosed)
+//  2. ldb file missing from disk. (leveldb.ErrNotFound)
+//  3. Corrupted db data. (leveldb.errors.ErrCorrupted)
+//  4. OS error when open file (too many open files, ...)
+//  5. OS error when write file (read-only, not enough disk space, ...)
+// Among all the above leveldb errors, only `too many open files` error is known to be recoverable,
+// thus the unrecoverable errors refers to error that is
+//  1. The error is from the lower storage level (from module leveldb)
+//  2. The error is not too many files error.
 func isUnrecoverableErr(err error) bool {
 	isLeveldbErr := strings.Contains(err.Error(), leveldbErrSpec)
 	isTooManyOpenFiles := strings.Contains(err.Error(), tooManyOpenFilesErrStr)
