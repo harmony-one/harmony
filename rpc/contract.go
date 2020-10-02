@@ -15,7 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
-	internal_common "github.com/harmony-one/harmony/internal/common"
+	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -50,10 +50,13 @@ func (s *PublicContractService) Call(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Execute call
-	result, _, _, err := doCall(ctx, s.hmy, args, blockNum, vm.Config{}, CallTimeout, s.hmy.RPCGasCap)
+	result, err := doCall(ctx, s.hmy, args, blockNum, vm.Config{}, CallTimeout, s.hmy.RPCGasCap)
+	if err != nil {
+		return nil, err
+	}
 
-	// Response output is the same for all versions
-	return result, err
+	// If VM returns error, still return the ReturnData, which is the contract error message
+	return result.ReturnData, nil
 }
 
 // GetCode returns the code stored at the given address in the state for the given block number.
@@ -64,7 +67,7 @@ func (s *PublicContractService) GetCode(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
-	address := internal_common.ParseAddr(addr)
+	address := hmyCommon.ParseAddr(addr)
 	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
 		return nil, err
@@ -89,7 +92,7 @@ func (s *PublicContractService) GetStorageAt(
 	if state == nil || err != nil {
 		return nil, err
 	}
-	address := internal_common.ParseAddr(addr)
+	address := hmyCommon.ParseAddr(addr)
 	res := state.GetState(address, common.HexToHash(key))
 
 	// Response output is the same for all versions
@@ -100,7 +103,7 @@ func (s *PublicContractService) GetStorageAt(
 func doCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int,
-) ([]byte, uint64, bool, error) {
+) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
@@ -110,7 +113,7 @@ func doCall(
 	// Fetch state
 	state, header, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
-		return nil, 0, false, err
+		return core.ExecutionResult{}, err
 	}
 
 	// Set sender address or use a default if none specified
@@ -166,9 +169,9 @@ func doCall(
 	defer cancel()
 
 	// Get a new instance of the EVM.
-	evm, vmError, err := hmy.GetEVM(ctx, msg, state, header)
+	evm, err := hmy.GetEVM(ctx, msg, state, header)
 	if err != nil {
-		return nil, 0, false, err
+		return core.ExecutionResult{}, err
 	}
 
 	// Wait for the context to be done and cancel the evm. Even if the
@@ -181,16 +184,16 @@ func doCall(
 	// Setup the gas pool (also for unmetered requests)
 	// and apply the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	res, gas, failed, err := core.ApplyMessage(evm, msg, gp)
-	if err := vmError(); err != nil {
-		return nil, 0, false, err
+	result, err := core.ApplyMessage(evm, msg, gp)
+	if err != nil {
+		return core.ExecutionResult{}, err
 	}
 
 	// If the timer caused an abort, return an appropriate error message
 	if evm.Cancelled() {
-		return nil, 0, false, fmt.Errorf("execution aborted (timeout = %v)", timeout)
+		return core.ExecutionResult{}, fmt.Errorf("execution aborted (timeout = %v)", timeout)
 	}
 
 	// Response output is the same for all versions
-	return res, gas, failed, err
+	return result, nil
 }
