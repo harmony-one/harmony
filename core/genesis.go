@@ -282,11 +282,21 @@ func (g *Genesis) Commit(db ethdb.Database) (*types.Block, error) {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
 	}
 
-	rawdb.WriteBlock(db, block)
-	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(db, block.Hash())
-	rawdb.WriteHeadHeaderHash(db, block.Hash())
+	if err := rawdb.WriteBlock(db, block); err != nil {
+		return nil, err
+	}
+	if err := rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil); err != nil {
+		return nil, err
+	}
+	if err := rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
+		return nil, err
+	}
+	if err := rawdb.WriteHeadBlockHash(db, block.Hash()); err != nil {
+		return nil, err
+	}
+	if err := rawdb.WriteHeadHeaderHash(db, block.Hash()); err != nil {
+		return nil, err
+	}
 
 	err := rawdb.WriteShardStateBytes(db, block.Header().Epoch(), block.Header().ShardState())
 
