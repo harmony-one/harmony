@@ -1088,9 +1088,11 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			batch.Reset()
 		}
 	}
-	bytes += batch.ValueSize()
-	if err := batch.Write(); err != nil {
-		return 0, err
+	if batch.ValueSize() > 0 {
+		bytes += batch.ValueSize()
+		if err := batch.Write(); err != nil {
+			return 0, err
+		}
 	}
 
 	// Update the head fast sync block if better
