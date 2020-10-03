@@ -19,7 +19,7 @@ func (s *ConstructAPI) ConstructionParse(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(request.Transaction)
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.Transaction)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -86,6 +86,7 @@ func parseUnsignedTransaction(
 			foundSender = true
 			op.Account = wrappedTransaction.From
 		}
+		op.Status = ""
 	}
 	if !foundSender {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -129,6 +130,9 @@ func parseSignedTransaction(
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "wrapped transaction sender/from does not match transaction signer",
 		})
+	}
+	for _, op := range formattedTx.Operations {
+		op.Status = ""
 	}
 	return &types.ConstructionParseResponse{
 		Operations:               formattedTx.Operations,

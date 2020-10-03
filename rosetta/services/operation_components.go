@@ -105,12 +105,6 @@ func getTransferOperationComponents(
 		})
 	}
 
-	if op0.RelatedOperations == nil {
-		op0.RelatedOperations = []*types.OperationIdentifier{}
-	}
-	if op1.RelatedOperations == nil {
-		op1.RelatedOperations = []*types.OperationIdentifier{}
-	}
 	if len(op1.RelatedOperations) == 1 &&
 		op1.RelatedOperations[0].Index != op0.OperationIdentifier.Index {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{

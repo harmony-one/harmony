@@ -7,14 +7,13 @@ import (
 	"testing"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
+func TestUnpackWrappedTransactionFromString(t *testing.T) {
 	refKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +47,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testWrappedTx, testTx, rosettaError := unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytes))
+	testWrappedTx, testTx, rosettaError := unpackWrappedTransactionFromString(string(marshalledBytes))
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -84,7 +83,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testWrappedTx, testStx, rosettaError := unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytes))
+	testWrappedTx, testStx, rosettaError := unpackWrappedTransactionFromString(string(marshalledBytes))
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -95,16 +94,10 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 		t.Error("unwrapped tx struct does not matched reference tx struct")
 	}
 
-	// Test Invalid hex string
-	_, _, rosettaError = unpackWrappedTransactionFromHexString("asdasd")
-	if rosettaError == nil {
-		t.Fatal("expected error")
-	}
-
 	// Test invalid marshall
 	marshalledBytesFail := marshalledBytes[:]
 	marshalledBytesFail[0] = 0x0
-	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	_, _, rosettaError = unpackWrappedTransactionFromString(string(marshalledBytesFail))
 	if rosettaError == nil {
 		t.Fatal("expected error")
 	}
@@ -115,7 +108,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	_, _, rosettaError = unpackWrappedTransactionFromString(string(marshalledBytesFail))
 	if rosettaError == nil {
 		t.Fatal("expected error")
 	}
@@ -126,7 +119,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	_, _, rosettaError = unpackWrappedTransactionFromString(string(marshalledBytesFail))
 	if rosettaError == nil {
 		t.Fatal("expected error")
 	}
@@ -137,7 +130,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	_, _, rosettaError = unpackWrappedTransactionFromString(string(marshalledBytesFail))
 	if rosettaError == nil {
 		t.Fatal("expected error")
 	}
@@ -149,7 +142,7 @@ func TestUnpackWrappedTransactionFromHexString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, rosettaError = unpackWrappedTransactionFromHexString(hexutil.Encode(marshalledBytesFail))
+	_, _, rosettaError = unpackWrappedTransactionFromString(string(marshalledBytesFail))
 	if rosettaError == nil {
 		t.Fatal("expected error")
 	}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 
@@ -25,18 +24,12 @@ type WrappedTransaction struct {
 	EstimatedGasUsed uint64                   `json:"estimated_gas_used"`
 }
 
-// unpackWrappedTransactionFromHexString ..
-func unpackWrappedTransactionFromHexString(
-	hex string,
+// unpackWrappedTransactionFromString ..
+func unpackWrappedTransactionFromString(
+	str string,
 ) (*WrappedTransaction, hmyTypes.PoolTransaction, *types.Error) {
 	wrappedTransaction := &WrappedTransaction{}
-	wrappedTxBytes, err := hexutil.Decode(hex)
-	if err != nil {
-		return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	if err := json.Unmarshal(wrappedTxBytes, wrappedTransaction); err != nil {
+	if err := json.Unmarshal([]byte(str), wrappedTransaction); err != nil {
 		return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": errors.WithMessage(err, "unknown wrapped transaction format").Error(),
 		})
@@ -179,7 +172,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromHexString(request.UnsignedTransaction)
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.UnsignedTransaction)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
