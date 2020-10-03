@@ -78,6 +78,42 @@ func TestConstructPlainTransaction(t *testing.T) {
 		t.Error("data does not match")
 	}
 
+	// test valid empty transaction metadata transaction
+	refMetadata.Transaction = &TransactionMetadata{}
+	generalTx, rosettaError = constructPlainTransaction(refComponents, refMetadata, refShard)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	tx, ok = generalTx.(*hmyTypes.Transaction)
+	if !ok {
+		t.Fatal("invalid transaction")
+	}
+	if tx.Nonce() != refMetadata.Nonce {
+		t.Error("nonce does not match")
+	}
+	testToID, rosettaError = newAccountIdentifier(*(tx.To()))
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if types.Hash(testToID) != types.Hash(refTo) {
+		t.Error("to account ID does not math")
+	}
+	if tx.ShardID() != refShard {
+		t.Error("invalid shard")
+	}
+	if tx.Value().Cmp(refComponents.Amount) != 0 {
+		t.Error("transaction value does not match")
+	}
+	if tx.Gas() != refMetadata.GasLimit {
+		t.Error("transaction gas limit does not match")
+	}
+	if tx.GasPrice().Cmp(refMetadata.GasPrice) != 0 {
+		t.Error("transaction gas price does not match")
+	}
+	refMetadata.Transaction = &TransactionMetadata{
+		Data: &refData,
+	}
+
 	// test invalid receiver
 	_, rosettaError = constructPlainTransaction(&OperationComponents{
 		Type:           common.TransferOperation,

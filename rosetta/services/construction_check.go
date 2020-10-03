@@ -45,16 +45,13 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	if request.Metadata == nil {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "require transaction metadata",
-		})
-	}
 	txMetadata := &TransactionMetadata{}
-	if err := txMetadata.UnmarshalFromInterface(request.Metadata); err != nil {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid transaction metadata").Error(),
-		})
+	if request.Metadata != nil {
+		if err := txMetadata.UnmarshalFromInterface(request.Metadata); err != nil {
+			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": errors.WithMessage(err, "invalid transaction metadata").Error(),
+			})
+		}
 	}
 	if txMetadata.FromShardID != nil && *txMetadata.FromShardID != s.hmy.ShardID {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{

@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -42,6 +43,9 @@ func (hmy *Harmony) GetBlockSigners(
 	blockWithSigners, err := hmy.BlockByNumber(ctx, blockNum+1)
 	if err != nil {
 		return nil, nil, err
+	}
+	if blockWithSigners == nil {
+		return nil, nil, fmt.Errorf("block number %v not found", blockNum+1)
 	}
 	committee, err := hmy.GetValidators(blk.Epoch())
 	if err != nil {

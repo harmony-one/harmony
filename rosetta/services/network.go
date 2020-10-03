@@ -3,12 +3,14 @@ package services
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/libp2p/go-libp2p-core/peer"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -55,7 +57,16 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 
 	// Fetch relevant headers, syncing status, & peers
-	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	currBlock := s.hmy.CurrentBlock()
+	var currentHeader *block.Header
+	var err error
+	if !s.hmy.IsStakingEpoch(currBlock.Epoch()) {
+		// all blocks in the era before staking epoch requires the next block to get the block reward transactions
+		blkNum := new(big.Int).Sub(currBlock.Number(), big.NewInt(1))
+		currentHeader, err = s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(blkNum.Uint64()))
+	} else {
+		currentHeader, err = s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	}
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get current header: %v", err.Error()),
