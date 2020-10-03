@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -17,6 +18,7 @@ import (
 // ConstructMetadataOptions is constructed by ConstructionPreprocess for ConstructionMetadata options
 type ConstructMetadataOptions struct {
 	TransactionMetadata *TransactionMetadata `json:"transaction_metadata"`
+	OperationType       string               `json:"operation_type,omitempty"`
 	GasPriceMultiplier  *float64             `json:"gas_price_multiplier,omitempty"`
 }
 
@@ -32,6 +34,9 @@ func (m *ConstructMetadataOptions) UnmarshalFromInterface(metadata interface{}) 
 	}
 	if T.TransactionMetadata == nil {
 		return fmt.Errorf("transaction metadata is required")
+	}
+	if T.OperationType == "" {
+		return fmt.Errorf("operation type is required")
 	}
 	*m = T
 	return nil
@@ -58,6 +63,7 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": fmt.Sprintf("expect from shard ID to be %v", s.hmy.ShardID),
 		})
 	}
+
 	components, rosettaError := GetOperationComponents(request.Operations)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -67,8 +73,10 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": "sender address is not found for given operations",
 		})
 	}
+
 	options, err := types.MarshalMap(ConstructMetadataOptions{
 		TransactionMetadata: txMetadata,
+		OperationType:       components.Type,
 		GasPriceMultiplier:  request.SuggestedFeeMultiplier,
 	})
 	if err != nil {
@@ -106,7 +114,7 @@ func (m *ConstructMetadata) UnmarshalFromInterface(blockArgs interface{}) error 
 		return fmt.Errorf("gas price is required")
 	}
 	if T.Transaction == nil {
-		return fmt.Errorf("transaction metadat is required")
+		return fmt.Errorf("transaction metadata is required")
 	}
 	*m = T
 	return nil
@@ -151,7 +159,19 @@ func (s *ConstructAPI) ConstructionMetadata(
 			})
 		}
 	}
-	estGasUsed, err := rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{Data: &data}, nil)
+
+	var estGasUsed uint64
+	if !isStakingOperation(options.OperationType) {
+		if options.OperationType == common.ContractCreationOperation {
+			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{Data: &data}, nil)
+		} else {
+			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{To: &ethCommon.Address{}, Data: &data}, nil)
+		}
+	} else {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "staking operations are not supported",
+		})
+	}
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": errors.WithMessage(err, "invalid transaction data").Error(),
@@ -199,4 +219,14 @@ func getSuggestedFeeAndPrice(
 			Currency: &common.Currency,
 		},
 	}, gasPrice
+}
+
+// isStakingOperation ..
+func isStakingOperation(op string) bool {
+	for _, stakingOp := range common.StakingOperationTypes {
+		if stakingOp == op {
+			return true
+		}
+	}
+	return false
 }

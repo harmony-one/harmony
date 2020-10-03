@@ -80,6 +80,7 @@ func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 		server.NewBlockAPIController(services.NewBlockAPI(hmy), asserter),
 		server.NewMempoolAPIController(services.NewMempoolAPI(hmy), asserter),
 		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
+		server.NewConstructionAPIController(services.NewConstructionAPI(hmy), asserter),
 	)
 }
 

@@ -62,12 +62,12 @@ func constructCrossShardTransaction(
 	to, err := getAddress(components.To)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid sender address"),
+			"message": errors.WithMessage(err, "invalid sender address").Error(),
 		})
 	}
 	if metadata.Transaction.FromShardID == nil || metadata.Transaction.ToShardID == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "cross shard transfer requires to & from shard IDs"),
+			"message": errors.WithMessage(err, "cross shard transfer requires to & from shard IDs").Error(),
 		})
 	}
 	if *metadata.Transaction.FromShardID != sourceShardID {
@@ -84,7 +84,7 @@ func constructCrossShardTransaction(
 	if metadata.Transaction.Data != nil {
 		if data, err = hexutil.Decode(*metadata.Transaction.Data); err != nil {
 			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-				"message": errors.WithMessage(err, "improper data format for transaction data"),
+				"message": errors.WithMessage(err, "improper data format for transaction data").Error(),
 			})
 		}
 	}
@@ -106,7 +106,7 @@ func constructContractCreationTransaction(
 	data, err := hexutil.Decode(*metadata.Transaction.Data)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "improper data format for transaction data"),
+			"message": errors.WithMessage(err, "improper data format for transaction data").Error(),
 		})
 	}
 	return hmyTypes.NewContractCreation(
@@ -126,14 +126,14 @@ func constructPlainTransaction(
 	to, err := getAddress(components.To)
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "invalid sender address"),
+			"message": errors.WithMessage(err, "invalid sender address").Error(),
 		})
 	}
 	data := hexutil.Bytes{}
 	if metadata.Transaction.Data != nil {
 		if data, err = hexutil.Decode(*metadata.Transaction.Data); err != nil {
 			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-				"message": errors.WithMessage(err, "improper data format for transaction data"),
+				"message": errors.WithMessage(err, "improper data format for transaction data").Error(),
 			})
 		}
 	}
