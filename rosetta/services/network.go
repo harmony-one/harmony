@@ -60,7 +60,7 @@ func (s *NetworkAPI) NetworkStatus(
 	currBlock := s.hmy.CurrentBlock()
 	var currentHeader *block.Header
 	var err error
-	if !s.hmy.IsStakingEpoch(currBlock.Epoch()) {
+	if currBlock.Number().Cmp(big.NewInt(0)) == 1 && !s.hmy.IsStakingEpoch(currBlock.Epoch()) {
 		// all blocks in the era before staking epoch requires the next block to get the block reward transactions
 		blkNum := new(big.Int).Sub(currBlock.Number(), big.NewInt(1))
 		currentHeader, err = s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(blkNum.Uint64()))

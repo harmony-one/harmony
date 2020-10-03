@@ -25,6 +25,9 @@ const (
 
 	// CurveType ..
 	CurveType = types.Secp256k1
+
+	// SignatureType ..
+	SignatureType = types.EcdsaRecovery
 )
 
 var (

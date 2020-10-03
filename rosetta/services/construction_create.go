@@ -15,6 +15,11 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	// SignedPayloadLength ..
+	SignedPayloadLength = 65
+)
+
 // WrappedTransaction is a wrapper for a transaction that includes all relevant
 // data to parse a transaction.
 type WrappedTransaction struct {
@@ -150,7 +155,7 @@ func (s *ConstructAPI) getSigningPayload(
 ) (*types.SigningPayload, *types.Error) {
 	payload := &types.SigningPayload{
 		AccountIdentifier: senderAccountID,
-		SignatureType:     types.Ecdsa,
+		SignatureType:     common.SignatureType,
 	}
 	switch tx.(type) {
 	case *stakingTypes.StakingTransaction:
@@ -183,9 +188,9 @@ func (s *ConstructAPI) ConstructionCombine(
 	}
 
 	sig := request.Signatures[0]
-	if sig.SignatureType != types.Ecdsa {
+	if sig.SignatureType != common.SignatureType {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": fmt.Sprintf("invalid transaction type, currently only support %v", types.Ecdsa),
+			"message": fmt.Sprintf("invalid transaction type, currently only support %v", common.SignatureType),
 		})
 	}
 	sigAddress, rosettaError := getAddressFromPublicKey(sig.PublicKey)
@@ -213,6 +218,12 @@ func (s *ConstructAPI) ConstructionCombine(
 
 	var err error
 	var signedTx hmyTypes.PoolTransaction
+	if len(sig.Bytes) != SignedPayloadLength {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("invalid signature byte length, require len %v got len %v",
+				SignedPayloadLength, len(sig.Bytes)),
+		})
+	}
 	if stakingTx, ok := tx.(*stakingTypes.StakingTransaction); ok && wrappedTransaction.IsStaking {
 		signedTx, err = stakingTx.WithSignature(s.stakingSigner, sig.Bytes)
 	} else if plainTx, ok := tx.(*hmyTypes.Transaction); ok && !wrappedTransaction.IsStaking {
