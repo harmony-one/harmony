@@ -508,7 +508,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", tenOnes.Uint64()),
+			Value:    formatNegativeValue(tenOnes),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
@@ -572,7 +572,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", tenOnes.Uint64()),
+			Value:    formatNegativeValue(tenOnes),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
@@ -811,7 +811,7 @@ func TestNewTransferOperations(t *testing.T) {
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 		},
@@ -904,7 +904,7 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: metadata,
@@ -1039,7 +1039,7 @@ func TestNewContractCreationOperations(t *testing.T) {
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
@@ -1143,7 +1143,7 @@ func TestNewOperations(t *testing.T) {
 	}
 	gasFee := big.NewInt(int64(1e18))
 	amount := &types.Amount{
-		Value:    fmt.Sprintf("-%v", gasFee),
+		Value:    formatNegativeValue(gasFee),
 		Currency: &common.Currency,
 	}
 

@@ -67,7 +67,7 @@ func constructCrossShardTransaction(
 	}
 	if metadata.Transaction.FromShardID == nil || metadata.Transaction.ToShardID == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "cross shard transfer requires to & from shard IDs").Error(),
+			"message": "cross shard transfer requires to & from shard IDs",
 		})
 	}
 	if *metadata.Transaction.FromShardID != sourceShardID {

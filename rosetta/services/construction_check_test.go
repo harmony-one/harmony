@@ -7,6 +7,8 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
+
+	"github.com/harmony-one/harmony/rosetta/common"
 )
 
 func TestConstructMetadataOptions(t *testing.T) {
@@ -25,6 +27,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
+				OperationType:       common.TransferOperation,
 				GasPriceMultiplier:  nil,
 			},
 			ExpectError: false,
@@ -32,6 +35,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
+				OperationType:       common.TransferOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: false,
@@ -39,6 +43,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
+				OperationType:       common.TransferOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: true,
@@ -46,7 +51,16 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
+				OperationType:       common.TransferOperation,
 				GasPriceMultiplier:  nil,
+			},
+			ExpectError: true,
+		},
+		{
+			Metadata: ConstructMetadataOptions{
+				TransactionMetadata: refTxMedata,
+				OperationType:       "",
+				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: true,
 		},

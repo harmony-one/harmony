@@ -164,6 +164,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 	if !isStakingOperation(options.OperationType) {
 		if options.OperationType == common.ContractCreationOperation {
 			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{Data: &data}, nil)
+			estGasUsed *= 2 // HACK to account for imperfect contract creation estimation
 		} else {
 			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{To: &ethCommon.Address{}, Data: &data}, nil)
 		}

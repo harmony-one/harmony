@@ -971,7 +971,7 @@ func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Err
 		})
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkMsg.Amount),
+		Value:    formatNegativeValue(stkMsg.Amount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -1003,7 +1003,7 @@ func getAmountFromDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*type
 		}
 	}
 	return &types.Amount{
-		Value:    fmt.Sprintf("-%v", stkAmount),
+		Value:    formatNegativeValue(stkAmount),
 		Currency: &common.Currency,
 	}, nil
 }
@@ -1065,7 +1065,7 @@ func newTransferOperations(
 		return nil, rosettaError
 	}
 	subAmount := &types.Amount{
-		Value:    fmt.Sprintf("-%v", tx.Value()),
+		Value:    formatNegativeValue(tx.Value()),
 		Currency: &common.Currency,
 	}
 
@@ -1143,7 +1143,7 @@ func newCrossShardSenderTransferOperations(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: metadata,
@@ -1185,7 +1185,7 @@ func newContractCreationOperations(
 			Status:  status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
@@ -1247,7 +1247,7 @@ func newOperations(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: accountID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", gasFeeInATTO),
+				Value:    formatNegativeValue(gasFeeInATTO),
 				Currency: &common.Currency,
 			},
 		},
@@ -1268,6 +1268,15 @@ func findLogsWithTopic(
 		}
 	}
 	return logs
+}
+
+// formatNegativeValue ..
+func formatNegativeValue(num *big.Int) string {
+	value := "0"
+	if num != nil && num.Cmp(big.NewInt(0)) == 1 {
+		value = fmt.Sprintf("-%v", new(big.Int).Abs(num))
+	}
+	return value
 }
 
 // getGenesisSpec ..
