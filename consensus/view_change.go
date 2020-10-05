@@ -331,7 +331,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	}
 }
 
-// onViewChange is called when validators received newView message from the new leader
+// onNewView is called when validators received newView message from the new leader
 // the validator needs to check the m3bitmap to see if the quorum is reached
 // If the new view message contains payload (block), and at least one m1 message was
 // collected by the new leader (m3count > m2count), the validator will create a new
