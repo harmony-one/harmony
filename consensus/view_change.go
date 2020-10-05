@@ -138,6 +138,15 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
 
+	// init my own payload
+	if err := consensus.vc.InitPayload(
+		consensus.FBFTLog,
+		viewID,
+		consensus.blockNum,
+		consensus.priKey); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+	}
+
 	// for view change, send separate view change per public key
 	// do not do multi-sign of view change message
 	for _, key := range consensus.priKey {
@@ -196,7 +205,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if err := consensus.vc.InitPayload(consensus.FBFTLog,
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
-		newLeaderKey.Bytes.Hex(),
 		consensus.priKey); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
 		return

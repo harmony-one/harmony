@@ -51,7 +51,6 @@ type viewChange struct {
 	bhpBitmap    map[uint64]*bls_cosi.Mask
 	nilBitmap    map[uint64]*bls_cosi.Mask
 	viewIDBitmap map[uint64]*bls_cosi.Mask
-	viewIDCount  map[uint64]map[string]int
 	newViewMsg   map[uint64]map[string]uint64
 
 	m1Payload []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
@@ -318,74 +317,91 @@ func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls
 }
 
 // InitPayload do it once when validator received view change message
-// TODO: if I start the view change message, I should init my payload already
 func (vc *viewChange) InitPayload(
 	fbftlog *FBFTLog,
 	viewID uint64,
 	blockNum uint64,
-	myPubKey string,
 	privKeys multibls.PrivateKeys,
 ) error {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 
-	// add my own M2 type message signature and bitmap
-	_, ok := vc.nilSigs[viewID][myPubKey]
+	// m1 or m2 init once per viewID/key.
+	// m1 and m2 are mutually exclusive.
+	// If the node has valid prepared block, it will add m1 signature.
+	// If not, the node will add m2 signature.
+	// Honest node should have only one kind of m1/m2 signature.
 
-	if !ok {
-		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M2 (NIL) type messaage")
-		for i, key := range privKeys {
-			if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-				vc.getLogger().Warn().Int("index", i).Msg("[InitPayload] nilBitmap setkey failed")
-				continue
+	inited := false
+	for _, key := range privKeys {
+		_, ok1 := vc.bhpSigs[viewID][key.Pub.Bytes.Hex()]
+		_, ok2 := vc.nilSigs[viewID][key.Pub.Bytes.Hex()]
+		if ok1 || ok2 {
+			inited = true
+			break
+		}
+	}
+
+	// add my own M1/M2 type message signature and bitmap
+	if !inited {
+		preparedMsgs := fbftlog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, blockNum)
+		preparedMsg := fbftlog.FindMessageByMaxViewID(preparedMsgs)
+		hasBlock := false
+		if preparedMsg != nil {
+			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
+				if err := vc.blockVerifier(preparedBlock); err == nil {
+					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M1 (prepared) type messaage")
+					msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
+					for _, key := range privKeys {
+						if err := vc.bhpBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
+							vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] bhpBitmap setkey failed")
+							continue
+						}
+						vc.bhpSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(msgToSign)
+					}
+					hasBlock = true
+					// if m1Payload is empty, we just add one
+					if vc.isM1PayloadEmpty() {
+						vc.m1Payload = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
+					}
+				}
 			}
-			vc.nilSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(NIL)
+		}
+		if !hasBlock {
+			vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M2 (NIL) type messaage")
+			for _, key := range privKeys {
+				if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
+					vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
+					continue
+				}
+				vc.nilSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(NIL)
+			}
+		}
+	}
+
+	inited = false
+	for _, key := range privKeys {
+		_, ok3 := vc.viewIDSigs[viewID][key.Pub.Bytes.Hex()]
+		if ok3 {
+			inited = true
+			break
 		}
 	}
 
 	// add my own M3 type message signature and bitmap
-	_, ok = vc.viewIDSigs[viewID][myPubKey]
-
-	if !ok {
+	if !inited {
 		viewIDBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint64(viewIDBytes, viewID)
 		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M3 (ViewID) type messaage")
-		for i, key := range privKeys {
+		for _, key := range privKeys {
 			if err := vc.viewIDBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-				vc.getLogger().Warn().Int("index", i).Msg("[InitPayload] viewIDBitmap setkey failed")
+				vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
 				continue
 			}
 			vc.viewIDSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(viewIDBytes)
 		}
 	}
 
-	// add my own M1 type message signature and bitmap
-	_, ok = vc.bhpSigs[viewID][myPubKey]
-
-	if !ok {
-		preparedMsgs := fbftlog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, blockNum)
-		preparedMsg := fbftlog.FindMessageByMaxViewID(preparedMsgs)
-		if preparedMsg != nil {
-			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
-				if err := vc.blockVerifier(preparedBlock); err != nil {
-					return err
-				}
-				vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M1 (prepared) type messaage")
-				msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-				for i, key := range privKeys {
-					if err := vc.bhpBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
-						vc.getLogger().Warn().Int("index", i).Msg("[InitPayload] bhpBitmap setkey failed")
-						continue
-					}
-					vc.bhpSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(msgToSign)
-				}
-				// if m1Payload is empty, we just add one
-				if vc.isM1PayloadEmpty() {
-					vc.m1Payload = append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
-				}
-			}
-		}
-	}
 	return nil
 }
 
