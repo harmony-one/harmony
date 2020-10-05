@@ -98,7 +98,7 @@ func (consensus *Consensus) GetNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		Uint64("newViewID", viewID).
 		Uint64("myCurBlockViewID", consensus.GetCurBlockViewID()).
 		Msg("[GetNextLeaderKey] got leaderPubKey from coinbase")
-	wasFound, next := consensus.Decider.NextAfter(consensus.LeaderPubKey, gap)
+	wasFound, next := consensus.Decider.NthNext(consensus.LeaderPubKey, gap)
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).

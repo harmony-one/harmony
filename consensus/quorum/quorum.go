@@ -72,7 +72,7 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NextAfter(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
 }
 
@@ -187,8 +187,8 @@ func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
 	return -1
 }
 
-// NextAfter return the next pubkey, next can be negative number
-func (s *cIdentities) NextAfter(pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+// NthNext return the Nth next pubkey, next can be negative number
+func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
 	idx := s.IndexOf(pubKey.Bytes)
