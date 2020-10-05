@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 
@@ -20,17 +21,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// ViewChangeMsgType defines the type of view change message
-type ViewChangeMsgType byte
-
 const (
-	// M1 is the view change message with block
-	M1 ViewChangeMsgType = iota
-	// M2 is the view change message w/o block
-	M2
-	// ERR is the error condition when parsing the message type
-	ERR
-
 	// ValidPayloadLength is the valid length for viewchange payload
 	ValidPayloadLength = 32 + bls.BLSSignatureSizeInBytes
 )
@@ -237,8 +228,21 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 	return nil, nil
 }
 
-// VerifyViewChangeMsg returns the type of the view change message after verification
-func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls.PublicKeys) (ViewChangeMsgType, *types.Block, error) {
+var (
+	errDupM1     = errors.New("received M1 (prepared) message already")
+	errDupM2     = errors.New("received M2 (NIL) message already")
+	errDupM3     = errors.New("received M3 (ViewID) message already")
+	errVerifyM1  = errors.New("failed to verfiy signature for M1 message")
+	errVerifyM2  = errors.New("failed to verfiy signature for M2 message")
+	errM1Payload = errors.New("failed to verify multi signature for M1 prepared payload")
+)
+
+// ProcessViewChangeMsg process the view change message after verification
+func (vc *viewChange) ProcessViewChangeMsg(
+	fbftlog *FBFTLog,
+	recvMsg *FBFTMessage,
+	members multibls.PublicKeys,
+) error {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
 
@@ -248,31 +252,31 @@ func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls
 
 	// check and add viewID (m3 type) message signature
 	if _, ok := vc.viewIDSigs[recvMsg.ViewID][senderKeyStr]; ok {
-		return ERR, nil, errors.New("[VerifyViewChangeMsg] received M3 (ViewID) message already")
+		return errDupM3
 	}
 
 	if len(recvMsg.Payload) >= ValidPayloadLength && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
-			return ERR, nil, err
+			return err
 		}
 		if err := vc.blockVerifier(preparedBlock); err != nil {
-			return ERR, nil, err
+			return err
 		}
 		_, ok := vc.bhpSigs[recvMsg.ViewID][senderKeyStr]
 		if ok {
-			return M1, nil, errors.New("[VerifyViewChangeMsg] received M1 (prepared) message already")
+			return errDupM1
 		}
 		if !recvMsg.ViewchangeSig.VerifyHash(senderKey.Object, recvMsg.Payload) {
-			return ERR, nil, errors.New("[VerifyViewChangeMsg] failed to verify signature for m1 type message")
+			return errVerifyM1
 		}
 		blockHash := recvMsg.Payload[:32]
 
 		aggSig, mask, err := chain.ReadSignatureBitmapByPublicKeys(recvMsg.Payload[32:], members)
 		if err != nil {
-			return ERR, nil, err
+			return err
 		}
 		if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
-			return ERR, nil, errors.New("[VerifyViewChangeMsg] failed to verify multi signature for m1 prepared payload")
+			return errM1Payload
 		}
 
 		vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
@@ -289,14 +293,32 @@ func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls
 		// Set the bitmap indicating that this validator signed.
 		vc.viewIDBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true)
 
-		return M1, preparedBlock, nil
+		if vc.isM1PayloadEmpty() {
+			vc.m1Payload = append(recvMsg.Payload[:0:0], recvMsg.Payload...)
+			// create prepared message for new leader
+			preparedMsg := FBFTMessage{
+				MessageType: msg_pb.MessageType_PREPARED,
+				ViewID:      recvMsg.ViewID,
+				BlockNum:    recvMsg.BlockNum,
+			}
+			preparedMsg.BlockHash = common.Hash{}
+			copy(preparedMsg.BlockHash[:], recvMsg.Payload[:32])
+			preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
+			copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
+			preparedMsg.SenderPubkey = recvMsg.LeaderPubkey
+			vc.getLogger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
+			fbftlog.AddMessage(&preparedMsg)
+			fbftlog.AddBlock(preparedBlock)
+		}
+		return nil
 	}
+
 	_, ok := vc.nilSigs[recvMsg.ViewID][senderKeyStr]
 	if ok {
-		return M2, nil, errors.New("[VerifyViewChangeMsg] received M2 (NIL) message already")
+		return errDupM2
 	}
 	if !recvMsg.ViewchangeSig.VerifyHash(senderKey.Object, NIL) {
-		return ERR, nil, errors.New("[VerifyViewChangeMsg] failed to verify signature for m2 type message")
+		return errVerifyM2
 	}
 
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
@@ -313,7 +335,7 @@ func (vc *viewChange) VerifyViewChangeMsg(recvMsg *FBFTMessage, members multibls
 	// Set the bitmap indicating that this validator signed.
 	vc.viewIDBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true)
 
-	return M2, nil, nil
+	return nil
 }
 
 // InitPayload do it once when validator received view change message

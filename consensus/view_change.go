@@ -210,7 +210,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	msgType, preparedBlock, err := consensus.vc.VerifyViewChangeMsg(recvMsg, members)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.FBFTLog, recvMsg, members)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
@@ -218,31 +218,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Str("msgSender", recvMsg.SenderPubkey.Bytes.Hex()).
 			Msg("Verify View Change Message Error")
 		return
-	}
-
-	if msgType == M1 {
-		preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-			msg_pb.MessageType_PREPARED, recvMsg.BlockNum,
-		)
-		// search for local prepared msg and add one if not found
-		preparedMsg := consensus.FBFTLog.FindMessageByViewID(preparedMsgs, recvMsg.ViewID)
-		if preparedMsg == nil {
-			// create prepared message for new leader
-			preparedMsg := FBFTMessage{
-				MessageType: msg_pb.MessageType_PREPARED,
-				ViewID:      recvMsg.ViewID,
-				BlockNum:    recvMsg.BlockNum,
-			}
-			preparedMsg.BlockHash = common.Hash{}
-			copy(preparedMsg.BlockHash[:], recvMsg.Payload[:32])
-			preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
-			copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
-			preparedMsg.SenderPubkey = newLeaderKey
-			consensus.getLogger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
-			consensus.FBFTLog.AddMessage(&preparedMsg)
-
-			consensus.FBFTLog.AddBlock(preparedBlock)
-		}
 	}
 
 	// received enough view change messages, change state to normal consensus
