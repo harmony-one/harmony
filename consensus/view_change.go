@@ -138,6 +138,9 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
 
+	// update the dictionary key if the viewID is first time received
+	consensus.vc.AddViewIDKeyIfNotExist(viewID, consensus.Decider.Participants())
+
 	// init my own payload
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
