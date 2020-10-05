@@ -40,7 +40,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	var encodedBlock []byte
 	if preparedMsg != nil {
 		block := consensus.FBFTLog.GetBlockByHash(preparedMsg.BlockHash)
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Interface("Block", block).
 			Interface("preparedMsg", preparedMsg).
 			Msg("[constructViewChangeMessage] found prepared msg")

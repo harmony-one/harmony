@@ -155,7 +155,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
-	consensus.getLogger().Debug().Msg("[onViewChange] Received ViewChange Message")
+	consensus.getLogger().Info().Msg("[onViewChange] Received ViewChange Message")
 	recvMsg, err := ParseViewChangeMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onViewChange] Unable To Parse Viewchange Message")
@@ -165,7 +165,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	newLeaderKey := recvMsg.LeaderPubkey
 	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey.Object)
 	if err != nil {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Err(err).
 			Str("Sender", recvMsg.SenderPubkey.Bytes.Hex()).
 			Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
