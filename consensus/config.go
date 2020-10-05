@@ -4,14 +4,14 @@ import "time"
 
 // timeout constant
 const (
-	// default timeout configuration is shorten to 30 seconds as the consensus is 5s
-	viewChangeTimeout = 30
+	// default timeout configuration is shorten to 45 seconds as the consensus is 5s
+	viewChangeTimeout = 45
 	// The duration of viewChangeTimeout for each view change
 	viewChangeDuration time.Duration = viewChangeTimeout * time.Second
 
 	// timeout duration for announce/prepare/commit
-	// shorten the duration from 60 to 30 seconds as the consensus is 5s
-	phaseDuration     time.Duration = 30 * time.Second
+	// shorten the duration from 60 to 45 seconds as the consensus is 5s
+	phaseDuration     time.Duration = viewChangeTimeout * time.Second
 	bootstrapDuration time.Duration = 120 * time.Second
 	maxLogSize        uint32        = 1000
 	// threshold between received consensus message blockNum and my blockNum
