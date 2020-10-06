@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/pkg/errors"
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/rosetta/common"

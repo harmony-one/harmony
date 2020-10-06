@@ -2,9 +2,9 @@ package services
 
 import (
 	"context"
-	"github.com/pkg/errors"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/pkg/errors"
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/rosetta/common"
