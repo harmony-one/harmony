@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/crypto/hash"
 )
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
@@ -55,27 +55,29 @@ func (m *FBFTMessage) String() string {
 	)
 }
 
-// Hash return the hash of the FBFT message for the unique identifier for FBFT message
-func (m *FBFTMessage) Hash() common.Hash {
-	// TODO: verify with RJ whether this struct uniquely defines a FBFT message
-	hashData := struct {
-		MsgType   uint32
-		BlockHash common.Hash
-		SenderKey bls.SerializedPublicKey
-		LeaderKey bls.SerializedPublicKey
-		Payload   []byte
-	}{
-		MsgType:   uint32(m.MessageType),
-		BlockHash: m.BlockHash,
-		Payload:   m.Payload,
-	}
+const (
+	idTypeBytes   = 4
+	idHashBytes   = common.HashLength
+	idSenderBytes = bls.PublicKeySizeInBytes
+
+	idBytes = idTypeBytes + idHashBytes + idSenderBytes
+)
+
+type (
+	// fbftMsgID is the id that uniquely defines a fbft message.
+	fbftMsgID [idBytes]byte
+)
+
+// id return the ID of the FBFT message which uniquely identifies a FBFT message.
+// The ID is a concatenation of MsgType, BlockHash, and sender key
+func (m *FBFTMessage) id() fbftMsgID {
+	var id fbftMsgID
+	binary.LittleEndian.PutUint32(id[:], uint32(m.MessageType))
+	copy(id[idTypeBytes:], m.BlockHash[:])
 	if m.SenderPubkey != nil {
-		hashData.SenderKey = m.SenderPubkey.Bytes
+		copy(id[idTypeBytes+idHashBytes:], m.SenderPubkey.Bytes[:])
 	}
-	if m.LeaderPubkey != nil {
-		hashData.LeaderKey = m.LeaderPubkey.Bytes
-	}
-	return hash.FromRLPNew256(hashData)
+	return id
 }
 
 // FBFTLog represents the log stored by a node during FBFT process
@@ -84,7 +86,7 @@ type FBFTLog struct {
 	verifiedBlocks map[common.Hash]struct{}     // store block hashes for blocks that has already been verified
 	blockLock      sync.RWMutex
 
-	messages map[common.Hash]*FBFTMessage // store messages received in FBFT
+	messages map[fbftMsgID]*FBFTMessage // store messages received in FBFT
 	msgLock  sync.RWMutex
 }
 
@@ -92,7 +94,7 @@ type FBFTLog struct {
 func NewFBFTLog() *FBFTLog {
 	pbftLog := FBFTLog{
 		blocks:         make(map[common.Hash]*types.Block),
-		messages:       make(map[common.Hash]*FBFTMessage),
+		messages:       make(map[fbftMsgID]*FBFTMessage),
 		verifiedBlocks: make(map[common.Hash]struct{}),
 	}
 	return &pbftLog
@@ -188,7 +190,7 @@ func (log *FBFTLog) AddMessage(msg *FBFTMessage) {
 	log.msgLock.Lock()
 	defer log.msgLock.Unlock()
 
-	log.messages[msg.Hash()] = msg
+	log.messages[msg.id()] = msg
 }
 
 // GetMessagesByTypeSeqViewHash returns pbft messages with matching type, blockNum, viewID and blockHash
