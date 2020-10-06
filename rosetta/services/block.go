@@ -788,6 +788,11 @@ func formatUndelegationPayoutTransaction(
 
 }
 
+var (
+	// DefaultSenderAddress ..
+	DefaultSenderAddress = ethcommon.HexToAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
+)
+
 // formatTransaction for staking, cross-shard sender, and plain transactions
 func formatTransaction(
 	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
@@ -856,9 +861,7 @@ func getOperations(
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
+		senderAddress = DefaultSenderAddress
 	}
 	accountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
@@ -873,15 +876,15 @@ func getOperations(
 	var txOperations []*types.Operation
 	if tx.To() == nil {
 		txOperations, rosettaError = newContractCreationOperations(
-			gasOperations[0].OperationIdentifier, tx, receipt,
+			gasOperations[0].OperationIdentifier, tx, receipt, senderAddress,
 		)
 	} else if tx.ShardID() != tx.ToShardID() {
 		txOperations, rosettaError = newCrossShardSenderTransferOperations(
-			gasOperations[0].OperationIdentifier, tx,
+			gasOperations[0].OperationIdentifier, tx, senderAddress,
 		)
 	} else {
 		txOperations, rosettaError = newTransferOperations(
-			gasOperations[0].OperationIdentifier, tx, receipt,
+			gasOperations[0].OperationIdentifier, tx, receipt, senderAddress,
 		)
 	}
 	if rosettaError != nil {
@@ -895,8 +898,10 @@ func getOperations(
 func getStakingOperations(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
-	// Sender address should have errored prior to call this function
-	senderAddress, _ := tx.SenderAddress()
+	senderAddress, err := tx.SenderAddress()
+	if err != nil {
+		senderAddress = DefaultSenderAddress
+	}
 	accountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -1034,10 +1039,8 @@ func getAmountFromCollectRewards(
 // including contract transactions.
 func newTransferOperations(
 	startingOperationID *types.OperationIdentifier,
-	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
+	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
-	// Sender address should have errored prior to call this function
-	senderAddress, _ := tx.SenderAddress()
 	receiverAddress := *tx.To()
 
 	// Common elements
@@ -1109,10 +1112,8 @@ func newTransferOperations(
 // on the sender's shard.
 func newCrossShardSenderTransferOperations(
 	startingOperationID *types.OperationIdentifier,
-	tx *hmytypes.Transaction,
+	tx *hmytypes.Transaction, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
-	// Sender address should have errored prior to call this function
-	senderAddress, _ := tx.SenderAddress()
 	senderAccountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -1154,10 +1155,8 @@ func newCrossShardSenderTransferOperations(
 // newContractCreationOperations extracts & formats the operation(s) for a contract creation tx
 func newContractCreationOperations(
 	startingOperationID *types.OperationIdentifier,
-	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt,
+	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
-	// Sender address should have errored prior to call this function
-	senderAddress, _ := tx.SenderAddress()
 	senderAccountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError

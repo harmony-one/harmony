@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/common/denominations"
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -34,19 +32,14 @@ type ConstructAPI struct {
 	hmy           *hmy.Harmony
 	signer        hmyTypes.Signer
 	stakingSigner stakingTypes.Signer
-
-	// tempSignerPrivateKey for unsigned transactions to satisfy assumption of
-	// signed transaction for transaction processing/formatting
-	tempSignerPrivateKey *ecdsa.PrivateKey
 }
 
 // NewConstructionAPI creates a new instance of a ConstructAPI.
 func NewConstructionAPI(hmy *hmy.Harmony) server.ConstructionAPIServicer {
 	return &ConstructAPI{
-		hmy:                  hmy,
-		signer:               hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
-		stakingSigner:        stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
-		tempSignerPrivateKey: internalCommon.MustGeneratePrivateKey(),
+		hmy:           hmy,
+		signer:        hmyTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
+		stakingSigner: stakingTypes.NewEIP155Signer(new(big.Int).SetUint64(hmy.ChainID)),
 	}
 }
 

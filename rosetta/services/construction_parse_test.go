@@ -55,7 +55,6 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	}
 	parsedResponse, rosettaError := parseUnsignedTransaction(
 		context.Background(), wrappedTransaction, refUnsignedTx,
-		internalCommon.MustGeneratePrivateKey(), tempTestSigner, tempTestStakingSigner,
 	)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
@@ -73,9 +72,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	}
 
 	// test nil
-	_, rosettaError = parseUnsignedTransaction(context.Background(), nil, nil,
-		internalCommon.MustGeneratePrivateKey(), tempTestSigner, tempTestStakingSigner,
-	)
+	_, rosettaError = parseUnsignedTransaction(context.Background(), nil, nil)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}

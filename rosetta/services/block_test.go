@@ -836,7 +836,7 @@ func TestNewTransferOperations(t *testing.T) {
 	receipt := &hmytypes.Receipt{
 		Status: hmytypes.ReceiptStatusFailed,
 	}
-	operations, rosettaError := newTransferOperations(startingOpID, tx, receipt)
+	operations, rosettaError := newTransferOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -851,7 +851,7 @@ func TestNewTransferOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = newTransferOperations(startingOpID, tx, receipt)
+	operations, rosettaError = newTransferOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -910,7 +910,7 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 			Metadata: metadata,
 		},
 	}
-	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx)
+	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -1051,7 +1051,7 @@ func TestNewContractCreationOperations(t *testing.T) {
 		Status:          hmytypes.ReceiptStatusFailed,
 		ContractAddress: contractAddr,
 	}
-	operations, rosettaError := newContractCreationOperations(startingOpID, tx, receipt)
+	operations, rosettaError := newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -1065,7 +1065,7 @@ func TestNewContractCreationOperations(t *testing.T) {
 	// Test successful contract creation
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = newContractCreationOperations(startingOpID, tx, receipt)
+	operations, rosettaError = newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

@@ -34,7 +34,7 @@ func (s *OperationComponents) IsStaking() bool {
 //
 // Providing a gas expenditure operation is INVALID.
 // All staking & cross-shard operations require metadata matching the operation type to be a valid.
-// All non-staking operations do not require metadata.
+// All other operations do not require metadata.
 // TODO (dm): implement staking transaction construction
 func GetOperationComponents(
 	operations []*types.Operation,
