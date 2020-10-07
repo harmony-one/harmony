@@ -40,7 +40,7 @@ var (
 func SetLogContext(_port, _ip string) {
 	port = _port
 	ip = _ip
-	setZeroLogContext(_port, _ip)
+	setZeroLogContext(_ip, _port)
 }
 
 // SetLogVerbosity specifies the verbosity of global logger

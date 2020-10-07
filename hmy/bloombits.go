@@ -134,7 +134,10 @@ func (b *BloomIndexer) Commit() error {
 		if err != nil {
 			return err
 		}
-		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
+		err = rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
+		if err != nil {
+			return err
+		}
 	}
 	return batch.Write()
 }

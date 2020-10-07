@@ -124,14 +124,20 @@ func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) 
 func WriteCXReceiptsProofSpent(dbw DatabaseWriter, cxp *types.CXReceiptsProof) error {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
-	return dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte})
+	if err := dbw.Put(cxReceiptSpentKey(shardID, blockNum), []byte{SpentByte}); err != nil {
+		utils.Logger().Error().Msg("Failed to write CX receipt proof")
+		return err
+	}
+	return nil
 }
 
 // DeleteCXReceiptsProofSpent removes unspent indicator of a given blockHash
-func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint64) {
+func DeleteCXReceiptsProofSpent(db DatabaseDeleter, shardID uint32, number uint64) error {
 	if err := db.Delete(cxReceiptSpentKey(shardID, number)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete receipts unspent indicator")
+		return err
 	}
+	return nil
 }
 
 // ReadValidatorSnapshot retrieves validator's snapshot by its address
@@ -169,17 +175,21 @@ func WriteValidatorSnapshot(batch DatabaseWriter, v *staking.ValidatorWrapper, e
 }
 
 // DeleteValidatorSnapshot removes the validator's snapshot by its address
-func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big.Int) {
+func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big.Int) error {
 	if err := db.Delete(validatorSnapshotKey(addr, epoch)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete snapshot of a validator")
+		return err
 	}
+	return nil
 }
 
 // DeleteValidatorStats ..
-func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) {
+func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) error {
 	if err := db.Delete(validatorStatsKey(addr)); err != nil {
 		utils.Logger().Error().Msg("Failed to delete stats of a validator")
+		return err
 	}
+	return nil
 }
 
 // ReadValidatorStats retrieves validator's stats by its address,

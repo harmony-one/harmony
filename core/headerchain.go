@@ -390,7 +390,9 @@ func (hc *HeaderChain) GetTdByHash(hash common.Hash) *big.Int {
 // WriteTd stores a block's total difficulty into the database, also caching it
 // along the way.
 func (hc *HeaderChain) WriteTd(hash common.Hash, number uint64, td *big.Int) error {
-	rawdb.WriteTd(hc.chainDb, hash, number, td)
+	if err := rawdb.WriteTd(hc.chainDb, hash, number, td); err != nil {
+		return err
+	}
 	hc.tdCache.Add(hash, new(big.Int).Set(td))
 	return nil
 }
@@ -446,20 +448,23 @@ func (hc *HeaderChain) CurrentHeader() *block.Header {
 }
 
 // SetCurrentHeader sets the current head header of the canonical chain.
-func (hc *HeaderChain) SetCurrentHeader(head *block.Header) {
-	rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash())
+func (hc *HeaderChain) SetCurrentHeader(head *block.Header) error {
+	if err := rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash()); err != nil {
+		return err
+	}
 
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
+	return nil
 }
 
 // DeleteCallback is a callback function that is called by SetHead before
 // each header is deleted.
-type DeleteCallback func(rawdb.DatabaseDeleter, common.Hash, uint64)
+type DeleteCallback func(rawdb.DatabaseDeleter, common.Hash, uint64) error
 
 // SetHead rewinds the local chain to a new head. Everything above the new head
 // will be deleted and the new one set.
-func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
+func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 	height := uint64(0)
 
 	if hdr := hc.CurrentHeader(); hdr != nil {
@@ -470,18 +475,31 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 		hash := hdr.Hash()
 		num := hdr.Number().Uint64()
 		if delFn != nil {
-			delFn(batch, hash, num)
+			if err := delFn(batch, hash, num); err != nil {
+				return err
+			}
 		}
-		rawdb.DeleteHeader(batch, hash, num)
-		rawdb.DeleteTd(batch, hash, num)
-
+		if err := rawdb.DeleteHeader(batch, hash, num); err != nil {
+			return err
+		}
+		if err := rawdb.DeleteTd(batch, hash, num); err != nil {
+			return err
+		}
 		hc.currentHeader.Store(hc.GetHeader(hdr.ParentHash(), hdr.Number().Uint64()-1))
 	}
 	// Roll back the canonical chain numbering
 	for i := height; i > head; i-- {
-		rawdb.DeleteCanonicalHash(batch, i)
+		if err := rawdb.DeleteCanonicalHash(batch, i); err != nil {
+			return err
+		}
 	}
-	batch.Write()
+	if err := rawdb.WriteHeadHeaderHash(batch, hc.currentHeaderHash); err != nil {
+		return err
+	}
+
+	if err := batch.Write(); err != nil {
+		return err
+	}
 
 	// Clear out any stale content from the caches
 	hc.headerCache.Purge()
@@ -493,7 +511,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 
-	rawdb.WriteHeadHeaderHash(hc.chainDb, hc.currentHeaderHash)
+	return nil
 }
 
 // SetGenesis sets a new genesis block header for the chain

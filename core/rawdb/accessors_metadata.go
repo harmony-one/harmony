@@ -18,11 +18,11 @@ package rawdb
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -37,11 +37,13 @@ func ReadDatabaseVersion(db DatabaseReader) int {
 }
 
 // WriteDatabaseVersion stores the version number of the database
-func WriteDatabaseVersion(db DatabaseWriter, version int) {
+func WriteDatabaseVersion(db DatabaseWriter, version int) error {
 	enc, _ := rlp.EncodeToBytes(version)
 	if err := db.Put(databaseVerisionKey, enc); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store the database version")
+		return err
 	}
+	return nil
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
@@ -59,17 +61,20 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConfig) {
+func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConfig) error {
 	if cfg == nil {
-		return
+		return errors.New("nil config")
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to JSON encode chain config")
+		return err
 	}
 	if err := db.Put(configKey(hash), data); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to store chain config")
+		return err
 	}
+	return nil
 }
 
 // ReadPreimage retrieves a single preimage of the provided hash.
@@ -80,12 +85,14 @@ func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
 
 // WritePreimages writes the provided set of preimages to the database. `number` is the
 // current block number, and is used for debug messages only.
-func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash][]byte) {
+func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash][]byte) error {
 	for hash, preimage := range preimages {
 		if err := db.Put(preimageKey(hash), preimage); err != nil {
 			utils.Logger().Error().Err(err).Msg("Failed to store trie preimage")
+			return err
 		}
 	}
 	preimageCounter.Inc(int64(len(preimages)))
 	preimageHitCounter.Inc(int64(len(preimages)))
+	return nil
 }
