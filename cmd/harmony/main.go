@@ -370,7 +370,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	if err := currentNode.BootstrapConsensus(); err != nil {
 		fmt.Println("could not bootstrap consensus", err.Error())
-		os.Exit(-1)
+		if !currentNode.NodeConfig.IsOffline {
+			os.Exit(-1)
+		}
 	}
 
 	if err := currentNode.Start(); err != nil {

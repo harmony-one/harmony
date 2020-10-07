@@ -556,17 +556,19 @@ func (node *Node) Start() error {
 		Uint32("shard-id", node.Consensus.ShardID).
 		Msg("starting with these topics")
 
-	for key, isCon := range groups {
-		topicHandle, err := node.host.GetOrJoin(string(key))
-		if err != nil {
-			return err
+	if !node.NodeConfig.IsOffline {
+		for key, isCon := range groups {
+			topicHandle, err := node.host.GetOrJoin(string(key))
+			if err != nil {
+				return err
+			}
+			allTopics = append(
+				allTopics, u{
+					NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+					consensusBound: isCon,
+				},
+			)
 		}
-		allTopics = append(
-			allTopics, u{
-				NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
-				consensusBound: isCon,
-			},
-		)
 	}
 	pubsub := node.host.PubSub()
 	ownID := node.host.GetID()
@@ -598,6 +600,10 @@ func (node *Node) Start() error {
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+
+	if node.NodeConfig.IsOffline {
+		select {} // sleep until program is terminated
+	}
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
