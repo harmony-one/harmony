@@ -8,6 +8,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
 
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
 
@@ -212,7 +213,7 @@ func TestGetSuggestedFeeAndPrice(t *testing.T) {
 			GasMul:         2,
 			EstGasUsed:     nil,
 			RefGasPrice:    big.NewInt(DefaultGasPrice * 2),
-			RefAmountValue: new(big.Int).Mul(big.NewInt(DefaultGasPrice*2), DefaultGasLimit),
+			RefAmountValue: new(big.Int).Mul(big.NewInt(DefaultGasPrice*2), big.NewInt(0).SetUint64(params.TxGas)),
 		},
 	}
 

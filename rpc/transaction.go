@@ -690,6 +690,7 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 }
 
 // EstimateGas ..
+// TODO: fix contract creation gas estimation, it currently underestimates.
 func EstimateGas(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int,
 ) (uint64, error) {

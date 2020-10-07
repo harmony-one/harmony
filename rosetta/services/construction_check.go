@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 )
@@ -134,7 +135,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 		})
 	}
 
-	if request.PublicKeys == nil || len(request.PublicKeys) != 1 {
+	if len(request.PublicKeys) != 1 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "require sender public key only",
 		})
@@ -206,7 +207,7 @@ func getSuggestedFeeAndPrice(
 	gasMul float64, estGasUsed *big.Int,
 ) ([]*types.Amount, *big.Int) {
 	if estGasUsed == nil {
-		estGasUsed = DefaultGasLimit
+		estGasUsed = big.NewInt(0).SetUint64(params.TxGas)
 	}
 	if gasMul < 1 {
 		gasMul = 1

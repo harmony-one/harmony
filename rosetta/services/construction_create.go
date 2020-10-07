@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// SignedPayloadLength ..
+	// SignedPayloadLength is the required length of the ECDSA payload
 	SignedPayloadLength = 65
 )
 
@@ -90,7 +90,7 @@ func (s *ConstructAPI) ConstructionPayloads(
 			"message": errors.WithMessage(err, "invalid metadata").Error(),
 		})
 	}
-	if request.PublicKeys == nil || len(request.PublicKeys) != 1 {
+	if len(request.PublicKeys) != 1 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "require sender public key only",
 		})
@@ -181,7 +181,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if request.Signatures == nil || len(request.Signatures) != 1 {
+	if len(request.Signatures) != 1 {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "require exactly 1 signature",
 		})

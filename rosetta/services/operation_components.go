@@ -13,6 +13,9 @@ import (
 const (
 	// maxNumOfConstructionOps ..
 	maxNumOfConstructionOps = 2
+
+	// transferOperationCount ..
+	transferOperationCount = 2
 )
 
 // OperationComponents are components from a set of operations to construct a valid transaction
@@ -50,7 +53,7 @@ func GetOperationComponents(
 		})
 	}
 
-	if len(operations) == 2 {
+	if len(operations) == transferOperationCount {
 		return getTransferOperationComponents(operations)
 	}
 	switch operations[0].Type {
@@ -69,9 +72,9 @@ func GetOperationComponents(
 func getTransferOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
-	if operations == nil {
+	if len(operations) != transferOperationCount {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "nil operations",
+			"message": "require exactly 2 operations",
 		})
 	}
 	op0, op1 := operations[0], operations[1]

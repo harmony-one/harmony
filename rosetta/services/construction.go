@@ -22,11 +22,6 @@ const (
 	DefaultGasPrice = denominations.Nano
 )
 
-var (
-	// DefaultGasLimit ..
-	DefaultGasLimit = big.NewInt(24000)
-)
-
 // ConstructAPI implements the server.ConstructAPIServicer interface.
 type ConstructAPI struct {
 	hmy           *hmy.Harmony
