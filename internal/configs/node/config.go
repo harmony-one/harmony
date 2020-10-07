@@ -78,6 +78,7 @@ type ConfigType struct {
 	IP              string              // IP of the node.
 	RPCServer       RPCServerConfig     // RPC server port and ip
 	RosettaServer   RosettaServerConfig // rosetta server port and ip
+	IsOffline       bool
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey multibls.PrivateKeys

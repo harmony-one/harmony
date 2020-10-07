@@ -15,6 +15,7 @@ var (
 		noStakingFlag,
 		shardIDFlag,
 		isArchiveFlag,
+		isOfflineFlag,
 		dataDirFlag,
 
 		legacyNodeTypeFlag,
@@ -178,6 +179,11 @@ var (
 		Usage:    "run node in archive mode",
 		DefValue: defaultConfig.General.IsArchival,
 	}
+	isOfflineFlag = cli.BoolFlag{
+		Name:     "run.offline",
+		Usage:    "run node in offline mode",
+		DefValue: defaultConfig.General.IsOffline,
+	}
 	dataDirFlag = cli.StringFlag{
 		Name:     "datadir",
 		Usage:    "directory of chain database",
@@ -270,6 +276,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.General.DataDir = cli.GetStringFlagValue(cmd, dataDirFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDataDirFlag) {
 		config.General.DataDir = cli.GetStringFlagValue(cmd, legacyDataDirFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, isOfflineFlag) {
+		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
 	}
 }
 

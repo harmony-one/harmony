@@ -15,6 +15,7 @@ var defaultConfig = harmonyConfig{
 		NoStaking:  false,
 		ShardID:    -1,
 		IsArchival: false,
+		IsOffline:  false,
 		DataDir:    "./",
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),

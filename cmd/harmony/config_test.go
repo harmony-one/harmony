@@ -99,6 +99,9 @@ func TestV1_0_0Config(t *testing.T) {
 	if config.HTTP.RosettaEnabled {
 		t.Errorf("Expected rosetta http server to be disabled when loading old config")
 	}
+	if config.General.IsOffline {
+		t.Errorf("Expect node to de online when loading old config")
+	}
 	if config.Version != "1.0.0" {
 		t.Errorf("Expected config version: 1.0.0, not %v", config.Version)
 	}

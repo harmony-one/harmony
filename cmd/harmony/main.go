@@ -271,6 +271,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	}
 	currentNode := setupConsensusAndNode(hc, nodeConfig)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
+	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
@@ -494,6 +495,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	netType := nodeconfig.NetworkType(hc.Network.NetworkType)
 	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetArchival(hc.General.IsArchival)
+	nodeConfig.IsOffline = hc.General.IsOffline
 
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)

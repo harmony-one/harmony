@@ -52,6 +52,7 @@ type generalConfig struct {
 	NoStaking  bool
 	ShardID    int
 	IsArchival bool
+	IsOffline  bool
 	DataDir    string
 }
 
