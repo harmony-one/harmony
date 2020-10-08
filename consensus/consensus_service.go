@@ -109,8 +109,7 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Sign on the hash of the message with the private keys and return the signature.
-// If multiple keys are provided, the aggregated signature will be returned.
+// Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
 	signature := priKey.SignHash(hash[:])
