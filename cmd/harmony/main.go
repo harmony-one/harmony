@@ -178,6 +178,10 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 		return harmonyConfig{}, err
 	}
 
+	if config.General.IsOffline {
+		config.P2P.IP = nodeconfig.DefaultLocalListenIP
+	}
+
 	return config, nil
 }
 
@@ -346,7 +350,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("Role", currentNode.NodeConfig.Role().String()).
 		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", publicListenIP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
 
@@ -507,7 +511,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	}
 
 	selfPeer := p2p.Peer{
-		IP:              publicListenIP,
+		IP:              hc.P2P.IP,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
@@ -579,11 +583,11 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	}
 
 	// Syncing provider is provided by following rules:
-	//   1. If starting with a localnet, use local sync peers.
+	//   1. If starting with a localnet or offline, use local sync peers.
 	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
 	//      discover peers.
 	//   3. Else, use the dns for syncing.
-	if hc.Network.NetworkType == nodeconfig.Localnet {
+	if hc.Network.NetworkType == nodeconfig.Localnet || hc.General.IsOffline {
 		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 		selfPort := hc.P2P.Port
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(

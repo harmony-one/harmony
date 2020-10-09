@@ -44,6 +44,7 @@ type networkConfig struct {
 
 type p2pConfig struct {
 	Port    int
+	IP      string
 	KeyFile string
 }
 
