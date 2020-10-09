@@ -129,12 +129,6 @@ func (s *BlockAPI) Block(
 func (s *BlockAPI) genesisBlock(
 	ctx context.Context, request *types.BlockRequest, blk *hmytypes.Block,
 ) (response *types.BlockResponse, rosettaError *types.Error) {
-	if blk.Number().Uint64() != 0 {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": "tried to format response as genesis block on non-genesis block",
-		})
-	}
-
 	var currBlockID, prevBlockID *types.BlockIdentifier
 	currBlockID = &types.BlockIdentifier{
 		Index: blk.Number().Int64(),
@@ -152,6 +146,9 @@ func (s *BlockAPI) genesisBlock(
 	otherTransactions := []*types.TransactionIdentifier{}
 	// Report initial genesis funds as transactions to fit API.
 	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(blk.ShardID())) {
+		if tx.To() == nil {
+			return nil, common.NewError(common.CatchAllError, nil)
+		}
 		otherTransactions = append(
 			otherTransactions, getSpecialCaseTransactionIdentifier(blk.Hash(), *tx.To(), SpecialGenesisTxID),
 		)
@@ -668,8 +665,10 @@ func formatGenesisTransaction(
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var b32Addr string
 	targetB32Addr := internalCommon.MustAddressToBech32(targetAddr)
-	genesisSpec := getGenesisSpec(shardID)
-	for _, tx := range getPseudoTransactionForGenesis(genesisSpec) {
+	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(shardID)) {
+		if tx.To() == nil {
+			return nil, common.NewError(common.CatchAllError, nil)
+		}
 		b32Addr = internalCommon.MustAddressToBech32(*tx.To())
 		if targetB32Addr == b32Addr {
 			accID, rosettaError := newAccountIdentifier(*tx.To())
@@ -1041,6 +1040,9 @@ func newTransferOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
+	if tx.To() == nil {
+		return nil, common.NewError(common.CatchAllError, nil)
+	}
 	receiverAddress := *tx.To()
 
 	// Common elements
@@ -1114,6 +1116,9 @@ func newCrossShardSenderTransferOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
+	if tx.To() == nil {
+		return nil, common.NewError(common.CatchAllError, nil)
+	}
 	senderAccountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
