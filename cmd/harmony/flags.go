@@ -39,7 +39,7 @@ var (
 
 	p2pFlags = []cli.Flag{
 		p2pPortFlag,
-		p2pIpFlag,
+		p2pIPFlag,
 		p2pKeyFileFlag,
 
 		legacyKeyFileFlag,
@@ -371,7 +371,7 @@ var (
 		Usage:    "port to listen for p2p protocols",
 		DefValue: defaultConfig.P2P.Port,
 	}
-	p2pIpFlag = cli.StringFlag{
+	p2pIPFlag = cli.StringFlag{
 		Name:     "p2p.ip",
 		Usage:    "ip to listen for p2p protocols",
 		DefValue: defaultConfig.P2P.IP,
@@ -393,8 +393,8 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
-	if cli.IsFlagChanged(cmd, p2pIpFlag) {
-		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIpFlag)
+	if cli.IsFlagChanged(cmd, p2pIPFlag) {
+		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIPFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, p2pKeyFileFlag) {
