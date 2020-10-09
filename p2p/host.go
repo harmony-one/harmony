@@ -13,7 +13,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
@@ -65,7 +65,7 @@ const (
 
 // NewHost ..
 func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
-	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", self.Port))
+	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
 	if err != nil {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
