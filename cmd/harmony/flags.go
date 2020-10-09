@@ -15,6 +15,7 @@ var (
 		noStakingFlag,
 		shardIDFlag,
 		isArchiveFlag,
+		isOfflineFlag,
 		dataDirFlag,
 
 		legacyNodeTypeFlag,
@@ -38,6 +39,7 @@ var (
 
 	p2pFlags = []cli.Flag{
 		p2pPortFlag,
+		p2pIPFlag,
 		p2pKeyFileFlag,
 
 		legacyKeyFileFlag,
@@ -178,6 +180,11 @@ var (
 		Usage:    "run node in archive mode",
 		DefValue: defaultConfig.General.IsArchival,
 	}
+	isOfflineFlag = cli.BoolFlag{
+		Name:     "run.offline",
+		Usage:    "run node in offline mode",
+		DefValue: defaultConfig.General.IsOffline,
+	}
 	dataDirFlag = cli.StringFlag{
 		Name:     "datadir",
 		Usage:    "directory of chain database",
@@ -271,6 +278,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyDataDirFlag) {
 		config.General.DataDir = cli.GetStringFlagValue(cmd, legacyDataDirFlag)
 	}
+
+	if cli.IsFlagChanged(cmd, isOfflineFlag) {
+		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
+	}
 }
 
 // network flags
@@ -360,6 +371,11 @@ var (
 		Usage:    "port to listen for p2p protocols",
 		DefValue: defaultConfig.P2P.Port,
 	}
+	p2pIPFlag = cli.StringFlag{
+		Name:     "p2p.ip",
+		Usage:    "ip to listen for p2p protocols",
+		DefValue: defaultConfig.P2P.IP,
+	}
 	p2pKeyFileFlag = cli.StringFlag{
 		Name:     "p2p.keyfile",
 		Usage:    "the p2p key file of the harmony node",
@@ -376,6 +392,12 @@ var (
 func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
+	}
+	if cli.IsFlagChanged(cmd, p2pIPFlag) {
+		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIPFlag)
+	}
+	if config.General.IsOffline {
+		config.P2P.IP = nodeconfig.DefaultLocalListenIP
 	}
 
 	if cli.IsFlagChanged(cmd, p2pKeyFileFlag) {
@@ -1068,11 +1090,11 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, legacyPublicRPCFlag) {
 		if !cli.GetBoolFlagValue(cmd, legacyPublicRPCFlag) {
-			config.HTTP.IP = localListenIP
-			config.WS.IP = localListenIP
+			config.HTTP.IP = nodeconfig.DefaultLocalListenIP
+			config.WS.IP = nodeconfig.DefaultLocalListenIP
 		} else {
-			config.HTTP.IP = publicListenIP
-			config.WS.IP = publicListenIP
+			config.HTTP.IP = nodeconfig.DefaultPublicListenIP
+			config.WS.IP = nodeconfig.DefaultPublicListenIP
 		}
 	}
 

@@ -173,6 +173,10 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 
 // DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
 func (node *Node) DoBeaconSyncing() {
+	if node.NodeConfig.IsOffline {
+		return
+	}
+
 	go func(node *Node) {
 		// TODO ek – infinite loop; add shutdown/cleanup logic
 		for beaconBlock := range node.BeaconBlockChannel {
@@ -218,6 +222,10 @@ func (node *Node) DoBeaconSyncing() {
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+	if node.NodeConfig.IsOffline {
+		return
+	}
+
 	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
@@ -349,6 +357,10 @@ func (node *Node) SendNewBlockToUnsync() {
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
+	if node.NodeConfig.IsOffline {
+		return response, nil
+	}
+
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_BLOCKHASH:
 		if request.BlockHash == nil {

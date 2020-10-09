@@ -77,6 +77,7 @@ func TestConnectionToInvalidPeer(t *testing.T) {
 	assert.NotEmpty(t, discoveredHost.GetID())
 
 	discoveredPeer := discoveredHost.GetSelfPeer()
+	discoveredPeer.IP = "8.8.8.8" // force invalid peer
 
 	err = host.ConnectHostPeer(discoveredPeer)
 	assert.Error(t, err)

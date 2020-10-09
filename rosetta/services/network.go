@@ -87,7 +87,7 @@ func (s *NetworkAPI) NetworkStatus(
 	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain) {
 		syncStatus = common.SyncingNewBlock
 	} else if targetHeight == 0 {
-		syncStatus = common.SyncingStartup
+		syncStatus = common.SyncingUnknown
 	}
 	stage := syncStatus.String()
 

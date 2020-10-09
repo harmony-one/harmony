@@ -55,14 +55,14 @@ type SyncStatus int
 
 // Sync status enum
 const (
-	SyncingStartup SyncStatus = iota
+	SyncingUnknown SyncStatus = iota
 	SyncingNewBlock
 	SyncingFinish
 )
 
 // String ..
 func (s SyncStatus) String() string {
-	return [...]string{"booting syncing service", "syncing new block(s)", "fully synced"}[s]
+	return [...]string{"unknown", "syncing new block(s)", "fully synced"}[s]
 }
 
 // SubNetworkMetadata for the sub network identifier of a shard

@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.1"
+const tomlConfigVersion = "1.0.2"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -15,11 +15,13 @@ var defaultConfig = harmonyConfig{
 		NoStaking:  false,
 		ShardID:    -1,
 		IsArchival: false,
+		IsOffline:  false,
 		DataDir:    "./",
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: p2pConfig{
 		Port:    nodeconfig.DefaultP2PPort,
+		IP:      nodeconfig.DefaultPublicListenIP,
 		KeyFile: "./.hmykey",
 	},
 	HTTP: httpConfig{
@@ -143,9 +145,4 @@ const (
 	legacyBLSKmsTypePrompt  = "prompt"
 	legacyBLSKmsTypeFile    = "file"
 	legacyBLSKmsTypeNone    = "none"
-)
-
-const (
-	localListenIP  = "127.0.0.1"
-	publicListenIP = "0.0.0.0"
 )
