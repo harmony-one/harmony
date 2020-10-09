@@ -213,7 +213,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	err = consensus.vc.ProcessViewChangeMsg(consensus.FBFTLog, recvMsg, members)
+	err = consensus.vc.ProcessViewChangeMsg(consensus.FBFTLog, consensus.Decider, recvMsg)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).

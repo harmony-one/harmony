@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -235,13 +236,14 @@ var (
 	errVerifyM1  = errors.New("failed to verfiy signature for M1 message")
 	errVerifyM2  = errors.New("failed to verfiy signature for M2 message")
 	errM1Payload = errors.New("failed to verify multi signature for M1 prepared payload")
+	errNoQuorum  = errors.New("no quorum on M1 (prepared) payload")
 )
 
 // ProcessViewChangeMsg process the view change message after verification
 func (vc *viewChange) ProcessViewChangeMsg(
 	fbftlog *FBFTLog,
+	decider quorum.Decider,
 	recvMsg *FBFTMessage,
-	members multibls.PublicKeys,
 ) error {
 	vc.vcLock.Lock()
 	defer vc.vcLock.Unlock()
@@ -271,23 +273,28 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		}
 		blockHash := recvMsg.Payload[:32]
 
-		aggSig, mask, err := chain.ReadSignatureBitmapByPublicKeys(recvMsg.Payload[32:], members)
+		aggSig, mask, err := chain.ReadSignatureBitmapByPublicKeys(recvMsg.Payload[32:], decider.Participants())
 		if err != nil {
 			return err
 		}
+
+		if !decider.IsQuorumAchievedByMask(mask) {
+			return errNoQuorum
+		}
+
 		if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 			return errM1Payload
 		}
 
 		vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 			Str("validatorPubKey", senderKeyStr).
-			Msg("[VerifyViewChangeMsg] Add M1 (prepared) type message")
+			Msg("[ProcessViewChangeMsg] Add M1 (prepared) type message")
 		vc.bhpSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
 		vc.bhpBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
 
 		vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 			Str("validatorPubKey", senderKeyStr).
-			Msg("[VerifyViewChangeMsg] Add M3 (ViewID) type message")
+			Msg("[ProcessViewChangeMsg] Add M3 (ViewID) type message")
 
 		vc.viewIDSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewidSig
 		// Set the bitmap indicating that this validator signed.
@@ -306,7 +313,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 			preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 			copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 			preparedMsg.SenderPubkey = recvMsg.LeaderPubkey
-			vc.getLogger().Info().Msg("[onViewChange] New Leader Prepared Message Added")
+			vc.getLogger().Info().Msg("[ProcessViewChangeMsg] New Leader Prepared Message Added")
 			fbftlog.AddMessage(&preparedMsg)
 			fbftlog.AddBlock(preparedBlock)
 		}
@@ -323,13 +330,13 @@ func (vc *viewChange) ProcessViewChangeMsg(
 
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 		Str("validatorPubKey", senderKeyStr).
-		Msg("[VerifyViewChangeMsg] Add M2 (NIL) type message")
+		Msg("[ProcessViewChangeMsg] Add M2 (NIL) type message")
 	vc.nilSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
 	vc.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Bytes, true) // Set the bitmap indicating that this validator signed.
 
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 		Str("validatorPubKey", senderKeyStr).
-		Msg("[VerifyViewChangeMsg] Add M3 (ViewID) type message")
+		Msg("[ProcessViewChangeMsg] Add M3 (ViewID) type message")
 
 	vc.viewIDSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewidSig
 	// Set the bitmap indicating that this validator signed.
