@@ -244,6 +244,9 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	if config.HTTP.RosettaPort == 0 {
 		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
 	}
+	if config.P2P.IP == "" {
+		config.P2P.IP = defaultConfig.P2P.IP
+	}
 	return config, nil
 }
 
