@@ -7,13 +7,12 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
 )
 
 const (
 	// RosettaVersion tied back to the version of the rosetta go-sdk
-	RosettaVersion = "0.3.4" // TODO (dm): set variable via build flags
+	RosettaVersion = "0.4.4" // TODO (dm): set variable via build flags
 
 	// Blockchain ..
 	Blockchain = "Harmony"
@@ -26,6 +25,9 @@ const (
 
 	// CurveType ..
 	CurveType = types.Secp256k1
+
+	// SignatureType ..
+	SignatureType = types.EcdsaRecovery
 )
 
 var (
@@ -43,6 +45,9 @@ var (
 		Symbol:   Symbol,
 		Decimals: Decimals,
 	}
+
+	// CurrencyHash for quick equivalent checks
+	CurrencyHash = types.Hash(Currency)
 )
 
 // SyncStatus ..
@@ -50,14 +55,14 @@ type SyncStatus int
 
 // Sync status enum
 const (
-	SyncingStartup SyncStatus = iota
+	SyncingUnknown SyncStatus = iota
 	SyncingNewBlock
 	SyncingFinish
 )
 
 // String ..
 func (s SyncStatus) String() string {
-	return [...]string{"booting syncing service", "syncing new block(s)", "fully synced"}[s]
+	return [...]string{"unknown", "syncing new block(s)", "fully synced"}[s]
 }
 
 // SubNetworkMetadata for the sub network identifier of a shard
@@ -81,7 +86,7 @@ func (s *SubNetworkMetadata) UnmarshalFromInterface(metadata interface{}) error 
 
 // GetNetwork fetches the networking identifier for the given shard
 func GetNetwork(shardID uint32) (*types.NetworkIdentifier, error) {
-	metadata, err := rpc.NewStructuredResponse(SubNetworkMetadata{
+	metadata, err := types.MarshalMap(SubNetworkMetadata{
 		IsBeacon: shardID == shard.BeaconChainShardID,
 	})
 	if err != nil {

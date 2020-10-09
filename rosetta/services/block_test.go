@@ -19,7 +19,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rpc"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/staking"
 	stakingNetwork "github.com/harmony-one/harmony/staking/network"
@@ -55,7 +54,7 @@ func getMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]in
 	if err != nil {
 		return nil, err
 	}
-	return rpc.NewStructuredResponse(rpcStakingTx.Msg)
+	return types.MarshalMap(rpcStakingTx.Msg)
 }
 
 func createTestTransaction(
@@ -92,6 +91,23 @@ func createTestContractCreationTransaction(
 	}
 	tx := hmytypes.NewContractCreation(nonce, shard, big.NewInt(0), gasLimit, gasPrice, data)
 	return hmytypes.SignTx(tx, signer, fromKey)
+}
+
+// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
+func assertOperationTypeUniquenessInvariant(operations []*types.Operation) error {
+	foundType := ""
+	for _, op := range operations {
+		if op.Type == common.ExpendGasOperation {
+			continue
+		}
+		if foundType == "" {
+			foundType = op.Type
+		}
+		if op.Type != foundType {
+			return fmt.Errorf("found more than 1 type in given set of operations")
+		}
+	}
+	return nil
 }
 
 // Note that this test only checks the general format of each type transaction on Harmony.
@@ -147,6 +163,9 @@ func testFormatStakingTransaction(
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
 	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
+	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
 	}
@@ -198,6 +217,9 @@ func testFormatPlainTransaction(
 	if len(rosettaTx.Operations) != 3 {
 		t.Error("Expected 3 operations")
 	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
+	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
 	}
@@ -207,10 +229,10 @@ func testFormatPlainTransaction(
 	if rosettaTx.Operations[1].Type != common.TransferOperation {
 		t.Error("Expected 2nd operation to transfer related")
 	}
-	if !reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
+	if rosettaTx.Operations[1].Metadata != nil {
 		t.Error("Expected 1st operation to have no metadata")
 	}
-	if !reflect.DeepEqual(rosettaTx.Operations[2].Metadata, map[string]interface{}{}) {
+	if rosettaTx.Operations[2].Metadata != nil {
 		t.Error("Expected 2nd operation to have no metadata")
 	}
 	if reflect.DeepEqual(rosettaTx.Metadata, map[string]interface{}{}) {
@@ -235,6 +257,9 @@ func TestFormatGenesisTransaction(t *testing.T) {
 		}
 		if len(tx.Operations) != 1 {
 			t.Error("expected exactly 1 operation")
+		}
+		if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+			t.Error(err)
 		}
 		if tx.Operations[0].OperationIdentifier.Index != 0 {
 			t.Error("expected operational ID to be 0")
@@ -275,6 +300,9 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	}
 	if len(tx.Operations) != 1 {
 		t.Fatal("Expected exactly 1 operation")
+	}
+	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+		t.Error(err)
 	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
 		t.Error("expected operational ID to be 0")
@@ -350,6 +378,9 @@ func TestFormatUndelegationPayoutTransaction(t *testing.T) {
 	if len(tx.Operations) != 1 {
 		t.Fatal("expected tx operations to be of length 1")
 	}
+	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+		t.Error(err)
+	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
 		t.Error("Expect first operation to be index 0")
 	}
@@ -402,6 +433,9 @@ func testFormatCrossShardSenderTransaction(
 	}
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
+	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
 		t.Error("Invalid transaction")
@@ -474,7 +508,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", tenOnes.Uint64()),
+			Value:    formatNegativeValue(tenOnes),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
@@ -485,6 +519,9 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -535,7 +572,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Status:  common.SuccessOperationStatus.Status,
 		Account: senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("-%v", tenOnes.Uint64()),
+			Value:    formatNegativeValue(tenOnes),
 			Currency: &common.Currency,
 		},
 		Metadata: metadata,
@@ -546,6 +583,9 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -608,6 +648,9 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
@@ -669,6 +712,9 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestGetStakingOperationsFromEditValidator(t *testing.T) {
@@ -723,6 +769,9 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestNewTransferOperations(t *testing.T) {
@@ -762,10 +811,9 @@ func TestNewTransferOperations(t *testing.T) {
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{},
 		},
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -783,30 +831,35 @@ func TestNewTransferOperations(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{},
 		},
 	}
 	receipt := &hmytypes.Receipt{
 		Status: hmytypes.ReceiptStatusFailed,
 	}
-	operations, rosettaError := newTransferOperations(startingOpID, tx, receipt)
+	operations, rosettaError := newTransferOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 
 	// Test successful plain / contract transaction
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = newTransferOperations(startingOpID, tx, receipt)
+	operations, rosettaError = newTransferOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -826,11 +879,18 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
+	startingOpID := &types.OperationIdentifier{}
 	receiverAccID, rosettaError := newAccountIdentifier(*tx.To())
 	if rosettaError != nil {
-		t.Fatal(rosettaError)
+		t.Error(rosettaError)
 	}
-	startingOpID := &types.OperationIdentifier{}
+	metadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccID,
+		To:   receiverAccID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	refOperations := []*types.Operation{
 		{
@@ -844,20 +904,21 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{
-				"to_account": receiverAccID,
-			},
+			Metadata: metadata,
 		},
 	}
-	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx)
+	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -889,6 +950,13 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 		ToShardID: 1,
 		Amount:    tx.Value(),
 	}
+	opMetadata, err := types.MarshalMap(common.CrossShardTransactionOperationMetadata{
+		From: senderAccID,
+		To:   receiverAccID,
+	})
+	if err != nil {
+		t.Error(err)
+	}
 
 	refCxID := &types.TransactionIdentifier{Hash: tx.Hash().String()}
 	refOperations := []*types.Operation{
@@ -903,15 +971,15 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
 				Currency: &common.Currency,
 			},
-			Metadata: map[string]interface{}{
-				"from_account": senderAccID,
-			},
+			Metadata: opMetadata,
 		},
 	}
-	refMetadata, err := rpc.NewStructuredResponse(TransactionMetadata{
+	to := tx.ToShardID()
+	from := tx.ShardID()
+	refMetadata, err := types.MarshalMap(TransactionMetadata{
 		CrossShardIdentifier: refCxID,
-		ToShardID:            tx.ToShardID(),
-		FromShardID:          tx.ShardID(),
+		ToShardID:            &to,
+		FromShardID:          &from,
 	})
 	refRosettaTx := &types.Transaction{
 		TransactionIdentifier: refCxID,
@@ -924,6 +992,9 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 	}
 	if !reflect.DeepEqual(rosettaTx, refRosettaTx) {
 		t.Errorf("Expected transaction to be %v not %v", refRosettaTx, rosettaTx)
+	}
+	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -952,6 +1023,10 @@ func TestNewContractCreationOperations(t *testing.T) {
 
 	// Test failed contract creation
 	contractAddr := crypto.PubkeyToAddress(dummyContractKey.PublicKey)
+	contractAddressID, rosettaError := newAccountIdentifier(contractAddr)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
 	refOperations := []*types.Operation{
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -964,11 +1039,11 @@ func TestNewContractCreationOperations(t *testing.T) {
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
-				Value:    fmt.Sprintf("-%v", tx.Value().Uint64()),
+				Value:    formatNegativeValue(tx.Value()),
 				Currency: &common.Currency,
 			},
 			Metadata: map[string]interface{}{
-				"contract_address": contractAddr.String(),
+				"contract_address": contractAddressID,
 			},
 		},
 	}
@@ -976,23 +1051,29 @@ func TestNewContractCreationOperations(t *testing.T) {
 		Status:          hmytypes.ReceiptStatusFailed,
 		ContractAddress: contractAddr,
 	}
-	operations, rosettaError := newContractCreationOperations(startingOpID, tx, receipt)
+	operations, rosettaError := newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 
 	// Test successful contract creation
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = newContractCreationOperations(startingOpID, tx, receipt)
+	operations, rosettaError = newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -1006,7 +1087,7 @@ func TestNewAccountIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	metadata, err := rpc.NewStructuredResponse(AccountMetadata{Address: addr.String()})
+	metadata, err := types.MarshalMap(AccountMetadata{Address: addr.String()})
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
@@ -1024,13 +1105,45 @@ func TestNewAccountIdentifier(t *testing.T) {
 	}
 }
 
+func TestGetAddress(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+	b32Addr, err := internalCommon.AddressToBech32(addr)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	testAccID := &types.AccountIdentifier{
+		Address: b32Addr,
+	}
+
+	testAddr, err := getAddress(testAccID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if testAddr != addr {
+		t.Errorf("expected %v to be %v", testAddr.String(), addr.String())
+	}
+
+	defaultAddr := ethcommon.Address{}
+	testAddr, err = getAddress(nil)
+	if err == nil {
+		t.Error("expected err for nil identifier")
+	}
+	if testAddr != defaultAddr {
+		t.Errorf("expected errored addres to be %v not %v", defaultAddr.String(), testAddr.String())
+	}
+}
+
 func TestNewOperations(t *testing.T) {
 	accountID := &types.AccountIdentifier{
 		Address: "test-address",
 	}
 	gasFee := big.NewInt(int64(1e18))
 	amount := &types.Amount{
-		Value:    fmt.Sprintf("-%v", gasFee),
+		Value:    formatNegativeValue(gasFee),
 		Currency: &common.Currency,
 	}
 

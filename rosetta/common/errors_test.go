@@ -18,6 +18,8 @@ func TestErrorCodes(t *testing.T) {
 		BlockNotFoundError,
 		TransactionNotFoundError,
 		ReceiptNotFoundError,
+		UnsupportedCurveTypeError,
+		InvalidTransactionConstructionError,
 	}
 
 	for i, err := range errors {
@@ -40,6 +42,8 @@ func TestRetryableError(t *testing.T) {
 		BlockNotFoundError,
 		TransactionNotFoundError,
 		ReceiptNotFoundError,
+		UnsupportedCurveTypeError,
+		InvalidTransactionConstructionError,
 	}
 
 	for _, err := range retriableErrors {
@@ -52,5 +56,20 @@ func TestRetryableError(t *testing.T) {
 		if err.Retriable != false {
 			t.Errorf("Expected error code %v to not be retriable", err.Code)
 		}
+	}
+}
+
+func TestNewError(t *testing.T) {
+	testErr := NewError(CatchAllError, map[string]interface{}{
+		"message": "boom",
+	})
+	if testErr == &CatchAllError {
+		t.Fatal("expected return of a copy of error")
+	}
+	if testErr.Details == nil {
+		t.Fatal("suppose to have details")
+	}
+	if testErr.Details["trace"] == nil {
+		t.Error("expect trace")
 	}
 }

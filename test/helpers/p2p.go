@@ -3,6 +3,7 @@ package helpers
 import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
 	"github.com/pkg/errors"
@@ -25,8 +26,8 @@ var (
 
 func init() {
 	Hosts = []Host{
-		{IP: "127.0.0.1", Port: "9000"},
-		{IP: "8.8.8.8", Port: "9001"},
+		{IP: nodeconfig.DefaultLocalListenIP, Port: "9000"},
+		{IP: nodeconfig.DefaultLocalListenIP, Port: "9001"},
 	}
 
 	Topics = []string{

@@ -140,7 +140,7 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 func (s *PublicTransactionService) EstimateGas(
 	ctx context.Context, args CallArgs,
 ) (hexutil.Uint64, error) {
-	gas, err := doEstimateGas(ctx, s.hmy, args, nil)
+	gas, err := EstimateGas(ctx, s.hmy, args, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -689,8 +689,9 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 	return hashes[size*pageIndex : size*pageIndex+size]
 }
 
-// doEstimateGas ..
-func doEstimateGas(
+// EstimateGas ..
+// TODO: fix contract creation gas estimation, it currently underestimates.
+func EstimateGas(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int,
 ) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
@@ -725,7 +726,7 @@ func doEstimateGas(
 		args.Gas = (*hexutil.Uint64)(&gas)
 
 		result, err := doCall(ctx, hmy, args, blockNum, vm.Config{}, 0, big.NewInt(int64(max)))
-		if err != nil || result.VMErr == nil {
+		if err != nil || result.VMErr == vm.ErrCodeStoreOutOfGas || result.VMErr == vm.ErrOutOfGas {
 			return false
 		}
 		return true

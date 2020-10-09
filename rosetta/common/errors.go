@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/harmony-one/harmony/rpc"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 var (
@@ -63,12 +65,26 @@ var (
 		Message:   "receipt not found",
 		Retriable: false,
 	}
+
+	// UnsupportedCurveTypeError ..
+	UnsupportedCurveTypeError = types.Error{
+		Code:      8,
+		Message:   "unsupported curve type",
+		Retriable: false,
+	}
+
+	// InvalidTransactionConstructionError ..
+	InvalidTransactionConstructionError = types.Error{
+		Code:      9,
+		Message:   "invalid transaction construction",
+		Retriable: false,
+	}
 )
 
 // NewError create a new error with a given detail structure
 func NewError(rosettaError types.Error, detailStructure interface{}) *types.Error {
 	newError := rosettaError
-	details, err := rpc.NewStructuredResponse(detailStructure)
+	details, err := types.MarshalMap(detailStructure)
 	if err != nil {
 		newError.Details = map[string]interface{}{
 			"message": fmt.Sprintf("unable to get error details: %v", err.Error()),
@@ -76,5 +92,8 @@ func NewError(rosettaError types.Error, detailStructure interface{}) *types.Erro
 	} else {
 		newError.Details = details
 	}
+	newError.Details["trace"] = utils.GetCallStackInfo(2)
+	newError.Details["rosetta_version"] = RosettaVersion
+	newError.Details["node_version"] = nodeconfig.GetVersion()
 	return &newError
 }

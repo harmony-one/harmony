@@ -44,6 +44,7 @@ type networkConfig struct {
 
 type p2pConfig struct {
 	Port    int
+	IP      string
 	KeyFile string
 }
 
@@ -52,6 +53,7 @@ type generalConfig struct {
 	NoStaking  bool
 	ShardID    int
 	IsArchival bool
+	IsOffline  bool
 	DataDir    string
 }
 
@@ -160,6 +162,10 @@ func validateHarmonyConfig(config harmonyConfig) error {
 		return errors.New("flag --run.shard must be specified for explorer node")
 	}
 
+	if config.General.IsOffline && config.P2P.IP != nodeconfig.DefaultLocalListenIP {
+		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
+	}
+
 	return nil
 }
 
@@ -241,6 +247,9 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	// Correct for old config version load (port 0 is invalid anyways)
 	if config.HTTP.RosettaPort == 0 {
 		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
+	}
+	if config.P2P.IP == "" {
+		config.P2P.IP = defaultConfig.P2P.IP
 	}
 	return config, nil
 }

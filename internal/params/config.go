@@ -35,7 +35,7 @@ var (
 		RedelegationEpoch: big.NewInt(290),
 		EIP155Epoch:       big.NewInt(28),
 		S3Epoch:           big.NewInt(28),
-		IstanbulEpoch:     big.NewInt(10000000),
+		IstanbulEpoch:     big.NewInt(314),
 		ReceiptLogEpoch:   big.NewInt(101),
 	}
 

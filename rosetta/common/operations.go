@@ -1,10 +1,16 @@
 package common
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
+
+	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
+// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
 const (
 	// ExpendGasOperation ..
 	ExpendGasOperation = "Gas"
@@ -22,7 +28,7 @@ const (
 	GenesisFundsOperation = "Genesis"
 
 	// PreStakingBlockRewardOperation ..
-	PreStakingBlockRewardOperation = "PreOpenStakingBlockReward"
+	PreStakingBlockRewardOperation = "PreStakingBlockReward"
 
 	// UndelegationPayoutOperation ..
 	UndelegationPayoutOperation = "UndelegationPayout"
@@ -70,3 +76,41 @@ var (
 		Successful: false,
 	}
 )
+
+// CreateValidatorOperationMetadata ..
+type CreateValidatorOperationMetadata rpcV2.CreateValidatorMsg
+
+// EditValidatorOperationMetadata ..
+type EditValidatorOperationMetadata rpcV2.EditValidatorMsg
+
+// DelegateOperationMetadata ..
+type DelegateOperationMetadata rpcV2.DelegateMsg
+
+// UndelegateOperationMetadata ..
+type UndelegateOperationMetadata rpcV2.UndelegateMsg
+
+// CollectRewardsMetadata ..
+type CollectRewardsMetadata rpcV2.CollectRewardsMsg
+
+// CrossShardTransactionOperationMetadata ..
+type CrossShardTransactionOperationMetadata struct {
+	From *types.AccountIdentifier `json:"from"`
+	To   *types.AccountIdentifier `json:"to"`
+}
+
+// UnmarshalFromInterface ..
+func (s *CrossShardTransactionOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T CrossShardTransactionOperationMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+	if T.To == nil || T.From == nil {
+		return fmt.Errorf("expected to & from to be present for CrossShardTransactionOperationMetadata")
+	}
+	*s = T
+	return nil
+}
