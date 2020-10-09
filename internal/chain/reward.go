@@ -185,7 +185,7 @@ func AccumulateRewardsAndCountSigs(
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
-			return network.EmptyPayout, err
+			return network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
 		}
 		subComm := shard.Committee{shard.BeaconChainShardID, members}
 
@@ -291,7 +291,7 @@ func AccumulateRewardsAndCountSigs(
 					cxLink.Bitmap(), subComm,
 				)
 				if err != nil {
-					return network.EmptyPayout, err
+					return network.EmptyPayout, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
 				}
 
 				staked := subComm.StakedValidators()
