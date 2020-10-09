@@ -396,6 +396,9 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pIPFlag) {
 		config.P2P.IP = cli.GetStringFlagValue(cmd, p2pIPFlag)
 	}
+	if config.General.IsOffline {
+		config.P2P.IP = nodeconfig.DefaultLocalListenIP
+	}
 
 	if cli.IsFlagChanged(cmd, p2pKeyFileFlag) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, p2pKeyFileFlag)

@@ -162,6 +162,10 @@ func validateHarmonyConfig(config harmonyConfig) error {
 		return errors.New("flag --run.shard must be specified for explorer node")
 	}
 
+	if config.General.IsOffline && config.P2P.IP != nodeconfig.DefaultLocalListenIP {
+		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
+	}
+
 	return nil
 }
 

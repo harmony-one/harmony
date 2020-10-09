@@ -601,10 +601,6 @@ func (node *Node) Start() error {
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
-	if node.NodeConfig.IsOffline {
-		select {} // sleep until program is terminated
-	}
-
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
 		if err != nil {

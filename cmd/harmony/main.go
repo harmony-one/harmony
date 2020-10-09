@@ -178,10 +178,6 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 		return harmonyConfig{}, err
 	}
 
-	if config.General.IsOffline {
-		config.P2P.IP = nodeconfig.DefaultLocalListenIP
-	}
-
 	return config, nil
 }
 
