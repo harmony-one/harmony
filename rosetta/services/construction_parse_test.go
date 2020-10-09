@@ -50,8 +50,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	wrappedTransaction := &WrappedTransaction{
 		// RLP bytes should not be needed
 		// Is staking flag should not be needed
-		From:             refSenderID,
-		EstimatedGasUsed: testTx.Gas(),
+		From: refSenderID,
 	}
 	parsedResponse, rosettaError := parseUnsignedTransaction(
 		context.Background(), wrappedTransaction, refUnsignedTx,
@@ -110,8 +109,7 @@ func TestParseSignedTransaction(t *testing.T) {
 	wrappedTransaction := &WrappedTransaction{
 		// RLP bytes should not be needed
 		// Is staking flag should not be needed
-		From:             refSenderID,
-		EstimatedGasUsed: testTx.Gas(),
+		From: refSenderID,
 	}
 	parsedResponse, rosettaError := parseSignedTransaction(context.Background(), wrappedTransaction, testTx)
 	if rosettaError != nil {
@@ -138,8 +136,7 @@ func TestParseSignedTransaction(t *testing.T) {
 	wrappedTransaction = &WrappedTransaction{
 		// RLP bytes should not be needed
 		// Is staking flag should not be needed
-		From:             randomAccountID,
-		EstimatedGasUsed: testTx.Gas(),
+		From: randomAccountID,
 	}
 	_, rosettaError = parseSignedTransaction(context.Background(), wrappedTransaction, testTx)
 	if rosettaError == nil {

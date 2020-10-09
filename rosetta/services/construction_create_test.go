@@ -38,10 +38,9 @@ func TestUnpackWrappedTransactionFromString(t *testing.T) {
 		t.Fatal(err)
 	}
 	wrappedTransaction := WrappedTransaction{
-		RLPBytes:         buf.Bytes(),
-		From:             refAddrID,
-		EstimatedGasUsed: refEstGasUsed.Uint64(),
-		IsStaking:        false,
+		RLPBytes:  buf.Bytes(),
+		From:      refAddrID,
+		IsStaking: false,
 	}
 	marshalledBytes, err := json.Marshal(wrappedTransaction)
 	if err != nil {

@@ -23,10 +23,9 @@ const (
 // WrappedTransaction is a wrapper for a transaction that includes all relevant
 // data to parse a transaction.
 type WrappedTransaction struct {
-	RLPBytes         []byte                   `json:"rlp_bytes"`
-	IsStaking        bool                     `json:"is_staking"`
-	From             *types.AccountIdentifier `json:"from"`
-	EstimatedGasUsed uint64                   `json:"estimated_gas_used"`
+	RLPBytes  []byte                   `json:"rlp_bytes"`
+	IsStaking bool                     `json:"is_staking"`
+	From      *types.AccountIdentifier `json:"from"`
 }
 
 // unpackWrappedTransactionFromString ..
@@ -133,10 +132,9 @@ func (s *ConstructAPI) ConstructionPayloads(
 		})
 	}
 	wrappedTxMarshalledBytes, err := json.Marshal(WrappedTransaction{
-		RLPBytes:         buf.Bytes(),
-		From:             senderID,
-		EstimatedGasUsed: metadata.GasLimit,
-		IsStaking:        components.IsStaking(),
+		RLPBytes:  buf.Bytes(),
+		From:      senderID,
+		IsStaking: components.IsStaking(),
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
