@@ -2219,13 +2219,6 @@ func (bc *BlockChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
-// ChainDB ...
-// TODO(ricl): in eth, this is not exposed. I expose it here because I need it in Harmony object.
-// In eth, chainDB is initialized within Ethereum object
-func (bc *BlockChain) ChainDB() ethdb.Database {
-	return bc.db
-}
-
 // GetVMConfig returns the block chain VM config.
 func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
