@@ -148,21 +148,21 @@ func TestEvenNodes(t *testing.T) {
 	sign(stakedVote, sKeys[reg], Prepare)
 	achieved := stakedVote.IsQuorumAchieved(Prepare)
 	if achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: false (All Staker nodes = 32%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: false (All Staker nodes = 32%%)",
 			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys[reg], Commit)
 	achieved = stakedVote.IsQuorumAchieved(Commit)
 	if achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: false (All Staker nodes = 32%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: false (All Staker nodes = 32%%)",
 			Commit, strconv.FormatBool(achieved))
 	}
 	// ViewChange
 	sign(stakedVote, sKeys[reg], ViewChange)
 	achieved = stakedVote.IsQuorumAchieved(ViewChange)
 	if achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, Got: %s, Expected: false (All Staker nodes = 32%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, Got: %s, Expected: false (All Staker nodes = 32%%)",
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
@@ -176,21 +176,21 @@ func TestEvenNodes(t *testing.T) {
 	sign(stakedVote, sKeys[hmy], Prepare)
 	achieved = stakedVote.IsQuorumAchieved(Prepare)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All nodes = 100%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: true (All nodes = 100%%)",
 			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys[hmy], Commit)
 	achieved = stakedVote.IsQuorumAchieved(Commit)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All nodes = 100%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: true (All nodes = 100%%)",
 			Commit, strconv.FormatBool(achieved))
 	}
 	// ViewChange
 	sign(stakedVote, sKeys[hmy], ViewChange)
 	achieved = stakedVote.IsQuorumAchieved(ViewChange)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, Got: %s, Expected: true (All nodes = 100%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, Got: %s, Expected: true (All nodes = 100%%)",
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold
@@ -215,21 +215,21 @@ func Test33HarmonyNodes(t *testing.T) {
 	sign(stakedVote, sKeys, Prepare)
 	achieved := stakedVote.IsQuorumAchieved(Prepare)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All Harmony nodes = 68%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: true (All Harmony nodes = 68%%)",
 			Prepare, strconv.FormatBool(achieved))
 	}
 	// Commit
 	sign(stakedVote, sKeys, Commit)
 	achieved = stakedVote.IsQuorumAchieved(Commit)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, QuorumAchieved: %s, Expected: true (All Harmony nodes = 68%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, QuorumAchieved: %s, Expected: true (All Harmony nodes = 68%%)",
 			Commit, strconv.FormatBool(achieved))
 	}
 	// ViewChange
 	sign(stakedVote, sKeys, ViewChange)
 	achieved = stakedVote.IsQuorumAchieved(ViewChange)
 	if !achieved {
-		t.Errorf("[IsQuorumAchieved] Phase: %s, Got: %s, Expected: true (All Harmony nodes = 68%%)",
+		t.Errorf("[IsQuorumAchieved] MessageType: %s, Got: %s, Expected: true (All Harmony nodes = 68%%)",
 			ViewChange, strconv.FormatBool(achieved))
 	}
 	// RewardThreshold

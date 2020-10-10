@@ -123,8 +123,8 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
-	// Temporary flag to control whether multi-sig signing is enabled
-	MultiSig bool
+	// Temporary flag to control whether aggregate signature signing is enabled
+	AggregateSig bool
 
 	// TODO (leo): an new metrics system to keep track of the consensus/viewchange
 	// finality of previous consensus in the unit of milliseconds

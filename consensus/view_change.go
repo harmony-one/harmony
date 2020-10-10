@@ -133,7 +133,7 @@ func (consensus *Consensus) GetNextLeaderKey() *bls.PublicKeyWrapper {
 // ResetViewChangeState reset the state for viewchange
 func (consensus *Consensus) ResetViewChangeState() {
 	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
+		Str("MessageType", consensus.phase.String()).
 		Msg("[ResetViewChangeState] Resetting view change state")
 	consensus.current.SetMode(Normal)
 	consensus.m1Payload = []byte{}

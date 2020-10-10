@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Phase is a phase that needs quorum to proceed
+// MessageType is a phase that needs quorum to proceed
 type Phase byte
 
 const (
@@ -41,7 +41,7 @@ func (p Phase) String() string {
 	if name, ok := phaseNames[p]; ok {
 		return name
 	}
-	return fmt.Sprintf("Unknown Quorum Phase %+v", byte(p))
+	return fmt.Sprintf("Unknown Quorum MessageType %+v", byte(p))
 }
 
 // Policy is the rule we used to decide is quorum achieved

@@ -19,7 +19,7 @@ import (
 // created only for distribution to
 // all the other quorum members.
 type NetworkMessage struct {
-	Phase                      msg_pb.MessageType
+	MessageType                msg_pb.MessageType
 	Bytes                      []byte
 	FBFTMsg                    *FBFTMessage
 	OptionalAggregateSignature *bls_core.Sign
@@ -165,7 +165,7 @@ func (consensus *Consensus) construct(
 	}
 
 	return &NetworkMessage{
-		Phase:                      p,
+		MessageType:                p,
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
 		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: aggSig,

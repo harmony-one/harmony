@@ -76,7 +76,7 @@ func (consensus *Consensus) prepare() {
 	consensus.getLogger().Debug().
 		Str("From", consensus.phase.String()).
 		Str("To", FBFTPrepare.String()).
-		Msg("[Announce] Switching Phase")
+		Msg("[Announce] Switching MessageType")
 	consensus.switchPhase(FBFTPrepare, true)
 }
 
@@ -312,7 +312,7 @@ func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
 
 func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper) []*NetworkMessage {
 	p2pMsgs := []*NetworkMessage{}
-	if consensus.MultiSig {
+	if consensus.AggregateSig {
 		networkMessage, err := consensus.construct(msgType, payloadForSign, priKeys)
 		if err != nil {
 			consensus.getLogger().Err(err).

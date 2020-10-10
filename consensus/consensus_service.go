@@ -151,7 +151,7 @@ func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls_core.Sign {
 // UpdateBitmaps update the bitmaps for prepare and commit phase
 func (consensus *Consensus) UpdateBitmaps() {
 	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
+		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
@@ -167,7 +167,7 @@ func (consensus *Consensus) UpdateBitmaps() {
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
+		Str("MessageType", consensus.phase.String()).
 		Msg("[ResetState] Resetting consensus state")
 	consensus.switchPhase(FBFTAnnounce, true)
 	consensus.blockHash = [32]byte{}
@@ -344,7 +344,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	// TODO: remove once multisig is fully upgraded in the network
 	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
-		consensus.MultiSig = true
+		consensus.AggregateSig = true
 	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
