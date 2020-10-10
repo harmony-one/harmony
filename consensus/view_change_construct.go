@@ -186,7 +186,10 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 
 	_, ok = vc.newViewMsg[recvMsg.ViewID][senderKeyStr]
 	if ok {
-		return nil, errors.New("[VerifyNewViewMsg] received new view message already")
+		vc.getLogger().Warn().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("MyBlockNum", vc.newViewMsg[recvMsg.ViewID][senderKeyStr]).
+			Msg("[VerifyNewViewMsg] redundant NewView Message")
 	}
 
 	vc.newViewMsg[recvMsg.ViewID][senderKeyStr] = recvMsg.BlockNum
