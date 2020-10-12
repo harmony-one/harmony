@@ -244,19 +244,6 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 	return msgs[maxIdx]
 }
 
-// FindMessageByViewID returns the mesasge with matching view ID
-func (log *FBFTLog) FindMessageByViewID(msgs []*FBFTMessage, viewID uint64) *FBFTMessage {
-	if len(msgs) == 0 {
-		return nil
-	}
-	for k, v := range msgs {
-		if v.ViewID == viewID {
-			return msgs[k]
-		}
-	}
-	return nil
-}
-
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
 func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	// TODO Have this do sanity checks on the message please
