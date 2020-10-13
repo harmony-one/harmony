@@ -19,7 +19,7 @@ docker run -d -p 9700:9700 -v "$(pwd)/data:/root/data" harmony-rosetta --run.sha
 > This command will create the container of the harmony node on shard 0 in the detached mode, 
 > binding port 9700 (the rosetta port) on the container to the host and mounting the shared 
 > `./data` directory on the host to `/root/data` on the container. Note that the container
-> uses `/root/data` for all data storage.
+> uses `/root/data` for all data storage (this is where the `harmony_db_*` directories will be stored).
 
 You can view your container with the following command:
 ```bash
@@ -88,6 +88,36 @@ the host port to the container's rpc server port.
 ```bash
 docker run -d -p 9700:9700 -p 9800:9900 -v "$(pwd)/data:/root/data" harmony-rosetta --run.shard=0 -n testnet --ws
 ```
+
+### Running the node in non-archival mode
+One can append `--run.archive=false` to the docker run command to run the node in non-archival mode. For example:
+```bash 
+docker run -d -p 9700:9700 -v "$(pwd)/data:/root/data" harmony-rosetta --run.shard=0 -n testnet --run.archive=false
+```
+
+### Running a node with a rcloned DB
+Note that all node data will be stored in the `/root/data` directory within the container. Therefore, you can rclone
+the `harmony_db_*` directory to some directory (i.e: `./data`) and mount the volume on the docker run. 
+This way, the node will use DB in the volume that is shared between the container and host. For example: 
+```bash 
+docker run -d -p 9700:9700 -v "$(pwd)/data:/root/data" harmony-rosetta --run.shard=0
+```
+
+Note that the directory structure for `/root/data` (== `./data`) should look something like:
+```
+.
+├── explorer_storage_127.0.0.1_9000
+├── harmony_db_0
+├── harmony_db_1
+├── logs
+│    ├── node_execution.log
+│    └── zerolog-harmony.log
+└── transactions.rlp
+``` 
+
+### Inspecting Logs
+If you mount `./data` on the host to `/root/data` in the container, you van view the harmony node logs at
+`./data/logs/` on your host machine.
 
 ### View rosetta request logs
 You can view all the rosetta endpoint requests with the following command:
