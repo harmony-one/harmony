@@ -26,13 +26,4 @@ RUN rm -rf *
 WORKDIR /root
 
 COPY run.sh run.sh
-#ENTRYPOINT ["/bin/bash","/root/run.sh"]
-
-
-
-
-
-
-
-
-
+ENTRYPOINT ["/bin/bash","/root/run.sh"]
