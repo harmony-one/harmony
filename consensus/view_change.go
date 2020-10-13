@@ -157,11 +157,16 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 			continue
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
-		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
+		if err := consensus.msgSender.SendWithRetry(
+			consensus.blockNum,
+			msg_pb.MessageType_VIEWCHANGE,
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
 			p2p.ConstructMessage(msgToSend),
-		)
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("could not send out the ViewChange message")
+		}
 	}
 }
 
