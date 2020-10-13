@@ -309,8 +309,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// TODO: remove once multisig is fully upgraded in the network
-	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
+	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
+	if (consensus.ChainReader.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
+		(consensus.ChainReader.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(53000)) > 0) ||
+		(consensus.ChainReader.Config().ChainID != params.MainnetChainID && consensus.ChainReader.Config().ChainID != params.TestChainID) {
 		consensus.AggregateSig = true
 	}
 
