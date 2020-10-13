@@ -16,7 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MessageType is a phase that needs quorum to proceed
+// Phase is a phase that needs quorum to proceed
 type Phase byte
 
 const (
@@ -253,7 +253,13 @@ func (s *cIdentities) SubmitVote(
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
+	seenKeys := map[bls.SerializedPublicKey]struct{}{}
 	for _, pubKey := range pubkeys {
+		if _, ok := seenKeys[pubKey]; ok {
+			return nil, errors.Errorf("duplicate key found in votes %x", pubKey)
+		}
+		seenKeys[pubKey] = struct{}{}
+
 		if ballet := s.ReadBallot(p, pubKey); ballet != nil {
 			return nil, errors.Errorf("vote is already submitted %x", pubKey)
 		}
