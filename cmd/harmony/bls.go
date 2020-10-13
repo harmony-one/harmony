@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/multibls"
@@ -25,7 +27,19 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 			os.Exit(100)
 		}
 	})
-	config.ConsensusPriKey = multiBLSPriKey
+
+	// Dedup private keys
+	uniqueKeys := map[bls.SerializedPublicKey]struct{}{}
+	deduped := multibls.PrivateKeys{}
+	for _, priKey := range multiBLSPriKey {
+		if _, ok := uniqueKeys[priKey.Pub.Bytes]; ok {
+			continue
+		}
+		uniqueKeys[priKey.Pub.Bytes] = struct{}{}
+		deduped = append(deduped, priKey)
+	}
+
+	config.ConsensusPriKey = deduped
 	return multiBLSPriKey.GetPublicKeys()
 }
 

@@ -7,7 +7,7 @@ import (
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/configs/sharding"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
 
@@ -477,5 +477,56 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	}
 	if decider.SignersCount(Prepare) != 4 {
 		test.Errorf("signers are incorrect for harmony nodes signing with aggregate sig: have %d, expect %d", decider.SignersCount(Prepare), 4)
+	}
+}
+
+func TestInvalidAggregateSig(test *testing.T) {
+	shard.Schedule = shardingconfig.LocalnetSchedule
+	blockHash := [32]byte{}
+	copy(blockHash[:], []byte("random"))
+
+	slotList := shard.SlotList{}
+	sKeys := []bls_core.SecretKey{}
+	pubKeys := []bls.PublicKeyWrapper{}
+
+	quorumNodes := 8
+
+	for i := 0; i < quorumNodes; i++ {
+		newSlot, sKey := generateRandomSlot()
+		if i < 3 {
+			newSlot.EffectiveStake = nil
+		}
+		sKeys = append(sKeys, sKey)
+		slotList = append(slotList, newSlot)
+		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		pubKeys = append(pubKeys, wrapper)
+	}
+
+	aggSig := &bls_core.Sign{}
+	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2], &sKeys[2]} {
+		if s := priKey.SignHash(blockHash[:]); s != nil {
+			aggSig.Add(s)
+		}
+	}
+
+	aggPubKey := &bls_core.PublicKey{}
+
+	for _, priKey := range []*bls_core.PublicKey{pubKeys[0].Object, pubKeys[1].Object, pubKeys[2].Object} {
+		aggPubKey.Add(priKey)
+	}
+
+	if aggSig.VerifyHash(aggPubKey, blockHash[:]) {
+		test.Error("Expect aggregate signature verification to fail due to duplicate signing from one key")
+	}
+
+	aggSig = &bls_core.Sign{}
+	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2]} {
+		if s := priKey.SignHash(blockHash[:]); s != nil {
+			aggSig.Add(s)
+		}
+	}
+	if !aggSig.VerifyHash(aggPubKey, blockHash[:]) {
+		test.Error("Expect aggregate signature verification to succeed with correctly matched keys and sigs")
 	}
 }
