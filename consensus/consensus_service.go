@@ -95,9 +95,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
-	consensus.vcLock.Lock()
 	consensus.ResetViewChangeState()
-	consensus.vcLock.Unlock()
 	return consensus.Decider.ParticipantsCount()
 }
 
@@ -127,24 +125,6 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 	return nil
 }
 
-// GetViewIDSigsArray returns the signatures for viewID in viewchange
-func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls_core.Sign {
-	sigs := []*bls_core.Sign{}
-	for _, sig := range consensus.viewIDSigs[viewID] {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
-// GetNilSigsArray returns the signatures for nil prepared message in viewchange
-func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls_core.Sign {
-	sigs := []*bls_core.Sign{}
-	for _, sig := range consensus.nilSigs[viewID] {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
 // UpdateBitmaps update the bitmaps for prepare and commit phase
 func (consensus *Consensus) UpdateBitmaps() {
 	consensus.getLogger().Debug().
@@ -159,10 +139,7 @@ func (consensus *Consensus) UpdateBitmaps() {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
-		Msg("[ResetState] Resetting consensus state")
-	consensus.switchPhase(FBFTAnnounce, true)
+	consensus.switchPhase("ResetState", FBFTAnnounce)
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
@@ -248,17 +225,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, members,
 	)
-}
-
-// getLogger returns logger for consensus contexts added
-func (consensus *Consensus) getLogger() *zerolog.Logger {
-	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.GetCurBlockViewID()).
-		Interface("phase", consensus.phase).
-		Str("mode", consensus.current.Mode().String()).
-		Logger()
-	return &logger
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
@@ -494,31 +460,6 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 	return false
 }
 
-func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
-	members := consensus.Decider.Participants()
-	if _, ok := consensus.bhpSigs[viewID]; !ok {
-		consensus.bhpSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.nilSigs[viewID]; !ok {
-		consensus.nilSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.viewIDSigs[viewID]; !ok {
-		consensus.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.bhpBitmap[viewID]; !ok {
-		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.bhpBitmap[viewID] = bhpBitmap
-	}
-	if _, ok := consensus.nilBitmap[viewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.nilBitmap[viewID] = nilBitmap
-	}
-	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.viewIDBitmap[viewID] = viewIDBitmap
-	}
-}
-
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
@@ -550,4 +491,26 @@ func (consensus *Consensus) FinishFinalityCount() {
 // GetFinality returns the finality time in milliseconds of previous consensus
 func (consensus *Consensus) GetFinality() int64 {
 	return consensus.finality
+}
+
+// switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
+func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
+	consensus.getLogger().Info().
+		Str("from:", consensus.phase.String()).
+		Str("to:", desired.String()).
+		Str("switchPhase:", subject)
+
+	consensus.phase = desired
+	return
+}
+
+// getLogger returns logger for consensus contexts added
+func (consensus *Consensus) getLogger() *zerolog.Logger {
+	logger := utils.Logger().With().
+		Uint64("myBlock", consensus.blockNum).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
+		Str("phase", consensus.phase.String()).
+		Str("mode", consensus.current.Mode().String()).
+		Logger()
+	return &logger
 }

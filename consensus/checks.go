@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	protobuf "github.com/golang/protobuf/proto"
 	libbls "github.com/harmony-one/bls/ffi/go/bls"
@@ -165,7 +166,8 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MyViewChangingID", consensus.GetViewChangingID()).
 		Uint64("MsgViewChangingID", recvMsg.ViewID).
-		Msg("onViewChange")
+		Str("SendPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
+		Msg("[onViewChangeSanityCheck]")
 
 	if consensus.blockNum > recvMsg.BlockNum {
 		consensus.getLogger().Debug().
@@ -174,18 +176,28 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 	if consensus.blockNum < recvMsg.BlockNum {
 		consensus.getLogger().Warn().
-			Msg("[onViewChange] New Leader Has Lower Blocknum")
+			Msg("[onViewChangeSanityCheck] MsgBlockNum is different from my BlockNumber")
 		return false
 	}
 	if consensus.IsViewChangingMode() &&
-		consensus.GetViewChangingID() > recvMsg.ViewID {
+		consensus.GetCurBlockViewID() > recvMsg.ViewID {
 		consensus.getLogger().Warn().
-			Msg("[onViewChange] ViewChanging ID Is Low")
+			Msg("[onViewChangeSanityCheck] ViewChanging ID Is Low")
 		return false
 	}
 	if recvMsg.ViewID-consensus.GetViewChangingID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
-			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
+			Msg("[onViewChangeSanityCheck] Received viewID that is MaxViewIDDiff (249) further from the current viewID!")
+		return false
+	}
+	senderKey := recvMsg.SenderPubkey
+
+	viewIDHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDHash, recvMsg.ViewID)
+	if !recvMsg.ViewidSig.VerifyHash(senderKey.Object, viewIDHash) {
+		consensus.getLogger().Warn().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Msg("[onViewChangeSanityCheck] Failed to Verify viewID Signature")
 		return false
 	}
 	return true
