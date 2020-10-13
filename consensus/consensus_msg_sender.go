@@ -13,7 +13,7 @@ import (
 
 const (
 	// RetryIntervalInSec is the interval for message retry
-	RetryIntervalInSec = 10
+	RetryIntervalInSec = 7
 )
 
 // MessageSender is the wrapper object that controls how a consensus message is sent

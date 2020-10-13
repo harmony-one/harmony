@@ -73,11 +73,7 @@ func (consensus *Consensus) prepare() {
 			Msg("[OnAnnounce] Sent Prepare Message!!")
 	}
 
-	consensus.getLogger().Debug().
-		Str("From", consensus.phase.String()).
-		Str("To", FBFTPrepare.String()).
-		Msg("[Announce] Switching MessageType")
-	consensus.switchPhase(FBFTPrepare, true)
+	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 // if onPrepared accepts the prepared message from the leader, then
@@ -210,11 +206,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Msg("[OnPrepared] Sent Commit Message!!")
 	}
 
-	consensus.getLogger().Debug().
-		Str("From", consensus.phase.String()).
-		Str("To", FBFTCommit.String()).
-		Msg("[OnPrepared] Switching phase")
-	consensus.switchPhase(FBFTCommit, true)
+	consensus.switchPhase("onPrepared", FBFTCommit)
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
