@@ -11,10 +11,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -27,6 +29,46 @@ type CallArgs struct {
 	GasPrice *hexutil.Big    `json:"gasPrice"`
 	Value    *hexutil.Big    `json:"value"`
 	Data     *hexutil.Bytes  `json:"data"`
+}
+
+// Adapted from go-ethereum/internal/ethapi/api.go
+// ToMessage converts CallArgs to the Message type used by the core evm
+func (args *CallArgs) ToMessage(globalGasCap *big.Int) types.Message {
+	// Set sender address or use zero address if none specified.
+	var addr common.Address
+	if args.From != nil {
+		addr = *args.From
+	}
+
+	// Set default gas & gas price if none were set
+	gas := uint64(math.MaxUint64 / 2)
+	if args.Gas != nil {
+		gas = uint64(*args.Gas)
+	}
+	if globalGasCap != nil && globalGasCap.Uint64() < gas {
+		utils.Logger().Warn().
+			Uint64("requested", gas).
+			Uint64("cap", globalGasCap.Uint64()).
+			Msg("Caller gas above allowance, capping")
+		gas = globalGasCap.Uint64()
+	}
+	gasPrice := new(big.Int)
+	if args.GasPrice != nil {
+		gasPrice = args.GasPrice.ToInt()
+	}
+
+	value := new(big.Int)
+	if args.Value != nil {
+		value = args.Value.ToInt()
+	}
+
+	var data []byte
+	if args.Data != nil {
+		data = []byte(*args.Data)
+	}
+
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, false)
+	return msg
 }
 
 // StakingNetworkInfo returns global staking info.
