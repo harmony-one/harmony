@@ -92,7 +92,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
 			} else {
-				consensus.startViewChange(consensus.GetCurBlockViewID() + 1)
+				consensus.startViewChange(consensus.GetCurBlockViewID())
 			}
 		}
 		consensus.getLogger().Debug().
