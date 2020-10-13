@@ -436,6 +436,13 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	if decider.SignersCount(Prepare) != 2 {
 		test.Errorf("signers are incorrect for harmony nodes signing with aggregate sig: have %d, expect %d", decider.SignersCount(Prepare), 2)
 	}
+
+	aggSig = &bls_core.Sign{}
+	for _, priKey := range []*bls_core.SecretKey{&sKeys[3], &sKeys[4]} {
+		if s := priKey.SignHash(blockHash[:]); s != nil {
+			aggSig.Add(s)
+		}
+	}
 	// aggregate sig from all of 2 external nodes
 	_, err := decider.AddNewVote(Prepare,
 		[]*bls.PublicKeyWrapper{&pubKeys[3], &pubKeys[4]},
@@ -449,6 +456,16 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	}
 	if decider.SignersCount(Prepare) != 4 {
 		test.Errorf("signers are incorrect for harmony nodes signing with aggregate sig: have %d, expect %d", decider.SignersCount(Prepare), 4)
+	}
+
+	// Aggregate Vote should only contain sig from 0, 1, 3, 4
+	fourSigs := decider.AggregateVotes(Prepare)
+	aggPubKey := &bls_core.PublicKey{}
+	for _, priKey := range []*bls_core.PublicKey{pubKeys[0].Object, pubKeys[1].Object, pubKeys[3].Object, pubKeys[4].Object} {
+		aggPubKey.Add(priKey)
+	}
+	if !fourSigs.VerifyHash(aggPubKey, blockHash[:]) {
+		test.Error("Failed to aggregate votes for 4 keys from 2 aggregate sigs")
 	}
 
 	_, err = decider.AddNewVote(Prepare,

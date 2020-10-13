@@ -41,7 +41,7 @@ func (p Phase) String() string {
 	if name, ok := phaseNames[p]; ok {
 		return name
 	}
-	return fmt.Sprintf("Unknown Quorum MessageType %+v", byte(p))
+	return fmt.Sprintf("Unknown Quorum Phase %+v", byte(p))
 }
 
 // Policy is the rule we used to decide is quorum achieved
