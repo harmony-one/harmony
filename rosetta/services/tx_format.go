@@ -33,7 +33,7 @@ func FormatTransaction(
 	case *stakingTypes.StakingTransaction:
 		isStaking = true
 		stakingTx := tx.(*stakingTypes.StakingTransaction)
-		operations, rosettaError = GetStakingOperations(stakingTx, receipt)
+		operations, rosettaError = GetOperationsFromStakingTransaction(stakingTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -42,7 +42,7 @@ func FormatTransaction(
 	case *hmytypes.Transaction:
 		isStaking = false
 		plainTx := tx.(*hmytypes.Transaction)
-		operations, rosettaError = GetOperations(plainTx, receipt)
+		operations, rosettaError = GetOperationsFromTransaction(plainTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}

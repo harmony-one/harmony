@@ -15,9 +15,9 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-// GetOperations for one of the following transactions:
+// GetOperationsFromTransaction for one of the following transactions:
 // contract creation, cross-shard sender, same-shard transfer
-func GetOperations(
+func GetOperationsFromTransaction(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
@@ -55,8 +55,8 @@ func GetOperations(
 	return append(gasOperations, txOperations...), nil
 }
 
-// GetStakingOperations for all staking directives
-func GetStakingOperations(
+// GetOperationsFromStakingTransaction for all staking directives
+func GetOperationsFromStakingTransaction(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
