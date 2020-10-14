@@ -172,6 +172,9 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 
 // stopViewChange stops the current view change
 func (consensus *Consensus) stopViewChange(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper) error {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	msgToSend := consensus.constructNewViewMessage(
 		viewID, newLeaderPriKey,
 	)
@@ -379,6 +382,9 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.getLogger().Info().Msg("Not in ViewChanging Mode.")
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 
