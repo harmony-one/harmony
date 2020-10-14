@@ -25,7 +25,7 @@ func NewMempoolAPI(hmy *hmy.Harmony) server.MempoolAPIServicer {
 	}
 }
 
-// Mempool ...
+// Mempool implements the /mempool endpoint.
 func (s *MempoolAPI) Mempool(
 	ctx context.Context, req *types.NetworkRequest,
 ) (*types.MempoolResponse, *types.Error) {
@@ -50,7 +50,7 @@ func (s *MempoolAPI) Mempool(
 	}, nil
 }
 
-// MempoolTransaction ...
+// MempoolTransaction implements the /mempool/transaction endpoint.
 func (s *MempoolAPI) MempoolTransaction(
 	ctx context.Context, req *types.MempoolTransactionRequest,
 ) (*types.MempoolTransactionResponse, *types.Error) {
@@ -84,7 +84,7 @@ func (s *MempoolAPI) MempoolTransaction(
 		GasUsed:           poolTx.Gas(),
 	}
 
-	respTx, err := formatTransaction(poolTx, estReceipt)
+	respTx, err := FormatTransaction(poolTx, estReceipt)
 	if err != nil {
 		return nil, err
 	}
