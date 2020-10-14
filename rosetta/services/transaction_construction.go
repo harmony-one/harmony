@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -10,6 +11,30 @@ import (
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
+
+// TransactionMetadata contains all (optional) information for a transaction.
+type TransactionMetadata struct {
+	// CrossShardIdentifier is the transaction identifier on the from/source shard
+	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
+	ToShardID            *uint32                      `json:"to_shard,omitempty"`
+	FromShardID          *uint32                      `json:"from_shard,omitempty"`
+	Data                 *string                      `json:"data,omitempty"`
+	Logs                 []*hmyTypes.Log              `json:"logs,omitempty"`
+}
+
+// UnmarshalFromInterface ..
+func (t *TransactionMetadata) UnmarshalFromInterface(metaData interface{}) error {
+	var args TransactionMetadata
+	dat, err := json.Marshal(metaData)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &args); err != nil {
+		return err
+	}
+	*t = args
+	return nil
+}
 
 // ConstructTransaction object (unsigned).
 // TODO (dm): implement staking transaction construction
