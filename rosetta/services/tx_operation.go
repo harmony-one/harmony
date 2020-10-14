@@ -22,7 +22,7 @@ func GetOperationsFromTransaction(
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
-		senderAddress = DefaultSenderAddress
+		senderAddress = FormatDefaultSenderAddress
 	}
 	accountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
@@ -61,7 +61,7 @@ func GetOperationsFromStakingTransaction(
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
-		senderAddress = DefaultSenderAddress
+		senderAddress = FormatDefaultSenderAddress
 	}
 	accountID, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {

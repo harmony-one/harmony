@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	// DefaultSenderAddress ..
-	DefaultSenderAddress = ethcommon.HexToAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
+	// FormatDefaultSenderAddress ..
+	FormatDefaultSenderAddress = ethcommon.HexToAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 )
 
 // FormatTransaction for staking, cross-shard sender, and plain transactions

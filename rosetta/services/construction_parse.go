@@ -45,7 +45,7 @@ func parseUnsignedTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	tempAccID, rosettaError := newAccountIdentifier(DefaultSenderAddress)
+	tempAccID, rosettaError := newAccountIdentifier(FormatDefaultSenderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
