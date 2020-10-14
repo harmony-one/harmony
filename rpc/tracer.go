@@ -772,7 +772,11 @@ func (s *PrivateDebugService) traceTx(ctx context.Context, message core.Message,
 		err    error
 	)
 
-	tracer = vm.NewStructLogger(config.LogConfig)
+	if config == nil {
+		tracer = vm.NewStructLogger(nil)
+	} else {
+		tracer = vm.NewStructLogger(config.LogConfig)
+	}
 
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, statedb, s.hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
