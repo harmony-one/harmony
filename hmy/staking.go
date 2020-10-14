@@ -133,6 +133,14 @@ func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
 	return hmy.BlockChain.Config().IsPreStaking(epoch)
 }
 
+// IsCommitteeSelectionBlock checks if the given block is the committee selection block
+func (hmy *Harmony) IsCommitteeSelectionBlock(blk *types.Block) bool {
+	isBeaconChain := blk.ShardID() == shard.BeaconChainShardID
+	isNewEpoch := len(blk.Header().ShardState()) > 0
+	inPreStakingEra := hmy.IsPreStakingEpoch(blk.Epoch())
+	return isBeaconChain && isNewEpoch && inPreStakingEra
+}
+
 // GetDelegationLockingPeriodInEpoch ...
 func (hmy *Harmony) GetDelegationLockingPeriodInEpoch(epoch *big.Int) int {
 	return chain.GetLockPeriodInEpoch(hmy.BlockChain, epoch)
