@@ -89,6 +89,41 @@ func (consensus *Consensus) prepare() {
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
+// sendCommitMessages send out commit messages to leader
+func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
+	// Sign commit signature on the received block
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+	groupID := []nodeconfig.GroupID{
+		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+	}
+	for _, key := range consensus.priKey {
+		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+			continue
+		}
+
+		networkMessage, _ := consensus.construct(
+			msg_pb.MessageType_COMMIT,
+			commitPayload,
+			&key,
+		)
+
+		if consensus.current.Mode() != Listening {
+			if err := consensus.msgSender.SendWithoutRetry(
+				groupID,
+				p2p.ConstructMessage(networkMessage.Bytes),
+			); err != nil {
+				consensus.getLogger().Warn().Msg("[sendCommitMessages] Cannot send commit message!!")
+			} else {
+				consensus.getLogger().Info().
+					Uint64("blockNum", consensus.blockNum).
+					Hex("blockHash", consensus.blockHash[:]).
+					Msg("[sendCommitMessages] Sent Commit Message!!")
+			}
+		}
+	}
+}
+
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
@@ -202,38 +237,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
-
-	// Sign commit signature on the received block
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
-	groupID := []nodeconfig.GroupID{
-		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-	}
-	for _, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
-			continue
-		}
-
-		networkMessage, _ := consensus.construct(
-			msg_pb.MessageType_COMMIT,
-			commitPayload,
-			&key,
-		)
-
-		if consensus.current.Mode() != Listening {
-			if err := consensus.msgSender.SendWithoutRetry(
-				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
-			); err != nil {
-				consensus.getLogger().Warn().Msg("[OnPrepared] Cannot send commit message!!")
-			} else {
-				consensus.getLogger().Info().
-					Uint64("blockNum", consensus.blockNum).
-					Hex("blockHash", consensus.blockHash[:]).
-					Msg("[OnPrepared] Sent Commit Message!!")
-			}
-		}
-	}
+	consensus.sendCommitMessages(&blockObj)
 	consensus.switchPhase("onPrepared", FBFTCommit)
 }
 
