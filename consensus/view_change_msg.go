@@ -106,7 +106,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		Type:        msg_pb.MessageType_NEWVIEW,
 		Request: &msg_pb.Message_Viewchange{
 			Viewchange: &msg_pb.ViewChangeRequest{
-				ViewId:       consensus.GetViewChangingID(),
+				ViewId:       viewID,
 				BlockNum:     consensus.blockNum,
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
