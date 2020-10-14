@@ -230,8 +230,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 
 	// received enough view change messages, change state to normal consensus
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
-		consensus.getLogger().Info().Msg("[onViewChange] View Change Message Quorum Reached")
 		consensus.current.SetMode(Normal)
+		consensus.getLogger().Info().Msg("[onViewChange] View Change Message Quorum Reached")
 		consensus.LeaderPubKey = newLeaderKey
 		consensus.ResetState()
 		if consensus.vc.IsM1PayloadEmpty() {
