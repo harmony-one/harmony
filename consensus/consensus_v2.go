@@ -43,6 +43,13 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		return nil
 	}
 
+	// when node is not in ViewChanging mode, ignore viewchange / newview messages
+	if !consensus.IsViewChangingMode() &&
+		(msg.Type == msg_pb.MessageType_VIEWCHANGE ||
+			msg.Type == msg_pb.MessageType_NEWVIEW) {
+		return nil
+	}
+
 	intendedForValidator, intendedForLeader :=
 		!consensus.IsLeader(),
 		consensus.IsLeader()
