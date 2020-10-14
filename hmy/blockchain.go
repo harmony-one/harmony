@@ -85,7 +85,7 @@ type DetailedBlockSignerInfo struct {
 	BlockHash common.Hash
 }
 
-// NewBlockSignerInfo fetches the block signer information for any non-genesis block
+// GetDetailedBlockSignerInfo fetches the block signer information for any non-genesis block
 func (hmy *Harmony) GetDetailedBlockSignerInfo(
 	ctx context.Context, blk *types.Block,
 ) (*DetailedBlockSignerInfo, error) {

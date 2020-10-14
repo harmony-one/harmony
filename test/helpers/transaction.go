@@ -13,6 +13,7 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+// CreateTestStakingTransaction creates a pre-signed staking transaction
 func CreateTestStakingTransaction(
 	payloadMaker func() (stakingTypes.Directive, interface{}), key *ecdsa.PrivateKey,
 	nonce, gasLimit uint64, gasPrice *big.Int,
@@ -31,6 +32,7 @@ func CreateTestStakingTransaction(
 	return stakingTypes.Sign(tx, stakingTypes.NewEIP155Signer(tx.ChainID()), key)
 }
 
+// GetMessageFromStakingTx gets the staking message, as seen by the rpc layer
 func GetMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]interface{}, error) {
 	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
 	if err != nil {
@@ -39,6 +41,7 @@ func GetMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]in
 	return types.MarshalMap(rpcStakingTx.Msg)
 }
 
+// CreateTestTransaction creates a pre-signed transaction
 func CreateTestTransaction(
 	signer hmytypes.Signer, fromShard, toShard uint32, nonce, gasLimit uint64,
 	gasPrice, amount *big.Int, data []byte,
@@ -65,6 +68,7 @@ func CreateTestTransaction(
 	return hmytypes.SignTx(tx, signer, fromKey)
 }
 
+// CreateTestContractCreationTransaction creates a pre-signed contract creation transaction
 func CreateTestContractCreationTransaction(
 	signer hmytypes.Signer, shard uint32, nonce, gasLimit uint64, gasPrice, amount *big.Int, data []byte,
 ) (*hmytypes.Transaction, error) {
