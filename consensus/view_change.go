@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -381,6 +380,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.consensusTimeout[timeoutViewChange].Stop()
+
 	// newView message verified success, override my state
 	consensus.SetViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = recvMsg.SenderPubkey
@@ -388,31 +389,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// NewView message is verified, change state to normal consensus
 	if preparedBlock != nil {
-		// Construct and send the commit message
-		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
-		groupID := []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
-		for _, key := range consensus.priKey {
-			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
-				continue
-			}
-			network, err := consensus.construct(
-				msg_pb.MessageType_COMMIT,
-				commitPayload,
-				&key,
-			)
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("could not create commit message")
-				continue
-			}
-			msgToSend := network.Bytes
-			consensus.getLogger().Info().Msg("onNewView === commit")
-			consensus.host.SendMessageToGroups(
-				groupID,
-				p2p.ConstructMessage(msgToSend),
-			)
-		}
+		consensus.sendCommitMessages(preparedBlock)
 		consensus.switchPhase("onNewView", FBFTCommit)
 	} else {
 		consensus.ResetState()
@@ -422,7 +399,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
-	consensus.consensusTimeout[timeoutViewChange].Stop()
 }
 
 // ResetViewChangeState resets the view change structure
