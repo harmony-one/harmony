@@ -102,11 +102,15 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 			continue
 		}
 
-		networkMessage, _ := consensus.construct(
+		networkMessage, err := consensus.construct(
 			msg_pb.MessageType_COMMIT,
 			commitPayload,
 			&key,
 		)
+		if err != nil {
+			consensus.getLogger().Warn().Msg("[sendCommitMessages] cannot construct network message")
+			continue
+		}
 
 		if consensus.current.Mode() != Listening {
 			if err := consensus.msgSender.SendWithoutRetry(
