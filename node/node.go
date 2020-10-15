@@ -461,9 +461,9 @@ func (node *Node) validateShardBoundMessage(
 			return nil, nil, true, nil
 		}
 	} else {
-		// ignore newview message if the node is not in viewchanging mode
+		// ignore viewchange/newview message if the node is not in viewchanging mode
 		switch m.Type {
-		case msg_pb.MessageType_NEWVIEW:
+		case msg_pb.MessageType_NEWVIEW, msg_pb.MessageType_VIEWCHANGE:
 			return nil, nil, true, nil
 		}
 	}
