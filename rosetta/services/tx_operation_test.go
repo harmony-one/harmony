@@ -59,7 +59,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newOperations(gasFee, senderAccID)
+	refOperations := newNativeOperations(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -70,7 +70,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Account: senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
 	})
@@ -81,7 +81,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
@@ -123,7 +123,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newOperations(gasFee, senderAccID)
+	refOperations := newNativeOperations(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -134,7 +134,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Account: senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
 	})
@@ -145,7 +145,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
@@ -187,7 +187,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newOperations(gasFee, senderAccID)
+	refOperations := newNativeOperations(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -198,7 +198,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Account: senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
 	})
@@ -209,7 +209,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
@@ -251,7 +251,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 			},
 		},
 	}
-	refOperations := newOperations(gasFee, senderAccID)
+	refOperations := newNativeOperations(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -262,7 +262,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 		Account: senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
 	})
@@ -273,7 +273,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
@@ -308,7 +308,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newOperations(gasFee, senderAccID)
+	refOperations := newNativeOperations(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -319,7 +319,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		Account: senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
 	})
@@ -330,12 +330,12 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
 
-func TestNewTransferOperations(t *testing.T) {
+func TestNewTransferNativeOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 0, 0, 1e18, gasPrice, big.NewInt(1), []byte("test"),
@@ -368,12 +368,12 @@ func TestNewTransferOperations(t *testing.T) {
 					Index: startingOpID.Index,
 				},
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 		},
 		{
@@ -385,26 +385,26 @@ func TestNewTransferOperations(t *testing.T) {
 					Index: startingOpID.Index + 1,
 				},
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 		},
 	}
 	receipt := &hmytypes.Receipt{
 		Status: hmytypes.ReceiptStatusFailed,
 	}
-	operations, rosettaError := newTransferOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError := newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 
@@ -412,19 +412,19 @@ func TestNewTransferOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = newTransferOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
 
-func TestNewCrossShardSenderTransferOperations(t *testing.T) {
+func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 1, 0, 1e18, gasPrice, big.NewInt(1), []byte("data-does-nothing"),
@@ -461,29 +461,29 @@ func TestNewCrossShardSenderTransferOperations(t *testing.T) {
 			RelatedOperations: []*types.OperationIdentifier{
 				startingOpID,
 			},
-			Type:    common.CrossShardTransferOperation,
+			Type:    common.CrossShardTransferNativeOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 			Metadata: metadata,
 		},
 	}
-	operations, rosettaError := newCrossShardSenderTransferOperations(startingOpID, tx, senderAddr)
+	operations, rosettaError := newCrossShardSenderTransferNativeOperations(startingOpID, tx, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
 
-func TestNewContractCreationOperations(t *testing.T) {
+func TestNewContractCreationNativeOperations(t *testing.T) {
 	dummyContractKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -525,7 +525,7 @@ func TestNewContractCreationOperations(t *testing.T) {
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 			Metadata: map[string]interface{}{
 				"contract_address": contractAddressID,
@@ -536,43 +536,43 @@ func TestNewContractCreationOperations(t *testing.T) {
 		Status:          hmytypes.ReceiptStatusFailed,
 		ContractAddress: contractAddr,
 	}
-	operations, rosettaError := newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError := newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 
 	// Test successful contract creation
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = newContractCreationOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
 		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
 	}
-	if err := assertOperationTypeUniquenessInvariant(operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
 }
 
-func TestNewOperations(t *testing.T) {
+func TestNewNativeOperations(t *testing.T) {
 	accountID := &types.AccountIdentifier{
 		Address: "test-address",
 	}
 	gasFee := big.NewInt(int64(1e18))
 	amount := &types.Amount{
 		Value:    negativeBigValue(gasFee),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
-	ops := newOperations(gasFee, accountID)
+	ops := newNativeOperations(gasFee, accountID)
 	if len(ops) != 1 {
 		t.Fatalf("Expected new operations to be of length 1")
 	}

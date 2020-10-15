@@ -28,7 +28,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
-				OperationType:       common.TransferOperation,
+				OperationType:       common.TransferNativeOperation,
 				GasPriceMultiplier:  nil,
 			},
 			ExpectError: false,
@@ -36,7 +36,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
-				OperationType:       common.TransferOperation,
+				OperationType:       common.TransferNativeOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: false,
@@ -44,7 +44,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
-				OperationType:       common.TransferOperation,
+				OperationType:       common.TransferNativeOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: true,
@@ -52,7 +52,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
-				OperationType:       common.TransferOperation,
+				OperationType:       common.TransferNativeOperation,
 				GasPriceMultiplier:  nil,
 			},
 			ExpectError: true,
@@ -170,7 +170,7 @@ func TestConstructMetadata(t *testing.T) {
 	}
 }
 
-func TestGetSuggestedFeeAndPrice(t *testing.T) {
+func TestGetSuggestedNativeFeeAndPrice(t *testing.T) {
 	refEstGasUsed := big.NewInt(1000000)
 
 	cases := []struct {
@@ -218,7 +218,7 @@ func TestGetSuggestedFeeAndPrice(t *testing.T) {
 	}
 
 	for i, test := range cases {
-		refAmounts, refPrice := getSuggestedFeeAndPrice(test.GasMul, test.EstGasUsed)
+		refAmounts, refPrice := getSuggestedNativeFeeAndPrice(test.GasMul, test.EstGasUsed)
 		if len(refAmounts) != 1 {
 			t.Errorf("expect exactly 1 amount for case %v", i)
 			continue

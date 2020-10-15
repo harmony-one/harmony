@@ -21,8 +21,8 @@ import (
 	"github.com/harmony-one/harmony/test/helpers"
 )
 
-// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
-func assertOperationTypeUniquenessInvariant(operations []*types.Operation) error {
+// Invariant: A transaction can only contain 1 type of native operation(s) other than gas expenditure.
+func assertNativeOperationTypeUniquenessInvariant(operations []*types.Operation) error {
 	foundType := ""
 	for _, op := range operations {
 		if op.Type == common.ExpendGasOperation {
@@ -91,7 +91,7 @@ func testFormatStakingTransaction(
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
 	}
-	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
 		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
@@ -145,7 +145,7 @@ func testFormatPlainTransaction(
 	if len(rosettaTx.Operations) != 3 {
 		t.Error("Expected 3 operations")
 	}
-	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
 		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
@@ -154,7 +154,7 @@ func testFormatPlainTransaction(
 	if rosettaTx.Operations[0].Type != common.ExpendGasOperation {
 		t.Error("Expected 1st operation to be gas")
 	}
-	if rosettaTx.Operations[1].Type != common.TransferOperation {
+	if rosettaTx.Operations[1].Type != common.TransferNativeOperation {
 		t.Error("Expected 2nd operation to transfer related")
 	}
 	if rosettaTx.Operations[1].Metadata != nil {
@@ -186,7 +186,7 @@ func TestFormatGenesisTransaction(t *testing.T) {
 		if len(tx.Operations) != 1 {
 			t.Error("expected exactly 1 operation")
 		}
-		if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+		if err := assertNativeOperationTypeUniquenessInvariant(tx.Operations); err != nil {
 			t.Error(err)
 		}
 		if tx.Operations[0].OperationIdentifier.Index != 0 {
@@ -229,7 +229,7 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	if len(tx.Operations) != 1 {
 		t.Fatal("Expected exactly 1 operation")
 	}
-	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(tx.Operations); err != nil {
 		t.Error(err)
 	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
@@ -306,7 +306,7 @@ func TestFormatUndelegationPayoutTransaction(t *testing.T) {
 	if len(tx.Operations) != 1 {
 		t.Fatal("expected tx operations to be of length 1")
 	}
-	if err := assertOperationTypeUniquenessInvariant(tx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(tx.Operations); err != nil {
 		t.Error(err)
 	}
 	if tx.Operations[0].OperationIdentifier.Index != 0 {
@@ -362,7 +362,7 @@ func testFormatCrossShardSenderTransaction(
 	if len(rosettaTx.Operations) != 2 {
 		t.Error("Expected 2 operations")
 	}
-	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
 		t.Error(err)
 	}
 	if rosettaTx.TransactionIdentifier.Hash != tx.Hash().String() {
@@ -371,7 +371,7 @@ func testFormatCrossShardSenderTransaction(
 	if rosettaTx.Operations[0].Type != common.ExpendGasOperation {
 		t.Error("Expected 1st operation to be gas")
 	}
-	if rosettaTx.Operations[1].Type != common.CrossShardTransferOperation {
+	if rosettaTx.Operations[1].Type != common.CrossShardTransferNativeOperation {
 		t.Error("Expected 2nd operation to cross-shard transfer related")
 	}
 	if reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
@@ -427,12 +427,12 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0, // There is no gas expenditure for cross-shard payout
 			},
-			Type:    common.CrossShardTransferOperation,
+			Type:    common.CrossShardTransferNativeOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 			Metadata: opMetadata,
 		},
@@ -456,7 +456,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 	if !reflect.DeepEqual(rosettaTx, refRosettaTx) {
 		t.Errorf("Expected transaction to be %v not %v", refRosettaTx, rosettaTx)
 	}
-	if err := assertOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
+	if err := assertNativeOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
 		t.Error(err)
 	}
 }

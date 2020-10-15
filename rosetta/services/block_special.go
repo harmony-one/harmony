@@ -262,7 +262,7 @@ func (s *BlockAPI) getAllUndelegationPayoutTransactions(
 					Account: accID,
 					Amount: &types.Amount{
 						Value:    payout.String(),
-						Currency: &common.Currency,
+						Currency: &common.NativeCurrency,
 					},
 				},
 			},

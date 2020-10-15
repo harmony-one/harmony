@@ -10,27 +10,30 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// Invariant: A transaction can only contain 1 type of operation(s) other than gas expenditure.
+// Invariant: A transaction can only contain 1 type of native operation(s) other than gas expenditure.
 const (
-	// ExpendGasOperation ..
+	// ExpendGasOperation is an operation that only affects the native currency.
 	ExpendGasOperation = "Gas"
 
-	// TransferOperation ..
-	TransferOperation = "Transfer"
+	// TransferNativeOperation is an operation that only affects the native currency.
+	TransferNativeOperation = "NativeTransfer"
 
-	// CrossShardTransferOperation ..
-	CrossShardTransferOperation = "CrossShardTransfer"
+	// CrossShardTransferNativeOperation is an operation that only affects the native currency.
+	CrossShardTransferNativeOperation = "NativeCrossShardTransfer"
 
-	// ContractCreationOperation ..
+	// ContractCreationOperation is an operation that only affects the native currency.
 	ContractCreationOperation = "ContractCreation"
 
-	// GenesisFundsOperation ..
+	// GenesisFundsOperation is a special operation for genesis block only.
+	// Note that no transaction can be constructed with this operation.
 	GenesisFundsOperation = "Genesis"
 
-	// PreStakingBlockRewardOperation ..
+	// PreStakingBlockRewardOperation is a special operation for pre-staking era only.
+	// Note that no transaction can be constructed with this operation.
 	PreStakingBlockRewardOperation = "PreStakingBlockReward"
 
-	// UndelegationPayoutOperation ..
+	// UndelegationPayoutOperation is a special operation for committee election block only.
+	// Note that no transaction can be constructed with this operation.
 	UndelegationPayoutOperation = "UndelegationPayout"
 )
 
@@ -38,8 +41,8 @@ var (
 	// PlainOperationTypes ..
 	PlainOperationTypes = []string{
 		ExpendGasOperation,
-		TransferOperation,
-		CrossShardTransferOperation,
+		TransferNativeOperation,
+		CrossShardTransferNativeOperation,
 		ContractCreationOperation,
 		GenesisFundsOperation,
 		PreStakingBlockRewardOperation,

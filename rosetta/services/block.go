@@ -88,7 +88,6 @@ func (s *BlockAPI) Block(
 	}
 	// Report cross-shard transaction payouts.
 	for _, cxReceipts := range blk.IncomingReceipts() {
-		// Report cross-shard transaction payouts.
 		for _, cxReceipt := range cxReceipts.Receipts {
 			otherTransactions = append(otherTransactions, &types.TransactionIdentifier{
 				Hash: cxReceipt.TxHash.String(),

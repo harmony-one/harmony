@@ -75,7 +75,7 @@ func (s *AccountAPI) AccountBalance(
 
 	amount := types.Amount{
 		Value:    balance.String(),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
 	respBlock := types.BlockIdentifier{

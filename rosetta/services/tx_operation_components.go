@@ -57,7 +57,7 @@ func GetOperationComponents(
 		return getTransferOperationComponents(operations)
 	}
 	switch operations[0].Type {
-	case common.CrossShardTransferOperation:
+	case common.CrossShardTransferNativeOperation:
 		return getCrossShardOperationComponents(operations[0])
 	case common.ContractCreationOperation:
 		return getContractCreationOperationComponents(operations[0])
@@ -78,7 +78,7 @@ func getTransferOperationComponents(
 		})
 	}
 	op0, op1 := operations[0], operations[1]
-	if op0.Type != common.TransferOperation || op1.Type != common.TransferOperation {
+	if op0.Type != common.TransferNativeOperation || op1.Type != common.TransferNativeOperation {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid operation type(s) for same shard transfer",
 		})
@@ -101,8 +101,8 @@ func getTransferOperationComponents(
 			"message": "amount taken from sender is not exactly paid out to receiver for same shard transfer",
 		})
 	}
-	if types.Hash(op0.Amount.Currency) != common.CurrencyHash ||
-		types.Hash(op1.Amount.Currency) != common.CurrencyHash {
+	if types.Hash(op0.Amount.Currency) != common.NativeCurrencyHash ||
+		types.Hash(op1.Amount.Currency) != common.NativeCurrencyHash {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid currency for provided amounts",
 		})
@@ -170,7 +170,7 @@ func getCrossShardOperationComponents(
 			"message": "sender amount must not be positive for cross shard transfer",
 		})
 	}
-	if types.Hash(operation.Amount.Currency) != common.CurrencyHash {
+	if types.Hash(operation.Amount.Currency) != common.NativeCurrencyHash {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid currency for provided amounts",
 		})
@@ -215,7 +215,7 @@ func getContractCreationOperationComponents(
 			"message": "sender amount must not be positive for contract creation",
 		})
 	}
-	if types.Hash(operation.Amount.Currency) != common.CurrencyHash {
+	if types.Hash(operation.Amount.Currency) != common.NativeCurrencyHash {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid currency for provided amounts",
 		})

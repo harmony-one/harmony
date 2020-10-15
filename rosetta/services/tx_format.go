@@ -42,7 +42,7 @@ func FormatTransaction(
 	case *hmytypes.Transaction:
 		isStaking = false
 		plainTx := tx.(*hmytypes.Transaction)
-		operations, rosettaError = GetOperationsFromTransaction(plainTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromTransaction(plainTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -123,12 +123,12 @@ func FormatCrossShardReceiverTransaction(
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: 0, // There is no gas expenditure for cross-shard transaction payout
 				},
-				Type:    common.CrossShardTransferOperation,
+				Type:    common.CrossShardTransferNativeOperation,
 				Status:  common.SuccessOperationStatus.Status,
 				Account: receiverAccountID,
 				Amount: &types.Amount{
 					Value:    cxReceipt.Amount.String(),
-					Currency: &common.Currency,
+					Currency: &common.NativeCurrency,
 				},
 				Metadata: opMetadata,
 			},
@@ -164,7 +164,7 @@ func FormatGenesisTransaction(
 						Account: accID,
 						Amount: &types.Amount{
 							Value:    tx.Value().String(),
-							Currency: &common.Currency,
+							Currency: &common.NativeCurrency,
 						},
 					},
 				},
@@ -225,7 +225,7 @@ func FormatPreStakingRewardTransaction(
 				Account: accID,
 				Amount: &types.Amount{
 					Value:    rewardsForThisBlock.String(),
-					Currency: &common.Currency,
+					Currency: &common.NativeCurrency,
 				},
 			},
 		},
@@ -256,7 +256,7 @@ func FormatUndelegationPayoutTransaction(
 				Account: accID,
 				Amount: &types.Amount{
 					Value:    payout.String(),
-					Currency: &common.Currency,
+					Currency: &common.NativeCurrency,
 				},
 			},
 		},

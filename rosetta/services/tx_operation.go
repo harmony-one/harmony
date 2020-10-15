@@ -15,9 +15,10 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-// GetOperationsFromTransaction for one of the following transactions:
-// contract creation, cross-shard sender, same-shard transfer
-func GetOperationsFromTransaction(
+// GetNativeOperationsFromTransaction for one of the following transactions:
+// contract creation, cross-shard sender, same-shard transfer.
+// Native operations only include operations that affect the native currency balance of an account.
+func GetNativeOperationsFromTransaction(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
@@ -31,20 +32,20 @@ func GetOperationsFromTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newOperations(gasExpended, accountID)
+	gasOperations := newNativeOperations(gasExpended, accountID)
 
 	// Handle different cases of plain transactions
 	var txOperations []*types.Operation
 	if tx.To() == nil {
-		txOperations, rosettaError = newContractCreationOperations(
+		txOperations, rosettaError = newContractCreationNativeOperations(
 			gasOperations[0].OperationIdentifier, tx, receipt, senderAddress,
 		)
 	} else if tx.ShardID() != tx.ToShardID() {
-		txOperations, rosettaError = newCrossShardSenderTransferOperations(
+		txOperations, rosettaError = newCrossShardSenderTransferNativeOperations(
 			gasOperations[0].OperationIdentifier, tx, senderAddress,
 		)
 	} else {
-		txOperations, rosettaError = newTransferOperations(
+		txOperations, rosettaError = newTransferNativeOperations(
 			gasOperations[0].OperationIdentifier, tx, receipt, senderAddress,
 		)
 	}
@@ -56,6 +57,7 @@ func GetOperationsFromTransaction(
 }
 
 // GetOperationsFromStakingTransaction for all staking directives
+// Note that only native operations can come from staking transactions.
 func GetOperationsFromStakingTransaction(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
@@ -70,7 +72,7 @@ func GetOperationsFromStakingTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newOperations(gasExpended, accountID)
+	gasOperations := newNativeOperations(gasExpended, accountID)
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
 	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
@@ -104,7 +106,7 @@ func GetOperationsFromStakingTransaction(
 	default:
 		amount = &types.Amount{
 			Value:    "0", // All other staking transactions do not apply balance changes instantly or at all
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		}
 	}
 
@@ -138,7 +140,7 @@ func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Err
 	}
 	return &types.Amount{
 		Value:    negativeBigValue(stkMsg.Amount),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}, nil
 }
 
@@ -170,7 +172,7 @@ func getAmountFromDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*type
 	}
 	return &types.Amount{
 		Value:    negativeBigValue(stkAmount),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}, nil
 }
 
@@ -183,7 +185,7 @@ func getAmountFromCollectRewards(
 		if log.Address == senderAddress {
 			amount = &types.Amount{
 				Value:    big.NewInt(0).SetBytes(log.Data).String(),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			}
 			break
 		}
@@ -196,9 +198,9 @@ func getAmountFromCollectRewards(
 	return amount, nil
 }
 
-// newTransferOperations extracts & formats the operation(s) for plain transaction,
+// newTransferNativeOperations extracts & formats the native operation(s) for plain transaction,
 // including contract transactions.
-func newTransferOperations(
+func newTransferNativeOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
@@ -208,7 +210,7 @@ func newTransferOperations(
 	receiverAddress := *tx.To()
 
 	// Common elements
-	opType := common.TransferOperation
+	opType := common.TransferNativeOperation
 	opStatus := common.SuccessOperationStatus.Status
 	if receipt.Status == hmytypes.ReceiptStatusFailed {
 		if len(tx.Data()) > 0 {
@@ -233,7 +235,7 @@ func newTransferOperations(
 	}
 	subAmount := &types.Amount{
 		Value:    negativeBigValue(tx.Value()),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
 	// Addition operation elements
@@ -249,7 +251,7 @@ func newTransferOperations(
 	}
 	addAmount := &types.Amount{
 		Value:    tx.Value().String(),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
 	return []*types.Operation{
@@ -272,9 +274,9 @@ func newTransferOperations(
 	}, nil
 }
 
-// newCrossShardSenderTransferOperations extracts & formats the operation(s) for cross-shard-tx
-// on the sender's shard.
-func newCrossShardSenderTransferOperations(
+// newCrossShardSenderTransferNativeOperations extracts & formats the native operation(s)
+// for cross-shard-tx on the sender's shard.
+func newCrossShardSenderTransferNativeOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
@@ -307,20 +309,20 @@ func newCrossShardSenderTransferOperations(
 			RelatedOperations: []*types.OperationIdentifier{
 				startingOperationID,
 			},
-			Type:    common.CrossShardTransferOperation,
+			Type:    common.CrossShardTransferNativeOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 			Metadata: metadata,
 		},
 	}, nil
 }
 
-// newContractCreationOperations extracts & formats the operation(s) for a contract creation tx
-func newContractCreationOperations(
+// newContractCreationNativeOperations extracts & formats the native operation(s) for a contract creation tx
+func newContractCreationNativeOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
@@ -352,7 +354,7 @@ func newContractCreationOperations(
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 			Metadata: map[string]interface{}{
 				"contract_address": contractAddressID,
@@ -361,9 +363,9 @@ func newContractCreationOperations(
 	}, nil
 }
 
-// newOperations creates a new operation with the gas fee as the first operation.
+// newNativeOperations creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
-func newOperations(
+func newNativeOperations(
 	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{
@@ -376,7 +378,7 @@ func newOperations(
 			Account: accountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(gasFeeInATTO),
-				Currency: &common.Currency,
+				Currency: &common.NativeCurrency,
 			},
 		},
 	}
