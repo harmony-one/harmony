@@ -194,6 +194,7 @@ func (m *Mask) GetSignedPubKeysFromBitmap(bitmap []byte) ([]*PublicKeyWrapper, e
 		)
 	}
 	pubKeys := []*PublicKeyWrapper{}
+	// For details about who bitmap is structured, refer to func SetMask
 	for i := range m.Publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)

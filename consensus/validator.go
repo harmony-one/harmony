@@ -307,18 +307,23 @@ func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, pay
 	if consensus.AggregateSig {
 		networkMessage, err := consensus.construct(msgType, payloadForSign, priKeys)
 		if err != nil {
-			consensus.getLogger().Err(err).
-				Str("message-type", msgType.String()).
-				Msg("could not construct message")
+			logger := consensus.getLogger().Err(err).
+				Str("message-type", msgType.String())
+			for _, key := range priKeys {
+				logger.Str("key", key.Pri.SerializeToHexStr())
+			}
+			logger.Msg("could not construct message")
+		} else {
+			p2pMsgs = append(p2pMsgs, networkMessage)
 		}
 
-		p2pMsgs = append(p2pMsgs, networkMessage)
 	} else {
 		for _, key := range priKeys {
 			networkMessage, err := consensus.construct(msgType, payloadForSign, []*bls.PrivateKeyWrapper{key})
 			if err != nil {
 				consensus.getLogger().Err(err).
 					Str("message-type", msgType.String()).
+					Str("key", key.Pri.SerializeToHexStr()).
 					Msg("could not construct message")
 				continue
 			}
