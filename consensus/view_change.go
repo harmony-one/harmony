@@ -170,8 +170,8 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	}
 }
 
-// stopViewChange stops the current view change
-func (consensus *Consensus) stopViewChange(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper) error {
+// startNewView stops the current view change
+func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -190,7 +190,7 @@ func (consensus *Consensus) stopViewChange(viewID uint64, newLeaderPriKey *bls.P
 	consensus.getLogger().Info().
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Hex("M1Payload", consensus.vc.GetM1Payload()).
-		Msg("[stopViewChange] Sent NewView Messge")
+		Msg("[startNewView] Sent NewView Messge")
 
 	consensus.current.SetMode(Normal)
 	consensus.consensusTimeout[timeoutViewChange].Stop()
@@ -201,7 +201,7 @@ func (consensus *Consensus) stopViewChange(viewID uint64, newLeaderPriKey *bls.P
 	consensus.getLogger().Info().
 		Uint64("viewID", viewID).
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
-		Msg("[stopViewChange] viewChange stopped. I am the New Leader")
+		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
 	return nil
 }
@@ -269,8 +269,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		// no previous prepared message, go straight to normal mode
 		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
-			if err := consensus.stopViewChange(recvMsg.ViewID, newLeaderPriKey); err != nil {
-				consensus.getLogger().Error().Err(err).Msg("[onViewChange] stopViewChange failed")
+			if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
 			consensus.ResetState()
@@ -287,8 +287,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] self commit failed")
 			return
 		}
-		if err := consensus.stopViewChange(recvMsg.ViewID, newLeaderPriKey); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[onViewChange] stopViewChange failed")
+		if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 			return
 		}
 		consensus.ResetState()
