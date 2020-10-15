@@ -5,8 +5,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/multibls"
@@ -28,18 +26,7 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 		}
 	})
 
-	// Dedup private keys
-	uniqueKeys := map[bls.SerializedPublicKey]struct{}{}
-	deduped := multibls.PrivateKeys{}
-	for _, priKey := range multiBLSPriKey {
-		if _, ok := uniqueKeys[priKey.Pub.Bytes]; ok {
-			continue
-		}
-		uniqueKeys[priKey.Pub.Bytes] = struct{}{}
-		deduped = append(deduped, priKey)
-	}
-
-	config.ConsensusPriKey = deduped
+	config.ConsensusPriKey = multiBLSPriKey
 	return multiBLSPriKey.GetPublicKeys()
 }
 
@@ -58,7 +45,7 @@ func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
 	if len(keys) > raw.MaxKeys {
 		return nil, fmt.Errorf("bls keys exceed maximum count %v", raw.MaxKeys)
 	}
-	return keys, err
+	return keys.Dedup(), err
 }
 
 func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {

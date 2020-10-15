@@ -222,7 +222,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	// Verify the signature on commitPayload is correct
 	logger := consensus.getLogger().With().
-		Interface("validatorPubKey", recvMsg.SenderPubkeys).
+		Str("recvMsg", recvMsg.String()).
 		Int64("numReceivedSoFar", signerCount).Logger()
 
 	logger.Debug().Msg("[OnCommit] Received new commit message")

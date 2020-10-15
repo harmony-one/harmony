@@ -3,6 +3,8 @@ package multibls
 import (
 	"strings"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 )
@@ -43,6 +45,22 @@ func (multiKey PrivateKeys) GetPublicKeys() PublicKeys {
 	}
 
 	return pubKeys
+}
+
+// Dedup will return a new list of dedupped private keys.
+// This func won't modify the original slice.
+func (multiKey PrivateKeys) Dedup() PrivateKeys {
+	uniqueKeys := make(map[bls.SerializedPublicKey]struct{})
+	deduped := make(PrivateKeys, 0, len(multiKey))
+	for _, priKey := range multiKey {
+		if _, ok := uniqueKeys[priKey.Pub.Bytes]; ok {
+			utils.Logger().Warn().Str("PubKey", priKey.Pub.Bytes.Hex()).Msg("Duplicate private key ignored!")
+			continue
+		}
+		uniqueKeys[priKey.Pub.Bytes] = struct{}{}
+		deduped = append(deduped, priKey)
+	}
+	return deduped
 }
 
 // GetPrivateKeys creates a multibls PrivateKeys using bls.SecretKey

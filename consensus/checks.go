@@ -60,10 +60,8 @@ func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
 	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Interface("ValidatorPubKey", recvMsg.SenderPubkeys).
+			Str("recvMsg", recvMsg.String()).
 			Msg("BlockNum/viewID not match")
 		return false
 	}
@@ -76,8 +74,9 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 	)
 	if len(logMsgs) > 0 {
 		if len(logMsgs[0].SenderPubkeys) != 1 || len(recvMsg.SenderPubkeys) != 1 {
-			consensus.getLogger().Debug().
-				Interface("signers", recvMsg.SenderPubkeys).
+			consensus.getLogger().Warn().
+				Str("logMsgs[0]", logMsgs[0].String()).
+				Str("recvMsg", recvMsg.String()).
 				Msg("[OnAnnounce] Announce message have 0 or more than 1 signers")
 			return false
 		}
@@ -86,10 +85,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 			consensus.getLogger().Debug().
 				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys[0].Bytes.Hex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkeys", recvMsg.SenderPubkeys[0].Bytes.Hex()).
-				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
-				Uint64("recvMsg.ViewID", recvMsg.ViewID).
-				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
+				Str("recvMsg", recvMsg.String()).
 				Str("LeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 				Msg("[OnAnnounce] Leader is malicious")
 			if consensus.IsViewChangingMode() {
@@ -198,7 +194,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 
 	if len(recvMsg.SenderPubkeys) != 1 {
-		consensus.getLogger().Error().Msg("[onViewChange] zero or multiple signers in view change message.")
+		consensus.getLogger().Error().Msg("[onViewChangeSanityCheck] zero or multiple signers in view change message.")
 		return false
 	}
 	senderKey := recvMsg.SenderPubkeys[0]
