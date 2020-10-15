@@ -78,6 +78,8 @@ type DetailedBlockSignerInfo struct {
 	// Signers is a map of addresses in the Signers for the block to
 	// all of the serialized BLS keys that signed said block.
 	Signers map[common.Address][]bls.SerializedPublicKey
+	// Committee when the block was signed.
+	Committee shard.SlotList
 	// TotalKeysSigned is the total number of bls keys that signed the block.
 	TotalKeysSigned uint
 	// Mask is the bitmap Mask for the block.
@@ -109,6 +111,7 @@ func (hmy *Harmony) GetDetailedBlockSignerInfo(
 	}
 	return &DetailedBlockSignerInfo{
 		Signers:         sigInfos,
+		Committee:       slotList,
 		TotalKeysSigned: totalSigners,
 		Mask:            mask,
 		BlockHash:       blk.Hash(),

@@ -83,11 +83,20 @@ func (s *BlockAPI) genesisBlock(
 	}
 	prevBlockID = currBlockID
 
+	metadata, err := types.MarshalMap(BlockMetadata{
+		Epoch: blk.Epoch(),
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 	responseBlock := &types.Block{
 		BlockIdentifier:       currBlockID,
 		ParentBlockIdentifier: prevBlockID,
 		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
 		Transactions:          []*types.Transaction{},   // Do not return tx details as it is optional.
+		Metadata:              metadata,
 	}
 
 	otherTransactions := []*types.TransactionIdentifier{}
@@ -145,6 +154,36 @@ func (s *BlockAPI) specialGenesisBlockTransaction(
 	return &types.BlockTransactionResponse{Transaction: txs}, nil
 }
 
+// getPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
+// rewards for signing block n is paid out on block n+1
+func (s *BlockAPI) getPreStakingRewardTransactionIdentifiers(
+	ctx context.Context, currBlock *hmytypes.Block,
+) ([]*types.TransactionIdentifier, *types.Error) {
+	if currBlock.Number().Cmp(big.NewInt(1)) != 1 {
+		return nil, nil
+	}
+	blockNumToBeRewarded := currBlock.Number().Uint64() - 1
+	rewardedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumToBeRewarded).EthBlockNumber())
+	if err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	blockSigInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, rewardedBlock)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	txIDs := []*types.TransactionIdentifier{}
+	for acc, signedBlsKeys := range blockSigInfo.Signers {
+		if len(signedBlsKeys) > 0 {
+			txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(currBlock.Hash(), acc, SpecialPreStakingRewardTxID))
+		}
+	}
+	return txIDs, nil
+}
+
 // specialBlockTransaction is a formatter for special, non-genesis, transactions
 func (s *BlockAPI) specialBlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
@@ -171,20 +210,32 @@ func (s *BlockAPI) specialBlockTransaction(
 
 // preStakingRewardBlockTransaction is a special handler for pre-staking era
 func (s *BlockAPI) preStakingRewardBlockTransaction(
-	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
+	ctx context.Context, txID *types.TransactionIdentifier, currBlock *hmytypes.Block,
 ) (*types.BlockTransactionResponse, *types.Error) {
+	if currBlock.Number().Cmp(big.NewInt(1)) != 1 {
+		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
+			"message": "block does not contain any pre-staking era block rewards",
+		})
+	}
 	blkHash, address, rosettaError := unpackSpecialCaseTransactionIdentifier(txID, SpecialPreStakingRewardTxID)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if blkHash.String() != blk.Hash().String() {
+	blockNumToBeRewarded := currBlock.Number().Uint64() - 1
+	rewardedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumToBeRewarded).EthBlockNumber())
+	if err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if blkHash.String() != currBlock.Hash().String() {
 		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": fmt.Sprintf(
-				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
+				"block hash %v != requested block hash %v in tx ID", blkHash.String(), currBlock.Hash().String(),
 			),
 		})
 	}
-	blockSignerInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, blk)
+	blockSignerInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, rewardedBlock)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),

@@ -188,21 +188,24 @@ func FormatPreStakingRewardTransaction(
 	}
 
 	// Calculate rewards exactly like `AccumulateRewardsAndCountSigs` but short circuit when possible.
+	// WARNING: must do calculation in the order of the committee to get accurate values.
 	i := 0
 	last := big.NewInt(0)
 	rewardsForThisBlock := big.NewInt(0)
 	count := big.NewInt(int64(blockSigInfo.TotalKeysSigned))
-	for sigAddr, keys := range blockSigInfo.Signers {
+	for _, slot := range blockSigInfo.Committee {
 		rewardsForThisAddr := big.NewInt(0)
-		for range keys {
-			cur := big.NewInt(0)
-			cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
-			reward := big.NewInt(0).Sub(cur, last)
-			rewardsForThisAddr = new(big.Int).Add(reward, rewardsForThisAddr)
-			last = cur
-			i++
+		if keys, ok := blockSigInfo.Signers[slot.EcdsaAddress]; ok {
+			for range keys {
+				cur := big.NewInt(0)
+				cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+				reward := big.NewInt(0).Sub(cur, last)
+				rewardsForThisAddr = new(big.Int).Add(reward, rewardsForThisAddr)
+				last = cur
+				i++
+			}
 		}
-		if sigAddr == address {
+		if slot.EcdsaAddress == address {
 			rewardsForThisBlock = rewardsForThisAddr
 			if !(rewardsForThisAddr.Cmp(big.NewInt(0)) > 0) {
 				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{

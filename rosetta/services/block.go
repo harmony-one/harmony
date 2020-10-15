@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -25,6 +26,11 @@ func NewBlockAPI(hmy *hmy.Harmony) server.BlockAPIServicer {
 	return &BlockAPI{
 		hmy: hmy,
 	}
+}
+
+// BlockMetadata ..
+type BlockMetadata struct {
+	Epoch *big.Int `json:"epoch"`
 }
 
 // Block implements the /block endpoint
@@ -68,11 +74,20 @@ func (s *BlockAPI) Block(
 		return nil, rosettaError
 	}
 
+	metadata, err := types.MarshalMap(BlockMetadata{
+		Epoch: blk.Epoch(),
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 	responseBlock := &types.Block{
 		BlockIdentifier:       currBlockID,
 		ParentBlockIdentifier: prevBlockID,
 		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
 		Transactions:          transactions,
+		Metadata:              metadata,
 	}
 
 	otherTransactions := []*types.TransactionIdentifier{}
@@ -107,25 +122,6 @@ func (s *BlockAPI) Block(
 		Block:             responseBlock,
 		OtherTransactions: otherTransactions,
 	}, nil
-}
-
-// getPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
-func (s *BlockAPI) getPreStakingRewardTransactionIdentifiers(
-	ctx context.Context, blk *hmytypes.Block,
-) ([]*types.TransactionIdentifier, *types.Error) {
-	txIDs := []*types.TransactionIdentifier{}
-	blockSigInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, blk)
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	for acc, signedBlsKeys := range blockSigInfo.Signers {
-		if len(signedBlsKeys) > 0 {
-			txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(blk.Hash(), acc, SpecialPreStakingRewardTxID))
-		}
-	}
-	return txIDs, nil
 }
 
 // getBlock ..
