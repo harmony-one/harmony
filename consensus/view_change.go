@@ -203,6 +203,9 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
+	consensus.ResetState()
+	consensus.LeaderPubKey = newLeaderPriKey.Pub
+
 	return nil
 }
 
@@ -250,7 +253,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
 		consensus.priKey); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+		consensus.getLogger().Error().Err(err).Msg("[onViewChange] Init Payload Error")
 		return
 	}
 
@@ -260,7 +263,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("viewID", recvMsg.ViewID).
 			Uint64("blockNum", recvMsg.BlockNum).
 			Str("msgSender", recvMsg.SenderPubkey.Bytes.Hex()).
-			Msg("Verify View Change Message Error")
+			Msg("[onViewChange] process View Change message error")
 		return
 	}
 
@@ -273,8 +276,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
-			consensus.ResetState()
-			consensus.LeaderPubKey = newLeaderKey
 
 			go func() {
 				consensus.ReadySignal <- struct{}{}
@@ -291,8 +292,6 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 			return
 		}
-		consensus.ResetState()
-		consensus.LeaderPubKey = newLeaderKey
 	}
 }
 
