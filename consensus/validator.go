@@ -114,6 +114,10 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
+		consensus.spinUpStateSync()
+	}
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
@@ -122,13 +126,10 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
 		return
 	}
-
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().
-			Msgf("[OnPrepared] Quorum Not achieved")
+		consensus.getLogger().Warn().Msgf("[OnPrepared] Quorum Not achieved.")
 		return
 	}
-
 	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
@@ -169,13 +170,20 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Msg("[OnPrepared] Prepared message and block added")
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
-	consensus.tryCatchup()
-
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
 		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
 		return
 	}
+	if consensus.BlockVerifier == nil {
+		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
+		return
+	}
+	if err := consensus.BlockVerifier(&blockObj); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
+		return
+	}
+	consensus.FBFTLog.MarkBlockVerified(&blockObj)
 
 	if consensus.checkViewID(recvMsg) != nil {
 		if consensus.current.Mode() == Normal {
@@ -223,16 +231,18 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
+		consensus.spinUpStateSync()
+	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
 		return
 	}
-
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().
-			Msgf("[OnCommitted] Quorum Not achieved")
+		consensus.getLogger().Warn().Msgf("[OnCommitted] Quorum Not achieved.")
 		return
 	}
 
@@ -263,22 +273,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
-	if recvMsg.BlockNum > consensus.blockNum && recvMsg.BlockNum-consensus.blockNum > consensusBlockNumBuffer {
+	consensus.tryCatchup()
+	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
-		go func() {
-			select {
-			case consensus.BlockNumLowChan <- struct{}{}:
-				consensus.current.SetMode(Syncing)
-				for _, v := range consensus.consensusTimeout {
-					v.Stop()
-				}
-			case <-time.After(1 * time.Second):
-			}
-		}()
 		return
 	}
 
-	consensus.tryCatchup()
 	if consensus.IsViewChangingMode() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Still in ViewChanging mode, Exiting!!")
 		return
@@ -353,4 +353,15 @@ func (consensus *Consensus) broadcastConsensusP2pMessages(p2pMsgs []*NetworkMess
 		}
 	}
 	return nil
+}
+
+func (consensus *Consensus) spinUpStateSync() {
+	select {
+	case consensus.BlockNumLowChan <- struct{}{}:
+		consensus.current.SetMode(Syncing)
+		for _, v := range consensus.consensusTimeout {
+			v.Stop()
+		}
+	default:
+	}
 }

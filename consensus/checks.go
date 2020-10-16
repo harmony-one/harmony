@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
 )
 
@@ -138,24 +137,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Msg("[OnPrepared] BlockHash not match")
 		return false
 	}
-	if consensus.current.Mode() == Normal {
-		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
-				Str("MsgBlockNum", blockObj.Header().Number().String()).
-				Msg("[OnPrepared] Block header is not verified successfully")
-			return false
-		}
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(blockObj); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-			return false
-		}
-	}
-
 	return true
 }
 

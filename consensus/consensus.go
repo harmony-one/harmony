@@ -83,7 +83,7 @@ type Consensus struct {
 	ReadySignal chan struct{}
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block)
+	OnConsensusDone func(*types.Block) error
 	// The verifier func passed from Node object
 	BlockVerifier BlockVerifierFunc
 	// verified block to state sync broadcast
@@ -180,7 +180,7 @@ func New(
 	consensus.Decider = Decider
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
-	consensus.BlockNumLowChan = make(chan struct{})
+	consensus.BlockNumLowChan = make(chan struct{}, 1)
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
