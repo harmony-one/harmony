@@ -1,10 +1,56 @@
 package consensus
 
 import (
+	"bytes"
+	"encoding/binary"
 	"testing"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
+
+func TestFBFTLog_id(t *testing.T) {
+	tests := []FBFTMessage{
+		{
+			MessageType: msg_pb.MessageType_ANNOUNCE,
+			BlockHash:   [32]byte{01, 02},
+			SenderPubkey: &bls.PublicKeyWrapper{
+				Bytes: bls.SerializedPublicKey{0x01, 0x02},
+			},
+		},
+		{
+			MessageType: msg_pb.MessageType_COMMIT,
+			BlockHash:   [32]byte{02, 03},
+		},
+	}
+	for _, msg := range tests {
+		id := msg.id()
+
+		if uint32(msg.MessageType) != binary.LittleEndian.Uint32(id[:]) {
+			t.Errorf("message type not expected")
+		}
+		if !bytes.Equal(id[idTypeBytes:idTypeBytes+idHashBytes], msg.BlockHash[:]) {
+			t.Errorf("block hash not expected")
+		}
+		if msg.SenderPubkey == nil {
+			var emptyKey bls.SerializedPublicKey
+			if !bytes.Equal(id[idTypeBytes+idHashBytes:], emptyKey[:]) {
+				t.Errorf("sender key not expected when empty")
+			}
+		} else {
+			if !bytes.Equal(id[idTypeBytes+idHashBytes:], msg.SenderPubkey.Bytes[:]) {
+				t.Errorf("sender key not expected")
+			}
+		}
+		if idDup := msg.id(); idDup != id {
+			t.Errorf("id not replicable")
+		}
+		msg.MessageType = 100
+		if idDiff := msg.id(); idDiff == id {
+			t.Errorf("id not unique")
+		}
+	}
+}
 
 func TestGetMessagesByTypeSeqViewHash(t *testing.T) {
 	pbftMsg := FBFTMessage{

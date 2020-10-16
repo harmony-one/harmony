@@ -352,17 +352,9 @@ func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
-func (node *Node) PostConsensusProcessing(
-	newBlock *types.Block,
-) {
+func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if _, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true); err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Uint64("blockNum", newBlock.NumberU64()).
-			Str("parentHash", newBlock.Header().ParentHash().Hex()).
-			Str("hash", newBlock.Header().Hash().Hex()).
-			Msg("Error Adding new block to blockchain")
-		return
+		return err
 	}
 	utils.Logger().Info().
 		Uint64("blockNum", newBlock.NumberU64()).
@@ -412,11 +404,11 @@ func (node *Node) PostConsensusProcessing(
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
-					return
+					return err
 				}
 				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
-					return
+					return err
 				}
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,
@@ -435,6 +427,7 @@ func (node *Node) PostConsensusProcessing(
 			}
 		}
 	}
+	return nil
 }
 
 // BootstrapConsensus is the a goroutine to check number of peers and start the consensus
