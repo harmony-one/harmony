@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
@@ -134,11 +135,8 @@ func (hmy *Harmony) IsPreStakingEpoch(epoch *big.Int) bool {
 }
 
 // IsCommitteeSelectionBlock checks if the given block is the committee selection block
-func (hmy *Harmony) IsCommitteeSelectionBlock(blk *types.Block) bool {
-	isBeaconChain := blk.ShardID() == shard.BeaconChainShardID
-	isNewEpoch := len(blk.Header().ShardState()) > 0
-	inPreStakingEra := hmy.IsPreStakingEpoch(blk.Epoch())
-	return isBeaconChain && isNewEpoch && inPreStakingEra
+func (hmy *Harmony) IsCommitteeSelectionBlock(header *block.Header) bool {
+	return chain.IsCommitteeSelectionBlock(hmy.BlockChain, header)
 }
 
 // GetDelegationLockingPeriodInEpoch ...

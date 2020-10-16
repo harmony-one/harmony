@@ -193,7 +193,7 @@ func (s *BlockAPI) specialBlockTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if s.hmy.IsCommitteeSelectionBlock(blk) {
+	if s.hmy.IsCommitteeSelectionBlock(blk.Header()) {
 		// Note that undelegation payout MUST be checked before reporting error in pre-staking & staking era.
 		response, rosettaError := s.undelegationPayoutBlockTransaction(ctx, request.TransactionIdentifier, blk)
 		if rosettaError != nil && !s.hmy.IsStakingEpoch(blk.Epoch()) && s.hmy.IsPreStakingEpoch(blk.Epoch()) {
@@ -282,7 +282,7 @@ func (s *BlockAPI) undelegationPayoutBlockTransaction(
 func (s *BlockAPI) getAllUndelegationPayoutTransactions(
 	ctx context.Context, blk *hmytypes.Block,
 ) ([]*types.Transaction, *types.Error) {
-	if !s.hmy.IsCommitteeSelectionBlock(blk) {
+	if !s.hmy.IsCommitteeSelectionBlock(blk.Header()) {
 		return []*types.Transaction{}, nil
 	}
 

@@ -1166,7 +1166,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if bc.cacheConfig.Disabled || len(block.Header().ShardState()) > 0 {
+	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
 		if err := triedb.Commit(root, false); err != nil {
 			if isUnrecoverableErr(err) {
 				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
