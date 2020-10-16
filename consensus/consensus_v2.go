@@ -276,7 +276,7 @@ func (consensus *Consensus) Start(
 						break
 					} else {
 						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-						viewID := consensus.GetCurBlockViewID()
+						viewID := consensus.GetViewChangingID()
 						consensus.startViewChange(viewID + 1)
 						break
 					}
