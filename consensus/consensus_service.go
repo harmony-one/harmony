@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -502,6 +503,69 @@ func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 
 	consensus.phase = desired
 	return
+}
+
+var (
+	errGetPreparedBlock  = errors.New("failed to get prepared block for self commit")
+	errReadBitmapPayload = errors.New("failed to read signature bitmap payload")
+)
+
+// selfCommit will create a commit message and commit it locally
+// it is used by the new leadder of the view change routine
+// when view change is succeeded and the new leader
+// received prepared payload from other validators or from local
+func (consensus *Consensus) selfCommit(payload []byte) error {
+	var blockHash [32]byte
+	copy(blockHash[:], payload[:32])
+
+	// Leader sign and add commit message
+	block := consensus.FBFTLog.GetBlockByHash(blockHash)
+	if block == nil {
+		return errGetPreparedBlock
+	}
+
+	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
+	if err != nil {
+		return errReadBitmapPayload
+	}
+
+	// update consensus structure when succeeded
+	// protect consensus data update logic
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	copy(consensus.blockHash[:], blockHash[:])
+	consensus.switchPhase("selfCommit", FBFTCommit)
+	consensus.aggregatedPrepareSig = aggSig
+	consensus.prepareBitmap = mask
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
+	for i, key := range consensus.priKey {
+		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Int("Index", i).
+				Str("Key", key.Pub.Bytes.Hex()).
+				Msg("[selfCommit] New Leader commit bitmap set failed")
+			continue
+		}
+
+		if _, err := consensus.Decider.SubmitVote(
+			quorum.Commit,
+			key.Pub.Bytes,
+			key.Pri.SignHash(commitPayload),
+			common.BytesToHash(consensus.blockHash[:]),
+			block.NumberU64(),
+			block.Header().ViewID().Uint64(),
+		); err != nil {
+			consensus.getLogger().Warn().
+				Err(err).
+				Int("Index", i).
+				Str("Key", key.Pub.Bytes.Hex()).
+				Msg("[selfCommit] submit vote on viewchange commit failed")
+		}
+	}
+	return nil
 }
 
 // getLogger returns logger for consensus contexts added
