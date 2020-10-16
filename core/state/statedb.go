@@ -739,9 +739,11 @@ func (db *DB) Prepare(thash, bhash common.Hash, ti int) {
 }
 
 func (db *DB) clearJournalAndRefund() {
-	db.journal = newJournal()
-	db.validRevisions = db.validRevisions[:0]
-	db.refund = 0
+	if len(db.journal.entries) > 0 {
+		db.journal = newJournal()
+		db.refund = 0
+	}
+	db.validRevisions = db.validRevisions[:0] // Snapshots can be created without journal entires
 }
 
 // Commit writes the state to the underlying in-memory trie database.
