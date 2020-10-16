@@ -179,8 +179,8 @@ type TxReceipt struct {
 	ShardID           uint32         `json:"shardID"`
 	From              string         `json:"from"`
 	To                string         `json:"to"`
-	Root              hexutil.Bytes  `json:"root,omitempty"`
-	Status            hexutil.Uint   `json:"status,omitempty"`
+	Root              hexutil.Bytes  `json:"root"`
+	Status            hexutil.Uint   `json:"status"`
 }
 
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
@@ -196,8 +196,8 @@ type StakingTxReceipt struct {
 	LogsBloom         ethtypes.Bloom    `json:"logsBloom"`
 	Sender            string            `json:"sender"`
 	Type              staking.Directive `json:"type"`
-	Root              hexutil.Bytes     `json:"root,omitempty"`
-	Status            hexutil.Uint      `json:"status,omitempty"`
+	Root              hexutil.Bytes     `json:"root"`
+	Status            hexutil.Uint      `json:"status"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -349,13 +349,8 @@ func NewTxReceipt(
 		ShardID:           tx.ShardID(),
 		From:              sender,
 		To:                receiver,
-	}
-
-	// Set optionals
-	if len(receipt.PostState) > 0 {
-		txReceipt.Root = receipt.PostState
-	} else {
-		txReceipt.Status = hexutil.Uint(receipt.Status)
+		Root:              receipt.PostState,
+		Status:            hexutil.Uint(receipt.Status),
 	}
 
 	// Set empty array for empty logs
@@ -396,13 +391,8 @@ func NewStakingTxReceipt(
 		LogsBloom:         receipt.Bloom,
 		Sender:            sender,
 		Type:              tx.StakingType(),
-	}
-
-	// Set optionals
-	if len(receipt.PostState) > 0 {
-		txReceipt.Root = receipt.PostState
-	} else {
-		txReceipt.Status = hexutil.Uint(receipt.Status)
+		Root:              receipt.PostState,
+		Status:            hexutil.Uint(receipt.Status),
 	}
 
 	// Set empty array for empty logs
