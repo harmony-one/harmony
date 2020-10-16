@@ -113,18 +113,19 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte,
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
-	if !vc.isM1PayloadEmpty() {
-		block := fbftlog.GetBlockByHash(hash)
-		if block != nil {
-			encodedBlock, err := rlp.EncodeToBytes(block)
-			if err != nil || len(encodedBlock) == 0 {
-				vc.getLogger().Err(err).Msg("[GetPreparedBlock] Failed encoding prepared block")
-				return vc.m1Payload, nil
-			}
-			return vc.m1Payload, encodedBlock
-		}
+	if vc.isM1PayloadEmpty() {
+		return nil, nil
 	}
-	return vc.m1Payload, nil
+
+	if block := fbftlog.GetBlockByHash(hash); block != nil {
+		encodedBlock, err := rlp.EncodeToBytes(block)
+		if err != nil || len(encodedBlock) == 0 {
+			return nil, nil
+		}
+		return vc.m1Payload, encodedBlock
+	}
+
+	return nil, nil
 }
 
 // GetM2Bitmap returns the nilBitmap as M2Bitmap
@@ -443,6 +444,7 @@ func (vc *viewChange) InitPayload(
 }
 
 // isM1PayloadEmpty returns true if m1Payload is not set
+// this is an unlocked internal function call
 func (vc *viewChange) isM1PayloadEmpty() bool {
 	return len(vc.m1Payload) == 0
 }
@@ -463,6 +465,8 @@ func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
 
 // GetM1Payload returns the m1Payload
 func (vc *viewChange) GetM1Payload() []byte {
+	vc.vcLock.RLock()
+	defer vc.vcLock.RUnlock()
 	return vc.m1Payload
 }
 

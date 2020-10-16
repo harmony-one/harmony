@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
-	"github.com/harmony-one/harmony/consensus/signature"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/pkg/errors"
 )
 
 // MaxViewIDDiff limits the received view ID to only 249 further from the current view ID
@@ -157,12 +157,56 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 			continue
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
-		consensus.host.SendMessageToGroups([]nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
+		if err := consensus.msgSender.SendWithRetry(
+			consensus.blockNum,
+			msg_pb.MessageType_VIEWCHANGE,
+			[]nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
 			p2p.ConstructMessage(msgToSend),
-		)
+		); err != nil {
+			consensus.getLogger().Err(err).
+				Msg("could not send out the ViewChange message")
+		}
 	}
+}
+
+// startNewView stops the current view change
+func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper) error {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	msgToSend := consensus.constructNewViewMessage(
+		viewID, newLeaderPriKey,
+	)
+	if err := consensus.msgSender.SendWithRetry(
+		consensus.blockNum,
+		msg_pb.MessageType_NEWVIEW,
+		[]nodeconfig.GroupID{
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
+		p2p.ConstructMessage(msgToSend),
+	); err != nil {
+		return errors.New("failed to send out the NewView message")
+	}
+	consensus.getLogger().Info().
+		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
+		Hex("M1Payload", consensus.vc.GetM1Payload()).
+		Msg("[startNewView] Sent NewView Messge")
+
+	consensus.current.SetMode(Normal)
+	consensus.consensusTimeout[timeoutViewChange].Stop()
+	consensus.SetViewIDs(viewID)
+	consensus.ResetViewChangeState()
+	consensus.consensusTimeout[timeoutConsensus].Start()
+
+	consensus.getLogger().Info().
+		Uint64("viewID", viewID).
+		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
+		Msg("[startNewView] viewChange stopped. I am the New Leader")
+
+	consensus.ResetState()
+	consensus.LeaderPubKey = newLeaderPriKey.Pub
+
+	return nil
 }
 
 // onViewChange is called when the view change message is received.
@@ -212,7 +256,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
 		consensus.priKey); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+		consensus.getLogger().Error().Err(err).Msg("[onViewChange] Init Payload Error")
 		return
 	}
 
@@ -222,93 +266,35 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			Uint64("viewID", recvMsg.ViewID).
 			Uint64("blockNum", recvMsg.BlockNum).
 			Str("msgSender", senderKey.Bytes.Hex()).
-			Msg("Verify View Change Message Error")
+			Msg("[onViewChange] process View Change message error")
 		return
 	}
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
-		consensus.getLogger().Info().Msg("[onViewChange] View Change Message Quorum Reached")
-		consensus.current.SetMode(Normal)
-		consensus.LeaderPubKey = newLeaderKey
-		consensus.ResetState()
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.IsViewChangingMode() {
+		// no previous prepared message, go straight to normal mode
+		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
-			// TODO(Chao): explain why ReadySignal is sent only in this case but not the other case.
-			// Make sure the newly proposed block have the correct view ID
-			consensus.SetCurBlockViewID(recvMsg.ViewID)
+			if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
+				return
+			}
+
 			go func() {
 				consensus.ReadySignal <- struct{}{}
 			}()
-		} else {
-			consensus.switchPhase("onViewChange", FBFTCommit)
-			payload := consensus.vc.GetM1Payload()
-			copy(consensus.blockHash[:], payload[:32])
-			aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
-
-			if err != nil {
-				consensus.getLogger().Error().Err(err).
-					Msg("[onViewChange] ReadSignatureBitmapPayload Fail")
-				return
-			}
-
-			consensus.aggregatedPrepareSig = aggSig
-			consensus.prepareBitmap = mask
-			// Leader sign and add commit message
-			block := consensus.FBFTLog.GetBlockByHash(consensus.blockHash)
-			if block == nil {
-				consensus.getLogger().Warn().Msg("[onViewChange] failed to get prepared block for self commit")
-				return
-			}
-			commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-				block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
-			for i, key := range consensus.priKey {
-				if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
-					consensus.getLogger().Warn().Err(err).
-						Msgf("[OnViewChange] New Leader commit bitmap set failed for key at index %d", i)
-					continue
-				}
-
-				if _, err := consensus.Decider.SubmitVote(
-					quorum.Commit,
-					[]bls.SerializedPublicKey{key.Pub.Bytes},
-					key.Pri.SignHash(commitPayload),
-					common.BytesToHash(consensus.blockHash[:]),
-					block.NumberU64(),
-					block.Header().ViewID().Uint64(),
-				); err != nil {
-					consensus.getLogger().Warn().Err(err).Msg("submit vote on viewchange commit failed")
-					return
-				}
-
-			}
+			return
 		}
 
-		consensus.SetViewIDs(recvMsg.ViewID)
-		msgToSend := consensus.constructNewViewMessage(
-			recvMsg.ViewID, newLeaderPriKey,
-		)
-
-		if err := consensus.msgSender.SendWithRetry(
-			consensus.blockNum,
-			msg_pb.MessageType_NEWVIEW,
-			[]nodeconfig.GroupID{
-				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
-			p2p.ConstructMessage(msgToSend),
-		); err != nil {
-			consensus.getLogger().Err(err).
-				Msg("could not send out the NEWVIEW message")
+		payload := consensus.vc.GetM1Payload()
+		if err := consensus.selfCommit(payload); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[onViewChange] self commit failed")
+			return
 		}
-		consensus.getLogger().Info().
-			Str("myKey", newLeaderKey.Bytes.Hex()).
-			Hex("M1Payload", consensus.vc.GetM1Payload()).
-			Msg("[onViewChange] Sent NewView Messge")
-
-		consensus.ResetViewChangeState()
-		consensus.consensusTimeout[timeoutViewChange].Stop()
-		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Info().
-			Str("myKey", newLeaderKey.Bytes.Hex()).
-			Msg("[onViewChange] I am the New Leader")
+		if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
+			return
+		}
 	}
 }
 
@@ -376,9 +362,12 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 				Msg("[onNewView] Failed to Verify Signature for M1 (prepare) message")
 			return
 		}
+		consensus.mutex.Lock()
 		copy(consensus.blockHash[:], blockHash)
 		consensus.aggregatedPrepareSig = aggSig
 		consensus.prepareBitmap = mask
+		consensus.mutex.Unlock()
+
 		// create prepared message from newview
 		preparedMsg := FBFTMessage{
 			MessageType: msg_pb.MessageType_PREPARED,
@@ -403,6 +392,11 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	consensus.consensusTimeout[timeoutViewChange].Stop()
+
 	// newView message verified success, override my state
 	consensus.SetViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
@@ -410,32 +404,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// NewView message is verified, change state to normal consensus
 	if preparedBlock != nil {
-		// Construct and send the commit message
-		commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
-			preparedBlock.Epoch(), preparedBlock.Hash(), preparedBlock.NumberU64(), preparedBlock.Header().ViewID().Uint64())
-		groupID := []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
-
-		for _, key := range consensus.priKey {
-			if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
-				continue
-			}
-			p2pMsg, err := consensus.construct(
-				msg_pb.MessageType_COMMIT,
-				commitPayload,
-				[]*bls.PrivateKeyWrapper{&key},
-			)
-			if err != nil {
-				consensus.getLogger().Err(err).Msg("could not create commit message")
-				continue
-			}
-
-			consensus.getLogger().Info().Msg("onNewView === commit")
-			consensus.host.SendMessageToGroups(
-				groupID,
-				p2p.ConstructMessage(p2pMsg.Bytes),
-			)
-		}
+		consensus.sendCommitMessages(preparedBlock)
 		consensus.switchPhase("onNewView", FBFTCommit)
 	} else {
 		consensus.ResetState()
@@ -445,7 +414,6 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
-	consensus.consensusTimeout[timeoutViewChange].Stop()
 }
 
 // ResetViewChangeState resets the view change structure
