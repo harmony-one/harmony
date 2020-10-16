@@ -23,6 +23,7 @@ type harmonyConfig struct {
 	P2P       p2pConfig
 	HTTP      httpConfig
 	WS        wsConfig
+	RPCOpt    rpcOptConfig
 	BLSKeys   blsConfig
 	TxPool    txPoolConfig
 	Pprof     pprofConfig
@@ -115,6 +116,10 @@ type wsConfig struct {
 	Enabled bool
 	IP      string
 	Port    int
+}
+
+type rpcOptConfig struct {
+	Enabled bool
 }
 
 type devnetConfig struct {

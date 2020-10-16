@@ -191,6 +191,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyP2PFlags(cmd, config)
 	applyHTTPFlags(cmd, config)
 	applyWSFlags(cmd, config)
+	applyRPCOptFlags(cmd, config)
 	applyBLSFlags(cmd, config)
 	applyConsensusFlags(cmd, config)
 	applyTxPoolFlags(cmd, config)
@@ -306,12 +307,13 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	// Parse RPC config
 	nodeConfig.RPCServer = nodeconfig.RPCServerConfig{
-		HTTPEnabled: hc.HTTP.Enabled,
-		HTTPIp:      hc.HTTP.IP,
-		HTTPPort:    hc.HTTP.Port,
-		WSEnabled:   hc.WS.Enabled,
-		WSIp:        hc.WS.IP,
-		WSPort:      hc.WS.Port,
+		HTTPEnabled:  hc.HTTP.Enabled,
+		HTTPIp:       hc.HTTP.IP,
+		HTTPPort:     hc.HTTP.Port,
+		WSEnabled:    hc.WS.Enabled,
+		WSIp:         hc.WS.IP,
+		WSPort:       hc.WS.Port,
+		DebugEnabled: hc.RPCOpt.Enabled,
 	}
 	if nodeConfig.ShardID != shard.BeaconChainShardID {
 		utils.Logger().Info().
