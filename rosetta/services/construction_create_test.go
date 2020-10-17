@@ -11,6 +11,7 @@ import (
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/test/helpers"
 )
 
 func TestUnpackWrappedTransactionFromString(t *testing.T) {
@@ -27,8 +28,8 @@ func TestUnpackWrappedTransactionFromString(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(big.NewInt(0))
 
 	// Test plain transactions
-	tx, err := createTestTransaction(
-		signer, 0, 1, 2, refEstGasUsed.Uint64(), big.NewInt(1e10), []byte{0x01, 0x02},
+	tx, err := helpers.CreateTestTransaction(
+		signer, 0, 1, 2, refEstGasUsed.Uint64(), gasPrice, big.NewInt(1e10), []byte{0x01, 0x02},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -62,13 +63,13 @@ func TestUnpackWrappedTransactionFromString(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	stx, err := createTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
+	stx, err := helpers.CreateTestStakingTransaction(func() (stakingTypes.Directive, interface{}) {
 		return stakingTypes.DirectiveDelegate, stakingTypes.Delegate{
 			DelegatorAddress: refAddr,
 			ValidatorAddress: crypto.PubkeyToAddress(receiverKey.PublicKey),
 			Amount:           tenOnes,
 		}
-	}, refKey, 10, refEstGasUsed.Uint64())
+	}, refKey, 10, refEstGasUsed.Uint64(), gasPrice)
 	if err != nil {
 		t.Fatal(err)
 	}

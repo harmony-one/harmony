@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -10,6 +11,7 @@ import (
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
 
@@ -25,7 +27,7 @@ func NewAccountAPI(hmy *hmy.Harmony) server.AccountAPIServicer {
 	}
 }
 
-// AccountBalance ...
+// AccountBalance implements the /account/balance endpoint
 func (s *AccountAPI) AccountBalance(
 	ctx context.Context, request *types.AccountBalanceRequest,
 ) (*types.AccountBalanceResponse, *types.Error) {
@@ -73,7 +75,7 @@ func (s *AccountAPI) AccountBalance(
 
 	amount := types.Amount{
 		Value:    balance.String(),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
 	respBlock := types.BlockIdentifier{
@@ -85,4 +87,42 @@ func (s *AccountAPI) AccountBalance(
 		BlockIdentifier: &respBlock,
 		Balances:        []*types.Amount{&amount},
 	}, nil
+}
+
+// AccountMetadata used for account identifiers
+type AccountMetadata struct {
+	Address string `json:"hex_address"`
+}
+
+// newAccountIdentifier ..
+func newAccountIdentifier(
+	address ethCommon.Address,
+) (*types.AccountIdentifier, *types.Error) {
+	b32Address, err := internalCommon.AddressToBech32(address)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	metadata, err := types.MarshalMap(AccountMetadata{Address: address.String()})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	return &types.AccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}, nil
+}
+
+// getAddress ..
+func getAddress(
+	identifier *types.AccountIdentifier,
+) (ethCommon.Address, error) {
+	if identifier == nil {
+		return ethCommon.Address{}, fmt.Errorf("identifier cannot be nil")
+	}
+	return internalCommon.Bech32ToAddress(identifier.Address)
 }

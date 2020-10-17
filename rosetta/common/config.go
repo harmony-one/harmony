@@ -17,11 +17,11 @@ const (
 	// Blockchain ..
 	Blockchain = "Harmony"
 
-	// Symbol ..
-	Symbol = "ONE"
+	// NativeSymbol ..
+	NativeSymbol = "ONE"
 
-	// Decimals ..
-	Decimals = 18
+	// NativePrecision in the number of decimal places
+	NativePrecision = 18
 
 	// CurveType ..
 	CurveType = types.Secp256k1
@@ -40,14 +40,14 @@ var (
 	// IdleTimeout ..
 	IdleTimeout = 120 * time.Second
 
-	// Currency ..
-	Currency = types.Currency{
-		Symbol:   Symbol,
-		Decimals: Decimals,
+	// NativeCurrency ..
+	NativeCurrency = types.Currency{
+		Symbol:   NativeSymbol,
+		Decimals: NativePrecision,
 	}
 
-	// CurrencyHash for quick equivalent checks
-	CurrencyHash = types.Hash(Currency)
+	// NativeCurrencyHash for quick equivalent checks
+	NativeCurrencyHash = types.Hash(NativeCurrency)
 )
 
 // SyncStatus ..

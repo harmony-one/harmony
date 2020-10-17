@@ -436,6 +436,11 @@ func (b *Block) Uncles() []*block.Header {
 	return b.uncles
 }
 
+// IsLastBlockInEpoch returns if its the last block of the epoch.
+func (b *Block) IsLastBlockInEpoch() bool {
+	return b.header.IsLastBlockInEpoch()
+}
+
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions

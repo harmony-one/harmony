@@ -14,7 +14,7 @@ import (
 func TestGetContractCreationOperationComponents(t *testing.T) {
 	refAmount := &types.Amount{
 		Value:    "-12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refKey := internalCommon.MustGeneratePrivateKey()
 	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refKey.PublicKey))
@@ -57,7 +57,7 @@ func TestGetContractCreationOperationComponents(t *testing.T) {
 		Type: common.ContractCreationOperation,
 		Amount: &types.Amount{
 			Value:    "12000",
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Account: refFrom,
 	})
@@ -101,7 +101,7 @@ func TestGetContractCreationOperationComponents(t *testing.T) {
 func TestGetCrossShardOperationComponents(t *testing.T) {
 	refAmount := &types.Amount{
 		Value:    "-12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refFromKey := internalCommon.MustGeneratePrivateKey()
 	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
@@ -124,7 +124,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test valid operations
 	refOperation := &types.Operation{
-		Type:     common.CrossShardTransferOperation,
+		Type:     common.CrossShardTransferNativeOperation,
 		Amount:   refAmount,
 		Account:  refFrom,
 		Metadata: refMetadataMap,
@@ -148,7 +148,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test nil amount
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferOperation,
+		Type:     common.CrossShardTransferNativeOperation,
 		Amount:   nil,
 		Account:  refFrom,
 		Metadata: refMetadataMap,
@@ -159,10 +159,10 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test positive amount
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type: common.CrossShardTransferOperation,
+		Type: common.CrossShardTransferNativeOperation,
 		Amount: &types.Amount{
 			Value:    "12000",
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 		Account:  refFrom,
 		Metadata: refMetadataMap,
@@ -173,7 +173,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test different/unsupported currency
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type: common.CrossShardTransferOperation,
+		Type: common.CrossShardTransferNativeOperation,
 		Amount: &types.Amount{
 			Value: "-12000",
 			Currency: &types.Currency{
@@ -190,7 +190,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test nil account
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferOperation,
+		Type:     common.CrossShardTransferNativeOperation,
 		Amount:   refAmount,
 		Account:  nil,
 		Metadata: refMetadataMap,
@@ -201,7 +201,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test no metadata
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:    common.CrossShardTransferOperation,
+		Type:    common.CrossShardTransferNativeOperation,
 		Amount:  refAmount,
 		Account: refFrom,
 	})
@@ -224,7 +224,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferOperation,
+		Type:     common.CrossShardTransferNativeOperation,
 		Amount:   refAmount,
 		Account:  refFrom,
 		Metadata: badMetadataMap,
@@ -243,11 +243,11 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 func TestGetTransferOperationComponents(t *testing.T) {
 	refFromAmount := &types.Amount{
 		Value:    "-12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refToAmount := &types.Amount{
 		Value:    "12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refFromKey := internalCommon.MustGeneratePrivateKey()
 	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
@@ -266,7 +266,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0,
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Amount:  refFromAmount,
 			Account: refFrom,
 		},
@@ -279,7 +279,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 					Index: 0,
 				},
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Amount:  refToAmount,
 			Account: refTo,
 		},
@@ -345,20 +345,20 @@ func TestGetTransferOperationComponents(t *testing.T) {
 
 	// test invalid operation
 	refOperations[0].Type = common.ExpendGasOperation
-	refOperations[1].Type = common.TransferOperation
+	refOperations[1].Type = common.TransferNativeOperation
 	_, rosettaError = getTransferOperationComponents(refOperations)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
 
 	// test invalid operation sender
-	refOperations[0].Type = common.TransferOperation
+	refOperations[0].Type = common.TransferNativeOperation
 	refOperations[1].Type = common.ExpendGasOperation
 	_, rosettaError = getTransferOperationComponents(refOperations)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
-	refOperations[1].Type = common.TransferOperation
+	refOperations[1].Type = common.TransferNativeOperation
 
 	// test nil amount
 	refOperations[0].Amount = nil
@@ -385,7 +385,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 	refOperations[0].Account = refFrom
 	refOperations[1].Amount = &types.Amount{
 		Value:    "0",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refOperations[1].Account = refTo
 	_, rosettaError = getTransferOperationComponents(refOperations)
@@ -396,7 +396,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 	// test uneven amount sender
 	refOperations[0].Amount = &types.Amount{
 		Value:    "0",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refOperations[0].Account = refFrom
 	refOperations[1].Amount = refToAmount
@@ -439,7 +439,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
-	refOperations[0].Amount.Currency = &common.Currency
+	refOperations[0].Amount.Currency = &common.NativeCurrency
 
 	// test invalid currency sender
 	refOperations[0].Amount = refFromAmount
@@ -454,7 +454,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
-	refOperations[1].Amount.Currency = &common.Currency
+	refOperations[1].Amount.Currency = &common.NativeCurrency
 
 	// test invalid related operation
 	refOperations[1].RelatedOperations[0].Index = 2
@@ -493,11 +493,11 @@ func TestGetTransferOperationComponents(t *testing.T) {
 func TestGetOperationComponents(t *testing.T) {
 	refFromAmount := &types.Amount{
 		Value:    "-12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refToAmount := &types.Amount{
 		Value:    "12000",
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 	refFromKey := internalCommon.MustGeneratePrivateKey()
 	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
@@ -517,7 +517,7 @@ func TestGetOperationComponents(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0,
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Amount:  refFromAmount,
 			Account: refFrom,
 		},
@@ -530,7 +530,7 @@ func TestGetOperationComponents(t *testing.T) {
 					Index: 0,
 				},
 			},
-			Type:    common.TransferOperation,
+			Type:    common.TransferNativeOperation,
 			Amount:  refToAmount,
 			Account: refTo,
 		},
@@ -551,7 +551,7 @@ func TestGetOperationComponents(t *testing.T) {
 	}
 	_, rosettaError = GetOperationComponents([]*types.Operation{
 		{
-			Type:     common.CrossShardTransferOperation,
+			Type:     common.CrossShardTransferNativeOperation,
 			Amount:   refFromAmount,
 			Account:  refFrom,
 			Metadata: refMetadataMap,

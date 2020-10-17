@@ -183,11 +183,11 @@ func (s *ConstructAPI) ConstructionMetadata(
 	if options.GasPriceMultiplier != nil && *options.GasPriceMultiplier > 1 {
 		gasMul = *options.GasPriceMultiplier
 	}
-	suggestedFee, suggestedPrice := getSuggestedFeeAndPrice(gasMul, new(big.Int).SetUint64(estGasUsed))
+	sugNativeFee, sugNativePrice := getSuggestedNativeFeeAndPrice(gasMul, new(big.Int).SetUint64(estGasUsed))
 
 	metadata, err := types.MarshalMap(ConstructMetadata{
 		Nonce:       nonce,
-		GasPrice:    suggestedPrice,
+		GasPrice:    sugNativePrice,
 		GasLimit:    estGasUsed,
 		Transaction: options.TransactionMetadata,
 	})
@@ -198,12 +198,12 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}
 	return &types.ConstructionMetadataResponse{
 		Metadata:     metadata,
-		SuggestedFee: suggestedFee,
+		SuggestedFee: sugNativeFee,
 	}, nil
 }
 
-// getSuggestedFeeAndPrice ..
-func getSuggestedFeeAndPrice(
+// getSuggestedNativeFeeAndPrice ..
+func getSuggestedNativeFeeAndPrice(
 	gasMul float64, estGasUsed *big.Int,
 ) ([]*types.Amount, *big.Int) {
 	if estGasUsed == nil {
@@ -218,7 +218,7 @@ func getSuggestedFeeAndPrice(
 	return []*types.Amount{
 		{
 			Value:    fmt.Sprintf("%v", new(big.Int).Mul(gasPrice, estGasUsed)),
-			Currency: &common.Currency,
+			Currency: &common.NativeCurrency,
 		},
 	}, gasPrice
 }

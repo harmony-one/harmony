@@ -41,11 +41,11 @@ func parseUnsignedTransaction(
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := formatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	tempAccID, rosettaError := newAccountIdentifier(DefaultSenderAddress)
+	tempAccID, rosettaError := newAccountIdentifier(FormatDefaultSenderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -82,7 +82,7 @@ func parseSignedTransaction(
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := formatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}

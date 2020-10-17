@@ -396,7 +396,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	node.BroadcastMissingCXReceipts()
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if len(newBlock.Header().ShardState()) > 0 {
+	if newBlock.IsLastBlockInEpoch() {
 		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
 	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {

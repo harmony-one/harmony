@@ -116,6 +116,12 @@ func (h *Header) With() HeaderFieldSetter {
 	return HeaderFieldSetter{h: h}
 }
 
+// IsLastBlockInEpoch returns True if it is the last block of the epoch.
+// Note that the last block contains the shard state of the next epoch.
+func (h *Header) IsLastBlockInEpoch() bool {
+	return len(h.ShardState()) > 0
+}
+
 // HeaderRegistry is the taggedrlp type registry for versioned headers.
 var HeaderRegistry = taggedrlp.NewRegistry()
 

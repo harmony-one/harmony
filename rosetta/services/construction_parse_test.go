@@ -11,6 +11,7 @@ import (
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/test/helpers"
 )
 
 var (
@@ -20,8 +21,8 @@ var (
 
 func TestParseUnsignedTransaction(t *testing.T) {
 	refEstGasUsed := big.NewInt(100000)
-	testTx, err := createTestTransaction(
-		tempTestSigner, 0, 1, 2, refEstGasUsed.Uint64(), big.NewInt(1e18), []byte{},
+	testTx, err := helpers.CreateTestTransaction(
+		tempTestSigner, 0, 1, 2, refEstGasUsed.Uint64(), gasPrice, big.NewInt(1e18), []byte{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +38,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.Gas(),
 	}
-	refFormattedTx, rosettaError := formatTransaction(testTx, refTestReceipt)
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -83,8 +84,8 @@ func TestParseUnsignedTransactionStaking(t *testing.T) {
 
 func TestParseSignedTransaction(t *testing.T) {
 	refEstGasUsed := big.NewInt(100000)
-	testTx, err := createTestTransaction(
-		tempTestSigner, 0, 1, 2, refEstGasUsed.Uint64(), big.NewInt(1e18), []byte{},
+	testTx, err := helpers.CreateTestTransaction(
+		tempTestSigner, 0, 1, 2, refEstGasUsed.Uint64(), gasPrice, big.NewInt(1e18), []byte{},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +101,7 @@ func TestParseSignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.Gas(),
 	}
-	refFormattedTx, rosettaError := formatTransaction(testTx, refTestReceipt)
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
