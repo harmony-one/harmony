@@ -62,10 +62,11 @@ func (m *FBFTMessage) String() string {
 
 const (
 	idTypeBytes   = 4
+	idViewIDBytes = 8
 	idHashBytes   = common.HashLength
 	idSenderBytes = bls.PublicKeySizeInBytes
 
-	idBytes = idTypeBytes + idHashBytes + idSenderBytes
+	idBytes = idTypeBytes + idViewIDBytes + idHashBytes + idSenderBytes
 )
 
 type (
@@ -78,9 +79,13 @@ type (
 func (m *FBFTMessage) id() fbftMsgID {
 	var id fbftMsgID
 	binary.LittleEndian.PutUint32(id[:], uint32(m.MessageType))
-	copy(id[idTypeBytes:], m.BlockHash[:])
-	if m.SenderPubkey != nil {
-		copy(id[idTypeBytes+idHashBytes:], m.SenderPubkey.Bytes[:])
+	binary.LittleEndian.PutUint64(id[idTypeBytes:], m.ViewID)
+	copy(id[idTypeBytes+idViewIDBytes:], m.BlockHash[:])
+
+	if len(m.SenderPubkeys) == 1 {
+		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].Bytes[:])
+	} else {
+		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeyBitmap[:])
 	}
 	return id
 }

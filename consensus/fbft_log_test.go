@@ -13,14 +13,18 @@ func TestFBFTLog_id(t *testing.T) {
 	tests := []FBFTMessage{
 		{
 			MessageType: msg_pb.MessageType_ANNOUNCE,
+			ViewID:      4,
 			BlockHash:   [32]byte{01, 02},
-			SenderPubkey: &bls.PublicKeyWrapper{
+			SenderPubkeys: []*bls.PublicKeyWrapper{&bls.PublicKeyWrapper{
 				Bytes: bls.SerializedPublicKey{0x01, 0x02},
-			},
+			}},
+			SenderPubkeyBitmap: []byte{05, 07},
 		},
 		{
-			MessageType: msg_pb.MessageType_COMMIT,
-			BlockHash:   [32]byte{02, 03},
+			MessageType:        msg_pb.MessageType_COMMIT,
+			ViewID:             4,
+			BlockHash:          [32]byte{02, 03},
+			SenderPubkeyBitmap: []byte{05, 07},
 		},
 	}
 	for _, msg := range tests {
@@ -29,16 +33,18 @@ func TestFBFTLog_id(t *testing.T) {
 		if uint32(msg.MessageType) != binary.LittleEndian.Uint32(id[:]) {
 			t.Errorf("message type not expected")
 		}
-		if !bytes.Equal(id[idTypeBytes:idTypeBytes+idHashBytes], msg.BlockHash[:]) {
+		if msg.ViewID != binary.LittleEndian.Uint64(id[idTypeBytes:]) {
+			t.Errorf("view id not expected")
+		}
+		if !bytes.Equal(id[idTypeBytes+idViewIDBytes:idTypeBytes+idViewIDBytes+idHashBytes], msg.BlockHash[:]) {
 			t.Errorf("block hash not expected")
 		}
-		if msg.SenderPubkey == nil {
-			var emptyKey bls.SerializedPublicKey
-			if !bytes.Equal(id[idTypeBytes+idHashBytes:], emptyKey[:]) {
-				t.Errorf("sender key not expected when empty")
+		if len(msg.SenderPubkeys) != 1 {
+			if !bytes.Equal(id[idTypeBytes+idViewIDBytes+idHashBytes:idTypeBytes+idViewIDBytes+idHashBytes+len(msg.SenderPubkeyBitmap)], msg.SenderPubkeyBitmap[:]) {
+				t.Errorf("sender key expected to be the bitmap when key list is not size 1")
 			}
 		} else {
-			if !bytes.Equal(id[idTypeBytes+idHashBytes:], msg.SenderPubkey.Bytes[:]) {
+			if !bytes.Equal(id[idTypeBytes+idViewIDBytes+idHashBytes:], msg.SenderPubkeys[0].Bytes[:]) {
 				t.Errorf("sender key not expected")
 			}
 		}
