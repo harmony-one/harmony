@@ -241,7 +241,7 @@ var (
 	errVerifyM2        = errors.New("failed to verfiy signature for M2 message")
 	errM1Payload       = errors.New("failed to verify multi signature for M1 prepared payload")
 	errNoQuorum        = errors.New("no quorum on M1 (prepared) payload")
-	errIncorrectSender = errors.New("view change msg must have only one sender")
+	errIncorrectSender = errors.New("multiple senders not allowed")
 )
 
 // ProcessViewChangeMsg process the view change message after verification

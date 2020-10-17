@@ -90,6 +90,8 @@ func (m *FBFTMessage) id() fbftMsgID {
 	if m.HasSingleSender() {
 		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].Bytes[:])
 	} else {
+		// Currently this case is not reachable as only validator will use id() func
+		// and validator won't receive message with multiple senders
 		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeyBitmap[:])
 	}
 	return id

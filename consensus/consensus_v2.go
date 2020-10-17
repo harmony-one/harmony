@@ -522,6 +522,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	}
 	if !committedMsg.HasSingleSender() {
 		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
+		return errIncorrectSender
 	}
 
 	atomic.AddUint64(&consensus.blockNum, 1)
