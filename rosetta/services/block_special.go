@@ -210,9 +210,9 @@ func (s *BlockAPI) specialBlockTransaction(
 
 // preStakingRewardBlockTransaction is a special handler for pre-staking era
 func (s *BlockAPI) preStakingRewardBlockTransaction(
-	ctx context.Context, txID *types.TransactionIdentifier, currBlock *hmytypes.Block,
+	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
 ) (*types.BlockTransactionResponse, *types.Error) {
-	if currBlock.Number().Cmp(big.NewInt(1)) != 1 {
+	if blk.Number().Cmp(big.NewInt(1)) != 1 {
 		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
 			"message": "block does not contain any pre-staking era block rewards",
 		})
@@ -221,21 +221,21 @@ func (s *BlockAPI) preStakingRewardBlockTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	blockNumToBeRewarded := currBlock.Number().Uint64() - 1
-	rewardedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumToBeRewarded).EthBlockNumber())
+	blockNumOfSigsForReward := blk.Number().Uint64() - 1
+	signedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumOfSigsForReward).EthBlockNumber())
 	if err != nil {
 		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
-	if blkHash.String() != currBlock.Hash().String() {
+	if blkHash.String() != blk.Hash().String() {
 		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": fmt.Sprintf(
-				"block hash %v != requested block hash %v in tx ID", blkHash.String(), currBlock.Hash().String(),
+				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
 			),
 		})
 	}
-	blockSignerInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, rewardedBlock)
+	blockSignerInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, signedBlock)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
