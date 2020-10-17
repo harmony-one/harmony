@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/common/fdlimit"
+	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -195,6 +196,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyTxPoolFlags(cmd, config)
 	applyPprofFlags(cmd, config)
 	applyLogFlags(cmd, config)
+	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
 }
@@ -272,6 +274,12 @@ func setupNodeAndRun(hc harmonyConfig) {
 	currentNode := setupConsensusAndNode(hc, nodeConfig)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
+
+	// Check NTP configuration
+	if !ntp.IsLocalTimeAccurate(nodeConfig.NtpServer) {
+		fmt.Fprintf(os.Stderr, "ERROR: local timeclock is not accurate. Please config NTP properly.\n")
+		os.Exit(1)
+	}
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
@@ -403,7 +411,6 @@ func nodeconfigSetShardSchedule(config harmonyConfig) {
 			dnConfig = getDefaultDevnetConfigCopy()
 		}
 
-		// TODO (leo): use a passing list of accounts here
 		devnetConfig, err := shardingconfig.NewInstance(
 			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
@@ -530,6 +537,8 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 		}
 		nodeConfig.WebHooks.Hooks = config
 	}
+
+	nodeConfig.NtpServer = hc.Sys.NtpServer
 
 	return nodeConfig, nil
 }

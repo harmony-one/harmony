@@ -62,6 +62,9 @@ var defaultConfig = harmonyConfig{
 		RotateSize: 100,
 		Verbosity:  3,
 	},
+	Sys: sysConfig{
+		NtpServer: "1.pool.ntp.org",
+	},
 }
 
 var defaultDevnetConfig = devnetConfig{
@@ -79,6 +82,10 @@ var defaultRevertConfig = revertConfig{
 var defaultLogContext = logContext{
 	IP:   "127.0.0.1",
 	Port: 9000,
+}
+
+var defaultSysConfig = sysConfig{
+	NtpServer: "1.pool.ntp.org",
 }
 
 var defaultConsensusConfig = consensusConfig{
@@ -117,6 +124,11 @@ func getDefaultLogContextCopy() logContext {
 
 func getDefaultConsensusConfigCopy() consensusConfig {
 	config := defaultConsensusConfig
+	return config
+}
+
+func getDefaultSysConfigCopy() sysConfig {
+	config := defaultSysConfig
 	return config
 }
 

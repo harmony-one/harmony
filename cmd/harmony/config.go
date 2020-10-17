@@ -27,6 +27,7 @@ type harmonyConfig struct {
 	TxPool    txPoolConfig
 	Pprof     pprofConfig
 	Log       logConfig
+	Sys       sysConfig
 	Consensus *consensusConfig `toml:",omitempty"`
 	Devnet    *devnetConfig    `toml:",omitempty"`
 	Revert    *revertConfig    `toml:",omitempty"`
@@ -96,6 +97,10 @@ type logConfig struct {
 type logContext struct {
 	IP   string
 	Port int
+}
+
+type sysConfig struct {
+	NtpServer string
 }
 
 type httpConfig struct {
