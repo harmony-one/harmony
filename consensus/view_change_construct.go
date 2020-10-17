@@ -254,8 +254,8 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	defer vc.vcLock.Unlock()
 
 	preparedBlock := &types.Block{}
-	if len(recvMsg.SenderPubkeys) != 1 {
-		return errNoQuorum
+	if !recvMsg.HasSingleSender() {
+		return errIncorrectSender
 	}
 	senderKey := recvMsg.SenderPubkeys[0]
 	senderKeyStr := senderKey.Bytes.Hex()

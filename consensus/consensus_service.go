@@ -200,7 +200,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
-		if len(msg.SenderPubkeys) != 1 {
+		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]

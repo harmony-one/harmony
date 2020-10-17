@@ -520,7 +520,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	if err := consensus.OnConsensusDone(blk); err != nil {
 		return err
 	}
-	if len(committedMsg.SenderPubkeys) != 1 {
+	if !committedMsg.HasSingleSender() {
 		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
 	}
 

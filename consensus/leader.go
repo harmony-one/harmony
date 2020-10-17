@@ -155,7 +155,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 	signerPubKey := &bls_core.PublicKey{}
-	if len(recvMsg.SenderPubkeys) == 1 {
+	if recvMsg.HasSingleSender() {
 		signerPubKey = recvMsg.SenderPubkeys[0].Object
 	} else {
 		for _, pubKey := range recvMsg.SenderPubkeys {
@@ -250,7 +250,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Logger()
 
 	signerPubKey := &bls_core.PublicKey{}
-	if len(recvMsg.SenderPubkeys) == 1 {
+	if recvMsg.HasSingleSender() {
 		signerPubKey = recvMsg.SenderPubkeys[0].Object
 	} else {
 		for _, pubKey := range recvMsg.SenderPubkeys {

@@ -72,7 +72,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
 	if len(logMsgs) > 0 {
-		if len(logMsgs[0].SenderPubkeys) != 1 || len(recvMsg.SenderPubkeys) != 1 {
+		if !logMsgs[0].HasSingleSender() || !recvMsg.HasSingleSender() {
 			consensus.getLogger().Warn().
 				Str("logMsgs[0]", logMsgs[0].String()).
 				Str("recvMsg", recvMsg.String()).
@@ -174,7 +174,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		return false
 	}
 
-	if len(recvMsg.SenderPubkeys) != 1 {
+	if !recvMsg.HasSingleSender() {
 		consensus.getLogger().Error().Msg("[onViewChangeSanityCheck] zero or multiple signers in view change message.")
 		return false
 	}

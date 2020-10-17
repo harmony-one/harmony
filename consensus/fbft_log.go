@@ -60,6 +60,11 @@ func (m *FBFTMessage) String() string {
 	)
 }
 
+// HasSingleSender returns whether the message has only a single sender
+func (m *FBFTMessage) HasSingleSender() bool {
+	return len(m.SenderPubkeys) == 1
+}
+
 const (
 	idTypeBytes   = 4
 	idViewIDBytes = 8
@@ -82,7 +87,7 @@ func (m *FBFTMessage) id() fbftMsgID {
 	binary.LittleEndian.PutUint64(id[idTypeBytes:], m.ViewID)
 	copy(id[idTypeBytes+idViewIDBytes:], m.BlockHash[:])
 
-	if len(m.SenderPubkeys) == 1 {
+	if m.HasSingleSender() {
 		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].Bytes[:])
 	} else {
 		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeyBitmap[:])

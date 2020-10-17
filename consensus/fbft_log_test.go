@@ -39,7 +39,7 @@ func TestFBFTLog_id(t *testing.T) {
 		if !bytes.Equal(id[idTypeBytes+idViewIDBytes:idTypeBytes+idViewIDBytes+idHashBytes], msg.BlockHash[:]) {
 			t.Errorf("block hash not expected")
 		}
-		if len(msg.SenderPubkeys) != 1 {
+		if !msg.HasSingleSender() {
 			if !bytes.Equal(id[idTypeBytes+idViewIDBytes+idHashBytes:idTypeBytes+idViewIDBytes+idHashBytes+len(msg.SenderPubkeyBitmap)], msg.SenderPubkeyBitmap[:]) {
 				t.Errorf("sender key expected to be the bitmap when key list is not size 1")
 			}

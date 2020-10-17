@@ -323,7 +323,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
-	if len(recvMsg.SenderPubkeys) != 1 {
+	if !recvMsg.HasSingleSender() {
 		consensus.getLogger().Error().Msg("[onNewView] multiple signers in view change message.")
 		return
 	}
