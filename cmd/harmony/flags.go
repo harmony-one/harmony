@@ -904,6 +904,7 @@ var (
 		Name:     "sys.ntp",
 		Usage:    "the ntp server",
 		DefValue: defaultConfig.Sys.NtpServer,
+		Hidden:   true,
 	}
 )
 
