@@ -4,24 +4,35 @@ import (
 	"time"
 
 	beevik_ntp "github.com/beevik/ntp"
+	"github.com/pkg/errors"
 )
 
 const (
 	// tolerance range of local clock with NTP time server
-	toleranceRange = time.Duration(50 * time.Millisecond)
+	toleranceRangeWarning = time.Duration(10 * time.Second)
+	toleranceRangeError   = time.Duration(30 * time.Second)
 )
 
-// IsLocalTimeAccurate returns whether the local clock acturate or not
-func IsLocalTimeAccurate(ntpServer string) bool {
+var (
+	errDriftTooMuch = errors.New("local time drift off ntp server more than 30 seconds")
+	errDriftInRange = errors.New("local time drift off ntp server more than 10 seconds")
+)
+
+// CheckLocalTimeAccurate returns whether the local clock accurate or not
+func CheckLocalTimeAccurate(ntpServer string) (bool, error) {
 	response, err := beevik_ntp.Query(ntpServer)
-	// failed to query ntp time, return false
+	// failed to query ntp time
 	if err != nil {
-		return false
+		return false, err
 	}
-	if response.ClockOffset > toleranceRange {
-		return false
+	// drift too much
+	if response.ClockOffset > toleranceRangeError {
+		return false, errDriftTooMuch
 	}
-	return true
+	if response.ClockOffset > toleranceRangeWarning {
+		return true, errDriftInRange
+	}
+	return true, nil
 }
 
 // CurrentTime return the current time calibrated using ntp server

@@ -84,10 +84,6 @@ var defaultLogContext = logContext{
 	Port: 9000,
 }
 
-var defaultSysConfig = sysConfig{
-	NtpServer: "1.pool.ntp.org",
-}
-
 var defaultConsensusConfig = consensusConfig{
 	MinPeers: 6,
 }
@@ -124,11 +120,6 @@ func getDefaultLogContextCopy() logContext {
 
 func getDefaultConsensusConfigCopy() consensusConfig {
 	config := defaultConsensusConfig
-	return config
-}
-
-func getDefaultSysConfigCopy() sysConfig {
-	config := defaultSysConfig
 	return config
 }
 

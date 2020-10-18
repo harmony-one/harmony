@@ -276,9 +276,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 
 	// Check NTP configuration
-	if !ntp.IsLocalTimeAccurate(nodeConfig.NtpServer) {
-		fmt.Fprintf(os.Stderr, "ERROR: local timeclock is not accurate. Please config NTP properly.\n")
+	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
+	if !accurate {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: local timeclock is not accurate. Please config NTP properly.\n")
 		os.Exit(1)
+	}
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
 	}
 
 	// Prepare for graceful shutdown from os signals

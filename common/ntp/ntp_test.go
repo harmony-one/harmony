@@ -5,13 +5,15 @@ import (
 	"testing"
 )
 
-func TestIsLocalTimeAccurate(t *testing.T) {
-	if !IsLocalTimeAccurate("0.pool.ntp.org") {
-		t.Fatal("local time is not accurate")
+func TestCheckLocalTimeAccurate(t *testing.T) {
+	accurate, err := CheckLocalTimeAccurate("0.pool.ntp.org")
+	if !accurate {
+		t.Fatalf("local time is not accurate: %v\n", err)
 	}
 
-	if IsLocalTimeAccurate("wrong.ip") {
-		t.Fatal("query ntp pool should failed")
+	accurate, err = CheckLocalTimeAccurate("wrong.ip")
+	if accurate {
+		t.Fatalf("query ntp pool should failed: %v\n", err)
 	}
 }
 

@@ -908,13 +908,12 @@ var (
 )
 
 func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.HasFlagsChanged(cmd, sysFlags) {
-		cfg := getDefaultSysConfigCopy()
-		config.Sys = cfg
-	}
-
 	if cli.IsFlagChanged(cmd, sysNtpServerFlag) {
 		config.Sys.NtpServer = cli.GetStringFlagValue(cmd, sysNtpServerFlag)
+	}
+
+	if config.Sys.NtpServer == "" {
+		config.Sys.NtpServer = defaultConfig.Sys.NtpServer
 	}
 }
 
