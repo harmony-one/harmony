@@ -224,7 +224,88 @@ func TestEnableKeyFunctions(test *testing.T) {
 	}
 
 	if err := mask.SetKey(pubKey4.Bytes, true); err == nil {
-		test.Error("Expected key nout found error")
+		test.Error("Expected key not found error")
+	}
+}
+
+func TestGetSignedPubKeysFromBitmap(test *testing.T) {
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey4 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	pubKey4.Bytes.FromLibBLSPublicKey(pubKey4.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
+
+	if err != nil {
+		test.Errorf("Failed to create a new Mask: %s", err)
+	}
+	length := mask.Len()
+	_ = length
+
+	if mask.Len() != 1 {
+		test.Errorf("Mask created with wrong size: %d", mask.Len())
+	}
+
+	mask.SetBit(0, true)
+	mask.SetBit(1, false)
+	mask.SetBit(0, true)
+	mask.SetBit(2, true)
+
+	enabledKeysFromBitmap, _ := mask.GetSignedPubKeysFromBitmap(mask.Bitmap)
+
+	if len(enabledKeysFromBitmap) != 2 ||
+		!enabledKeysFromBitmap[0].Object.IsEqual(pubKey1.Object) || !enabledKeysFromBitmap[1].Object.IsEqual(pubKey3.Object) {
+		test.Error("Enabled keys from bitmap are incorrect")
+	}
+}
+
+func TestSetKeyAtomic(test *testing.T) {
+	pubKey1 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey2 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey3 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+	pubKey4 := PublicKeyWrapper{Object: RandPrivateKey().GetPublicKey()}
+
+	pubKey1.Bytes.FromLibBLSPublicKey(pubKey1.Object)
+	pubKey2.Bytes.FromLibBLSPublicKey(pubKey2.Object)
+	pubKey3.Bytes.FromLibBLSPublicKey(pubKey3.Object)
+	pubKey4.Bytes.FromLibBLSPublicKey(pubKey4.Object)
+	mask, err := NewMask([]PublicKeyWrapper{pubKey1, pubKey2, pubKey3}, &pubKey1)
+
+	if err != nil {
+		test.Errorf("Failed to create a new Mask: %s", err)
+	}
+	length := mask.Len()
+	_ = length
+
+	if mask.Len() != 1 {
+		test.Errorf("Mask created with wrong size: %d", mask.Len())
+	}
+
+	mask.SetKey(pubKey1.Bytes, true)
+
+	enabledKeysFromBitmap, _ := mask.GetSignedPubKeysFromBitmap(mask.Bitmap)
+
+	if len(enabledKeysFromBitmap) != 1 ||
+		!enabledKeysFromBitmap[0].Object.IsEqual(pubKey1.Object) {
+		test.Error("Enabled keys from bitmap are incorrect")
+	}
+
+	mask.SetKeysAtomic([]*PublicKeyWrapper{&pubKey1, &pubKey2}, true)
+
+	enabledKeysFromBitmap, _ = mask.GetSignedPubKeysFromBitmap(mask.Bitmap)
+	if len(enabledKeysFromBitmap) != 2 ||
+		!enabledKeysFromBitmap[0].Object.IsEqual(pubKey1.Object) || !enabledKeysFromBitmap[1].Object.IsEqual(pubKey2.Object) {
+		test.Error("Enabled keys from bitmap are incorrect")
+	}
+
+	err = mask.SetKeysAtomic([]*PublicKeyWrapper{&pubKey1, &pubKey4}, true)
+
+	if !strings.Contains(err.Error(), "key not found") {
+		test.Error(err, "expect error due to key not found")
 	}
 }
 

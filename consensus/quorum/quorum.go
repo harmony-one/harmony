@@ -80,7 +80,7 @@ type ParticipantTracker interface {
 type SignatoryTracker interface {
 	ParticipantTracker
 	SubmitVote(
-		p Phase, pubkey bls.SerializedPublicKey,
+		p Phase, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
@@ -117,7 +117,7 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkey bls.SerializedPublicKey,
+		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
@@ -168,10 +168,29 @@ type depInject struct {
 func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 	ballots := s.ReadAllBallots(p)
 	sigs := make([]*bls_core.Sign, 0, len(ballots))
+	collectedKeys := map[bls_cosi.SerializedPublicKey]struct{}{}
 	for _, ballot := range ballots {
 		sig := &bls_core.Sign{}
 		// NOTE invariant that shouldn't happen by now
 		// but pointers are pointers
+
+		// If the multisig from any of the signers in this ballot are already collected,
+		// we need to skip this ballot as its multisig is a duplicate.
+		alreadyCollected := false
+		for _, key := range ballot.SignerPubKeys {
+			if _, ok := collectedKeys[key]; ok {
+				alreadyCollected = true
+				break
+			}
+		}
+		if alreadyCollected {
+			continue
+		}
+
+		for _, key := range ballot.SignerPubKeys {
+			collectedKeys[key] = struct{}{}
+		}
+
 		if ballot != nil {
 			sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
 			sigs = append(sigs, sig)
@@ -231,30 +250,43 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) SubmitVote(
-	p Phase, pubkey bls.SerializedPublicKey,
+	p Phase, pubkeys []bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
-	if ballet := s.ReadBallot(p, pubkey); ballet != nil {
-		return nil, errors.Errorf("vote is already submitted %x", pubkey)
+	seenKeys := map[bls.SerializedPublicKey]struct{}{}
+	for _, pubKey := range pubkeys {
+		if _, ok := seenKeys[pubKey]; ok {
+			return nil, errors.Errorf("duplicate key found in votes %x", pubKey)
+		}
+		seenKeys[pubKey] = struct{}{}
+
+		if ballet := s.ReadBallot(p, pubKey); ballet != nil {
+			return nil, errors.Errorf("vote is already submitted %x", pubKey)
+		}
 	}
 
 	ballot := &votepower.Ballot{
-		SignerPubKey:    pubkey,
+		SignerPubKeys:   pubkeys,
 		BlockHeaderHash: headerHash,
 		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
 		Height:          height,
 		ViewID:          viewID,
 	}
-	switch p {
-	case Prepare:
-		s.prepare.BallotBox[pubkey] = ballot
-	case Commit:
-		s.commit.BallotBox[pubkey] = ballot
-	case ViewChange:
-		s.viewChange.BallotBox[pubkey] = ballot
-	default:
-		return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
+
+	// For each of the keys signed in the multi-sig, a separate ballot with the same multisig is recorded
+	// This way it's easier to check if a specific key already signed or not.
+	for _, pubKey := range pubkeys {
+		switch p {
+		case Prepare:
+			s.prepare.BallotBox[pubKey] = ballot
+		case Commit:
+			s.commit.BallotBox[pubKey] = ballot
+		case ViewChange:
+			s.viewChange.BallotBox[pubKey] = ballot
+		default:
+			return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
+		}
 	}
 	return ballot, nil
 }

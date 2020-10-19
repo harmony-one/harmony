@@ -176,8 +176,8 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	}
 	FBFTMsg.ViewidSig = &vcSig1
 
-	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+	FBFTMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
+	copy(FBFTMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
 	FBFTMsg.LeaderPubkey = &bls.PublicKeyWrapper{Object: leaderKey}
 	copy(FBFTMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
 
@@ -210,8 +210,8 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 		return nil, err
 	}
 
-	FBFTMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(FBFTMsg.SenderPubkey.Bytes[:], vcMsg.SenderPubkey[:])
+	FBFTMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
+	copy(FBFTMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
 
 	if len(vcMsg.M3Aggsigs) > 0 {
 		m3Sig := bls_core.Sign{}

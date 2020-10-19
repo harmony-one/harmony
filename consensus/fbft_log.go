@@ -18,27 +18,32 @@ import (
 
 // FBFTMessage is the record of pbft messages received by a node during FBFT process
 type FBFTMessage struct {
-	MessageType   msg_pb.MessageType
-	ViewID        uint64
-	BlockNum      uint64
-	BlockHash     common.Hash
-	Block         []byte
-	SenderPubkey  *bls.PublicKeyWrapper
-	LeaderPubkey  *bls.PublicKeyWrapper
-	Payload       []byte
-	ViewchangeSig *bls_core.Sign
-	ViewidSig     *bls_core.Sign
-	M2AggSig      *bls_core.Sign
-	M2Bitmap      *bls_cosi.Mask
-	M3AggSig      *bls_core.Sign
-	M3Bitmap      *bls_cosi.Mask
+	MessageType        msg_pb.MessageType
+	ViewID             uint64
+	BlockNum           uint64
+	BlockHash          common.Hash
+	Block              []byte
+	SenderPubkeys      []*bls.PublicKeyWrapper
+	SenderPubkeyBitmap []byte
+	LeaderPubkey       *bls.PublicKeyWrapper
+	Payload            []byte
+	ViewchangeSig      *bls_core.Sign
+	ViewidSig          *bls_core.Sign
+	M2AggSig           *bls_core.Sign
+	M2Bitmap           *bls_cosi.Mask
+	M3AggSig           *bls_core.Sign
+	M3Bitmap           *bls_cosi.Mask
 }
 
 // String ..
 func (m *FBFTMessage) String() string {
 	sender := ""
-	if m.SenderPubkey != nil {
-		sender = m.SenderPubkey.Bytes.Hex()
+	for _, key := range m.SenderPubkeys {
+		if sender == "" {
+			sender = key.Bytes.Hex()
+		} else {
+			sender = sender + ";" + key.Bytes.Hex()
+		}
 	}
 	leader := ""
 	if m.LeaderPubkey != nil {
@@ -55,12 +60,18 @@ func (m *FBFTMessage) String() string {
 	)
 }
 
+// HasSingleSender returns whether the message has only a single sender
+func (m *FBFTMessage) HasSingleSender() bool {
+	return len(m.SenderPubkeys) == 1
+}
+
 const (
 	idTypeBytes   = 4
+	idViewIDBytes = 8
 	idHashBytes   = common.HashLength
 	idSenderBytes = bls.PublicKeySizeInBytes
 
-	idBytes = idTypeBytes + idHashBytes + idSenderBytes
+	idBytes = idTypeBytes + idViewIDBytes + idHashBytes + idSenderBytes
 )
 
 type (
@@ -73,9 +84,15 @@ type (
 func (m *FBFTMessage) id() fbftMsgID {
 	var id fbftMsgID
 	binary.LittleEndian.PutUint32(id[:], uint32(m.MessageType))
-	copy(id[idTypeBytes:], m.BlockHash[:])
-	if m.SenderPubkey != nil {
-		copy(id[idTypeBytes+idHashBytes:], m.SenderPubkey.Bytes[:])
+	binary.LittleEndian.PutUint64(id[idTypeBytes:], m.ViewID)
+	copy(id[idTypeBytes+idViewIDBytes:], m.BlockHash[:])
+
+	if m.HasSingleSender() {
+		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].Bytes[:])
+	} else {
+		// Currently this case is not reachable as only validator will use id() func
+		// and validator won't receive message with multiple senders
+		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeyBitmap[:])
 	}
 	return id
 }
@@ -291,7 +308,7 @@ func (log *FBFTLog) FindMessageByMaxViewID(msgs []*FBFTMessage) *FBFTMessage {
 }
 
 // ParseFBFTMessage parses FBFT message into FBFTMessage structure
-func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
+func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	// TODO Have this do sanity checks on the message please
 	pbftMsg := FBFTMessage{}
 	pbftMsg.MessageType = msg.GetType()
@@ -303,13 +320,27 @@ func ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
+	pbftMsg.SenderPubkeyBitmap = make([]byte, len(consensusMsg.SenderPubkeyBitmap))
+	copy(pbftMsg.SenderPubkeyBitmap[:], consensusMsg.SenderPubkeyBitmap[:])
 
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
-	if err != nil {
-		return nil, err
+	if len(consensusMsg.SenderPubkey) != 0 {
+		// If SenderPubKey is populated, treat it as a single key message
+		pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
+		if err != nil {
+			return nil, err
+		}
+		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
+		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
+	} else {
+		// else, it should be a multi-key message where the bitmap is populated
+		consensus.multiSigMutex.RLock()
+		pubKeys, err := consensus.multiSigBitmap.GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
+		consensus.multiSigMutex.RUnlock()
+		if err != nil {
+			return nil, err
+		}
+		pbftMsg.SenderPubkeys = pubKeys
 	}
-	pbftMsg.SenderPubkey = &bls.PublicKeyWrapper{Object: pubKey}
-	copy(pbftMsg.SenderPubkey.Bytes[:], consensusMsg.SenderPubkey[:])
 
 	return &pbftMsg, nil
 }

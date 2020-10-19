@@ -33,7 +33,7 @@ var (
 // explorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Message) error {
 	if msg.Type == msg_pb.MessageType_COMMITTED {
-		recvMsg, err := consensus.ParseFBFTMessage(msg)
+		recvMsg, err := node.Consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msg("[Explorer] onCommitted unable to parse msg")
@@ -79,7 +79,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
 
-		recvMsg, err := consensus.ParseFBFTMessage(msg)
+		recvMsg, err := node.Consensus.ParseFBFTMessage(msg)
 		if err != nil {
 			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
 			return err

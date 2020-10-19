@@ -50,6 +50,10 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
+
+	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
+	multiSigMutex  sync.RWMutex
+
 	// The chain reader for the blockchain this consensus is working on
 	ChainReader *core.BlockChain
 	// Minimal number of peers in the shard
@@ -109,8 +113,8 @@ type Consensus struct {
 	BlockPeriod time.Duration
 	// The time due for next block proposal
 	NextBlockDue time.Time
-	// Temporary flag to control whether multi-sig signing is enabled
-	MultiSig bool
+	// Temporary flag to control whether aggregate signature signing is enabled
+	AggregateSig bool
 
 	// TODO (leo): an new metrics system to keep track of the consensus/viewchange
 	// finality of previous consensus in the unit of milliseconds
@@ -180,7 +184,6 @@ func New(
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
 	consensus.phase = FBFTAnnounce
-	// TODO Refactor consensus.block* into State?
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()

@@ -111,7 +111,7 @@ func (consensus *Consensus) finalizeCommits() {
 		return
 	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, leaderPriKey)
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[FinalizeCommits] Unable to construct Committed message")
@@ -520,10 +520,14 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	if err := consensus.OnConsensusDone(blk); err != nil {
 		return err
 	}
+	if !committedMsg.HasSingleSender() {
+		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
+		return errIncorrectSender
+	}
 
 	atomic.AddUint64(&consensus.blockNum, 1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
-	consensus.LeaderPubKey = committedMsg.SenderPubkey
+	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	consensus.ResetState()
 	return nil
 }

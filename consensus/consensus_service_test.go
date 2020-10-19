@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -13,49 +12,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 )
-
-func TestPopulateMessageFields(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
-	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
-	if err != nil {
-		t.Fatalf("newhost failure: %v", err)
-	}
-	blsPriKey := bls.RandPrivateKey()
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityVote, shard.BeaconChainShardID,
-	)
-	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
-	)
-	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
-	}
-	consensus.SetCurBlockViewID(2)
-	blockHash := [32]byte{}
-	consensus.blockHash = blockHash
-
-	msg := &msg_pb.Message{
-		Request: &msg_pb.Message_Consensus{
-			Consensus: &msg_pb.ConsensusRequest{},
-		},
-	}
-
-	keyBytes := bls.SerializedPublicKey{}
-	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
-	consensusMsg := consensus.populateMessageFields(msg.GetConsensus(), consensus.blockHash[:],
-		keyBytes)
-
-	if consensusMsg.ViewId != 2 {
-		t.Errorf("Consensus ID is not populated correctly")
-	}
-	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
-		t.Errorf("Block hash is not populated correctly")
-	}
-	if !bytes.Equal(consensusMsg.SenderPubkey, blsPriKey.GetPublicKey().Serialize()) {
-		t.Errorf("Sender ID is not populated correctly")
-	}
-}
 
 func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}

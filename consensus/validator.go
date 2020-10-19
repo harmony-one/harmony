@@ -5,17 +5,19 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
 			Err(err).
@@ -59,79 +61,45 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) prepare() {
-	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
-	for _, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
-			continue
-		}
-		networkMessage, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, &key)
-		if err != nil {
-			consensus.getLogger().Err(err).
-				Str("message-type", msg_pb.MessageType_PREPARE.String()).
-				Msg("could not construct message")
-			return
-		}
+	priKeys := consensus.getPriKeysInCommittee()
 
-		// TODO: this will not return immediately, may block
-		if consensus.current.Mode() != Listening {
-			if err := consensus.msgSender.SendWithoutRetry(
-				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
-			); err != nil {
-				consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
-			} else {
-				consensus.getLogger().Info().
-					Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
-					Msg("[OnAnnounce] Sent Prepare Message!!")
-			}
-		}
+	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_PREPARE, nil, priKeys)
+
+	if err := consensus.broadcastConsensusP2pMessages(p2pMsgs); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[OnAnnounce] Cannot send prepare message")
+	} else {
+		consensus.getLogger().Info().
+			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
+			Msg("[OnAnnounce] Sent Prepare Message!!")
 	}
+
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
-	// Sign commit signature on the received block
+	priKeys := consensus.getPriKeysInCommittee()
+
+	// Sign commit signature on the received block and construct the p2p messages
 	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
-	groupID := []nodeconfig.GroupID{
-		nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-	}
-	for _, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
-			continue
-		}
 
-		networkMessage, err := consensus.construct(
-			msg_pb.MessageType_COMMIT,
-			commitPayload,
-			&key,
-		)
-		if err != nil {
-			consensus.getLogger().Warn().Msg("[sendCommitMessages] cannot construct network message")
-			continue
-		}
+	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_COMMIT, commitPayload, priKeys)
 
-		if consensus.current.Mode() != Listening {
-			if err := consensus.msgSender.SendWithoutRetry(
-				groupID,
-				p2p.ConstructMessage(networkMessage.Bytes),
-			); err != nil {
-				consensus.getLogger().Warn().Msg("[sendCommitMessages] Cannot send commit message!!")
-			} else {
-				consensus.getLogger().Info().
-					Uint64("blockNum", consensus.blockNum).
-					Hex("blockHash", consensus.blockHash[:]).
-					Msg("[sendCommitMessages] Sent Commit Message!!")
-			}
-		}
+	if err := consensus.broadcastConsensusP2pMessages(p2pMsgs); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[sendCommitMessages] Cannot send commit message!!")
+	} else {
+		consensus.getLogger().Info().
+			Uint64("blockNum", consensus.blockNum).
+			Hex("blockHash", consensus.blockHash[:]).
+			Msg("[sendCommitMessages] Sent Commit Message!!")
 	}
 }
 
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnPrepared] Unparseable validator message")
 		return
@@ -234,7 +202,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 
-	// TODO: genesis account node delay for 1 second,
 	// this is a temp fix for allows FN nodes to earning reward
 	if consensus.delayCommit > 0 {
 		time.Sleep(consensus.delayCommit)
@@ -249,12 +216,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
+
 	consensus.sendCommitMessages(&blockObj)
 	consensus.switchPhase("onPrepared", FBFTCommit)
 }
 
 func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
-	recvMsg, err := ParseFBFTMessage(msg)
+	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
@@ -323,6 +291,68 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
+}
+
+// Collect private keys that are part of the current committee.
+// TODO: cache valid private keys and only update when keys change.
+func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
+	priKeys := []*bls.PrivateKeyWrapper{}
+	for i, key := range consensus.priKey {
+		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+			continue
+		}
+		priKeys = append(priKeys, &consensus.priKey[i])
+	}
+	return priKeys
+}
+
+func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper) []*NetworkMessage {
+	p2pMsgs := []*NetworkMessage{}
+	if consensus.AggregateSig {
+		networkMessage, err := consensus.construct(msgType, payloadForSign, priKeys)
+		if err != nil {
+			logger := consensus.getLogger().Err(err).
+				Str("message-type", msgType.String())
+			for _, key := range priKeys {
+				logger.Str("key", key.Pri.SerializeToHexStr())
+			}
+			logger.Msg("could not construct message")
+		} else {
+			p2pMsgs = append(p2pMsgs, networkMessage)
+		}
+
+	} else {
+		for _, key := range priKeys {
+			networkMessage, err := consensus.construct(msgType, payloadForSign, []*bls.PrivateKeyWrapper{key})
+			if err != nil {
+				consensus.getLogger().Err(err).
+					Str("message-type", msgType.String()).
+					Str("key", key.Pri.SerializeToHexStr()).
+					Msg("could not construct message")
+				continue
+			}
+
+			p2pMsgs = append(p2pMsgs, networkMessage)
+		}
+	}
+	return p2pMsgs
+}
+
+func (consensus *Consensus) broadcastConsensusP2pMessages(p2pMsgs []*NetworkMessage) error {
+	groupID := []nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))}
+
+	for _, p2pMsg := range p2pMsgs {
+		// TODO: this will not return immediately, may block
+		if consensus.current.Mode() != Listening {
+			if err := consensus.msgSender.SendWithoutRetry(
+				groupID,
+				p2p.ConstructMessage(p2pMsg.Bytes),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (consensus *Consensus) spinUpStateSync() {

@@ -1,6 +1,7 @@
 package quorum
 
 import (
+	"bytes"
 	"encoding/json"
 	"math/big"
 
@@ -57,19 +58,43 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *stakedVoteWeight) AddNewVote(
-	p Phase, pubKeyBytes bls.SerializedPublicKey,
+	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
-	// TODO(audit): pass in sig as byte[] too, so no need to serialize
-	ballet, err := v.SubmitVote(p, pubKeyBytes, sig, headerHash, height, viewID)
+	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
+	signerAddr := common.Address{}
+	for i, pubKey := range pubKeys {
+		voter, ok := v.roster.Voters[pubKey.Bytes]
+		if !ok {
+			return nil, errors.Errorf("Signer not in committee: %x", pubKey.Bytes)
+		}
+		if i == 0 {
+			signerAddr = voter.EarningAccount
+		} else {
+			// Aggregated signature should not contain signatures from keys belonging to different accounts,
+			// to avoid malicious node catching other people's signatures and merge with their own to cause problems.
+			// Harmony nodes are excluded from this rule.
+			if bytes.Compare(signerAddr.Bytes(), voter.EarningAccount[:]) != 0 && !voter.IsHarmonyNode {
+				return nil, errors.Errorf("Multiple signer accounts used in multi-sig: %x, %x", signerAddr.Bytes(), voter.EarningAccount)
+			}
+		}
+		pubKeysBytes[i] = pubKey.Bytes
+	}
+
+	ballet, err := v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
 
 	if err != nil {
 		return ballet, err
 	}
 
 	// Accumulate total voting power
-	additionalVotePower := v.roster.Voters[pubKeyBytes].OverallPercent
+	additionalVotePower := numeric.NewDec(0)
+
+	for _, pubKeyBytes := range pubKeysBytes {
+		additionalVotePower = additionalVotePower.Add(v.roster.Voters[pubKeyBytes].OverallPercent)
+	}
+
 	tallyQuorum := func() *tallyAndQuorum {
 		switch p {
 		case Prepare:
@@ -83,7 +108,6 @@ func (v *stakedVoteWeight) AddNewVote(
 			return nil
 		}
 	}()
-
 	tallyQuorum.tally = tallyQuorum.tally.Add(additionalVotePower)
 
 	t := v.QuorumThreshold()

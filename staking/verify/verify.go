@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	errQuorumVerifyAggSign = errors.New("insufficient voting power to verify aggreate sig")
+	errQuorumVerifyAggSign = errors.New("insufficient voting power to verify aggregate sig")
 	errAggregateSigFail    = errors.New("could not verify hash of aggregate signature")
 )
 

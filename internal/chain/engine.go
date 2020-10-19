@@ -250,7 +250,7 @@ func (e *engineImpl) Finalize(
 		chain, state, header, e.Beaconchain(),
 	)
 	if err != nil {
-		return nil, nil, errors.New("cannot pay block reward")
+		return nil, nil, err
 	}
 
 	// Apply slashes

@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -93,6 +95,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
+	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
@@ -129,18 +132,23 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 // UpdateBitmaps update the bitmaps for prepare and commit phase
 func (consensus *Consensus) UpdateBitmaps() {
 	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
+		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.multiSigMutex.Lock()
+	consensus.multiSigBitmap = multiSigBitmap
+	consensus.multiSigMutex.Unlock()
 }
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
 	consensus.switchPhase("ResetState", FBFTAnnounce)
+
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
@@ -192,7 +200,10 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
-		consensus.LeaderPubKey = msg.SenderPubkey
+		if !msg.HasSingleSender() {
+			return errors.New("Leader message can not have multiple sender keys")
+		}
+		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Debug().
@@ -298,6 +309,13 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.BlockPeriod = 5 * time.Second
+
+	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
+	if (consensus.ChainReader.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
+		(consensus.ChainReader.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
+		(consensus.ChainReader.Config().ChainID != params.MainnetChainID && consensus.ChainReader.Config().ChainID != params.TestChainID) {
+		consensus.AggregateSig = true
+	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.ChainReader.Config().IsStaking(curEpoch)
@@ -551,7 +569,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 
 		if _, err := consensus.Decider.SubmitVote(
 			quorum.Commit,
-			key.Pub.Bytes,
+			[]bls.SerializedPublicKey{key.Pub.Bytes},
 			key.Pri.SignHash(commitPayload),
 			common.BytesToHash(consensus.blockHash[:]),
 			block.NumberU64(),

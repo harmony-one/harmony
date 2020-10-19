@@ -223,7 +223,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if err != nil {
 		consensus.getLogger().Info().
 			Err(err).
-			Str("Sender", recvMsg.SenderPubkey.Bytes.Hex()).
+			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
 			Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
 			Str("myBLSPubKey", consensus.priKey.GetPublicKeys().SerializeToHexStr()).
 			Msg("[onViewChange] I am not the Leader")
@@ -234,7 +234,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Info().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).
-			Str("validatorPubKey", recvMsg.SenderPubkey.Bytes.Hex()).
+			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
 			Str("newLeaderKey", newLeaderKey.Bytes.Hex()).
 			Msg("[onViewChange] Received Enough View Change Messages")
 		return
@@ -243,6 +243,9 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 	if !consensus.onViewChangeSanityCheck(recvMsg) {
 		return
 	}
+
+	// already checked the length of SenderPubkeys in onViewChangeSanityCheck
+	senderKey := recvMsg.SenderPubkeys[0]
 
 	// update the dictionary key if the viewID is first time received
 	members := consensus.Decider.Participants()
@@ -262,7 +265,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
 			Uint64("blockNum", recvMsg.BlockNum).
-			Str("msgSender", recvMsg.SenderPubkey.Bytes.Hex()).
+			Str("msgSender", senderKey.Bytes.Hex()).
 			Msg("[onViewChange] process View Change message error")
 		return
 	}
@@ -320,6 +323,12 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		return
 	}
 
+	if !recvMsg.HasSingleSender() {
+		consensus.getLogger().Error().Msg("[onNewView] multiple signers in view change message.")
+		return
+	}
+	senderKey := recvMsg.SenderPubkeys[0]
+
 	if !consensus.onNewViewSanityCheck(recvMsg) {
 		return
 	}
@@ -369,7 +378,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		copy(preparedMsg.BlockHash[:], blockHash[:])
 		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
-		preparedMsg.SenderPubkey = recvMsg.SenderPubkey
+
+		preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{senderKey}
 		consensus.FBFTLog.AddMessage(&preparedMsg)
 
 		if preparedBlock != nil {
@@ -389,7 +399,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 
 	// newView message verified success, override my state
 	consensus.SetViewIDs(recvMsg.ViewID)
-	consensus.LeaderPubKey = recvMsg.SenderPubkey
+	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 
 	// NewView message is verified, change state to normal consensus

@@ -175,7 +175,7 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 		return nil, errors.New("[VerifyNewViewMsg] M3AggSig or M3Bitmap is nil")
 	}
 
-	senderKey := recvMsg.SenderPubkey
+	senderKey := recvMsg.SenderPubkeys[0]
 	senderKeyStr := senderKey.Bytes.Hex()
 
 	// first time received the new view message
@@ -234,13 +234,14 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 }
 
 var (
-	errDupM1     = errors.New("received M1 (prepared) message already")
-	errDupM2     = errors.New("received M2 (NIL) message already")
-	errDupM3     = errors.New("received M3 (ViewID) message already")
-	errVerifyM1  = errors.New("failed to verfiy signature for M1 message")
-	errVerifyM2  = errors.New("failed to verfiy signature for M2 message")
-	errM1Payload = errors.New("failed to verify multi signature for M1 prepared payload")
-	errNoQuorum  = errors.New("no quorum on M1 (prepared) payload")
+	errDupM1           = errors.New("received M1 (prepared) message already")
+	errDupM2           = errors.New("received M2 (NIL) message already")
+	errDupM3           = errors.New("received M3 (ViewID) message already")
+	errVerifyM1        = errors.New("failed to verfiy signature for M1 message")
+	errVerifyM2        = errors.New("failed to verfiy signature for M2 message")
+	errM1Payload       = errors.New("failed to verify multi signature for M1 prepared payload")
+	errNoQuorum        = errors.New("no quorum on M1 (prepared) payload")
+	errIncorrectSender = errors.New("multiple senders not allowed")
 )
 
 // ProcessViewChangeMsg process the view change message after verification
@@ -253,7 +254,10 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	defer vc.vcLock.Unlock()
 
 	preparedBlock := &types.Block{}
-	senderKey := recvMsg.SenderPubkey
+	if !recvMsg.HasSingleSender() {
+		return errIncorrectSender
+	}
+	senderKey := recvMsg.SenderPubkeys[0]
 	senderKeyStr := senderKey.Bytes.Hex()
 
 	// check and add viewID (m3 type) message signature
@@ -316,7 +320,8 @@ func (vc *viewChange) ProcessViewChangeMsg(
 			copy(preparedMsg.BlockHash[:], recvMsg.Payload[:32])
 			preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 			copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
-			preparedMsg.SenderPubkey = recvMsg.LeaderPubkey
+
+			preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{recvMsg.LeaderPubkey}
 			vc.getLogger().Info().Msg("[ProcessViewChangeMsg] New Leader Prepared Message Added")
 			fbftlog.AddMessage(&preparedMsg)
 			fbftlog.AddBlock(preparedBlock)
@@ -336,7 +341,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		Str("validatorPubKey", senderKeyStr).
 		Msg("[ProcessViewChangeMsg] Add M2 (NIL) type message")
 	vc.nilSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
-	vc.nilBitmap[recvMsg.ViewID].SetKey(recvMsg.SenderPubkey.Bytes, true) // Set the bitmap indicating that this validator signed.
+	vc.nilBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
 
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 		Str("validatorPubKey", senderKeyStr).
