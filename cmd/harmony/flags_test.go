@@ -98,8 +98,8 @@ func TestHarmonyFlags(t *testing.T) {
 						Port: 9000,
 					},
 				},
-				Sys: sysConfig{
-					NtpServer: "1.pool.ntp.org",
+				Sys: &sysConfig{
+					NtpServer: defaultSysConfig.NtpServer,
 				},
 				Legacy: &legacyConfig{
 					TPBroadcastInvalidTxn: &trueBool,
@@ -773,16 +773,18 @@ func TestLogFlags(t *testing.T) {
 func TestSysFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig sysConfig
+		expConfig *sysConfig
 		expErr    error
 	}{
 		{
-			args:      []string{},
-			expConfig: defaultConfig.Sys,
+			args: []string{},
+			expConfig: &sysConfig{
+				NtpServer: defaultSysConfig.NtpServer,
+			},
 		},
 		{
 			args: []string{"--sys.ntp", "0.pool.ntp.org"},
-			expConfig: sysConfig{
+			expConfig: &sysConfig{
 				NtpServer: "0.pool.ntp.org",
 			},
 		},

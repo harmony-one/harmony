@@ -27,7 +27,7 @@ type harmonyConfig struct {
 	TxPool    txPoolConfig
 	Pprof     pprofConfig
 	Log       logConfig
-	Sys       sysConfig
+	Sys       *sysConfig       `toml:",omitempty"`
 	Consensus *consensusConfig `toml:",omitempty"`
 	Devnet    *devnetConfig    `toml:",omitempty"`
 	Revert    *revertConfig    `toml:",omitempty"`

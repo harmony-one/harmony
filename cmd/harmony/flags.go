@@ -903,18 +903,19 @@ var (
 	sysNtpServerFlag = cli.StringFlag{
 		Name:     "sys.ntp",
 		Usage:    "the ntp server",
-		DefValue: defaultConfig.Sys.NtpServer,
+		DefValue: defaultSysConfig.NtpServer,
 		Hidden:   true,
 	}
 )
 
 func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.IsFlagChanged(cmd, sysNtpServerFlag) {
-		config.Sys.NtpServer = cli.GetStringFlagValue(cmd, sysNtpServerFlag)
+	if cli.HasFlagsChanged(cmd, sysFlags) || config.Sys == nil {
+		cfg := getDefaultSysConfigCopy()
+		config.Sys = &cfg
 	}
 
-	if config.Sys.NtpServer == "" {
-		config.Sys.NtpServer = defaultConfig.Sys.NtpServer
+	if cli.IsFlagChanged(cmd, sysNtpServerFlag) {
+		config.Sys.NtpServer = cli.GetStringFlagValue(cmd, sysNtpServerFlag)
 	}
 }
 
