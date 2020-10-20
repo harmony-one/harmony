@@ -84,3 +84,7 @@ db-127.0.0.1-*
 # testdata
 .testdata
 coverage.txt
+
+# testdata directory
+harmony_db_*
+explorer_storage_*

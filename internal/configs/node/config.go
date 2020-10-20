@@ -79,6 +79,7 @@ type ConfigType struct {
 	RPCServer       RPCServerConfig     // RPC server port and ip
 	RosettaServer   RosettaServerConfig // rosetta server port and ip
 	IsOffline       bool
+	NtpServer       string
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
 	ConsensusPriKey multibls.PrivateKeys

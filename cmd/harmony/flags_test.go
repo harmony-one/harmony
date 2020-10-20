@@ -98,6 +98,9 @@ func TestHarmonyFlags(t *testing.T) {
 						Port: 9000,
 					},
 				},
+				Sys: &sysConfig{
+					NtpServer: defaultSysConfig.NtpServer,
+				},
 				Legacy: &legacyConfig{
 					TPBroadcastInvalidTxn: &trueBool,
 				},
@@ -762,6 +765,44 @@ func TestLogFlags(t *testing.T) {
 
 		if !reflect.DeepEqual(hc.Log, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Log, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestSysFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig *sysConfig
+		expErr    error
+	}{
+		{
+			args: []string{},
+			expConfig: &sysConfig{
+				NtpServer: defaultSysConfig.NtpServer,
+			},
+		},
+		{
+			args: []string{"--sys.ntp", "0.pool.ntp.org"},
+			expConfig: &sysConfig{
+				NtpServer: "0.pool.ntp.org",
+			},
+		},
+	}
+
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, sysFlags, applySysFlags)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+
+		if !reflect.DeepEqual(hc.Sys, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sys, test.expConfig)
 		}
 		ts.tearDown()
 	}
