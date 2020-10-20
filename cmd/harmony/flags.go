@@ -120,6 +120,10 @@ var (
 		legacyLogRotateSizeFlag,
 	}
 
+	sysFlags = []cli.Flag{
+		sysNtpServerFlag,
+	}
+
 	devnetFlags = append(newDevnetFlags, legacyDevnetFlags...)
 
 	newDevnetFlags = []cli.Flag{
@@ -237,6 +241,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, txPoolFlags...)
 	flags = append(flags, pprofFlags...)
 	flags = append(flags, logFlags...)
+	flags = append(flags, sysFlags...)
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
 	flags = append(flags, legacyMiscFlags...)
@@ -891,6 +896,26 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
 		if cli.IsFlagChanged(cmd, logContextPortFlag) {
 			config.Log.Context.Port = cli.GetIntFlagValue(cmd, logContextPortFlag)
 		}
+	}
+}
+
+var (
+	sysNtpServerFlag = cli.StringFlag{
+		Name:     "sys.ntp",
+		Usage:    "the ntp server",
+		DefValue: defaultSysConfig.NtpServer,
+		Hidden:   true,
+	}
+)
+
+func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if cli.HasFlagsChanged(cmd, sysFlags) || config.Sys == nil {
+		cfg := getDefaultSysConfigCopy()
+		config.Sys = &cfg
+	}
+
+	if cli.IsFlagChanged(cmd, sysNtpServerFlag) {
+		config.Sys.NtpServer = cli.GetStringFlagValue(cmd, sysNtpServerFlag)
 	}
 }
 

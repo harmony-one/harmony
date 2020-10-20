@@ -8,6 +8,7 @@ require (
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20190607111240-52c2a7864a08 // indirect
 	github.com/aws/aws-sdk-go v1.30.1
+	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/cespare/cp v1.1.1
 	github.com/coinbase/rosetta-sdk-go v0.4.4

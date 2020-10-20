@@ -64,6 +64,10 @@ var defaultConfig = harmonyConfig{
 	},
 }
 
+var defaultSysConfig = sysConfig{
+	NtpServer: "1.pool.ntp.org",
+}
+
 var defaultDevnetConfig = devnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
@@ -97,6 +101,11 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 		devnet := getDefaultDevnetConfigCopy()
 		config.Devnet = &devnet
 	}
+	return config
+}
+
+func getDefaultSysConfigCopy() sysConfig {
+	config := defaultSysConfig
 	return config
 }
 
