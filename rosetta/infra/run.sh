@@ -8,4 +8,5 @@ BASE_ARGS=(--http.ip "0.0.0.0" --ws.ip "0.0.0.0" --http.rosetta --node_type "exp
 
 mkdir -p "$LOGS"
 echo -e NODE ARGS: \" "$@"  "${BASE_ARGS[@]}" \"
+echo "NODE VERSION: $(./harmony --version)"
 "$DIR/harmony" "$@" "${BASE_ARGS[@]}"
