@@ -484,7 +484,7 @@ func TestWSFlags(t *testing.T) {
 }
 
 func TestRPCOptFlags(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		args      []string
 		expConfig rpcOptConfig
 	}{
