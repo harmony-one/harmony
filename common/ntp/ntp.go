@@ -20,7 +20,8 @@ var (
 
 // CheckLocalTimeAccurate returns whether the local clock accurate or not
 func CheckLocalTimeAccurate(ntpServer string) (bool, error) {
-	response, err := beevik_ntp.Query(ntpServer)
+	options := beevik_ntp.QueryOptions{Timeout: 10 * time.Second}
+	response, err := beevik_ntp.QueryWithOptions(ntpServer, options)
 	// failed to query ntp time
 	if err != nil {
 		return false, err
