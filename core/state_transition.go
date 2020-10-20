@@ -17,11 +17,10 @@
 package core
 
 import (
+	"bytes"
 	"math"
 	"math/big"
-
-	staking2 "github.com/harmony-one/harmony/staking"
-	"github.com/harmony-one/harmony/staking/network"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -29,6 +28,8 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	staking2 "github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/network"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -95,8 +96,15 @@ type Message interface {
 	BlockNum() *big.Int
 }
 
+// ExecutionResult is the return value from a transaction committed to the DB
+type ExecutionResult struct {
+	ReturnData []byte
+	UsedGas    uint64
+	VMErr      error
+}
+
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead, isValidatorCreation bool) (uint64, error) {
+func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
@@ -116,10 +124,14 @@ func IntrinsicGas(data []byte, contractCreation, homestead, isValidatorCreation 
 			}
 		}
 		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-gas)/params.TxDataNonZeroGas < nz {
+		nonZeroGas := params.TxDataNonZeroGasFrontier
+		if istanbul {
+			nonZeroGas = params.TxDataNonZeroGasEIP2028
+		}
+		if (math.MaxUint64-gas)/nonZeroGas < nz {
 			return 0, vm.ErrOutOfGas
 		}
-		gas += nz * params.TxDataNonZeroGas
+		gas += nz * nonZeroGas
 
 		z := uint64(len(data)) - nz
 		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
@@ -151,7 +163,7 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) ([]byte, uint64, bool, error) {
+func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
 }
 
@@ -212,46 +224,46 @@ func (st *StateTransition) preCheck() error {
 // TransitionDb will transition the state by applying the current message and
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
-func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bool, err error) {
-	if err = st.preCheck(); err != nil {
-		return
+func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
+	if err := st.preCheck(); err != nil {
+		return ExecutionResult{}, err
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
+	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead, false)
+	gas, err := IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
 	if err != nil {
-		return nil, 0, false, err
+		return ExecutionResult{}, err
 	}
 	if err = st.useGas(gas); err != nil {
-		return nil, 0, false, err
+		return ExecutionResult{}, err
 	}
 
-	var (
-		evm = st.evm
-		// vm errors do not effect consensus and are therefor
-		// not assigned to err, except for insufficient balance
-		// error.
-		vmerr error
-	)
+	evm := st.evm
+
+	var ret []byte
+	// All VM errors are valid except for insufficient balance, therefore returned separately
+	var vmErr error
+
 	if contractCreation {
-		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
+		ret, _, st.gas, vmErr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		ret, st.gas, vmErr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
-	if vmerr != nil {
-		utils.Logger().Info().Err(vmerr).Msg("VM returned with error")
+	if vmErr != nil {
+		utils.Logger().Info().Err(vmErr).Msg("VM returned with error")
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.
 
-		if vmerr == vm.ErrInsufficientBalance {
-			return nil, 0, false, vmerr
+		if vmErr == vm.ErrInsufficientBalance {
+			return ExecutionResult{}, vmErr
 		}
 	}
 	st.refundGas()
@@ -262,7 +274,11 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		st.state.AddBalance(st.evm.Coinbase, txFee)
 	}
 
-	return ret, st.gasUsed(), vmerr != nil, err
+	return ExecutionResult{
+		ReturnData: ret,
+		UsedGas:    st.gasUsed(),
+		VMErr:      vmErr,
+	}, err
 }
 
 func (st *StateTransition) refundGas() {
@@ -298,9 +314,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 
 	sender := vm.AccountRef(msg.From())
 	homestead := st.evm.ChainConfig().IsS3(st.evm.EpochNumber) // s3 includes homestead
+	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead, msg.Type() == types.StakeCreateVal)
+	gas, err := IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
 		return 0, err
@@ -425,21 +442,34 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 
 	st.state.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-	// Add log if everything is good
-	for valAddr, redelegatedToken := range fromLockedTokens {
-		encodedRedelegationData := []byte{}
-		addrBytes := valAddr.Bytes()
-		encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
-		encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
-		// The data field format is:
-		// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
-		// [rest of the bytes]: the bigInt serialized bytes for the token amount.
-		st.state.AddLog(&types.Log{
-			Address:     delegate.DelegatorAddress,
-			Topics:      []common.Hash{staking2.DelegateTopic},
-			Data:        encodedRedelegationData,
-			BlockNumber: st.evm.BlockNumber.Uint64(),
+	if len(fromLockedTokens) > 0 {
+		sortedKeys := []common.Address{}
+		for key := range fromLockedTokens {
+			sortedKeys = append(sortedKeys, key)
+		}
+		sort.SliceStable(sortedKeys, func(i, j int) bool {
+			return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
 		})
+		// Add log if everything is good
+		for _, key := range sortedKeys {
+			redelegatedToken, ok := fromLockedTokens[key]
+			if !ok {
+				return errors.New("Key missing for delegation receipt")
+			}
+			encodedRedelegationData := []byte{}
+			addrBytes := key.Bytes()
+			encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+			encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+			// The data field format is:
+			// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
+			// [rest of the bytes]: the bigInt serialized bytes for the token amount.
+			st.state.AddLog(&types.Log{
+				Address:     delegate.DelegatorAddress,
+				Topics:      []common.Hash{staking2.DelegateTopic},
+				Data:        encodedRedelegationData,
+				BlockNumber: st.evm.BlockNumber.Uint64(),
+			})
+		}
 	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"crypto/ecdsa"
 	"database/sql/driver"
 	"encoding/hex"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/harmony-one/harmony/internal/bech32"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
@@ -227,4 +229,13 @@ func ParseAddr(s string) ethCommon.Address {
 	}
 	// The result can be 0x00...00 if the passing param is not a correct address.
 	return ethCommon.HexToAddress(s)
+}
+
+// MustGeneratePrivateKey generates a random private key for an address. It panics on error.
+func MustGeneratePrivateKey() *ecdsa.PrivateKey {
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		panic(err)
+	}
+	return key
 }

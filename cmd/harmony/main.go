@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
@@ -109,10 +110,13 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}
 
-	prepareRootCmd(cmd)
+	if err := prepareRootCmd(cmd); err != nil {
+		fmt.Fprint(os.Stderr, err)
+		os.Exit(128)
+	}
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprint(os.Stderr, err)
 		cmd.Help()
 		os.Exit(128)
 	}
@@ -122,7 +126,7 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	setupNodeAndRun(cfg)
 }
 
-func prepareRootCmd(cmd *cobra.Command) {
+func prepareRootCmd(cmd *cobra.Command) error {
 	// HACK Force usage of go implementation rather than the C based one. Do the right way, see the
 	// notes one line 66,67 of https://golang.org/src/net/net.go that say can make the decision at
 	// build time.
@@ -131,6 +135,20 @@ func prepareRootCmd(cmd *cobra.Command) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	// Set up randomization seed.
 	rand.Seed(int64(time.Now().Nanosecond()))
+	// Raise fd limits
+	return raiseFdLimits()
+}
+
+func raiseFdLimits() error {
+	limit, err := fdlimit.Maximum()
+	if err != nil {
+		return errors.Wrap(err, "Failed to retrieve file descriptor allowance")
+	}
+	_, err = fdlimit.Raise(uint64(limit))
+	if err != nil {
+		return errors.Wrap(err, "Failed to raise file descriptor allowance")
+	}
+	return nil
 }
 
 func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
@@ -253,6 +271,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	}
 	currentNode := setupConsensusAndNode(hc, nodeConfig)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
+	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 
 	// Prepare for graceful shutdown from os signals
 	osSignal := make(chan os.Signal)
@@ -302,7 +321,10 @@ func setupNodeAndRun(hc harmonyConfig) {
 			for chain.CurrentBlock().NumberU64() >= uint64(hc.Revert.RevertTo) {
 				curBlock := chain.CurrentBlock()
 				rollbacks := []ethCommon.Hash{curBlock.Hash()}
-				chain.Rollback(rollbacks)
+				if err := chain.Rollback(rollbacks); err != nil {
+					fmt.Printf("Revert failed: %v\n", err)
+					os.Exit(1)
+				}
 				lastSig := curBlock.Header().LastCommitSignature()
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
 				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
@@ -322,8 +344,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Str("BeaconGroupID", nodeConfig.GetBeaconGroupID().String()).
 		Str("ClientGroupID", nodeConfig.GetClientGroupID().String()).
 		Str("Role", currentNode.NodeConfig.Role().String()).
+		Str("Version", getHarmonyVersion()).
 		Str("multiaddress",
-			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", publicListenIP, hc.P2P.Port, myHost.GetID().Pretty()),
+			fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", hc.P2P.IP, hc.P2P.Port, myHost.GetID().Pretty()),
 		).
 		Msg(startMsg)
 
@@ -347,7 +370,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	if err := currentNode.BootstrapConsensus(); err != nil {
 		fmt.Println("could not bootstrap consensus", err.Error())
-		os.Exit(-1)
+		if !currentNode.NodeConfig.IsOffline {
+			os.Exit(-1)
+		}
 	}
 
 	if err := currentNode.Start(); err != nil {
@@ -472,6 +497,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	netType := nodeconfig.NetworkType(hc.Network.NetworkType)
 	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
 	nodeConfig.SetArchival(hc.General.IsArchival)
+	nodeConfig.IsOffline = hc.General.IsOffline
 
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)
@@ -481,7 +507,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	}
 
 	selfPeer := p2p.Peer{
-		IP:              publicListenIP,
+		IP:              hc.P2P.IP,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
@@ -553,11 +579,11 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	}
 
 	// Syncing provider is provided by following rules:
-	//   1. If starting with a localnet, use local sync peers.
+	//   1. If starting with a localnet or offline, use local sync peers.
 	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
 	//      discover peers.
 	//   3. Else, use the dns for syncing.
-	if hc.Network.NetworkType == nodeconfig.Localnet {
+	if hc.Network.NetworkType == nodeconfig.Localnet || hc.General.IsOffline {
 		epochConfig := shard.Schedule.InstanceForEpoch(ethCommon.Big0)
 		selfPort := hc.P2P.Port
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
@@ -606,7 +632,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
-	currentConsensus.BlockVerifier = currentNode.VerifyNewBlock
+	currentConsensus.SetBlockVerifier(currentNode.VerifyNewBlock)
 	currentConsensus.OnConsensusDone = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())

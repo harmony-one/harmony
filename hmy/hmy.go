@@ -93,6 +93,8 @@ type NodeAPI interface {
 	ListTopic() []string
 	ListBlockedPeer() []peer.ID
 
+	GetConsensusInternal() commonRPC.ConsensusInternal
+
 	// debug API
 	GetConsensusMode() string
 	GetConsensusPhase() string
@@ -176,6 +178,8 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 	c := commonRPC.C{}
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
 
+	consensusInternal := hmy.NodeAPI.GetConsensusInternal()
+
 	return commonRPC.NodeMetadata{
 		BLSPublicKey:   blsKeys,
 		Version:        nodeconfig.GetVersion(),
@@ -190,16 +194,16 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		Archival:       cfg.GetArchival(),
 		NodeBootTime:   hmy.NodeAPI.GetNodeBootTime(),
 		PeerID:         nodeconfig.GetPeerID(),
+		Consensus:      consensusInternal,
 		C:              c,
 	}
 }
 
 // GetEVM returns a new EVM entity
-func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, func() error, error) {
+func (hmy *Harmony) GetEVM(ctx context.Context, msg core.Message, state *state.DB, header *block.Header) (*vm.EVM, error) {
 	state.SetBalance(msg.From(), math.MaxBig256)
-	vmError := func() error { return nil }
 	vmCtx := core.NewEVMContext(msg, header, hmy.BlockChain, nil)
-	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), vmError, nil
+	return vm.NewEVM(vmCtx, state, hmy.BlockChain.Config(), *hmy.BlockChain.GetVMConfig()), nil
 }
 
 // ChainDb ..

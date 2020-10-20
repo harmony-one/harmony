@@ -90,19 +90,17 @@ func (sink *TransactionErrorSink) Contains(hash string) bool {
 func (sink *TransactionErrorSink) Remove(tx PoolTransaction) {
 	if plainTx, ok := tx.(*Transaction); ok {
 		hash := plainTx.Hash().String()
-		present := sink.failedPlainTxs.Remove(hash)
+		sink.failedPlainTxs.Remove(hash)
 		utils.Logger().Debug().
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
-			Bool("was-in-error-sink", present).
 			Msgf("Removed plain transaction error message")
 	} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 		hash := stakingTx.Hash().String()
-		present := sink.failedStakingTxs.Remove(hash)
+		sink.failedStakingTxs.Remove(hash)
 		utils.Logger().Debug().
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
-			Bool("was-in-error-sink", present).
 			Msgf("Removed staking transaction error message")
 	} else {
 		utils.Logger().Error().

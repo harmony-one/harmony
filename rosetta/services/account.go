@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -10,7 +11,7 @@ import (
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-	hmyCommon "github.com/harmony-one/harmony/internal/common"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
 
@@ -26,21 +27,21 @@ func NewAccountAPI(hmy *hmy.Harmony) server.AccountAPIServicer {
 	}
 }
 
-// AccountBalance ...
+// AccountBalance implements the /account/balance endpoint
 func (s *AccountAPI) AccountBalance(
-	ctx context.Context, req *types.AccountBalanceRequest,
+	ctx context.Context, request *types.AccountBalanceRequest,
 ) (*types.AccountBalanceResponse, *types.Error) {
-	if err := assertValidNetworkIdentifier(req.NetworkIdentifier, s.hmy.ShardID); err != nil {
+	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
 
 	var block *hmyTypes.Block
-	if req.BlockIdentifier == nil {
+	if request.BlockIdentifier == nil {
 		block = s.hmy.CurrentBlock()
 	} else {
 		var err error
-		if req.BlockIdentifier.Hash != nil {
-			blockHash := ethCommon.HexToHash(*req.BlockIdentifier.Hash)
+		if request.BlockIdentifier.Hash != nil {
+			blockHash := ethCommon.HexToHash(*request.BlockIdentifier.Hash)
 			block, err = s.hmy.GetBlock(ctx, blockHash)
 			if err != nil {
 				return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
@@ -48,7 +49,7 @@ func (s *AccountAPI) AccountBalance(
 				})
 			}
 		} else {
-			blockNum := rpc.BlockNumber(*req.BlockIdentifier.Index)
+			blockNum := rpc.BlockNumber(*request.BlockIdentifier.Index)
 			block, err = s.hmy.BlockByNumber(ctx, blockNum)
 			if err != nil {
 				return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
@@ -58,7 +59,12 @@ func (s *AccountAPI) AccountBalance(
 		}
 	}
 
-	addr := hmyCommon.ParseAddr(req.AccountIdentifier.Address)
+	addr, err := getAddress(request.AccountIdentifier)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
@@ -69,7 +75,7 @@ func (s *AccountAPI) AccountBalance(
 
 	amount := types.Amount{
 		Value:    balance.String(),
-		Currency: &common.Currency,
+		Currency: &common.NativeCurrency,
 	}
 
 	respBlock := types.BlockIdentifier{
@@ -81,4 +87,42 @@ func (s *AccountAPI) AccountBalance(
 		BlockIdentifier: &respBlock,
 		Balances:        []*types.Amount{&amount},
 	}, nil
+}
+
+// AccountMetadata used for account identifiers
+type AccountMetadata struct {
+	Address string `json:"hex_address"`
+}
+
+// newAccountIdentifier ..
+func newAccountIdentifier(
+	address ethCommon.Address,
+) (*types.AccountIdentifier, *types.Error) {
+	b32Address, err := internalCommon.AddressToBech32(address)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	metadata, err := types.MarshalMap(AccountMetadata{Address: address.String()})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	return &types.AccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}, nil
+}
+
+// getAddress ..
+func getAddress(
+	identifier *types.AccountIdentifier,
+) (ethCommon.Address, error) {
+	if identifier == nil {
+		return ethCommon.Address{}, fmt.Errorf("identifier cannot be nil")
+	}
+	return internalCommon.Bech32ToAddress(identifier.Address)
 }

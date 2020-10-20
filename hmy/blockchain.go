@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,6 +44,9 @@ func (hmy *Harmony) GetBlockSigners(
 	if err != nil {
 		return nil, nil, err
 	}
+	if blockWithSigners == nil {
+		return nil, nil, fmt.Errorf("block number %v not found", blockNum+1)
+	}
 	committee, err := hmy.GetValidators(blk.Epoch())
 	if err != nil {
 		return nil, nil, err
@@ -67,6 +71,51 @@ func (hmy *Harmony) GetBlockSigners(
 		return nil, nil, err
 	}
 	return committee.Slots, mask, nil
+}
+
+// DetailedBlockSignerInfo contains all of the block singing information
+type DetailedBlockSignerInfo struct {
+	// Signers is a map of addresses in the Signers for the block to
+	// all of the serialized BLS keys that signed said block.
+	Signers map[common.Address][]bls.SerializedPublicKey
+	// Committee when the block was signed.
+	Committee shard.SlotList
+	// TotalKeysSigned is the total number of bls keys that signed the block.
+	TotalKeysSigned uint
+	// Mask is the bitmap Mask for the block.
+	Mask      *bls.Mask
+	BlockHash common.Hash
+}
+
+// GetDetailedBlockSignerInfo fetches the block signer information for any non-genesis block
+func (hmy *Harmony) GetDetailedBlockSignerInfo(
+	ctx context.Context, blk *types.Block,
+) (*DetailedBlockSignerInfo, error) {
+	slotList, mask, err := hmy.GetBlockSigners(
+		ctx, rpc.BlockNumber(blk.Number().Uint64()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	totalSigners := uint(0)
+	sigInfos := map[common.Address][]bls.SerializedPublicKey{}
+	for _, slot := range slotList {
+		if _, ok := sigInfos[slot.EcdsaAddress]; !ok {
+			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
+		}
+		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
+			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
+			totalSigners++
+		}
+	}
+	return &DetailedBlockSignerInfo{
+		Signers:         sigInfos,
+		Committee:       slotList,
+		TotalKeysSigned: totalSigners,
+		Mask:            mask,
+		BlockHash:       blk.Hash(),
+	}, nil
 }
 
 // GetLatestChainHeaders ..

@@ -12,7 +12,7 @@ RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -26,6 +26,7 @@ help:
 	@echo "debug - start a localnet with 2 shards (s0 rpc endpoint = localhost:9599; s1 rpc endpoint = localhost:9598)"
 	@echo "debug-kill - force kill the localnet"
 	@echo "clean - remove node files & logs created by localnet"
+	@echo "distclean - remove node files & logs created by localnet, and all libs"
 	@echo "test - run the entire test suite (go test & Node API test)"
 	@echo "test-go - run the go test (with go lint, fmt, imports, mod, and generate checks)"
 	@echo "test-api - run the Node API test"
@@ -33,7 +34,11 @@ help:
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
 	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
 	@echo "rpm - build a harmony RPM pacakge"
+	@echo "rpmpub_dev - publish harmony RPM package to development repo"
+	@echo "rpmpub_prod - publish harmony RPM package to production repo"
 	@echo "deb - build a harmony Debian pacakge"
+	@echo "debpub_dev - publish harmony Debian package to development repo"
+	@echo "debpub_prod - publish harmony Debian package to production repo"
 
 libs:
 	make -C $(TOP)/mcl -j8
@@ -61,6 +66,11 @@ clean:
 	rm -rf ./latest
 	rm -f ./*.rlp
 	rm -rf ~/rpmbuild
+	rm -f coverage.txt
+
+distclean: clean
+	make -C $(TOP)/mcl clean
+	make -C $(TOP)/bls clean
 
 go-get:
 	source ./scripts/setup_bls_build_flags.sh

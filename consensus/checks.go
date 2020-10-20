@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	protobuf "github.com/golang/protobuf/proto"
 	libbls "github.com/harmony-one/bls/ffi/go/bls"
@@ -9,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/pkg/errors"
 )
 
@@ -57,12 +57,10 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
-	if recvMsg.ViewID != consensus.GetCurViewID() || recvMsg.BlockNum != consensus.blockNum {
+	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
-			Uint64("MsgViewID", recvMsg.ViewID).
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
-			Interface("ValidatorPubKey", recvMsg.SenderPubkeys).
+			Str("recvMsg", recvMsg.String()).
 			Msg("BlockNum/viewID not match")
 		return false
 	}
@@ -74,9 +72,10 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 		msg_pb.MessageType_ANNOUNCE, recvMsg.BlockNum, recvMsg.ViewID,
 	)
 	if len(logMsgs) > 0 {
-		if len(logMsgs[0].SenderPubkeys) != 1 || len(recvMsg.SenderPubkeys) != 1 {
-			consensus.getLogger().Debug().
-				Interface("signers", recvMsg.SenderPubkeys).
+		if !logMsgs[0].HasSingleSender() || !recvMsg.HasSingleSender() {
+			consensus.getLogger().Warn().
+				Str("logMsgs[0]", logMsgs[0].String()).
+				Str("recvMsg", recvMsg.String()).
 				Msg("[OnAnnounce] Announce message have 0 or more than 1 signers")
 			return false
 		}
@@ -85,10 +84,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 			consensus.getLogger().Debug().
 				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys[0].Bytes.Hex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
-				Str("recvMsg.SenderPubkeys", recvMsg.SenderPubkeys[0].Bytes.Hex()).
-				Uint64("recvMsg.BlockNum", recvMsg.BlockNum).
-				Uint64("recvMsg.ViewID", recvMsg.ViewID).
-				Str("recvMsgBlockHash", recvMsg.BlockHash.Hex()).
+				Str("recvMsg", recvMsg.String()).
 				Str("LeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 				Msg("[OnAnnounce] Leader is malicious")
 			if consensus.IsViewChangingMode() {
@@ -96,7 +92,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
 			} else {
-				consensus.startViewChange(consensus.GetCurViewID() + 1)
+				consensus.startViewChange(consensus.GetCurBlockViewID() + 1)
 			}
 		}
 		consensus.getLogger().Debug().
@@ -141,24 +137,6 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Msg("[OnPrepared] BlockHash not match")
 		return false
 	}
-	if consensus.current.Mode() == Normal {
-		err := chain.Engine.VerifyHeader(consensus.ChainReader, blockObj.Header(), true)
-		if err != nil {
-			consensus.getLogger().Error().
-				Err(err).
-				Str("inChain", consensus.ChainReader.CurrentHeader().Number().String()).
-				Str("MsgBlockNum", blockObj.Header().Number().String()).
-				Msg("[OnPrepared] Block header is not verified successfully")
-			return false
-		}
-		if consensus.BlockVerifier == nil {
-			// do nothing
-		} else if err := consensus.BlockVerifier(blockObj); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-			return false
-		}
-	}
-
 	return true
 }
 
@@ -171,7 +149,8 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MyViewChangingID", consensus.GetViewChangingID()).
 		Uint64("MsgViewChangingID", recvMsg.ViewID).
-		Msg("onViewChange")
+		Interface("SendPubKeys", recvMsg.SenderPubkeys).
+		Msg("[onViewChangeSanityCheck]")
 
 	if consensus.blockNum > recvMsg.BlockNum {
 		consensus.getLogger().Debug().
@@ -180,22 +159,33 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 	if consensus.blockNum < recvMsg.BlockNum {
 		consensus.getLogger().Warn().
-			Msg("[onViewChange] New Leader Has Lower Blocknum")
+			Msg("[onViewChangeSanityCheck] MsgBlockNum is different from my BlockNumber")
 		return false
 	}
 	if consensus.IsViewChangingMode() &&
-		consensus.GetViewChangingID() > recvMsg.ViewID {
+		consensus.GetCurBlockViewID() > recvMsg.ViewID {
 		consensus.getLogger().Warn().
-			Msg("[onViewChange] ViewChanging ID Is Low")
+			Msg("[onViewChangeSanityCheck] ViewChanging ID Is Low")
 		return false
 	}
 	if recvMsg.ViewID-consensus.GetViewChangingID() > MaxViewIDDiff {
 		consensus.getLogger().Debug().
-			Msg("Received viewID that is MaxViewIDDiff (100) further from the current viewID!")
+			Msg("[onViewChangeSanityCheck] Received viewID that is MaxViewIDDiff (249) further from the current viewID!")
 		return false
 	}
-	if len(recvMsg.SenderPubkeys) != 1 {
-		consensus.getLogger().Error().Msg("[onViewChange] multiple signers in view change message.")
+
+	if !recvMsg.HasSingleSender() {
+		consensus.getLogger().Error().Msg("[onViewChangeSanityCheck] zero or multiple signers in view change message.")
+		return false
+	}
+	senderKey := recvMsg.SenderPubkeys[0]
+
+	viewIDHash := make([]byte, 8)
+	binary.LittleEndian.PutUint64(viewIDHash, recvMsg.ViewID)
+	if !recvMsg.ViewidSig.VerifyHash(senderKey.Object, viewIDHash) {
+		consensus.getLogger().Warn().
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Msg("[onViewChangeSanityCheck] Failed to Verify viewID Signature")
 		return false
 	}
 	return true
@@ -203,9 +193,9 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 // TODO: leo: move the sanity check to p2p message validation
 func (consensus *Consensus) onNewViewSanityCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.ViewID < consensus.GetCurViewID() {
+	if recvMsg.ViewID < consensus.GetCurBlockViewID() {
 		consensus.getLogger().Warn().
-			Uint64("LastSuccessfulConsensusViewID", consensus.GetCurViewID()).
+			Uint64("LastSuccessfulConsensusViewID", consensus.GetCurBlockViewID()).
 			Uint64("MsgViewChangingID", recvMsg.ViewID).
 			Msg("[onNewView] ViewID should be larger than the viewID of the last successful consensus")
 		return false

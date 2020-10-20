@@ -51,6 +51,7 @@ func TestHarmonyFlags(t *testing.T) {
 				},
 				P2P: p2pConfig{
 					Port:    9000,
+					IP:      defaultConfig.P2P.IP,
 					KeyFile: defaultConfig.P2P.KeyFile,
 				},
 				HTTP: httpConfig{
@@ -299,6 +300,7 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file"},
 			expConfig: p2pConfig{
 				Port:    9001,
+				IP:      nodeconfig.DefaultPublicListenIP,
 				KeyFile: "./key.file",
 			},
 		},
@@ -306,6 +308,7 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: p2pConfig{
 				Port:    9001,
+				IP:      nodeconfig.DefaultPublicListenIP,
 				KeyFile: "./key.file",
 			},
 		},
@@ -388,7 +391,7 @@ func TestRPCFlags(t *testing.T) {
 			expConfig: httpConfig{
 				Enabled:        true,
 				RosettaEnabled: false,
-				IP:             publicListenIP,
+				IP:             nodeconfig.DefaultPublicListenIP,
 				Port:           9501,
 				RosettaPort:    9701,
 			},
@@ -448,7 +451,7 @@ func TestWSFlags(t *testing.T) {
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: wsConfig{
 				Enabled: true,
-				IP:      publicListenIP,
+				IP:      nodeconfig.DefaultPublicListenIP,
 				Port:    9801,
 			},
 		},

@@ -50,6 +50,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 					// Prepare last commit signatures
 					commitSigs := make(chan []byte)
 					sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+
+					node.Consensus.StartFinalityCount()
 					if err != nil {
 						utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 						break
@@ -232,7 +234,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	}
 
 	finalizedBlock, err := node.Worker.FinalizeNewBlock(
-		commitSigs, node.Consensus.GetCurViewID(),
+		commitSigs, node.Consensus.GetCurBlockViewID(),
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {

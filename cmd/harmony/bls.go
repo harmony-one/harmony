@@ -25,6 +25,7 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 			os.Exit(100)
 		}
 	})
+
 	config.ConsensusPriKey = multiBLSPriKey
 	return multiBLSPriKey.GetPublicKeys()
 }
@@ -44,7 +45,7 @@ func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
 	if len(keys) > raw.MaxKeys {
 		return nil, fmt.Errorf("bls keys exceed maximum count %v", raw.MaxKeys)
 	}
-	return keys, err
+	return keys.Dedup(), err
 }
 
 func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {

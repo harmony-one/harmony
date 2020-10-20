@@ -39,6 +39,10 @@ const (
 )
 
 const (
+	// DefaultLocalListenIP is the IP used for local hosting
+	DefaultLocalListenIP = "127.0.0.1"
+	// DefaultPublicListenIP is the IP used for public hosting
+	DefaultPublicListenIP = "0.0.0.0"
 	// DefaultP2PPort is the key to be used for p2p communication
 	DefaultP2PPort = 9000
 	// DefaultDNSPort is the default DNS port. The actual port used is DNSPort - 3000. This is a

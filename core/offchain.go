@@ -32,12 +32,14 @@ func (bc *BlockChain) CommitOffChainData(
 	state *state.DB,
 ) (status WriteStatus, err error) {
 	// Write receipts of the block
-	rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
+	if err := rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
+		return NonStatTy, err
+	}
 	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
 	isStaking := bc.chainConfig.IsStaking(block.Epoch())
 	isPreStaking := bc.chainConfig.IsPreStaking(block.Epoch())
 	header := block.Header()
-	isNewEpoch := len(header.ShardState()) > 0
+	isNewEpoch := block.IsLastBlockInEpoch()
 	// Cross-shard txns
 	epoch := block.Header().Epoch()
 	if bc.chainConfig.HasCrossTxFields(block.Epoch()) {
@@ -60,7 +62,9 @@ func (bc *BlockChain) CommitOffChainData(
 			}
 		}
 		// Mark incomingReceipts in the block as spent
-		bc.WriteCXReceiptsProofSpent(batch, block.IncomingReceipts())
+		if err := bc.WriteCXReceiptsProofSpent(batch, block.IncomingReceipts()); err != nil {
+			return NonStatTy, err
+		}
 	}
 
 	// VRF + VDF
@@ -313,7 +317,7 @@ func (bc *BlockChain) writeValidatorStats(
 
 func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
 	nextBlockEpoch := header.Epoch()
-	if len(header.ShardState()) > 0 {
+	if header.IsLastBlockInEpoch() {
 		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
 		decodeShardState, err := shard.DecodeWrapper(header.ShardState())
 		if err != nil {

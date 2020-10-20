@@ -37,6 +37,16 @@ type C struct {
 	NotConnected    int `json:"not-connected"`
 }
 
+// ConsensusInternal captures consensus internal data
+type ConsensusInternal struct {
+	ViewID        uint64 `json:"viewId"`
+	ViewChangeID  uint64 `json:"viewChangeId"`
+	Mode          string `json:"mode"`
+	Phase         string `json:"phase"`
+	BlockNum      uint64 `json:"blocknum"`
+	ConsensusTime int64  `json:"finality"`
+}
+
 // NodeMetadata captures select metadata of the RPC answering node
 type NodeMetadata struct {
 	BLSPublicKey   []string           `json:"blskey"`
@@ -52,6 +62,7 @@ type NodeMetadata struct {
 	Archival       bool               `json:"is-archival"`
 	NodeBootTime   int64              `json:"node-unix-start-time"`
 	PeerID         peer.ID            `json:"peerid"`
+	Consensus      ConsensusInternal  `json:"consensus"`
 	C              C                  `json:"p2p-connectivity"`
 }
 

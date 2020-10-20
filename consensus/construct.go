@@ -19,7 +19,7 @@ import (
 // created only for distribution to
 // all the other quorum members.
 type NetworkMessage struct {
-	Phase                      msg_pb.MessageType
+	MessageType                msg_pb.MessageType
 	Bytes                      []byte
 	FBFTMsg                    *FBFTMessage
 	OptionalAggregateSignature *bls_core.Sign
@@ -29,7 +29,7 @@ type NetworkMessage struct {
 func (consensus *Consensus) populateMessageFields(
 	request *msg_pb.ConsensusRequest, blockHash []byte,
 ) *msg_pb.ConsensusRequest {
-	request.ViewId = consensus.GetCurViewID()
+	request.ViewId = consensus.GetCurBlockViewID()
 	request.BlockNum = consensus.blockNum
 	request.ShardId = consensus.ShardID
 	// 32 byte block hash
@@ -165,7 +165,7 @@ func (consensus *Consensus) construct(
 	}
 
 	return &NetworkMessage{
-		Phase:                      p,
+		MessageType:                p,
 		Bytes:                      proto.ConstructConsensusMessage(marshaledMessage),
 		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: aggSig,

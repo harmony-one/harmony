@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
@@ -22,7 +24,7 @@ type LDBFactory struct {
 // NewChainDB returns a new LDB for the blockchain for given shard.
 func (f *LDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 	dir := path.Join(f.RootDir, fmt.Sprintf("harmony_db_%d", shardID))
-	return ethdb.NewLDBDatabase(dir, 128, 64)
+	return rawdb.NewLevelDBDatabase(dir, 128, 64, "")
 }
 
 // MemDBFactory is a memory-backed blockchain database factory.
@@ -30,5 +32,5 @@ type MemDBFactory struct{}
 
 // NewChainDB returns a new memDB for the blockchain for given shard.
 func (f *MemDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
-	return ethdb.NewMemDatabase(), nil
+	return rawdb.NewMemoryDatabase(), nil
 }

@@ -237,6 +237,9 @@ func Verify(
 		addrs = append(addrs, *addr)
 	}
 
+	if len(addrs) > 1 {
+		return errors.Errorf("multiple double signer addresses found (%x) ", addrs)
+	}
 	if !signerFound {
 		return errors.Errorf("offender address (%x) does not match the signer's address (%x)", candidate.Evidence.Offender, addrs)
 	}

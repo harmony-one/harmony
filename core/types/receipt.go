@@ -23,6 +23,7 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -217,4 +218,20 @@ func (r Receipts) ToShardID(i int) uint32 {
 // MaxToShardID returns 0, arbitrary value, NOT used
 func (r Receipts) MaxToShardID() uint32 {
 	return 0
+}
+
+// FindLogsWithTopic returns all the logs that contain the given receipt
+func FindLogsWithTopic(
+	receipt *Receipt, targetTopic ethcommon.Hash,
+) []*Log {
+	logs := []*Log{}
+	for _, log := range receipt.Logs {
+		for _, topic := range log.Topics {
+			if topic == targetTopic {
+				logs = append(logs, log)
+				break
+			}
+		}
+	}
+	return logs
 }

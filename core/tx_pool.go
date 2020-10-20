@@ -252,6 +252,7 @@ type TxPool struct {
 	txErrorSink *types.TransactionErrorSink // All failed txs gets reported here
 
 	homestead bool
+	istanbul  bool
 }
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
@@ -334,6 +335,9 @@ func (pool *TxPool) loop() {
 				pool.mu.Lock()
 				if pool.chainconfig.IsS3(ev.Block.Epoch()) {
 					pool.homestead = true
+				}
+				if pool.chainconfig.IsIstanbul(ev.Block.Epoch()) {
+					pool.istanbul = true
 				}
 				pool.reset(head.Header(), ev.Block.Header())
 				head = ev.Block
@@ -740,9 +744,9 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	intrGas := uint64(0)
 	if isStakingTx {
-		intrGas, err = IntrinsicGas(tx.Data(), false, pool.homestead, stakingTx.StakingType() == staking.DirectiveCreateValidator)
+		intrGas, err = IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
 	} else {
-		intrGas, err = IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, false)
+		intrGas, err = IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false)
 	}
 	if err != nil {
 		return err

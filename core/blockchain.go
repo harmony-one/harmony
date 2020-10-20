@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -345,7 +346,9 @@ func (bc *BlockChain) loadLastState() error {
 	//	}
 	//}
 	currentHeader := currentBlock.Header()
-	bc.hc.SetCurrentHeader(currentHeader)
+	if err := bc.hc.SetCurrentHeader(currentHeader); err != nil {
+		return errors.Wrap(err, "headerChain SetCurrentHeader")
+	}
 
 	// Restore the last known head fast block
 	bc.currentFastBlock.Store(currentBlock)
@@ -395,10 +398,12 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	defer bc.mu.Unlock()
 
 	// Rewind the header chain, deleting all block bodies until then
-	delFn := func(db rawdb.DatabaseDeleter, hash common.Hash, num uint64) {
-		rawdb.DeleteBody(db, hash, num)
+	delFn := func(db rawdb.DatabaseDeleter, hash common.Hash, num uint64) error {
+		return rawdb.DeleteBody(db, hash, num)
 	}
-	bc.hc.SetHead(head, delFn)
+	if err := bc.hc.SetHead(head, delFn); err != nil {
+		return errors.Wrap(err, "headerChain SetHeader")
+	}
 	currentHeader := bc.hc.CurrentHeader()
 
 	// Clear out any stale content from the caches
@@ -433,8 +438,12 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	currentBlock := bc.CurrentBlock()
 	currentFastBlock := bc.CurrentFastBlock()
 
-	rawdb.WriteHeadBlockHash(bc.db, currentBlock.Hash())
-	rawdb.WriteHeadFastBlockHash(bc.db, currentFastBlock.Hash())
+	if err := rawdb.WriteHeadBlockHash(bc.db, currentBlock.Hash()); err != nil {
+		return err
+	}
+	if err := rawdb.WriteHeadFastBlockHash(bc.db, currentFastBlock.Hash()); err != nil {
+		return err
+	}
 
 	return bc.loadLastState()
 }
@@ -516,13 +525,19 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	defer bc.mu.Unlock()
 
 	// Prepare the genesis block and reinitialise the chain
-	rawdb.WriteBlock(bc.db, genesis)
+	if err := rawdb.WriteBlock(bc.db, genesis); err != nil {
+		return err
+	}
 
 	bc.genesisBlock = genesis
-	bc.insert(bc.genesisBlock)
-	bc.currentBlock.Store(bc.genesisBlock)
+	if err := bc.insert(bc.genesisBlock); err != nil {
+		return err
+	}
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
-	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
+	if err := bc.hc.SetCurrentHeader(bc.genesisBlock.Header()); err != nil {
+		return err
+	}
+	bc.currentBlock.Store(bc.genesisBlock)
 	bc.currentFastBlock.Store(bc.genesisBlock)
 
 	return nil
@@ -587,8 +602,7 @@ func (bc *BlockChain) removeInValidatorList(toRemove map[common.Address]struct{}
 			newVals = append(newVals, addr)
 		}
 	}
-	bc.WriteValidatorList(bc.db, newVals)
-	return nil
+	return bc.WriteValidatorList(bc.db, newVals)
 }
 
 // Export writes the active chain to the given writer.
@@ -627,24 +641,37 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 	return nil
 }
 
-// similar to insert, but add to the db writer.
-func (bc *BlockChain) insertWithWriter(batch rawdb.DatabaseWriter, block *types.Block) {
+// writeHeadBlock writes a new head block
+func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 	// If the block is on a side chain or an unknown one, force other heads onto it too
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
 
 	// Add the block to the canonical chain number scheme and mark as the head
-	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(batch, block.Hash())
+	batch := bc.ChainDb().NewBatch()
+	if err := rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64()); err != nil {
+		return err
+	}
+	if err := rawdb.WriteHeadBlockHash(batch, block.Hash()); err != nil {
+		return err
+	}
+	if err := batch.Write(); err != nil {
+		return err
+	}
 
 	bc.currentBlock.Store(block)
 
 	// If the block is better than our head or is on a different chain, force update heads
 	if updateHeads {
-		bc.hc.SetCurrentHeader(block.Header())
-		rawdb.WriteHeadFastBlockHash(batch, block.Hash())
+		if err := bc.hc.SetCurrentHeader(block.Header()); err != nil {
+			return errors.Wrap(err, "HeaderChain SetCurrentHeader")
+		}
+		if err := rawdb.WriteHeadFastBlockHash(bc.db, block.Hash()); err != nil {
+			return err
+		}
 
 		bc.currentFastBlock.Store(block)
 	}
+	return nil
 }
 
 // insert injects a new head block into the current block chain. This method
@@ -653,8 +680,8 @@ func (bc *BlockChain) insertWithWriter(batch rawdb.DatabaseWriter, block *types.
 // or if they are on a different side chain.
 //
 // Note, this function assumes that the `mu` mutex is held!
-func (bc *BlockChain) insert(block *types.Block) {
-	bc.insertWithWriter(bc.db, block)
+func (bc *BlockChain) insert(block *types.Block) error {
+	return bc.writeHeadBlock(block)
 }
 
 // Genesis retrieves the chain's genesis block.
@@ -890,7 +917,7 @@ const (
 
 // Rollback is designed to remove a chain of links from the database that aren't
 // certain enough to be valid.
-func (bc *BlockChain) Rollback(chain []common.Hash) {
+func (bc *BlockChain) Rollback(chain []common.Hash) error {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
@@ -902,7 +929,9 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 		if currentHeader != nil && currentHeader.Hash() == hash {
 			parentHeader := bc.GetHeader(currentHeader.ParentHash(), currentHeader.Number().Uint64()-1)
 			if parentHeader != nil {
-				bc.hc.SetCurrentHeader(parentHeader)
+				if err := bc.hc.SetCurrentHeader(parentHeader); err != nil {
+					return errors.Wrap(err, "HeaderChain SetCurrentHeader")
+				}
 			}
 		}
 		if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentFastBlock.Hash() == hash {
@@ -916,7 +945,9 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
 			if newBlock != nil {
 				bc.currentBlock.Store(newBlock)
-				rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash())
+				if err := rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash()); err != nil {
+					return err
+				}
 
 				for _, stkTxn := range currentBlock.StakingTransactions() {
 					if stkTxn.StakingType() == staking.DirectiveCreateValidator {
@@ -928,7 +959,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 			}
 		}
 	}
-	bc.removeInValidatorList(valsToRemove)
+	return bc.removeInValidatorList(valsToRemove)
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
@@ -1022,7 +1053,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		}
 		// Short circuit if the owner header is unknown
 		if !bc.HasHeader(block.Hash(), block.NumberU64()) {
-			return i, fmt.Errorf("containing header #%d [%x…] unknown", block.Number(), block.Hash().Bytes()[:4])
+			return 0, fmt.Errorf("containing header #%d [%x…] unknown", block.Number(), block.Hash().Bytes()[:4])
 		}
 		// Skip if the entire data is already known
 		if bc.HasBlock(block.Hash(), block.NumberU64()) {
@@ -1031,12 +1062,21 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		}
 		// Compute all the non-consensus fields of the receipts
 		if err := SetReceiptsData(bc.chainConfig, block, receipts); err != nil {
-			return i, fmt.Errorf("failed to set receipts data: %v", err)
+			return 0, fmt.Errorf("failed to set receipts data: %v", err)
 		}
 		// Write all the data out into the database
-		rawdb.WriteBody(batch, block.Hash(), block.NumberU64(), block.Body())
-		rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts)
-		rawdb.WriteTxLookupEntries(batch, block)
+		if err := rawdb.WriteBody(batch, block.Hash(), block.NumberU64(), block.Body()); err != nil {
+			return 0, err
+		}
+		if err := rawdb.WriteReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
+			return 0, err
+		}
+		if err := rawdb.WriteBlockTxLookUpEntries(batch, block); err != nil {
+			return 0, err
+		}
+		if err := rawdb.WriteBlockStxLookUpEntries(batch, block); err != nil {
+			return 0, err
+		}
 
 		stats.processed++
 
@@ -1092,7 +1132,9 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
 		return err
 	}
-	rawdb.WriteBlock(bc.db, block)
+	if err := rawdb.WriteBlock(bc.db, block); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1124,8 +1166,12 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if bc.cacheConfig.Disabled || len(block.Header().ShardState()) > 0 {
+	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
 		if err := triedb.Commit(root, false); err != nil {
+			if isUnrecoverableErr(err) {
+				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
+				os.Exit(1)
+			}
 			return NonStatTy, err
 		}
 	} else {
@@ -1181,7 +1227,9 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	batch := bc.db.NewBatch()
 	// Write the raw block
-	rawdb.WriteBlock(batch, block)
+	if err := rawdb.WriteBlock(batch, block); err != nil {
+		return NonStatTy, err
+	}
 
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
@@ -1192,15 +1240,30 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	// Write the positional metadata for transaction/receipt lookups and preimages
-	rawdb.WriteTxLookupEntries(batch, block)
-	rawdb.WriteCxLookupEntries(batch, block)
-	rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
-
-	// Update current block
-	bc.insertWithWriter(batch, block)
+	if err := rawdb.WriteBlockTxLookUpEntries(batch, block); err != nil {
+		return NonStatTy, err
+	}
+	if err := rawdb.WriteBlockStxLookUpEntries(batch, block); err != nil {
+		return NonStatTy, err
+	}
+	if err := rawdb.WriteCxLookupEntries(batch, block); err != nil {
+		return NonStatTy, err
+	}
+	if err := rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages()); err != nil {
+		return NonStatTy, err
+	}
 
 	if err := batch.Write(); err != nil {
+		if isUnrecoverableErr(err) {
+			fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+			os.Exit(1)
+		}
 		return NonStatTy, err
+	}
+
+	// Update current block
+	if err := bc.writeHeadBlock(block); err != nil {
+		return NonStatTy, errors.Wrap(err, "writeHeadBlock")
 	}
 
 	bc.futureBlocks.Remove(block.Hash())
@@ -2203,10 +2266,13 @@ func (bc *BlockChain) CXMerkleProof(toShardID uint32, block *types.Block) (*type
 
 // WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
 // true: unspent, false: spent
-func (bc *BlockChain) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) {
+func (bc *BlockChain) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
 	for _, cxp := range cxps {
-		rawdb.WriteCXReceiptsProofSpent(db, cxp)
+		if err := rawdb.WriteCXReceiptsProofSpent(db, cxp); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // IsSpent checks whether a CXReceiptsProof is unspent
@@ -2943,4 +3009,27 @@ func (bc *BlockChain) SuperCommitteeForNextEpoch(
 
 	}
 	return nextCommittee, err
+}
+
+var (
+	leveldbErrSpec         = "leveldb"
+	tooManyOpenFilesErrStr = "Too many open files"
+)
+
+// isUnrecoverableErr check whether the input error is not recoverable.
+// When writing db, there could be some possible errors from storage level (leveldb).
+// Known possible leveldb errors are:
+//  1. Leveldb is already closed. (leveldb.ErrClosed)
+//  2. ldb file missing from disk. (leveldb.ErrNotFound)
+//  3. Corrupted db data. (leveldb.errors.ErrCorrupted)
+//  4. OS error when open file (too many open files, ...)
+//  5. OS error when write file (read-only, not enough disk space, ...)
+// Among all the above leveldb errors, only `too many open files` error is known to be recoverable,
+// thus the unrecoverable errors refers to error that is
+//  1. The error is from the lower storage level (from module leveldb)
+//  2. The error is not too many files error.
+func isUnrecoverableErr(err error) bool {
+	isLeveldbErr := strings.Contains(err.Error(), leveldbErrSpec)
+	isTooManyOpenFiles := strings.Contains(err.Error(), tooManyOpenFilesErrStr)
+	return isLeveldbErr && !isTooManyOpenFiles
 }

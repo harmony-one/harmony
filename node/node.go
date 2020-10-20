@@ -43,6 +43,8 @@ import (
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -119,6 +121,9 @@ type Node struct {
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
+
+	Metrics metrics.Registry
+
 	// metrics of p2p messages
 	NumP2PMessages     uint32
 	NumTotalMessages   uint32
@@ -457,9 +462,9 @@ func (node *Node) validateShardBoundMessage(
 			return nil, nil, true, nil
 		}
 	} else {
-		// ignore newview message if the node is not in viewchanging mode
+		// ignore viewchange/newview message if the node is not in viewchanging mode
 		switch m.Type {
-		case msg_pb.MessageType_NEWVIEW:
+		case msg_pb.MessageType_NEWVIEW, msg_pb.MessageType_VIEWCHANGE:
 			return nil, nil, true, nil
 		}
 	}
@@ -569,17 +574,19 @@ func (node *Node) Start() error {
 		Uint32("shard-id", node.Consensus.ShardID).
 		Msg("starting with these topics")
 
-	for key, isCon := range groups {
-		topicHandle, err := node.host.GetOrJoin(string(key))
-		if err != nil {
-			return err
+	if !node.NodeConfig.IsOffline {
+		for key, isCon := range groups {
+			topicHandle, err := node.host.GetOrJoin(string(key))
+			if err != nil {
+				return err
+			}
+			allTopics = append(
+				allTopics, u{
+					NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+					consensusBound: isCon,
+				},
+			)
 		}
-		allTopics = append(
-			allTopics, u{
-				NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
-				consensusBound: isCon,
-			},
-		)
 	}
 	pubsub := node.host.PubSub()
 	ownID := node.host.GetID()
@@ -898,16 +905,15 @@ func New(
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
-
-			shardID := node.NodeConfig.ShardID
-			// HACK get the real error reason
-			_, err := node.shardChains.ShardChain(shardID)
-
-			fmt.Fprintf(
-				os.Stderr,
-				"reason:%s beaconchain-is-nil:%t shardchain-is-nil:%t",
-				err.Error(), b1, b2,
-			)
+			var err error
+			if b2 {
+				shardID := node.NodeConfig.ShardID
+				// HACK get the real error reason
+				_, err = node.shardChains.ShardChain(shardID)
+			} else {
+				_, err = node.shardChains.ShardChain(shard.BeaconChainShardID)
+			}
+			fmt.Fprintf(os.Stderr, "Cannot initialize node: %v\n", err)
 			os.Exit(-1)
 		}
 
@@ -916,6 +922,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
+		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
 		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
@@ -930,7 +937,7 @@ func New(
 		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
-		node.Consensus.VerifiedNewBlock = make(chan *types.Block)
+		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		chain.Engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block

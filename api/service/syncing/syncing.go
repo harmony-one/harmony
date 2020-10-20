@@ -703,7 +703,10 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 			if !verifyAllSig {
 				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-					bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()})
+					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
+						utils.Logger().Err(rbErr).Msg("[SYNC] UpdateBlockAndStatus: failed to rollback")
+						return err
+					}
 				}
 			}
 			return err
@@ -924,7 +927,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-			return
+			break
 		}
 		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
@@ -940,13 +943,37 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Error().Err(err).
 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
+			ss.purgeOldBlocksFromCache()
+			break
 		}
 		ss.purgeOldBlocksFromCache()
-		if consensus != nil {
-			consensus.SetMode(consensus.UpdateConsensusInformation())
+	}
+	if consensus != nil {
+		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
+			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
 		}
+		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
 	ss.purgeAllBlocksFromCache()
+}
+
+func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
+	curNumber := bc.CurrentBlock().NumberU64()
+	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
+	if err != nil {
+		return err
+	}
+	for {
+		block := blockIter.Next()
+		if block == nil {
+			break
+		}
+		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+			return errors.Wrap(err, "failed to InsertChain")
+		}
+	}
+	consensus.FBFTLog.PruneCacheBeforeBlock(bc.CurrentBlock().NumberU64() + 1)
+	return nil
 }
 
 // GetSyncingPort returns the syncing port.

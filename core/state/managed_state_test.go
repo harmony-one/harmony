@@ -19,14 +19,15 @@ package state
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var addr = common.BytesToAddress([]byte("test"))
 
 func create() (*ManagedState, *account) {
-	statedb, _ := New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
+	statedb, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
 	ms := ManageState(statedb)
 	ms.DB.SetNonce(addr, 100)
 	ms.accounts[addr] = newAccount(ms.DB.getStateObject(addr))

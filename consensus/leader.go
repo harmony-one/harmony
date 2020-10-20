@@ -94,11 +94,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 			Msg("[Announce] Sent Announce Message!!")
 	}
 
-	consensus.getLogger().Debug().
-		Str("From", consensus.phase.String()).
-		Str("To", FBFTPrepare.String()).
-		Msg("[Announce] Switching phase")
-	consensus.switchPhase(FBFTPrepare, true)
+	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
@@ -110,7 +106,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.blockNum, consensus.GetCurViewID(), recvMsg.BlockHash,
+		consensus.blockNum, consensus.GetCurBlockViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).
@@ -159,7 +155,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		return
 	}
 	signerPubKey := &bls_core.PublicKey{}
-	if len(recvMsg.SenderPubkeys) == 1 {
+	if recvMsg.HasSingleSender() {
 		signerPubKey = recvMsg.SenderPubkeys[0].Object
 	} else {
 		for _, pubKey := range recvMsg.SenderPubkeys {
@@ -198,7 +194,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 		if err := consensus.didReachPrepareQuorum(); err != nil {
 			return
 		}
-		consensus.switchPhase(FBFTCommit, true)
+		consensus.switchPhase("onPrepare", FBFTCommit)
 	}
 	//// Read - End
 }
@@ -226,7 +222,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	// Verify the signature on commitPayload is correct
 	logger := consensus.getLogger().With().
-		Interface("validatorPubKey", recvMsg.SenderPubkeys).
+		Str("recvMsg", recvMsg.String()).
 		Int64("numReceivedSoFar", signerCount).Logger()
 
 	logger.Debug().Msg("[OnCommit] Received new commit message")
@@ -254,7 +250,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		Logger()
 
 	signerPubKey := &bls_core.PublicKey{}
-	if len(recvMsg.SenderPubkeys) == 1 {
+	if recvMsg.HasSingleSender() {
 		signerPubKey = recvMsg.SenderPubkeys[0].Object
 	} else {
 		for _, pubKey := range recvMsg.SenderPubkeys {
@@ -287,7 +283,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	//// Write - End
 
 	//// Read - Start
-	viewID := consensus.GetCurViewID()
+	viewID := consensus.GetCurBlockViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
 		go func(viewID uint64) {

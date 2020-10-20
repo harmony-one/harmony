@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -98,9 +99,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
-	consensus.vcLock.Lock()
 	consensus.ResetViewChangeState()
-	consensus.vcLock.Unlock()
 	return consensus.Decider.ParticipantsCount()
 }
 
@@ -109,8 +108,7 @@ func NewFaker() *Consensus {
 	return &Consensus{}
 }
 
-// Sign on the hash of the message with the private keys and return the signature.
-// If multiple keys are provided, the aggregated signature will be returned.
+// Sign on the hash of the message
 func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
 	hash := hash.Keccak256(message)
 	signature := priKey.SignHash(hash[:])
@@ -131,28 +129,10 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 	return nil
 }
 
-// GetViewIDSigsArray returns the signatures for viewID in viewchange
-func (consensus *Consensus) GetViewIDSigsArray(viewID uint64) []*bls_core.Sign {
-	sigs := []*bls_core.Sign{}
-	for _, sig := range consensus.viewIDSigs[viewID] {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
-// GetNilSigsArray returns the signatures for nil prepared message in viewchange
-func (consensus *Consensus) GetNilSigsArray(viewID uint64) []*bls_core.Sign {
-	sigs := []*bls_core.Sign{}
-	for _, sig := range consensus.nilSigs[viewID] {
-		sigs = append(sigs, sig)
-	}
-	return sigs
-}
-
 // UpdateBitmaps update the bitmaps for prepare and commit phase
 func (consensus *Consensus) UpdateBitmaps() {
 	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
+		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
@@ -167,10 +147,8 @@ func (consensus *Consensus) UpdateBitmaps() {
 
 // ResetState resets the state of the consensus
 func (consensus *Consensus) ResetState() {
-	consensus.getLogger().Debug().
-		Str("Phase", consensus.phase.String()).
-		Msg("[ResetState] Resetting consensus state")
-	consensus.switchPhase(FBFTAnnounce, true)
+	consensus.switchPhase("ResetState", FBFTAnnounce)
+
 	consensus.blockHash = [32]byte{}
 	consensus.block = []byte{}
 	consensus.Decider.ResetPrepareAndCommitVotes()
@@ -222,7 +200,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		//so only set mode to normal when new node enters consensus and need checking viewID
 		consensus.current.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
-		if len(msg.SenderPubkeys) != 1 {
+		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
@@ -232,9 +210,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.GetCurViewID() {
+	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurViewID() {
+	} else if msg.ViewID < consensus.GetCurBlockViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -259,17 +237,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, members,
 	)
-}
-
-// getLogger returns logger for consensus contexts added
-func (consensus *Consensus) getLogger() *zerolog.Logger {
-	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.GetCurViewID()).
-		Interface("phase", consensus.phase).
-		Str("mode", consensus.current.Mode().String()).
-		Logger()
-	return &logger
 }
 
 // retrieve corresponding blsPublicKey from Coinbase Address
@@ -331,7 +298,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 
 	// Overwrite nextEpoch if the shard state has a epoch number
-	if len(curHeader.ShardState()) > 0 {
+	if curHeader.IsLastBlockInEpoch() {
 		nextShardState, err := curHeader.GetShardState()
 		if err != nil {
 			return Syncing
@@ -343,14 +310,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// TODO: remove once multisig is fully upgraded in the network
-	if consensus.ChainReader.Config().ChainID != params.MainnetChainID || curEpoch.Cmp(big.NewInt(1000)) > 0 {
-		consensus.MultiSig = true
+	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
+	if (consensus.ChainReader.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
+		(consensus.ChainReader.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
+		(consensus.ChainReader.Config().ChainID != params.MainnetChainID && consensus.ChainReader.Config().ChainID != params.TestChainID) {
+		consensus.AggregateSig = true
 	}
 
 	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
-		len(curHeader.ShardState()) > 0 &&
-		!consensus.ChainReader.Config().IsStaking(curEpoch)
+		curHeader.IsLastBlockInEpoch() && !consensus.ChainReader.Config().IsStaking(curEpoch)
 	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
@@ -380,7 +348,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.getLogger().Info().Msg("[UpdateConsensusInformation] Updating.....")
 	// genesis block is a special case that will have shard state and needs to skip processing
 	isNotGenesisBlock := curHeader.Number().Cmp(big.NewInt(0)) > 0
-	if len(curHeader.ShardState()) > 0 && isNotGenesisBlock {
+	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
 			nextEpoch, consensus.ChainReader,
@@ -450,7 +418,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the epoch
-	if len(curHeader.ShardState()) == 0 && curHeader.Number().Uint64() != 0 {
+	if !curHeader.IsLastBlockInEpoch() && curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Error().Err(err).
@@ -510,44 +478,120 @@ func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
 	return false
 }
 
-func (consensus *Consensus) addViewIDKeyIfNotExist(viewID uint64) {
-	members := consensus.Decider.Participants()
-	if _, ok := consensus.bhpSigs[viewID]; !ok {
-		consensus.bhpSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.nilSigs[viewID]; !ok {
-		consensus.nilSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.viewIDSigs[viewID]; !ok {
-		consensus.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
-	}
-	if _, ok := consensus.bhpBitmap[viewID]; !ok {
-		bhpBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.bhpBitmap[viewID] = bhpBitmap
-	}
-	if _, ok := consensus.nilBitmap[viewID]; !ok {
-		nilBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.nilBitmap[viewID] = nilBitmap
-	}
-	if _, ok := consensus.viewIDBitmap[viewID]; !ok {
-		viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
-		consensus.viewIDBitmap[viewID] = viewIDBitmap
-	}
-}
-
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
-	consensus.SetCurViewID(height)
+	consensus.SetCurBlockViewID(height)
 	consensus.SetViewChangingID(height)
 }
 
-// SetCurViewID set the current view ID
-func (consensus *Consensus) SetCurViewID(viewID uint64) {
-	consensus.current.SetCurViewID(viewID)
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) SetCurBlockViewID(viewID uint64) {
+	consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
+}
+
+// StartFinalityCount set the finality counter to current time
+func (consensus *Consensus) StartFinalityCount() {
+	consensus.finalityCounter = time.Now().UnixNano()
+}
+
+// FinishFinalityCount calculate the current finality
+func (consensus *Consensus) FinishFinalityCount() {
+	d := time.Now().UnixNano()
+	consensus.finality = (d - consensus.finalityCounter) / 1000000
+}
+
+// GetFinality returns the finality time in milliseconds of previous consensus
+func (consensus *Consensus) GetFinality() int64 {
+	return consensus.finality
+}
+
+// switchPhase will switch FBFTPhase to nextPhase if the desirePhase equals the nextPhase
+func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
+	consensus.getLogger().Info().
+		Str("from:", consensus.phase.String()).
+		Str("to:", desired.String()).
+		Str("switchPhase:", subject)
+
+	consensus.phase = desired
+	return
+}
+
+var (
+	errGetPreparedBlock  = errors.New("failed to get prepared block for self commit")
+	errReadBitmapPayload = errors.New("failed to read signature bitmap payload")
+)
+
+// selfCommit will create a commit message and commit it locally
+// it is used by the new leadder of the view change routine
+// when view change is succeeded and the new leader
+// received prepared payload from other validators or from local
+func (consensus *Consensus) selfCommit(payload []byte) error {
+	var blockHash [32]byte
+	copy(blockHash[:], payload[:32])
+
+	// Leader sign and add commit message
+	block := consensus.FBFTLog.GetBlockByHash(blockHash)
+	if block == nil {
+		return errGetPreparedBlock
+	}
+
+	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
+	if err != nil {
+		return errReadBitmapPayload
+	}
+
+	// update consensus structure when succeeded
+	// protect consensus data update logic
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
+	copy(consensus.blockHash[:], blockHash[:])
+	consensus.switchPhase("selfCommit", FBFTCommit)
+	consensus.aggregatedPrepareSig = aggSig
+	consensus.prepareBitmap = mask
+	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
+	for i, key := range consensus.priKey {
+		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Int("Index", i).
+				Str("Key", key.Pub.Bytes.Hex()).
+				Msg("[selfCommit] New Leader commit bitmap set failed")
+			continue
+		}
+
+		if _, err := consensus.Decider.SubmitVote(
+			quorum.Commit,
+			[]bls.SerializedPublicKey{key.Pub.Bytes},
+			key.Pri.SignHash(commitPayload),
+			common.BytesToHash(consensus.blockHash[:]),
+			block.NumberU64(),
+			block.Header().ViewID().Uint64(),
+		); err != nil {
+			consensus.getLogger().Warn().
+				Err(err).
+				Int("Index", i).
+				Str("Key", key.Pub.Bytes.Hex()).
+				Msg("[selfCommit] submit vote on viewchange commit failed")
+		}
+	}
+	return nil
+}
+
+// getLogger returns logger for consensus contexts added
+func (consensus *Consensus) getLogger() *zerolog.Logger {
+	logger := utils.Logger().With().
+		Uint64("myBlock", consensus.blockNum).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
+		Str("phase", consensus.phase.String()).
+		Str("mode", consensus.current.Mode().String()).
+		Logger()
+	return &logger
 }

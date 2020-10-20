@@ -20,78 +20,143 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// DumpAccount ...
+// DumpAccount represents an account in the state
 type DumpAccount struct {
-	Balance  string            `json:"balance"`
-	Nonce    uint64            `json:"nonce"`
-	Root     string            `json:"root"`
-	CodeHash string            `json:"codeHash"`
-	Code     string            `json:"code"`
-	Storage  map[string]string `json:"storage"`
+	Balance   string                 `json:"balance"`
+	Nonce     uint64                 `json:"nonce"`
+	Root      string                 `json:"root"`
+	CodeHash  string                 `json:"codeHash"`
+	Code      string                 `json:"code,omitempty"`
+	Storage   map[common.Hash]string `json:"storage,omitempty"`
+	Address   *common.Address        `json:"address,omitempty"` // Address only present in iterative (line-by-line) mode
+	SecureKey hexutil.Bytes          `json:"key,omitempty"`     // If we don't have address, we can output the key
+
 }
 
-// Dump ...
+// Dump represents the full dump in a collected format, as one large map
 type Dump struct {
-	Root     string                 `json:"root"`
-	Accounts map[string]DumpAccount `json:"accounts"`
+	Root     string                         `json:"root"`
+	Accounts map[common.Address]DumpAccount `json:"accounts"`
 }
 
-// RawDump ...
-func (db *DB) RawDump() Dump {
-	dump := Dump{
-		Root:     fmt.Sprintf("%x", db.trie.Hash()),
-		Accounts: make(map[string]DumpAccount),
-	}
+// iterativeDump is a 'collector'-implementation which dump output line-by-line iteratively
+type iterativeDump struct {
+	*json.Encoder
+}
 
-	it := trie.NewIterator(db.trie.NodeIterator(nil))
+// Collector interface which the state trie calls during iteration
+type collector interface {
+	onRoot(common.Hash)
+	onAccount(common.Address, DumpAccount)
+}
+
+func (d *Dump) onRoot(root common.Hash) {
+	d.Root = fmt.Sprintf("%x", root)
+}
+
+func (d *Dump) onAccount(addr common.Address, account DumpAccount) {
+	d.Accounts[addr] = account
+}
+
+func (d iterativeDump) onAccount(addr common.Address, account DumpAccount) {
+	dumpAccount := &DumpAccount{
+		Balance:   account.Balance,
+		Nonce:     account.Nonce,
+		Root:      account.Root,
+		CodeHash:  account.CodeHash,
+		Code:      account.Code,
+		Storage:   account.Storage,
+		SecureKey: account.SecureKey,
+		Address:   nil,
+	}
+	if addr != (common.Address{}) {
+		dumpAccount.Address = &addr
+	}
+	d.Encode(dumpAccount)
+}
+
+func (d iterativeDump) onRoot(root common.Hash) {
+	d.Encode(struct {
+		Root common.Hash `json:"root"`
+	}{root})
+}
+
+func (s *DB) dump(c collector, excludeCode, excludeStorage, excludeMissingPreimages bool) {
+	emptyAddress := (common.Address{})
+	missingPreimages := 0
+	c.onRoot(s.trie.Hash())
+	it := trie.NewIterator(s.trie.NodeIterator(nil))
 	for it.Next() {
-		addr := db.trie.GetKey(it.Key)
 		var data Account
 		if err := rlp.DecodeBytes(it.Value, &data); err != nil {
 			panic(err)
 		}
-		obj := newObject(nil, common.BytesToAddress(addr), data)
-		var wrapper staking.ValidatorWrapper
-		wrap := ""
-		if err := rlp.DecodeBytes(obj.Code(db.db), &wrapper); err != nil {
-			//
-		} else {
-			marsh, err := json.Marshal(wrapper)
-			if err == nil {
-				wrap = string(marsh)
-			}
-		}
-
+		addr := common.BytesToAddress(s.trie.GetKey(it.Key))
+		obj := newObject(nil, addr, data)
 		account := DumpAccount{
 			Balance:  data.Balance.String(),
 			Nonce:    data.Nonce,
 			Root:     common.Bytes2Hex(data.Root[:]),
 			CodeHash: common.Bytes2Hex(data.CodeHash),
-			Code:     wrap,
-			Storage:  make(map[string]string),
 		}
-		storageIt := trie.NewIterator(obj.getTrie(db.db).NodeIterator(nil))
-		for storageIt.Next() {
-			account.Storage[common.Bytes2Hex(db.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(storageIt.Value)
+		if emptyAddress == addr {
+			// Preimage missing
+			missingPreimages++
+			if excludeMissingPreimages {
+				continue
+			}
+			account.SecureKey = it.Key
 		}
-		dump.Accounts[common2.MustAddressToBech32(common.BytesToAddress(addr))] = account
+		if !excludeCode {
+			account.Code = common.Bytes2Hex(obj.Code(s.db))
+		}
+		if !excludeStorage {
+			account.Storage = make(map[common.Hash]string)
+			storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(nil))
+			for storageIt.Next() {
+				_, content, _, err := rlp.Split(storageIt.Value)
+				if err != nil {
+					utils.Logger().Err(err).Msg("Failed to decode the value returned by iterator")
+					continue
+				}
+				account.Storage[common.BytesToHash(s.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(content)
+			}
+		}
+		c.onAccount(addr, account)
 	}
-	return dump
+	if missingPreimages > 0 {
+		utils.Logger().Warn().Int("missing", missingPreimages).Msg("Dump incomplete due to missing preimages")
+	}
 }
 
-// Dump ...
-func (db *DB) Dump() string {
-	json, err := json.MarshalIndent(db.RawDump(), "", "    ")
+// RawDump returns the entire state an a single large object
+func (s *DB) RawDump(excludeCode, excludeStorage, excludeMissingPreimages bool) Dump {
+	dump := &Dump{
+		Accounts: make(map[common.Address]DumpAccount),
+	}
+	s.dump(dump, excludeCode, excludeStorage, excludeMissingPreimages)
+	return *dump
+}
+
+// Dump returns a JSON string representing the entire state as a single json-object
+func (s *DB) Dump(excludeCode, excludeStorage, excludeMissingPreimages bool) []byte {
+	dump := s.RawDump(excludeCode, excludeStorage, excludeMissingPreimages)
+	json, err := json.MarshalIndent(dump, "", "    ")
 	if err != nil {
 		fmt.Println("dump err", err)
 	}
+	return json
+}
 
-	return string(json)
+// IterativeDump dumps out accounts as json-objects, delimited by linebreaks on stdout
+func (s *DB) IterativeDump(excludeCode, excludeStorage, excludeMissingPreimages bool, output *json.Encoder) {
+	s.dump(iterativeDump{output}, excludeCode, excludeStorage, excludeMissingPreimages)
 }

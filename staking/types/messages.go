@@ -108,7 +108,7 @@ type EditValidator struct {
 	SlotKeyToRemove    *bls.SerializedPublicKey `json:"slot-key-to_remove" rlp:"nil"`
 	SlotKeyToAdd       *bls.SerializedPublicKey `json:"slot-key-to_add" rlp:"nil"`
 	SlotKeyToAddSig    *bls.SerializedSignature `json:"slot-key-to-add-sig" rlp:"nil"`
-	EPOSStatus         effective.Eligibility    `json:"epos-eligibility-status" rlp:"nil"`
+	EPOSStatus         effective.Eligibility    `json:"epos-eligibility-status"`
 }
 
 // Type of EditValidator

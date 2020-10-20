@@ -72,7 +72,7 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NextAfter(*bls.PublicKeyWrapper) (bool, *bls.PublicKeyWrapper)
+	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
 }
 
@@ -206,14 +206,15 @@ func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
 	return -1
 }
 
-func (s *cIdentities) NextAfter(pubKey *bls.PublicKeyWrapper) (bool, *bls.PublicKeyWrapper) {
+// NthNext return the Nth next pubkey, next can be negative number
+func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
 	idx := s.IndexOf(pubKey.Bytes)
 	if idx != -1 {
 		found = true
 	}
-	idx = (idx + 1) % int(s.ParticipantsCount())
+	idx = (idx + next) % int(s.ParticipantsCount())
 	return found, &s.publicKeys[idx]
 }
 
@@ -253,7 +254,13 @@ func (s *cIdentities) SubmitVote(
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
+	seenKeys := map[bls.SerializedPublicKey]struct{}{}
 	for _, pubKey := range pubkeys {
+		if _, ok := seenKeys[pubKey]; ok {
+			return nil, errors.Errorf("duplicate key found in votes %x", pubKey)
+		}
+		seenKeys[pubKey] = struct{}{}
+
 		if ballet := s.ReadBallot(p, pubKey); ballet != nil {
 			return nil, errors.Errorf("vote is already submitted %x", pubKey)
 		}

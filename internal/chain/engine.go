@@ -212,13 +212,11 @@ func (e *engineImpl) Finalize(
 ) (*types.Block, reward.Reader, error) {
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
-	isNewEpoch := len(header.ShardState()) > 0
-	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	if isBeaconChain && isNewEpoch && inPreStakingEra {
+	if IsCommitteeSelectionBlock(chain, header) {
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
 		}
@@ -310,6 +308,14 @@ func payoutUndelegations(
 		Msg("paid out delegations")
 
 	return nil
+}
+
+// IsCommitteeSelectionBlock checks if the given header is for the committee selection block
+// which can only occur on beacon chain and if epoch > pre-staking epoch.
+func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) bool {
+	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
+	inPreStakingEra := chain.Config().IsPreStaking(header.Epoch())
+	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
 func setLastEpochInCommittee(header *block.Header, state *state.DB) error {

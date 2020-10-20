@@ -9,7 +9,9 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -78,6 +80,32 @@ func GetAddressFromBLSPubKeyBytes(pubKeyBytes []byte) common.Address {
 		Logger().Err(err).Msg("Failed to get address of bls key")
 	}
 	return addr
+}
+
+// GetCallStackInfo return a string containing the file name, function name
+// and the line number of a specified entry on the call stack.
+// Inspired by https://github.com/jimlawless/whereami
+func GetCallStackInfo(depthList ...int) string {
+	var depth int
+	if depthList == nil {
+		depth = 1
+	} else {
+		depth = depthList[0]
+	}
+	function, file, line, _ := runtime.Caller(depth)
+	return fmt.Sprintf("File: %s  Function: %s Line: %d",
+		chopPath(file), runtime.FuncForPC(function).Name(), line,
+	)
+}
+
+// chopPath returns the source filename after the last slash.
+// Inspired by https://github.com/jimlawless/whereami
+func chopPath(original string) string {
+	i := strings.LastIndex(original, "/")
+	if i == -1 {
+		return original
+	}
+	return original[i+1:]
 }
 
 // TODO Remove this from main code - it is only used in *_test.go

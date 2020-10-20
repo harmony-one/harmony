@@ -32,9 +32,10 @@ var (
 		PreStakingEpoch:   big.NewInt(185),
 		QuickUnlockEpoch:  big.NewInt(191),
 		FiveSecondsEpoch:  big.NewInt(230),
-		RedelegationEpoch: big.NewInt(10000000),
+		RedelegationEpoch: big.NewInt(290),
 		EIP155Epoch:       big.NewInt(28),
 		S3Epoch:           big.NewInt(28),
+		IstanbulEpoch:     big.NewInt(314),
 		ReceiptLogEpoch:   big.NewInt(101),
 	}
 
@@ -50,6 +51,7 @@ var (
 		RedelegationEpoch: big.NewInt(36500),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
+		IstanbulEpoch:     big.NewInt(43800),
 		ReceiptLogEpoch:   big.NewInt(0),
 	}
 
@@ -66,6 +68,7 @@ var (
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
+		IstanbulEpoch:     big.NewInt(0),
 		ReceiptLogEpoch:   big.NewInt(0),
 	}
 
@@ -82,6 +85,7 @@ var (
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
+		IstanbulEpoch:     big.NewInt(0),
 		ReceiptLogEpoch:   big.NewInt(0),
 	}
 
@@ -98,6 +102,7 @@ var (
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
+		IstanbulEpoch:     big.NewInt(0),
 		ReceiptLogEpoch:   big.NewInt(0),
 	}
 
@@ -113,6 +118,7 @@ var (
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
+		IstanbulEpoch:     big.NewInt(0),
 		ReceiptLogEpoch:   big.NewInt(0),
 	}
 
@@ -130,6 +136,7 @@ var (
 		big.NewInt(0),             // RedelegationEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
+		big.NewInt(0),             // IstanbulEpoch
 		big.NewInt(0),             // ReceiptLogEpoch
 	}
 
@@ -147,6 +154,7 @@ var (
 		big.NewInt(0), // RedelegationEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
+		big.NewInt(0), // IstanbulEpoch
 		big.NewInt(0), // ReceiptLogEpoch
 	}
 
@@ -205,6 +213,9 @@ type ChainConfig struct {
 
 	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
+
+	// Istanbul epoch
+	IstanbulEpoch *big.Int `json:"istanbul-epoch,omitempty"`
 
 	// ReceiptLogEpoch is the first epoch support receiptlog
 	ReceiptLogEpoch *big.Int `json:"receipt-log-epoch,omitempty"`
@@ -282,6 +293,11 @@ func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
 }
 
+// IsIstanbul returns whether epoch is either equal to the Istanbul fork epoch or greater.
+func (c *ChainConfig) IsIstanbul(epoch *big.Int) bool {
+	return isForked(c.IstanbulEpoch, epoch)
+}
+
 // IsReceiptLog returns whether epoch is either equal to the ReceiptLog fork epoch or greater.
 func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 	return isForked(c.ReceiptLogEpoch, epoch)
@@ -316,8 +332,8 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                   *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog bool
+	ChainID                                               *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -332,5 +348,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsEIP155:     c.IsEIP155(epoch),
 		IsS3:         c.IsS3(epoch),
 		IsReceiptLog: c.IsReceiptLog(epoch),
+		IsIstanbul:   c.IsIstanbul(epoch),
 	}
 }

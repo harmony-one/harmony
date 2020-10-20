@@ -230,6 +230,7 @@ func (w *Worker) commitTransaction(
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
 	}
@@ -318,7 +319,7 @@ func (w *Worker) GetNewEpoch() *big.Int {
 		// have an epoch and it will decide the next epoch for following blocks
 		epoch = new(big.Int).Set(shardState.Epoch)
 	} else {
-		if len(parent.Header().ShardState()) > 0 && parent.NumberU64() != 0 {
+		if parent.IsLastBlockInEpoch() && parent.NumberU64() != 0 {
 			// if parent has proposed a new shard state it increases by 1, except for genesis block.
 			epoch = epoch.Add(epoch, common.Big1)
 		}

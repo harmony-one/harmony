@@ -3,12 +3,14 @@ package services
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/libp2p/go-libp2p-core/peer"
 
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -55,7 +57,16 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 
 	// Fetch relevant headers, syncing status, & peers
-	currentHeader, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	currBlock := s.hmy.CurrentBlock()
+	var currentHeader *block.Header
+	var err error
+	if currBlock.Number().Cmp(big.NewInt(0)) == 1 && !s.hmy.IsStakingEpoch(currBlock.Epoch()) {
+		// all blocks in the era before staking epoch requires the next block to get the block reward transactions
+		blkNum := new(big.Int).Sub(currBlock.Number(), big.NewInt(1))
+		currentHeader, err = s.hmy.HeaderByNumber(ctx, rpc.BlockNumber(blkNum.Uint64()))
+	} else {
+		currentHeader, err = s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	}
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Sprintf("unable to get current header: %v", err.Error()),
@@ -76,7 +87,7 @@ func (s *NetworkAPI) NetworkStatus(
 	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain) {
 		syncStatus = common.SyncingNewBlock
 	} else if targetHeight == 0 {
-		syncStatus = common.SyncingStartup
+		syncStatus = common.SyncingUnknown
 	}
 	stage := syncStatus.String()
 
@@ -193,6 +204,8 @@ func getErrors() []*types.Error {
 		&common.BlockNotFoundError,
 		&common.TransactionNotFoundError,
 		&common.ReceiptNotFoundError,
+		&common.UnsupportedCurveTypeError,
+		&common.InvalidTransactionConstructionError,
 	}
 }
 
@@ -240,41 +253,8 @@ func assertValidNetworkIdentifier(netID *types.NetworkIdentifier, shardID uint32
 		})
 	}
 
-	// Check for valid network ID and set a message if an error occurs
-	message := ""
-	if netID.Blockchain != currNetID.Blockchain {
-		message = fmt.Sprintf("Invalid blockchain, expected %v", currNetID.Blockchain)
-	} else if netID.Network != currNetID.Network {
-		message = fmt.Sprintf("Invalid network, expected %v", currNetID.Network)
-	} else if netID.SubNetworkIdentifier.Network != currNetID.SubNetworkIdentifier.Network {
-		message = fmt.Sprintf(
-			"Invalid subnetwork, expected %v", currNetID.SubNetworkIdentifier.Network,
-		)
-	} else {
-		var metadata, currMetadata common.SubNetworkMetadata
-
-		if err := currMetadata.UnmarshalFromInterface(currNetID.SubNetworkIdentifier.Metadata); err != nil {
-			return common.NewError(common.SanityCheckError, map[string]interface{}{
-				"message": fmt.Sprintf("Error while asserting valid network ID: %v", err.Error()),
-			})
-		}
-		if err := metadata.UnmarshalFromInterface(netID.SubNetworkIdentifier.Metadata); err != nil {
-			message = fmt.Sprintf("Subnetwork metadata is of unknown format: %v", err.Error())
-		}
-
-		if metadata.IsBeacon != currMetadata.IsBeacon {
-			if currMetadata.IsBeacon {
-				message = "Invalid subnetwork, expected beacon chain subnetwork"
-			} else {
-				message = "Invalid subnetwork, expected non-beacon chain subnetwork"
-			}
-		}
-	}
-
-	if message != "" {
-		return common.NewError(common.InvalidNetworkError, map[string]interface{}{
-			"message": message,
-		})
+	if netID == nil || types.Hash(currNetID) != types.Hash(netID) {
+		return &common.InvalidNetworkError
 	}
 	return nil
 }

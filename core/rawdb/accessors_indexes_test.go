@@ -20,11 +20,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -41,7 +42,7 @@ var (
 
 // Tests that positional lookup metadata can be stored and retrieved.
 func TestLookupStorage(t *testing.T) {
-	db := ethdb.NewMemDatabase()
+	db := rawdb.NewMemoryDatabase()
 
 	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	tx2 := types.NewTransaction(2, common.BytesToAddress([]byte{0x22}), 0, big.NewInt(222), 2222, big.NewInt(22222), []byte{0x22, 0x22, 0x22})
@@ -73,7 +74,12 @@ func TestLookupStorage(t *testing.T) {
 	}
 	// Insert all the transactions into the database, and verify contents
 	WriteBlock(db, block)
-	WriteTxLookupEntries(db, block)
+	if err := WriteBlockTxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockTxLookUpEntries: %v", err)
+	}
+	if err := WriteBlockStxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
 
 	for i, tx := range txs {
 		if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
@@ -116,7 +122,7 @@ func TestLookupStorage(t *testing.T) {
 
 // Test that staking tx hash does not find a plain tx hash (and visa versa) within the same block
 func TestMixedLookupStorage(t *testing.T) {
-	db := ethdb.NewMemDatabase()
+	db := rawdb.NewMemoryDatabase()
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	stx := sampleCreateValidatorStakingTxn()
 
@@ -125,8 +131,15 @@ func TestMixedLookupStorage(t *testing.T) {
 	header := blockfactory.NewTestHeader().With().Number(big.NewInt(314)).Header()
 	block := types.NewBlock(header, txs, types.Receipts{&types.Receipt{}, &types.Receipt{}}, nil, nil, stxs)
 
-	WriteBlock(db, block)
-	WriteTxLookupEntries(db, block)
+	if err := WriteBlock(db, block); err != nil {
+		t.Fatalf("WriteBlock: %v", err)
+	}
+	if err := WriteBlockTxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
+	if err := WriteBlockStxLookUpEntries(db, block); err != nil {
+		t.Fatalf("WriteBlockStxLookUpEntries: %v", err)
+	}
 
 	if recTx, _, _, _ := ReadStakingTransaction(db, tx.Hash()); recTx != nil {
 		t.Fatal("got staking transactions with plain tx hash")

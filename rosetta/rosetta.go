@@ -43,7 +43,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 
-	router := server.CorsMiddleware(recoverMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy))))
+	router := recoverMiddleware(server.CorsMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy))))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
@@ -76,9 +76,11 @@ func newHTTPServer(handler http.Handler) *http.Server {
 
 func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 	return server.NewRouter(
-		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
-		server.NewBlockAPIController(services.NewBlockAPI(hmy), asserter),
 		server.NewAccountAPIController(services.NewAccountAPI(hmy), asserter),
+		server.NewBlockAPIController(services.NewBlockAPI(hmy), asserter),
+		server.NewMempoolAPIController(services.NewMempoolAPI(hmy), asserter),
+		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
+		server.NewConstructionAPIController(services.NewConstructionAPI(hmy), asserter),
 	)
 }
 
