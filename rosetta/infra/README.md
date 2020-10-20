@@ -1,4 +1,4 @@
-    # Docker deployment of a Rosetta enabled Harmony node
+# Docker deployment of a Rosetta enabled Harmony node
 
 ## Docker Image
 You can choose to build the docker image using the included Dockerfile with the following command:
@@ -29,19 +29,11 @@ docker ps
 You can ensure that your node is running with the following curl command:
 ```bash
 curl -X POST --data '{
-"network_identifier": {
-  "blockchain": "Harmony",
-  "network": "Mainnet",
-  "sub_network_identifier": {
-    "network": "shard 0",
-      "metadata": {
-        "is_beacon": true
-      }
-  }
-}}' http://localhost:9700/network/status
+    "metadata": {}
+}' http://localhost:9700/network/list
 ```
 
-Once can start the node in the offline mode with the following command:
+You can start the node in the offline mode with the following command:
 ```bash
 docker run -d -p 9700:9700 -v "$(pwd)/data:/root/data" harmonyone/explorer-node --run.shard=0 --run.offline 
 ```
@@ -66,7 +58,7 @@ docker stop [CONTAINER ID]
 **Note that all the arguments provided when running the docker img are immediately forwarded to the harmony node binary.**
 > Note that the following args are **appended** to the provided arg when running the image: 
 > `--http.ip "0.0.0.0" --ws.ip "0.0.0.0" --http.rosetta --node_type "explorer" --datadir "./data" --log.dir "./data/logs"`.
-> This effectively makes them args that you cannot change.  
+> This effectively makes them args that you cannot easily change.  
 
 ### Running the node on testnet
 All the args on the image run are forwarded to the harmony node binary. Therefore, you can simply add `-n testnet` to 
