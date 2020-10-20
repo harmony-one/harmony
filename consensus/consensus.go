@@ -86,9 +86,6 @@ type Consensus struct {
 	OnConsensusDone func(*types.Block) error
 	// The verifier func passed from Node object
 	BlockVerifier BlockVerifierFunc
-	// Block Proposer proposes new block at the specific block number
-	BlockProposer func(blockNum uint64) (*types.Block, error)
-
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low

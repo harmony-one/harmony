@@ -110,6 +110,7 @@ type Engine interface {
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
+	// sigsReady signal indicates whether the commit sigs are populated in the header object.
 	Finalize(
 		chain ChainReader, header *block.Header,
 		state *state.DB, txs []*types.Transaction,

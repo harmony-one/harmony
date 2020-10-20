@@ -504,7 +504,7 @@ func (w *Worker) FinalizeNewBlock(
 				copyHeader.SetLastCommitBitmap(signers)
 			}
 			sigsReady <- true
-		case <-time.After(10 * time.Second):
+		case <-time.After(5 * time.Second):
 			// Exit goroutine
 			utils.Logger().Warn().Msg("Timeout waiting for commit sigs")
 		}

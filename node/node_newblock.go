@@ -56,6 +56,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
 						break
 					}
+					// Currently the block proposal is not triggered asynchronously yet with last consensus.
+					// TODO: trigger block proposal when 66% commit, and feed and final commit sigs here.
 					go func() {
 						commitSigs <- sigs
 					}()

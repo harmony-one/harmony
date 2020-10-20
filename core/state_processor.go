@@ -137,6 +137,7 @@ func (p *StateProcessor) Process(
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	sigsReady := make(chan bool)
 	go func() {
+		// Block processing don't need to block on reward computation as in block proposal
 		sigsReady <- true
 	}()
 	_, payout, err := p.engine.Finalize(

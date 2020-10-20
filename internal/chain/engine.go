@@ -203,6 +203,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 
 // Finalize implements Engine, accumulating the block rewards,
 // setting the final state and assembling the block.
+// sigsReady signal indicates whether the commit sigs are populated in the header object.
 func (e *engineImpl) Finalize(
 	chain engine.ChainReader, header *block.Header,
 	state *state.DB, txs []*types.Transaction,

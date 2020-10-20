@@ -473,7 +473,7 @@ func waitForCommitSigs(sigsReady chan bool) error {
 			return errors.New("Failed to get commit sigs")
 		}
 		utils.Logger().Info().Msg("Commit sigs are ready")
-	case <-time.After(10 * time.Second):
+	case <-time.After(5 * time.Second):
 		return errors.New("Timeout waiting for commit sigs for reward calculation")
 	}
 	return nil
