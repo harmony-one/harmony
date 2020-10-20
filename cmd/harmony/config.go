@@ -119,7 +119,7 @@ type wsConfig struct {
 }
 
 type rpcOptConfig struct {
-	Enabled bool
+	DebugEnabled bool // Enables PrivateDebugService APIs, including the EVM tracer
 }
 
 type devnetConfig struct {

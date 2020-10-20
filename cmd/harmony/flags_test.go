@@ -491,7 +491,7 @@ func TestRPCOptFlags(t *testing.T) {
 		{
 			args: []string{"--rpc.debug"},
 			expConfig: rpcOptConfig{
-				Enabled: true,
+				DebugEnabled: true,
 			},
 		},
 	}

@@ -313,7 +313,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		WSEnabled:    hc.WS.Enabled,
 		WSIp:         hc.WS.IP,
 		WSPort:       hc.WS.Port,
-		DebugEnabled: hc.RPCOpt.Enabled,
+		DebugEnabled: hc.RPCOpt.DebugEnabled,
 	}
 	if nodeConfig.ShardID != shard.BeaconChainShardID {
 		utils.Logger().Info().

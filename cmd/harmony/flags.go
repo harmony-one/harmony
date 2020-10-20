@@ -513,14 +513,14 @@ var (
 	rpcDebugEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.debug",
 		Usage:    "enable private debug apis",
-		DefValue: defaultConfig.RPCOpt.Enabled,
+		DefValue: defaultConfig.RPCOpt.DebugEnabled,
 		Hidden:   true,
 	}
 )
 
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
-		config.RPCOpt.Enabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
 	}
 }
 
