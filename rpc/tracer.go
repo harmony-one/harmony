@@ -95,7 +95,7 @@ type blockTraceResult struct {
 // is being traced.
 type txTraceTask struct {
 	statedb *state.DB // Intermediate state prepped for tracing
-	index   int            // Transaction offset in the block
+	index   int       // Transaction offset in the block
 }
 
 // TraceChain returns the structured logs created during the execution of EVM
@@ -138,9 +138,9 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 	database := state.NewDatabaseWithCache(s.hmy.ChainDb(), 16)
 
 	if origin > 0 {
-		start = s.hmy.BlockChain.GetBlock(start.ParentHash(), origin - 1)
+		start = s.hmy.BlockChain.GetBlock(start.ParentHash(), origin-1)
 		if start == nil {
-			return nil, fmt.Errorf("parent block #%d not found", origin - 1)
+			return nil, fmt.Errorf("parent block #%d not found", origin-1)
 		}
 	}
 
@@ -153,7 +153,7 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 		}
 		// Find the most recent block that has state available
 		for i := uint64(0); i < reexec; i++ {
-			start = s.hmy.BlockChain.GetBlock(start.ParentHash(), start.NumberU64() - 1)
+			start = s.hmy.BlockChain.GetBlock(start.ParentHash(), start.NumberU64()-1)
 			if start == nil {
 				break
 			}
@@ -168,7 +168,7 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 	}
 
 	// Execute all the transactions contained within the chain concurrently for each block
-	blocks := int(end.NumberU64() - origin)
+	blocks := int(end.NumberU64()-origin)
 
 	threads := runtime.NumCPU()
 	if threads > blocks {
@@ -265,7 +265,7 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 			}
 
 			// Print progress logs if long enough time elapsed
-			if time.Since(logged) > 8 * time.Second {
+			if time.Since(logged) > 8*time.Second {
 				if number > origin {
 					nodes, imgs := database.TrieDB().Size()
 					utils.Logger().Info().
@@ -274,7 +274,7 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 						Uint64("current", number).
 						Uint64("transactions", traced).
 						Float64("elapsed", time.Since(begin).Seconds()).
-						Float64("memory", float64(nodes) + float64(imgs)).
+						Float64("memory", float64(nodes)+float64(imgs)).
 						Msg("Tracing chain segment")
 				} else {
 					utils.Logger().Info().Msg("Preparing state for chain trace")
@@ -292,8 +292,8 @@ func (s *PrivateDebugService) traceChain(ctx context.Context, start, end *types.
 				txs := block.Transactions()
 
 				select {
-				case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: block, rootRef: proot, results: make([]*txTraceResult, len(txs)),}:
-				case <- notifier.Closed():
+				case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: block, rootRef: proot, results: make([]*txTraceResult, len(txs))}:
+				case <-notifier.Closed():
 					return
 				}
 				traced += uint64(len(txs))
@@ -669,7 +669,7 @@ func (s *PrivateDebugService) computeStateDB(block *types.Block, reexec uint64) 
 			utils.Logger().Info().
 				Uint64("block", block.NumberU64()).
 				Uint64("target", origin).
-				Uint64("remaining", origin - block.NumberU64()).
+				Uint64("remaining", origin-block.NumberU64()).
 				Float64("elasped", time.Since(start).Seconds()).
 				Msg(fmt.Sprintf("Regenerating historical state"))
 			logged = time.Now()
