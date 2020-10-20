@@ -17,13 +17,10 @@ RUN git clone https://github.com/harmony-one/mcl.git
 WORKDIR $HMY_PATH/harmony
 
 RUN make linux_static
-RUN cp ./bin/harmony /root && chmod +x /root/harmony
-
-WORKDIR $GOPATH
-
-RUN rm -rf *
+RUN mv ./bin/harmony /root/harmony && chmod +x /root/harmony
+RUN mv ./rosetta/infra/run.sh /root/run.sh && chmod +x /root/run.sh
+RUN rm -rf $GOPATH
 
 WORKDIR /root
 
-COPY run.sh run.sh
 ENTRYPOINT ["/bin/bash","/root/run.sh"]
