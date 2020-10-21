@@ -1,7 +1,9 @@
-FROM golang:1.14
+# Build
+FROM golang:1.14 AS build
 
-RUN apt update -y && apt upgrade -y
-RUN apt install libgmp-dev libssl-dev curl git -y
+RUN apt update -y && \
+    apt install libgmp-dev libssl-dev git -y && \
+    apt -y clean all
 
 ENV GOPATH=/root/go
 ENV GO111MODULE=on
@@ -10,17 +12,29 @@ RUN mkdir -p $HMY_PATH
 
 WORKDIR $HMY_PATH
 
-RUN git clone https://github.com/harmony-one/harmony.git
-RUN git clone https://github.com/harmony-one/bls.git
-RUN git clone https://github.com/harmony-one/mcl.git
+RUN git clone https://github.com/harmony-one/harmony.git && \
+    git clone https://github.com/harmony-one/bls.git && \
+    git clone https://github.com/harmony-one/mcl.git
 
 WORKDIR $HMY_PATH/harmony
 
-RUN make linux_static
-RUN mv ./bin/harmony /root/harmony && chmod +x /root/harmony
-RUN mv ./rosetta/infra/run.sh /root/run.sh && chmod +x /root/run.sh
-RUN rm -rf $GOPATH
+RUN make linux_static && \
+    cp ./bin/harmony /root/harmony && \
+    cp ./rosetta/infra/run.sh /root/run.sh
+
+# Execution
+FROM ubuntu:latest
+
+RUN apt update -y && \
+    apt install libgmp-dev libssl-dev -y && \
+    apt -y clean all
 
 WORKDIR /root
 
+COPY --from=build /root/harmony /root/harmony
+COPY --from=build /root/run.sh /root/run.sh
+
+EXPOSE 9500/tcp
+EXPOSE 9700/tcp
+EXPOSE 9800/tcp
 ENTRYPOINT ["/bin/bash","/root/run.sh"]
