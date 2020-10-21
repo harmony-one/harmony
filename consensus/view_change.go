@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"sync"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -159,6 +161,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
+	epoch := big.NewInt(0)
 	if consensus.ChainReader == nil {
 		consensus.getLogger().Error().Msg("[getNextLeaderKey] ChainReader is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.LeaderPubKey
@@ -175,6 +178,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
 				lastLeaderPubKey = consensus.LeaderPubKey
 			}
+			epoch = curHeader.Epoch()
 			// viewchange happened at the first block of new epoch
 			// use the LeaderPubKey as the base of the next leader
 			// as we shouldn't use lastLeader from coinbase as the base.
@@ -192,7 +196,12 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		Uint64("newViewID", viewID).
 		Uint64("myCurBlockViewID", consensus.GetCurBlockViewID()).
 		Msg("[getNextLeaderKey] got leaderPubKey from coinbase")
-	wasFound, next := consensus.Decider.NthNext(lastLeaderPubKey, gap)
+	// wasFound, next := consensus.Decider.NthNext(lastLeaderPubKey, gap)
+	// FIXME: rotate leader on harmony nodes only before fully externalization
+	wasFound, next := consensus.Decider.NthNextHmy(
+		shard.Schedule.InstanceForEpoch(epoch),
+		lastLeaderPubKey,
+		gap)
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
