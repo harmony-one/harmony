@@ -395,10 +395,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	// Broadcast client requested missing cross shard receipts if there is any
 	node.BroadcastMissingCXReceipts()
 
-	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
-	if newBlock.IsLastBlockInEpoch() {
-		node.Consensus.SetMode(node.Consensus.UpdateConsensusInformation())
-	}
 	if h := node.NodeConfig.WebHooks.Hooks; h != nil {
 		if h.Availability != nil {
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
