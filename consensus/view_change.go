@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -172,6 +173,14 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
+				lastLeaderPubKey = consensus.LeaderPubKey
+			}
+			// viewchange happened at the first block of new epoch
+			// use the LeaderPubKey as the base of the next leader
+			// as we shouldn't use lastLeader from coinbase as the base.
+			// The LeaderPubKey should be updated to the index 0 of the committee
+			if core.IsEpochBlockByNumber(consensus.blockNum) {
+				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
 				lastLeaderPubKey = consensus.LeaderPubKey
 			}
 		}
