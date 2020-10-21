@@ -53,7 +53,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 
 					node.Consensus.StartFinalityCount()
 					if err != nil {
-						utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
+						utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
 						break
 					}
 					// Currently the block proposal is not triggered asynchronously yet with last consensus.
@@ -89,8 +89,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
-	utils.AnalysisStart("proposeNewBlock", nowEpoch, blockNow)
-	defer utils.AnalysisEnd("proposeNewBlock", nowEpoch, blockNow)
+	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
+	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
 	node.Worker.UpdateCurrent()
 
@@ -111,7 +111,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 
 	emptyAddr := common.Address{}
 	if coinbase == emptyAddr {
-		return nil, errors.New("[proposeNewBlock] Failed setting coinbase")
+		return nil, errors.New("[ProposeNewBlock] Failed setting coinbase")
 	}
 
 	// Must set coinbase here because the operations below depend on it
@@ -192,7 +192,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				if err == nil || exist != nil {
 					invalidToDelete = append(invalidToDelete, pending)
 					utils.Logger().Debug().
-						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
+						AnErr("[ProposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
 
@@ -200,19 +200,19 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				// no need to verify again in proposal.
 				if !node.Blockchain().Config().IsCrossLink(pending.Epoch()) {
 					utils.Logger().Debug().
-						AnErr("[proposeNewBlock] pending crosslink that's before crosslink epoch", err)
+						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
 					continue
 				}
 
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
 			utils.Logger().Info().
-				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
+				Msgf("[ProposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
 			utils.Logger().Error().Err(err).Msgf(
-				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
 		}
@@ -240,14 +240,14 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Failed finalizing the new block")
+		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
 		return nil, err
 	}
-	utils.Logger().Info().Msg("[proposeNewBlock] verifying the new block header")
+	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
 	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
 
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Failed verifying the new block header")
+		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
 		return nil, err
 	}
 	return finalizedBlock, nil
