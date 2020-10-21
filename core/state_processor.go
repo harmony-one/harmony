@@ -135,9 +135,14 @@ func (p *StateProcessor) Process(
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
+	sigsReady := make(chan bool)
+	go func() {
+		// Block processing don't need to block on reward computation as in block proposal
+		sigsReady <- true
+	}()
 	_, payout, err := p.engine.Finalize(
 		p.bc, header, statedb, block.Transactions(),
-		receipts, outcxs, incxs, block.StakingTransactions(), slashes,
+		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady,
 	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")

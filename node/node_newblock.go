@@ -47,13 +47,22 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
-					node.Consensus.StartFinalityCount()
-					newBlock, err := node.proposeNewBlock()
-					if err != nil {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
-					}
+					// Prepare last commit signatures
+					commitSigs := make(chan []byte)
+					sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
-					err = node.Blockchain().Validator().ValidateHeader(newBlock, true)
+					node.Consensus.StartFinalityCount()
+					if err != nil {
+						utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
+						break
+					}
+					// Currently the block proposal is not triggered asynchronously yet with last consensus.
+					// TODO: trigger block proposal when 66% commit, and feed and final commit sigs here.
+					go func() {
+						commitSigs <- sigs
+					}()
+					newBlock, err := node.ProposeNewBlock(commitSigs)
+
 					if err == nil {
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
@@ -68,7 +77,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Verifying New Block Header!!!!!!!!!")
+						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 					}
 				}
 			}
@@ -76,11 +85,12 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 	}()
 }
 
-func (node *Node) proposeNewBlock() (*types.Block, error) {
+// ProposeNewBlock proposes a new block...
+func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
-	utils.AnalysisStart("proposeNewBlock", nowEpoch, blockNow)
-	defer utils.AnalysisEnd("proposeNewBlock", nowEpoch, blockNow)
+	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
+	defer utils.AnalysisEnd("ProposeNewBlock", nowEpoch, blockNow)
 
 	node.Worker.UpdateCurrent()
 
@@ -101,7 +111,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 
 	emptyAddr := common.Address{}
 	if coinbase == emptyAddr {
-		return nil, errors.New("[proposeNewBlock] Failed setting coinbase")
+		return nil, errors.New("[ProposeNewBlock] Failed setting coinbase")
 	}
 
 	// Must set coinbase here because the operations below depend on it
@@ -182,7 +192,7 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				if err == nil || exist != nil {
 					invalidToDelete = append(invalidToDelete, pending)
 					utils.Logger().Debug().
-						AnErr("[proposeNewBlock] pending crosslink is already committed onchain", err)
+						AnErr("[ProposeNewBlock] pending crosslink is already committed onchain", err)
 					continue
 				}
 
@@ -190,19 +200,19 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 				// no need to verify again in proposal.
 				if !node.Blockchain().Config().IsCrossLink(pending.Epoch()) {
 					utils.Logger().Debug().
-						AnErr("[proposeNewBlock] pending crosslink that's before crosslink epoch", err)
+						AnErr("[ProposeNewBlock] pending crosslink that's before crosslink epoch", err)
 					continue
 				}
 
 				crossLinksToPropose = append(crossLinksToPropose, pending)
 			}
 			utils.Logger().Info().
-				Msgf("[proposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
+				Msgf("[ProposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
 					len(crossLinksToPropose), len(allPending),
 				)
 		} else {
 			utils.Logger().Error().Err(err).Msgf(
-				"[proposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
+				"[ProposeNewBlock] Unable to Read PendingCrossLinks, number of crosslinks: %d",
 				len(allPending),
 			)
 		}
@@ -225,17 +235,22 @@ func (node *Node) proposeNewBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	// Prepare last commit signatures
-	sig, mask, err := node.Consensus.BlockCommitSig(header.Number().Uint64() - 1)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[proposeNewBlock] Cannot get commit signatures from last block")
-		return nil, err
-	}
-
-	return node.Worker.FinalizeNewBlock(
-		sig, mask, node.Consensus.GetCurBlockViewID(),
+	finalizedBlock, err := node.Worker.FinalizeNewBlock(
+		commitSigs, node.Consensus.GetCurBlockViewID(),
 		coinbase, crossLinksToPropose, shardState,
 	)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed finalizing the new block")
+		return nil, err
+	}
+	utils.Logger().Info().Msg("[ProposeNewBlock] verifying the new block header")
+	err = node.Blockchain().Validator().ValidateHeader(finalizedBlock, true)
+
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
+		return nil, err
+	}
+	return finalizedBlock, nil
 }
 
 func (node *Node) proposeReceiptsProof() []*types.CXReceiptsProof {

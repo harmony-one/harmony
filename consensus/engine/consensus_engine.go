@@ -110,11 +110,13 @@ type Engine interface {
 	// and assembles the final block.
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
+	// sigsReady signal indicates whether the commit sigs are populated in the header object.
+	// Finalize() will block on sigsReady signal until the first value is send to the channel.
 	Finalize(
 		chain ChainReader, header *block.Header,
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-		doubleSigners slash.Records,
+		doubleSigners slash.Records, sigsReady chan bool,
 	) (*types.Block, reward.Reader, error)
 }
