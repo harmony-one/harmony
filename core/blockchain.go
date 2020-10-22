@@ -293,16 +293,6 @@ func IsEpochBlock(block *types.Block) bool {
 	return shard.Schedule.IsLastBlock(block.NumberU64() - 1)
 }
 
-// IsEpochBlockByNumber returns whether this block is the first block of an epoch.
-// by checking the block number
-func IsEpochBlockByNumber(blockNum uint64) bool {
-	if blockNum == 0 {
-		// genesis block is the first epoch block
-		return true
-	}
-	return shard.Schedule.IsLastBlock(blockNum - 1)
-}
-
 // EpochFirstBlock returns the block number of the first block of an epoch.
 // TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
 func EpochFirstBlock(epoch *big.Int) *big.Int {
