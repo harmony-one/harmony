@@ -60,6 +60,28 @@ function launch_bootnode() {
   echo "bootnode launched." + " $BN_MA"
 }
 
+declare -a ports
+function test_viewchange() {
+   for port in "${ports[@]}"; do
+      rpc_port=$(( $port + 500 ))
+      is_leader=$(curl -s --request POST "http://127.0.0.1:${rpc_port}/" --header 'Content-Type: application/json' --data-raw '{ "jsonrpc": "2.0", "method": "hmyv2_getNodeMetadata", "params": [], "id": 1}' | jq .result | jq -r '.["is-leader"]')
+      if [ "$is_leader" == "true" ]; then
+         # ps -ax | grep -E "harmony.*$port"
+         pid=$(ps -ax | grep -E "harmony.*$port" | grep -v grep | awk '{ print $1 }' | head -n 1)
+         echo "triggering view change on $port/$pid"
+         # trigger a view change by killing the leader
+         kill $pid
+         sleep 60
+         cmd=${cmds[$port]}
+         echo "start node again $port/$cmd"
+         $cmd &
+         break
+      fi
+   done
+}
+
+declare -A cmds
+
 function launch_localnet() {
   launch_bootnode
 
@@ -103,6 +125,8 @@ function launch_localnet() {
       continue
     fi
 
+    ports=("${ports[@]}" "${port}")
+
     # Setup flags for i-th node based on config
     case "${mode}" in
     explorer)
@@ -126,6 +150,7 @@ function launch_localnet() {
 
     # Start the node
     ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+    cmds[$port]="${ROOT}/bin/harmony ${args[@]} ${extra_args[@]}"
   done <"${config}"
 }
 
@@ -190,5 +215,6 @@ extra_args=("$@")
 
 setup
 launch_localnet
+(sleep 60; test_viewchange) &
 sleep "${DURATION}"
 cleanup || true
