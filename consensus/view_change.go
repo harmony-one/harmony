@@ -95,16 +95,15 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 
 // fallbackNextViewID return the next view ID and duration when there is an exception
 // to calculate the time-based viewId
-func (consensus *Consensus) fallbackNextViewID(viewID uint64) (uint64, time.Duration) {
-	consensus.getLogger().Error().
-		Uint64("viewID", viewID).
-		Msg("[fallbackNextViewID] use legacy viewID algorithm")
-
-	if viewID < consensus.current.GetCurBlockViewID() {
-		return consensus.current.GetCurBlockViewID() + 1, time.Duration(int64(viewChangeDuration))
+func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
+	diff := int64(consensus.GetViewChangingID() + 1 - consensus.GetCurBlockViewID())
+	if diff <= 0 {
+		diff = int64(1)
 	}
-	diff := int64(viewID + 1 - consensus.current.GetCurBlockViewID())
-	return viewID + 1, time.Duration(diff * diff * int64(viewChangeDuration))
+	consensus.getLogger().Error().
+		Int64("diff", diff).
+		Msg("[fallbackNextViewID] use legacy viewID algorithm")
+	return consensus.GetViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
 // getNextViewID return the next view ID based on the timestamp
@@ -117,32 +116,32 @@ func (consensus *Consensus) fallbackNextViewID(viewID uint64) (uint64, time.Dura
 // The view change duration is a fixed duration now to avoid stuck into offline nodes during
 // the view change.
 // viewID is only used as the fallback mechansim to determine the nextViewID
-func (consensus *Consensus) getNextViewID(viewID uint64) (uint64, time.Duration) {
+func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	// handle corner case at first
 	if consensus.ChainReader == nil {
-		return consensus.fallbackNextViewID(viewID)
+		return consensus.fallbackNextViewID()
 	}
 	curHeader := consensus.ChainReader.CurrentHeader()
 	if curHeader == nil {
-		return consensus.fallbackNextViewID(viewID)
+		return consensus.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
 	curTimestamp := time.Now().Unix()
 
 	// timestamp messed up in current validator node
-	if curTimestamp < blockTimestamp {
-		return consensus.fallbackNextViewID(viewID)
+	if curTimestamp <= blockTimestamp {
+		return consensus.fallbackNextViewID()
 	}
 	totalNode := consensus.Decider.ParticipantsCount()
-	// diff is at least 1, and it won't exceeded the totalNode
+	// diff is at least 1, and it won't exceed the totalNode
 	diff := uint64(((curTimestamp - blockTimestamp) / viewChangeTimeout) % int64(totalNode))
-	nextViewID := diff + consensus.current.GetCurBlockViewID()
+	nextViewID := diff + consensus.GetCurBlockViewID()
 
 	consensus.getLogger().Info().
 		Int64("curTimestamp", curTimestamp).
 		Int64("blockTimestamp", blockTimestamp).
 		Uint64("nextViewID", nextViewID).
-		Uint64("curViewID", consensus.current.GetCurBlockViewID()).
+		Uint64("curViewID", consensus.GetCurBlockViewID()).
 		Msg("[getNextViewID]")
 
 	// duration is always the fixed view change duration for synchronous view change
@@ -221,21 +220,19 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 	return timeouts
 }
 
-// startViewChange send a new view change
-// the viewID is the current viewID
-func (consensus *Consensus) startViewChange(viewID uint64) {
+// startViewChange start the view change process
+func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange {
 		return
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	nextViewID, duration := consensus.getNextViewID(viewID)
+	nextViewID, duration := consensus.getNextViewID()
 	consensus.SetViewChangingID(nextViewID)
 	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
 
 	consensus.getLogger().Warn().
-		Uint64("viewID", viewID).
 		Uint64("nextViewID", nextViewID).
 		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
@@ -254,7 +251,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 		nextViewID,
 		consensus.blockNum,
 		consensus.priKey); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
 
 	// for view change, send separate view change per public key
@@ -272,7 +269,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
-				Msg("could not send out the ViewChange message")
+				Msg("[startViewChange] could not send out the ViewChange message")
 		}
 	}
 }
