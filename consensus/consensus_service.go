@@ -81,7 +81,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.Decider.UpdateParticipants(pubKeys)
 	utils.Logger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Debug().
+		utils.Logger().Info().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
 			Msg("Member")
@@ -92,6 +92,9 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 		consensus.LeaderPubKey = &allKeys[0]
 		utils.Logger().Info().
 			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+	} else {
+		utils.Logger().Error().
+			Msg("[UpdatePublicKeys] Participants is empty")
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys

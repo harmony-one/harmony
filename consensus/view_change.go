@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"math/big"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -90,20 +92,122 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 	return time.Duration(diff * diff * int64(viewChangeDuration))
 }
 
-// GetNextLeaderKey uniquely determine who is the leader for given viewID
-func (consensus *Consensus) GetNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
-	gap := 1
+// fallbackNextViewID return the next view ID and duration when there is an exception
+// to calculate the time-based viewId
+func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
+	diff := int64(consensus.GetViewChangingID() + 1 - consensus.GetCurBlockViewID())
+	if diff <= 0 {
+		diff = int64(1)
+	}
+	consensus.getLogger().Error().
+		Int64("diff", diff).
+		Msg("[fallbackNextViewID] use legacy viewID algorithm")
+	return consensus.GetViewChangingID() + 1, time.Duration(diff * diff * int64(viewChangeDuration))
+}
+
+// getNextViewID return the next view ID based on the timestamp
+// The next view ID is calculated based on the difference of validator's timestamp
+// and the block's timestamp. So that it can be deterministic to return the next view ID
+// only based on the blockchain block and the validator's current timestamp.
+// The next view ID is the single factor used to determine
+// the next leader, so it is mod the number of nodes per shard.
+// It returns the next viewID and duration of the view change
+// The view change duration is a fixed duration now to avoid stuck into offline nodes during
+// the view change.
+// viewID is only used as the fallback mechansim to determine the nextViewID
+func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
+	// handle corner case at first
+	if consensus.ChainReader == nil {
+		return consensus.fallbackNextViewID()
+	}
+	curHeader := consensus.ChainReader.CurrentHeader()
+	if curHeader == nil {
+		return consensus.fallbackNextViewID()
+	}
+	blockTimestamp := curHeader.Time().Int64()
+	curTimestamp := time.Now().Unix()
+
+	// timestamp messed up in current validator node
+	if curTimestamp <= blockTimestamp {
+		return consensus.fallbackNextViewID()
+	}
+	totalNode := consensus.Decider.ParticipantsCount()
+	// diff is at least 1, and it won't exceed the totalNode
+	diff := uint64(((curTimestamp - blockTimestamp) / viewChangeTimeout) % int64(totalNode))
+	nextViewID := diff + consensus.GetCurBlockViewID()
+
 	consensus.getLogger().Info().
+		Int64("curTimestamp", curTimestamp).
+		Int64("blockTimestamp", blockTimestamp).
+		Uint64("nextViewID", nextViewID).
+		Uint64("curViewID", consensus.GetCurBlockViewID()).
+		Msg("[getNextViewID]")
+
+	// duration is always the fixed view change duration for synchronous view change
+	return nextViewID, viewChangeDuration
+}
+
+// getNextLeaderKey uniquely determine who is the leader for given viewID
+// It reads the current leader's pubkey based on the blockchain data and returns
+// the next leader based on the gap of the viewID of the view change and the last
+// know view id of the block.
+func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
+	gap := 1
+
+	if viewID > consensus.GetCurBlockViewID() {
+		gap = int(viewID - consensus.GetCurBlockViewID())
+	}
+	var lastLeaderPubKey *bls.PublicKeyWrapper
+	var err error
+	epoch := big.NewInt(0)
+	if consensus.ChainReader == nil {
+		consensus.getLogger().Error().Msg("[getNextLeaderKey] ChainReader is nil. Use consensus.LeaderPubKey")
+		lastLeaderPubKey = consensus.LeaderPubKey
+	} else {
+		curHeader := consensus.ChainReader.CurrentHeader()
+		if curHeader == nil {
+			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
+			lastLeaderPubKey = consensus.LeaderPubKey
+		} else {
+			// this is the truth of the leader based on blockchain blocks
+			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
+			if err != nil || lastLeaderPubKey == nil {
+				consensus.getLogger().Error().Err(err).
+					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
+				lastLeaderPubKey = consensus.LeaderPubKey
+			}
+			epoch = curHeader.Epoch()
+			// viewchange happened at the first block of new epoch
+			// use the LeaderPubKey as the base of the next leader
+			// as we shouldn't use lastLeader from coinbase as the base.
+			// The LeaderPubKey should be updated to the index 0 of the committee
+			if curHeader.IsLastBlockInEpoch() {
+				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
+				lastLeaderPubKey = consensus.LeaderPubKey
+			}
+		}
+	}
+	consensus.getLogger().Info().
+		Str("lastLeaderPubKey", lastLeaderPubKey.Bytes.Hex()).
 		Str("leaderPubKey", consensus.LeaderPubKey.Bytes.Hex()).
+		Int("gap", gap).
 		Uint64("newViewID", viewID).
 		Uint64("myCurBlockViewID", consensus.GetCurBlockViewID()).
-		Msg("[GetNextLeaderKey] got leaderPubKey from coinbase")
-	wasFound, next := consensus.Decider.NthNext(consensus.LeaderPubKey, gap)
+		Msg("[getNextLeaderKey] got leaderPubKey from coinbase")
+	// wasFound, next := consensus.Decider.NthNext(lastLeaderPubKey, gap)
+	// FIXME: rotate leader on harmony nodes only before fully externalization
+	wasFound, next := consensus.Decider.NthNextHmy(
+		shard.Schedule.InstanceForEpoch(epoch),
+		lastLeaderPubKey,
+		gap)
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("GetNextLeaderKey: currentLeaderKey not found")
+			Msg("[getNextLeaderKey] currentLeaderKey not found")
 	}
+	consensus.getLogger().Info().
+		Str("nextLeader", next.Bytes.Hex()).
+		Msg("[getNextLeaderKey] next Leader")
 	return next
 }
 
@@ -115,21 +219,20 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 	return timeouts
 }
 
-// startViewChange send a new view change
-// the viewID is the current viewID
-func (consensus *Consensus) startViewChange(viewID uint64) {
+// startViewChange start the view change process
+func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange {
 		return
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	consensus.SetViewChangingID(viewID)
-	consensus.LeaderPubKey = consensus.GetNextLeaderKey(viewID)
+	nextViewID, duration := consensus.getNextViewID()
+	consensus.SetViewChangingID(nextViewID)
+	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
 
-	duration := consensus.current.GetViewChangeDuraion()
 	consensus.getLogger().Warn().
-		Uint64("viewID", viewID).
+		Uint64("nextViewID", nextViewID).
 		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
@@ -139,15 +242,15 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
 
 	// update the dictionary key if the viewID is first time received
-	consensus.vc.AddViewIDKeyIfNotExist(viewID, consensus.Decider.Participants())
+	consensus.vc.AddViewIDKeyIfNotExist(nextViewID, consensus.Decider.Participants())
 
 	// init my own payload
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
-		viewID,
+		nextViewID,
 		consensus.blockNum,
 		consensus.priKey); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
 
 	// for view change, send separate view change per public key
@@ -165,7 +268,7 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 			p2p.ConstructMessage(msgToSend),
 		); err != nil {
 			consensus.getLogger().Err(err).
-				Msg("could not send out the ViewChange message")
+				Msg("[startViewChange] could not send out the ViewChange message")
 		}
 	}
 }
