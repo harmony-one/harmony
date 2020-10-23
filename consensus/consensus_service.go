@@ -95,7 +95,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	} else {
 		utils.Logger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
-		consensus.pubKeyLock.Unlock()
 	}
 	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
