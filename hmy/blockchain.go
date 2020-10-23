@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -140,6 +141,43 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 		rewards[slot.EcdsaAddress] = new(big.Int).Add(reward, rewardsForThisAddr)
 		last = cur
 	}
+
+	// Report tx fees of the coinbase (== leader)
+	receipts, err := hmy.GetReceipts(ctx, blk.Hash())
+	if err != nil {
+		return nil, err
+	}
+	txFees := big.NewInt(0)
+	for _, tx := range blk.Transactions() {
+		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), tx.Hash())
+		if dbTx == nil {
+			return nil, fmt.Errorf("could not find receipt for tx: %v", tx.Hash().String())
+		}
+		if len(receipts) <= int(receiptIndex) {
+			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
+				receiptIndex, len(receipts), tx.Hash().String())
+		}
+		txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
+		txFees = new(big.Int).Add(txFee, txFees)
+	}
+	for _, stx := range blk.StakingTransactions() {
+		dbsTx, _, _, receiptIndex := rawdb.ReadStakingTransaction(hmy.ChainDb(), stx.Hash())
+		if dbsTx == nil {
+			return nil, fmt.Errorf("could not find receipt for tx: %v", stx.Hash().String())
+		}
+		if len(receipts) <= int(receiptIndex) {
+			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
+				receiptIndex, len(receipts), stx.Hash().String())
+		}
+		txFee := new(big.Int).Mul(stx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
+		txFees = new(big.Int).Add(txFee, txFees)
+	}
+	if amt, ok := rewards[blk.Header().Coinbase()]; ok {
+		rewards[blk.Header().Coinbase()] = new(big.Int).Add(amt, txFees)
+	} else {
+		rewards[blk.Header().Coinbase()] = txFees
+	}
+
 	hmy.preStakingBlockRewardsCache.Add(blk.Hash(), rewards)
 	return rewards, nil
 }
