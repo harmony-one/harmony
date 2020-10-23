@@ -12,12 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/shard"
-	stakingNetwork "github.com/harmony-one/harmony/staking/network"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/test/helpers"
 )
@@ -208,23 +205,12 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	testBlockSigInfo := &hmy.DetailedBlockSignerInfo{
-		Signers: map[ethcommon.Address][]bls.SerializedPublicKey{
-			testAddr: { // Only care about length for this test
-				bls.SerializedPublicKey{},
-				bls.SerializedPublicKey{},
-			},
-		},
-		Committee: shard.SlotList{
-			{
-				EcdsaAddress: testAddr,
-			},
-		},
-		TotalKeysSigned: 150,
-		BlockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
+	testRewards := hmy.PreStakingBlockRewards{
+		testAddr: big.NewInt(1),
 	}
-	refTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.BlockHash, testAddr, SpecialPreStakingRewardTxID)
-	tx, rosettaError := FormatPreStakingRewardTransaction(refTxID, testBlockSigInfo, testAddr)
+	refTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
+	tx, rosettaError := FormatPreStakingRewardTransaction(refTxID, testRewards, testAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -247,39 +233,6 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	if tx.Operations[0].Status != common.SuccessOperationStatus.Status {
 		t.Error("expected successful operation status")
 	}
-
-	// Expect: myNumberOfSigForBlock * (totalAmountOfRewardsPerBlock / numOfSigsForBlock) to be my block reward amount
-	refAmount := new(big.Int).Mul(new(big.Int).Quo(stakingNetwork.BlockReward, big.NewInt(150)), big.NewInt(2))
-	fmtRefAmount := fmt.Sprintf("%v", refAmount)
-	if tx.Operations[0].Amount.Value != fmtRefAmount {
-		t.Errorf("expected operation amount to be %v not %v", fmtRefAmount, tx.Operations[0].Amount.Value)
-	}
-
-	testBlockSigInfo = &hmy.DetailedBlockSignerInfo{
-		Signers: map[ethcommon.Address][]bls.SerializedPublicKey{
-			testAddr: { // Only care about length for this test
-				bls.SerializedPublicKey{},
-				bls.SerializedPublicKey{},
-			},
-		},
-		Committee:       shard.SlotList{},
-		TotalKeysSigned: 150,
-		BlockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
-	}
-	tx, rosettaError = FormatPreStakingRewardTransaction(refTxID, testBlockSigInfo, testAddr)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	if len(tx.Operations) != 1 {
-		t.Fatal("expected exactly 1 operation")
-	}
-	amt, err := types.AmountValue(tx.Operations[0].Amount)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if amt.Cmp(big.NewInt(0)) != 0 {
-		t.Error("expected amount to be 0")
-	}
 }
 
 func TestFormatPreStakingRewardTransactionFail(t *testing.T) {
@@ -288,42 +241,16 @@ func TestFormatPreStakingRewardTransactionFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	testAddr := crypto.PubkeyToAddress(testKey.PublicKey)
-	testBlockSigInfo := &hmy.DetailedBlockSignerInfo{
-		Signers: map[ethcommon.Address][]bls.SerializedPublicKey{
-			testAddr: {},
-		},
-		Committee: shard.SlotList{
-			{
-				EcdsaAddress: testAddr,
-			},
-		},
-		TotalKeysSigned: 150,
-		BlockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
+	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
+	testRewards := hmy.PreStakingBlockRewards{
+		FormatDefaultSenderAddress: big.NewInt(1),
 	}
-	testTxID := getSpecialCaseTransactionIdentifier(testBlockSigInfo.BlockHash, testAddr, SpecialPreStakingRewardTxID)
-	_, rosettaError := FormatPreStakingRewardTransaction(testTxID, testBlockSigInfo, testAddr)
+	testTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
+	_, rosettaError := FormatPreStakingRewardTransaction(testTxID, testRewards, testAddr)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}
-	if !reflect.DeepEqual(&common.TransactionNotFoundError, rosettaError) {
-		t.Error("expected transaction not found error")
-	}
-
-	testBlockSigInfo = &hmy.DetailedBlockSignerInfo{
-		Signers: map[ethcommon.Address][]bls.SerializedPublicKey{},
-		Committee: shard.SlotList{
-			{
-				EcdsaAddress: testAddr,
-			},
-		},
-		TotalKeysSigned: 150,
-		BlockHash:       ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238"),
-	}
-	_, rosettaError = FormatPreStakingRewardTransaction(testTxID, testBlockSigInfo, testAddr)
-	if rosettaError == nil {
-		t.Fatal("expected rosetta error")
-	}
-	if !reflect.DeepEqual(&common.TransactionNotFoundError, rosettaError) {
+	if common.TransactionNotFoundError.Code != rosettaError.Code {
 		t.Error("expected transaction not found error")
 	}
 }
