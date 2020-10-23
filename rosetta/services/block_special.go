@@ -155,31 +155,23 @@ func (s *BlockAPI) specialGenesisBlockTransaction(
 }
 
 // getPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
-// rewards for signing block n is paid out on block n+1
 func (s *BlockAPI) getPreStakingRewardTransactionIdentifiers(
 	ctx context.Context, currBlock *hmytypes.Block,
 ) ([]*types.TransactionIdentifier, *types.Error) {
 	if currBlock.Number().Cmp(big.NewInt(1)) != 1 {
 		return nil, nil
 	}
-	blockNumToBeRewarded := currBlock.Number().Uint64() - 1
-	rewardedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumToBeRewarded).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	blockSigInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, rewardedBlock)
+	rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, currBlock)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
 	txIDs := []*types.TransactionIdentifier{}
-	for acc, signedBlsKeys := range blockSigInfo.Signers {
-		if len(signedBlsKeys) > 0 {
-			txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(currBlock.Hash(), acc, SpecialPreStakingRewardTxID))
-		}
+	for addr := range rewards {
+		txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(
+			currBlock.Hash(), addr, SpecialPreStakingRewardTxID,
+		))
 	}
 	return txIDs, nil
 }
@@ -221,13 +213,6 @@ func (s *BlockAPI) preStakingRewardBlockTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	blockNumOfSigsForReward := blk.Number().Uint64() - 1
-	signedBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumOfSigsForReward).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
 	if blkHash.String() != blk.Hash().String() {
 		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": fmt.Sprintf(
@@ -235,13 +220,13 @@ func (s *BlockAPI) preStakingRewardBlockTransaction(
 			),
 		})
 	}
-	blockSignerInfo, err := s.hmy.GetDetailedBlockSignerInfo(ctx, signedBlock)
+	rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, blk)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
-	transactions, rosettaError := FormatPreStakingRewardTransaction(txID, blockSignerInfo, address)
+	transactions, rosettaError := FormatPreStakingRewardTransaction(txID, rewards, address)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
