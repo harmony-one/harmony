@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-version="v2 20200811.1"
+version="v2 20201023.0"
 
 unset -v progname
 progname="${0##*/}"
@@ -56,7 +56,7 @@ function valid_ip()
 
 function myip() {
 # get ipv4 address only, right now only support ipv4 addresses
-   PUB_IP=$(dig -4 @resolver1.opendns.com ANY myip.opendns.com +short)
+   PUB_IP=$(dig TXT +short o-o.myaddr.l.google.com @ns1.google.com | awk -F'"' '{ print $2}')
    if valid_ip $PUB_IP; then
       msg "public IP address autodetected: $PUB_IP"
    else
