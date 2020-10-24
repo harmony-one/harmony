@@ -59,6 +59,10 @@ var (
 		wsPortFlag,
 	}
 
+	rpcOptFlags = []cli.Flag{
+		rpcDebugEnabledFlag,
+	}
+
 	blsFlags = append(newBLSFlags, legacyBLSFlags...)
 
 	newBLSFlags = []cli.Flag{
@@ -236,6 +240,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, p2pFlags...)
 	flags = append(flags, httpFlags...)
 	flags = append(flags, wsFlags...)
+	flags = append(flags, rpcOptFlags...)
 	flags = append(flags, blsFlags...)
 	flags = append(flags, consensusFlags...)
 	flags = append(flags, txPoolFlags...)
@@ -500,6 +505,22 @@ func applyWSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, wsPortFlag) {
 		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
+	}
+}
+
+// rpc opt flags
+var (
+	rpcDebugEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.debug",
+		Usage:    "enable private debug apis",
+		DefValue: defaultConfig.RPCOpt.DebugEnabled,
+		Hidden:   true,
+	}
+)
+
+func applyRPCOptFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
+		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
 	}
 }
 
