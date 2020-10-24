@@ -87,6 +87,9 @@ function launch_localnet() {
       echo "skip empty node"
       continue
     fi
+    if [[ $EXPOSEAPIS == "true" ]]; then
+      args=("${args[@]}" "--http.ip=0.0.0.0" "--ws.ip=0.0.0.0")
+    fi
 
     # Setup BLS key for i-th localnet node
     if [[ ! -e "$bls_key" ]]; then
@@ -142,6 +145,7 @@ USAGE: $ME [OPTIONS] config_file_name [extra args to node]
    -N network     network type (default: $NETWORK)
    -B             don't build the binary
    -v             verbosity in log (default: $VERBOSE)
+   -e             expose WS & HTTP ip (default: $EXPOSEAPIS)
 
 This script will build all the binaries and start harmony and based on the configuration file.
 
@@ -159,8 +163,9 @@ DRYRUN=
 NETWORK=localnet
 VERBOSE=false
 NOBUILD=false
+EXPOSEAPIS=false
 
-while getopts "hD:m:s:nBN:v" option; do
+while getopts "hD:m:s:nBN:ve" option; do
   case ${option} in
   h) usage ;;
   D) DURATION=$OPTARG ;;
@@ -170,6 +175,7 @@ while getopts "hD:m:s:nBN:v" option; do
   B) NOBUILD=true ;;
   N) NETWORK=$OPTARG ;;
   v) VERBOSE=true ;;
+  e) EXPOSEAPIS=true ;;
   *) usage ;;
   esac
 done

@@ -6,8 +6,9 @@ go:
 go_import_path: github.com/harmony-one/harmony
 env:
   - TEST="make"
-  - TEST="./scripts/travis_checker.sh"
-  - TEST="./scripts/travis_node_checker.sh"
+  - TEST="bash ./scripts/travis_go_checker.sh"
+  - TEST="bash ./scripts/travis_rpc_checker.sh"
+  - TEST="bash ./scripts/travis_rosetta_checker.sh"
 install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
