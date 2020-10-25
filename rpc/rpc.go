@@ -16,8 +16,9 @@ import (
 
 // Version enum
 const (
-	V1 Version = iota
+	V1    Version = iota
 	V2
+	Debug
 )
 
 const (
@@ -38,9 +39,9 @@ const (
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", netV1Namespace, netV2Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -130,6 +131,7 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		NewPublicPoolAPI(hmy, V2),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
+		NewPublicTracerAPI(hmy, Debug),
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy),
 		v2.NewPublicLegacyAPI(hmy),
