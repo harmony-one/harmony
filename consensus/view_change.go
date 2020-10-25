@@ -278,9 +278,17 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	if !consensus.IsViewChangingMode() {
+		return errors.New("not in view changing mode anymore")
+	}
+
 	msgToSend := consensus.constructNewViewMessage(
 		viewID, newLeaderPriKey,
 	)
+	if msgToSend == nil {
+		return errors.New("failed to construct NewView message")
+	}
+
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum,
 		msg_pb.MessageType_NEWVIEW,
