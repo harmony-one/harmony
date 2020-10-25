@@ -44,6 +44,7 @@ const (
 )
 
 var (
+	// ErrNotAvailable to indicate the RPC is not ready for public use
 	ErrNotAvailable = errors.New("RPC not available yet")
 )
 

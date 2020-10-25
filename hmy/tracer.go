@@ -643,7 +643,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	}
 }
 
-// computeTxEnv returns the execution environment of a certain transaction.
+// ComputeTxEnv returns the execution environment of a certain transaction.
 func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64) (core.Message, vm.Context, *state.DB, error) {
 	// Create the parent state database
 	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
@@ -680,10 +680,10 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 	return nil, vm.Context{}, nil, fmt.Errorf("transaction index %d out of range for block %#x", txIndex, block.Hash())
 }
 
-// Taken from go-ethereum/internal/ethapi/api.go
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
+// Taken from go-ethereum/internal/ethapi/api.go
 type ExecutionResult struct {
 	Gas         uint64         `json:"gas"`
 	Failed      bool           `json:"failed"`
