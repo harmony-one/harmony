@@ -303,6 +303,8 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Hex("M1Payload", consensus.vc.GetM1Payload()).
 		Msg("[startNewView] Sent NewView Messge")
 
+	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
+
 	consensus.current.SetMode(Normal)
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 	consensus.SetViewIDs(viewID)
@@ -512,6 +514,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.SetViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
+
+	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
 
 	// NewView message is verified, change state to normal consensus
 	if preparedBlock != nil {
