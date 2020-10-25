@@ -241,7 +241,7 @@ func (node *Node) BroadcastCrossLink() {
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
-			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
+			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain, headers)),
 	)
 }
 
@@ -400,11 +400,11 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
-					return err
+					return nil
 				}
 				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
-					return err
+					return nil
 				}
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,

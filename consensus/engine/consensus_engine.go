@@ -15,7 +15,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// ChainReader defines a collection of methods needed to access the local
+// Blockchain defines a collection of methods needed to access the local
 // blockchain during header and/or uncle verification.
 // Note this reader interface is still in process of being integrated with the BFT consensus.
 type ChainReader interface {

@@ -48,7 +48,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	msgToSend, FPBTMsg := networkMessage.Bytes, networkMessage.FBFTMsg
 
-	// TODO(chao): review FPBT log data structure
 	consensus.FBFTLog.AddMessage(FPBTMsg)
 	consensus.getLogger().Debug().
 		Str("MsgBlockHash", FPBTMsg.BlockHash.Hex()).
@@ -81,7 +80,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		}, p2p.ConstructMessage(msgToSend)); err != nil {
+		}, p2p.ConstructMessage(msgToSend), true); err != nil {
 		consensus.getLogger().Warn().
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
 				nodeconfig.ShardID(consensus.ShardID),
@@ -200,6 +199,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
+	if consensus.GetViewChangingID() == 10 {
+		return
+	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
@@ -242,7 +244,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			Msg("[OnCommit] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -300,6 +302,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
+
+		go func() {
+			consensus.preCommitAndPropose(blockObj)
+		}()
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {

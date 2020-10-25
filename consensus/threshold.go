@@ -46,7 +46,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			Msg("[didReachPrepareQuorum] Unparseable block data")
 		return err
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	// so by this point, everyone has committed to the blockhash of this block
@@ -74,6 +74,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
 		p2p.ConstructMessage(msgToSend),
+		true,
 	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {

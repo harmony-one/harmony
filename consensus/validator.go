@@ -81,7 +81,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 	priKeys := consensus.getPriKeysInCommittee()
 
 	// Sign commit signature on the received block and construct the p2p messages
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_COMMIT, commitPayload, priKeys)
@@ -156,19 +156,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	consensus.FBFTLog.AddBlock(&blockObj)
-	// add block field
-	blockPayload := make([]byte, len(recvMsg.Block))
-	copy(blockPayload[:], recvMsg.Block[:])
-	consensus.block = blockPayload
-	recvMsg.Block = []byte{} // save memory space
-	consensus.FBFTLog.AddMessage(recvMsg)
-	consensus.getLogger().Debug().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Hex("blockHash", recvMsg.BlockHash[:]).
-		Msg("[OnPrepared] Prepared message and block added")
-
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
 	if consensus.current.Mode() != Normal {
 		// don't sign the block that is not verified
@@ -184,6 +171,19 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	consensus.FBFTLog.MarkBlockVerified(&blockObj)
+
+	consensus.FBFTLog.AddBlock(&blockObj)
+	// add block field
+	blockPayload := make([]byte, len(recvMsg.Block))
+	copy(blockPayload[:], recvMsg.Block[:])
+	consensus.block = blockPayload
+	recvMsg.Block = []byte{} // save memory space
+	consensus.FBFTLog.AddMessage(recvMsg)
+	consensus.getLogger().Debug().
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Hex("blockHash", recvMsg.BlockHash[:]).
+		Msg("[OnPrepared] Prepared message and block added")
 
 	if consensus.checkViewID(recvMsg) != nil {
 		if consensus.current.Mode() == Normal {
@@ -227,8 +227,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
-	// NOTE let it handle its own logs
-	if !consensus.isRightBlockNumCheck(recvMsg) {
+	// It's ok to receive committed message for last block due to pipelining.
+	// The committed message for last block could include more signatures now.
+	if recvMsg.BlockNum < consensus.blockNum-1 {
+		consensus.getLogger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
 	if recvMsg.BlockNum > consensus.blockNum {
@@ -256,7 +260,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("[OnCommitted] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
@@ -272,6 +276,21 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
+
+	// If we already have a committed signature received before, check whether the new one
+	// has more signatures and if yes, override the old data.
+	// Otherwise, simply write the commit signature in db.
+	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
+	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) {
+		new := mask.CountEnabled()
+		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
+		cur := mask.CountEnabled()
+		if new > cur {
+			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+		}
+	} else {
+		consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+	}
 
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {

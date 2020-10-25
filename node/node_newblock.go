@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,14 +25,13 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
 		utils.Logger().Debug().
 			Msg("Waiting for Consensus ready")
-		// TODO: make local net start faster
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		for {
@@ -48,20 +49,27 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
-					commitSigs := make(chan []byte)
-					sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+					newCommitSigsChan := make(chan []byte)
 
-					node.Consensus.StartFinalityCount()
-					if err != nil {
-						utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
-						break
-					}
-					// Currently the block proposal is not triggered asynchronously yet with last consensus.
-					// TODO: trigger block proposal when 66% commit, and feed and final commit sigs here.
 					go func() {
-						commitSigs <- sigs
+						select {
+						case commitSigs := <-commitSigsChan:
+							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
+								newCommitSigsChan <- commitSigs
+							}
+						case <-time.After(5 * time.Second):
+							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+
+							if err != nil {
+								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
+							} else {
+								newCommitSigsChan <- sigs
+							}
+
+						}
 					}()
-					newBlock, err := node.ProposeNewBlock(commitSigs)
+					node.Consensus.StartFinalityCount()
+					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 
 					if err == nil {
 						utils.Logger().Info().

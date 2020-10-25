@@ -243,7 +243,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 	header *block.Header,
 ) (*bls.PublicKeyWrapper, error) {
-	shardState, err := consensus.ChainReader.ReadShardState(header.Epoch())
+	shardState, err := consensus.Blockchain.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
 			header.Epoch(),
@@ -257,7 +257,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 	}
 
 	committerKey := new(bls_core.PublicKey)
-	isStaking := consensus.ChainReader.Config().IsStaking(header.Epoch())
+	isStaking := consensus.Blockchain.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
@@ -293,7 +293,7 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	curHeader := consensus.ChainReader.CurrentHeader()
+	curHeader := consensus.Blockchain.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
 
@@ -308,18 +308,18 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	consensus.BlockPeriod = 5 * time.Second
+	consensus.BlockPeriod = 3 * time.Second
 
 	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
-	if (consensus.ChainReader.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
-		(consensus.ChainReader.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
-		(consensus.ChainReader.Config().ChainID != params.MainnetChainID && consensus.ChainReader.Config().ChainID != params.TestChainID) {
+	if (consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
+		(consensus.Blockchain.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
+		(consensus.Blockchain.Config().ChainID != params.MainnetChainID && consensus.Blockchain.Config().ChainID != params.TestChainID) {
 		consensus.AggregateSig = true
 	}
 
-	isFirstTimeStaking := consensus.ChainReader.Config().IsStaking(nextEpoch) &&
-		curHeader.IsLastBlockInEpoch() && !consensus.ChainReader.Config().IsStaking(curEpoch)
-	haventUpdatedDecider := consensus.ChainReader.Config().IsStaking(curEpoch) &&
+	isFirstTimeStaking := consensus.Blockchain.Config().IsStaking(nextEpoch) &&
+		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain.Config().IsStaking(curEpoch)
+	haventUpdatedDecider := consensus.Blockchain.Config().IsStaking(curEpoch) &&
 		consensus.Decider.Policy() != quorum.SuperMajorityStake
 
 	// Only happens once, the flip-over to a new Decider policy
@@ -335,7 +335,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	epochToSet := curEpoch
 	hasError := false
 	curShardState, err := committee.WithStakingEnabled.ReadFromDB(
-		curEpoch, consensus.ChainReader,
+		curEpoch, consensus.Blockchain,
 	)
 	if err != nil {
 		utils.Logger().Error().
@@ -351,7 +351,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if curHeader.IsLastBlockInEpoch() && isNotGenesisBlock {
 
 		nextShardState, err := committee.WithStakingEnabled.ReadFromDB(
-			nextEpoch, consensus.ChainReader,
+			nextEpoch, consensus.Blockchain,
 		)
 		if err != nil {
 			utils.Logger().Error().
@@ -555,7 +555,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	consensus.switchPhase("selfCommit", FBFTCommit)
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 	for i, key := range consensus.priKey {
 		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {

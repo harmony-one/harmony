@@ -98,16 +98,8 @@ func (consensus *Consensus) construct(
 	// Do the signing, 96 byte of bls signature
 	needMsgSig := true
 	switch p {
-	case msg_pb.MessageType_PREPARED:
-		consensusMsg.Block = consensus.block
-		// Payload
-		buffer := bytes.Buffer{}
-		// 96 bytes aggregated signature
-		aggSig = consensus.Decider.AggregateVotes(quorum.Prepare)
-		buffer.Write(aggSig.Serialize())
-		// Bitmap
-		buffer.Write(consensus.prepareBitmap.Bitmap)
-		consensusMsg.Payload = buffer.Bytes()
+	case msg_pb.MessageType_ANNOUNCE:
+		consensusMsg.Payload = consensus.blockHash[:]
 	case msg_pb.MessageType_PREPARE:
 		needMsgSig = false
 		sig := bls_core.Sign{}
@@ -126,16 +118,11 @@ func (consensus *Consensus) construct(
 			}
 		}
 		consensusMsg.Payload = sig.Serialize()
+	case msg_pb.MessageType_PREPARED:
+		consensusMsg.Block = consensus.block
+		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Prepare)
 	case msg_pb.MessageType_COMMITTED:
-		buffer := bytes.Buffer{}
-		// 96 bytes aggregated signature
-		aggSig = consensus.Decider.AggregateVotes(quorum.Commit)
-		buffer.Write(aggSig.Serialize())
-		// Bitmap
-		buffer.Write(consensus.commitBitmap.Bitmap)
-		consensusMsg.Payload = buffer.Bytes()
-	case msg_pb.MessageType_ANNOUNCE:
-		consensusMsg.Payload = consensus.blockHash[:]
+		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Commit)
 	}
 
 	var marshaledMessage []byte
@@ -170,4 +157,25 @@ func (consensus *Consensus) construct(
 		FBFTMsg:                    FBFTMsg,
 		OptionalAggregateSignature: aggSig,
 	}, nil
+}
+
+// constructQuorumSigAndBitmap constructs the aggregated sig and bitmap as
+// a byte slice in format of: [[aggregated sig], [sig bitmap]]
+func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
+	buffer := bytes.Buffer{}
+	// 96 bytes aggregated signature
+	aggSig := consensus.Decider.AggregateVotes(p)
+	buffer.Write(aggSig.Serialize())
+	// Bitmap
+	if p == quorum.Prepare {
+		buffer.Write(consensus.prepareBitmap.Bitmap)
+	} else if p == quorum.Commit {
+		buffer.Write(consensus.commitBitmap.Bitmap)
+	} else {
+		utils.Logger().Error().
+			Str("phase", p.String()).
+			Msg("[constructQuorumSigAndBitmap] Invalid phase is supplied.")
+		return []byte{}
+	}
+	return buffer.Bytes()
 }

@@ -54,8 +54,8 @@ type Consensus struct {
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 	multiSigMutex  sync.RWMutex
 
-	// The chain reader for the blockchain this consensus is working on
-	ChainReader *core.BlockChain
+	// The blockchain this consensus is working on
+	Blockchain *core.BlockChain
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
@@ -81,6 +81,8 @@ type Consensus struct {
 	vc *viewChange
 	// Signal channel for starting a new consensus process
 	ReadySignal chan struct{}
+	// Channel to send full commit signatures to finish new block proposal
+	CommitSigChannel chan []byte
 	// The post-consensus processing func passed from Node object
 	// Called when consensus on a new block is done
 	OnConsensusDone func(*types.Block) error
@@ -207,6 +209,7 @@ func New(
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan struct{})
+	consensus.CommitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)

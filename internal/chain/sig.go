@@ -11,15 +11,15 @@ import (
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
 func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
-	if len(recvPayload) < 96 {
+	if len(recvPayload) < bls.BLSSignatureSizeInBytes {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	payload := append(recvPayload[:0:0], recvPayload...)
 	//#### Read payload data
 	// 96 byte of multi-sig
 	offset := 0
-	multiSig := payload[offset : offset+96]
-	offset += 96
+	multiSig := payload[offset : offset+bls.BLSSignatureSizeInBytes]
+	offset += bls.BLSSignatureSizeInBytes
 	// bitmap
 	bitmap := payload[offset:]
 	//#### END Read payload data

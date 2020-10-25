@@ -56,7 +56,7 @@ func (sender *MessageSender) Reset(blockNum uint64) {
 }
 
 // SendWithRetry sends message with retry logic.
-func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []nodeconfig.GroupID, p2pMsg []byte) error {
+func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.MessageType, groups []nodeconfig.GroupID, p2pMsg []byte, immediate bool) error {
 	if sender.retryTimes != 0 {
 		msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0}
 		atomic.StoreUint32(&msgRetry.isActive, 1)
@@ -65,7 +65,10 @@ func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.Messa
 			sender.Retry(&msgRetry)
 		}()
 	}
-	return sender.host.SendMessageToGroups(groups, p2pMsg)
+	if immediate {
+		return sender.host.SendMessageToGroups(groups, p2pMsg)
+	}
+	return nil
 }
 
 // SendWithoutRetry sends message without retry logic.

@@ -227,7 +227,7 @@ func IsEligibleForEPoSAuction(snapshot *staking.ValidatorSnapshot, validator *st
 	}
 }
 
-// ChainReader is a subset of Engine.ChainReader, just enough to do assignment
+// Blockchain is a subset of Engine.Blockchain, just enough to do assignment
 type ChainReader interface {
 	// ReadShardState retrieves sharding state given the epoch number.
 	// This api reads the shard state cached or saved on the chaindb.

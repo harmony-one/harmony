@@ -100,28 +100,28 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	return nil
 }
 
-func (consensus *Consensus) finalizeCommits() {
+func (consensus *Consensus) finalCommit() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
-		Msg("[finalizeCommits] Finalizing Block")
+		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.blockNum
+
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[FinalizeCommits] leader not found")
+		consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
 		return
 	}
 	// Construct committed message
 	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
-			Msg("[FinalizeCommits] Unable to construct Committed message")
+			Msg("[finalCommit] Unable to construct Committed message")
 		return
 	}
-	msgToSend, aggSig, FBFTMsg :=
+	msgToSend, FBFTMsg :=
 		network.Bytes,
-		network.OptionalAggregateSignature,
 		network.FBFTMsg
-	consensus.aggregatedCommitSig = aggSig // this may not needed
+	commitSigAndBitmap := FBFTMsg.Payload // this may not needed
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
@@ -129,31 +129,38 @@ func (consensus *Consensus) finalizeCommits() {
 	if block == nil {
 		consensus.getLogger().Warn().
 			Str("blockHash", hex.EncodeToString(curBlockHash[:])).
-			Msg("[FinalizeCommits] Cannot find block by hash")
+			Msg("[finalCommit] Cannot find block by hash")
 		return
 	}
 
-	consensus.tryCatchup()
+	consensus.commitBlock(block, FBFTMsg)
+
 	if consensus.blockNum-beforeCatchupNum != 1 {
 		consensus.getLogger().Warn().
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
-			Msg("[FinalizeCommits] Leader cannot provide the correct block for committed message")
+			Msg("[finalCommit] Leader cannot provide the correct block for committed message")
 		return
 	}
 
 	// if leader success finalize the block, send committed message to validators
+	// TODO: once leader rotation is implemented, leader who is about to be switched out
+	//       needs to send the committed message immediately so the next leader can
+	//       have the full commit signatures for new block
+	// For now, the leader don't need to send immediately as the committed sig will be
+	// included in the next block and sent in next prepared message.
+	sendImmediately := false
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		p2p.ConstructMessage(msgToSend)); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalizeCommits] Cannot send committed message")
+		p2p.ConstructMessage(msgToSend), sendImmediately); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
-			Msg("[finalizeCommits] Sent Committed Message")
+			Msg("[finalCommit] Sent Committed Message")
 	}
 
 	// Dump new block into level db
@@ -164,9 +171,9 @@ func (consensus *Consensus) finalizeCommits() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Info().Msg("[finalizeCommits] Start consensus timer; stop bootstrap timer only once")
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer; stop bootstrap timer only once")
 	} else {
-		consensus.getLogger().Info().Msg("[finalizeCommits] Start consensus timer")
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 	}
 	consensus.consensusTimeout[timeoutConsensus].Start()
 
@@ -180,11 +187,11 @@ func (consensus *Consensus) finalizeCommits() {
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
 	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[finalizeCommits] Waiting for Block Time")
+	consensus.getLogger().Info().Msg("[finalCommit] Waiting for Block Time")
 	<-time.After(time.Until(consensus.NextBlockDue))
 
-	// Send signal to Node to propose the new block for consensus
-	consensus.ReadySignal <- struct{}{}
+	// Send commit sig/bitmap to finish the new block proposal
+	consensus.CommitSigChannel <- commitSigAndBitmap
 
 	// Update time due for next block
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
@@ -196,7 +203,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil
 	}
-	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
+	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -276,15 +283,15 @@ func (consensus *Consensus) Start(
 				}
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-				consensus.SetViewIDs(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
+				consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
+				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
@@ -296,8 +303,8 @@ func (consensus *Consensus) Start(
 				//VRF/VDF is only generated in the beacon chain
 				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {
 					// generate VRF if the current block has a new leader
-					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
-						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
+					if !consensus.Blockchain.IsSameLeaderAsPreviousBlock(newBlock) {
+						vrfBlockNumbers, err := consensus.Blockchain.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
 						if err != nil {
 							consensus.getLogger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -328,7 +335,7 @@ func (consensus *Consensus) Start(
 							if (!vdfInProgress) && len(vrfBlockNumbers) >= consensus.VdfSeedSize() {
 								//check local database to see if there's a VDF generated for this epoch
 								//generate a VDF if no blocknum is available
-								_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
+								_, err := consensus.Blockchain.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
 								if err != nil {
 									consensus.GenerateVdfAndProof(newBlock, vrfBlockNumbers)
 									vdfInProgress = true
@@ -349,7 +356,7 @@ func (consensus *Consensus) Start(
 								Msg("[ConsensusMainLoop] failed to verify the VDF output")
 						} else {
 							//write the VDF only if VDF has not been generated
-							_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
+							_, err := consensus.Blockchain.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
 							if err == nil {
 								consensus.getLogger().Info().
 									Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -385,7 +392,7 @@ func (consensus *Consensus) Start(
 					consensus.mutex.Lock()
 					defer consensus.mutex.Unlock()
 					if viewID == consensus.GetCurBlockViewID() {
-						consensus.finalizeCommits()
+						consensus.finalCommit()
 					}
 				}()
 
@@ -465,6 +472,54 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 	return blocks, msgs, nil
 }
 
+// preCommitAndPropose commit the current block with 67% commit signatures and start
+// proposing new block which will wait on the full commit signatures to finish
+func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
+	if blk == nil {
+		return errors.New("block to pre-commit is nil")
+	}
+
+	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	if err != nil {
+		return err
+	}
+
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	if err != nil {
+		return errors.Wrap(err, "[preCommitAndPropose] Unable to construct Committed message")
+	}
+
+	msgToSend, FBFTMsg :=
+		network.Bytes,
+		network.FBFTMsg
+	consensus.FBFTLog.AddMessage(FBFTMsg)
+
+	blk.SetCurrentCommitSig(FBFTMsg.Payload)
+	if err := consensus.OnConsensusDone(blk); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+		return err
+	}
+
+	// if leader success finalize the block, send committed message to validators
+	if err := consensus.msgSender.SendWithRetry(
+		blk.NumberU64(),
+		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+		},
+		p2p.ConstructMessage(msgToSend), true); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
+	} else {
+		consensus.getLogger().Info().
+			Str("blockHash", blk.Hash().Hex()).
+			Uint64("blockNum", consensus.blockNum).
+			Msg("[preCommitAndPropose] Sent Committed Message")
+	}
+
+	// Send signal to Node to propose the new block for consensus
+	consensus.ReadySignal <- struct{}{}
+	return nil
+}
+
 // tryCatchup add the last mile block in PBFT log memory cache to blockchain.
 func (consensus *Consensus) tryCatchup() error {
 	// TODO: change this to a more systematic symbol
@@ -510,14 +565,22 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
-	if err := consensus.OnConsensusDone(blk); err != nil {
-		return err
+	if consensus.Blockchain.CurrentBlock().NumberU64() < blk.NumberU64() {
+		if err := consensus.OnConsensusDone(blk); err != nil {
+			return err
+		}
 	}
+
 	if !committedMsg.HasSingleSender() {
 		consensus.getLogger().Error().Msg("[TryCatchup] Leader message can not have multiple sender keys")
 		return errIncorrectSender
 	}
 
+	consensus.SetupForNewConsensus(blk, committedMsg)
+	return nil
+}
+
+func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.AddUint64(&consensus.blockNum, 1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
@@ -526,7 +589,6 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
 	consensus.ResetState()
-	return nil
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
@@ -557,7 +619,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 	}
 	sk := vrf_bls.NewVRFSigner(key.Pri)
 	blockHash := [32]byte{}
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		newBlock.NumberU64() - 1,
 	)
 	if previousHeader == nil {
@@ -582,7 +644,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey.Object)
 	var blockHash [32]byte
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,
 	)
 	if previousHeader == nil {
@@ -610,7 +672,7 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 		return false
 	}
 
-	vrfBlockNumbers, _ := consensus.ChainReader.ReadEpochVrfBlockNums(
+	vrfBlockNumbers, _ := consensus.Blockchain.ReadEpochVrfBlockNums(
 		headerObj.Epoch(),
 	)
 	consensus.getLogger().Info().
@@ -626,7 +688,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 	//derive VDF seed from VRFs generated in the current epoch
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.ChainReader.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}
@@ -660,7 +722,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 // ValidateVdfAndProof validates the VDF/proof in the current epoch
 func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
-	vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(headerObj.Epoch())
+	vrfBlockNumbers, err := consensus.Blockchain.ReadEpochVrfBlockNums(headerObj.Epoch())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Str("MsgBlockNum", headerObj.Number().String()).
@@ -675,7 +737,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.ChainReader.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}
