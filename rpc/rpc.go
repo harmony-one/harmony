@@ -16,7 +16,7 @@ import (
 
 // Version enum
 const (
-	V1    Version = iota
+	V1 Version = iota
 	V2
 	Debug
 )

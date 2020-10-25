@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/math"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core"
@@ -142,7 +142,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 	}
 
 	// Execute all the transactions contained within the chain concurrently for each block
-	blocks := int(end.NumberU64()-origin)
+	blocks := int(end.NumberU64() - origin)
 
 	threads := runtime.NumCPU()
 	if threads > blocks {
@@ -632,10 +632,10 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	switch tracer := tracer.(type) {
 	case *vm.StructLogger:
 		return &ExecutionResult{
-			Gas: result.UsedGas,
-			Failed: result.VMErr != nil,
+			Gas:         result.UsedGas,
+			Failed:      result.VMErr != nil,
 			ReturnValue: fmt.Sprintf("%x", result.ReturnData),
-			StructLogs: FormatLogs(tracer.StructLogs()),
+			StructLogs:  FormatLogs(tracer.StructLogs()),
 		}, nil
 
 	default:
