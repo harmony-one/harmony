@@ -316,6 +316,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
+	// TODO: consider make ResetState unified and only called in one place like finalizeCommit()
 	consensus.ResetState()
 	consensus.LeaderPubKey = newLeaderPriKey.Pub
 
