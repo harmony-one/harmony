@@ -554,6 +554,9 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
+	// Have to keep the block hash so the leader can finish the commit phase of prepared block
+	consensus.ResetState()
+
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.switchPhase("selfCommit", FBFTCommit)
 	consensus.aggregatedPrepareSig = aggSig
