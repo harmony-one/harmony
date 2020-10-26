@@ -426,7 +426,10 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Unable to Parse NewView Message")
 		return
 	}
-
+	if consensus.blockNum < recvMsg.BlockNum {
+		consensus.getLogger().Info().Msg("[onNewView] block number left behind, spin syncing")
+		consensus.spinUpStateSync()
+	}
 	// change view and leaderKey to keep in sync with network
 	if consensus.blockNum != recvMsg.BlockNum {
 		consensus.getLogger().Warn().
