@@ -316,6 +316,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
+	consensus.ResetState()
 	consensus.LeaderPubKey = newLeaderPriKey.Pub
 
 	return nil
@@ -407,6 +408,8 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 			return
 		}
+		// Have to keep the block hash so the leader can finish the commit phase of prepared block
+		copy(consensus.blockHash[:], payload[:32])
 	}
 }
 
