@@ -316,7 +316,6 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
-	consensus.ResetState()
 	consensus.LeaderPubKey = newLeaderPriKey.Pub
 
 	return nil
