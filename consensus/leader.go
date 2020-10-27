@@ -3,6 +3,8 @@ package consensus
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
@@ -199,8 +201,9 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
-	if consensus.GetViewChangingID() == 10 {
-		return
+	utils.Logger().Info().Msgf("ViewChanging %d %d", consensus.GetCurBlockViewID(), consensus.GetViewChangingID())
+	if consensus.GetCurBlockViewID() == 10 {
+		//return
 	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {

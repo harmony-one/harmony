@@ -227,6 +227,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
+
+	consensus.getLogger().Info().
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Msg("[OnCommitted] Received committed message")
+
 	// It's ok to receive committed message for last block due to pipelining.
 	// The committed message for last block could include more signatures now.
 	if recvMsg.BlockNum < consensus.blockNum-1 {

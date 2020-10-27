@@ -57,7 +57,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsC
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
 							}
-						case <-time.After(5 * time.Second):
+						case <-time.After(4 * time.Second):
 							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {
@@ -65,7 +65,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsC
 							} else {
 								newCommitSigsChan <- sigs
 							}
-
 						}
 					}()
 					node.Consensus.StartFinalityCount()

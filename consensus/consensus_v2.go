@@ -142,6 +142,7 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
+
 	// if leader success finalize the block, send committed message to validators
 	// TODO: once leader rotation is implemented, leader who is about to be switched out
 	//       needs to send the committed message immediately so the next leader can
@@ -483,6 +484,9 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	if err != nil {
 		return err
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
 	if err != nil {

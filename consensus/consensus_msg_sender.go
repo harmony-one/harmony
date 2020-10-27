@@ -115,6 +115,7 @@ func (sender *MessageSender) StopRetry(msgType msg_pb.MessageType) {
 	if ok {
 		msgRetry := data.(*MessageRetry)
 		atomic.StoreUint32(&msgRetry.isActive, 0)
+		utils.Logger().Info().Str("type", msgType.String()).Uint32("isActive", msgRetry.isActive).Msg("STOPPING RETRY")
 	}
 }
 
