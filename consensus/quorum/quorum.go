@@ -242,23 +242,6 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextHmy return the Nth next pubkey of Harmony nodes, next can be negative number
-func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
-	found := false
-
-	idx := s.IndexOf(pubKey.Bytes)
-	if idx != -1 {
-		found = true
-	}
-	numNodes := instance.NumHarmonyOperatedNodesPerShard()
-	// sanity check to avoid out of bound access
-	if numNodes <= 0 || numNodes > len(s.publicKeys) {
-		numNodes = len(s.publicKeys)
-	}
-	idx = (idx + next) % numNodes
-	return found, &s.publicKeys[idx]
-}
-
 func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
