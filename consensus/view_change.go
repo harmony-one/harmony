@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"github.com/harmony-one/harmony/shard"
 	"math/big"
 	"sync"
 	"time"
@@ -14,6 +13,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
@@ -219,21 +219,20 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 	return timeouts
 }
 
-// startViewChange send a new view change
-// the viewID is the current viewID
-func (consensus *Consensus) startViewChange(viewID uint64) {
+// startViewChange start the view change process
+func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange {
 		return
 	}
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
-	consensus.SetViewChangingID(viewID)
-	consensus.LeaderPubKey = consensus.getNextLeaderKey(viewID)
+	nextViewID, duration := consensus.getNextViewID()
+	consensus.SetViewChangingID(nextViewID)
+	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
 
-	duration := consensus.current.GetViewChangeDuraion()
 	consensus.getLogger().Warn().
-		Uint64("viewID", viewID).
+		Uint64("nextViewID", nextViewID).
 		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
@@ -243,15 +242,15 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
 
 	// update the dictionary key if the viewID is first time received
-	consensus.vc.AddViewIDKeyIfNotExist(viewID, consensus.Decider.Participants())
+	consensus.vc.AddViewIDKeyIfNotExist(nextViewID, consensus.Decider.Participants())
 
 	// init my own payload
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
-		viewID,
+		nextViewID,
 		consensus.blockNum,
 		consensus.priKey); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("Init Payload Error")
+		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
 
 	// for view change, send separate view change per public key
@@ -270,19 +269,27 @@ func (consensus *Consensus) startViewChange(viewID uint64) {
 			true,
 		); err != nil {
 			consensus.getLogger().Err(err).
-				Msg("could not send out the ViewChange message")
+				Msg("[startViewChange] could not send out the ViewChange message")
 		}
 	}
 }
 
 // startNewView stops the current view change
-func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper) error {
+func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper, reset bool) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+
+	if !consensus.IsViewChangingMode() {
+		return errors.New("not in view changing mode anymore")
+	}
 
 	msgToSend := consensus.constructNewViewMessage(
 		viewID, newLeaderPriKey,
 	)
+	if msgToSend == nil {
+		return errors.New("failed to construct NewView message")
+	}
+
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum,
 		msg_pb.MessageType_NEWVIEW,
@@ -298,6 +305,8 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Hex("M1Payload", consensus.vc.GetM1Payload()).
 		Msg("[startNewView] Sent NewView Messge")
 
+	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
+
 	consensus.current.SetMode(Normal)
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 	consensus.SetViewIDs(viewID)
@@ -309,7 +318,10 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
-	consensus.ResetState()
+	// TODO: consider make ResetState unified and only called in one place like finalizeCommit()
+	if reset {
+		consensus.ResetState()
+	}
 	consensus.LeaderPubKey = newLeaderPriKey.Pub
 
 	return nil
@@ -381,7 +393,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		// no previous prepared message, go straight to normal mode
 		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
-			if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+			if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey, true); err != nil {
 				consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 				return
 			}
@@ -397,7 +409,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] self commit failed")
 			return
 		}
-		if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey); err != nil {
+		if err := consensus.startNewView(recvMsg.ViewID, newLeaderPriKey, false); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[onViewChange] startNewView failed")
 			return
 		}
@@ -507,6 +519,8 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 	consensus.SetViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
+
+	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
 
 	// NewView message is verified, change state to normal consensus
 	if preparedBlock != nil {

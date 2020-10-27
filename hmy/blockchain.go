@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -19,6 +20,8 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/availability"
+	stakingNetwork "github.com/harmony-one/harmony/staking/network"
 	"github.com/pkg/errors"
 )
 
@@ -75,15 +78,10 @@ func (hmy *Harmony) GetBlockSigners(
 
 // DetailedBlockSignerInfo contains all of the block singing information
 type DetailedBlockSignerInfo struct {
-	// Signers is a map of addresses in the Signers for the block to
-	// all of the serialized BLS keys that signed said block.
-	Signers map[common.Address][]bls.SerializedPublicKey
+	// Signers are all the signers for the block
+	Signers shard.SlotList
 	// Committee when the block was signed.
 	Committee shard.SlotList
-	// TotalKeysSigned is the total number of bls keys that signed the block.
-	TotalKeysSigned uint
-	// Mask is the bitmap Mask for the block.
-	Mask      *bls.Mask
 	BlockHash common.Hash
 }
 
@@ -91,31 +89,97 @@ type DetailedBlockSignerInfo struct {
 func (hmy *Harmony) GetDetailedBlockSignerInfo(
 	ctx context.Context, blk *types.Block,
 ) (*DetailedBlockSignerInfo, error) {
-	slotList, mask, err := hmy.GetBlockSigners(
-		ctx, rpc.BlockNumber(blk.Number().Uint64()),
-	)
+	parentBlk, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.NumberU64()-1))
 	if err != nil {
 		return nil, err
 	}
-
-	totalSigners := uint(0)
-	sigInfos := map[common.Address][]bls.SerializedPublicKey{}
-	for _, slot := range slotList {
-		if _, ok := sigInfos[slot.EcdsaAddress]; !ok {
-			sigInfos[slot.EcdsaAddress] = []bls.SerializedPublicKey{}
-		}
-		if ok, err := mask.KeyEnabled(slot.BLSPublicKey); ok && err == nil {
-			sigInfos[slot.EcdsaAddress] = append(sigInfos[slot.EcdsaAddress], slot.BLSPublicKey)
-			totalSigners++
-		}
+	parentShardState, err := hmy.BlockChain.ReadShardState(parentBlk.Epoch())
+	if err != nil {
+		return nil, err
 	}
+	committee, signers, _, err := availability.BallotResult(
+		parentBlk.Header(), blk.Header(), parentShardState, blk.ShardID(),
+	)
 	return &DetailedBlockSignerInfo{
-		Signers:         sigInfos,
-		Committee:       slotList,
-		TotalKeysSigned: totalSigners,
-		Mask:            mask,
-		BlockHash:       blk.Hash(),
+		Signers:   signers,
+		Committee: committee,
+		BlockHash: blk.Hash(),
 	}, nil
+}
+
+// PreStakingBlockRewards are the rewards for a block in the pre-staking era (epoch < staking epoch).
+type PreStakingBlockRewards map[common.Address]*big.Int
+
+// GetPreStakingBlockRewards for the given block number.
+// Calculated rewards are done exactly like chain.AccumulateRewardsAndCountSigs.
+func (hmy *Harmony) GetPreStakingBlockRewards(
+	ctx context.Context, blk *types.Block,
+) (PreStakingBlockRewards, error) {
+	if hmy.IsStakingEpoch(blk.Epoch()) {
+		return nil, fmt.Errorf("block %v is in staking era", blk.Number())
+	}
+
+	if cachedReward, ok := hmy.preStakingBlockRewardsCache.Get(blk.Hash()); ok {
+		return cachedReward.(PreStakingBlockRewards), nil
+	}
+	rewards := PreStakingBlockRewards{}
+
+	sigInfo, err := hmy.GetDetailedBlockSignerInfo(ctx, blk)
+	if err != nil {
+		return nil, err
+	}
+	last := big.NewInt(0)
+	count := big.NewInt(int64(len(sigInfo.Signers)))
+	for i, slot := range sigInfo.Signers {
+		rewardsForThisAddr, ok := rewards[slot.EcdsaAddress]
+		if !ok {
+			rewardsForThisAddr = big.NewInt(0)
+		}
+		cur := big.NewInt(0)
+		cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+		reward := big.NewInt(0).Sub(cur, last)
+		rewards[slot.EcdsaAddress] = new(big.Int).Add(reward, rewardsForThisAddr)
+		last = cur
+	}
+
+	// Report tx fees of the coinbase (== leader)
+	receipts, err := hmy.GetReceipts(ctx, blk.Hash())
+	if err != nil {
+		return nil, err
+	}
+	txFees := big.NewInt(0)
+	for _, tx := range blk.Transactions() {
+		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), tx.Hash())
+		if dbTx == nil {
+			return nil, fmt.Errorf("could not find receipt for tx: %v", tx.Hash().String())
+		}
+		if len(receipts) <= int(receiptIndex) {
+			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
+				receiptIndex, len(receipts), tx.Hash().String())
+		}
+		txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
+		txFees = new(big.Int).Add(txFee, txFees)
+	}
+	for _, stx := range blk.StakingTransactions() {
+		dbsTx, _, _, receiptIndex := rawdb.ReadStakingTransaction(hmy.ChainDb(), stx.Hash())
+		if dbsTx == nil {
+			return nil, fmt.Errorf("could not find receipt for tx: %v", stx.Hash().String())
+		}
+		if len(receipts) <= int(receiptIndex) {
+			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
+				receiptIndex, len(receipts), stx.Hash().String())
+		}
+		txFee := new(big.Int).Mul(stx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
+		txFees = new(big.Int).Add(txFee, txFees)
+	}
+	if amt, ok := rewards[blk.Header().Coinbase()]; ok {
+		rewards[blk.Header().Coinbase()] = new(big.Int).Add(amt, txFees)
+	} else {
+		rewards[blk.Header().Coinbase()] = txFees
+	}
+
+	hmy.preStakingBlockRewardsCache.Add(blk.Hash(), rewards)
+	return rewards, nil
 }
 
 // GetLatestChainHeaders ..

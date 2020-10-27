@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
-	stakingNetwork "github.com/harmony-one/harmony/staking/network"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -176,44 +175,18 @@ func FormatGenesisTransaction(
 
 // FormatPreStakingRewardTransaction for block rewards in pre-staking era for a given Bech-32 address.
 func FormatPreStakingRewardTransaction(
-	txID *types.TransactionIdentifier, blockSigInfo *hmy.DetailedBlockSignerInfo, address ethcommon.Address,
+	txID *types.TransactionIdentifier, rewards hmy.PreStakingBlockRewards, address ethcommon.Address,
 ) (*types.Transaction, *types.Error) {
-	signatures, ok := blockSigInfo.Signers[address]
-	if !ok || len(signatures) == 0 {
-		return nil, &common.TransactionNotFoundError
-	}
 	accID, rosettaError := newAccountIdentifier(address)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-
-	// Calculate rewards exactly like `AccumulateRewardsAndCountSigs` but short circuit when possible.
-	// WARNING: must do calculation in the order of the committee to get accurate values.
-	i := 0
-	last := big.NewInt(0)
-	rewardsForThisBlock := big.NewInt(0)
-	count := big.NewInt(int64(blockSigInfo.TotalKeysSigned))
-	for _, slot := range blockSigInfo.Committee {
-		rewardsForThisAddr := big.NewInt(0)
-		if keys, ok := blockSigInfo.Signers[slot.EcdsaAddress]; ok {
-			for range keys {
-				cur := big.NewInt(0)
-				cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
-				reward := big.NewInt(0).Sub(cur, last)
-				rewardsForThisAddr = new(big.Int).Add(reward, rewardsForThisAddr)
-				last = cur
-				i++
-			}
-		}
-		if slot.EcdsaAddress == address {
-			rewardsForThisBlock = rewardsForThisAddr
-			if !(rewardsForThisAddr.Cmp(big.NewInt(0)) > 0) {
-				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-					"message": "expected non-zero block reward in pre-staking era for block signer",
-				})
-			}
-			break
-		}
+	value, ok := rewards[address]
+	if !ok {
+		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
+			"message": fmt.Sprintf("%v does not have any rewards for block",
+				internalCommon.MustAddressToBech32(address)),
+		})
 	}
 
 	return &types.Transaction{
@@ -227,7 +200,7 @@ func FormatPreStakingRewardTransaction(
 				Status:  common.SuccessOperationStatus.Status,
 				Account: accID,
 				Amount: &types.Amount{
-					Value:    rewardsForThisBlock.String(),
+					Value:    value.String(),
 					Currency: &common.NativeCurrency,
 				},
 			},

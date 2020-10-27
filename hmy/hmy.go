@@ -29,10 +29,11 @@ import (
 const (
 	// BloomBitsBlocks is the number of blocks a single bloom bit section vector
 	// contains on the server side.
-	BloomBitsBlocks              uint64 = 4096
-	leaderCacheSize                     = 250 // Approx number of BLS keys in committee
-	undelegationPayoutsCacheSize        = 500 // max number of epochs to store in cache
-	totalStakeCacheDuration             = 20  // number of blocks where the returned total stake will remain the same
+	BloomBitsBlocks                 uint64 = 4096
+	leaderCacheSize                        = 250  // Approx number of BLS keys in committee
+	undelegationPayoutsCacheSize           = 500  // max number of epochs to store in cache
+	preStakingBlockRewardsCacheSize        = 1024 // max number of block rewards to store in cache
+	totalStakeCacheDuration                = 20   // number of blocks where the returned total stake will remain the same
 )
 
 var (
@@ -67,6 +68,8 @@ type Harmony struct {
 	leaderCache *lru.Cache
 	// undelegationPayoutsCache to save on recomputation every epoch
 	undelegationPayoutsCache *lru.Cache
+	// preStakingBlockRewardsCache to save on recomputation for commonly checked blocks in epoch < staking epoch
+	preStakingBlockRewardsCache *lru.Cache
 	// totalStakeCache to save on recomputation for `totalStakeCacheDuration` blocks.
 	totalStakeCache *totalStakeCache
 }
@@ -111,25 +114,27 @@ func New(
 	chainDb := nodeAPI.Blockchain().ChainDB()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	undelegationPayoutsCache, _ := lru.New(undelegationPayoutsCacheSize)
+	preStakingBlockRewardsCache, _ := lru.New(preStakingBlockRewardsCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
 	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Start(nodeAPI.Blockchain())
 	return &Harmony{
-		ShutdownChan:             make(chan bool),
-		BloomRequests:            make(chan chan *bloombits.Retrieval),
-		BloomIndexer:             bloomIndexer,
-		BlockChain:               nodeAPI.Blockchain(),
-		BeaconChain:              nodeAPI.Beaconchain(),
-		TxPool:                   txPool,
-		CxPool:                   cxPool,
-		eventMux:                 new(event.TypeMux),
-		chainDb:                  chainDb,
-		NodeAPI:                  nodeAPI,
-		ChainID:                  nodeAPI.Blockchain().Config().ChainID.Uint64(),
-		ShardID:                  shardID,
-		leaderCache:              leaderCache,
-		totalStakeCache:          totalStakeCache,
-		undelegationPayoutsCache: undelegationPayoutsCache,
+		ShutdownChan:                make(chan bool),
+		BloomRequests:               make(chan chan *bloombits.Retrieval),
+		BloomIndexer:                bloomIndexer,
+		BlockChain:                  nodeAPI.Blockchain(),
+		BeaconChain:                 nodeAPI.Beaconchain(),
+		TxPool:                      txPool,
+		CxPool:                      cxPool,
+		eventMux:                    new(event.TypeMux),
+		chainDb:                     chainDb,
+		NodeAPI:                     nodeAPI,
+		ChainID:                     nodeAPI.Blockchain().Config().ChainID.Uint64(),
+		ShardID:                     shardID,
+		leaderCache:                 leaderCache,
+		totalStakeCache:             totalStakeCache,
+		undelegationPayoutsCache:    undelegationPayoutsCache,
+		preStakingBlockRewardsCache: preStakingBlockRewardsCache,
 	}
 }
 

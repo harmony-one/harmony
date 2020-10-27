@@ -142,7 +142,6 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
-
 	// if leader success finalize the block, send committed message to validators
 	// TODO: once leader rotation is implemented, leader who is about to be switched out
 	//       needs to send the committed message immediately so the next leader can
@@ -272,13 +271,11 @@ func (consensus *Consensus) Start(
 					}
 					if k != timeoutViewChange {
 						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-						viewID := consensus.GetCurBlockViewID()
-						consensus.startViewChange(viewID + 1)
+						consensus.startViewChange()
 						break
 					} else {
 						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-						viewID := consensus.GetViewChangingID()
-						consensus.startViewChange(viewID + 1)
+						consensus.startViewChange()
 						break
 					}
 				}

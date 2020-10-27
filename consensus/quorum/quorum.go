@@ -2,7 +2,6 @@ package quorum
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/internal/configs/sharding"
 	"math/big"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -11,6 +10,7 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -216,7 +216,29 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 	if idx != -1 {
 		found = true
 	}
-	idx = (idx + next) % int(s.ParticipantsCount())
+	numNodes := int(s.ParticipantsCount())
+	// sanity check to avoid out of bound access
+	if numNodes <= 0 || numNodes > len(s.publicKeys) {
+		numNodes = len(s.publicKeys)
+	}
+	idx = (idx + next) % numNodes
+	return found, &s.publicKeys[idx]
+}
+
+// NthNextHmy return the Nth next pubkey of Harmony nodes, next can be negative number
+func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	}
+	numNodes := instance.NumHarmonyOperatedNodesPerShard()
+	// sanity check to avoid out of bound access
+	if numNodes <= 0 || numNodes > len(s.publicKeys) {
+		numNodes = len(s.publicKeys)
+	}
+	idx = (idx + next) % numNodes
 	return found, &s.publicKeys[idx]
 }
 

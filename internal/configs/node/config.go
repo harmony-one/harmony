@@ -103,6 +103,8 @@ type RPCServerConfig struct {
 	WSEnabled bool
 	WSIp      string
 	WSPort    int
+
+	DebugEnabled bool
 }
 
 // RosettaServerConfig is the config for the rosetta server

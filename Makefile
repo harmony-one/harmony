@@ -29,8 +29,10 @@ help:
 	@echo "distclean - remove node files & logs created by localnet, and all libs"
 	@echo "test - run the entire test suite (go test & Node API test)"
 	@echo "test-go - run the go test (with go lint, fmt, imports, mod, and generate checks)"
-	@echo "test-api - run the Node API test"
-	@echo "test-api-attach - attach onto the Node API testing docker container for inspection"
+	@echo "test-rpc - run the rpc tests"
+	@echo "test-rpc-attach - attach onto the rpc testing docker container for inspection"
+	@echo "test-rosetta - run the rosetta tests"
+	@echo "test-rosetta-attach - attach onto the rosetta testing docker container for inspection"
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
 	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
 	@echo "rpm - build a harmony RPM pacakge"
@@ -82,11 +84,17 @@ test:
 test-go:
 	bash ./test/go.sh
 
-test-api:
-	bash ./test/api.sh run
+test-rpc:
+	bash ./test/rpc.sh run
 
-test-api-attach:
-	bash ./test/api.sh attach
+test-rpc-attach:
+	bash ./test/rpc.sh attach
+
+test-rosetta:
+	bash ./test/rosetta.sh run
+
+test-rosetta-attach:
+	bash ./test/rosetta.sh attach
 
 linux_static:
 	make -C $(TOP)/mcl -j8

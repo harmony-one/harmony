@@ -36,6 +36,9 @@ var defaultConfig = harmonyConfig{
 		IP:      "127.0.0.1",
 		Port:    nodeconfig.DefaultWSPort,
 	},
+	RPCOpt: rpcOptConfig{
+		DebugEnabled: false,
+	},
 	BLSKeys: blsConfig{
 		KeyDir:   "./.hmy/blskeys",
 		KeyFiles: []string{},

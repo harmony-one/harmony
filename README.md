@@ -142,25 +142,36 @@ make debug-kill
 
 To keep things consistent, we have a docker image to run all tests. **These are the same tests ran on the pull request checks**.
 
+Note that all testing docker container binds a couple of ports to the host machine for your convince. The ports are: 
+* `9500` - Shard 0 RPC for a validator
+* `9501` - Shard 1 RPC for a validator
+* `9599` - Shard 0 RPC for an explorer
+* `9598` - Shard 1 RPC for an explorer
+* `9799` - Shard 0 Rosetta (for an explorer)
+* `9798` - Shard 1 Rosetta (for an explorer)
+* `9899` - Shard 0 WS for an explorer
+* `9898` - Shard 1 WS for an explorer
+> This allows you to use curl, hmy CLI, postman, rosetta-cli, etc... on your host machine to play with or probe the localnet that was used for the test. 
+
 ### Go tests
-To run this test do:
+To run this test, do:
 ```bash
 make test-go
 ``` 
 This test runs the go tests along with go lint, go fmt, go imports, go mod, and go generate checks.
 
-### API tests
-To run this test do:
+### RPC tests
+To run this test, do:
 ```bash
-make test-api
+make test-rpc
 ```
-This test starts a localnet (within the Docker container), **ensures it reaches consensus**, and runs a series of tests to ensure correct Node API behavior.
+This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs a series of tests to ensure correct RPC behavior.
 This test also acts as a preliminary integration test (more through tests are done on the testnets). 
 > The tests ran by this command can be found [here](https://github.com/harmony-one/harmony-test/tree/master/localnet).
 
 If you wish to debug further with the localnet after the tests are done, open a new shell and run:
 ```bash
-make test-api-attach
+make test-rpc-attach
 ```
 > This will open a shell in the docker container that is running the Node API tests.
 >
@@ -168,6 +179,20 @@ make test-api-attach
 > therefore you can use that to debug if needed. For example, one could do `hmy blockchain latest-headers` to check 
 > the current block height of localnet. Reference the documentation for the CLI [here](https://docs.harmony.one/home/wallets/harmony-cli) 
 > for more details & commands.
+
+### Rosetta tests
+To run this test, do:
+```bash
+make test-rosetta
+```
+This test starts a localnet (within the Docker container), **ensures it reaches a consensus**, and runs the Construction & Data API checks using the [rosetta-cli](https://github.com/coinbase/rosetta-cli).
+This test also acts as a preliminary integration test (more through tests are done on the testnets).
+> The config for this test can be found [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s0.json) & [here](https://github.com/harmony-one/harmony-test/blob/master/localnet/configs/localnet_rosetta_test_s1.json)
+
+Similar to the RPC tests, if you wish to debug further with the localnet after the tests are done, open a new shell and run:
+```bash
+make test-rosetta-attach
+```
 
 ## License
 

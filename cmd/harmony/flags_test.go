@@ -483,6 +483,31 @@ func TestWSFlags(t *testing.T) {
 	}
 }
 
+func TestRPCOptFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig rpcOptConfig
+	}{
+		{
+			args: []string{"--rpc.debug"},
+			expConfig: rpcOptConfig{
+				DebugEnabled: true,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, rpcOptFlags, applyRPCOptFlags)
+
+		hc, _ := ts.run(test.args)
+
+		if !reflect.DeepEqual(hc.RPCOpt, test.expConfig) {
+			t.Errorf("Test %v: \n\t%+v\n\t%+v", i, hc.RPCOpt, test.expConfig)
+		}
+
+		ts.tearDown()
+	}
+}
+
 func TestBLSFlags(t *testing.T) {
 	tests := []struct {
 		args      []string

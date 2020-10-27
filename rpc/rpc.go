@@ -64,7 +64,7 @@ func (n Version) Namespace() string {
 
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
-	apis = append(apis, getAPIs(hmy)...)
+	apis = append(apis, getAPIs(hmy, config.DebugEnabled)...)
 
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
@@ -115,8 +115,8 @@ func StopServers() error {
 }
 
 // getAPIs returns all the API methods for the RPC interface
-func getAPIs(hmy *hmy.Harmony) []rpc.API {
-	return []rpc.API{
+func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
+	publicAPIs := []rpc.API{
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
@@ -130,13 +130,20 @@ func getAPIs(hmy *hmy.Harmony) []rpc.API {
 		NewPublicPoolAPI(hmy, V2),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
-		// Private methods
-		NewPrivateDebugAPI(hmy, V1),
-		NewPrivateDebugAPI(hmy, V2),
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy),
 		v2.NewPublicLegacyAPI(hmy),
 	}
+
+	privateAPIs := []rpc.API{
+		NewPrivateDebugAPI(hmy, V1),
+		NewPrivateDebugAPI(hmy, V2),
+	}
+
+	if debugEnable {
+		return append(publicAPIs, privateAPIs...)
+	}
+	return publicAPIs
 }
 
 func startHTTP(apis []rpc.API) (err error) {
