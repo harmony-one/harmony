@@ -188,7 +188,7 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 
 // IsAllSigsCollected ..
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
-	return v.SignersCount(Commit) == v.ParticipantsCount()
+	return v.voteTally.Commit.tally.Equal(numeric.NewDec(1))
 }
 
 func (v *stakedVoteWeight) SetVoters(
