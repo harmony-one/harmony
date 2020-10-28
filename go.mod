@@ -11,7 +11,7 @@ require (
 	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/cespare/cp v1.1.1
-	github.com/coinbase/rosetta-sdk-go v0.4.4
+	github.com/coinbase/rosetta-sdk-go v0.4.6
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect

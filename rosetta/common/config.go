@@ -12,7 +12,7 @@ import (
 
 const (
 	// RosettaVersion tied back to the version of the rosetta go-sdk
-	RosettaVersion = "0.4.4" // TODO (dm): set variable via build flags
+	RosettaVersion = "1.4.6" // TODO (dm): set variable via build flags
 
 	// Blockchain ..
 	Blockchain = "Harmony"
