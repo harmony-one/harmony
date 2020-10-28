@@ -311,7 +311,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		}
 	}
 
-	consensus.BlockPeriod = 3 * time.Second
+	consensus.BlockPeriod = 4 * time.Second
 
 	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
 	if (consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||

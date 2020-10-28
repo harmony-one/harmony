@@ -114,7 +114,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.blockNum+1 {
 		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
 		consensus.spinUpStateSync()
 	}
@@ -156,12 +156,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
-	if consensus.current.Mode() != Normal {
-		// don't sign the block that is not verified
-		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
-		return
-	}
 	if consensus.BlockVerifier == nil {
 		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
 		return
@@ -217,6 +211,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		copy(consensus.blockHash[:], blockHash[:])
 	}
 
+	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
+	if consensus.current.Mode() != Normal {
+		// don't sign the block that is not verified
+		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
+		return
+	}
+
 	consensus.sendCommitMessages(&blockObj)
 	consensus.switchPhase("onPrepared", FBFTCommit)
 }
@@ -241,7 +242,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.blockNum+1 {
 		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
 	}

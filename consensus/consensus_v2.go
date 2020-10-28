@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/rs/zerolog"
 
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -134,6 +136,7 @@ func (consensus *Consensus) finalCommit() {
 	}
 
 	consensus.commitBlock(block, FBFTMsg)
+	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
 	if consensus.blockNum-beforeCatchupNum != 1 {
 		consensus.getLogger().Warn().
@@ -148,7 +151,7 @@ func (consensus *Consensus) finalCommit() {
 	//       have the full commit signatures for new block
 	// For now, the leader don't need to send immediately as the committed sig will be
 	// included in the next block and sent in next prepared message.
-	sendImmediately := false
+	sendImmediately := true
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
@@ -189,12 +192,17 @@ func (consensus *Consensus) finalCommit() {
 	// Sleep to wait for the full block time
 	consensus.getLogger().Info().Msg("[finalCommit] Waiting for Block Time")
 	<-time.After(time.Until(consensus.NextBlockDue))
-
-	// Send commit sig/bitmap to finish the new block proposal
-	consensus.CommitSigChannel <- commitSigAndBitmap
-
 	// Update time due for next block
 	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+
+	// Send commit sig/bitmap to finish the new block proposal
+	go func() {
+		select {
+		case consensus.CommitSigChannel <- commitSigAndBitmap:
+		case <-time.After(6 * time.Second):
+			utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
+		}
+	}()
 }
 
 // BlockCommitSigs returns the byte array of aggregated
@@ -517,6 +525,9 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	}
 
 	// Send signal to Node to propose the new block for consensus
+	consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] sending block proposal signal")
+
+	// TODO: make sure preCommit happens before finalCommit
 	consensus.ReadySignal <- struct{}{}
 	return nil
 }

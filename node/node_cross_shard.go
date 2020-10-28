@@ -20,6 +20,7 @@ func (node *Node) BroadcastCXReceipts(newBlock *types.Block) {
 	//#### Read payload data from committed msg
 	if len(commitSigAndBitmap) <= 96 {
 		utils.Logger().Debug().Int("commitSigAndBitmapLen", len(commitSigAndBitmap)).Msg("[BroadcastCXReceipts] commitSigAndBitmap Not Enough Length")
+		return
 	}
 	commitSig := make([]byte, 96)
 	commitBitmap := make([]byte, len(commitSigAndBitmap)-96)
