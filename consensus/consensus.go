@@ -54,8 +54,8 @@ type Consensus struct {
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 	multiSigMutex  sync.RWMutex
 
-	// The chain reader for the blockchain this consensus is working on
-	ChainReader *core.BlockChain
+	// The blockchain this consensus is working on
+	Blockchain *core.BlockChain
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int
