@@ -81,7 +81,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 	priKeys := consensus.getPriKeysInCommittee()
 
 	// Sign commit signature on the received block and construct the p2p messages
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 
 	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_COMMIT, commitPayload, priKeys)
@@ -227,6 +227,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
+	consensus.getLogger().Info().
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Msg("[OnCommitted] Received committed message")
+
 	// NOTE let it handle its own logs
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
@@ -256,7 +261,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("[OnCommitted] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
@@ -272,6 +277,21 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
+
+	// If we already have a committed signature received before, check whether the new one
+	// has more signatures and if yes, override the old data.
+	// Otherwise, simply write the commit signature in db.
+	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
+	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) {
+		new := mask.CountEnabled()
+		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
+		cur := mask.CountEnabled()
+		if new > cur {
+			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+		}
+	} else {
+		consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+	}
 
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {

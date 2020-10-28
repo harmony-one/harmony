@@ -241,7 +241,7 @@ func (node *Node) BroadcastCrossLink() {
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
-			proto_node.ConstructCrossLinkMessage(node.Consensus.ChainReader, headers)),
+			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain, headers)),
 	)
 }
 

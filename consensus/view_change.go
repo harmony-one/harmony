@@ -117,10 +117,10 @@ func (consensus *Consensus) fallbackNextViewID() (uint64, time.Duration) {
 // viewID is only used as the fallback mechansim to determine the nextViewID
 func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	// handle corner case at first
-	if consensus.ChainReader == nil {
+	if consensus.Blockchain == nil {
 		return consensus.fallbackNextViewID()
 	}
-	curHeader := consensus.ChainReader.CurrentHeader()
+	curHeader := consensus.Blockchain.CurrentHeader()
 	if curHeader == nil {
 		return consensus.fallbackNextViewID()
 	}
@@ -160,11 +160,11 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
 	epoch := big.NewInt(0)
-	if consensus.ChainReader == nil {
-		consensus.getLogger().Error().Msg("[getNextLeaderKey] ChainReader is nil. Use consensus.LeaderPubKey")
+	if consensus.Blockchain == nil {
+		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.LeaderPubKey
 	} else {
-		curHeader := consensus.ChainReader.CurrentHeader()
+		curHeader := consensus.Blockchain.CurrentHeader()
 		if curHeader == nil {
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
