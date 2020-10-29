@@ -22,10 +22,10 @@ var (
 
 // FormatTransaction for staking, cross-shard sender, and plain transactions
 func FormatTransaction(
-	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt,
+	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractCode []byte,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
-	var isCrossShard, isStaking bool
+	var isCrossShard, isStaking, isContractCreation bool
 	var toShard uint32
 
 	switch tx.(type) {
@@ -36,7 +36,7 @@ func FormatTransaction(
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
-		isCrossShard = false
+		isCrossShard, isContractCreation = false, false
 		toShard = stakingTx.ShardID()
 	case *hmytypes.Transaction:
 		isStaking = false
@@ -46,6 +46,7 @@ func FormatTransaction(
 			return nil, rosettaError
 		}
 		isCrossShard = plainTx.ShardID() != plainTx.ToShardID()
+		isContractCreation = tx.To() == nil
 		toShard = plainTx.ToShardID()
 	default:
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -57,6 +58,20 @@ func FormatTransaction(
 
 	// Set all possible metadata
 	var txMetadata TransactionMetadata
+	if isContractCreation {
+		contractID, rosettaError := newAccountIdentifier(receipt.ContractAddress)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		txMetadata.ContractAccountIdentifier = contractID
+	} else if len(contractCode) > 0 && tx.To() != nil {
+		// Contract code was found, so receiving account must be the contract address
+		contractID, rosettaError := newAccountIdentifier(*tx.To())
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		txMetadata.ContractAccountIdentifier = contractID
+	}
 	if isCrossShard {
 		txMetadata.CrossShardIdentifier = txID
 		txMetadata.ToShardID = &toShard

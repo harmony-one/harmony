@@ -527,8 +527,22 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 				Value:    negativeBigValue(tx.Value()),
 				Currency: &common.NativeCurrency,
 			},
-			Metadata: map[string]interface{}{
-				"contract_address": contractAddressID,
+		},
+		{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: startingOpID.Index + 2,
+			},
+			RelatedOperations: []*types.OperationIdentifier{
+				{
+					Index: startingOpID.Index + 1,
+				},
+			},
+			Type:    common.ContractCreationOperation,
+			Status:  common.ContractFailureOperationStatus.Status,
+			Account: contractAddressID,
+			Amount: &types.Amount{
+				Value:    tx.Value().String(),
+				Currency: &common.NativeCurrency,
 			},
 		},
 	}
@@ -549,6 +563,7 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 
 	// Test successful contract creation
 	refOperations[0].Status = common.SuccessOperationStatus.Status
+	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
 	operations, rosettaError = newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
 	if rosettaError != nil {

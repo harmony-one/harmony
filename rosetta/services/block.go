@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -174,10 +175,20 @@ func (s *BlockAPI) BlockTransaction(
 		}
 		return response, rosettaError2
 	}
+	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(request.BlockIdentifier.Index).EthBlockNumber())
+	if state == nil || err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": fmt.Sprintf("block state not found for block %v", request.BlockIdentifier.Index),
+		})
+	}
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt)
+		contractCode := []byte{}
+		if txInfo.tx.To() != nil {
+			contractCode = state.GetCode(*txInfo.tx.To())
+		}
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractCode)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}

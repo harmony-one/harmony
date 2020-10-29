@@ -38,7 +38,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.Gas(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt)
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, []byte{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -101,7 +101,7 @@ func TestParseSignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.Gas(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt)
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, []byte{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
