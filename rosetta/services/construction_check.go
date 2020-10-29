@@ -210,7 +210,9 @@ func (s *ConstructAPI) ConstructionMetadata(
 
 	evmErrorMsg := ""
 	evmReturn := hexutil.Bytes{}
-	if isStakingOperation(options.OperationType) && len(data) > 0 {
+	if !isStakingOperation(options.OperationType) &&
+		options.OperationType != common.ContractCreationOperation &&
+		len(data) > 0 {
 		gas := hexutil.Uint64(estGasUsed)
 		callArgs := rpc.CallArgs{
 			From: senderAddr,
