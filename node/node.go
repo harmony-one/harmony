@@ -1053,7 +1053,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		Uint64("epoch", epoch.Uint64()).
 		Msg("[InitConsensusWithValidators] Try To Get PublicKeys")
 	shardState, err := committee.WithStakingEnabled.Compute(
-		epoch, node.Consensus.ChainReader,
+		epoch, node.Consensus.Blockchain,
 	)
 	if err != nil {
 		utils.Logger().Err(err).
@@ -1159,7 +1159,7 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	node.keysToAddrsEpoch = epoch
 
 	shardID := node.Consensus.ShardID
-	shardState, err := node.Consensus.ChainReader.ReadShardState(epoch)
+	shardState, err := node.Consensus.Blockchain.ReadShardState(epoch)
 	if err != nil {
 		utils.Logger().Error().Err(err).
 			Int64("epoch", epoch.Int64()).

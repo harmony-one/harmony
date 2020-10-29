@@ -615,7 +615,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
-	currentConsensus.ChainReader = currentNode.Blockchain()
+	currentConsensus.Blockchain = currentNode.Blockchain()
 	currentNode.NodeConfig.DNSZone = hc.Network.DNSZone
 
 	currentNode.NodeConfig.SetBeaconGroupID(

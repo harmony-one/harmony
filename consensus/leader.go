@@ -242,7 +242,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			Msg("[OnCommit] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.ChainReader,
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	logger = logger.With().
 		Uint64("MsgViewID", recvMsg.ViewID).

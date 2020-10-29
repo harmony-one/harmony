@@ -196,7 +196,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	if consensus.blockNum <= 1 {
 		return nil, nil
 	}
-	lastCommits, err := consensus.ChainReader.ReadCommitSig(blockNum)
+	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
 	if err != nil ||
 		len(lastCommits) < bls.BLSSignatureSizeInBytes {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
@@ -274,15 +274,15 @@ func (consensus *Consensus) Start(
 				}
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
-				consensus.SetViewIDs(consensus.ChainReader.CurrentHeader().ViewID().Uint64() + 1)
+				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
+				consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-				consensus.SetBlockNum(consensus.ChainReader.CurrentHeader().Number().Uint64() + 1)
+				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
 
@@ -294,8 +294,8 @@ func (consensus *Consensus) Start(
 				//VRF/VDF is only generated in the beacon chain
 				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {
 					// generate VRF if the current block has a new leader
-					if !consensus.ChainReader.IsSameLeaderAsPreviousBlock(newBlock) {
-						vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
+					if !consensus.Blockchain.IsSameLeaderAsPreviousBlock(newBlock) {
+						vrfBlockNumbers, err := consensus.Blockchain.ReadEpochVrfBlockNums(newBlock.Header().Epoch())
 						if err != nil {
 							consensus.getLogger().Info().
 								Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -326,7 +326,7 @@ func (consensus *Consensus) Start(
 							if (!vdfInProgress) && len(vrfBlockNumbers) >= consensus.VdfSeedSize() {
 								//check local database to see if there's a VDF generated for this epoch
 								//generate a VDF if no blocknum is available
-								_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
+								_, err := consensus.Blockchain.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
 								if err != nil {
 									consensus.GenerateVdfAndProof(newBlock, vrfBlockNumbers)
 									vdfInProgress = true
@@ -347,7 +347,7 @@ func (consensus *Consensus) Start(
 								Msg("[ConsensusMainLoop] failed to verify the VDF output")
 						} else {
 							//write the VDF only if VDF has not been generated
-							_, err := consensus.ChainReader.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
+							_, err := consensus.Blockchain.ReadEpochVdfBlockNum(newBlock.Header().Epoch())
 							if err == nil {
 								consensus.getLogger().Info().
 									Uint64("MsgBlockNum", newBlock.NumberU64()).
@@ -555,7 +555,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 	}
 	sk := vrf_bls.NewVRFSigner(key.Pri)
 	blockHash := [32]byte{}
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		newBlock.NumberU64() - 1,
 	)
 	if previousHeader == nil {
@@ -580,7 +580,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey.Object)
 	var blockHash [32]byte
-	previousHeader := consensus.ChainReader.GetHeaderByNumber(
+	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,
 	)
 	if previousHeader == nil {
@@ -608,7 +608,7 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 		return false
 	}
 
-	vrfBlockNumbers, _ := consensus.ChainReader.ReadEpochVrfBlockNums(
+	vrfBlockNumbers, _ := consensus.Blockchain.ReadEpochVrfBlockNums(
 		headerObj.Epoch(),
 	)
 	consensus.getLogger().Info().
@@ -624,7 +624,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 	//derive VDF seed from VRFs generated in the current epoch
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.ChainReader.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}
@@ -658,7 +658,7 @@ func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockN
 
 // ValidateVdfAndProof validates the VDF/proof in the current epoch
 func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
-	vrfBlockNumbers, err := consensus.ChainReader.ReadEpochVrfBlockNums(headerObj.Epoch())
+	vrfBlockNumbers, err := consensus.Blockchain.ReadEpochVrfBlockNums(headerObj.Epoch())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Str("MsgBlockNum", headerObj.Number().String()).
@@ -673,7 +673,7 @@ func (consensus *Consensus) ValidateVdfAndProof(headerObj *block.Header) bool {
 
 	seed := [32]byte{}
 	for i := 0; i < consensus.VdfSeedSize(); i++ {
-		previousVrf := consensus.ChainReader.GetVrfByNumber(vrfBlockNumbers[i])
+		previousVrf := consensus.Blockchain.GetVrfByNumber(vrfBlockNumbers[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = seed[j] ^ previousVrf[j]
 		}

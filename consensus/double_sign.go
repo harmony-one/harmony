@@ -40,8 +40,8 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 									return true
 								}
 
-								curHeader := consensus.ChainReader.CurrentHeader()
-								committee, err := consensus.ChainReader.ReadShardState(curHeader.Epoch())
+								curHeader := consensus.Blockchain.CurrentHeader()
+								committee, err := consensus.Blockchain.ReadShardState(curHeader.Epoch())
 								if err != nil {
 									consensus.getLogger().Err(err).
 										Uint32("shard", consensus.ShardID).
