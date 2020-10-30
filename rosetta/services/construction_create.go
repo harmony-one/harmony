@@ -242,7 +242,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	senderAddress, err := signedTx.SenderAddress()
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "unable to get sender address with signed transaction").Error(),
+			"message": errors.WithMessage(err, "bad signature payload").Error(),
 		})
 	}
 	if *sigAddress != senderAddress {
