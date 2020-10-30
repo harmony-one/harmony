@@ -48,14 +48,14 @@ func (s *AccountAPI) AccountBalance(
 
 	addr, err := getAddress(request.AccountIdentifier)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": "invalid address",
 		})
 	}
@@ -87,7 +87,7 @@ func newAccountIdentifier(
 ) (*types.AccountIdentifier, *types.Error) {
 	b32Address, err := internalCommon.AddressToBech32(address)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
