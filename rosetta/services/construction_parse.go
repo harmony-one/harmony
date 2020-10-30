@@ -37,6 +37,12 @@ func parseUnsignedTransaction(
 		})
 	}
 
+	if _, err := getAddress(wrappedTransaction.From); err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
 	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
@@ -89,7 +95,7 @@ func parseSignedTransaction(
 	sender, err := tx.SenderAddress()
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "unable to get sender address, invalid signed transaction"),
+			"message": errors.WithMessage(err, "unable to get sender address for signed transaction").Error(),
 		})
 	}
 	senderID, rosettaError := newAccountIdentifier(sender)
