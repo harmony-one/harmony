@@ -57,7 +57,7 @@ func GetOperationComponents(
 		return getTransferOperationComponents(operations)
 	}
 	switch operations[0].Type {
-	case common.CrossShardTransferNativeOperation:
+	case common.NativeCrossShardTransferOperation:
 		return getCrossShardOperationComponents(operations[0])
 	case common.ContractCreationOperation:
 		return getContractCreationOperationComponents(operations[0])
@@ -78,7 +78,7 @@ func getTransferOperationComponents(
 		})
 	}
 	op0, op1 := operations[0], operations[1]
-	if op0.Type != common.TransferNativeOperation || op1.Type != common.TransferNativeOperation {
+	if op0.Type != common.NativeTransferOperation || op1.Type != common.NativeTransferOperation {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid operation type(s) for same shard transfer",
 		})

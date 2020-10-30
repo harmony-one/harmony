@@ -27,7 +27,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 	refDataBytes := []byte{0xEE, 0xEE, 0xEE}
 	refData := hexutil.Encode(refDataBytes)
 	refComponents := &OperationComponents{
-		Type:           common.TransferNativeOperation,
+		Type:           common.NativeTransferOperation,
 		From:           refFrom,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -116,7 +116,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 
 	// test invalid receiver
 	_, rosettaError = constructPlainTransaction(&OperationComponents{
-		Type:           common.TransferNativeOperation,
+		Type:           common.NativeTransferOperation,
 		From:           refFrom,
 		To:             nil,
 		Amount:         big.NewInt(12000),
@@ -126,7 +126,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 		t.Error("expected error")
 	}
 	_, rosettaError = constructPlainTransaction(&OperationComponents{
-		Type: common.TransferNativeOperation,
+		Type: common.NativeTransferOperation,
 		From: refFrom,
 		To: &types.AccountIdentifier{
 			Address: "",
@@ -140,7 +140,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 
 	// test valid nil sender
 	_, rosettaError = constructPlainTransaction(&OperationComponents{
-		Type:           common.TransferNativeOperation,
+		Type:           common.NativeTransferOperation,
 		From:           nil,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -179,7 +179,7 @@ func TestConstructCrossShardTransaction(t *testing.T) {
 	refDataBytes := []byte{0xEE, 0xEE, 0xEE}
 	refData := hexutil.Encode(refDataBytes)
 	refComponents := &OperationComponents{
-		Type:           common.CrossShardTransferNativeOperation,
+		Type:           common.NativeCrossShardTransferOperation,
 		From:           refFrom,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -238,7 +238,7 @@ func TestConstructCrossShardTransaction(t *testing.T) {
 
 	// test invalid receiver
 	_, rosettaError = constructCrossShardTransaction(&OperationComponents{
-		Type:           common.CrossShardTransferNativeOperation,
+		Type:           common.NativeCrossShardTransferOperation,
 		From:           refFrom,
 		To:             nil,
 		Amount:         big.NewInt(12000),
@@ -248,7 +248,7 @@ func TestConstructCrossShardTransaction(t *testing.T) {
 		t.Error("expected error")
 	}
 	_, rosettaError = constructCrossShardTransaction(&OperationComponents{
-		Type: common.CrossShardTransferNativeOperation,
+		Type: common.NativeCrossShardTransferOperation,
 		From: refFrom,
 		To: &types.AccountIdentifier{
 			Address: "",
@@ -262,7 +262,7 @@ func TestConstructCrossShardTransaction(t *testing.T) {
 
 	// test valid nil sender
 	_, rosettaError = constructCrossShardTransaction(&OperationComponents{
-		Type:           common.CrossShardTransferNativeOperation,
+		Type:           common.NativeCrossShardTransferOperation,
 		From:           nil,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -432,7 +432,7 @@ func TestConstructTransaction(t *testing.T) {
 
 	// test valid cross-shard transfer (negative test cases are in TestConstructCrossShardTransaction)
 	generalTx, rosettaError := ConstructTransaction(&OperationComponents{
-		Type:           common.CrossShardTransferNativeOperation,
+		Type:           common.NativeCrossShardTransferOperation,
 		From:           refFrom,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -485,7 +485,7 @@ func TestConstructTransaction(t *testing.T) {
 
 	// test valid transfer (negative test cases are in TestConstructPlainTransaction)
 	generalTx, rosettaError = ConstructTransaction(&OperationComponents{
-		Type:           common.TransferNativeOperation,
+		Type:           common.NativeTransferOperation,
 		From:           refFrom,
 		To:             refTo,
 		Amount:         big.NewInt(12000),
@@ -512,7 +512,7 @@ func TestConstructTransaction(t *testing.T) {
 	// test invalid sender shard
 	badShard := refShard + refToShard + 1
 	_, rosettaError = ConstructTransaction(&OperationComponents{
-		Type:           common.TransferNativeOperation,
+		Type:           common.NativeTransferOperation,
 		From:           refFrom,
 		To:             refTo,
 		Amount:         big.NewInt(12000),

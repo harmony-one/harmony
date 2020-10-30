@@ -368,7 +368,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 					Index: startingOpID.Index,
 				},
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
@@ -385,7 +385,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 					Index: startingOpID.Index + 1,
 				},
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
@@ -461,7 +461,7 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 			RelatedOperations: []*types.OperationIdentifier{
 				startingOpID,
 			},
-			Type:    common.CrossShardTransferNativeOperation,
+			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{

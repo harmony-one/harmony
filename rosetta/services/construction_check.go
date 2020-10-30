@@ -77,7 +77,7 @@ func (s *ConstructAPI) ConstructionPreprocess(
 		})
 	}
 	if txMetadata.ToShardID != nil && txMetadata.FromShardID != nil &&
-		components.Type != common.CrossShardTransferNativeOperation && *txMetadata.ToShardID != *txMetadata.FromShardID {
+		components.Type != common.NativeCrossShardTransferOperation && *txMetadata.ToShardID != *txMetadata.FromShardID {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "given from & to shard are different for a native same shard transfer",
 		})

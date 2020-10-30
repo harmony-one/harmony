@@ -28,7 +28,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
-				OperationType:       common.TransferNativeOperation,
+				OperationType:       common.NativeTransferOperation,
 				GasPriceMultiplier:  nil,
 			},
 			ExpectError: false,
@@ -36,7 +36,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: refTxMedata,
-				OperationType:       common.TransferNativeOperation,
+				OperationType:       common.NativeTransferOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: false,
@@ -44,7 +44,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
-				OperationType:       common.TransferNativeOperation,
+				OperationType:       common.NativeTransferOperation,
 				GasPriceMultiplier:  &refGasPrice,
 			},
 			ExpectError: true,
@@ -52,7 +52,7 @@ func TestConstructMetadataOptions(t *testing.T) {
 		{
 			Metadata: ConstructMetadataOptions{
 				TransactionMetadata: nil,
-				OperationType:       common.TransferNativeOperation,
+				OperationType:       common.NativeTransferOperation,
 				GasPriceMultiplier:  nil,
 			},
 			ExpectError: true,
