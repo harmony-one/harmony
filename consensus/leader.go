@@ -202,8 +202,8 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	utils.Logger().Info().Msgf("ViewChanging %d %d", consensus.GetCurBlockViewID(), consensus.GetViewChangingID())
-	if consensus.GetCurBlockViewID() == 10 {
-		//return
+	if consensus.GetCurBlockViewID()%7 == 0 {
+		return
 	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
@@ -307,6 +307,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 
 		go func() {
+			// TODO: make it a channel
 			consensus.preCommitAndPropose(blockObj)
 		}()
 

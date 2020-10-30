@@ -123,6 +123,9 @@ func (consensus *Consensus) finalCommit() {
 	msgToSend, FBFTMsg :=
 		network.Bytes,
 		network.FBFTMsg
+	consensus.getLogger().Warn().
+		Str("bitmap", hex.EncodeToString(FBFTMsg.Payload[:])).
+		Msg("[finalCommit] BITMAP")
 	commitSigAndBitmap := FBFTMsg.Payload // this may not needed
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
@@ -151,7 +154,11 @@ func (consensus *Consensus) finalCommit() {
 	//       have the full commit signatures for new block
 	// For now, the leader don't need to send immediately as the committed sig will be
 	// included in the next block and sent in next prepared message.
-	sendImmediately := true
+
+	sendImmediately := false
+	if !consensus.IsLeader() {
+		sendImmediately = true
+	}
 	if err := consensus.msgSender.SendWithRetry(
 		block.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
@@ -246,7 +253,7 @@ func (consensus *Consensus) Start(
 				<-startChannel
 				toStart <- struct{}{}
 				consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
-				consensus.ReadySignal <- struct{}{}
+				consensus.ReadySignal <- SyncProposal
 			}()
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
@@ -502,6 +509,9 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	consensus.FBFTLog.AddMessage(FBFTMsg)
+	consensus.getLogger().Warn().
+		Str("bitmap", hex.EncodeToString(FBFTMsg.Payload[:])).
+		Msg("[finalCommit] BITMAP")
 
 	blk.SetCurrentCommitSig(FBFTMsg.Payload)
 	if err := consensus.OnConsensusDone(blk); err != nil {
@@ -509,6 +519,8 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return err
 	}
 
+	// If I am still the leader
+	//if consensus.IsLeader() {
 	// if leader success finalize the block, send committed message to validators
 	if err := consensus.msgSender.SendWithRetry(
 		blk.NumberU64(),
@@ -528,7 +540,9 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] sending block proposal signal")
 
 	// TODO: make sure preCommit happens before finalCommit
-	consensus.ReadySignal <- struct{}{}
+	consensus.ReadySignal <- AsyncProposal
+	//}
+	consensus.getLogger().Warn().Msg("[preCommitAndPropose] FULLY FINISHED")
 	return nil
 }
 

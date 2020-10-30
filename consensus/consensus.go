@@ -27,6 +27,15 @@ const (
 
 var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
 
+// ProposalType is to indicate the type of signal for new block proposal
+type ProposalType byte
+
+// Constant of the top level Message Type exchanged among nodes
+const (
+	SyncProposal ProposalType = iota
+	AsyncProposal
+)
+
 // BlockVerifierFunc is a function used to verify the block
 type BlockVerifierFunc func(*types.Block) error
 
@@ -79,8 +88,8 @@ type Consensus struct {
 	mutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
-	// Signal channel for starting a new consensus process
-	ReadySignal chan struct{}
+	// Signal channel for proposing a new block and start new consensus
+	ReadySignal chan ProposalType
 	// Channel to send full commit signatures to finish new block proposal
 	CommitSigChannel chan []byte
 	// The post-consensus processing func passed from Node object
@@ -208,7 +217,7 @@ func New(
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
-	consensus.ReadySignal = make(chan struct{})
+	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)

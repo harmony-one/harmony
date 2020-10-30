@@ -49,7 +49,7 @@ func SetLogVerbosity(verbosity log.Lvl) {
 	if glogger != nil {
 		glogger.Verbosity(logVerbosity)
 	}
-	updateZeroLogLevel(int(verbosity))
+	updateZeroLogLevel(int(4))
 }
 
 // AddLogFile creates a StreamHandler that outputs JSON logs

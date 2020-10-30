@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -25,7 +27,7 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
@@ -41,7 +43,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsC
 				utils.Logger().Debug().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case <-readySignal:
+			case proposalType := <-readySignal:
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
@@ -52,12 +54,16 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, commitSigsC
 					newCommitSigsChan := make(chan []byte)
 
 					go func() {
+						waitTime := 0 * time.Second
+						if proposalType == consensus.AsyncProposal {
+							waitTime = 4 * time.Second
+						}
 						select {
 						case commitSigs := <-commitSigsChan:
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
 							}
-						case <-time.After(4 * time.Second):
+						case <-time.After(waitTime):
 							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {

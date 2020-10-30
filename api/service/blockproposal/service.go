@@ -3,6 +3,7 @@ package blockproposal
 import (
 	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -10,14 +11,14 @@ import (
 type Service struct {
 	stopChan              chan struct{}
 	stoppedChan           chan struct{}
-	readySignal           chan struct{}
+	readySignal           chan consensus.ProposalType
 	commitSigsChan        chan []byte
 	messageChan           chan *msg_pb.Message
-	waitForConsensusReady func(readySignal chan struct{}, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})
+	waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
 // New returns a block proposal service.
-func New(readySignal chan struct{}, commitSigsChan chan []byte, waitForConsensusReady func(readySignal chan struct{}, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+func New(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
 	return &Service{readySignal: readySignal, commitSigsChan: commitSigsChan, waitForConsensusReady: waitForConsensusReady}
 }
 

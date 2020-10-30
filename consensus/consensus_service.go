@@ -451,7 +451,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal <- struct{}{}
+					consensus.ReadySignal <- SyncProposal
 				}()
 			}
 			return Normal
@@ -573,9 +573,9 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			continue
 		}
 
-		if _, err := consensus.Decider.SubmitVote(
+		if _, err := consensus.Decider.AddNewVote(
 			quorum.Commit,
-			[]bls.SerializedPublicKey{key.Pub.Bytes},
+			[]*bls_cosi.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
 			common.BytesToHash(consensus.blockHash[:]),
 			block.NumberU64(),
