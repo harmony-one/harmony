@@ -113,7 +113,7 @@ func (s *ConstructAPI) ConstructionPayloads(
 			"message": "sender address is not found for given operations",
 		})
 	}
-	if types.Hash(senderID) != types.Hash(components.From) {
+	if senderID.Address != components.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "sender account identifier from operations does not match account identifier from public key",
 		})
@@ -202,7 +202,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if wrappedTransaction.From == nil || types.Hash(wrappedTransaction.From) != types.Hash(sigAccountID) {
+	if wrappedTransaction.From == nil || wrappedTransaction.From.Address != sigAccountID.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "signer public key does not match unsigned transaction's sender",
 		})

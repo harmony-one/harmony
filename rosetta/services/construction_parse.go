@@ -52,7 +52,7 @@ func parseUnsignedTransaction(
 	foundSender := false
 	operations := formattedTx.Operations
 	for _, op := range operations {
-		if types.Hash(op.Account) == types.Hash(tempAccID) {
+		if op.Account.Address == tempAccID.Address {
 			foundSender = true
 			op.Account = wrappedTransaction.From
 		}
@@ -96,7 +96,7 @@ func parseSignedTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if types.Hash(senderID) != types.Hash(wrappedTransaction.From) {
+	if senderID.Address != wrappedTransaction.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "wrapped transaction sender/from does not match transaction signer",
 		})

@@ -187,7 +187,7 @@ func getCrossShardOperationComponents(
 			"message": "operation must have account sender/from & receiver/to identifiers for cross shard transfer",
 		})
 	}
-	if types.Hash(operation.Account) != types.Hash(components.From) {
+	if operation.Account.Address != components.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "operation account identifier does not match sender/from identifiers for cross shard transfer",
 		})
