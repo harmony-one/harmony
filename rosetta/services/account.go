@@ -36,39 +36,26 @@ func (s *AccountAPI) AccountBalance(
 	}
 
 	var block *hmyTypes.Block
+	var rosettaError *types.Error
 	if request.BlockIdentifier == nil {
 		block = s.hmy.CurrentBlock()
 	} else {
-		var err error
-		if request.BlockIdentifier.Hash != nil {
-			blockHash := ethCommon.HexToHash(*request.BlockIdentifier.Hash)
-			block, err = s.hmy.GetBlock(ctx, blockHash)
-			if err != nil {
-				return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-					"message": "block hash not found",
-				})
-			}
-		} else {
-			blockNum := rpc.BlockNumber(*request.BlockIdentifier.Index)
-			block, err = s.hmy.BlockByNumber(ctx, blockNum)
-			if err != nil {
-				return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-					"message": "block index not found",
-				})
-			}
+		block, rosettaError = getBlock(ctx, s.hmy, request.BlockIdentifier)
+		if rosettaError != nil {
+			return nil, rosettaError
 		}
 	}
 
 	addr, err := getAddress(request.AccountIdentifier)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": "invalid address",
 		})
 	}
@@ -100,7 +87,7 @@ func newAccountIdentifier(
 ) (*types.AccountIdentifier, *types.Error) {
 	b32Address, err := internalCommon.AddressToBech32(address)
 	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}

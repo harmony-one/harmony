@@ -18,8 +18,10 @@ type TransactionMetadata struct {
 	CrossShardIdentifier *types.TransactionIdentifier `json:"cross_shard_transaction_identifier,omitempty"`
 	ToShardID            *uint32                      `json:"to_shard,omitempty"`
 	FromShardID          *uint32                      `json:"from_shard,omitempty"`
-	Data                 *string                      `json:"data,omitempty"`
-	Logs                 []*hmyTypes.Log              `json:"logs,omitempty"`
+	// ContractAccountIdentifier is the 'main' contract account ID associated with a transaction
+	ContractAccountIdentifier *types.AccountIdentifier `json:"contract_account_identifier,omitempty"`
+	Data                      *string                  `json:"data,omitempty"`
+	Logs                      []*hmyTypes.Log          `json:"logs,omitempty"`
 }
 
 // UnmarshalFromInterface ..

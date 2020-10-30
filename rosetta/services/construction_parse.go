@@ -41,7 +41,7 @@ func parseUnsignedTransaction(
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt, wrappedTransaction.ContractCode)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -82,7 +82,7 @@ func parseSignedTransaction(
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt, wrappedTransaction.ContractCode)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 
@@ -23,9 +24,10 @@ const (
 // WrappedTransaction is a wrapper for a transaction that includes all relevant
 // data to parse a transaction.
 type WrappedTransaction struct {
-	RLPBytes  []byte                   `json:"rlp_bytes"`
-	IsStaking bool                     `json:"is_staking"`
-	From      *types.AccountIdentifier `json:"from"`
+	RLPBytes     []byte                   `json:"rlp_bytes"`
+	IsStaking    bool                     `json:"is_staking"`
+	ContractCode hexutil.Bytes            `json:"contract_code"`
+	From         *types.AccountIdentifier `json:"from"`
 }
 
 // unpackWrappedTransactionFromString ..
@@ -132,9 +134,10 @@ func (s *ConstructAPI) ConstructionPayloads(
 		})
 	}
 	wrappedTxMarshalledBytes, err := json.Marshal(WrappedTransaction{
-		RLPBytes:  buf.Bytes(),
-		From:      senderID,
-		IsStaking: components.IsStaking(),
+		RLPBytes:     buf.Bytes(),
+		From:         senderID,
+		ContractCode: metadata.ContractCode,
+		IsStaking:    components.IsStaking(),
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
