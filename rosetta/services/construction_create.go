@@ -196,7 +196,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	sig := request.Signatures[0]
 	if sig.SignatureType != common.SignatureType {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": fmt.Sprintf("invalid transaction type, currently only support %v", common.SignatureType),
+			"message": fmt.Sprintf("invalid signature type, currently only support %v", common.SignatureType),
 		})
 	}
 	sigAddress, rosettaError := getAddressFromPublicKey(sig.PublicKey)
