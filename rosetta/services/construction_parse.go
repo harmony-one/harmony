@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
@@ -20,6 +21,11 @@ func (s *ConstructAPI) ConstructionParse(
 	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.Transaction)
 	if rosettaError != nil {
 		return nil, rosettaError
+	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
 	}
 	if request.Signed {
 		return parseSignedTransaction(ctx, wrappedTransaction, tx)
