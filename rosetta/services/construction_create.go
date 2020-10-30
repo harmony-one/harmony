@@ -187,6 +187,11 @@ func (s *ConstructAPI) ConstructionCombine(
 			"message": "require exactly 1 signature",
 		})
 	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
+	}
 
 	sig := request.Signatures[0]
 	if sig.SignatureType != common.SignatureType {
