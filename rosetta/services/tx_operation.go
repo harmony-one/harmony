@@ -210,7 +210,7 @@ func newTransferNativeOperations(
 	receiverAddress := *tx.To()
 
 	// Common elements
-	opType := common.TransferNativeOperation
+	opType := common.NativeTransferOperation
 	opStatus := common.SuccessOperationStatus.Status
 	if receipt.Status == hmytypes.ReceiptStatusFailed {
 		if len(tx.Data()) > 0 {
@@ -309,7 +309,7 @@ func newCrossShardSenderTransferNativeOperations(
 			RelatedOperations: []*types.OperationIdentifier{
 				startingOperationID,
 			},
-			Type:    common.CrossShardTransferNativeOperation,
+			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{

@@ -113,9 +113,16 @@ func (s *ConstructAPI) ConstructionPayloads(
 			"message": "sender address is not found for given operations",
 		})
 	}
-	if types.Hash(senderID) != types.Hash(components.From) {
+	if senderID.Address != components.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "sender account identifier from operations does not match account identifier from public key",
+		})
+	}
+	if metadata.Transaction.FromShardID != nil && *metadata.Transaction.FromShardID != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v",
+				*metadata.Transaction.FromShardID, s.hmy.ShardID,
+			),
 		})
 	}
 
@@ -187,11 +194,16 @@ func (s *ConstructAPI) ConstructionCombine(
 			"message": "require exactly 1 signature",
 		})
 	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
+	}
 
 	sig := request.Signatures[0]
 	if sig.SignatureType != common.SignatureType {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": fmt.Sprintf("invalid transaction type, currently only support %v", common.SignatureType),
+			"message": fmt.Sprintf("invalid signature type, currently only support %v", common.SignatureType),
 		})
 	}
 	sigAddress, rosettaError := getAddressFromPublicKey(sig.PublicKey)
@@ -202,7 +214,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if wrappedTransaction.From == nil || types.Hash(wrappedTransaction.From) != types.Hash(sigAccountID) {
+	if wrappedTransaction.From == nil || wrappedTransaction.From.Address != sigAccountID.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "signer public key does not match unsigned transaction's sender",
 		})
@@ -242,7 +254,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	senderAddress, err := signedTx.SenderAddress()
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "unable to get sender address with signed transaction").Error(),
+			"message": errors.WithMessage(err, "bad signature payload").Error(),
 		})
 	}
 	if *sigAddress != senderAddress {

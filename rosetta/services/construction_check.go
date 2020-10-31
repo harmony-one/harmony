@@ -76,6 +76,17 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": "sender address is not found for given operations",
 		})
 	}
+	if txMetadata.ToShardID != nil && txMetadata.FromShardID != nil &&
+		components.Type != common.NativeCrossShardTransferOperation && *txMetadata.ToShardID != *txMetadata.FromShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "given from & to shard are different for a native same shard transfer",
+		})
+	}
+	if request.SuggestedFeeMultiplier != nil && *request.SuggestedFeeMultiplier < 1 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "given gas price multiplier must be at least 1",
+		})
+	}
 
 	options, err := types.MarshalMap(ConstructMetadataOptions{
 		TransactionMetadata: txMetadata,
@@ -84,6 +95,11 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if _, err := getAddress(components.From); err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}

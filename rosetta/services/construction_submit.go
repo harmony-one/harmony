@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
@@ -27,6 +28,11 @@ func (s *ConstructAPI) ConstructionHash(
 			"message": "nil transaction",
 		})
 	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
+	}
 	return &types.TransactionIdentifierResponse{
 		TransactionIdentifier: &types.TransactionIdentifier{Hash: tx.Hash().String()},
 	}, nil
@@ -46,6 +52,11 @@ func (s *ConstructAPI) ConstructionSubmit(
 	if wrappedTransaction == nil || tx == nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "nil wrapped transaction or nil unwrapped transaction",
+		})
+	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
 		})
 	}
 
