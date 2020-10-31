@@ -130,7 +130,7 @@ func TestPersistConfig(t *testing.T) {
 		},
 		{
 			config: makeTestConfig("mainnet", func(cfg *harmonyConfig) {
-				consensus := getDefaultConsensusConfigCopy()
+				consensus := getConsensusConfigByNetwork("mainnet")
 				cfg.Consensus = &consensus
 
 				devnet := getDefaultDevnetConfigCopy()

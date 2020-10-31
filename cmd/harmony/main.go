@@ -574,13 +574,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	currentConsensus.SetCommitDelay(time.Duration(0))
 
 	// Parse minPeers from harmonyConfig
-	var minPeers int
-	if hc.Consensus != nil {
-		minPeers = hc.Consensus.MinPeers
-	} else {
-		minPeers = defaultConsensusConfig.MinPeers
-	}
-	currentConsensus.MinPeers = minPeers
+	currentConsensus.MinPeers = hc.Consensus.MinPeers
 
 	blacklist, err := setupBlacklist(hc)
 	if err != nil {

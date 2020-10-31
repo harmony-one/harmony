@@ -743,7 +743,7 @@ var (
 	consensusMinPeersFlag = cli.IntFlag{
 		Name:     "consensus.min-peers",
 		Usage:    "minimal number of peers in shard",
-		DefValue: defaultConsensusConfig.MinPeers,
+		DefValue: mainnetMinPeers,
 		Hidden:   true,
 	}
 	legacyDelayCommitFlag = cli.StringFlag{
@@ -760,17 +760,16 @@ var (
 	legacyConsensusMinPeersFlag = cli.IntFlag{
 		Name:     "min_peers",
 		Usage:    "Minimal number of Peers in shard",
-		DefValue: defaultConsensusConfig.MinPeers,
+		DefValue: mainnetMinPeers,
 		Hidden:   true,
 	}
 )
 
 func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.HasFlagsChanged(cmd, consensusValidFlags) {
-		cfg := getDefaultConsensusConfigCopy()
+	if config.Consensus == nil {
+		cfg := getConsensusConfigByNetwork(config.Network.NetworkType)
 		config.Consensus = &cfg
 	}
-
 	if cli.IsFlagChanged(cmd, consensusMinPeersFlag) {
 		config.Consensus.MinPeers = cli.GetIntFlagValue(cmd, consensusMinPeersFlag)
 	} else if cli.IsFlagChanged(cmd, legacyConsensusMinPeersFlag) {
@@ -930,7 +929,7 @@ var (
 )
 
 func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.HasFlagsChanged(cmd, sysFlags) || config.Sys == nil {
+	if config.Sys == nil {
 		cfg := getDefaultSysConfigCopy()
 		config.Sys = &cfg
 	}

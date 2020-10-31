@@ -88,10 +88,6 @@ var defaultLogContext = logContext{
 	Port: 9000,
 }
 
-var defaultConsensusConfig = consensusConfig{
-	MinPeers: 6,
-}
-
 const (
 	defaultBroadcastInvalidTx = true
 )
@@ -127,9 +123,18 @@ func getDefaultLogContextCopy() logContext {
 	return config
 }
 
-func getDefaultConsensusConfigCopy() consensusConfig {
-	config := defaultConsensusConfig
-	return config
+const (
+	mainnetMinPeers = 6
+	otherMinPeers   = 2
+)
+
+func getConsensusConfigByNetwork(networkType string) consensusConfig {
+	if networkType == nodeconfig.Mainnet {
+		return consensusConfig{mainnetMinPeers}
+	}
+	// If network is not mainnet, network scale is expected to be much smaller.
+	// Set the threshold smaller for easier bootstrap.
+	return consensusConfig{otherMinPeers}
 }
 
 const (

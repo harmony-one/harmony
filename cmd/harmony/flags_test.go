@@ -596,8 +596,16 @@ func TestConsensusFlags(t *testing.T) {
 		expErr    error
 	}{
 		{
-			args:      []string{},
-			expConfig: nil,
+			args: []string{},
+			expConfig: &consensusConfig{
+				MinPeers: mainnetMinPeers,
+			},
+		},
+		{
+			args: []string{"--network", "testnet"},
+			expConfig: &consensusConfig{
+				MinPeers: otherMinPeers,
+			},
 		},
 		{
 			args: []string{"--consensus.min-peers", "10"},
@@ -613,7 +621,11 @@ func TestConsensusFlags(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, consensusFlags, applyConsensusFlags)
+		ts := newFlagTestSuite(t, append(networkFlags, consensusFlags...), func(cmd *cobra.Command, cfg *harmonyConfig) {
+			nt := getNetworkType(cmd)
+			cfg.Network = getDefaultNetworkConfig(nt)
+			applyConsensusFlags(cmd, cfg)
+		})
 
 		hc, err := ts.run(test.args)
 
