@@ -131,7 +131,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	if curTimestamp <= blockTimestamp {
 		return consensus.fallbackNextViewID()
 	}
-	// diff is at least 1, and it won't exceed the totalNode
+	// diff only increases
 	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
 	nextViewID := diff + consensus.GetCurBlockViewID()
 
