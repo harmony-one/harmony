@@ -172,6 +172,20 @@ func (s *ConstructAPI) ConstructionMetadata(
 		})
 	}
 
+	currBlock, err := s.hmy.BlockByNumber(ctx, ethRpc.LatestBlockNumber)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	if options.OperationType == common.NativeCrossShardTransferOperation &&
+		!s.hmy.BlockChain.Config().AcceptsCrossTx(currBlock.Epoch()) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "cross-shard transaction is not accepted yet",
+		})
+	}
+
 	data := hexutil.Bytes{}
 	if options.TransactionMetadata.Data != nil {
 		var err error
