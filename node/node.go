@@ -204,10 +204,16 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	poolTxs := types.PoolTransactions{}
+	errs := []error{}
+	acceptCx := node.Blockchain().Config().AcceptsCrossTx(node.Blockchain().CurrentHeader().Epoch())
 	for _, tx := range newTxs {
+		if tx.ShardID() != tx.ToShardID() && !acceptCx {
+			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
+			continue
+		}
 		poolTxs = append(poolTxs, tx)
 	}
-	errs := node.TxPool.AddRemotes(poolTxs)
+	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
 
 	pendingCount, queueCount := node.TxPool.Stats()
 	utils.Logger().Info().
@@ -221,22 +227,28 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID &&
-		node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
-		poolTxs := types.PoolTransactions{}
-		for _, tx := range newStakingTxs {
-			poolTxs = append(poolTxs, tx)
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		if node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
+			poolTxs := types.PoolTransactions{}
+			for _, tx := range newStakingTxs {
+				poolTxs = append(poolTxs, tx)
+			}
+			errs := node.TxPool.AddRemotes(poolTxs)
+			pendingCount, queueCount := node.TxPool.Stats()
+			utils.Logger().Info().
+				Int("length of newStakingTxs", len(poolTxs)).
+				Int("totalPending", pendingCount).
+				Int("totalQueued", queueCount).
+				Msg("Got more staking transactions")
+			return errs
 		}
-		errs := node.TxPool.AddRemotes(poolTxs)
-		pendingCount, queueCount := node.TxPool.Stats()
-		utils.Logger().Info().
-			Int("length of newStakingTxs", len(poolTxs)).
-			Int("totalPending", pendingCount).
-			Int("totalQueued", queueCount).
-			Msg("Got more staking transactions")
-		return errs
+		return []error{
+			errors.WithMessage(errInvalidEpoch, "staking txs not accepted yet"),
+		}
 	}
-	return make([]error, len(newStakingTxs))
+	return []error{
+		errors.WithMessage(errInvalidShard, fmt.Sprintf("txs only valid on shard %v", shard.BeaconChainShardID)),
+	}
 }
 
 // AddPendingStakingTransaction staking transactions
@@ -248,13 +260,17 @@ func (node *Node) AddPendingStakingTransaction(
 		var err error
 		for i := range errs {
 			if errs[i] != nil {
-				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
+				utils.Logger().Info().
+					Err(errs[i]).
+					Msg("[AddPendingStakingTransaction] Failed adding new staking transaction")
 				err = errs[i]
 				break
 			}
 		}
 		if err == nil || node.BroadcastInvalidTx {
-			utils.Logger().Info().Str("Hash", newStakingTx.Hash().Hex()).Msg("Broadcasting Staking Tx")
+			utils.Logger().Info().
+				Str("Hash", newStakingTx.Hash().Hex()).
+				Msg("Broadcasting Staking Tx")
 			node.tryBroadcastStaking(newStakingTx)
 		}
 		return err
@@ -361,6 +377,8 @@ var (
 	errWrongShardID      = errors.New("wrong shard id")
 	errInvalidNodeMsg    = errors.New("invalid node message")
 	errIgnoreBeaconMsg   = errors.New("ignore beacon sync block")
+	errInvalidEpoch      = errors.New("invalid epoch for transaction")
+	errInvalidShard      = errors.New("invalid shard")
 )
 
 // validateNodeMessage validate node message
