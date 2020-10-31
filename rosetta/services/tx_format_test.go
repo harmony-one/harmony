@@ -152,7 +152,7 @@ func testFormatPlainTransaction(
 	if rosettaTx.Operations[0].Type != common.ExpendGasOperation {
 		t.Error("Expected 1st operation to be gas")
 	}
-	if rosettaTx.Operations[1].Type != common.TransferNativeOperation {
+	if rosettaTx.Operations[1].Type != common.NativeTransferOperation {
 		t.Error("Expected 2nd operation to transfer related")
 	}
 	if rosettaTx.Operations[1].Metadata != nil {
@@ -340,7 +340,7 @@ func testFormatCrossShardSenderTransaction(
 	if rosettaTx.Operations[0].Type != common.ExpendGasOperation {
 		t.Error("Expected 1st operation to be gas")
 	}
-	if rosettaTx.Operations[1].Type != common.CrossShardTransferNativeOperation {
+	if rosettaTx.Operations[1].Type != common.NativeCrossShardTransferOperation {
 		t.Error("Expected 2nd operation to cross-shard transfer related")
 	}
 	if reflect.DeepEqual(rosettaTx.Operations[1].Metadata, map[string]interface{}{}) {
@@ -396,7 +396,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0, // There is no gas expenditure for cross-shard payout
 			},
-			Type:    common.CrossShardTransferNativeOperation,
+			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{

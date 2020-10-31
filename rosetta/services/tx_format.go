@@ -137,7 +137,7 @@ func FormatCrossShardReceiverTransaction(
 				OperationIdentifier: &types.OperationIdentifier{
 					Index: 0, // There is no gas expenditure for cross-shard transaction payout
 				},
-				Type:    common.CrossShardTransferNativeOperation,
+				Type:    common.NativeCrossShardTransferOperation,
 				Status:  common.SuccessOperationStatus.Status,
 				Account: receiverAccountID,
 				Amount: &types.Amount{

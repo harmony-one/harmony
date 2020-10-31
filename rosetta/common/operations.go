@@ -15,11 +15,11 @@ const (
 	// ExpendGasOperation is an operation that only affects the native currency.
 	ExpendGasOperation = "Gas"
 
-	// TransferNativeOperation is an operation that only affects the native currency.
-	TransferNativeOperation = "NativeTransfer"
+	// NativeTransferOperation is an operation that only affects the native currency.
+	NativeTransferOperation = "NativeTransfer"
 
-	// CrossShardTransferNativeOperation is an operation that only affects the native currency.
-	CrossShardTransferNativeOperation = "NativeCrossShardTransfer"
+	// NativeCrossShardTransferOperation is an operation that only affects the native currency.
+	NativeCrossShardTransferOperation = "NativeCrossShardTransfer"
 
 	// ContractCreationOperation is an operation that only affects the native currency.
 	ContractCreationOperation = "ContractCreation"
@@ -41,8 +41,8 @@ var (
 	// PlainOperationTypes ..
 	PlainOperationTypes = []string{
 		ExpendGasOperation,
-		TransferNativeOperation,
-		CrossShardTransferNativeOperation,
+		NativeTransferOperation,
+		NativeCrossShardTransferOperation,
 		ContractCreationOperation,
 		GenesisFundsOperation,
 		PreStakingBlockRewardOperation,

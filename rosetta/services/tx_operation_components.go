@@ -57,7 +57,7 @@ func GetOperationComponents(
 		return getTransferOperationComponents(operations)
 	}
 	switch operations[0].Type {
-	case common.CrossShardTransferNativeOperation:
+	case common.NativeCrossShardTransferOperation:
 		return getCrossShardOperationComponents(operations[0])
 	case common.ContractCreationOperation:
 		return getContractCreationOperationComponents(operations[0])
@@ -78,7 +78,7 @@ func getTransferOperationComponents(
 		})
 	}
 	op0, op1 := operations[0], operations[1]
-	if op0.Type != common.TransferNativeOperation || op1.Type != common.TransferNativeOperation {
+	if op0.Type != common.NativeTransferOperation || op1.Type != common.NativeTransferOperation {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "invalid operation type(s) for same shard transfer",
 		})
@@ -187,7 +187,7 @@ func getCrossShardOperationComponents(
 			"message": "operation must have account sender/from & receiver/to identifiers for cross shard transfer",
 		})
 	}
-	if types.Hash(operation.Account) != types.Hash(components.From) {
+	if operation.Account.Address != components.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "operation account identifier does not match sender/from identifiers for cross shard transfer",
 		})

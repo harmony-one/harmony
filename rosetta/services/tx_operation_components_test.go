@@ -124,7 +124,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test valid operations
 	refOperation := &types.Operation{
-		Type:     common.CrossShardTransferNativeOperation,
+		Type:     common.NativeCrossShardTransferOperation,
 		Amount:   refAmount,
 		Account:  refFrom,
 		Metadata: refMetadataMap,
@@ -148,7 +148,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test nil amount
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferNativeOperation,
+		Type:     common.NativeCrossShardTransferOperation,
 		Amount:   nil,
 		Account:  refFrom,
 		Metadata: refMetadataMap,
@@ -159,7 +159,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test positive amount
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type: common.CrossShardTransferNativeOperation,
+		Type: common.NativeCrossShardTransferOperation,
 		Amount: &types.Amount{
 			Value:    "12000",
 			Currency: &common.NativeCurrency,
@@ -173,7 +173,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test different/unsupported currency
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type: common.CrossShardTransferNativeOperation,
+		Type: common.NativeCrossShardTransferOperation,
 		Amount: &types.Amount{
 			Value: "-12000",
 			Currency: &types.Currency{
@@ -190,7 +190,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test nil account
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferNativeOperation,
+		Type:     common.NativeCrossShardTransferOperation,
 		Amount:   refAmount,
 		Account:  nil,
 		Metadata: refMetadataMap,
@@ -201,7 +201,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 
 	// test no metadata
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:    common.CrossShardTransferNativeOperation,
+		Type:    common.NativeCrossShardTransferOperation,
 		Amount:  refAmount,
 		Account: refFrom,
 	})
@@ -224,7 +224,7 @@ func TestGetCrossShardOperationComponents(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, rosettaError = getCrossShardOperationComponents(&types.Operation{
-		Type:     common.CrossShardTransferNativeOperation,
+		Type:     common.NativeCrossShardTransferOperation,
 		Amount:   refAmount,
 		Account:  refFrom,
 		Metadata: badMetadataMap,
@@ -266,7 +266,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0,
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Amount:  refFromAmount,
 			Account: refFrom,
 		},
@@ -279,7 +279,7 @@ func TestGetTransferOperationComponents(t *testing.T) {
 					Index: 0,
 				},
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Amount:  refToAmount,
 			Account: refTo,
 		},
@@ -345,20 +345,20 @@ func TestGetTransferOperationComponents(t *testing.T) {
 
 	// test invalid operation
 	refOperations[0].Type = common.ExpendGasOperation
-	refOperations[1].Type = common.TransferNativeOperation
+	refOperations[1].Type = common.NativeTransferOperation
 	_, rosettaError = getTransferOperationComponents(refOperations)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
 
 	// test invalid operation sender
-	refOperations[0].Type = common.TransferNativeOperation
+	refOperations[0].Type = common.NativeTransferOperation
 	refOperations[1].Type = common.ExpendGasOperation
 	_, rosettaError = getTransferOperationComponents(refOperations)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}
-	refOperations[1].Type = common.TransferNativeOperation
+	refOperations[1].Type = common.NativeTransferOperation
 
 	// test nil amount
 	refOperations[0].Amount = nil
@@ -517,7 +517,7 @@ func TestGetOperationComponents(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0,
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Amount:  refFromAmount,
 			Account: refFrom,
 		},
@@ -530,7 +530,7 @@ func TestGetOperationComponents(t *testing.T) {
 					Index: 0,
 				},
 			},
-			Type:    common.TransferNativeOperation,
+			Type:    common.NativeTransferOperation,
 			Amount:  refToAmount,
 			Account: refTo,
 		},
@@ -551,7 +551,7 @@ func TestGetOperationComponents(t *testing.T) {
 	}
 	_, rosettaError = GetOperationComponents([]*types.Operation{
 		{
-			Type:     common.CrossShardTransferNativeOperation,
+			Type:     common.NativeCrossShardTransferOperation,
 			Amount:   refFromAmount,
 			Account:  refFrom,
 			Metadata: refMetadataMap,

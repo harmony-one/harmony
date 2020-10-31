@@ -57,7 +57,7 @@ func ConstructTransaction(
 
 	var tx hmyTypes.PoolTransaction
 	switch components.Type {
-	case common.CrossShardTransferNativeOperation:
+	case common.NativeCrossShardTransferOperation:
 		if tx, rosettaError = constructCrossShardTransaction(components, metadata, sourceShardID); rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -65,7 +65,7 @@ func ConstructTransaction(
 		if tx, rosettaError = constructContractCreationTransaction(components, metadata, sourceShardID); rosettaError != nil {
 			return nil, rosettaError
 		}
-	case common.TransferNativeOperation:
+	case common.NativeTransferOperation:
 		if tx, rosettaError = constructPlainTransaction(components, metadata, sourceShardID); rosettaError != nil {
 			return nil, rosettaError
 		}
