@@ -241,10 +241,9 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 				Int("totalQueued", queueCount).
 				Msg("Got more staking transactions")
 			return errs
-		} else {
-			return []error{
-				errors.WithMessage(errInvalidEpoch, "staking txs not accepted yet"),
-			}
+		}
+		return []error{
+			errors.WithMessage(errInvalidEpoch, "staking txs not accepted yet"),
 		}
 	}
 	return []error{
