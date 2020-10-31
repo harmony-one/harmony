@@ -71,19 +71,21 @@ func TestConstructPreparedMessage(test *testing.T) {
 	message := "test string"
 	leaderKey := bls.SerializedPublicKey{}
 	leaderKey.FromLibBLSPublicKey(leaderPubKey)
+	leaderKeyWrapper := bls.PublicKeyWrapper{Object: leaderPubKey, Bytes: leaderKey}
 	validatorKey := bls.SerializedPublicKey{}
 	validatorKey.FromLibBLSPublicKey(validatorPubKey)
-	consensus.Decider.submitVote(
+	validatorKeyWrapper := bls.PublicKeyWrapper{Object: validatorPubKey, Bytes: validatorKey}
+	consensus.Decider.AddNewVote(
 		quorum.Prepare,
-		[]bls.SerializedPublicKey{leaderKey},
+		[]*bls.PublicKeyWrapper{&leaderKeyWrapper},
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
 		consensus.GetCurBlockViewID(),
 	)
-	if _, err := consensus.Decider.submitVote(
+	if _, err := consensus.Decider.AddNewVote(
 		quorum.Prepare,
-		[]bls.SerializedPublicKey{validatorKey},
+		[]*bls.PublicKeyWrapper{&validatorKeyWrapper},
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
