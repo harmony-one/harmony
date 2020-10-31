@@ -573,9 +573,9 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			continue
 		}
 
-		if _, err := consensus.Decider.SubmitVote(
+		if _, err := consensus.Decider.AddNewVote(
 			quorum.Commit,
-			[]bls.SerializedPublicKey{key.Pub.Bytes},
+			[]*bls_cosi.PublicKeyWrapper{key.Pub},
 			key.Pri.SignHash(commitPayload),
 			common.BytesToHash(consensus.blockHash[:]),
 			block.NumberU64(),
