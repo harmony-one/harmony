@@ -125,6 +125,21 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 	}
 }
 
+// RemovePeer removes a peer from SyncConfig
+func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
+	sc.mtx.Lock()
+	defer sc.mtx.Unlock()
+
+	peer.client.Close()
+	for i, p := range sc.peers {
+		if p == peer {
+			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
+		}
+	}
+	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+		Msg("[SYNC] remove GRPC peer")
+}
+
 // CreateStateSync returns the implementation of StateSyncInterface interface.
 func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
 	stateSync := &StateSync{}
@@ -427,6 +442,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) {
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
 					Msg("[SYNC] getConsensusHashes Nil Response")
+				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			if len(response.Payload) > int(size+1) {
@@ -484,9 +500,18 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					break
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
+				if err != nil {
+					utils.Logger().Error().Err(err).
+						Str("peerID", peerConfig.ip).
+						Str("port", peerConfig.port).
+						Msg("[SYNC] downloadBlocks: GetBlocks failed")
+					ss.syncConfig.RemovePeer(peerConfig)
+					return
+				}
 				if err != nil || len(payload) == 0 {
 					count++
-					utils.Logger().Error().Err(err).Int("failNumber", count).Msg("[SYNC] downloadBlocks: GetBlocks failed")
+					utils.Logger().Error().Int("failNumber", count).
+						Msg("[SYNC] downloadBlocks: no more retrievable blocks")
 					if count > downloadBlocksRetryLimit {
 						break
 					}
@@ -871,6 +896,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			ss.syncMux.Lock()
