@@ -112,12 +112,12 @@ func (v *stakedVoteWeight) AddNewVote(
 
 	t := v.QuorumThreshold()
 
-	msg := "Attempt to reach quorum"
+	msg := "[AddNewVote] New Vote Added!"
 	if !tallyQuorum.quorumAchieved {
 		tallyQuorum.quorumAchieved = tallyQuorum.tally.GT(t)
 
 		if tallyQuorum.quorumAchieved {
-			msg = "Quorum Achieved!"
+			msg = "[AddNewVote] Quorum Achieved!"
 		}
 	}
 	utils.Logger().Info().

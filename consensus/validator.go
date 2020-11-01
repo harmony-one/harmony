@@ -1,12 +1,11 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -224,10 +223,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.prepareBitmap = mask
 
 	// Optimistically add blockhash field of prepare message
-	emptyHash := [32]byte{}
-	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
-		copy(consensus.blockHash[:], blockHash[:])
-	}
+	copy(consensus.blockHash[:], blockHash[:])
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
 	if consensus.current.Mode() != Normal {
