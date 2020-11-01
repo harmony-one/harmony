@@ -501,7 +501,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
-					utils.Logger().Error().Err(err).
+					utils.Logger().Warn().Err(err).
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
 						Msg("[SYNC] downloadBlocks: GetBlocks failed")
