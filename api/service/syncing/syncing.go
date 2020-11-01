@@ -134,6 +134,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 	for i, p := range sc.peers {
 		if p == peer {
 			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
+			break
 		}
 	}
 	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
