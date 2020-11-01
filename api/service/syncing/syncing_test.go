@@ -1,14 +1,63 @@
 package syncing
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/harmony-one/harmony/api/service/syncing/downloader"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSyncPeerConfig_IsEqual(t *testing.T) {
+	tests := []struct {
+		p1, p2 *SyncPeerConfig
+		exp    bool
+	}{
+		{
+			p1: &SyncPeerConfig{
+				ip:   "0.0.0.1",
+				port: "1",
+			},
+			p2: &SyncPeerConfig{
+				ip:   "0.0.0.1",
+				port: "2",
+			},
+			exp: false,
+		},
+		{
+			p1: &SyncPeerConfig{
+				ip:   "0.0.0.1",
+				port: "1",
+			},
+			p2: &SyncPeerConfig{
+				ip:   "0.0.0.2",
+				port: "1",
+			},
+			exp: false,
+		},
+		{
+			p1: &SyncPeerConfig{
+				ip:   "0.0.0.1",
+				port: "1",
+			},
+			p2: &SyncPeerConfig{
+				ip:   "0.0.0.1",
+				port: "1",
+			},
+			exp: true,
+		},
+	}
+	for i, test := range tests {
+		res := test.p1.IsEqual(test.p2)
+		if res != test.exp {
+			t.Errorf("Test %v: unexpected res %v / %v", i, res, test.exp)
+		}
+	}
+}
 
 // Simple test for IncorrectResponse
 func TestCreateTestSyncPeerConfig(t *testing.T) {
@@ -53,6 +102,32 @@ func TestCreateStateSync(t *testing.T) {
 	}
 }
 
+func TestCheckPeersDuplicity(t *testing.T) {
+	tests := []struct {
+		peers  []p2p.Peer
+		expErr error
+	}{
+		{
+			peers:  makePeersForTest(100),
+			expErr: nil,
+		},
+		{
+			peers: append(makePeersForTest(100), p2p.Peer{
+				IP: makeTestPeerIP(0),
+			}),
+			expErr: errors.New("duplicate peer"),
+		},
+	}
+
+	for i, test := range tests {
+		err := checkPeersDuplicity(test.peers)
+
+		if assErr := assertTestError(err, test.expErr); assErr != nil {
+			t.Errorf("Test %v: %v", i, assErr)
+		}
+	}
+}
+
 func TestLimitPeersWithBound(t *testing.T) {
 	tests := []struct {
 		size    int
@@ -76,7 +151,7 @@ func TestLimitPeersWithBound(t *testing.T) {
 		if len(res) != test.expSize {
 			t.Errorf("result size unexpected: %v / %v", len(res), test.expSize)
 		}
-		if err := checkTestPeerDuplicity(res); err != nil {
+		if err := checkPeersDuplicity(res); err != nil {
 			t.Error(err)
 		}
 	}
@@ -97,24 +172,30 @@ func TestLimitPeersWithBound_random(t *testing.T) {
 func makePeersForTest(size int) []p2p.Peer {
 	ps := make([]p2p.Peer, 0, size)
 	for i := 0; i != size; i++ {
-		ps = append(ps, p2p.Peer{
-			IP: makeTestPeerIP(i),
-		})
+		ps = append(ps, makePeerForTest(i))
 	}
 	return ps
 }
 
-func checkTestPeerDuplicity(ps []p2p.Peer) error {
-	m := make(map[string]struct{})
-	for _, p := range ps {
-		if _, ok := m[p.IP]; ok {
-			return fmt.Errorf("duplicate ip")
-		}
-		m[p.IP] = struct{}{}
+func makePeerForTest(i interface{}) p2p.Peer {
+	return p2p.Peer{
+		IP: makeTestPeerIP(i),
 	}
-	return nil
 }
 
 func makeTestPeerIP(i interface{}) string {
 	return fmt.Sprintf("%v", i)
+}
+
+func assertTestError(got, expect error) error {
+	if (got == nil) && (expect == nil) {
+		return nil
+	}
+	if (got == nil) != (expect == nil) {
+		return fmt.Errorf("unexpected error: [%v] / [%v]", got, expect)
+	}
+	if !strings.Contains(got.Error(), expect.Error()) {
+		return fmt.Errorf("unexpected error: [%v] / [%v]", got, expect)
+	}
+	return nil
 }
