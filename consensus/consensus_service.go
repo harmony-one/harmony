@@ -421,6 +421,12 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		Msg("[UpdateConsensusInformation] changing committee")
 
 	// take care of possible leader change during the epoch
+	// TODO: in a very rare case, when a M1 view change happened, the block contains coinbase for last leader
+	// but the new leader is actually recognized by most of the nodes. At this time, if a node sync to this
+	// exact block and set its leader, it will set with the failed leader as in the coinbase of the block.
+	// This is a very rare case scenario and not likely to cause any issue in mainnet. But we need to think about
+	// a solution to take care of this case because the coinbase of the latest block doesn't really represent the
+	// the real current leader in case of M1 view change.
 	if !curHeader.IsLastBlockInEpoch() && curHeader.Number().Uint64() != 0 {
 		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
 		if err != nil || leaderPubKey == nil {

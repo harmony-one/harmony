@@ -64,7 +64,6 @@ func (s *MempoolAPI) MempoolTransaction(
 		return nil, &common.TransactionNotFoundError
 	}
 
-	var nilAddress ethCommon.Address
 	senderAddr, _ := poolTx.SenderAddress()
 	estLog := &hmyTypes.Log{
 		Address:     senderAddr,
@@ -73,6 +72,7 @@ func (s *MempoolAPI) MempoolTransaction(
 		BlockNumber: s.hmy.CurrentBlock().NumberU64(),
 	}
 
+	// Contract related information for pending transactions is not reported
 	estReceipt := &hmyTypes.Receipt{
 		PostState:         []byte{},
 		Status:            hmyTypes.ReceiptStatusSuccessful, // Assume transaction will succeed
@@ -80,11 +80,11 @@ func (s *MempoolAPI) MempoolTransaction(
 		Bloom:             [256]byte{},
 		Logs:              []*hmyTypes.Log{estLog},
 		TxHash:            poolTx.Hash(),
-		ContractAddress:   nilAddress, // ContractAddress is only for smart contract creation & can not be determined until transaction is finalized
+		ContractAddress:   ethCommon.Address{},
 		GasUsed:           poolTx.Gas(),
 	}
 
-	respTx, err := FormatTransaction(poolTx, estReceipt)
+	respTx, err := FormatTransaction(poolTx, estReceipt, []byte{})
 	if err != nil {
 		return nil, err
 	}

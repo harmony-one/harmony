@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/pkg/errors"
@@ -21,6 +22,11 @@ func (s *ConstructAPI) ConstructionParse(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
+	}
 	if request.Signed {
 		return parseSignedTransaction(ctx, wrappedTransaction, tx)
 	}
@@ -37,11 +43,17 @@ func parseUnsignedTransaction(
 		})
 	}
 
+	if _, err := getAddress(wrappedTransaction.From); err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
 	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt, wrappedTransaction.ContractCode)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -52,7 +64,7 @@ func parseUnsignedTransaction(
 	foundSender := false
 	operations := formattedTx.Operations
 	for _, op := range operations {
-		if types.Hash(op.Account) == types.Hash(tempAccID) {
+		if op.Account.Address == tempAccID.Address {
 			foundSender = true
 			op.Account = wrappedTransaction.From
 		}
@@ -82,21 +94,21 @@ func parseSignedTransaction(
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.Gas(),
 	}
-	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt)
+	formattedTx, rosettaError := FormatTransaction(tx, intendedReceipt, wrappedTransaction.ContractCode)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
 	sender, err := tx.SenderAddress()
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "unable to get sender address, invalid signed transaction"),
+			"message": errors.WithMessage(err, "unable to get sender address for signed transaction").Error(),
 		})
 	}
 	senderID, rosettaError := newAccountIdentifier(sender)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if types.Hash(senderID) != types.Hash(wrappedTransaction.From) {
+	if senderID.Address != wrappedTransaction.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "wrapped transaction sender/from does not match transaction signer",
 		})

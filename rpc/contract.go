@@ -50,7 +50,7 @@ func (s *PublicContractService) Call(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Execute call
-	result, err := doCall(ctx, s.hmy, args, blockNum, vm.Config{}, CallTimeout, s.hmy.RPCGasCap)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, vm.Config{}, CallTimeout, s.hmy.RPCGasCap)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +99,8 @@ func (s *PublicContractService) GetStorageAt(
 	return res[:], state.Error()
 }
 
-// docall executes an EVM call
-func doCall(
+// DoEVMCall executes an EVM call
+func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int,
 ) (core.ExecutionResult, error) {

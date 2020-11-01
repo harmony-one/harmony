@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 
@@ -23,9 +24,10 @@ const (
 // WrappedTransaction is a wrapper for a transaction that includes all relevant
 // data to parse a transaction.
 type WrappedTransaction struct {
-	RLPBytes  []byte                   `json:"rlp_bytes"`
-	IsStaking bool                     `json:"is_staking"`
-	From      *types.AccountIdentifier `json:"from"`
+	RLPBytes     []byte                   `json:"rlp_bytes"`
+	IsStaking    bool                     `json:"is_staking"`
+	ContractCode hexutil.Bytes            `json:"contract_code"`
+	From         *types.AccountIdentifier `json:"from"`
 }
 
 // unpackWrappedTransactionFromString ..
@@ -111,9 +113,16 @@ func (s *ConstructAPI) ConstructionPayloads(
 			"message": "sender address is not found for given operations",
 		})
 	}
-	if types.Hash(senderID) != types.Hash(components.From) {
+	if senderID.Address != components.From.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "sender account identifier from operations does not match account identifier from public key",
+		})
+	}
+	if metadata.Transaction.FromShardID != nil && *metadata.Transaction.FromShardID != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v",
+				*metadata.Transaction.FromShardID, s.hmy.ShardID,
+			),
 		})
 	}
 
@@ -132,9 +141,10 @@ func (s *ConstructAPI) ConstructionPayloads(
 		})
 	}
 	wrappedTxMarshalledBytes, err := json.Marshal(WrappedTransaction{
-		RLPBytes:  buf.Bytes(),
-		From:      senderID,
-		IsStaking: components.IsStaking(),
+		RLPBytes:     buf.Bytes(),
+		From:         senderID,
+		ContractCode: metadata.ContractCode,
+		IsStaking:    components.IsStaking(),
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -184,11 +194,16 @@ func (s *ConstructAPI) ConstructionCombine(
 			"message": "require exactly 1 signature",
 		})
 	}
+	if tx.ShardID() != s.hmy.ShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": fmt.Sprintf("transaction is for shard %v != shard %v", tx.ShardID(), s.hmy.ShardID),
+		})
+	}
 
 	sig := request.Signatures[0]
 	if sig.SignatureType != common.SignatureType {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": fmt.Sprintf("invalid transaction type, currently only support %v", common.SignatureType),
+			"message": fmt.Sprintf("invalid signature type, currently only support %v", common.SignatureType),
 		})
 	}
 	sigAddress, rosettaError := getAddressFromPublicKey(sig.PublicKey)
@@ -199,7 +214,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if wrappedTransaction.From == nil || types.Hash(wrappedTransaction.From) != types.Hash(sigAccountID) {
+	if wrappedTransaction.From == nil || wrappedTransaction.From.Address != sigAccountID.Address {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "signer public key does not match unsigned transaction's sender",
 		})
@@ -239,7 +254,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	senderAddress, err := signedTx.SenderAddress()
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": errors.WithMessage(err, "unable to get sender address with signed transaction").Error(),
+			"message": errors.WithMessage(err, "bad signature payload").Error(),
 		})
 	}
 	if *sigAddress != senderAddress {

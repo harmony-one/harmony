@@ -9,8 +9,10 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
@@ -74,6 +76,17 @@ func (s *ConstructAPI) ConstructionPreprocess(
 			"message": "sender address is not found for given operations",
 		})
 	}
+	if txMetadata.ToShardID != nil && txMetadata.FromShardID != nil &&
+		components.Type != common.NativeCrossShardTransferOperation && *txMetadata.ToShardID != *txMetadata.FromShardID {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "given from & to shard are different for a native same shard transfer",
+		})
+	}
+	if request.SuggestedFeeMultiplier != nil && *request.SuggestedFeeMultiplier < 1 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "given gas price multiplier must be at least 1",
+		})
+	}
 
 	options, err := types.MarshalMap(ConstructMetadataOptions{
 		TransactionMetadata: txMetadata,
@@ -82,6 +95,11 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if _, err := getAddress(components.From); err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
@@ -95,10 +113,13 @@ func (s *ConstructAPI) ConstructionPreprocess(
 
 // ConstructMetadata with a set of operations will construct a valid transaction
 type ConstructMetadata struct {
-	Nonce       uint64               `json:"nonce"`
-	GasLimit    uint64               `json:"gas_limit"`
-	GasPrice    *big.Int             `json:"gas_price"`
-	Transaction *TransactionMetadata `json:"transaction_metadata"`
+	Nonce           uint64               `json:"nonce"`
+	GasLimit        uint64               `json:"gas_limit"`
+	GasPrice        *big.Int             `json:"gas_price"`
+	ContractCode    hexutil.Bytes        `json:"contract_code"`
+	EvmReturn       hexutil.Bytes        `json:"evm_return"`
+	EvmErrorMessage string               `json:"evm_error_message"`
+	Transaction     *TransactionMetadata `json:"transaction_metadata"`
 }
 
 // UnmarshalFromInterface ..
@@ -151,6 +172,20 @@ func (s *ConstructAPI) ConstructionMetadata(
 		})
 	}
 
+	currBlock, err := s.hmy.BlockByNumber(ctx, ethRpc.LatestBlockNumber)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	if options.OperationType == common.NativeCrossShardTransferOperation &&
+		!s.hmy.BlockChain.Config().AcceptsCrossTx(currBlock.Epoch()) {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "cross-shard transaction is not accepted yet",
+		})
+	}
+
 	data := hexutil.Bytes{}
 	if options.TransactionMetadata.Data != nil {
 		var err error
@@ -161,13 +196,31 @@ func (s *ConstructAPI) ConstructionMetadata(
 		}
 	}
 
+	var contractAddress ethCommon.Address
+	if options.TransactionMetadata.ContractAccountIdentifier != nil {
+		contractAddress, err = getAddress(options.TransactionMetadata.ContractAccountIdentifier)
+		if err != nil {
+			return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": errors.WithMessage(err, "unable to get provided contract address").Error(),
+			})
+		}
+	}
+	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, ethRpc.LatestBlockNumber)
+	if state == nil || err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": "block state not found for latest block",
+		})
+	}
+
 	var estGasUsed uint64
 	if !isStakingOperation(options.OperationType) {
 		if options.OperationType == common.ContractCreationOperation {
-			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{Data: &data}, nil)
+			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{From: senderAddr, Data: &data}, nil)
 			estGasUsed *= 2 // HACK to account for imperfect contract creation estimation
 		} else {
-			estGasUsed, err = rpc.EstimateGas(ctx, s.hmy, rpc.CallArgs{To: &ethCommon.Address{}, Data: &data}, nil)
+			estGasUsed, err = rpc.EstimateGas(
+				ctx, s.hmy, rpc.CallArgs{From: senderAddr, To: &contractAddress, Data: &data}, nil,
+			)
 		}
 	} else {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
@@ -185,11 +238,41 @@ func (s *ConstructAPI) ConstructionMetadata(
 	}
 	sugNativeFee, sugNativePrice := getSuggestedNativeFeeAndPrice(gasMul, new(big.Int).SetUint64(estGasUsed))
 
+	evmErrorMsg := ""
+	evmReturn := hexutil.Bytes{}
+	if !isStakingOperation(options.OperationType) &&
+		options.OperationType != common.ContractCreationOperation &&
+		len(data) > 0 {
+		gas := hexutil.Uint64(estGasUsed)
+		callArgs := rpc.CallArgs{
+			From: senderAddr,
+			To:   &contractAddress,
+			Data: &data,
+			Gas:  &gas,
+		}
+		evmExe, err := rpc.DoEVMCall(
+			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, vm.Config{}, rpc.CallTimeout, s.hmy.RPCGasCap,
+		)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": errors.WithMessage(err, "unable to execute EVM").Error(),
+			})
+		}
+		if evmExe.VMErr != nil {
+			evmErrorMsg = evmExe.VMErr.Error()
+		}
+		evmReturn = evmExe.ReturnData
+		sugNativeFee, sugNativePrice = getSuggestedNativeFeeAndPrice(gasMul, new(big.Int).SetUint64(evmExe.UsedGas))
+	}
+
 	metadata, err := types.MarshalMap(ConstructMetadata{
-		Nonce:       nonce,
-		GasPrice:    sugNativePrice,
-		GasLimit:    estGasUsed,
-		Transaction: options.TransactionMetadata,
+		Nonce:           nonce,
+		GasPrice:        sugNativePrice,
+		GasLimit:        estGasUsed,
+		Transaction:     options.TransactionMetadata,
+		ContractCode:    state.GetCode(contractAddress),
+		EvmErrorMessage: evmErrorMsg,
+		EvmReturn:       evmReturn,
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{

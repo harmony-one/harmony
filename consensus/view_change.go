@@ -131,9 +131,8 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	if curTimestamp <= blockTimestamp {
 		return consensus.fallbackNextViewID()
 	}
-	totalNode := consensus.Decider.ParticipantsCount()
-	// diff is at least 1, and it won't exceed the totalNode
-	diff := uint64(((curTimestamp - blockTimestamp) / viewChangeTimeout) % int64(totalNode))
+	// diff only increases
+	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
 	nextViewID := diff + consensus.GetCurBlockViewID()
 
 	consensus.getLogger().Info().
@@ -161,7 +160,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 	var err error
 	epoch := big.NewInt(0)
 	if consensus.Blockchain == nil {
-		consensus.getLogger().Error().Msg("[getNextLeaderKey] ChainReader is nil. Use consensus.LeaderPubKey")
+		consensus.getLogger().Error().Msg("[getNextLeaderKey] Blockchain is nil. Use consensus.LeaderPubKey")
 		lastLeaderPubKey = consensus.LeaderPubKey
 	} else {
 		curHeader := consensus.Blockchain.CurrentHeader()

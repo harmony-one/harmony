@@ -114,10 +114,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum+1 {
-		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
-		consensus.spinUpStateSync()
-	}
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
@@ -153,10 +149,12 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnPrepared] Received OnPrepared message11111111")
+
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
+		consensus.spinUpStateSync()
+	}
+
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.getLogger().Info().
@@ -248,7 +246,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
-
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -298,10 +295,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("[OnCommitted] Failed finding a matching block for committed message")
 		return
 	}
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message333333")
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
@@ -317,10 +310,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		Msg("[OnCommitted] Received committed message444444")
 	consensus.FBFTLog.AddMessage(recvMsg)
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message555555")
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
+		consensus.spinUpStateSync()
+	}
 
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).

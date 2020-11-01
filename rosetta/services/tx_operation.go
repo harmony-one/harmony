@@ -210,7 +210,7 @@ func newTransferNativeOperations(
 	receiverAddress := *tx.To()
 
 	// Common elements
-	opType := common.TransferNativeOperation
+	opType := common.NativeTransferOperation
 	opStatus := common.SuccessOperationStatus.Status
 	if receipt.Status == hmytypes.ReceiptStatusFailed {
 		if len(tx.Data()) > 0 {
@@ -309,7 +309,7 @@ func newCrossShardSenderTransferNativeOperations(
 			RelatedOperations: []*types.OperationIdentifier{
 				startingOperationID,
 			},
-			Type:    common.CrossShardTransferNativeOperation,
+			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
@@ -326,10 +326,7 @@ func newContractCreationNativeOperations(
 	startingOperationID *types.OperationIdentifier,
 	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 ) ([]*types.Operation, *types.Error) {
-	senderAccountID, rosettaError := newAccountIdentifier(senderAddress)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
+	// TODO: correct the contract creation transaction...
 
 	// Set execution status as necessary
 	status := common.SuccessOperationStatus.Status
@@ -341,24 +338,50 @@ func newContractCreationNativeOperations(
 		return nil, rosettaError
 	}
 
+	// Subtraction operation elements
+	subOperationID := &types.OperationIdentifier{
+		Index: startingOperationID.Index + 1,
+	}
+	subRelatedID := []*types.OperationIdentifier{
+		startingOperationID,
+	}
+	subAccountID, rosettaError := newAccountIdentifier(senderAddress)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	subAmount := &types.Amount{
+		Value:    negativeBigValue(tx.Value()),
+		Currency: &common.NativeCurrency,
+	}
+
+	// Addition operation elements
+	addOperationID := &types.OperationIdentifier{
+		Index: subOperationID.Index + 1,
+	}
+	addRelatedID := []*types.OperationIdentifier{
+		subOperationID,
+	}
+	addAmount := &types.Amount{
+		Value:    tx.Value().String(),
+		Currency: &common.NativeCurrency,
+	}
+
 	return []*types.Operation{
 		{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: startingOperationID.Index + 1,
-			},
-			RelatedOperations: []*types.OperationIdentifier{
-				startingOperationID,
-			},
-			Type:    common.ContractCreationOperation,
-			Status:  status,
-			Account: senderAccountID,
-			Amount: &types.Amount{
-				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.NativeCurrency,
-			},
-			Metadata: map[string]interface{}{
-				"contract_address": contractAddressID,
-			},
+			OperationIdentifier: subOperationID,
+			RelatedOperations:   subRelatedID,
+			Type:                common.ContractCreationOperation,
+			Status:              status,
+			Account:             subAccountID,
+			Amount:              subAmount,
+		},
+		{
+			OperationIdentifier: addOperationID,
+			RelatedOperations:   addRelatedID,
+			Type:                common.ContractCreationOperation,
+			Status:              status,
+			Account:             contractAddressID,
+			Amount:              addAmount,
 		},
 	}, nil
 }

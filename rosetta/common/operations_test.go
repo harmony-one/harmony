@@ -50,8 +50,8 @@ func TestPlainOperationTypes(t *testing.T) {
 	plainOperationTypes := PlainOperationTypes
 	referenceOperationTypes := []string{
 		ExpendGasOperation,
-		TransferNativeOperation,
-		CrossShardTransferNativeOperation,
+		NativeTransferOperation,
+		NativeCrossShardTransferOperation,
 		ContractCreationOperation,
 		GenesisFundsOperation,
 		PreStakingBlockRewardOperation,

@@ -82,7 +82,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		pubKeysBytes[i] = pubKey.Bytes
 	}
 
-	ballet, err := v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
+	ballet, err := v.submitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
 
 	if err != nil {
 		return ballet, err
@@ -188,7 +188,6 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 
 // IsAllSigsCollected ..
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
-	utils.Logger().Info().Msgf("ALL SIGS %s", v.voteTally.Commit.tally)
 	return v.voteTally.Commit.tally.Equal(numeric.NewDec(1))
 }
 

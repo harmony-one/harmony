@@ -608,7 +608,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 
 func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.AddUint64(&consensus.blockNum, 1)
-	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.SetViewIDs(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {

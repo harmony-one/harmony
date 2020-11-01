@@ -181,7 +181,7 @@ func (s *BlockAPI) specialBlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
 ) (*types.BlockTransactionResponse, *types.Error) {
 	// If no transaction info is found, check for special case transactions.
-	blk, rosettaError := s.getBlock(ctx, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
+	blk, rosettaError := getBlock(ctx, s.hmy, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
 	if rosettaError != nil {
 		return nil, rosettaError
 	}

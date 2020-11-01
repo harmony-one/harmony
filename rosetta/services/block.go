@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
@@ -43,7 +44,7 @@ func (s *BlockAPI) Block(
 
 	var blk *hmytypes.Block
 	var currBlockID, prevBlockID *types.BlockIdentifier
-	if blk, rosettaError = s.getBlock(ctx, request.BlockIdentifier); rosettaError != nil {
+	if blk, rosettaError = getBlock(ctx, s.hmy, request.BlockIdentifier); rosettaError != nil {
 		return nil, rosettaError
 	}
 
@@ -124,30 +125,6 @@ func (s *BlockAPI) Block(
 	}, nil
 }
 
-// getBlock ..
-func (s *BlockAPI) getBlock(
-	ctx context.Context, request *types.PartialBlockIdentifier,
-) (blk *hmytypes.Block, rosettaError *types.Error) {
-	var err error
-	if request.Hash != nil {
-		requestBlockHash := ethcommon.HexToHash(*request.Hash)
-		blk, err = s.hmy.GetBlock(ctx, requestBlockHash)
-	} else if request.Index != nil {
-		blk, err = s.hmy.BlockByNumber(ctx, rpc.BlockNumber(*request.Index).EthBlockNumber())
-	} else {
-		return nil, &common.BlockNotFoundError
-	}
-	if err != nil {
-		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	if blk == nil {
-		return nil, &common.BlockNotFoundError
-	}
-	return blk, nil
-}
-
 // BlockTransaction implements the /block/transaction endpoint
 func (s *BlockAPI) BlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
@@ -174,10 +151,20 @@ func (s *BlockAPI) BlockTransaction(
 		}
 		return response, rosettaError2
 	}
+	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(request.BlockIdentifier.Index).EthBlockNumber())
+	if state == nil || err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": fmt.Sprintf("block state not found for block %v", request.BlockIdentifier.Index),
+		})
+	}
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt)
+		contractCode := []byte{}
+		if txInfo.tx.To() != nil {
+			contractCode = state.GetCode(*txInfo.tx.To())
+		}
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractCode)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -244,4 +231,30 @@ func (s *BlockAPI) getTransactionInfo(
 		receipt:   receipt,
 		cxReceipt: cxReceipt,
 	}, nil
+}
+
+// getBlock ..
+func getBlock(
+	ctx context.Context, hmy *hmy.Harmony, blockID *types.PartialBlockIdentifier,
+) (blk *hmytypes.Block, rosettaError *types.Error) {
+	var err error
+	if blockID.Hash != nil {
+		requestBlockHash := ethcommon.HexToHash(*blockID.Hash)
+		blk, err = hmy.GetBlock(ctx, requestBlockHash)
+	} else if blockID.Index != nil {
+		blk, err = hmy.BlockByNumber(ctx, rpc.BlockNumber(*blockID.Index).EthBlockNumber())
+	} else {
+		return nil, &common.BlockNotFoundError
+	}
+	if err != nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	if blk == nil {
+		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
+			"message": "block not found for given block identifier",
+		})
+	}
+	return blk, nil
 }
