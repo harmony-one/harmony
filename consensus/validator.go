@@ -290,10 +290,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
 		cur := mask.CountEnabled()
 		if new > cur {
+			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
 			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 		}
-	} else {
-		consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 	}
 
 	consensus.tryCatchup()
