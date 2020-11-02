@@ -123,9 +123,6 @@ func (consensus *Consensus) finalCommit() {
 	msgToSend, FBFTMsg :=
 		network.Bytes,
 		network.FBFTMsg
-	consensus.getLogger().Warn().
-		Str("bitmap", hex.EncodeToString(FBFTMsg.Payload[:])).
-		Msg("[finalCommit] BITMAP")
 	commitSigAndBitmap := FBFTMsg.Payload // this may not needed
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
@@ -509,9 +506,6 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	consensus.FBFTLog.AddMessage(FBFTMsg)
-	consensus.getLogger().Warn().
-		Str("bitmap", hex.EncodeToString(FBFTMsg.Payload[:])).
-		Msg("[finalCommit] BITMAP")
 
 	blk.SetCurrentCommitSig(FBFTMsg.Payload)
 	if err := consensus.OnConsensusDone(blk); err != nil {

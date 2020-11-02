@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -156,10 +156,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnPrepared] Received OnPrepared message222222")
 
 	if consensus.BlockVerifier == nil {
 		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
@@ -169,21 +165,9 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
 		return
 	}
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnPrepared] Received OnPrepared message3333")
 	consensus.FBFTLog.MarkBlockVerified(&blockObj)
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnPrepared] Received OnPrepared message44444")
 	consensus.FBFTLog.AddBlock(&blockObj)
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnPrepared] Received OnPrepared message555555")
 	// add block field
 	blockPayload := make([]byte, len(recvMsg.Block))
 	copy(blockPayload[:], recvMsg.Block[:])
@@ -260,10 +244,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.spinUpStateSync()
 	}
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message11111111")
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
@@ -277,10 +257,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message222222")
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
@@ -300,10 +276,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message444444")
 	consensus.FBFTLog.AddMessage(recvMsg)
 
 	if recvMsg.BlockNum > consensus.blockNum {
@@ -311,10 +283,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.spinUpStateSync()
 	}
 
-	consensus.getLogger().Info().
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Msg("[OnCommitted] Received committed message666666")
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
