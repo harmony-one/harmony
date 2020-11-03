@@ -81,7 +81,8 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	SubmitVote(
+	// This func shouldn't be called directly from outside of quorum. Use AddNewVote instead.
+	submitVote(
 		p Phase, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
