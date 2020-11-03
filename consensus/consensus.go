@@ -30,7 +30,7 @@ var errLeaderPriKeyNotFound = errors.New("getting leader private key from consen
 // ProposalType is to indicate the type of signal for new block proposal
 type ProposalType byte
 
-// Constant of the top level Message Type exchanged among nodes
+// Constant of the type of new block proposal
 const (
 	SyncProposal ProposalType = iota
 	AsyncProposal

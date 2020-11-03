@@ -45,11 +45,11 @@ func SetLogContext(_port, _ip string) {
 
 // SetLogVerbosity specifies the verbosity of global logger
 func SetLogVerbosity(verbosity log.Lvl) {
-	logVerbosity = 4
+	logVerbosity = verbosity
 	if glogger != nil {
 		glogger.Verbosity(logVerbosity)
 	}
-	updateZeroLogLevel(int(4))
+	updateZeroLogLevel(int(verbosity))
 }
 
 // AddLogFile creates a StreamHandler that outputs JSON logs

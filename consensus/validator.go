@@ -239,10 +239,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum+1 {
-		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
-		consensus.spinUpStateSync()
-	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {

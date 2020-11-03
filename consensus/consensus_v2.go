@@ -123,7 +123,7 @@ func (consensus *Consensus) finalCommit() {
 	msgToSend, FBFTMsg :=
 		network.Bytes,
 		network.FBFTMsg
-	commitSigAndBitmap := FBFTMsg.Payload // this may not needed
+	commitSigAndBitmap := FBFTMsg.Payload
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
@@ -135,8 +135,8 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
+	block.SetCurrentCommitSig(commitSigAndBitmap)
 	consensus.commitBlock(block, FBFTMsg)
-	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
 	if consensus.blockNum-beforeCatchupNum != 1 {
 		consensus.getLogger().Warn().
@@ -145,13 +145,13 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
-	// if leader success finalize the block, send committed message to validators
+	// if leader successfully finalizes the block, send committed message to validators
 	// TODO: once leader rotation is implemented, leader who is about to be switched out
 	//       needs to send the committed message immediately so the next leader can
 	//       have the full commit signatures for new block
 	// For now, the leader don't need to send immediately as the committed sig will be
-	// included in the next block and sent in next prepared message.
-
+	// included in the next block and sent in next prepared message. Unless the node
+	// won't be the leader anymore or it's the last block of the epoch (no pipelining).
 	sendImmediately := false
 	if !consensus.IsLeader() || block.IsLastBlockInEpoch() {
 		sendImmediately = true
@@ -495,9 +495,9 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	}
 
 	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	consensus.mutex.Unlock()
+
 	if err != nil {
 		return errors.Wrap(err, "[preCommitAndPropose] Unable to construct Committed message")
 	}
@@ -513,9 +513,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return err
 	}
 
-	// If I am still the leader
-	//if consensus.IsLeader() {
-	// if leader success finalize the block, send committed message to validators
+	// If it's not the epoch block, do pipelining and send committed message to validators now at 67% committed.
 	if !blk.IsLastBlockInEpoch() {
 		if err := consensus.msgSender.SendWithRetry(
 			blk.NumberU64(),
@@ -535,10 +533,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	// Send signal to Node to propose the new block for consensus
 	consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] sending block proposal signal")
 
-	// TODO: make sure preCommit happens before finalCommit
 	consensus.ReadySignal <- AsyncProposal
-	//}
-	consensus.getLogger().Warn().Msg("[preCommitAndPropose] FULLY FINISHED")
 	return nil
 }
 

@@ -3,8 +3,10 @@ package consensus
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/consensus/signature"
 
@@ -199,6 +201,10 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
+	utils.Logger().Info().Msgf("ViewChanging %d %d", consensus.GetCurBlockViewID(), consensus.GetViewChangingID())
+	if consensus.GetCurBlockViewID()%7 == 0 {
+		return
+	}
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")

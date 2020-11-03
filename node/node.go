@@ -864,7 +864,7 @@ func (node *Node) Start() error {
 	}
 
 	for e := range errChan {
-		utils.Logger().Info().
+		utils.SampledLogger().Info().
 			Interface("item", e.payload).
 			Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
 	}
