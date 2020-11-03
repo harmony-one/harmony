@@ -315,7 +315,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		WSPort:       hc.WS.Port,
 		DebugEnabled: hc.RPCOpt.DebugEnabled,
 	}
-	if nodeConfig.ShardID != shard.BeaconChainShardID && hc.General.NodeType != nodeTypeExplorer {
+	if nodeConfig.ShardID != shard.BeaconChainShardID {
 		utils.Logger().Info().
 			Uint32("shardID", currentNode.Blockchain().ShardID()).
 			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")

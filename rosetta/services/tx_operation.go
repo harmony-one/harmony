@@ -158,20 +158,16 @@ func getAmountFromDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*type
 		})
 	}
 
-	stkAmount := stkMsg.Amount
+	deductedAmt := stkMsg.Amount
 	logs := hmytypes.FindLogsWithTopic(receipt, staking.DelegateTopic)
 	for _, log := range logs {
-		if len(log.Data) > ethcommon.AddressLength {
-			validatorAddress := ethcommon.BytesToAddress(log.Data[:ethcommon.AddressLength])
-			if log.Address == stkMsg.DelegatorAddress && stkMsg.ValidatorAddress == validatorAddress {
-				// Remove re-delegation amount as funds were never credited to account's balance.
-				stkAmount = new(big.Int).Sub(stkAmount, new(big.Int).SetBytes(log.Data[ethcommon.AddressLength:]))
-				break
-			}
+		if len(log.Data) > ethcommon.AddressLength && log.Address == stkMsg.DelegatorAddress {
+			// Remove re-delegation amount as funds were never credited to account's balance.
+			deductedAmt = new(big.Int).Sub(deductedAmt, new(big.Int).SetBytes(log.Data[ethcommon.AddressLength:]))
 		}
 	}
 	return &types.Amount{
-		Value:    negativeBigValue(stkAmount),
+		Value:    negativeBigValue(deductedAmt),
 		Currency: &common.NativeCurrency,
 	}, nil
 }
