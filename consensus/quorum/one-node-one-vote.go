@@ -36,7 +36,7 @@ func (v *uniformVoteWeight) AddNewVote(
 	for i, pubKey := range pubKeys {
 		pubKeysBytes[i] = pubKey.Bytes
 	}
-	return v.submitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
+	return v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
 }
 
 // IsQuorumAchieved ..
