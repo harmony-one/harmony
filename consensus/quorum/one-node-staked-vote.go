@@ -82,7 +82,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		pubKeysBytes[i] = pubKey.Bytes
 	}
 
-	ballet, err := v.submitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
+	ballet, err := v.SubmitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
 
 	if err != nil {
 		return ballet, err

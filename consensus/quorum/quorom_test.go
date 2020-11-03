@@ -88,7 +88,7 @@ func TestSubmitVote(test *testing.T) {
 
 	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
 
-	if _, err := decider.submitVote(
+	if _, err := decider.SubmitVote(
 		Prepare,
 		[]bls.SerializedPublicKey{pubKeyWrapper1.Bytes},
 		blsPriKey1.Sign(message),
@@ -99,7 +99,7 @@ func TestSubmitVote(test *testing.T) {
 		test.Log(err)
 	}
 
-	if _, err := decider.submitVote(
+	if _, err := decider.SubmitVote(
 		Prepare,
 		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes},
 		blsPriKey2.Sign(message),
@@ -110,7 +110,7 @@ func TestSubmitVote(test *testing.T) {
 		test.Log(err)
 	}
 	if decider.SignersCount(Prepare) != 2 {
-		test.Fatal("submitVote failed")
+		test.Fatal("SubmitVote failed")
 	}
 
 	aggSig := &bls_core.Sign{}
@@ -145,7 +145,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 
 	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
 
-	decider.submitVote(
+	decider.SubmitVote(
 		Prepare,
 		[]bls.SerializedPublicKey{pubKeyWrapper1.Bytes},
 		blsPriKey1.SignHash(blockHash[:]),
@@ -160,7 +160,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 			aggSig.Add(s)
 		}
 	}
-	if _, err := decider.submitVote(
+	if _, err := decider.SubmitVote(
 		Prepare,
 		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes, pubKeyWrapper3.Bytes},
 		aggSig,
@@ -172,7 +172,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 	}
 
 	if decider.SignersCount(Prepare) != 3 {
-		test.Fatal("submitVote failed")
+		test.Fatal("SubmitVote failed")
 	}
 
 	aggSig.Add(blsPriKey1.SignHash(blockHash[:]))
@@ -180,7 +180,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 		test.Fatal("AggregateVotes failed")
 	}
 
-	if _, err := decider.submitVote(
+	if _, err := decider.SubmitVote(
 		Prepare,
 		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes},
 		aggSig,

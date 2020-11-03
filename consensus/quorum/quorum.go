@@ -81,8 +81,7 @@ type ParticipantTracker interface {
 // SignatoryTracker ..
 type SignatoryTracker interface {
 	ParticipantTracker
-	// This func shouldn't be called directly from outside of quorum. Use AddNewVote instead.
-	submitVote(
+	SubmitVote(
 		p Phase, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
@@ -119,7 +118,6 @@ type Decider interface {
 	DependencyInjectionWriter
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
-	// Add new vote will add the signature in the memory and increase the cumulative voting power
 	AddNewVote(
 		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
 		sig *bls_core.Sign, headerHash common.Hash,
@@ -275,7 +273,7 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 	}
 }
 
-func (s *cIdentities) submitVote(
+func (s *cIdentities) SubmitVote(
 	p Phase, pubkeys []bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
