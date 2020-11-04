@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -12,8 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -50,7 +47,7 @@ func (s *PublicContractService) Call(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Execute call
-	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, vm.Config{}, CallTimeout, s.hmy.RPCGasCap)
+	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, CallTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +99,7 @@ func (s *PublicContractService) GetStorageAt(
 // DoEVMCall executes an EVM call
 func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
-	vmCfg vm.Config, timeout time.Duration, globalGasCap *big.Int,
+	timeout time.Duration,
 ) (core.ExecutionResult, error) {
 	defer func(start time.Time) {
 		utils.Logger().Debug().
@@ -116,44 +113,8 @@ func DoEVMCall(
 		return core.ExecutionResult{}, err
 	}
 
-	// Set sender address or use a default if none specified
-	var addr common.Address
-	if args.From == nil {
-		// Any address does not affect the logic of this call.
-		addr = common.HexToAddress(defaultFromAddress)
-	} else {
-		addr = *args.From
-	}
-
-	// Set default gas & gas price if none were set
-	gas := uint64(math.MaxUint64 / 2)
-	if args.Gas != nil {
-		gas = uint64(*args.Gas)
-	}
-	if globalGasCap != nil && globalGasCap.Uint64() < gas {
-		utils.Logger().Warn().
-			Uint64("requested", gas).
-			Uint64("cap", globalGasCap.Uint64()).
-			Msg("Caller gas above allowance, capping")
-		gas = globalGasCap.Uint64()
-	}
-	gasPrice := new(big.Int).SetUint64(defaultGasPrice)
-	if args.GasPrice != nil {
-		gasPrice = args.GasPrice.ToInt()
-	}
-
-	// Set value & data
-	value := new(big.Int)
-	if args.Value != nil {
-		value = args.Value.ToInt()
-	}
-	var data []byte
-	if args.Data != nil {
-		data = *args.Data
-	}
-
 	// Create new call message
-	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, false)
+	msg := args.ToMessage(hmy.RPCGasCap)
 
 	// Setup context so it may be cancelled the call has completed
 	// or, in case of unmetered gas, setup a context with a timeout.

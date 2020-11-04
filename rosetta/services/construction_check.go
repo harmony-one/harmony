@@ -12,7 +12,6 @@ import (
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
@@ -252,7 +251,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 			callArgs.To = &contractAddress
 		}
 		evmExe, err := rpc.DoEVMCall(
-			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, vm.Config{}, rpc.CallTimeout, s.hmy.RPCGasCap,
+			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, rpc.CallTimeout,
 		)
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
