@@ -60,10 +60,12 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						}
 						select {
 						case commitSigs := <-commitSigsChan:
+							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
 							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
 							}
 						case <-time.After(waitTime):
+							utils.Logger().Info().Msg("[ProposeNewBlock] timeout waiting for commit sigs, reading directly from DB")
 							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {

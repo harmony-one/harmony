@@ -229,14 +229,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnCommitted] Received committed message")
 
-	// It's ok to receive committed message for last block due to pipelining.
-	// The committed message for last block could include more signatures now.
-	if recvMsg.BlockNum < consensus.blockNum-1 {
-		consensus.getLogger().Debug().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("Wrong BlockNum Received, ignoring!")
+	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
+
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()

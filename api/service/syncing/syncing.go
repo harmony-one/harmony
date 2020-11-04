@@ -33,6 +33,7 @@ const (
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
 	inSyncThreshold                 = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	syncStatusCheckCount            = 3    // check this many times before confirming it's out of sync
 	SyncLoopBatchSize        uint32 = 1000 // maximum size for one query of block hashes
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
 	SyncLoopFrequency               = 1    // unit in second
@@ -920,6 +921,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	// remove SyncLoopFrequency
 	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
 	defer ticker.Stop()
+	outOfSyncCount := 1
 	for range ticker.C {
 		otherHeight := ss.getMaxPeerHeight(isBeacon)
 		currentHeight := bc.CurrentBlock().NumberU64()
@@ -928,6 +930,10 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
+		}
+		if outOfSyncCount < syncStatusCheckCount {
+			outOfSyncCount++
+			continue
 		}
 		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",

@@ -289,10 +289,12 @@ func (consensus *Consensus) Start(
 				}
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
+				consensus.mutex.Lock()
 				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 				consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 				mode := consensus.UpdateConsensusInformation()
 				consensus.current.SetMode(mode)
+				consensus.mutex.Unlock()
 				consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 
 			case <-consensus.syncNotReadyChan:
