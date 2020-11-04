@@ -511,6 +511,12 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.FBFTMsg
 	consensus.FBFTLog.AddMessage(FBFTMsg)
 
+	blk.SetCurrentCommitSig(FBFTMsg.Payload)
+	if err := consensus.OnConsensusDone(blk); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+		return err
+	}
+
 	if err := consensus.msgSender.SendWithRetry(
 		blk.NumberU64(),
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{

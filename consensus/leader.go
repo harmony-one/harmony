@@ -300,7 +300,6 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 
-
 		// If it's not the epoch block, do pipelining and send committed message to validators now at 67% committed.
 		if !blockObj.IsLastBlockInEpoch() {
 			go func() {
