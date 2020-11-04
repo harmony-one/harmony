@@ -300,10 +300,14 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 
-		go func() {
-			// TODO: make it synchronized with commitFinishChan
-			consensus.preCommitAndPropose(blockObj)
-		}()
+
+		// If it's not the epoch block, do pipelining and send committed message to validators now at 67% committed.
+		if !blockObj.IsLastBlockInEpoch() {
+			go func() {
+				// TODO: make it synchronized with commitFinishChan
+				consensus.preCommitAndPropose(blockObj)
+			}()
+		}
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {
