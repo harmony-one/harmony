@@ -44,7 +44,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-readySignal:
-				for node.Consensus != nil && node.Consensus.IsLeader() {
+				if node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
@@ -88,7 +88,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
-						break
 					} else {
 						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 					}

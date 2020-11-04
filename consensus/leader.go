@@ -80,7 +80,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		}, p2p.ConstructMessage(msgToSend), true); err != nil {
+		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
 				nodeconfig.ShardID(consensus.ShardID),
@@ -300,13 +300,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 
-		// If it's not the epoch block, do pipelining and send committed message to validators now at 67% committed.
-		if !blockObj.IsLastBlockInEpoch() {
-			go func() {
-				// TODO: make it synchronized with commitFinishChan
-				consensus.preCommitAndPropose(blockObj)
-			}()
-		}
+		go func() {
+			// TODO: make it synchronized with commitFinishChan
+			consensus.preCommitAndPropose(blockObj)
+		}()
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {

@@ -284,20 +284,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 
-	// If we already have a committed signature received before, check whether the new one
-	// has more signatures and if yes, override the old data.
-	// Otherwise, simply write the commit signature in db.
-	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
-	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) {
-		new := mask.CountEnabled()
-		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
-		cur := mask.CountEnabled()
-		if new > cur {
-			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
-			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
-		}
-	}
-
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")

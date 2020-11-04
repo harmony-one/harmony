@@ -92,9 +92,9 @@ type Consensus struct {
 	ReadySignal chan ProposalType
 	// Channel to send full commit signatures to finish new block proposal
 	CommitSigChannel chan []byte
-	// The post-consensus processing func passed from Node object
+	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block) error
+	PostConsensusJob func(*types.Block) error
 	// The verifier func passed from Node object
 	BlockVerifier BlockVerifierFunc
 	// verified block to state sync broadcast
