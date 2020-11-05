@@ -390,10 +390,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
+					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
 					return nil
 				}
 				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
+					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
 					return nil
 				}
 				computed := availability.ComputeCurrentSigning(
