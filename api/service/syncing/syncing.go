@@ -62,6 +62,11 @@ func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
 	return peerConfig.client
 }
 
+// IsEqual checks the equality between two sync peers
+func (peerConfig *SyncPeerConfig) IsEqual(pc2 *SyncPeerConfig) bool {
+	return peerConfig.ip == pc2.ip && peerConfig.port == pc2.port
+}
+
 // SyncBlockTask is the task struct to sync a specific block.
 type SyncBlockTask struct {
 	index     int
@@ -110,6 +115,13 @@ type SyncConfig struct {
 func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
+
+	// Ensure no duplicate peers
+	for _, p2 := range sc.peers {
+		if peer.IsEqual(p2) {
+			return
+		}
+	}
 	sc.peers = append(sc.peers, peer)
 }
 
@@ -123,6 +135,22 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 			break
 		}
 	}
+}
+
+// RemovePeer removes a peer from SyncConfig
+func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
+	sc.mtx.Lock()
+	defer sc.mtx.Unlock()
+
+	peer.client.Close()
+	for i, p := range sc.peers {
+		if p == peer {
+			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
+			break
+		}
+	}
+	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+		Msg("[SYNC] remove GRPC peer")
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
@@ -263,6 +291,10 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+	// sanity check to ensure no duplicate peers
+	if err := checkPeersDuplicity(peers); err != nil {
+		return err
+	}
 	// limit the number of dns peers to connect
 	randSeed := time.Now().UnixNano()
 	peers = limitNumPeers(peers, randSeed)
@@ -303,6 +335,23 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Bool("isBeacon", isBeacon).
 		Msg("[SYNC] Finished making connection to peers")
 
+	return nil
+}
+
+// checkPeersDuplicity checks whether there are duplicates in p2p.Peer
+func checkPeersDuplicity(ps []p2p.Peer) error {
+	type peerDupID struct {
+		ip   string
+		port string
+	}
+	m := make(map[peerDupID]struct{})
+	for _, p := range ps {
+		dip := peerDupID{p.IP, p.Port}
+		if _, ok := m[dip]; ok {
+			return fmt.Errorf("duplicate peer [%v:%v]", p.IP, p.Port)
+		}
+		m[dip] = struct{}{}
+	}
 	return nil
 }
 
@@ -427,6 +476,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) {
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
 					Msg("[SYNC] getConsensusHashes Nil Response")
+				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			if len(response.Payload) > int(size+1) {
@@ -484,9 +534,18 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					break
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
+				if err != nil {
+					utils.Logger().Warn().Err(err).
+						Str("peerID", peerConfig.ip).
+						Str("port", peerConfig.port).
+						Msg("[SYNC] downloadBlocks: GetBlocks failed")
+					ss.syncConfig.RemovePeer(peerConfig)
+					return
+				}
 				if err != nil || len(payload) == 0 {
 					count++
-					utils.Logger().Error().Err(err).Int("failNumber", count).Msg("[SYNC] downloadBlocks: GetBlocks failed")
+					utils.Logger().Error().Int("failNumber", count).
+						Msg("[SYNC] downloadBlocks: no more retrievable blocks")
 					if count > downloadBlocksRetryLimit {
 						break
 					}
@@ -871,6 +930,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			ss.syncMux.Lock()
