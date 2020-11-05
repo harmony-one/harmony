@@ -57,7 +57,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					go func() {
 						waitTime := 0 * time.Second
 						if proposalType == consensus.AsyncProposal {
-							waitTime = 4 * time.Second
+							waitTime = consensus.CommitSigReceiverTimeout
 						}
 						select {
 						case <-time.After(waitTime):

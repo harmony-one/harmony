@@ -29,6 +29,15 @@ var (
 	errVerifyMessageSignature = errors.New("verify message signature failed")
 )
 
+// timeout constant
+const (
+	// CommitSigSenderTimeout is the timeout for sending the commit sig to finish block proposal
+	CommitSigSenderTimeout = 6 * time.Second
+	// CommitSigReceiverTimeout is the timeout for the receiving side of the commit sig
+	// if timeout, the receiver should instead ready directly from db for the commit sig
+	CommitSigReceiverTimeout = 4 * time.Second
+)
+
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
 	return consensus.current.Mode() == ViewChanging
@@ -205,7 +214,7 @@ func (consensus *Consensus) finalCommit() {
 			go func() {
 				select {
 				case consensus.CommitSigChannel <- commitSigAndBitmap:
-				case <-time.After(6 * time.Second):
+				case <-time.After(CommitSigSenderTimeout):
 					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
 				}
 			}()

@@ -914,8 +914,8 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) bool {
 			Msg("[SYNC] Checking sync status")
 		return wasOutOfSync
 	}
-	time.Sleep(3 * time.Second)
-	// double check the sync status after 3 second to confirm (avoid false alarm)
+	time.Sleep(1 * time.Second)
+	// double check the sync status after 1 second to confirm (avoid false alarm)
 
 	otherHeight2 := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
@@ -936,11 +936,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
-	// remove SyncLoopFrequency
-	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
-	defer ticker.Stop()
-	outOfSyncCount := 1
-	for range ticker.C {
+	for {
 		otherHeight := ss.getMaxPeerHeight(isBeacon)
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
@@ -948,10 +944,6 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
-		}
-		if outOfSyncCount < syncStatusCheckCount {
-			outOfSyncCount++
-			continue
 		}
 		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",

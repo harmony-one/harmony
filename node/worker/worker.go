@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -504,7 +506,7 @@ func (w *Worker) FinalizeNewBlock(
 				copyHeader.SetLastCommitBitmap(signers)
 			}
 			sigsReady <- true
-		case <-time.After(5 * time.Second):
+		case <-time.After(consensus.CommitSigReceiverTimeoutz):
 			// Exit goroutine
 			utils.Logger().Warn().Msg("Timeout waiting for commit sigs")
 		}
