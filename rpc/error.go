@@ -17,6 +17,6 @@ var (
 	ErrRequestedBlockTooHigh = errors.New("requested block number greater than current block number")
 	// ErrUnknownRPCVersion when rpc method has an unknown or unhandled version
 	ErrUnknownRPCVersion = errors.New("API service has an unknown version")
-	// ErrTransactionNotFound when attempting to get a transaction that does exist or has not been finalized
+	// ErrTransactionNotFound when attempting to get a transaction that does not exist or has not been finalized
 	ErrTransactionNotFound = errors.New("transaction not found")
 )
