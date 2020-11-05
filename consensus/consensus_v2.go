@@ -400,7 +400,7 @@ func (consensus *Consensus) Start(
 // All blocks returned are guaranteed to pass the verification.
 type LastMileBlockIter struct {
 	blockCandidates []*types.Block
-	fbftLog         FBFTLog
+	fbftLog         *FBFTLog
 	verify          func(*types.Block) error
 	curIndex        int
 	logger          *zerolog.Logger
@@ -420,6 +420,7 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64) (*LastMileBlock
 	}
 	return &LastMileBlockIter{
 		blockCandidates: blocks,
+		fbftLog:         consensus.FBFTLog,
 		verify:          consensus.BlockVerifier,
 		curIndex:        0,
 		logger:          consensus.getLogger(),
