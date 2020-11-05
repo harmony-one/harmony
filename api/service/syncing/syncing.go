@@ -32,7 +32,7 @@ const (
 	TimesToFail                     = 5 // downloadBlocks service retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
-	inSyncThreshold                 = 1    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
+	inSyncThreshold                 = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 	SyncLoopBatchSize        uint32 = 1000 // maximum size for one query of block hashes
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
 	SyncLoopFrequency               = 1    // unit in second

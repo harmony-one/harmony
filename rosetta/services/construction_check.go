@@ -12,7 +12,6 @@ import (
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
@@ -240,18 +239,19 @@ func (s *ConstructAPI) ConstructionMetadata(
 
 	evmErrorMsg := ""
 	evmReturn := hexutil.Bytes{}
-	if !isStakingOperation(options.OperationType) &&
-		options.OperationType != common.ContractCreationOperation &&
-		len(data) > 0 {
+	if len(data) > 0 && (options.OperationType == common.ContractCreationOperation ||
+		options.OperationType == common.NativeTransferOperation) {
 		gas := hexutil.Uint64(estGasUsed)
 		callArgs := rpc.CallArgs{
 			From: senderAddr,
-			To:   &contractAddress,
 			Data: &data,
 			Gas:  &gas,
 		}
+		if options.OperationType == common.NativeTransferOperation {
+			callArgs.To = &contractAddress
+		}
 		evmExe, err := rpc.DoEVMCall(
-			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, vm.Config{}, rpc.CallTimeout, s.hmy.RPCGasCap,
+			ctx, s.hmy, callArgs, ethRpc.LatestBlockNumber, rpc.CallTimeout,
 		)
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{

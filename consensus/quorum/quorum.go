@@ -119,7 +119,6 @@ type Decider interface {
 	DependencyInjectionWriter
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
-	// Add new vote will add the signature in the memory and increase the cumulative voting power
 	AddNewVote(
 		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
 		sig *bls_core.Sign, headerHash common.Hash,

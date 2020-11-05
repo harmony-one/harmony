@@ -111,7 +111,7 @@ type NodeAPI interface {
 func New(
 	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, shardID uint32,
 ) *Harmony {
-	chainDb := nodeAPI.Blockchain().ChainDB()
+	chainDb := nodeAPI.Blockchain().ChainDb()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	undelegationPayoutsCache, _ := lru.New(undelegationPayoutsCacheSize)
 	preStakingBlockRewardsCache, _ := lru.New(preStakingBlockRewardsCacheSize)
