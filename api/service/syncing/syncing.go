@@ -29,14 +29,11 @@ import (
 // Constants for syncing.
 const (
 	downloadBlocksRetryLimit        = 5 // downloadBlocks service retry limit
-	TimesToFail                     = 5 // downloadBlocks service retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
 	inSyncThreshold                 = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
-	syncStatusCheckCount            = 3    // check this many times before confirming it's out of sync
 	SyncLoopBatchSize        uint32 = 1000 // maximum size for one query of block hashes
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
-	SyncLoopFrequency               = 1    // unit in second
 	LastMileBlocksSize              = 50
 
 	// after cutting off a number of connected peers, the result number of peers

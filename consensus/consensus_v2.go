@@ -158,6 +158,9 @@ func (consensus *Consensus) finalCommit() {
 	}
 
 	// if leader successfully finalizes the block, send committed message to validators
+	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
+	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
+	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
 	sendImmediately := false
 	if !consensus.IsLeader() || block.IsLastBlockInEpoch() {
 		sendImmediately = true
