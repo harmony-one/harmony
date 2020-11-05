@@ -260,7 +260,7 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 		utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if node.stateSync.IsOutOfSync(bc) {
+	if node.stateSync.IsOutOfSync(bc, true) {
 		node.IsInSync.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
@@ -542,5 +542,5 @@ func (node *Node) GetMaxPeerHeight() uint64 {
 
 // IsOutOfSync ...
 func (node *Node) IsOutOfSync(bc *core.BlockChain) bool {
-	return node.stateSync.IsOutOfSync(bc)
+	return node.stateSync.IsOutOfSync(bc, false)
 }

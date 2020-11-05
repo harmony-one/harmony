@@ -229,7 +229,11 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnCommitted] Received committed message")
 
-	if !consensus.isRightBlockNumCheck(recvMsg) {
+	// Ok to receive committed from last block since it could have more signatures
+	if recvMsg.BlockNum < consensus.blockNum-1 {
+		consensus.getLogger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
 
@@ -244,7 +248,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().Msgf("[OnCommitted] Quorum Not achieved.")
+		consensus.getLogger().Warn().Hex("sigbitmap", recvMsg.Payload).Msgf("[OnCommitted] Quorum Not achieved.")
 		return
 	}
 
@@ -272,13 +276,22 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.FBFTLog.AddMessage(recvMsg)
 
-	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
-		consensus.spinUpStateSync()
-	}
-
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
+
+	// If we already have a committed signature received before, check whether the new one
+	// has more signatures and if yes, override the old data.
+	// Otherwise, simply write the commit signature in db.
+	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
+	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) {
+		new := mask.CountEnabled()
+		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
+		cur := mask.CountEnabled()
+		if new > cur {
+			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
+			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
+		}
+	}
 
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {
