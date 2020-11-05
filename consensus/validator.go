@@ -114,6 +114,10 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
+		consensus.spinUpStateSync()
+	}
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
@@ -149,12 +153,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-
-	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
-		consensus.spinUpStateSync()
-	}
-
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -238,6 +236,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumCheck(recvMsg) {
 		return
 	}
+	if recvMsg.BlockNum > consensus.blockNum {
+		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
+		consensus.spinUpStateSync()
+	}
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
@@ -270,11 +272,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	consensus.FBFTLog.AddMessage(recvMsg)
 
-	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
-		consensus.spinUpStateSync()
-	}
-
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -290,10 +287,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
 		cur := mask.CountEnabled()
 		if new > cur {
+			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
 			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 		}
-	} else {
-		consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 	}
 
 	consensus.tryCatchup()

@@ -400,7 +400,7 @@ func (consensus *Consensus) Start(
 // All blocks returned are guaranteed to pass the verification.
 type LastMileBlockIter struct {
 	blockCandidates []*types.Block
-	fbftLog         FBFTLog
+	fbftLog         *FBFTLog
 	verify          func(*types.Block) error
 	curIndex        int
 	logger          *zerolog.Logger
@@ -420,6 +420,7 @@ func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64) (*LastMileBlock
 	}
 	return &LastMileBlockIter{
 		blockCandidates: blocks,
+		fbftLog:         consensus.FBFTLog,
 		verify:          consensus.BlockVerifier,
 		curIndex:        0,
 		logger:          consensus.getLogger(),
@@ -517,7 +518,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	}
 
 	atomic.AddUint64(&consensus.blockNum, 1)
-	consensus.SetViewIDs(committedMsg.ViewID + 1)
+	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
