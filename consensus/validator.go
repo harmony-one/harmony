@@ -155,16 +155,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	if consensus.BlockVerifier == nil {
-		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
-		return
-	}
-	if err := consensus.BlockVerifier(&blockObj); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-		return
-	}
-	consensus.FBFTLog.MarkBlockVerified(&blockObj)
-
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
 	blockPayload := make([]byte, len(recvMsg.Block))
@@ -177,6 +167,16 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
+
+	if consensus.BlockVerifier == nil {
+		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
+		return
+	}
+	if err := consensus.BlockVerifier(&blockObj); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
+		return
+	}
+	consensus.FBFTLog.MarkBlockVerified(&blockObj)
 
 	if consensus.checkViewID(recvMsg) != nil {
 		if consensus.current.Mode() == Normal {
