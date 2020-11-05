@@ -25,7 +25,7 @@ const (
 	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
 )
 
-var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
+var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
 
 // ProposalType is to indicate the type of signal for new block proposal
 type ProposalType byte

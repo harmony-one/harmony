@@ -95,6 +95,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 
 						// Send the new block to Consensus so it can be confirmed.
 						node.BlockChannel <- newBlock
+						break
 					} else {
 						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
 						retryCount--
