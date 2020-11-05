@@ -191,12 +191,6 @@ func (consensus *Consensus) finalCommit() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 
-	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[finalCommit] Waiting for Block Time")
-	<-time.After(time.Until(consensus.NextBlockDue))
-	// Update time due for next block
-	consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
 	if consensus.IsLeader() {
@@ -323,6 +317,12 @@ func (consensus *Consensus) Start(
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
+
+				// Sleep to wait for the full block time
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+				<-time.After(time.Until(consensus.NextBlockDue))
+				// Update time due for next block
+				consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 
 				//VRF/VDF is only generated in the beacon chain
 				if consensus.NeedsRandomNumberGeneration(newBlock.Header().Epoch()) {

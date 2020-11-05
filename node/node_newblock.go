@@ -44,7 +44,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-readySignal:
-				if node.Consensus != nil && node.Consensus.IsLeader() {
+				retryCount := 3
+				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
@@ -59,19 +60,23 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							waitTime = 4 * time.Second
 						}
 						select {
-						case commitSigs := <-commitSigsChan:
-							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
-							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
-								newCommitSigsChan <- commitSigs
-							}
 						case <-time.After(waitTime):
-							utils.Logger().Info().Msg("[ProposeNewBlock] timeout waiting for commit sigs, reading directly from DB")
+							if waitTime == 0 {
+								utils.Logger().Info().Msg("[ProposeNewBlock] Sync block proposal, reading commit sigs directly from DB")
+							} else {
+								utils.Logger().Info().Msg("[ProposeNewBlock] Timeout waiting for commit sigs, reading directly from DB")
+							}
 							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
 							if err != nil {
 								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
 							} else {
 								newCommitSigsChan <- sigs
+							}
+						case commitSigs := <-commitSigsChan:
+							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
+							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
+								newCommitSigsChan <- commitSigs
 							}
 						}
 					}()
@@ -92,6 +97,12 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						node.BlockChannel <- newBlock
 					} else {
 						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						retryCount--
+						if retryCount == 0 {
+							// break to avoid repeated failures
+							break
+						}
+						continue
 					}
 				}
 			}
