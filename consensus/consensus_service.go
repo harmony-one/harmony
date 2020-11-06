@@ -79,9 +79,9 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
-	utils.Logger().Info().Msg("My Committee updated")
+	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
 			Msg("Member")
@@ -90,10 +90,10 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	allKeys := consensus.Decider.Participants()
 	if len(allKeys) != 0 {
 		consensus.LeaderPubKey = &allKeys[0]
-		utils.Logger().Info().
+		consensus.getLogger().Info().
 			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
 	} else {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
 	}
 	consensus.pubKeyLock.Unlock()
@@ -341,7 +341,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		curEpoch, consensus.Blockchain,
 	)
 	if err != nil {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Err(err).
 			Uint32("shard", consensus.ShardID).
 			Msg("[UpdateConsensusInformation] Error retrieving current shard state")
@@ -357,7 +357,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			nextEpoch, consensus.Blockchain,
 		)
 		if err != nil {
-			utils.Logger().Error().
+			consensus.getLogger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
@@ -366,7 +366,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 		subComm, err := nextShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
-			utils.Logger().Error().
+			consensus.getLogger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving nextEpoch shard state")
@@ -378,7 +378,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	} else {
 		subComm, err := curShardState.FindCommitteeByID(curHeader.ShardID())
 		if err != nil {
-			utils.Logger().Error().
+			consensus.getLogger().Error().
 				Err(err).
 				Uint32("shard", consensus.ShardID).
 				Msg("Error retrieving current shard state")
@@ -407,14 +407,14 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if _, err := consensus.Decider.SetVoters(
 		committeeToSet, epochToSet,
 	); err != nil {
-		utils.Logger().Error().
+		consensus.getLogger().Error().
 			Err(err).
 			Uint32("shard", consensus.ShardID).
 			Msg("Error when updating voters")
 		return Syncing
 	}
 
-	utils.Logger().Info().
+	consensus.getLogger().Info().
 		Uint64("block-number", curHeader.Number().Uint64()).
 		Uint64("curEpoch", curHeader.Epoch().Uint64()).
 		Uint32("shard-id", consensus.ShardID).
