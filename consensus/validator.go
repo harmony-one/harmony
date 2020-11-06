@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/hex"
 	"time"
 
@@ -169,12 +168,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		Hex("blockHash", recvMsg.BlockHash[:]).
 		Msg("[OnPrepared] Prepared message and block added")
 
-	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
-	if consensus.current.Mode() != Normal {
-		// don't sign the block that is not verified
-		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
-		return
-	}
 	if consensus.BlockVerifier == nil {
 		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
 		return
@@ -212,9 +205,13 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	consensus.prepareBitmap = mask
 
 	// Optimistically add blockhash field of prepare message
-	emptyHash := [32]byte{}
-	if bytes.Equal(consensus.blockHash[:], emptyHash[:]) {
-		copy(consensus.blockHash[:], blockHash[:])
+	copy(consensus.blockHash[:], blockHash[:])
+
+	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
+	if consensus.current.Mode() != Normal {
+		// don't sign the block that is not verified
+		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
+		return
 	}
 
 	consensus.sendCommitMessages(&blockObj)
@@ -232,10 +229,14 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnCommitted] Received committed message")
 
-	// NOTE let it handle its own logs
-	if !consensus.isRightBlockNumCheck(recvMsg) {
+	// Ok to receive committed from last block since it could have more signatures
+	if recvMsg.BlockNum < consensus.blockNum-1 {
+		consensus.getLogger().Debug().
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
+
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
@@ -247,9 +248,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().Msgf("[OnCommitted] Quorum Not achieved.")
+		consensus.getLogger().Warn().Hex("sigbitmap", recvMsg.Payload).Msgf("[OnCommitted] Quorum Not achieved.")
 		return
 	}
+
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
@@ -271,9 +275,6 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 	}
 
 	consensus.FBFTLog.AddMessage(recvMsg)
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask

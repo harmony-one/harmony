@@ -396,7 +396,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 			}
 
 			go func() {
-				consensus.ReadySignal <- struct{}{}
+				consensus.ReadySignal <- SyncProposal
 			}()
 			return
 		}

@@ -195,8 +195,8 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	lastCommitPayload := signature.ConstructCommitPayload(chain,
 		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
-		const msg = "[VerifySeal] Unable to verify aggregated signature from last block"
-		return errors.New(msg)
+		const msg = "[VerifySeal] Unable to verify aggregated signature from last block: %x"
+		return errors.Errorf(msg, payload)
 	}
 	return nil
 }

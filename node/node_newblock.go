@@ -6,6 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus"
+
+	"github.com/harmony-one/harmony/crypto/bls"
+
 	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,14 +27,13 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
 
 		utils.Logger().Debug().
 			Msg("Waiting for Consensus ready")
-		// TODO: make local net start faster
 		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
 
 		for {
@@ -40,7 +43,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 				utils.Logger().Debug().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
-			case <-readySignal:
+			case proposalType := <-readySignal:
+				retryCount := 0
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
@@ -48,20 +52,36 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
-					commitSigs := make(chan []byte)
-					sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+					newCommitSigsChan := make(chan []byte)
 
-					node.Consensus.StartFinalityCount()
-					if err != nil {
-						utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
-						break
-					}
-					// Currently the block proposal is not triggered asynchronously yet with last consensus.
-					// TODO: trigger block proposal when 66% commit, and feed and final commit sigs here.
 					go func() {
-						commitSigs <- sigs
+						waitTime := 0 * time.Second
+						if proposalType == consensus.AsyncProposal {
+							waitTime = consensus.CommitSigReceiverTimeout
+						}
+						select {
+						case <-time.After(waitTime):
+							if waitTime == 0 {
+								utils.Logger().Info().Msg("[ProposeNewBlock] Sync block proposal, reading commit sigs directly from DB")
+							} else {
+								utils.Logger().Info().Msg("[ProposeNewBlock] Timeout waiting for commit sigs, reading directly from DB")
+							}
+							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
+
+							if err != nil {
+								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
+							} else {
+								newCommitSigsChan <- sigs
+							}
+						case commitSigs := <-commitSigsChan:
+							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
+							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
+								newCommitSigsChan <- commitSigs
+							}
+						}
 					}()
-					newBlock, err := node.ProposeNewBlock(commitSigs)
+					node.Consensus.StartFinalityCount()
+					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 
 					if err == nil {
 						utils.Logger().Info().
@@ -77,7 +97,14 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan struct{}, stopChan ch
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						retryCount++
+						utils.Logger().Err(err).Int("retryCount", retryCount).
+							Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						if retryCount > 3 {
+							// break to avoid repeated failures
+							break
+						}
+						continue
 					}
 				}
 			}

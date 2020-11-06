@@ -457,7 +457,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
 						Msg("[UpdateConsensusInformation] I am the New Leader")
-					consensus.ReadySignal <- struct{}{}
+					consensus.ReadySignal <- SyncProposal
 				}()
 			}
 			return Normal

@@ -48,7 +48,6 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	msgToSend, FPBTMsg := networkMessage.Bytes, networkMessage.FBFTMsg
 
-	// TODO(chao): review FPBT log data structure
 	consensus.FBFTLog.AddMessage(FPBTMsg)
 	consensus.getLogger().Debug().
 		Str("MsgBlockHash", FPBTMsg.BlockHash.Hex()).
@@ -300,6 +299,14 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 	if !quorumWasMet && quorumIsMet {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
+
+		if !blockObj.IsLastBlockInEpoch() {
+			// only do early commit if it's not epoch block to avoid problems
+			go func() {
+				// TODO: make it synchronized with commitFinishChan
+				consensus.preCommitAndPropose(blockObj)
+			}()
+		}
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {

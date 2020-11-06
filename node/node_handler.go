@@ -353,16 +353,6 @@ func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
 // 2. [leader] send new block to the client
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
-	if _, err := node.Blockchain().InsertChain([]*types.Block{newBlock}, true); err != nil {
-		return err
-	}
-	utils.Logger().Info().
-		Uint64("blockNum", newBlock.NumberU64()).
-		Str("hash", newBlock.Header().Hash().Hex()).
-		Msg("Added New Block to Blockchain!!!")
-
-	node.Consensus.FinishFinalityCount()
-
 	if node.Consensus.IsLeader() {
 		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
 			node.BroadcastNewBlock(newBlock)
@@ -400,11 +390,13 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			for _, addr := range node.GetAddresses(newBlock.Epoch()) {
 				wrapper, err := node.Beaconchain().ReadValidatorInformation(addr)
 				if err != nil {
-					return err
+					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator info")
+					return nil
 				}
 				snapshot, err := node.Beaconchain().ReadValidatorSnapshot(addr)
 				if err != nil {
-					return err
+					utils.Logger().Err(err).Str("addr", addr.Hex()).Msg("failed reaching validator snapshot")
+					return nil
 				}
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,

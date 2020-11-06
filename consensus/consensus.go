@@ -25,7 +25,16 @@ const (
 	vdfAndSeedSize  = 548 // size of VDF/Proof and Seed
 )
 
-var errLeaderPriKeyNotFound = errors.New("getting leader private key from consensus public keys failed")
+var errLeaderPriKeyNotFound = errors.New("leader private key not found locally")
+
+// ProposalType is to indicate the type of signal for new block proposal
+type ProposalType byte
+
+// Constant of the type of new block proposal
+const (
+	SyncProposal ProposalType = iota
+	AsyncProposal
+)
 
 // BlockVerifierFunc is a function used to verify the block
 type BlockVerifierFunc func(*types.Block) error
@@ -79,11 +88,13 @@ type Consensus struct {
 	mutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
-	// Signal channel for starting a new consensus process
-	ReadySignal chan struct{}
-	// The post-consensus processing func passed from Node object
+	// Signal channel for proposing a new block and start new consensus
+	ReadySignal chan ProposalType
+	// Channel to send full commit signatures to finish new block proposal
+	CommitSigChannel chan []byte
+	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
-	OnConsensusDone func(*types.Block) error
+	PostConsensusJob func(*types.Block) error
 	// The verifier func passed from Node object
 	BlockVerifier BlockVerifierFunc
 	// verified block to state sync broadcast
@@ -206,7 +217,8 @@ func New(
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.commitFinishChan = make(chan uint64)
-	consensus.ReadySignal = make(chan struct{})
+	consensus.ReadySignal = make(chan ProposalType)
+	consensus.CommitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)

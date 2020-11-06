@@ -29,13 +29,11 @@ import (
 // Constants for syncing.
 const (
 	downloadBlocksRetryLimit        = 5 // downloadBlocks service retry limit
-	TimesToFail                     = 5 // downloadBlocks service retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
 	inSyncThreshold                 = 0    // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
 	SyncLoopBatchSize        uint32 = 1000 // maximum size for one query of block hashes
 	verifyHeaderBatchSize    uint64 = 100  // block chain header verification batch size
-	SyncLoopFrequency               = 1    // unit in second
 	LastMileBlocksSize              = 50
 
 	// after cutting off a number of connected peers, the result number of peers
@@ -958,18 +956,36 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 }
 
 // IsOutOfSync checks whether the node is out of sync from other peers
-func (ss *StateSync) IsOutOfSync(bc *core.BlockChain) bool {
+func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) bool {
 	if ss.syncConfig == nil {
 		return true // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight := ss.getMaxPeerHeight(false)
+	otherHeight1 := ss.getMaxPeerHeight(false)
+	lastHeight := bc.CurrentBlock().NumberU64()
+	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
+
+	if !doubleCheck {
+		utils.Logger().Info().
+			Uint64("OtherHeight", otherHeight1).
+			Uint64("lastHeight", lastHeight).
+			Msg("[SYNC] Checking sync status")
+		return wasOutOfSync
+	}
+	time.Sleep(1 * time.Second)
+	// double check the sync status after 1 second to confirm (avoid false alarm)
+
+	otherHeight2 := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
-	utils.Logger().Debug().
-		Uint64("OtherHeight", otherHeight).
-		Uint64("MyHeight", currentHeight).
-		Bool("IsOutOfSync", currentHeight+inSyncThreshold < otherHeight).
+
+	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
+	utils.Logger().Info().
+		Uint64("OtherHeight1", otherHeight1).
+		Uint64("OtherHeight2", otherHeight2).
+		Uint64("lastHeight", lastHeight).
+		Uint64("currentHeight", currentHeight).
 		Msg("[SYNC] Checking sync status")
-	return currentHeight+inSyncThreshold < otherHeight
+	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
+	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight
 }
 
 // SyncLoop will keep syncing with peers until catches up
@@ -977,10 +993,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
-	// remove SyncLoopFrequency
-	ticker := time.NewTicker(SyncLoopFrequency * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
+	for {
 		otherHeight := ss.getMaxPeerHeight(isBeacon)
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
@@ -1032,7 +1045,7 @@ func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consen
 			return errors.Wrap(err, "failed to InsertChain")
 		}
 	}
-	consensus.FBFTLog.PruneCacheBeforeBlock(bc.CurrentBlock().NumberU64() + 1)
+	consensus.FBFTLog.PruneCacheBeforeBlock(bc.CurrentBlock().NumberU64())
 	return nil
 }
 
