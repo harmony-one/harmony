@@ -92,6 +92,7 @@ var (
 	// consensusValidFlags are flags that are effective
 	consensusValidFlags = []cli.Flag{
 		consensusMinPeersFlag,
+		consensusAggregateSigFlag,
 		legacyConsensusMinPeersFlag,
 	}
 

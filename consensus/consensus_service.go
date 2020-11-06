@@ -5,8 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -312,13 +310,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	}
 
 	consensus.BlockPeriod = 5 * time.Second
-
-	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
-	if (consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
-		(consensus.Blockchain.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
-		(consensus.Blockchain.Config().ChainID != params.MainnetChainID && consensus.Blockchain.Config().ChainID != params.TestChainID) {
-		consensus.AggregateSig = true
-	}
 
 	isFirstTimeStaking := consensus.Blockchain.Config().IsStaking(nextEpoch) &&
 		curHeader.IsLastBlockInEpoch() && !consensus.Blockchain.Config().IsStaking(curEpoch)
