@@ -60,7 +60,8 @@ type generalConfig struct {
 }
 
 type consensusConfig struct {
-	MinPeers int
+	MinPeers     int
+	AggregateSig bool
 }
 
 type blsConfig struct {

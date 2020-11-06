@@ -746,6 +746,11 @@ var (
 		DefValue: defaultConsensusConfig.MinPeers,
 		Hidden:   true,
 	}
+	consensusAggregateSigFlag = cli.BoolFlag{
+		Name:     "consensus.aggregate-sig",
+		Usage:    "(multi-key) aggregate bls signatures before sending",
+		DefValue: defaultConsensusConfig.AggregateSig,
+	}
 	legacyDelayCommitFlag = cli.StringFlag{
 		Name:       "delay_commit",
 		Usage:      "how long to delay sending commit messages in consensus, ex: 500ms, 1s",
@@ -775,6 +780,10 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Consensus.MinPeers = cli.GetIntFlagValue(cmd, consensusMinPeersFlag)
 	} else if cli.IsFlagChanged(cmd, legacyConsensusMinPeersFlag) {
 		config.Consensus.MinPeers = cli.GetIntFlagValue(cmd, legacyConsensusMinPeersFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, consensusAggregateSigFlag) {
+		config.Consensus.AggregateSig = cli.GetBoolFlagValue(cmd, consensusAggregateSigFlag)
 	}
 }
 
