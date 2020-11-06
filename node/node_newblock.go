@@ -44,7 +44,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-readySignal:
-				retryCount := 3
+				retryCount := 0
 				for node.Consensus != nil && node.Consensus.IsLeader() {
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
@@ -97,9 +97,10 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						node.BlockChannel <- newBlock
 						break
 					} else {
-						utils.Logger().Err(err).Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
-						retryCount--
-						if retryCount == 0 {
+						retryCount++
+						utils.Logger().Err(err).Int("retryCount", retryCount).
+							Msg("!!!!!!!!!Failed Proposing New Block!!!!!!!!!")
+						if retryCount > 3 {
 							// break to avoid repeated failures
 							break
 						}

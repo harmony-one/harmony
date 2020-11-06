@@ -80,7 +80,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	if err := consensus.msgSender.SendWithRetry(
 		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		}, p2p.ConstructMessage(msgToSend), true); err != nil {
+		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
 			Str("groupID", string(nodeconfig.NewGroupIDByShardID(
 				nodeconfig.ShardID(consensus.ShardID),

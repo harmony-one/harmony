@@ -161,23 +161,33 @@ func (consensus *Consensus) finalCommit() {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
-	sendImmediately := false
 	if !consensus.IsLeader() || block.IsLastBlockInEpoch() {
-		sendImmediately = true
-	}
-	if err := consensus.msgSender.SendWithRetry(
-		block.NumberU64(),
-		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
-		p2p.ConstructMessage(msgToSend),
-		sendImmediately); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
+		// send immediately
+		if err := consensus.msgSender.SendWithRetry(
+			block.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend)); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[finalCommit] Cannot send committed message")
+		} else {
+			consensus.getLogger().Info().
+				Hex("blockHash", curBlockHash[:]).
+				Uint64("blockNum", consensus.blockNum).
+				Msg("[finalCommit] Sent Committed Message")
+		}
 	} else {
+		// delayed send
+		consensus.msgSender.DelayedSendWithRetry(
+			block.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
-			Msg("[finalCommit] Sent Committed Message")
+			Msg("[finalCommit] Queued Committed Message")
 	}
 
 	// Dump new block into level db
@@ -550,8 +560,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
-		p2p.ConstructMessage(msgToSend),
-		true); err != nil {
+		p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
 	} else {
 		consensus.getLogger().Info().

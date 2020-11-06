@@ -74,7 +74,6 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		},
 		p2p.ConstructMessage(msgToSend),
-		true,
 	); err != nil {
 		consensus.getLogger().Warn().Msg("[OnPrepare] Cannot send prepared message")
 	} else {
