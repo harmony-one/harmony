@@ -772,7 +772,7 @@ var (
 )
 
 func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if cli.HasFlagsChanged(cmd, consensusValidFlags) {
+	if config.Consensus == nil && cli.HasFlagsChanged(cmd, consensusValidFlags) {
 		cfg := getDefaultConsensusConfigCopy()
 		config.Consensus = &cfg
 	}
