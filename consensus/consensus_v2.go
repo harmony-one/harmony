@@ -176,6 +176,7 @@ func (consensus *Consensus) finalCommit() {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[finalCommit] Sent Committed Message")
 		}
+		consensus.consensusTimeout[timeoutConsensus].Start()
 	} else {
 		// delayed send
 		consensus.msgSender.DelayedSendWithRetry(
@@ -202,7 +203,6 @@ func (consensus *Consensus) finalCommit() {
 	} else {
 		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 	}
-	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	consensus.getLogger().Info().
 		Uint64("blockNum", block.NumberU64()).
@@ -568,6 +568,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[preCommitAndPropose] Sent Committed Message")
 	}
+	consensus.consensusTimeout[timeoutConsensus].Start()
 
 	// Send signal to Node to propose the new block for consensus
 	consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
