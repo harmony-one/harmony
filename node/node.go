@@ -782,7 +782,7 @@ func (node *Node) Start() error {
 							}
 						} else {
 							if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-								errChan <- withError{err, nil}
+								errChan <- withError{err, msg.senderPubKey}
 							}
 						}
 					}
