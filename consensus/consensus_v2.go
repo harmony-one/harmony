@@ -343,6 +343,8 @@ func (consensus *Consensus) Start(
 				// Sleep to wait for the full block time
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
 				<-time.After(time.Until(consensus.NextBlockDue))
+				consensus.StartFinalityCount()
+
 				// Update time due for next block
 				consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
 
