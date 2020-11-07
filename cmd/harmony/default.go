@@ -89,7 +89,8 @@ var defaultLogContext = logContext{
 }
 
 var defaultConsensusConfig = consensusConfig{
-	MinPeers: 6,
+	MinPeers:     6,
+	AggregateSig: true,
 }
 
 const (

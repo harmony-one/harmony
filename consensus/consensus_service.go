@@ -313,10 +313,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// Enable aggregate sig at epoch 1000 for mainnet, at epoch 53000 for testnet, and always for other nets.
-	if (consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) > 0) ||
-		(consensus.Blockchain.Config().ChainID == params.TestnetChainID && curEpoch.Cmp(big.NewInt(54500)) > 0) ||
-		(consensus.Blockchain.Config().ChainID != params.MainnetChainID && consensus.Blockchain.Config().ChainID != params.TestChainID) {
+	// Disable aggregate sig at epoch TBD for mainnet (for other net, it's default to true)
+	if consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) >= 0 {
 		consensus.AggregateSig = true
 	}
 
