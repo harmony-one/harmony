@@ -60,6 +60,8 @@ func (sender *MessageSender) SendWithRetry(blockNum uint64, msgType msg_pb.Messa
 	if sender.retryTimes != 0 {
 		msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0}
 		atomic.StoreUint32(&msgRetry.isActive, 1)
+		// First stop the old one
+		sender.StopRetry(msgType)
 		sender.messagesToRetry.Store(msgType, &msgRetry)
 		go func() {
 			sender.Retry(&msgRetry)
@@ -73,6 +75,8 @@ func (sender *MessageSender) DelayedSendWithRetry(blockNum uint64, msgType msg_p
 	if sender.retryTimes != 0 {
 		msgRetry := MessageRetry{blockNum: blockNum, groups: groups, p2pMsg: p2pMsg, msgType: msgType, retryCount: 0}
 		atomic.StoreUint32(&msgRetry.isActive, 1)
+		// First stop the old one
+		sender.StopRetry(msgType)
 		sender.messagesToRetry.Store(msgType, &msgRetry)
 		go func() {
 			sender.Retry(&msgRetry)
