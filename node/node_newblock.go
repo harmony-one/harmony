@@ -80,7 +80,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							}
 						}
 					}()
-					node.Consensus.StartFinalityCount()
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 
 					if err == nil {
