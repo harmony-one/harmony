@@ -302,10 +302,10 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-			go func() {
-				// TODO: make it synchronized with commitFinishChan
-				consensus.preCommitAndPropose(blockObj)
-			}()
+
+			// TODO: make it synchronized with commitFinishChan
+			consensus.preCommitAndPropose(blockObj)
+
 		}
 
 		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")

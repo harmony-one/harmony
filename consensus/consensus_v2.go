@@ -535,47 +535,48 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	}
 
 	// Construct committed message
-	consensus.mutex.Lock()
 	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
-	consensus.mutex.Unlock()
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[preCommitAndPropose] Unable to construct Committed message")
 		return err
 	}
-	msgToSend, FBFTMsg :=
-		network.Bytes,
-		network.FBFTMsg
-	bareMinimumCommit := FBFTMsg.Payload
-	consensus.FBFTLog.AddMessage(FBFTMsg)
 
-	blk.SetCurrentCommitSig(bareMinimumCommit)
+	go func() {
+		msgToSend, FBFTMsg :=
+			network.Bytes,
+			network.FBFTMsg
+		bareMinimumCommit := FBFTMsg.Payload
+		consensus.FBFTLog.AddMessage(FBFTMsg)
 
-	if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
-		return err
-	}
+		blk.SetCurrentCommitSig(bareMinimumCommit)
 
-	// if leader successfully finalizes the block, send committed message to validators
-	if err := consensus.msgSender.SendWithRetry(
-		blk.NumberU64(),
-		msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
-			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
-		},
-		p2p.ConstructMessage(msgToSend)); err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
-	} else {
-		consensus.getLogger().Info().
-			Str("blockHash", blk.Hash().Hex()).
-			Uint64("blockNum", consensus.blockNum).
-			Msg("[preCommitAndPropose] Sent Committed Message")
-	}
-	consensus.consensusTimeout[timeoutConsensus].Start()
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+		}
 
-	// Send signal to Node to propose the new block for consensus
-	consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
+		// if leader successfully finalizes the block, send committed message to validators
+		if err := consensus.msgSender.SendWithRetry(
+			blk.NumberU64(),
+			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
+				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
+			},
+			p2p.ConstructMessage(msgToSend)); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] Cannot send committed message")
+		} else {
+			consensus.getLogger().Info().
+				Str("blockHash", blk.Hash().Hex()).
+				Uint64("blockNum", consensus.blockNum).
+				Msg("[preCommitAndPropose] Sent Committed Message")
+		}
+		consensus.consensusTimeout[timeoutConsensus].Start()
 
-	consensus.ReadySignal <- AsyncProposal
+		// Send signal to Node to propose the new block for consensus
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] sending block proposal signal")
+
+		consensus.ReadySignal <- AsyncProposal
+	}()
+
 	return nil
 }
 
