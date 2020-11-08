@@ -1834,7 +1834,7 @@ func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 
 // ReadCommitSig retrieves the commit signature on a block.
 func (bc *BlockChain) ReadCommitSig(blockNum uint64) ([]byte, error) {
-	if cached, ok := bc.lastCommitsCache.Get("commitSig" + string(blockNum)); ok {
+	if cached, ok := bc.lastCommitsCache.Get(blockNum); ok {
 		lastCommits := cached.([]byte)
 		return lastCommits, nil
 	}
@@ -1851,7 +1851,7 @@ func (bc *BlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error 
 	if err != nil {
 		return err
 	}
-	bc.lastCommitsCache.Add("commitSig"+string(blockNum), lastCommits)
+	bc.lastCommitsCache.Add(blockNum, lastCommits)
 	return nil
 }
 
