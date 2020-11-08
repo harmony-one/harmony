@@ -326,12 +326,17 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
-	consensus.getLogger().Info().Msg("[onViewChange] Received ViewChange Message")
 	recvMsg, err := ParseViewChangeMessage(msg)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onViewChange] Unable To Parse Viewchange Message")
 		return
 	}
+	consensus.getLogger().Info().
+		Uint64("viewID", recvMsg.ViewID).
+		Uint64("blockNum", recvMsg.BlockNum).
+		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
+		Msg("[onViewChange] Received ViewChange Message")
+
 	// if not leader, noop
 	newLeaderKey := recvMsg.LeaderPubkey
 	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey.Object)
@@ -421,13 +426,17 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 // Or the validator will enter announce phase to wait for the new block proposed
 // from the new leader
 func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
-	consensus.getLogger().Info().Msg("[onNewView] Received NewView Message")
 	members := consensus.Decider.Participants()
 	recvMsg, err := ParseNewViewMessage(msg, members)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Unable to Parse NewView Message")
 		return
 	}
+	consensus.getLogger().Info().
+		Uint64("viewID", recvMsg.ViewID).
+		Uint64("blockNum", recvMsg.BlockNum).
+		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
+		Msg("[onNewView] Received NewView Message")
 
 	// change view and leaderKey to keep in sync with network
 	if consensus.blockNum != recvMsg.BlockNum {
