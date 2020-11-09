@@ -146,6 +146,9 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 // IsQuorumAchivedByMask ..
 func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	threshold := v.QuorumThreshold()
+	if mask == nil {
+		return false
+	}
 	currentTotalPower := v.computeTotalPowerByMask(mask)
 	if currentTotalPower == nil {
 		return false
