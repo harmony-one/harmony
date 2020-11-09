@@ -133,7 +133,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		return consensus.fallbackNextViewID()
 	}
 	// diff only increases
-	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
+	diff := uint64((curTimestamp - blockTimestamp) / viewChangeSlot)
 	nextViewID := diff + lastBlockViewID
 
 	consensus.getLogger().Info().
@@ -169,6 +169,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
 		} else {
+			lastBlockViewID := curHeader.ViewID().Uint64()
+			gap = int(viewID - lastBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
 			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
 			if err != nil || lastLeaderPubKey == nil {
@@ -351,7 +353,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).

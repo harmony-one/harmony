@@ -202,6 +202,10 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDBytes) {
+		vc.getLogger().Warn().
+			Bytes("viewIDBytes", viewIDBytes).
+			Interface("AggregatePublic", m3Mask.AggregatePublic).
+			Msg("m3Sig.VerifyHash Failed")
 		return nil, errors.New("[VerifyNewViewMsg] Unable to Verify Aggregated Signature of M3 (ViewID) payload")
 	}
 
@@ -209,6 +213,10 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 	if recvMsg.M2AggSig != nil {
 		m2Sig := recvMsg.M2AggSig
 		if !m2Sig.VerifyHash(m2Mask.AggregatePublic, NIL) {
+			vc.getLogger().Warn().
+				Bytes("NIL", NIL).
+				Interface("AggregatePublic", m2Mask.AggregatePublic).
+				Msg("m2Sig.VerifyHash Failed")
 			return nil, errors.New("[VerifyNewViewMsg] Unable to Verify Aggregated Signature of M2 (NIL) payload")
 		}
 	}
