@@ -432,19 +432,6 @@ func (consensus *Consensus) Start(
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 				consensus.announce(newBlock)
-
-			case viewID := <-consensus.commitFinishChan:
-				consensus.getLogger().Info().Uint64("viewID", viewID).Msg("[ConsensusMainLoop] commitFinishChan")
-
-				// Only Leader execute this condition
-				func() {
-					consensus.mutex.Lock()
-					defer consensus.mutex.Unlock()
-					if viewID == consensus.GetCurBlockViewID() {
-						consensus.finalCommit()
-					}
-				}()
-
 			case <-stopChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] stopChan")
 				return
