@@ -169,6 +169,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
 		} else {
+			lastBlockViewID := curHeader.ViewID().Uint64()
+			gap = int(viewID - lastBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
 			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
 			if err != nil || lastLeaderPubKey == nil {
