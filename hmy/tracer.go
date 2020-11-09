@@ -19,6 +19,7 @@ package hmy
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -35,6 +36,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -614,13 +616,33 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		tracer vm.Tracer
 		err    error
 	)
+	switch {
+	case config != nil && config.Tracer != nil:
+		// Define a meaningful timeout of a single transaction trace
+		timeout := defaultTraceTimeout
+		if config.Timeout != nil {
+			if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
+				return nil, err
+			}
+		}
+		// Constuct the JavaScript tracer to execute with
+		if tracer, err = tracers.New(*config.Tracer); err != nil {
+			return nil, err
+		}
+		// Handle timeouts and RPC cancellations
+		deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
+		go func() {
+			<-deadlineCtx.Done()
+			tracer.(*tracers.Tracer).Stop(errors.New("execution timeout"))
+		}()
+		defer cancel()
 
-	if config == nil {
+	case config == nil:
 		tracer = vm.NewStructLogger(nil)
-	} else {
+
+	default:
 		tracer = vm.NewStructLogger(config.LogConfig)
 	}
-
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{Debug: true, Tracer: tracer})
 
@@ -637,6 +659,9 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 			ReturnValue: fmt.Sprintf("%x", result.ReturnData),
 			StructLogs:  FormatLogs(tracer.StructLogs()),
 		}, nil
+
+	case *tracers.Tracer:
+		return tracer.GetResult()
 
 	default:
 		panic(fmt.Sprintf("bad tracer type %T", tracer))
