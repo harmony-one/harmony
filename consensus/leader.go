@@ -308,6 +308,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			time.Sleep(1000 * time.Millisecond)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
+			consensus.mutex.Lock()
+			defer consensus.mutex.Unlock()
 			if viewID == consensus.GetCurBlockViewID() {
 				consensus.finalCommit()
 			}
