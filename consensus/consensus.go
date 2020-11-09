@@ -50,8 +50,6 @@ type Consensus struct {
 	current State
 	// How long to delay sending commit messages.
 	delayCommit time.Duration
-	// Consensus rounds whose commit phase finished
-	commitFinishChan chan uint64
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
@@ -216,7 +214,6 @@ func New(
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
