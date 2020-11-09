@@ -285,11 +285,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	viewID := consensus.GetCurBlockViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
-		go func(viewID uint64) {
-			logger.Info().Msg("[OnCommit] 100% Enough commits received")
-
-			consensus.finalCommit()
-		}(viewID)
+		logger.Info().Msg("[OnCommit] 100% Enough commits received")
+		consensus.finalCommit()
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 		return
@@ -311,7 +308,9 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			time.Sleep(1000 * time.Millisecond)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
-			consensus.finalCommit()
+			if viewID == consensus.GetCurBlockViewID() {
+				consensus.finalCommit()
+			}
 		}(viewID)
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
