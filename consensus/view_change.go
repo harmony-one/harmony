@@ -125,6 +125,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		return consensus.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
+	lastBlockViewID := curHeader.ViewID().Uint64()
 	curTimestamp := time.Now().Unix()
 
 	// timestamp messed up in current validator node
@@ -133,13 +134,13 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	}
 	// diff only increases
 	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
-	nextViewID := diff + consensus.GetCurBlockViewID()
+	nextViewID := diff + lastBlockViewID
 
 	consensus.getLogger().Info().
 		Int64("curTimestamp", curTimestamp).
 		Int64("blockTimestamp", blockTimestamp).
 		Uint64("nextViewID", nextViewID).
-		Uint64("curViewID", consensus.GetCurBlockViewID()).
+		Uint64("lastBlockViewID", lastBlockViewID).
 		Msg("[getNextViewID]")
 
 	// duration is always the fixed view change duration for synchronous view change
