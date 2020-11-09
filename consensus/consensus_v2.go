@@ -325,6 +325,7 @@ func (consensus *Consensus) Start(
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
 					consensus.current.SetMode(mode)
+					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 				}
 				consensus.mutex.Unlock()
