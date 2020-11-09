@@ -133,7 +133,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		return consensus.fallbackNextViewID()
 	}
 	// diff only increases
-	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
+	diff := uint64((curTimestamp - blockTimestamp) / viewChangeSlot)
 	nextViewID := diff + lastBlockViewID
 
 	consensus.getLogger().Info().

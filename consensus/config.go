@@ -6,6 +6,10 @@ import "time"
 const (
 	// default timeout configuration is shorten to 45 seconds as the consensus is 5s
 	viewChangeTimeout = 45
+	// viewChangeSlot means every 90 seconds, the view change ID will be advanced.
+	// so that the nodes init view change process within the 90 seconds range will
+	// be have the same view change ID
+	viewChangeSlot = 90
 	// The duration of viewChangeTimeout for each view change
 	viewChangeDuration time.Duration = viewChangeTimeout * time.Second
 
