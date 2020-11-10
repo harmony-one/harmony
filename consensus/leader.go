@@ -305,7 +305,7 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		go func(viewID uint64) {
 			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue)
+			maxWaitTime := time.Until(consensus.NextBlockDue) - 100*time.Millisecond
 			if maxWaitTime > waitTime {
 				waitTime = maxWaitTime
 			}
