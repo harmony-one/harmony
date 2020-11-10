@@ -427,11 +427,10 @@ func (w *Worker) verifySlashes(
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
-	commitSigs chan []byte, viewID uint64, coinbase common.Address,
+	commitSigs chan []byte, viewID func() uint64, coinbase common.Address,
 	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
 	w.current.header.SetCoinbase(coinbase)
-	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
 	// Put crosslinks into header
 	if len(crossLinks) > 0 {
@@ -515,7 +514,7 @@ func (w *Worker) FinalizeNewBlock(
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
-		w.current.slashes, sigsReady,
+		w.current.slashes, sigsReady, viewID,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot finalize block")

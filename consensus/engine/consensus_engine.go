@@ -117,6 +117,6 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-		doubleSigners slash.Records, sigsReady chan bool,
+		doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
 	) (*types.Block, reward.Reader, error)
 }
