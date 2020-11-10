@@ -176,7 +176,7 @@ func (consensus *Consensus) finalCommit() {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[finalCommit] Sent Committed Message")
 		}
-		consensus.getLogger().Debug().Msg("[finalCommit] Start consensus timer")
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 	} else {
 		// delayed send
@@ -323,7 +323,7 @@ func (consensus *Consensus) Start(
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
 					consensus.current.SetMode(mode)
-					consensus.getLogger().Debug().Msg("[syncReadyChan] Start consensus timer")
+					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 				}
@@ -556,7 +556,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
-		consensus.getLogger().Debug().Msg("[preCommitAndPropose] Start consensus timer")
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
 		// Send signal to Node to propose the new block for consensus
