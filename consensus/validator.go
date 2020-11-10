@@ -293,6 +293,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		}
 	}
 
+	initBn := consensus.blockNum
 	consensus.tryCatchup()
 	if recvMsg.BlockNum > consensus.blockNum {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
@@ -306,11 +307,13 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer; stop bootstrap timer only once")
-	} else {
-		consensus.getLogger().Debug().Msg("[OnCommitted] Start consensus timer")
+		consensus.getLogger().Debug().Msg("[OnCommitted] stop bootstrap timer only once")
 	}
-	consensus.consensusTimeout[timeoutConsensus].Start()
+
+	if initBn < consensus.blockNum {
+		consensus.getLogger().Info().Msg("[OnCommitted] Start consensus timer (new block added)")
+		consensus.consensusTimeout[timeoutConsensus].Start()
+	}
 }
 
 // Collect private keys that are part of the current committee.

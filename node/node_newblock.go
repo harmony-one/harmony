@@ -80,7 +80,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							}
 						}
 					}()
-					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
+					newBlock, err := node.ProposeNewBlock(newCommitSigsChan, proposalType)
 
 					if err == nil {
 						utils.Logger().Info().
@@ -112,7 +112,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 }
 
 // ProposeNewBlock proposes a new block...
-func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
+func (node *Node) ProposeNewBlock(commitSigs chan []byte, proposalType consensus.ProposalType) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)
@@ -261,8 +261,13 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		return nil, err
 	}
 
+	viewID := node.Consensus.GetCurBlockViewID()
+	if proposalType == consensus.AsyncProposal {
+		// If it's async proposal, the CurBlockViewID wasn't incremented yet. So need to add 1
+		viewID += 1
+	}
 	finalizedBlock, err := node.Worker.FinalizeNewBlock(
-		commitSigs, node.Consensus.GetCurBlockViewID(),
+		commitSigs, viewID,
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {

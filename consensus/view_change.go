@@ -125,7 +125,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		return consensus.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
-	lastBlockViewID := curHeader.ViewID().Uint64()
+	stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 	curTimestamp := time.Now().Unix()
 
 	// timestamp messed up in current validator node
@@ -135,13 +135,13 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 	// diff only increases, since view change timeout is shorter than
 	// view change slot now, we want to make sure diff is always greater than 0
 	diff := uint64((curTimestamp-blockTimestamp)/viewChangeSlot + 1)
-	nextViewID := diff + lastBlockViewID
+	nextViewID := diff + stuckBlockViewID
 
 	consensus.getLogger().Info().
 		Int64("curTimestamp", curTimestamp).
 		Int64("blockTimestamp", blockTimestamp).
 		Uint64("nextViewID", nextViewID).
-		Uint64("lastBlockViewID", lastBlockViewID).
+		Uint64("stuckBlockViewID", stuckBlockViewID).
 		Msg("[getNextViewID]")
 
 	// duration is always the fixed view change duration for synchronous view change
@@ -170,8 +170,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
 		} else {
-			lastBlockViewID := curHeader.ViewID().Uint64()
-			gap = int(viewID - lastBlockViewID)
+			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
+			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
 			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
 			if err != nil || lastLeaderPubKey == nil {
