@@ -176,6 +176,7 @@ func (consensus *Consensus) finalCommit() {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[finalCommit] Sent Committed Message")
 		}
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 	} else {
 		// delayed send
@@ -199,9 +200,7 @@ func (consensus *Consensus) finalCommit() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer; stop bootstrap timer only once")
-	} else {
-		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
+		consensus.getLogger().Info().Msg("[finalCommit] stop bootstrap timer only once")
 	}
 
 	consensus.getLogger().Info().
@@ -281,7 +280,7 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
-		ticker := time.NewTicker(3 * time.Second)
+		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
@@ -295,7 +294,6 @@ func (consensus *Consensus) Start(
 			case <-toStart:
 				start = true
 			case <-ticker.C:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
 				if !start && isInitialLeader {
 					continue
 				}
@@ -325,6 +323,7 @@ func (consensus *Consensus) Start(
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
 					consensus.current.SetMode(mode)
+					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 				}
@@ -557,6 +556,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
 		// Send signal to Node to propose the new block for consensus

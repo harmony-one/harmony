@@ -49,6 +49,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+						Bool("asyncProposal", proposalType == consensus.AsyncProposal).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
@@ -123,15 +124,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
+	leaderKey := node.Consensus.LeaderPubKey
 	var (
-		coinbase    = node.GetAddressForBLSKey(node.Consensus.LeaderPubKey.Object, header.Epoch())
+		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
 		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
-		blsPubKeyBytes := node.Consensus.LeaderPubKey.Object.GetAddress()
+		blsPubKeyBytes := leaderKey.Object.GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 
@@ -261,8 +263,11 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		return nil, err
 	}
 
+	viewIDFunc := func() uint64 {
+		return node.Consensus.GetCurBlockViewID()
+	}
 	finalizedBlock, err := node.Worker.FinalizeNewBlock(
-		commitSigs, node.Consensus.GetCurBlockViewID(),
+		commitSigs, viewIDFunc,
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {

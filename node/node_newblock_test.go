@@ -52,7 +52,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	}()
 
 	block, _ := node.Worker.FinalizeNewBlock(
-		commitSigs, 0, common.Address{}, nil, nil,
+		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
 	if err := node.VerifyNewBlock(block); err != nil {
@@ -64,7 +64,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	node.Worker.UpdateCurrent()
 
 	_, err = node.Worker.FinalizeNewBlock(
-		commitSigs, 0, common.Address{}, nil, nil,
+		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
 	if !strings.Contains(err.Error(), "cannot finalize block") {

@@ -204,9 +204,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("Start consensus timer")
+			Msg("[checkViewID] Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
