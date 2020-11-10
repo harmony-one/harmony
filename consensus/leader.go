@@ -303,9 +303,15 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {
-			time.Sleep(1000 * time.Millisecond)
+			waitTime := 1000 * time.Millisecond
+			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+			if maxWaitTime > waitTime {
+				waitTime = maxWaitTime
+			}
+			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
+				Msg("[OnCommit] Starting Grace Period")
+			time.Sleep(waitTime)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
 			consensus.mutex.Lock()
