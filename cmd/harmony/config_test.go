@@ -55,6 +55,8 @@ func TestV1_0_0Config(t *testing.T) {
   Enabled = true
   IP = "127.0.0.1"
   Port = 9500
+  PrometheusEnabled = true
+  PrometheusPort = 9900
 
 [Log]
   FileName = "harmony.log"

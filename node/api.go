@@ -2,6 +2,7 @@ package node
 
 import (
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta"
@@ -79,6 +80,17 @@ func (node *Node) StartRPC() error {
 // StopRPC stop RPC service
 func (node *Node) StopRPC() error {
 	return hmy_rpc.StopServers()
+}
+
+// StartPrometheus start promtheus metrics service
+func (node *Node) StartPrometheus() error {
+	prometheus.NewService(node.NodeConfig.PrometheusServer)
+	return nil
+}
+
+// StopPrometheus stop prometheus metrics service
+func (node *Node) StopPrometheus() error {
+	return prometheus.StopService()
 }
 
 // StartRosetta start rosetta service
