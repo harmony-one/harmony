@@ -513,6 +513,7 @@ func (consensus *Consensus) StartFinalityCount() {
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
 	consensus.finality = (d - consensus.finalityCounter) / 1000000
+	ConsensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
 // GetFinality returns the finality time in milliseconds of previous consensus

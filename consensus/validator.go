@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
@@ -29,6 +30,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
 		return
 	}
+	consensus.StartFinalityCount()
 
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -55,7 +57,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 		return
 	}
-	consensus.StartFinalityCount()
 	consensus.prepare()
 }
 
@@ -292,6 +293,12 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			consensus.Blockchain.WriteCommitSig(blockObj.NumberU64(), recvMsg.Payload)
 		}
 	}
+
+	ConsensusCounterVec.With(prometheus.Labels{"consensus": "bingo"}).Inc()
+	numSig := float64(consensus.NumSignaturesIncludedInBlock(blockObj))
+
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
+	ConsensusCounterVec.With(prometheus.Labels{"consensus": "signatures"}).Add(numSig)
 
 	initBn := consensus.blockNum
 	consensus.tryCatchup()
