@@ -69,6 +69,7 @@ var defaultConfig = harmonyConfig{
 		Enabled: true,
 		IP:      "0.0.0.0",
 		Port:    nodeconfig.DefaultPrometheusPort,
+		Gateway: "https://gateway.harmony.one",
 	},
 }
 
@@ -102,6 +103,7 @@ var defaultPrometheusConfig = prometheusConfig{
 	Enabled: true,
 	IP:      "0.0.0.0",
 	Port:    9900,
+	Gateway: "https://gateway.harmony.one",
 }
 
 const (

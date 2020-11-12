@@ -988,6 +988,7 @@ func New(
 	}
 
 	// init metrics
+	initMetrics()
 	NodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
 	return &node

@@ -395,7 +395,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	if err := currentNode.StartPrometheus(); err != nil {
+	if err := currentNode.StartPrometheus(nodeconfig.GetDefaultConfig().ConsensusPriKey.GetPublicKeys().SerializeToHexStr()); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Prometheus failed")

@@ -146,6 +146,7 @@ type prometheusConfig struct {
 	Enabled bool
 	IP      string
 	Port    int
+	Gateway string
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.

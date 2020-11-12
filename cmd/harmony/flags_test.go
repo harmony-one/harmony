@@ -109,6 +109,7 @@ func TestHarmonyFlags(t *testing.T) {
 					Enabled: true,
 					IP:      "0.0.0.0",
 					Port:    9900,
+					Gateway: "https://gateway.harmony.one",
 				},
 			},
 		},

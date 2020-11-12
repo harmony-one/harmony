@@ -1204,6 +1204,11 @@ var (
 		Usage:    "prometheus port to listen for HTTP requests",
 		DefValue: defaultConfig.Prometheus.Port,
 	}
+	prometheusGatewayFlag = cli.StringFlag{
+		Name:     "prometheus.pushgateway",
+		Usage:    "prometheus pushgateway URL",
+		DefValue: defaultConfig.Prometheus.Gateway,
+	}
 )
 
 func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
@@ -1224,4 +1229,7 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Prometheus.Enabled = cli.GetBoolFlagValue(cmd, prometheusEnabledFlag)
 	}
 
+	if cli.IsFlagChanged(cmd, prometheusGatewayFlag) {
+		config.Prometheus.Gateway = cli.GetStringFlagValue(cmd, prometheusGatewayFlag)
+	}
 }

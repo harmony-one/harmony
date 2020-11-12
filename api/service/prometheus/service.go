@@ -34,7 +34,7 @@ var (
 
 // NewService sets up a new instance for a given address host:port.
 // An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
-func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...Handler) {
+func NewService(config nodeconfig.PrometheusServerConfig, pubkey string, additionalHandlers ...Handler) {
 	if !config.HTTPEnabled {
 		utils.Logger().Info().Msg("Prometheus http server disabled...")
 		return
@@ -55,6 +55,20 @@ func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
 
+	// start pusher to push metrics to prometheus pushgateway
+	// every minute
+	go func(pubkey string) {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := utils.PromPusher(pubkey).Add(); err != nil {
+					utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
+				}
+			}
+		}
+	}(pubkey)
 	svc.Start()
 }
 
