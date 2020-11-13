@@ -11,7 +11,6 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -19,57 +18,52 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// SpecialTransactionSuffix enum for all special transactions
-type SpecialTransactionSuffix uint
-
-// Special transaction suffixes that are specific to the rosetta package
-const (
-	SpecialGenesisTxID SpecialTransactionSuffix = iota
-	SpecialPreStakingRewardTxID
-	SpecialUndelegationPayoutTxID
-)
-
-// Length for special case transaction identifiers
-const (
-	blockHashStrLen  = 64
-	bech32AddrStrLen = 42
-)
-
-// String ..
-func (s SpecialTransactionSuffix) String() string {
-	return [...]string{"genesis", "reward", "undelegation"}[s]
+// containsSpecialTransaction checks if the block contains any side effect operations to report.
+func (s *BlockAPI) containsSpecialTransaction(
+	ctx context.Context, blk *hmytypes.Block,
+) bool {
+	if blk == nil {
+		return false
+	}
+	return !s.hmy.IsStakingEpoch(blk.Epoch()) || s.hmy.IsCommitteeSelectionBlock(blk.Header())
 }
 
-// getSpecialCaseTransactionIdentifier fetches 'transaction identifiers' for a given block-hash and suffix.
-// Special cases include genesis transactions, pre-staking era block rewards, and undelegation payouts.
+const (
+	// SideEffectTransactionSuffix is use in the transaction identifier for each block that contains
+	// side-effect operations.
+	SideEffectTransactionSuffix = "side_effect"
+	blockHashStrLen             = 64
+)
+
+// getSideEffectTransactionIdentifier fetches 'transaction identifier' for side effect operations
+// for a  given block.
+// Side effects are genesis funds, pre-staking era block rewards, and undelegation payouts.
 // Must include block hash to guarantee uniqueness of tx identifiers.
-func getSpecialCaseTransactionIdentifier(
-	blockHash ethcommon.Hash, address ethcommon.Address, suffix SpecialTransactionSuffix,
+func getSideEffectTransactionIdentifier(
+	blockHash ethcommon.Hash,
 ) *types.TransactionIdentifier {
 	return &types.TransactionIdentifier{
-		Hash: fmt.Sprintf("%v_%v_%v",
-			blockHash.String(), internalCommon.MustAddressToBech32(address), suffix.String(),
+		Hash: fmt.Sprintf("%v_%v",
+			blockHash.String(), SideEffectTransactionSuffix,
 		),
 	}
 }
 
-// unpackSpecialCaseTransactionIdentifier returns the suffix & blockHash if the txID is formatted correctly.
-func unpackSpecialCaseTransactionIdentifier(
-	txID *types.TransactionIdentifier, expectedSuffix SpecialTransactionSuffix,
-) (ethcommon.Hash, ethcommon.Address, *types.Error) {
+// unpackSideEffectTransactionIdentifier returns the blockHash if the txID is formatted correctly.
+func unpackSideEffectTransactionIdentifier(
+	txID *types.TransactionIdentifier,
+) (ethcommon.Hash, *types.Error) {
 	hash := txID.Hash
 	hash = strings.TrimPrefix(hash, "0x")
 	hash = strings.TrimPrefix(hash, "0X")
-	minCharCount := blockHashStrLen + bech32AddrStrLen + 2
-	if len(hash) < minCharCount || string(hash[blockHashStrLen]) != "_" ||
-		string(hash[minCharCount-1]) != "_" || expectedSuffix.String() != hash[minCharCount:] {
-		return ethcommon.Hash{}, ethcommon.Address{}, common.NewError(common.CatchAllError, map[string]interface{}{
+	if len(hash) < blockHashStrLen || string(hash[blockHashStrLen]) != "_" ||
+		hash[blockHashStrLen+1:] != SideEffectTransactionSuffix {
+		return ethcommon.Hash{}, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "unknown special case transaction ID format",
 		})
 	}
 	blkHash := ethcommon.HexToHash(hash[:blockHashStrLen])
-	addr := internalCommon.MustBech32ToAddress(hash[blockHashStrLen+1 : minCharCount-1])
-	return blkHash, addr, nil
+	return blkHash, nil
 }
 
 // genesisBlock is a special handler for the genesis block.
@@ -99,15 +93,9 @@ func (s *BlockAPI) genesisBlock(
 		Metadata:              metadata,
 	}
 
-	otherTransactions := []*types.TransactionIdentifier{}
 	// Report initial genesis funds as transactions to fit API.
-	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(blk.ShardID())) {
-		if tx.To() == nil {
-			return nil, common.NewError(common.CatchAllError, nil)
-		}
-		otherTransactions = append(
-			otherTransactions, getSpecialCaseTransactionIdentifier(blk.Hash(), *tx.To(), SpecialGenesisTxID),
-		)
+	otherTransactions := []*types.TransactionIdentifier{
+		getSideEffectTransactionIdentifier(blk.Hash()),
 	}
 
 	return &types.BlockResponse{
@@ -116,20 +104,8 @@ func (s *BlockAPI) genesisBlock(
 	}, nil
 }
 
-// getPseudoTransactionForGenesis to create unsigned transaction that contain genesis funds.
-// Note that this is for internal usage only. Genesis funds are not transactions.
-func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction {
-	txs := []*hmytypes.Transaction{}
-	for acc, bal := range spec.Alloc {
-		txs = append(txs, hmytypes.NewTransaction(
-			0, acc, spec.ShardID, bal.Balance, 0, big.NewInt(0), spec.ExtraData,
-		))
-	}
-	return txs
-}
-
-// specialGenesisBlockTransaction is a special handler for genesis block transactions
-func (s *BlockAPI) specialGenesisBlockTransaction(
+// genesisBlockTransaction is a special handler for genesis block transactions
+func (s *BlockAPI) genesisBlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
 ) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
 	genesisBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(0).EthBlockNumber())
@@ -138,8 +114,8 @@ func (s *BlockAPI) specialGenesisBlockTransaction(
 			"message": err.Error(),
 		})
 	}
-	blkHash, address, rosettaError := unpackSpecialCaseTransactionIdentifier(
-		request.TransactionIdentifier, SpecialGenesisTxID,
+	blkHash, rosettaError := unpackSideEffectTransactionIdentifier(
+		request.TransactionIdentifier,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -147,11 +123,19 @@ func (s *BlockAPI) specialGenesisBlockTransaction(
 	if blkHash.String() != genesisBlock.Hash().String() {
 		return nil, &common.TransactionNotFoundError
 	}
-	txs, rosettaError := FormatGenesisTransaction(request.TransactionIdentifier, address, s.hmy.ShardID)
+
+	// The only side effect for the genesis block are the initial funds derived from the genesis spec.
+	genesisSideEffectOperations, rosettaError := GetSideEffectOperationsFromGenesisSpec(
+		getGenesisSpec(s.hmy.ShardID), nil,
+	)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	return &types.BlockTransactionResponse{Transaction: txs}, nil
+
+	return &types.BlockTransactionResponse{Transaction: &types.Transaction{
+		TransactionIdentifier: request.TransactionIdentifier,
+		Operations:            genesisSideEffectOperations,
+	}}, nil
 }
 
 // getPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
@@ -169,7 +153,7 @@ func (s *BlockAPI) getPreStakingRewardTransactionIdentifiers(
 	}
 	txIDs := []*types.TransactionIdentifier{}
 	for addr := range rewards {
-		txIDs = append(txIDs, getSpecialCaseTransactionIdentifier(
+		txIDs = append(txIDs, getSideEffectTransactionIdentifier(
 			currBlock.Hash(), addr, SpecialPreStakingRewardTxID,
 		))
 	}
@@ -209,7 +193,7 @@ func (s *BlockAPI) preStakingRewardBlockTransaction(
 			"message": "block does not contain any pre-staking era block rewards",
 		})
 	}
-	blkHash, address, rosettaError := unpackSpecialCaseTransactionIdentifier(txID, SpecialPreStakingRewardTxID)
+	blkHash, address, rosettaError := unpackSideEffectTransactionIdentifier(txID, SpecialPreStakingRewardTxID)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -237,7 +221,7 @@ func (s *BlockAPI) preStakingRewardBlockTransaction(
 func (s *BlockAPI) undelegationPayoutBlockTransaction(
 	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
 ) (*types.BlockTransactionResponse, *types.Error) {
-	blkHash, address, rosettaError := unpackSpecialCaseTransactionIdentifier(txID, SpecialUndelegationPayoutTxID)
+	blkHash, address, rosettaError := unpackSideEffectTransactionIdentifier(txID, SpecialUndelegationPayoutTxID)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -285,7 +269,7 @@ func (s *BlockAPI) getAllUndelegationPayoutTransactions(
 			return nil, rosettaError
 		}
 		transactions = append(transactions, &types.Transaction{
-			TransactionIdentifier: getSpecialCaseTransactionIdentifier(
+			TransactionIdentifier: getSideEffectTransactionIdentifier(
 				blk.Hash(), delegator, SpecialUndelegationPayoutTxID,
 			),
 			Operations: []*types.Operation{

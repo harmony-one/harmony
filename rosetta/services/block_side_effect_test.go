@@ -10,7 +10,6 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/harmony-one/harmony/core"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
@@ -41,33 +40,22 @@ func TestGetPseudoTransactionForGenesis(t *testing.T) {
 
 func TestSpecialCaseTransactionIdentifier(t *testing.T) {
 	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
-	testB32Address := "one10g7kfque6ew2jjfxxa6agkdwk4wlyjuncp6gwz"
-	testAddress := internalCommon.MustBech32ToAddress(testB32Address)
 	refTxID := &types.TransactionIdentifier{
-		Hash: fmt.Sprintf("%v_%v_%v", testBlkHash.String(), testB32Address, SpecialGenesisTxID.String()),
+		Hash: fmt.Sprintf("%v_%v", testBlkHash.String(), SideEffectTransactionSuffix),
 	}
-	specialTxID := getSpecialCaseTransactionIdentifier(
-		testBlkHash, testAddress, SpecialGenesisTxID,
-	)
+	specialTxID := getSideEffectTransactionIdentifier(testBlkHash)
 	if !reflect.DeepEqual(refTxID, specialTxID) {
 		t.Fatal("invalid for mate for special case TxID")
 	}
-	unpackedBlkHash, unpackedAddress, rosettaError := unpackSpecialCaseTransactionIdentifier(
-		specialTxID, SpecialGenesisTxID,
-	)
+	unpackedBlkHash, rosettaError := unpackSideEffectTransactionIdentifier(specialTxID)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
-	}
-	if unpackedAddress != testAddress {
-		t.Errorf("expected unpacked address to be %v not %v", testAddress.String(), unpackedAddress.String())
 	}
 	if unpackedBlkHash.String() != testBlkHash.String() {
 		t.Errorf("expected blk hash to be %v not %v", unpackedBlkHash.String(), testBlkHash.String())
 	}
 
-	_, _, rosettaError = unpackSpecialCaseTransactionIdentifier(
-		&types.TransactionIdentifier{Hash: ""}, SpecialGenesisTxID,
-	)
+	_, rosettaError = unpackSideEffectTransactionIdentifier(&types.TransactionIdentifier{Hash: ""})
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
 	}

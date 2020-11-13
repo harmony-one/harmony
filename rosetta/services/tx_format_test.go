@@ -173,7 +173,7 @@ func TestFormatGenesisTransaction(t *testing.T) {
 	genesisSpec := getGenesisSpec(0)
 	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
 	for acc := range genesisSpec.Alloc {
-		txID := getSpecialCaseTransactionIdentifier(testBlkHash, acc, SpecialGenesisTxID)
+		txID := getSideEffectTransactionIdentifier(testBlkHash, acc, SpecialGenesisTxID)
 		tx, rosettaError := FormatGenesisTransaction(txID, acc, 0)
 		if rosettaError != nil {
 			t.Fatal(rosettaError)
@@ -209,7 +209,7 @@ func TestFormatPreStakingRewardTransactionSuccess(t *testing.T) {
 	testRewards := hmy.PreStakingBlockRewards{
 		testAddr: big.NewInt(1),
 	}
-	refTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
+	refTxID := getSideEffectTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
 	tx, rosettaError := FormatPreStakingRewardTransaction(refTxID, testRewards, testAddr)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
@@ -245,7 +245,7 @@ func TestFormatPreStakingRewardTransactionFail(t *testing.T) {
 	testRewards := hmy.PreStakingBlockRewards{
 		FormatDefaultSenderAddress: big.NewInt(1),
 	}
-	testTxID := getSpecialCaseTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
+	testTxID := getSideEffectTransactionIdentifier(testBlkHash, testAddr, SpecialPreStakingRewardTxID)
 	_, rosettaError := FormatPreStakingRewardTransaction(testTxID, testRewards, testAddr)
 	if rosettaError == nil {
 		t.Fatal("expected rosetta error")
@@ -266,7 +266,7 @@ func TestFormatUndelegationPayoutTransaction(t *testing.T) {
 		testAddr: testPayout,
 	}
 	testBlockHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
-	testTxID := getSpecialCaseTransactionIdentifier(testBlockHash, testAddr, SpecialUndelegationPayoutTxID)
+	testTxID := getSideEffectTransactionIdentifier(testBlockHash, testAddr, SpecialUndelegationPayoutTxID)
 
 	tx, rosettaError := FormatUndelegationPayoutTransaction(testTxID, testDelegatorPayouts, testAddr)
 	if rosettaError != nil {

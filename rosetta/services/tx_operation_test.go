@@ -59,7 +59,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -74,7 +74,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -123,7 +123,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -138,7 +138,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -187,7 +187,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -202,7 +202,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -251,7 +251,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 			},
 		},
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -266,7 +266,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -308,7 +308,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -323,7 +323,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -587,7 +587,7 @@ func TestNewNativeOperations(t *testing.T) {
 		Currency: &common.NativeCurrency,
 	}
 
-	ops := newNativeOperations(gasFee, accountID)
+	ops := newNativeOperationsWithGas(gasFee, accountID)
 	if len(ops) != 1 {
 		t.Fatalf("Expected new operations to be of length 1")
 	}

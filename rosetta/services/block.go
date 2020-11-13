@@ -135,7 +135,7 @@ func (s *BlockAPI) BlockTransaction(
 
 	// Format genesis block transaction request
 	if request.BlockIdentifier.Index == 0 {
-		return s.specialGenesisBlockTransaction(ctx, request)
+		return s.genesisBlockTransaction(ctx, request)
 	}
 
 	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)

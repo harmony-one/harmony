@@ -2,6 +2,8 @@ package services
 
 import (
 	"fmt"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy"
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -32,7 +34,7 @@ func GetNativeOperationsFromTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperations(gasExpended, accountID)
+	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
 
 	// Handle different cases of plain transactions
 	var txOperations []*types.Operation
@@ -56,9 +58,9 @@ func GetNativeOperationsFromTransaction(
 	return append(gasOperations, txOperations...), nil
 }
 
-// GetOperationsFromStakingTransaction for all staking directives
+// GetNativeOperationsFromStakingTransaction for all staking directives
 // Note that only native operations can come from staking transactions.
-func GetOperationsFromStakingTransaction(
+func GetNativeOperationsFromStakingTransaction(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
@@ -72,7 +74,7 @@ func GetOperationsFromStakingTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperations(gasExpended, accountID)
+	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
 	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
@@ -123,6 +125,111 @@ func GetOperationsFromStakingTransaction(
 		Amount:   amount,
 		Metadata: metadata,
 	}), nil
+}
+
+// GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromUndelegationPayouts(
+	payouts hmy.UndelegationPayouts, startingOperationIndex *types.OperationIdentifier,
+) ([]*types.Operation, *types.Error) {
+	var opIndex *types.OperationIdentifier
+	operations := []*types.Operation{}
+	if startingOperationIndex != nil {
+		opIndex = startingOperationIndex
+	} else {
+		opIndex = &types.OperationIdentifier{
+			Index: 0,
+		}
+	}
+	for address, payout := range payouts {
+		accID, rosettaError := newAccountIdentifier(address)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: opIndex,
+			Type:                common.UndelegationPayoutOperation,
+			Status:              common.SuccessOperationStatus.Status,
+			Account:             accID,
+			Amount: &types.Amount{
+				Value:    payout.String(),
+				Currency: &common.NativeCurrency,
+			},
+		})
+		opIndex.Index++
+	}
+	return operations, nil
+}
+
+// GetSideEffectOperationsFromPreStakingRewards from the given rewards.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromPreStakingRewards(
+	rewards hmy.PreStakingBlockRewards, startingOperationIndex *types.OperationIdentifier,
+) ([]*types.Operation, *types.Error) {
+	var opIndex *types.OperationIdentifier
+	operations := []*types.Operation{}
+	if startingOperationIndex != nil {
+		opIndex = startingOperationIndex
+	} else {
+		opIndex = &types.OperationIdentifier{
+			Index: 0,
+		}
+	}
+	for address, value := range rewards {
+		accID, rosettaError := newAccountIdentifier(address)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: opIndex,
+			Type:                common.PreStakingBlockRewardOperation,
+			Status:              common.SuccessOperationStatus.Status,
+			Account:             accID,
+			Amount: &types.Amount{
+				Value:    value.String(),
+				Currency: &common.NativeCurrency,
+			},
+		})
+		opIndex.Index++
+	}
+	return operations, nil
+}
+
+// GetSideEffectOperationsFromGenesisSpec for the given spec.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromGenesisSpec(
+	spec *core.Genesis, startingOperationIndex *types.OperationIdentifier,
+) ([]*types.Operation, *types.Error) {
+	var opIndex *types.OperationIdentifier
+	operations := []*types.Operation{}
+	if startingOperationIndex != nil {
+		opIndex = startingOperationIndex
+	} else {
+		opIndex = &types.OperationIdentifier{
+			Index: 0,
+		}
+	}
+	for _, tx := range getPseudoTransactionForGenesis(spec) {
+		if tx.To() == nil {
+			return nil, common.NewError(common.CatchAllError, nil)
+		}
+		accID, rosettaError := newAccountIdentifier(*tx.To())
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: opIndex,
+			Type:                common.GenesisFundsOperation,
+			Status:              common.SuccessOperationStatus.Status,
+			Account:             accID,
+			Amount: &types.Amount{
+				Value:    tx.Value().String(),
+				Currency: &common.NativeCurrency,
+			},
+		})
+		opIndex.Index++
+	}
+	return operations, nil
 }
 
 func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Error) {
@@ -192,6 +299,18 @@ func getAmountFromCollectRewards(
 		})
 	}
 	return amount, nil
+}
+
+// getPseudoTransactionForGenesis to create unsigned transaction that contain genesis funds.
+// Note that this is for internal usage only. Genesis funds are not transactions.
+func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction {
+	txs := []*hmytypes.Transaction{}
+	for acc, bal := range spec.Alloc {
+		txs = append(txs, hmytypes.NewTransaction(
+			0, acc, spec.ShardID, bal.Balance, 0, big.NewInt(0), spec.ExtraData,
+		))
+	}
+	return txs
 }
 
 // newTransferNativeOperations extracts & formats the native operation(s) for plain transaction,
@@ -382,9 +501,9 @@ func newContractCreationNativeOperations(
 	}, nil
 }
 
-// newNativeOperations creates a new operation with the gas fee as the first operation.
+// newNativeOperationsWithGas creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
-func newNativeOperations(
+func newNativeOperationsWithGas(
 	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{
