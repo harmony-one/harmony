@@ -32,10 +32,10 @@ var (
 // timeout constant
 const (
 	// CommitSigSenderTimeout is the timeout for sending the commit sig to finish block proposal
-	CommitSigSenderTimeout = 6 * time.Second
+	CommitSigSenderTimeout = 10 * time.Second
 	// CommitSigReceiverTimeout is the timeout for the receiving side of the commit sig
 	// if timeout, the receiver should instead ready directly from db for the commit sig
-	CommitSigReceiverTimeout = 4 * time.Second
+	CommitSigReceiverTimeout = 8 * time.Second
 )
 
 // IsViewChangingMode return true if curernt mode is viewchanging
