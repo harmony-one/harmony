@@ -14,7 +14,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
 )
 
 // Service provides Prometheus metrics via the /metrics route. This route will
@@ -37,9 +36,8 @@ var (
 // NewService sets up a new instance for a given address host:port.
 // An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
 func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...Handler) {
-
 	if !config.HTTPEnabled {
-		getLogger().Info().Msg("Prometheus http server disabled...")
+		utils.Logger().Info().Msg("Prometheus http server disabled...")
 		return
 	}
 
@@ -52,7 +50,7 @@ func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...
 		mux.HandleFunc(h.Path, h.Handler)
 	}
 
-	getLogger().Info().Int("port", config.HTTPPort).
+	utils.Logger().Info().Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
@@ -69,32 +67,21 @@ func StopService() error {
 func (s *Service) goroutinezHandler(w http.ResponseWriter, _ *http.Request) {
 	stack := debug.Stack()
 	if _, err := w.Write(stack); err != nil {
-		getLogger().Error().Err(err).Msg("Failed to write goroutines stack")
+		utils.Logger().Error().Err(err).Msg("Failed to write goroutines stack")
 	}
 	if err := pprof.Lookup("goroutine").WriteTo(w, 2); err != nil {
-		getLogger().Error().Err(err).Msg("Failed to write pprof goroutines")
+		utils.Logger().Error().Err(err).Msg("Failed to write pprof goroutines")
 	}
 }
 
 // Start the prometheus service.
 func (s *Service) Start() {
 	go func() {
-		// See if the port is already used.
-		conn, err := net.DialTimeout("tcp", s.server.Addr, time.Second)
-		if err == nil {
-			if err := conn.Close(); err != nil {
-				getLogger().Error().Err(err).Msg("Failed to close connection")
-			}
-			// Something on the port; we cannot use it.
-			getLogger().Warn().Str("address", s.server.Addr).Msg("Port already in use; cannot start prometheus service")
-		} else {
-			// Nothing on that port; we can use it.
-			getLogger().Debug().Str("address", s.server.Addr).Msg("Starting prometheus service")
-			err := s.server.ListenAndServe()
-			if err != nil && err != http.ErrServerClosed {
-				getLogger().Error().Msgf("Could not listen to host:port :%s: %v", s.server.Addr, err)
-				s.failStatus = err
-			}
+		utils.Logger().Info().Str("address", s.server.Addr).Msg("Starting prometheus service")
+		err := s.server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			utils.Logger().Error().Msgf("Could not listen to host:port :%s: %v", s.server.Addr, err)
+			s.failStatus = err
 		}
 	}()
 }
@@ -112,11 +99,4 @@ func (s *Service) Status() error {
 		return s.failStatus
 	}
 	return nil
-}
-
-func getLogger() *zerolog.Logger {
-	logger := utils.Logger().With().
-		Str("context", "prometheus").
-		Logger()
-	return &logger
 }
