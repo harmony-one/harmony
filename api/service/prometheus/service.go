@@ -5,7 +5,6 @@ package prometheus
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime/debug"
 	"runtime/pprof"
