@@ -112,6 +112,7 @@ type httpConfig struct {
 	RosettaEnabled    bool
 	RosettaPort       int
 	PrometheusEnabled bool
+	PrometheusIP      string
 	PrometheusPort    int
 }
 

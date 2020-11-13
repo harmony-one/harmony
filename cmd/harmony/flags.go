@@ -52,6 +52,7 @@ var (
 		httpPortFlag,
 		httpRosettaPortFlag,
 		httpPrometheusEnabledFlag,
+		httpPrometheusIPFlag,
 		httpPrometheusPortFlag,
 	}
 
@@ -452,6 +453,11 @@ var (
 		Usage:    "enable HTTP / Prometheus requests",
 		DefValue: defaultConfig.HTTP.PrometheusEnabled,
 	}
+	httpPrometheusIPFlag = cli.StringFlag{
+		Name:     "http.prometheus.ip",
+		Usage:    "ip address to listen for prometheus service",
+		DefValue: defaultConfig.HTTP.PrometheusIP,
+	}
 	httpPrometheusPortFlag = cli.IntFlag{
 		Name:     "http.prometheus.port",
 		Usage:    "prometheus port to listen for HTTP requests",
@@ -475,6 +481,11 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, httpRosettaPortFlag) {
 		config.HTTP.RosettaPort = cli.GetIntFlagValue(cmd, httpRosettaPortFlag)
 		isRosettaSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpPrometheusIPFlag) {
+		config.HTTP.PrometheusIP = cli.GetStringFlagValue(cmd, httpPrometheusIPFlag)
+		isPrometheusSpecified = true
 	}
 
 	if cli.IsFlagChanged(cmd, httpPrometheusPortFlag) {

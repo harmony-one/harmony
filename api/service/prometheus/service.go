@@ -49,7 +49,7 @@ func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...
 		mux.HandleFunc(h.Path, h.Handler)
 	}
 
-	utils.Logger().Info().Int("port", config.HTTPPort).
+	utils.Logger().Debug().Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)

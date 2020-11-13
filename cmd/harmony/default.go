@@ -31,6 +31,7 @@ var defaultConfig = harmonyConfig{
 		Port:              nodeconfig.DefaultRPCPort,
 		RosettaPort:       nodeconfig.DefaultRosettaPort,
 		PrometheusEnabled: true,
+		PrometheusIP:      "0.0.0.0",
 		PrometheusPort:    nodeconfig.DefaultPrometheusPort,
 	},
 	WS: wsConfig{

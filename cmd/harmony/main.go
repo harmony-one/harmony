@@ -332,7 +332,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	// Pares Prometheus config
 	nodeConfig.PrometheusServer = nodeconfig.PrometheusServerConfig{
 		HTTPEnabled: hc.HTTP.PrometheusEnabled,
-		HTTPIp:      hc.HTTP.IP,
+		HTTPIp:      hc.HTTP.PrometheusIP,
 		HTTPPort:    hc.HTTP.PrometheusPort,
 	}
 
