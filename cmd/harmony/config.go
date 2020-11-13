@@ -106,11 +106,14 @@ type sysConfig struct {
 }
 
 type httpConfig struct {
-	Enabled        bool
-	IP             string
-	Port           int
-	RosettaEnabled bool
-	RosettaPort    int
+	Enabled           bool
+	IP                string
+	Port              int
+	RosettaEnabled    bool
+	RosettaPort       int
+	PrometheusEnabled bool
+	PrometheusIP      string
+	PrometheusPort    int
 }
 
 type wsConfig struct {

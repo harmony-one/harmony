@@ -329,6 +329,13 @@ func setupNodeAndRun(hc harmonyConfig) {
 		HTTPPort:    hc.HTTP.RosettaPort,
 	}
 
+	// Pares Prometheus config
+	nodeConfig.PrometheusServer = nodeconfig.PrometheusServerConfig{
+		HTTPEnabled: hc.HTTP.PrometheusEnabled,
+		HTTPIp:      hc.HTTP.PrometheusIP,
+		HTTPPort:    hc.HTTP.PrometheusPort,
+	}
+
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
@@ -385,6 +392,12 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Rosetta failed")
+	}
+
+	if err := currentNode.StartPrometheus(); err != nil {
+		utils.Logger().Warn().
+			Err(err).
+			Msg("Start Prometheus failed")
 	}
 
 	if err := currentNode.BootstrapConsensus(); err != nil {

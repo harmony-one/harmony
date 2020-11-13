@@ -30,7 +30,7 @@ func init() {
 }
 
 func TestV1_0_0Config(t *testing.T) {
-	testConfig := `Version = "1.0.0"
+	testConfig := `Version = "1.0.3"
 
 [BLSKeys]
   KMSConfigFile = ""
@@ -55,6 +55,9 @@ func TestV1_0_0Config(t *testing.T) {
   Enabled = true
   IP = "127.0.0.1"
   Port = 9500
+  PrometheusEnabled = true
+  PrometheusIP = "0.0.0.0"
+  PrometheusPort = 9900
 
 [Log]
   FileName = "harmony.log"
@@ -105,8 +108,8 @@ func TestV1_0_0Config(t *testing.T) {
 	if config.P2P.IP != defaultConfig.P2P.IP {
 		t.Errorf("Expect default p2p IP if old config is provided")
 	}
-	if config.Version != "1.0.0" {
-		t.Errorf("Expected config version: 1.0.0, not %v", config.Version)
+	if config.Version != "1.0.3" {
+		t.Errorf("Expected config version: 1.0.3, not %v", config.Version)
 	}
 	config.Version = defaultConfig.Version // Shortcut for testing, value checked above
 	if !reflect.DeepEqual(config, defaultConfig) {
