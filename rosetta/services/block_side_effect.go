@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -18,14 +17,14 @@ import (
 	"github.com/harmony-one/harmony/shard"
 )
 
-// containsSpecialTransaction checks if the block contains any side effect operations to report.
-func (s *BlockAPI) containsSpecialTransaction(
+// containsSideEffectTransaction checks if the block contains any side effect operations to report.
+func (s *BlockAPI) containsSideEffectTransaction(
 	ctx context.Context, blk *hmytypes.Block,
 ) bool {
 	if blk == nil {
 		return false
 	}
-	return !s.hmy.IsStakingEpoch(blk.Epoch()) || s.hmy.IsCommitteeSelectionBlock(blk.Header())
+	return s.hmy.IsCommitteeSelectionBlock(blk.Header()) || !s.hmy.IsStakingEpoch(blk.Epoch()) || blk.NumberU64() == 0
 }
 
 const (
@@ -138,26 +137,69 @@ func (s *BlockAPI) genesisBlockTransaction(
 	}}, nil
 }
 
-// getPreStakingRewardTransactionIdentifiers is only used for the /block endpoint
-func (s *BlockAPI) getPreStakingRewardTransactionIdentifiers(
-	ctx context.Context, currBlock *hmytypes.Block,
-) ([]*types.TransactionIdentifier, *types.Error) {
-	if currBlock.Number().Cmp(big.NewInt(1)) != 1 {
-		return nil, nil
-	}
-	rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, currBlock)
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
+// getSideEffectTransaction returns the side effect transaction for a block if said block has one.
+// Side effects to reports are: genesis funds, undelegation payouts, permissioned-phase block rewards.
+func (s *BlockAPI) getSideEffectTransaction(
+	ctx context.Context, blk *hmytypes.Block,
+) (*types.Transaction, *types.Error) {
+	if !s.containsSideEffectTransaction(ctx, blk) {
+		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
+			"message": "no side effect transaction found for given block",
 		})
 	}
-	txIDs := []*types.TransactionIdentifier{}
-	for addr := range rewards {
-		txIDs = append(txIDs, getSideEffectTransactionIdentifier(
-			currBlock.Hash(), addr, SpecialPreStakingRewardTxID,
-		))
+
+	var startingOpIndex *types.OperationIdentifier
+	txOperations := []*types.Operation{}
+	updateStartingOpIndex := func(newOperations []*types.Operation) {
+		if len(newOperations) > 0 {
+			startingOpIndex = &types.OperationIdentifier{
+				Index: newOperations[len(newOperations)-1].OperationIdentifier.Index + 1,
+			}
+		}
+		txOperations = append(txOperations, newOperations...)
 	}
-	return txIDs, nil
+
+	// Handle genesis funds
+	if blk.NumberU64() == 0 {
+		ops, rosettaError := GetSideEffectOperationsFromGenesisSpec(getGenesisSpec(s.hmy.ShardID), startingOpIndex)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		updateStartingOpIndex(ops)
+	}
+	// Handle undelegation payout
+	if s.hmy.IsCommitteeSelectionBlock(blk.Header()) && s.hmy.IsPreStakingEpoch(blk.Epoch()) {
+		payouts, err := s.hmy.GetUndelegationPayouts(ctx, blk.Epoch())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		ops, rosettaError := GetSideEffectOperationsFromUndelegationPayouts(payouts, startingOpIndex)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		updateStartingOpIndex(ops)
+	}
+	// Handle block rewards for epoch < staking epoch (permissioned-phase block rewards)
+	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
+		rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, blk)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		ops, rosettaError := GetSideEffectOperationsFromPreStakingRewards(rewards, startingOpIndex)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		updateStartingOpIndex(ops)
+	}
+
+	return &types.Transaction{
+		TransactionIdentifier: getSideEffectTransactionIdentifier(blk.Hash()),
+		Operations:            txOperations,
+	}, nil
 }
 
 // specialBlockTransaction is a formatter for special, non-genesis, transactions
@@ -169,126 +211,11 @@ func (s *BlockAPI) specialBlockTransaction(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if s.hmy.IsCommitteeSelectionBlock(blk.Header()) {
-		// Note that undelegation payout MUST be checked before reporting error in pre-staking & staking era.
-		response, rosettaError := s.undelegationPayoutBlockTransaction(ctx, request.TransactionIdentifier, blk)
-		if rosettaError != nil && !s.hmy.IsStakingEpoch(blk.Epoch()) && s.hmy.IsPreStakingEpoch(blk.Epoch()) {
-			// Handle edge case special transaction for pre-staking era
-			return s.preStakingRewardBlockTransaction(ctx, request.TransactionIdentifier, blk)
-		}
-		return response, rosettaError
-	}
-	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
-		return s.preStakingRewardBlockTransaction(ctx, request.TransactionIdentifier, blk)
-	}
-	return nil, &common.TransactionNotFoundError
-}
-
-// preStakingRewardBlockTransaction is a special handler for pre-staking era
-func (s *BlockAPI) preStakingRewardBlockTransaction(
-	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
-) (*types.BlockTransactionResponse, *types.Error) {
-	if blk.Number().Cmp(big.NewInt(1)) != 1 {
-		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
-			"message": "block does not contain any pre-staking era block rewards",
-		})
-	}
-	blkHash, address, rosettaError := unpackSideEffectTransactionIdentifier(txID, SpecialPreStakingRewardTxID)
+	tx, rosettaError := s.getSideEffectTransaction(ctx, blk)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	if blkHash.String() != blk.Hash().String() {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": fmt.Sprintf(
-				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
-			),
-		})
-	}
-	rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, blk)
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	transactions, rosettaError := FormatPreStakingRewardTransaction(txID, rewards, address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	return &types.BlockTransactionResponse{Transaction: transactions}, nil
-}
-
-// undelegationPayoutBlockTransaction is a special handler for undelegation payout transactions
-func (s *BlockAPI) undelegationPayoutBlockTransaction(
-	ctx context.Context, txID *types.TransactionIdentifier, blk *hmytypes.Block,
-) (*types.BlockTransactionResponse, *types.Error) {
-	blkHash, address, rosettaError := unpackSideEffectTransactionIdentifier(txID, SpecialUndelegationPayoutTxID)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	if blkHash.String() != blk.Hash().String() {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": fmt.Sprintf(
-				"block hash %v != requested block hash %v in tx ID", blkHash.String(), blk.Hash().String(),
-			),
-		})
-	}
-
-	delegatorPayouts, err := s.hmy.GetUndelegationPayouts(ctx, blk.Epoch())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-
-	transactions, rosettaError := FormatUndelegationPayoutTransaction(txID, delegatorPayouts, address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	return &types.BlockTransactionResponse{Transaction: transactions}, nil
-}
-
-// getAllUndelegationPayoutTransactions is only used for the /block endpoint
-func (s *BlockAPI) getAllUndelegationPayoutTransactions(
-	ctx context.Context, blk *hmytypes.Block,
-) ([]*types.Transaction, *types.Error) {
-	if !s.hmy.IsCommitteeSelectionBlock(blk.Header()) {
-		return []*types.Transaction{}, nil
-	}
-
-	delegatorPayouts, err := s.hmy.GetUndelegationPayouts(ctx, blk.Epoch())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-
-	transactions := []*types.Transaction{}
-	for delegator, payout := range delegatorPayouts {
-		accID, rosettaError := newAccountIdentifier(delegator)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		transactions = append(transactions, &types.Transaction{
-			TransactionIdentifier: getSideEffectTransactionIdentifier(
-				blk.Hash(), delegator, SpecialUndelegationPayoutTxID,
-			),
-			Operations: []*types.Operation{
-				{
-					OperationIdentifier: &types.OperationIdentifier{
-						Index: 0, // There is no gas expenditure for undelegation payout
-					},
-					Type:    common.UndelegationPayoutOperation,
-					Status:  common.SuccessOperationStatus.Status,
-					Account: accID,
-					Amount: &types.Amount{
-						Value:    payout.String(),
-						Currency: &common.NativeCurrency,
-					},
-				},
-			},
-		})
-	}
-	return transactions, nil
+	return &types.BlockTransactionResponse{Transaction: tx}, nil
 }
 
 // getGenesisSpec ..
