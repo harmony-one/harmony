@@ -75,13 +75,12 @@ func (s *BlockAPI) getSideEffectTransaction(
 		})
 	}
 
-	var startingOpIndex *types.OperationIdentifier
+	var startingOpIndex *int64
 	txOperations := []*types.Operation{}
 	updateStartingOpIndex := func(newOperations []*types.Operation) {
 		if len(newOperations) > 0 {
-			startingOpIndex = &types.OperationIdentifier{
-				Index: newOperations[len(newOperations)-1].OperationIdentifier.Index + 1,
-			}
+			index := newOperations[len(newOperations)-1].OperationIdentifier.Index + 1
+			startingOpIndex = &index
 		}
 		txOperations = append(txOperations, newOperations...)
 	}
@@ -89,6 +88,21 @@ func (s *BlockAPI) getSideEffectTransaction(
 	// Handle genesis funds
 	if blk.NumberU64() == 0 {
 		ops, rosettaError := GetSideEffectOperationsFromGenesisSpec(getGenesisSpec(s.hmy.ShardID), startingOpIndex)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		updateStartingOpIndex(ops)
+	}
+	// Handle block rewards for epoch < staking epoch (permissioned-phase block rewards)
+	// Note that block rewards don't start until the second block.
+	if !s.hmy.IsStakingEpoch(blk.Epoch()) && blk.NumberU64() > 1 {
+		rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, blk)
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		ops, rosettaError := GetSideEffectOperationsFromPreStakingRewards(rewards, startingOpIndex)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -103,20 +117,6 @@ func (s *BlockAPI) getSideEffectTransaction(
 			})
 		}
 		ops, rosettaError := GetSideEffectOperationsFromUndelegationPayouts(payouts, startingOpIndex)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		updateStartingOpIndex(ops)
-	}
-	// Handle block rewards for epoch < staking epoch (permissioned-phase block rewards)
-	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
-		rewards, err := s.hmy.GetPreStakingBlockRewards(ctx, blk)
-		if err != nil {
-			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-				"message": err.Error(),
-			})
-		}
-		ops, rosettaError := GetSideEffectOperationsFromPreStakingRewards(rewards, startingOpIndex)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}

@@ -130,16 +130,14 @@ func GetNativeOperationsFromStakingTransaction(
 // GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
 func GetSideEffectOperationsFromUndelegationPayouts(
-	payouts hmy.UndelegationPayouts, startingOperationIndex *types.OperationIdentifier,
+	payouts hmy.UndelegationPayouts, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	var opIndex *types.OperationIdentifier
+	var opIndex int64
 	operations := []*types.Operation{}
 	if startingOperationIndex != nil {
-		opIndex = startingOperationIndex
+		opIndex = *startingOperationIndex
 	} else {
-		opIndex = &types.OperationIdentifier{
-			Index: 0,
-		}
+		opIndex = 0
 	}
 	for address, payout := range payouts {
 		accID, rosettaError := newAccountIdentifier(address)
@@ -147,16 +145,18 @@ func GetSideEffectOperationsFromUndelegationPayouts(
 			return nil, rosettaError
 		}
 		operations = append(operations, &types.Operation{
-			OperationIdentifier: opIndex,
-			Type:                common.UndelegationPayoutOperation,
-			Status:              common.SuccessOperationStatus.Status,
-			Account:             accID,
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: opIndex,
+			},
+			Type:    common.UndelegationPayoutOperation,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: accID,
 			Amount: &types.Amount{
 				Value:    payout.String(),
 				Currency: &common.NativeCurrency,
 			},
 		})
-		opIndex.Index++
+		opIndex++
 	}
 	return operations, nil
 }
@@ -164,16 +164,14 @@ func GetSideEffectOperationsFromUndelegationPayouts(
 // GetSideEffectOperationsFromPreStakingRewards from the given rewards.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
 func GetSideEffectOperationsFromPreStakingRewards(
-	rewards hmy.PreStakingBlockRewards, startingOperationIndex *types.OperationIdentifier,
+	rewards hmy.PreStakingBlockRewards, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	var opIndex *types.OperationIdentifier
+	var opIndex int64
 	operations := []*types.Operation{}
 	if startingOperationIndex != nil {
-		opIndex = startingOperationIndex
+		opIndex = *startingOperationIndex
 	} else {
-		opIndex = &types.OperationIdentifier{
-			Index: 0,
-		}
+		opIndex = 0
 	}
 	for address, value := range rewards {
 		accID, rosettaError := newAccountIdentifier(address)
@@ -181,16 +179,18 @@ func GetSideEffectOperationsFromPreStakingRewards(
 			return nil, rosettaError
 		}
 		operations = append(operations, &types.Operation{
-			OperationIdentifier: opIndex,
-			Type:                common.PreStakingBlockRewardOperation,
-			Status:              common.SuccessOperationStatus.Status,
-			Account:             accID,
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: opIndex,
+			},
+			Type:    common.PreStakingBlockRewardOperation,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: accID,
 			Amount: &types.Amount{
 				Value:    value.String(),
 				Currency: &common.NativeCurrency,
 			},
 		})
-		opIndex.Index++
+		opIndex++
 	}
 	return operations, nil
 }
@@ -198,16 +198,14 @@ func GetSideEffectOperationsFromPreStakingRewards(
 // GetSideEffectOperationsFromGenesisSpec for the given spec.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
 func GetSideEffectOperationsFromGenesisSpec(
-	spec *core.Genesis, startingOperationIndex *types.OperationIdentifier,
+	spec *core.Genesis, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	var opIndex *types.OperationIdentifier
+	var opIndex int64
 	operations := []*types.Operation{}
 	if startingOperationIndex != nil {
-		opIndex = startingOperationIndex
+		opIndex = *startingOperationIndex
 	} else {
-		opIndex = &types.OperationIdentifier{
-			Index: 0,
-		}
+		opIndex = 0
 	}
 	for _, tx := range getPseudoTransactionForGenesis(spec) {
 		if tx.To() == nil {
@@ -218,16 +216,18 @@ func GetSideEffectOperationsFromGenesisSpec(
 			return nil, rosettaError
 		}
 		operations = append(operations, &types.Operation{
-			OperationIdentifier: opIndex,
-			Type:                common.GenesisFundsOperation,
-			Status:              common.SuccessOperationStatus.Status,
-			Account:             accID,
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: opIndex,
+			},
+			Type:    common.GenesisFundsOperation,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: accID,
 			Amount: &types.Amount{
 				Value:    tx.Value().String(),
 				Currency: &common.NativeCurrency,
 			},
 		})
-		opIndex.Index++
+		opIndex++
 	}
 	return operations, nil
 }
