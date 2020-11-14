@@ -2,14 +2,14 @@ package services
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/hmy"
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/rosetta/common"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
