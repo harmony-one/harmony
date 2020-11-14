@@ -13,7 +13,6 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rpc"
 	"github.com/harmony-one/harmony/shard"
 )
 
@@ -63,78 +62,6 @@ func unpackSideEffectTransactionIdentifier(
 	}
 	blkHash := ethcommon.HexToHash(hash[:blockHashStrLen])
 	return blkHash, nil
-}
-
-// genesisBlock is a special handler for the genesis block.
-func (s *BlockAPI) genesisBlock(
-	ctx context.Context, request *types.BlockRequest, blk *hmytypes.Block,
-) (response *types.BlockResponse, rosettaError *types.Error) {
-	var currBlockID, prevBlockID *types.BlockIdentifier
-	currBlockID = &types.BlockIdentifier{
-		Index: blk.Number().Int64(),
-		Hash:  blk.Hash().String(),
-	}
-	prevBlockID = currBlockID
-
-	metadata, err := types.MarshalMap(BlockMetadata{
-		Epoch: blk.Epoch(),
-	})
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	responseBlock := &types.Block{
-		BlockIdentifier:       currBlockID,
-		ParentBlockIdentifier: prevBlockID,
-		Timestamp:             blk.Time().Int64() * 1e3, // Timestamp must be in ms.
-		Transactions:          []*types.Transaction{},   // Do not return tx details as it is optional.
-		Metadata:              metadata,
-	}
-
-	// Report initial genesis funds as transactions to fit API.
-	otherTransactions := []*types.TransactionIdentifier{
-		getSideEffectTransactionIdentifier(blk.Hash()),
-	}
-
-	return &types.BlockResponse{
-		Block:             responseBlock,
-		OtherTransactions: otherTransactions,
-	}, nil
-}
-
-// genesisBlockTransaction is a special handler for genesis block transactions
-func (s *BlockAPI) genesisBlockTransaction(
-	ctx context.Context, request *types.BlockTransactionRequest,
-) (response *types.BlockTransactionResponse, rosettaError *types.Error) {
-	genesisBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(0).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	blkHash, rosettaError := unpackSideEffectTransactionIdentifier(
-		request.TransactionIdentifier,
-	)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	if blkHash.String() != genesisBlock.Hash().String() {
-		return nil, &common.TransactionNotFoundError
-	}
-
-	// The only side effect for the genesis block are the initial funds derived from the genesis spec.
-	genesisSideEffectOperations, rosettaError := GetSideEffectOperationsFromGenesisSpec(
-		getGenesisSpec(s.hmy.ShardID), nil,
-	)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-
-	return &types.BlockTransactionResponse{Transaction: &types.Transaction{
-		TransactionIdentifier: request.TransactionIdentifier,
-		Operations:            genesisSideEffectOperations,
-	}}, nil
 }
 
 // getSideEffectTransaction returns the side effect transaction for a block if said block has one.
@@ -210,6 +137,17 @@ func (s *BlockAPI) specialBlockTransaction(
 	blk, rosettaError := getBlock(ctx, s.hmy, &types.PartialBlockIdentifier{Index: &request.BlockIdentifier.Index})
 	if rosettaError != nil {
 		return nil, rosettaError
+	}
+	blkHash, rosettaError := unpackSideEffectTransactionIdentifier(
+		request.TransactionIdentifier,
+	)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+	if blkHash.String() != blk.Hash().String() {
+		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
+			"message": fmt.Sprintf("side effect transaction is not for block: %v", blk.NumberU64()),
+		})
 	}
 	tx, rosettaError := s.getSideEffectTransaction(ctx, blk)
 	if rosettaError != nil {

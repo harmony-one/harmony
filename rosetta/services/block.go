@@ -48,24 +48,24 @@ func (s *BlockAPI) Block(
 		return nil, rosettaError
 	}
 
-	// Format genesis block if it is requested.
-	if blk.Number().Uint64() == 0 {
-		return s.genesisBlock(ctx, request, blk)
-	}
-
 	currBlockID = &types.BlockIdentifier{
 		Index: blk.Number().Int64(),
 		Hash:  blk.Hash().String(),
 	}
-	prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	prevBlockID = &types.BlockIdentifier{
-		Index: prevBlock.Number().Int64(),
-		Hash:  prevBlock.Hash().String(),
+
+	if blk.NumberU64() == 0 {
+		prevBlockID = currBlockID
+	} else {
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		prevBlockID = &types.BlockIdentifier{
+			Index: prevBlock.Number().Int64(),
+			Hash:  prevBlock.Hash().String(),
+		}
 	}
 
 	// Report any side effect transactions
@@ -126,11 +126,6 @@ func (s *BlockAPI) BlockTransaction(
 ) (*types.BlockTransactionResponse, *types.Error) {
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
-	}
-
-	// Format genesis block transaction request
-	if request.BlockIdentifier.Index == 0 {
-		return s.genesisBlockTransaction(ctx, request)
 	}
 
 	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
