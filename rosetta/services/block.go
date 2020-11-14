@@ -132,8 +132,8 @@ func (s *BlockAPI) BlockTransaction(
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
 	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
 	if rosettaError != nil {
-		// If no transaction info is found, check for special case transaction.
-		response, rosettaError2 := s.specialBlockTransaction(ctx, request)
+		// If no transaction info is found, check for side effect case transaction.
+		response, rosettaError2 := s.sideEffectBlockTransaction(ctx, request)
 		if rosettaError2 != nil && rosettaError2.Code != common.TransactionNotFoundError.Code {
 			return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
 				"from_error": rosettaError2,

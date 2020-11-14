@@ -38,7 +38,7 @@ func TestGetPseudoTransactionForGenesis(t *testing.T) {
 	}
 }
 
-func TestSpecialCaseTransactionIdentifier(t *testing.T) {
+func TestSideEffectTransactionIdentifier(t *testing.T) {
 	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")
 	refTxID := &types.TransactionIdentifier{
 		Hash: fmt.Sprintf("%v_%v", testBlkHash.String(), SideEffectTransactionSuffix),

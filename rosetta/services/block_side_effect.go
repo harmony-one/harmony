@@ -57,7 +57,7 @@ func unpackSideEffectTransactionIdentifier(
 	if len(hash) < blockHashStrLen || string(hash[blockHashStrLen]) != "_" ||
 		hash[blockHashStrLen+1:] != SideEffectTransactionSuffix {
 		return ethcommon.Hash{}, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "unknown special case transaction ID format",
+			"message": "unknown side effect transaction ID format",
 		})
 	}
 	blkHash := ethcommon.HexToHash(hash[:blockHashStrLen])
@@ -129,8 +129,8 @@ func (s *BlockAPI) getSideEffectTransaction(
 	}, nil
 }
 
-// specialBlockTransaction is a formatter for special, non-genesis, transactions
-func (s *BlockAPI) specialBlockTransaction(
+// sideEffectBlockTransaction is a formatter for side effect transactions
+func (s *BlockAPI) sideEffectBlockTransaction(
 	ctx context.Context, request *types.BlockTransactionRequest,
 ) (*types.BlockTransactionResponse, *types.Error) {
 	// If no transaction info is found, check for special case transactions.
