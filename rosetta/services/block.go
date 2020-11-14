@@ -68,7 +68,7 @@ func (s *BlockAPI) Block(
 		}
 	}
 
-	// Report any side effect transactions
+	// Report any side effect transaction now as it can be computed & cached on block fetch.
 	transactions := []*types.Transaction{}
 	if s.containsSideEffectTransaction(ctx, blk) {
 		tx, rosettaError := s.getSideEffectTransaction(ctx, blk)
