@@ -56,7 +56,7 @@ function valid_ip()
 
 function myip() {
 # get ipv4 address only, right now only support ipv4 addresses
-   PUB_IP=$(dig TXT +short o-o.myaddr.l.google.com @ns1.google.com | awk -F'"' '{ print $2}')
+   PUB_IP=$(dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com | awk -F'"' '{ print $2}')
    if valid_ip $PUB_IP; then
       msg "public IP address autodetected: $PUB_IP"
    else

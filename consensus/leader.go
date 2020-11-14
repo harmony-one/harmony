@@ -211,6 +211,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	// proceed only when the message is not received before
+	for _, signer := range recvMsg.SenderPubkeys {
+		signed := consensus.Decider.ReadBallot(quorum.Commit, signer.Bytes)
+		if signed != nil {
+			consensus.getLogger().Debug().
+				Str("validatorPubKey", signer.Bytes.Hex()).
+				Msg("[OnCommit] Already Received commit message from the validator")
+			return
+		}
+	}
+
 	commitBitmap := consensus.commitBitmap
 
 	// has to be called before verifying signature

@@ -55,6 +55,8 @@ const (
 	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
+	// DefaultPrometheusPort is the default prometheus port. The actual port used is 9000+900
+	DefaultPrometheusPort = 9900
 )
 
 const (
@@ -66,6 +68,9 @@ const (
 
 	// rpcWSPortOffSet is the port offset for RPC websocket requests
 	rpcWSPortOffSet = 800
+
+	// prometheusHTTPPortOffset is the port offset for prometheus HTTP requests
+	prometheusHTTPPortOffset = 900
 )
 
 // GetDefaultBootNodes get the default bootnode with the given network type
@@ -122,4 +127,9 @@ func GetRosettaHTTPPortFromBase(basePort int) int {
 // GetWSPortFromBase return the Websocket port from the base port
 func GetWSPortFromBase(basePort int) int {
 	return basePort + rpcWSPortOffSet
+}
+
+// GetPrometheusHTTPPortFromBase return the prometheus HTTP port from base port
+func GetPrometheusHTTPPortFromBase(basePort int) int {
+	return basePort + prometheusHTTPPortOffset
 }

@@ -31,7 +31,7 @@ import (
 // timeout constant
 const (
 	// AsyncBlockProposalTimeout is the timeout which will abort the async block proposal.
-	AsyncBlockProposalTimeout = 5 * time.Second
+	AsyncBlockProposalTimeout = 9 * time.Second
 )
 
 func ballotResultBeaconchain(
