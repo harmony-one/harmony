@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/staking"
@@ -83,6 +84,74 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	}
 	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
+	testAcc1 := crypto.PubkeyToAddress(internalCommon.MustGeneratePrivateKey().PublicKey)
+	testAcc2 := crypto.PubkeyToAddress(internalCommon.MustGeneratePrivateKey().PublicKey)
+	testAmount1 := big.NewInt(12000)
+	testAmount2 := big.NewInt(10000)
+	testPayouts := map[ethcommon.Address]*big.Int{
+		testAcc1: testAmount1,
+		testAcc2: testAmount2,
+	}
+	testType := common.GenesisFundsOperation
+	ops, rosettaError := getSideEffectOperationsFromValueMap(testPayouts, testType, nil)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	for i, op := range ops {
+		if int64(i) != op.OperationIdentifier.Index {
+			t.Errorf("expected operation %v to have operation index %v", i, i)
+		}
+		address, err := getAddress(op.Account)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := testPayouts[address]; !ok {
+			t.Errorf("operation %v has address that is not in test map", i)
+		} else if value.String() != op.Amount.Value {
+			t.Errorf("operation %v has wrong value (%v != %v)", i, value.String(), op.Amount.Value)
+		}
+		if op.Type != testType {
+			t.Errorf("operation %v has wrong type", i)
+		}
+		if len(op.RelatedOperations) != 0 {
+			t.Errorf("operation %v has related operations", i)
+		}
+		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+			t.Errorf("operation %v has wrong currency", i)
+		}
+	}
+
+	testStartingIndex := int64(12)
+	ops, rosettaError = getSideEffectOperationsFromValueMap(testPayouts, testType, &testStartingIndex)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	for i, op := range ops {
+		if int64(i)+testStartingIndex != op.OperationIdentifier.Index {
+			t.Errorf("expected operation %v to have operation index %v", i, int64(i)+testStartingIndex)
+		}
+		address, err := getAddress(op.Account)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := testPayouts[address]; !ok {
+			t.Errorf("operation %v has address that is not in test map", i)
+		} else if value.String() != op.Amount.Value {
+			t.Errorf("operation %v has wrong value (%v != %v)", i, value.String(), op.Amount.Value)
+		}
+		if op.Type != testType {
+			t.Errorf("operation %v has wrong type", i)
+		}
+		if len(op.RelatedOperations) != 0 {
+			t.Errorf("operation %v has related operations", i)
+		}
+		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+			t.Errorf("operation %v has wrong currency", i)
+		}
 	}
 }
 

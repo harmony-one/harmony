@@ -9,8 +9,6 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	"github.com/harmony-one/harmony/core"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
 
@@ -20,23 +18,6 @@ var (
 	twelveOnes = new(big.Int).Mul(big.NewInt(12), oneBig)
 	gasPrice   = big.NewInt(10000)
 )
-
-func TestGetPseudoTransactionForGenesis(t *testing.T) {
-	genesisSpec := core.NewGenesisSpec(nodeconfig.Testnet, 0)
-	txs := getPseudoTransactionForGenesis(genesisSpec)
-	for acc := range genesisSpec.Alloc {
-		found := false
-		for _, tx := range txs {
-			if acc == *tx.To() {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("unable to find genesis account in generated pseudo transactions")
-		}
-	}
-}
 
 func TestSideEffectTransactionIdentifier(t *testing.T) {
 	testBlkHash := ethcommon.HexToHash("0x1a06b0378d63bf589282c032f0c85b32827e3a2317c2f992f45d8f07d0caa238")

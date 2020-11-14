@@ -132,33 +132,9 @@ func GetNativeOperationsFromStakingTransaction(
 func GetSideEffectOperationsFromUndelegationPayouts(
 	payouts hmy.UndelegationPayouts, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	var opIndex int64
-	operations := []*types.Operation{}
-	if startingOperationIndex != nil {
-		opIndex = *startingOperationIndex
-	} else {
-		opIndex = 0
-	}
-	for address, payout := range payouts {
-		accID, rosettaError := newAccountIdentifier(address)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: opIndex,
-			},
-			Type:    common.UndelegationPayoutOperation,
-			Status:  common.SuccessOperationStatus.Status,
-			Account: accID,
-			Amount: &types.Amount{
-				Value:    payout.String(),
-				Currency: &common.NativeCurrency,
-			},
-		})
-		opIndex++
-	}
-	return operations, nil
+	return getSideEffectOperationsFromValueMap(
+		payouts, common.UndelegationPayoutOperation, startingOperationIndex,
+	)
 }
 
 // GetSideEffectOperationsFromPreStakingRewards from the given rewards.
@@ -166,39 +142,28 @@ func GetSideEffectOperationsFromUndelegationPayouts(
 func GetSideEffectOperationsFromPreStakingRewards(
 	rewards hmy.PreStakingBlockRewards, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	var opIndex int64
-	operations := []*types.Operation{}
-	if startingOperationIndex != nil {
-		opIndex = *startingOperationIndex
-	} else {
-		opIndex = 0
-	}
-	for address, value := range rewards {
-		accID, rosettaError := newAccountIdentifier(address)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		operations = append(operations, &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: opIndex,
-			},
-			Type:    common.PreStakingBlockRewardOperation,
-			Status:  common.SuccessOperationStatus.Status,
-			Account: accID,
-			Amount: &types.Amount{
-				Value:    value.String(),
-				Currency: &common.NativeCurrency,
-			},
-		})
-		opIndex++
-	}
-	return operations, nil
+	return getSideEffectOperationsFromValueMap(
+		rewards, common.PreStakingBlockRewardOperation, startingOperationIndex,
+	)
 }
 
 // GetSideEffectOperationsFromGenesisSpec for the given spec.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
 func GetSideEffectOperationsFromGenesisSpec(
 	spec *core.Genesis, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	valueMap := map[ethcommon.Address]*big.Int{}
+	for address, acc := range spec.Alloc {
+		valueMap[address] = acc.Balance
+	}
+	return getSideEffectOperationsFromValueMap(
+		valueMap, common.GenesisFundsOperation, startingOperationIndex,
+	)
+}
+
+// getSideEffectOperationsFromValueMap is a helper for side effect operation construction from a value map.
+func getSideEffectOperationsFromValueMap(
+	valueMap map[ethcommon.Address]*big.Int, opType string, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	var opIndex int64
 	operations := []*types.Operation{}
@@ -207,11 +172,8 @@ func GetSideEffectOperationsFromGenesisSpec(
 	} else {
 		opIndex = 0
 	}
-	for _, tx := range getPseudoTransactionForGenesis(spec) {
-		if tx.To() == nil {
-			return nil, common.NewError(common.CatchAllError, nil)
-		}
-		accID, rosettaError := newAccountIdentifier(*tx.To())
+	for address, value := range valueMap {
+		accID, rosettaError := newAccountIdentifier(address)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -219,11 +181,11 @@ func GetSideEffectOperationsFromGenesisSpec(
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: opIndex,
 			},
-			Type:    common.GenesisFundsOperation,
+			Type:    opType,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: accID,
 			Amount: &types.Amount{
-				Value:    tx.Value().String(),
+				Value:    value.String(),
 				Currency: &common.NativeCurrency,
 			},
 		})
@@ -299,18 +261,6 @@ func getAmountFromCollectRewards(
 		})
 	}
 	return amount, nil
-}
-
-// getPseudoTransactionForGenesis to create unsigned transaction that contain genesis funds.
-// Note that this is for internal usage only. Genesis funds are not transactions.
-func getPseudoTransactionForGenesis(spec *core.Genesis) []*hmytypes.Transaction {
-	txs := []*hmytypes.Transaction{}
-	for acc, bal := range spec.Alloc {
-		txs = append(txs, hmytypes.NewTransaction(
-			0, acc, spec.ShardID, bal.Balance, 0, big.NewInt(0), spec.ExtraData,
-		))
-	}
-	return txs
 }
 
 // newTransferNativeOperations extracts & formats the native operation(s) for plain transaction,
