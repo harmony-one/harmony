@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-//go:generate go-bindata -nometadata -o assets.go -pkg tracers -ignore tracers.go -ignore assets.go ./...
-//go:generate gofmt -s -w assets.go
+// disable go:generate to pass "./scripts/travis_go_checker.sh"
+// go:generate go-bindata -nometadata -o assets.go -pkg tracers -ignore tracers.go -ignore assets.go ./...
+// go:generate gofmt -s -w assets.go
 
 // Package tracers contains the actual JavaScript tracer assets.
 package tracers
