@@ -299,6 +299,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
 	ConsensusCounterVec.With(prometheus.Labels{"consensus": "signatures"}).Add(numSig)
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(float64(blockObj.NumberU64()))
 
 	initBn := consensus.blockNum
 	consensus.tryCatchup()

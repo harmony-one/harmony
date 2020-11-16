@@ -213,6 +213,7 @@ func (consensus *Consensus) finalCommit() {
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 	ConsensusCounterVec.With(prometheus.Labels{"consensus": "hooray"}).Inc()
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(float64(block.NumberU64()))
 	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(float64(consensus.Decider.SignersCount(quorum.Commit)))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
