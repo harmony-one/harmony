@@ -157,8 +157,6 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
-	consensus.FBFTLog.PruneCacheBeforeBlock(block.NumberU64())
-
 	// if leader successfully finalizes the block, send committed message to validators
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
@@ -645,6 +643,7 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	if blk.IsLastBlockInEpoch() {
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
+	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.ResetState()
 }
 
@@ -662,7 +661,6 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
 	// clean up old log
-	consensus.FBFTLog.PruneCacheBeforeBlock(consensus.blockNum)
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
