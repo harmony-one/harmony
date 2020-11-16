@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -512,6 +513,7 @@ func (consensus *Consensus) StartFinalityCount() {
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
 	consensus.finality = (d - consensus.finalityCounter) / 1000000
+	consensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
 // GetFinality returns the finality time in milliseconds of previous consensus
@@ -594,6 +596,27 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		}
 	}
 	return nil
+}
+
+// NumSignaturesIncludedInBlock returns the number of signatures included in the block
+func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
+	count := uint32(0)
+	members := consensus.Decider.Participants()
+	// TODO(audit): do not reconstruct the Mask
+	mask, err := bls.NewMask(members, nil)
+	if err != nil {
+		return count
+	}
+	err = mask.SetMask(block.Header().LastCommitBitmap())
+	if err != nil {
+		return count
+	}
+	for _, key := range consensus.GetPublicKeys() {
+		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
+			count++
+		}
+	}
+	return count
 }
 
 // getLogger returns logger for consensus contexts added

@@ -29,6 +29,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
 		return
 	}
+	consensus.StartFinalityCount()
 
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -55,7 +56,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		}
 		return
 	}
-	consensus.StartFinalityCount()
 	consensus.prepare()
 }
 
