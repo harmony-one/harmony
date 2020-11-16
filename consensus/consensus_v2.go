@@ -643,6 +643,7 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	if blk.IsLastBlockInEpoch() {
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
+	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.ResetState()
 }
 
@@ -659,8 +660,6 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
-	// clean up old log
-	consensus.FBFTLog.PruneCacheBeforeBlock(consensus.blockNum)
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
