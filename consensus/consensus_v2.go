@@ -660,7 +660,6 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
-	// clean up old log
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
