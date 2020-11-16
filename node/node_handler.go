@@ -348,6 +348,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
 				Uint32("numSignatures", node.Consensus.NumSignaturesIncludedInBlock(newBlock)).
 				Msg("BINGO !!! Reached Consensus")
+
+			numSig := float64(node.Consensus.NumSignaturesIncludedInBlock(newBlock))
+			node.Consensus.UpdateValidatorMetrics(numSig, float64(newBlock.NumberU64()))
+
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)

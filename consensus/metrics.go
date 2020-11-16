@@ -67,3 +67,10 @@ var (
 		},
 	)
 )
+
+func (consensus *Consensus) UpdateValidatorMetrics(numSig float64, blockNum float64) {
+	ConsensusCounterVec.With(prometheus.Labels{"consensus": "bingo"}).Inc()
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
+	ConsensusCounterVec.With(prometheus.Labels{"consensus": "signatures"}).Add(numSig)
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(blockNum)
+}

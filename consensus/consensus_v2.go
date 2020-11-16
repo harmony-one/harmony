@@ -113,8 +113,10 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
+	numCommits := consensus.Decider.SignersCount(quorum.Commit)
+
 	consensus.getLogger().Info().
-		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
+		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.blockNum
 
@@ -214,7 +216,7 @@ func (consensus *Consensus) finalCommit() {
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
 	ConsensusCounterVec.With(prometheus.Labels{"consensus": "hooray"}).Inc()
 	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(float64(block.NumberU64()))
-	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(float64(consensus.Decider.SignersCount(quorum.Commit)))
+	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(float64(numCommits))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
