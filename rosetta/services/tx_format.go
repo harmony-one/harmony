@@ -9,8 +9,6 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -32,7 +30,7 @@ func FormatTransaction(
 	case *stakingTypes.StakingTransaction:
 		isStaking = true
 		stakingTx := tx.(*stakingTypes.StakingTransaction)
-		operations, rosettaError = GetOperationsFromStakingTransaction(stakingTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromStakingTransaction(stakingTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -148,111 +146,6 @@ func FormatCrossShardReceiverTransaction(
 			},
 		},
 	}, nil
-}
-
-// FormatGenesisTransaction for genesis block's initial balances
-func FormatGenesisTransaction(
-	txID *types.TransactionIdentifier, targetAddr ethcommon.Address, shardID uint32,
-) (fmtTx *types.Transaction, rosettaError *types.Error) {
-	var b32Addr string
-	targetB32Addr := internalCommon.MustAddressToBech32(targetAddr)
-	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(shardID)) {
-		if tx.To() == nil {
-			return nil, common.NewError(common.CatchAllError, nil)
-		}
-		b32Addr = internalCommon.MustAddressToBech32(*tx.To())
-		if targetB32Addr == b32Addr {
-			accID, rosettaError := newAccountIdentifier(*tx.To())
-			if rosettaError != nil {
-				return nil, rosettaError
-			}
-			return &types.Transaction{
-				TransactionIdentifier: txID,
-				Operations: []*types.Operation{
-					{
-						OperationIdentifier: &types.OperationIdentifier{
-							Index: 0,
-						},
-						Type:    common.GenesisFundsOperation,
-						Status:  common.SuccessOperationStatus.Status,
-						Account: accID,
-						Amount: &types.Amount{
-							Value:    tx.Value().String(),
-							Currency: &common.NativeCurrency,
-						},
-					},
-				},
-			}, nil
-		}
-	}
-	return nil, &common.TransactionNotFoundError
-}
-
-// FormatPreStakingRewardTransaction for block rewards in pre-staking era for a given Bech-32 address.
-func FormatPreStakingRewardTransaction(
-	txID *types.TransactionIdentifier, rewards hmy.PreStakingBlockRewards, address ethcommon.Address,
-) (*types.Transaction, *types.Error) {
-	accID, rosettaError := newAccountIdentifier(address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	value, ok := rewards[address]
-	if !ok {
-		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
-			"message": fmt.Sprintf("%v does not have any rewards for block",
-				internalCommon.MustAddressToBech32(address)),
-		})
-	}
-
-	return &types.Transaction{
-		TransactionIdentifier: txID,
-		Operations: []*types.Operation{
-			{
-				OperationIdentifier: &types.OperationIdentifier{
-					Index: 0,
-				},
-				Type:    common.PreStakingBlockRewardOperation,
-				Status:  common.SuccessOperationStatus.Status,
-				Account: accID,
-				Amount: &types.Amount{
-					Value:    value.String(),
-					Currency: &common.NativeCurrency,
-				},
-			},
-		},
-	}, nil
-}
-
-// FormatUndelegationPayoutTransaction for undelegation payouts at committee selection block
-func FormatUndelegationPayoutTransaction(
-	txID *types.TransactionIdentifier, delegatorPayouts hmy.UndelegationPayouts, address ethcommon.Address,
-) (*types.Transaction, *types.Error) {
-	accID, rosettaError := newAccountIdentifier(address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	payout, ok := delegatorPayouts[address]
-	if !ok {
-		return nil, &common.TransactionNotFoundError
-	}
-	return &types.Transaction{
-		TransactionIdentifier: txID,
-		Operations: []*types.Operation{
-			{
-				OperationIdentifier: &types.OperationIdentifier{
-					Index: 0,
-				},
-				Type:    common.UndelegationPayoutOperation,
-				Status:  common.SuccessOperationStatus.Status,
-				Account: accID,
-				Amount: &types.Amount{
-					Value:    payout.String(),
-					Currency: &common.NativeCurrency,
-				},
-			},
-		},
-	}, nil
-
 }
 
 // negativeBigValue formats a transaction value as a string

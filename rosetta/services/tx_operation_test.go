@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/staking"
@@ -59,7 +60,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -74,7 +75,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -83,6 +84,74 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	}
 	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
+	testAcc1 := crypto.PubkeyToAddress(internalCommon.MustGeneratePrivateKey().PublicKey)
+	testAcc2 := crypto.PubkeyToAddress(internalCommon.MustGeneratePrivateKey().PublicKey)
+	testAmount1 := big.NewInt(12000)
+	testAmount2 := big.NewInt(10000)
+	testPayouts := map[ethcommon.Address]*big.Int{
+		testAcc1: testAmount1,
+		testAcc2: testAmount2,
+	}
+	testType := common.GenesisFundsOperation
+	ops, rosettaError := getSideEffectOperationsFromValueMap(testPayouts, testType, nil)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	for i, op := range ops {
+		if int64(i) != op.OperationIdentifier.Index {
+			t.Errorf("expected operation %v to have operation index %v", i, i)
+		}
+		address, err := getAddress(op.Account)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := testPayouts[address]; !ok {
+			t.Errorf("operation %v has address that is not in test map", i)
+		} else if value.String() != op.Amount.Value {
+			t.Errorf("operation %v has wrong value (%v != %v)", i, value.String(), op.Amount.Value)
+		}
+		if op.Type != testType {
+			t.Errorf("operation %v has wrong type", i)
+		}
+		if len(op.RelatedOperations) != 0 {
+			t.Errorf("operation %v has related operations", i)
+		}
+		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+			t.Errorf("operation %v has wrong currency", i)
+		}
+	}
+
+	testStartingIndex := int64(12)
+	ops, rosettaError = getSideEffectOperationsFromValueMap(testPayouts, testType, &testStartingIndex)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	for i, op := range ops {
+		if int64(i)+testStartingIndex != op.OperationIdentifier.Index {
+			t.Errorf("expected operation %v to have operation index %v", i, int64(i)+testStartingIndex)
+		}
+		address, err := getAddress(op.Account)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := testPayouts[address]; !ok {
+			t.Errorf("operation %v has address that is not in test map", i)
+		} else if value.String() != op.Amount.Value {
+			t.Errorf("operation %v has wrong value (%v != %v)", i, value.String(), op.Amount.Value)
+		}
+		if op.Type != testType {
+			t.Errorf("operation %v has wrong type", i)
+		}
+		if len(op.RelatedOperations) != 0 {
+			t.Errorf("operation %v has related operations", i)
+		}
+		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+			t.Errorf("operation %v has wrong currency", i)
+		}
 	}
 }
 
@@ -123,7 +192,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -138,7 +207,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -187,7 +256,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -202,7 +271,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -251,7 +320,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 			},
 		},
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -266,7 +335,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -308,7 +377,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		Status:  hmytypes.ReceiptStatusSuccessful, // Failed staking transaction are never saved on-chain
 		GasUsed: gasUsed,
 	}
-	refOperations := newNativeOperations(gasFee, senderAccID)
+	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		RelatedOperations: []*types.OperationIdentifier{
@@ -323,7 +392,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -587,7 +656,7 @@ func TestNewNativeOperations(t *testing.T) {
 		Currency: &common.NativeCurrency,
 	}
 
-	ops := newNativeOperations(gasFee, accountID)
+	ops := newNativeOperationsWithGas(gasFee, accountID)
 	if len(ops) != 1 {
 		t.Fatalf("Expected new operations to be of length 1")
 	}
