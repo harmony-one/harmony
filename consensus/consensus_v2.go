@@ -157,6 +157,8 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
+	consensus.FBFTLog.PruneCacheBeforeBlock(block.NumberU64())
+
 	// if leader successfully finalizes the block, send committed message to validators
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
