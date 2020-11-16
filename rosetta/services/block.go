@@ -48,31 +48,34 @@ func (s *BlockAPI) Block(
 		return nil, rosettaError
 	}
 
-	// Format genesis block if it is requested.
-	if blk.Number().Uint64() == 0 {
-		return s.genesisBlock(ctx, request, blk)
-	}
-
 	currBlockID = &types.BlockIdentifier{
 		Index: blk.Number().Int64(),
 		Hash:  blk.Hash().String(),
 	}
-	prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	prevBlockID = &types.BlockIdentifier{
-		Index: prevBlock.Number().Int64(),
-		Hash:  prevBlock.Hash().String(),
+
+	if blk.NumberU64() == 0 {
+		prevBlockID = currBlockID
+	} else {
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		prevBlockID = &types.BlockIdentifier{
+			Index: prevBlock.Number().Int64(),
+			Hash:  prevBlock.Hash().String(),
+		}
 	}
 
-	// Report undelegation payouts as transactions to fit API.
-	// Report all transactions here since all undelegation payout amounts are known after fetching payouts.
-	transactions, rosettaError := s.getAllUndelegationPayoutTransactions(ctx, blk)
-	if rosettaError != nil {
-		return nil, rosettaError
+	// Report any side effect transaction now as it can be computed & cached on block fetch.
+	transactions := []*types.Transaction{}
+	if s.containsSideEffectTransaction(ctx, blk) {
+		tx, rosettaError := s.getSideEffectTransaction(ctx, blk)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		transactions = append(transactions, tx)
 	}
 
 	metadata, err := types.MarshalMap(BlockMetadata{
@@ -110,14 +113,6 @@ func (s *BlockAPI) Block(
 			})
 		}
 	}
-	// Report pre-staking era block rewards as transactions to fit API.
-	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
-		preStakingRewardTxIDs, rosettaError := s.getPreStakingRewardTransactionIdentifiers(ctx, blk)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		otherTransactions = append(otherTransactions, preStakingRewardTxIDs...)
-	}
 
 	return &types.BlockResponse{
 		Block:             responseBlock,
@@ -133,17 +128,12 @@ func (s *BlockAPI) BlockTransaction(
 		return nil, err
 	}
 
-	// Format genesis block transaction request
-	if request.BlockIdentifier.Index == 0 {
-		return s.specialGenesisBlockTransaction(ctx, request)
-	}
-
 	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
 	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
 	if rosettaError != nil {
-		// If no transaction info is found, check for special case transactions.
-		response, rosettaError2 := s.specialBlockTransaction(ctx, request)
+		// If no transaction info is found, check for side effect case transaction.
+		response, rosettaError2 := s.sideEffectBlockTransaction(ctx, request)
 		if rosettaError2 != nil && rosettaError2.Code != common.TransactionNotFoundError.Code {
 			return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
 				"from_error": rosettaError2,

@@ -133,7 +133,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 		commitSigs <- []byte{}
 	}()
 	block, _ := contractworker.
-		FinalizeNewBlock(commitSigs, 0, common.Address{}, nil, nil)
+		FinalizeNewBlock(commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil)
 	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {
 		fmt.Println(err)
@@ -182,7 +182,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 		commitSigs <- []byte{}
 	}()
 	block, _ := contractworker.FinalizeNewBlock(
-		commitSigs, 0, common.Address{}, nil, nil,
+		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 	_, err = chain.InsertChain(types.Blocks{block}, true /* verifyHeaders */)
 	if err != nil {

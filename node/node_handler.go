@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
-	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -328,26 +327,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	return nil
 }
 
-func (node *Node) numSignaturesIncludedInBlock(block *types.Block) uint32 {
-	count := uint32(0)
-	members := node.Consensus.Decider.Participants()
-	// TODO(audit): do not reconstruct the Mask
-	mask, err := internal_bls.NewMask(members, nil)
-	if err != nil {
-		return count
-	}
-	err = mask.SetMask(block.Header().LastCommitBitmap())
-	if err != nil {
-		return count
-	}
-	for _, key := range node.Consensus.GetPublicKeys() {
-		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
-			count++
-		}
-	}
-	return count
-}
-
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
 // 1. add the new block to blockchain
 // 2. [leader] send new block to the client
@@ -367,8 +346,12 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				Str("blockHash", newBlock.Hash().String()).
 				Int("numTxns", len(newBlock.Transactions())).
 				Int("numStakingTxns", len(newBlock.StakingTransactions())).
-				Uint32("numSignatures", node.numSignaturesIncludedInBlock(newBlock)).
+				Uint32("numSignatures", node.Consensus.NumSignaturesIncludedInBlock(newBlock)).
 				Msg("BINGO !!! Reached Consensus")
+
+			numSig := float64(node.Consensus.NumSignaturesIncludedInBlock(newBlock))
+			node.Consensus.UpdateValidatorMetrics(numSig, float64(newBlock.NumberU64()))
+
 			// 1% of the validator also need to do broadcasting
 			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)

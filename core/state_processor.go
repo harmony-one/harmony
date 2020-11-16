@@ -142,7 +142,7 @@ func (p *StateProcessor) Process(
 	}()
 	_, payout, err := p.engine.Finalize(
 		p.bc, header, statedb, block.Transactions(),
-		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady,
+		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")

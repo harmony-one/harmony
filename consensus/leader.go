@@ -211,6 +211,17 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
+	// proceed only when the message is not received before
+	for _, signer := range recvMsg.SenderPubkeys {
+		signed := consensus.Decider.ReadBallot(quorum.Commit, signer.Bytes)
+		if signed != nil {
+			consensus.getLogger().Debug().
+				Str("validatorPubKey", signer.Bytes.Hex()).
+				Msg("[OnCommit] Already Received commit message from the validator")
+			return
+		}
+	}
+
 	commitBitmap := consensus.commitBitmap
 
 	// has to be called before verifying signature
@@ -285,10 +296,8 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 	viewID := consensus.GetCurBlockViewID()
 
 	if consensus.Decider.IsAllSigsCollected() {
-		go func(viewID uint64) {
-			logger.Info().Msg("[OnCommit] 100% Enough commits received")
-			consensus.commitFinishChan <- viewID
-		}(viewID)
+		logger.Info().Msg("[OnCommit] 100% Enough commits received")
+		consensus.finalCommit()
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 		return
@@ -302,17 +311,25 @@ func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
 
 		if !blockObj.IsLastBlockInEpoch() {
 			// only do early commit if it's not epoch block to avoid problems
-
-			// TODO: make it synchronized with commitFinishChan
 			consensus.preCommitAndPropose(blockObj)
-
 		}
 
-		consensus.getLogger().Info().Msg("[OnCommit] Starting Grace Period")
 		go func(viewID uint64) {
-			time.Sleep(1000 * time.Millisecond)
+			waitTime := 1000 * time.Millisecond
+			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+			if maxWaitTime > waitTime {
+				waitTime = maxWaitTime
+			}
+			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
+				Msg("[OnCommit] Starting Grace Period")
+			time.Sleep(waitTime)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
-			consensus.commitFinishChan <- viewID
+
+			consensus.mutex.Lock()
+			defer consensus.mutex.Unlock()
+			if viewID == consensus.GetCurBlockViewID() {
+				consensus.finalCommit()
+			}
 		}(viewID)
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)

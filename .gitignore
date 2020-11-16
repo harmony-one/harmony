@@ -88,3 +88,6 @@ coverage.txt
 # testdata directory
 harmony_db_*
 explorer_storage_*
+
+# local blskeys for testing
+.hmy/blskeys

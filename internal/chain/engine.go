@@ -209,7 +209,7 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-	doubleSigners slash.Records, sigsReady chan bool,
+	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
 ) (*types.Block, reward.Reader, error) {
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
@@ -262,6 +262,10 @@ func (e *engineImpl) Finalize(
 	} else if len(doubleSigners) > 0 {
 		return nil, nil, errors.New("slashes proposed in non-beacon chain or non-staking epoch")
 	}
+
+	// ViewID setting needs to happen after commig sig reward logic for pipelining reason.
+	// TODO: make the viewID fetch from caller of the block proposal.
+	header.SetViewID(new(big.Int).SetUint64(viewID()))
 
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))

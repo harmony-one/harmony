@@ -7,7 +7,9 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/rosetta/common"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
@@ -32,7 +34,7 @@ func GetNativeOperationsFromTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperations(gasExpended, accountID)
+	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
 
 	// Handle different cases of plain transactions
 	var txOperations []*types.Operation
@@ -56,9 +58,9 @@ func GetNativeOperationsFromTransaction(
 	return append(gasOperations, txOperations...), nil
 }
 
-// GetOperationsFromStakingTransaction for all staking directives
+// GetNativeOperationsFromStakingTransaction for all staking directives
 // Note that only native operations can come from staking transactions.
-func GetOperationsFromStakingTransaction(
+func GetNativeOperationsFromStakingTransaction(
 	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
@@ -72,7 +74,7 @@ func GetOperationsFromStakingTransaction(
 
 	// All operations excepts for cross-shard tx payout expend gas
 	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperations(gasExpended, accountID)
+	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
 	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
@@ -123,6 +125,73 @@ func GetOperationsFromStakingTransaction(
 		Amount:   amount,
 		Metadata: metadata,
 	}), nil
+}
+
+// GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromUndelegationPayouts(
+	payouts hmy.UndelegationPayouts, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	return getSideEffectOperationsFromValueMap(
+		payouts, common.UndelegationPayoutOperation, startingOperationIndex,
+	)
+}
+
+// GetSideEffectOperationsFromPreStakingRewards from the given rewards.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromPreStakingRewards(
+	rewards hmy.PreStakingBlockRewards, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	return getSideEffectOperationsFromValueMap(
+		rewards, common.PreStakingBlockRewardOperation, startingOperationIndex,
+	)
+}
+
+// GetSideEffectOperationsFromGenesisSpec for the given spec.
+// If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
+func GetSideEffectOperationsFromGenesisSpec(
+	spec *core.Genesis, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	valueMap := map[ethcommon.Address]*big.Int{}
+	for address, acc := range spec.Alloc {
+		valueMap[address] = acc.Balance
+	}
+	return getSideEffectOperationsFromValueMap(
+		valueMap, common.GenesisFundsOperation, startingOperationIndex,
+	)
+}
+
+// getSideEffectOperationsFromValueMap is a helper for side effect operation construction from a value map.
+func getSideEffectOperationsFromValueMap(
+	valueMap map[ethcommon.Address]*big.Int, opType string, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	var opIndex int64
+	operations := []*types.Operation{}
+	if startingOperationIndex != nil {
+		opIndex = *startingOperationIndex
+	} else {
+		opIndex = 0
+	}
+	for address, value := range valueMap {
+		accID, rosettaError := newAccountIdentifier(address)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: opIndex,
+			},
+			Type:    opType,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: accID,
+			Amount: &types.Amount{
+				Value:    value.String(),
+				Currency: &common.NativeCurrency,
+			},
+		})
+		opIndex++
+	}
+	return operations, nil
 }
 
 func getAmountFromCreateValidatorMessage(data []byte) (*types.Amount, *types.Error) {
@@ -382,9 +451,9 @@ func newContractCreationNativeOperations(
 	}, nil
 }
 
-// newNativeOperations creates a new operation with the gas fee as the first operation.
+// newNativeOperationsWithGas creates a new operation with the gas fee as the first operation.
 // Note: the gas fee is gasPrice * gasUsed.
-func newNativeOperations(
+func newNativeOperationsWithGas(
 	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
 ) []*types.Operation {
 	return []*types.Operation{

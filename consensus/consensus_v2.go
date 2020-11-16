@@ -22,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -32,10 +33,10 @@ var (
 // timeout constant
 const (
 	// CommitSigSenderTimeout is the timeout for sending the commit sig to finish block proposal
-	CommitSigSenderTimeout = 6 * time.Second
+	CommitSigSenderTimeout = 10 * time.Second
 	// CommitSigReceiverTimeout is the timeout for the receiving side of the commit sig
 	// if timeout, the receiver should instead ready directly from db for the commit sig
-	CommitSigReceiverTimeout = 4 * time.Second
+	CommitSigReceiverTimeout = 8 * time.Second
 )
 
 // IsViewChangingMode return true if curernt mode is viewchanging
@@ -112,8 +113,10 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
+	numCommits := consensus.Decider.SignersCount(quorum.Commit)
+
 	consensus.getLogger().Info().
-		Int64("NumCommits", consensus.Decider.SignersCount(quorum.Commit)).
+		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.blockNum
 
@@ -176,6 +179,7 @@ func (consensus *Consensus) finalCommit() {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[finalCommit] Sent Committed Message")
 		}
+		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 	} else {
 		// delayed send
@@ -199,9 +203,7 @@ func (consensus *Consensus) finalCommit() {
 
 	if consensus.consensusTimeout[timeoutBootstrap].IsActive() {
 		consensus.consensusTimeout[timeoutBootstrap].Stop()
-		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer; stop bootstrap timer only once")
-	} else {
-		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
+		consensus.getLogger().Info().Msg("[finalCommit] stop bootstrap timer only once")
 	}
 
 	consensus.getLogger().Info().
@@ -212,6 +214,8 @@ func (consensus *Consensus) finalCommit() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
+
+	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
@@ -281,7 +285,7 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
 		defer close(stoppedChan)
-		ticker := time.NewTicker(3 * time.Second)
+		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
@@ -295,7 +299,6 @@ func (consensus *Consensus) Start(
 			case <-toStart:
 				start = true
 			case <-ticker.C:
-				consensus.getLogger().Debug().Msg("[ConsensusMainLoop] Ticker")
 				if !start && isInitialLeader {
 					continue
 				}
@@ -325,8 +328,10 @@ func (consensus *Consensus) Start(
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
 					consensus.current.SetMode(mode)
+					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
+					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 				}
 				consensus.mutex.Unlock()
 
@@ -335,6 +340,7 @@ func (consensus *Consensus) Start(
 				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
+				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 
 			case newBlock := <-blockChannel:
 				consensus.getLogger().Info().
@@ -432,19 +438,6 @@ func (consensus *Consensus) Start(
 					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
 					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
 				consensus.announce(newBlock)
-
-			case viewID := <-consensus.commitFinishChan:
-				consensus.getLogger().Info().Uint64("viewID", viewID).Msg("[ConsensusMainLoop] commitFinishChan")
-
-				// Only Leader execute this condition
-				func() {
-					consensus.mutex.Lock()
-					defer consensus.mutex.Unlock()
-					if viewID == consensus.GetCurBlockViewID() {
-						consensus.finalCommit()
-					}
-				}()
-
 			case <-stopChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] stopChan")
 				return
@@ -570,6 +563,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				Uint64("blockNum", consensus.blockNum).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
+		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
 		// Send signal to Node to propose the new block for consensus
@@ -638,9 +632,9 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 		return errIncorrectSender
 	}
 
+	consensus.FinishFinalityCount()
 	consensus.PostConsensusJob(blk)
 	consensus.SetupForNewConsensus(blk, committedMsg)
-	consensus.FinishFinalityCount()
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
 		Msg("Added New Block to Blockchain!!!")
@@ -656,6 +650,7 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	if blk.IsLastBlockInEpoch() {
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
+	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.ResetState()
 }
 
@@ -672,8 +667,6 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
-	// clean up old log
-	consensus.FBFTLog.PruneCacheBeforeBlock(consensus.blockNum)
 }
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block

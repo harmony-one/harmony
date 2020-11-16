@@ -15,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // MaxViewIDDiff limits the received view ID to only 249 further from the current view ID
@@ -125,22 +126,23 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		return consensus.fallbackNextViewID()
 	}
 	blockTimestamp := curHeader.Time().Int64()
-	lastBlockViewID := curHeader.ViewID().Uint64()
+	stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 	curTimestamp := time.Now().Unix()
 
 	// timestamp messed up in current validator node
 	if curTimestamp <= blockTimestamp {
 		return consensus.fallbackNextViewID()
 	}
-	// diff only increases
-	diff := uint64((curTimestamp - blockTimestamp) / viewChangeTimeout)
-	nextViewID := diff + lastBlockViewID
+	// diff only increases, since view change timeout is shorter than
+	// view change slot now, we want to make sure diff is always greater than 0
+	diff := uint64((curTimestamp-blockTimestamp)/viewChangeSlot + 1)
+	nextViewID := diff + stuckBlockViewID
 
 	consensus.getLogger().Info().
 		Int64("curTimestamp", curTimestamp).
 		Int64("blockTimestamp", blockTimestamp).
 		Uint64("nextViewID", nextViewID).
-		Uint64("lastBlockViewID", lastBlockViewID).
+		Uint64("stuckBlockViewID", stuckBlockViewID).
 		Msg("[getNextViewID]")
 
 	// duration is always the fixed view change duration for synchronous view change
@@ -169,6 +171,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			consensus.getLogger().Error().Msg("[getNextLeaderKey] Failed to get current header from blockchain")
 			lastLeaderPubKey = consensus.LeaderPubKey
 		} else {
+			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
+			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
 			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
 			if err != nil || lastLeaderPubKey == nil {
@@ -237,6 +241,7 @@ func (consensus *Consensus) startViewChange() {
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
+	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
@@ -351,7 +356,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 		return
 	}
 
-	if consensus.Decider.IsQuorumAchieved(quorum.ViewChange) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).
@@ -541,6 +546,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
+	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
 }
 
 // ResetViewChangeState resets the view change structure

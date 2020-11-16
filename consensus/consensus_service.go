@@ -2,11 +2,13 @@ package consensus
 
 import (
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/params"
 
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -26,6 +28,11 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+)
+
+var (
+	logOnce sync.Once
+	logger  zerolog.Logger
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -165,11 +172,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.aggregatedCommitSig = nil
 }
 
-// ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
-func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.IgnoreViewIDCheck.Toggle()
-}
-
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
@@ -209,9 +211,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("Start consensus timer")
+			Msg("[checkViewID] Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
@@ -511,6 +513,7 @@ func (consensus *Consensus) StartFinalityCount() {
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
 	consensus.finality = (d - consensus.finalityCounter) / 1000000
+	consensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
 // GetFinality returns the finality time in milliseconds of previous consensus
@@ -595,13 +598,36 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	return nil
 }
 
+// NumSignaturesIncludedInBlock returns the number of signatures included in the block
+func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
+	count := uint32(0)
+	members := consensus.Decider.Participants()
+	// TODO(audit): do not reconstruct the Mask
+	mask, err := bls.NewMask(members, nil)
+	if err != nil {
+		return count
+	}
+	err = mask.SetMask(block.Header().LastCommitBitmap())
+	if err != nil {
+		return count
+	}
+	for _, key := range consensus.GetPublicKeys() {
+		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
+			count++
+		}
+	}
+	return count
+}
+
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
-	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.GetCurBlockViewID()).
-		Str("phase", consensus.phase.String()).
-		Str("mode", consensus.current.Mode().String()).
-		Logger()
+	logOnce.Do(func() {
+		logger = utils.Logger().With().
+			Uint64("myBlock", consensus.blockNum).
+			Uint64("myViewID", consensus.GetCurBlockViewID()).
+			Str("phase", consensus.phase.String()).
+			Str("mode", consensus.current.Mode().String()).
+			Logger()
+	})
 	return &logger
 }
