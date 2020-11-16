@@ -214,9 +214,8 @@ func (consensus *Consensus) finalCommit() {
 		Int("numTxns", len(block.Transactions())).
 		Int("numStakingTxns", len(block.StakingTransactions())).
 		Msg("HOORAY!!!!!!! CONSENSUS REACHED!!!!!!!")
-	ConsensusCounterVec.With(prometheus.Labels{"consensus": "hooray"}).Inc()
-	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(float64(block.NumberU64()))
-	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(float64(numCommits))
+
+	consensus.UpdateLeaderMetrics(float64(numCommits), float64(block.NumberU64()))
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
@@ -332,7 +331,7 @@ func (consensus *Consensus) Start(
 					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
-					ConsensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
+					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 				}
 				consensus.mutex.Unlock()
 
@@ -341,7 +340,7 @@ func (consensus *Consensus) Start(
 				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 				consensus.current.SetMode(Syncing)
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
-				ConsensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
+				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 
 			case newBlock := <-blockChannel:
 				consensus.getLogger().Info().

@@ -241,7 +241,7 @@ func (consensus *Consensus) startViewChange() {
 		Dur("timeoutDuration", duration).
 		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("[startViewChange]")
-	ConsensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
+	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
 
 	consensus.consensusTimeout[timeoutViewChange].SetDuration(duration)
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
@@ -546,7 +546,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
-	ConsensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
+	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()
 }
 
 // ResetViewChangeState resets the view change structure

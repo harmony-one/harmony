@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	// ConsensusCounterVec is used to keep track of consensus reached
-	ConsensusCounterVec = promauto.NewCounterVec(
+	// consensusCounterVec is used to keep track of consensus reached
+	consensusCounterVec = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "consensus",
@@ -18,8 +18,8 @@ var (
 			"consensus",
 		},
 	)
-	// ConsensusVCCounterVec is used to keep track of number of view change
-	ConsensusVCCounterVec = promauto.NewCounterVec(
+	// consensusVCCounterVec is used to keep track of number of view change
+	consensusVCCounterVec = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "consensus",
@@ -30,8 +30,8 @@ var (
 			"viewchange",
 		},
 	)
-	// ConsensusSyncCounterVec is used to keep track of consensus syncing state
-	ConsensusSyncCounterVec = promauto.NewCounterVec(
+	// consensusSyncCounterVec is used to keep track of consensus syncing state
+	consensusSyncCounterVec = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "consensus",
@@ -42,8 +42,8 @@ var (
 			"consensus",
 		},
 	)
-	// ConsensusGaugeVec is used to keep track of gauge number of the consensus
-	ConsensusGaugeVec = promauto.NewGaugeVec(
+	// consensusGaugeVec is used to keep track of gauge number of the consensus
+	consensusGaugeVec = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "hmy",
 			Subsystem: "consensus",
@@ -54,10 +54,10 @@ var (
 			"consensus",
 		},
 	)
-	// ConsensusFinalityHistogram is used to keep track of finality
+	// consensusFinalityHistogram is used to keep track of finality
 	// 10 ExponentialBuckets are in the unit of millisecond:
 	// 800, 1000, 1250, 1562, 1953, 2441, 3051, 3814, 4768, 5960, inf
-	ConsensusFinalityHistogram = promauto.NewHistogram(
+	consensusFinalityHistogram = promauto.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: "hmy",
 			Subsystem: "consensus",
@@ -68,9 +68,18 @@ var (
 	)
 )
 
+// UpdateValidatorMetrics will udpate validator metrics
 func (consensus *Consensus) UpdateValidatorMetrics(numSig float64, blockNum float64) {
-	ConsensusCounterVec.With(prometheus.Labels{"consensus": "bingo"}).Inc()
-	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
-	ConsensusCounterVec.With(prometheus.Labels{"consensus": "signatures"}).Add(numSig)
-	ConsensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(blockNum)
+	consensusCounterVec.With(prometheus.Labels{"consensus": "bingo"}).Inc()
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "signatures"}).Set(numSig)
+	consensusCounterVec.With(prometheus.Labels{"consensus": "signatures"}).Add(numSig)
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(blockNum)
+}
+
+// UpdateLeaderMetrics will udpate leader metrics
+func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum float64) {
+	consensusCounterVec.With(prometheus.Labels{"consensus": "hooray"}).Inc()
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "block_num"}).Set(blockNum)
+	consensusCounterVec.With(prometheus.Labels{"consensus": "num_commits"}).Add(numCommits)
+	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
