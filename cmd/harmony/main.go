@@ -200,6 +200,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPrometheusFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyConfig) {
@@ -331,9 +332,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	// Pares Prometheus config
 	nodeConfig.PrometheusServer = nodeconfig.PrometheusServerConfig{
-		HTTPEnabled: hc.HTTP.PrometheusEnabled,
-		HTTPIp:      hc.HTTP.PrometheusIP,
-		HTTPPort:    hc.HTTP.PrometheusPort,
+		HTTPEnabled: hc.Prometheus.Enabled,
+		HTTPIp:      hc.Prometheus.IP,
+		HTTPPort:    hc.Prometheus.Port,
 	}
 
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
