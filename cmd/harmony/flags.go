@@ -51,9 +51,6 @@ var (
 		httpIPFlag,
 		httpPortFlag,
 		httpRosettaPortFlag,
-		httpPrometheusEnabledFlag,
-		httpPrometheusIPFlag,
-		httpPrometheusPortFlag,
 	}
 
 	wsFlags = []cli.Flag{
@@ -167,6 +164,12 @@ var (
 		legacyPublicRPCFlag,
 		legacyWebHookConfigFlag,
 		legacyTPBroadcastInvalidTxFlag,
+	}
+
+	prometheusFlags = []cli.Flag{
+		prometheusEnabledFlag,
+		prometheusIPFlag,
+		prometheusPortFlag,
 	}
 )
 
@@ -448,25 +451,10 @@ var (
 		Usage:    "rosetta port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.RosettaPort,
 	}
-	httpPrometheusEnabledFlag = cli.BoolFlag{
-		Name:     "http.prometheus",
-		Usage:    "enable HTTP / Prometheus requests",
-		DefValue: defaultConfig.HTTP.PrometheusEnabled,
-	}
-	httpPrometheusIPFlag = cli.StringFlag{
-		Name:     "http.prometheus.ip",
-		Usage:    "ip address to listen for prometheus service",
-		DefValue: defaultConfig.HTTP.PrometheusIP,
-	}
-	httpPrometheusPortFlag = cli.IntFlag{
-		Name:     "http.prometheus.port",
-		Usage:    "prometheus port to listen for HTTP requests",
-		DefValue: defaultConfig.HTTP.PrometheusPort,
-	}
 )
 
 func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
-	var isRPCSpecified, isRosettaSpecified, isPrometheusSpecified bool
+	var isRPCSpecified, isRosettaSpecified bool
 
 	if cli.IsFlagChanged(cmd, httpIPFlag) {
 		config.HTTP.IP = cli.GetStringFlagValue(cmd, httpIPFlag)
@@ -483,16 +471,6 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 		isRosettaSpecified = true
 	}
 
-	if cli.IsFlagChanged(cmd, httpPrometheusIPFlag) {
-		config.HTTP.PrometheusIP = cli.GetStringFlagValue(cmd, httpPrometheusIPFlag)
-		isPrometheusSpecified = true
-	}
-
-	if cli.IsFlagChanged(cmd, httpPrometheusPortFlag) {
-		config.HTTP.PrometheusPort = cli.GetIntFlagValue(cmd, httpPrometheusPortFlag)
-		isPrometheusSpecified = true
-	}
-
 	if cli.IsFlagChanged(cmd, httpRosettaEnabledFlag) {
 		config.HTTP.RosettaEnabled = cli.GetBoolFlagValue(cmd, httpRosettaEnabledFlag)
 	} else if isRosettaSpecified {
@@ -503,12 +481,6 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.HTTP.Enabled = cli.GetBoolFlagValue(cmd, httpEnabledFlag)
 	} else if isRPCSpecified {
 		config.HTTP.Enabled = true
-	}
-
-	if cli.IsFlagChanged(cmd, httpPrometheusEnabledFlag) {
-		config.HTTP.PrometheusEnabled = cli.GetBoolFlagValue(cmd, httpPrometheusEnabledFlag)
-	} else if isPrometheusSpecified {
-		config.HTTP.PrometheusEnabled = true
 	}
 
 }
@@ -1170,7 +1142,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.P2P.Port = legacyPort
 		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
-		config.HTTP.PrometheusPort = nodeconfig.GetPrometheusHTTPPortFromBase(legacyPort)
+		config.Prometheus.Port = nodeconfig.GetPrometheusHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 
@@ -1212,6 +1184,44 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 			val := cli.GetBoolFlagValue(cmd, legacyTPBroadcastInvalidTxFlag)
 			config.Legacy.TPBroadcastInvalidTxn = &val
 		}
+	}
+
+}
+
+var (
+	prometheusEnabledFlag = cli.BoolFlag{
+		Name:     "prometheus",
+		Usage:    "enable HTTP / Prometheus requests",
+		DefValue: defaultConfig.Prometheus.Enabled,
+	}
+	prometheusIPFlag = cli.StringFlag{
+		Name:     "prometheus.ip",
+		Usage:    "ip address to listen for prometheus service",
+		DefValue: defaultConfig.Prometheus.IP,
+	}
+	prometheusPortFlag = cli.IntFlag{
+		Name:     "prometheus.port",
+		Usage:    "prometheus port to listen for HTTP requests",
+		DefValue: defaultConfig.Prometheus.Port,
+	}
+)
+
+func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if config.Prometheus == nil {
+		cfg := getDefaultPrometheusConfigCopy()
+		config.Prometheus = &cfg
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusIPFlag) {
+		config.Prometheus.IP = cli.GetStringFlagValue(cmd, prometheusIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusPortFlag) {
+		config.Prometheus.Port = cli.GetIntFlagValue(cmd, prometheusPortFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusEnabledFlag) {
+		config.Prometheus.Enabled = cli.GetBoolFlagValue(cmd, prometheusEnabledFlag)
 	}
 
 }
