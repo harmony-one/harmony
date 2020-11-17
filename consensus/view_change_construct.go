@@ -109,7 +109,7 @@ func (vc *viewChange) Reset() {
 }
 
 // GetPreparedBlock returns the prepared block or nil if not found
-func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte, []byte) {
+func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
 	vc.vcLock.RLock()
 	defer vc.vcLock.RUnlock()
 
@@ -117,7 +117,11 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte,
 		return nil, nil
 	}
 
-	if block := fbftlog.GetBlockByHash(hash); block != nil {
+	blockHash := [32]byte{}
+	// First 32 bytes of m1 payload is the correct block hash
+	copy(blockHash[:], vc.GetM1Payload())
+
+	if block := fbftlog.GetBlockByHash(blockHash); block != nil {
 		encodedBlock, err := rlp.EncodeToBytes(block)
 		if err != nil || len(encodedBlock) == 0 {
 			return nil, nil

@@ -115,7 +115,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 	}
 
 	vcMsg := message.GetViewchange()
-	vcMsg.Payload, vcMsg.PreparedBlock = consensus.vc.GetPreparedBlock(consensus.FBFTLog, consensus.blockHash)
+	vcMsg.Payload, vcMsg.PreparedBlock = consensus.vc.GetPreparedBlock(consensus.FBFTLog)
 	vcMsg.M2Aggsigs, vcMsg.M2Bitmap = consensus.vc.GetM2Bitmap(viewID)
 	vcMsg.M3Aggsigs, vcMsg.M3Bitmap = consensus.vc.GetM3Bitmap(viewID)
 	if vcMsg.M3Bitmap == nil || vcMsg.M3Aggsigs == nil {
