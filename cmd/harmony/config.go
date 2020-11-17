@@ -269,6 +269,9 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	if config.P2P.IP == "" {
 		config.P2P.IP = defaultConfig.P2P.IP
 	}
+	if config.Prometheus == nil {
+		config.Prometheus = defaultConfig.Prometheus
+	}
 	return config, nil
 }
 
