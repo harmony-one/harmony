@@ -16,13 +16,14 @@ import (
 
 // PrometheusConfig is the config for the prometheus service
 type PrometheusConfig struct {
-	Enabled  bool
-	IP       string
-	Port     int
-	Gateway  string // address of the pushgateway
-	Network  string // network type, used as job prefix
-	Shard    uint32 // shard id, used as job suffix
-	Instance string //identifier of the instance in prometheus metrics
+	Enabled    bool
+	IP         string
+	Port       int
+	EnablePush bool   // enable pushgateway support
+	Gateway    string // address of the pushgateway
+	Network    string // network type, used as job prefix
+	Shard      uint32 // shard id, used as job suffix
+	Instance   string //identifier of the instance in prometheus metrics
 }
 
 // Service provides Prometheus metrics via the /metrics route. This route will
@@ -69,6 +70,10 @@ func NewService(additionalHandlers ...Handler) {
 	// start pusher to push metrics to prometheus pushgateway
 	// every minute
 	go func(config PrometheusConfig) {
+		if !config.EnablePush {
+			utils.Logger().Info().Msg("Prometheus pushgateway support is disabled...")
+			return
+		}
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -130,6 +135,7 @@ func SetConfig(
 	enabled bool,
 	ip string,
 	port int,
+	enablepush bool,
 	gateway string,
 	network string,
 	shard uint32,
@@ -138,6 +144,7 @@ func SetConfig(
 	config.Enabled = enabled
 	config.IP = ip
 	config.Port = port
+	config.EnablePush = enablepush
 	config.Gateway = gateway
 	config.Network = network
 	config.Shard = shard

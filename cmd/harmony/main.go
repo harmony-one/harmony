@@ -377,6 +377,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		hc.Prometheus.Enabled,
 		hc.Prometheus.IP,
 		hc.Prometheus.Port,
+		hc.Prometheus.EnablePush,
 		hc.Prometheus.Gateway,
 		hc.Network.NetworkType,
 		nodeConfig.ShardID,

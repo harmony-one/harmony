@@ -66,10 +66,11 @@ var defaultConfig = harmonyConfig{
 		Verbosity:  3,
 	},
 	Prometheus: &prometheusConfig{
-		Enabled: true,
-		IP:      "0.0.0.0",
-		Port:    nodeconfig.DefaultPrometheusPort,
-		Gateway: "https://gateway.harmony.one",
+		Enabled:    true,
+		IP:         "0.0.0.0",
+		Port:       nodeconfig.DefaultPrometheusPort,
+		Gateway:    "https://gateway.harmony.one",
+		EnablePush: true,
 	},
 }
 
@@ -100,10 +101,11 @@ var defaultConsensusConfig = consensusConfig{
 }
 
 var defaultPrometheusConfig = prometheusConfig{
-	Enabled: true,
-	IP:      "0.0.0.0",
-	Port:    9900,
-	Gateway: "https://gateway.harmony.one",
+	Enabled:    true,
+	IP:         "0.0.0.0",
+	Port:       9900,
+	EnablePush: true,
+	Gateway:    "https://gateway.harmony.one",
 }
 
 const (
