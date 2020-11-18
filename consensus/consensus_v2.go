@@ -157,7 +157,6 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
-		return
 	}
 
 	// if leader successfully finalizes the block, send committed message to validators
