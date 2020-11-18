@@ -14,14 +14,14 @@ var (
 )
 
 // Pusher returns the pusher, initialized once only
-func PromPusher(pubkey string) *push.Pusher {
+func PromPusher(job string, instance string) *push.Pusher {
 	onceForPusher.Do(func() {
 		if registry == nil {
 			registry = prometheus.NewRegistry()
 		}
-		pusher = push.New("https://gateway.harmony.one", "hmy").
+		pusher = push.New("https://gateway.harmony.one", job).
 			Gatherer(registry).
-			Grouping("instance", pubkey)
+			Grouping("instance", instance)
 	})
 	return pusher
 }

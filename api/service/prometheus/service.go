@@ -57,18 +57,18 @@ func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...
 
 	// start pusher to push metrics to prometheus pushgateway
 	// every minute
-	go func(instance string) {
+	go func(job string, instance string) {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				if err := utils.PromPusher(instance).Add(); err != nil {
+				if err := utils.PromPusher(job, instance).Add(); err != nil {
 					utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
 				}
 			}
 		}
-	}(config.Instance)
+	}(fmt.Sprintf("%s/%d", config.Network, config.Shard), config.Instance)
 	svc.Start()
 }
 
