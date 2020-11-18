@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"runtime/debug"
 	"runtime/pprof"
+	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
 )
 
 // PrometheusConfig is the config for the prometheus service
@@ -30,6 +33,8 @@ type PrometheusConfig struct {
 // show all the metrics registered with the Prometheus DefaultRegisterer.
 type Service struct {
 	server     *http.Server
+	registry   *prometheus.Registry
+	pusher     *push.Pusher
 	failStatus error
 }
 
@@ -40,8 +45,9 @@ type Handler struct {
 }
 
 var (
-	svc    = &Service{}
-	config = PrometheusConfig{}
+	registryOnce sync.Once
+	svc          = &Service{}
+	config       = PrometheusConfig{}
 )
 
 // NewService sets up a new instance for a given address host:port.
@@ -66,25 +72,30 @@ func NewService(additionalHandlers ...Handler) {
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", config.IP, config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
+	if svc.registry == nil {
+		svc.registry = prometheus.NewRegistry()
+	}
+	if config.EnablePush {
+		utils.Logger().Info().Msg("Prometheus enabled pushgateway support ...")
+		svc.pusher = push.New(config.Gateway, fmt.Sprintf("%s/%d", config.Network, config.Shard)).
+			Gatherer(svc.registry).
+			Grouping("instance", config.Instance)
 
-	// start pusher to push metrics to prometheus pushgateway
-	// every minute
-	go func(config PrometheusConfig) {
-		if !config.EnablePush {
-			utils.Logger().Info().Msg("Prometheus pushgateway support is disabled...")
-			return
-		}
-		ticker := time.NewTicker(time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				if err := PromPusher(config).Add(); err != nil {
-					utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
+		// start pusher to push metrics to prometheus pushgateway
+		// every minute
+		go func(config PrometheusConfig) {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if err := svc.pusher.Add(); err != nil {
+						utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
+					}
 				}
 			}
-		}
-	}(config)
+		}(config)
+	}
 	svc.Start()
 }
 
@@ -154,4 +165,13 @@ func SetConfig(
 // GetConfig return the prometheus config
 func GetConfig() PrometheusConfig {
 	return config
+}
+
+func PromRegistry() *prometheus.Registry {
+	registryOnce.Do(func() {
+		if svc.registry == nil {
+			svc.registry = prometheus.NewRegistry()
+		}
+	})
+	return svc.registry
 }
