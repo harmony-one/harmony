@@ -10,10 +10,20 @@ import (
 	"runtime/pprof"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// PrometheusConfig is the config for the prometheus service
+type PrometheusConfig struct {
+	Enabled  bool
+	IP       string
+	Port     int
+	Gateway  string // address of the pushgateway
+	Network  string // network type, used as job prefix
+	Shard    uint32 // shard id, used as job suffix
+	Instance string //identifier of the instance in prometheus metrics
+}
 
 // Service provides Prometheus metrics via the /metrics route. This route will
 // show all the metrics registered with the Prometheus DefaultRegisterer.
@@ -29,13 +39,14 @@ type Handler struct {
 }
 
 var (
-	svc = &Service{}
+	svc    = &Service{}
+	config = PrometheusConfig{}
 )
 
 // NewService sets up a new instance for a given address host:port.
 // An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
-func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...Handler) {
-	if !config.HTTPEnabled {
+func NewService(additionalHandlers ...Handler) {
+	if !config.Enabled {
 		utils.Logger().Info().Msg("Prometheus http server disabled...")
 		return
 	}
@@ -49,26 +60,26 @@ func NewService(config nodeconfig.PrometheusServerConfig, additionalHandlers ...
 		mux.HandleFunc(h.Path, h.Handler)
 	}
 
-	utils.Logger().Debug().Int("port", config.HTTPPort).
-		Str("ip", config.HTTPIp).
+	utils.Logger().Debug().Int("port", config.Port).
+		Str("ip", config.IP).
 		Msg("Starting Prometheus server")
-	endpoint := fmt.Sprintf("%s:%d", config.HTTPIp, config.HTTPPort)
+	endpoint := fmt.Sprintf("%s:%d", config.IP, config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
 
 	// start pusher to push metrics to prometheus pushgateway
 	// every minute
-	go func(job string, instance string) {
+	go func(config PrometheusConfig) {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				if err := utils.PromPusher(job, instance).Add(); err != nil {
+				if err := PromPusher(config).Add(); err != nil {
 					utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
 				}
 			}
 		}
-	}(fmt.Sprintf("%s/%d", config.Network, config.Shard), config.Instance)
+	}(config)
 	svc.Start()
 }
 
@@ -112,4 +123,28 @@ func (s *Service) Status() error {
 		return s.failStatus
 	}
 	return nil
+}
+
+// SetConfig initialize the prometheus config
+func SetConfig(
+	enabled bool,
+	ip string,
+	port int,
+	gateway string,
+	network string,
+	shard uint32,
+	instance string,
+) {
+	config.Enabled = enabled
+	config.IP = ip
+	config.Port = port
+	config.Gateway = gateway
+	config.Network = network
+	config.Shard = shard
+	config.Instance = instance
+}
+
+// GetConfig return the prometheus config
+func GetConfig() PrometheusConfig {
+	return config
 }

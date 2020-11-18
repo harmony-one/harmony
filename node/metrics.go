@@ -1,7 +1,7 @@
 package node
 
 import (
-	"github.com/harmony-one/harmony/internal/utils"
+	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -57,7 +57,7 @@ var (
 )
 
 func initMetrics() {
-	utils.PromRegistry().MustRegister(
+	prom.PromRegistry().MustRegister(
 		nodeStringCounterVec,
 		nodeP2PMessageCounterVec,
 		nodeConsensusMessageCounterVec,

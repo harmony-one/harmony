@@ -170,6 +170,7 @@ var (
 		prometheusEnabledFlag,
 		prometheusIPFlag,
 		prometheusPortFlag,
+		prometheusGatewayFlag,
 	}
 )
 
@@ -257,6 +258,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
 	flags = append(flags, legacyMiscFlags...)
+	flags = append(flags, prometheusFlags...)
 
 	return flags
 }

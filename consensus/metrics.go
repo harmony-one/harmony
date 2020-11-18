@@ -1,7 +1,7 @@
 package consensus
 
 import (
-	"github.com/harmony-one/harmony/internal/utils"
+	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -88,7 +88,7 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 }
 
 func initMetrics() {
-	utils.PromRegistry().MustRegister(
+	prom.PromRegistry().MustRegister(
 		consensusCounterVec,
 		consensusVCCounterVec,
 		consensusSyncCounterVec,

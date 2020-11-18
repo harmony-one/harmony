@@ -1,6 +1,7 @@
-package utils
+package prometheus
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"sync"
@@ -14,14 +15,14 @@ var (
 )
 
 // Pusher returns the pusher, initialized once only
-func PromPusher(job string, instance string) *push.Pusher {
+func PromPusher(config PrometheusConfig) *push.Pusher {
 	onceForPusher.Do(func() {
 		if registry == nil {
 			registry = prometheus.NewRegistry()
 		}
-		pusher = push.New("https://gateway.harmony.one", job).
+		pusher = push.New(config.Gateway, fmt.Sprintf("%s/%d", config.Network, config.Shard)).
 			Gatherer(registry).
-			Grouping("instance", instance)
+			Grouping("instance", config.Instance)
 	})
 	return pusher
 }

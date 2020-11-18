@@ -19,6 +19,7 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
@@ -330,17 +331,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 		HTTPPort:    hc.HTTP.RosettaPort,
 	}
 
-	// Pares Prometheus config
-	nodeConfig.PrometheusServer = nodeconfig.PrometheusServerConfig{
-		HTTPEnabled: hc.Prometheus.Enabled,
-		HTTPIp:      hc.Prometheus.IP,
-		HTTPPort:    hc.Prometheus.Port,
-		Gateway:     hc.Prometheus.Gateway,
-		Network:     hc.Network.NetworkType,
-		Shard:       nodeConfig.ShardID,
-		Instance:    nodeconfig.GetPeerID().String(),
-	}
-
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
@@ -382,6 +372,16 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Msg(startMsg)
 
 	nodeconfig.SetPeerID(myHost.GetID())
+
+	prometheus.SetConfig(
+		hc.Prometheus.Enabled,
+		hc.Prometheus.IP,
+		hc.Prometheus.Port,
+		hc.Prometheus.Gateway,
+		hc.Network.NetworkType,
+		nodeConfig.ShardID,
+		myHost.GetID().Pretty(),
+	)
 
 	currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
