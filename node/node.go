@@ -370,7 +370,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 
 	// reject huge node messages
 	if len(payload) >= types.MaxEncodedPoolTransactionSize {
-		NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_oversized"}).Inc()
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_oversized"}).Inc()
 		return nil, 0, core.ErrOversizedData
 	}
 
@@ -380,39 +380,39 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	switch msgType {
 	case proto_node.Transaction:
 		// nothing much to validate transaction message unless decode the RLP
-		NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "tx"}).Inc()
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "tx"}).Inc()
 	case proto_node.Staking:
 		// nothing much to validate staking message unless decode the RLP
-		NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "staking_tx"}).Inc()
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "staking_tx"}).Inc()
 	case proto_node.Block:
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
-			NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
 			// only non-beacon nodes process the beacon block sync messages
 			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.SlashCandidate:
-			NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
 			// only beacon chain node process slash candidate messages
 			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.Receipt:
-			NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
 		case proto_node.CrossLink:
-			NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
 			// only beacon chain node process crosslink messages
 			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		default:
-			NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
 		}
 	default:
-		NodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_node_type"}).Inc()
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_node_type"}).Inc()
 		return nil, 0, errInvalidNodeMsg
 	}
 
@@ -430,7 +430,7 @@ func (node *Node) validateShardBoundMessage(
 		m msg_pb.Message
 	)
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
-		NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_unmarshal"}).Inc()
+		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_unmarshal"}).Inc()
 		return nil, nil, true, errors.WithStack(err)
 	}
 
@@ -443,7 +443,7 @@ func (node *Node) validateShardBoundMessage(
 			msg_pb.MessageType_COMMIT,
 			msg_pb.MessageType_VIEWCHANGE,
 			msg_pb.MessageType_NEWVIEW:
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -455,14 +455,14 @@ func (node *Node) validateShardBoundMessage(
 	if node.Consensus.IsViewChangingMode() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	} else {
 		// ignore viewchange/newview message if the node is not in viewchanging mode
 		switch m.Type {
 		case msg_pb.MessageType_NEWVIEW, msg_pb.MessageType_VIEWCHANGE:
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -471,7 +471,7 @@ func (node *Node) validateShardBoundMessage(
 	if node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -482,7 +482,7 @@ func (node *Node) validateShardBoundMessage(
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeCon.SenderPubkey
@@ -492,12 +492,12 @@ func (node *Node) validateShardBoundMessage(
 		}
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
 	} else {
-		NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
+		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
@@ -506,7 +506,7 @@ func (node *Node) validateShardBoundMessage(
 	if !node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -514,24 +514,24 @@ func (node *Node) validateShardBoundMessage(
 	serializedKey := bls.SerializedPublicKey{}
 	if len(senderKey) > 0 {
 		if len(senderKey) != bls.PublicKeySizeInBytes {
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_key_size"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_key_size"}).Inc()
 			return nil, nil, true, errors.WithStack(errNotRightKeySize)
 		}
 
 		copy(serializedKey[:], senderKey)
 		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
 		count := node.Consensus.Decider.ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
-			NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
 		}
 	}
 
-	NodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "valid"}).Inc()
+	nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "valid"}).Inc()
 
 	// serializedKey will be empty for multiSig sender
 	return &m, &serializedKey, false, nil
@@ -617,7 +617,7 @@ func (node *Node) Start() error {
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
-	NodeStringCounterVec.WithLabelValues("peerid", nodeconfig.GetPeerID().String()).Inc()
+	nodeStringCounterVec.WithLabelValues("peerid", nodeconfig.GetPeerID().String()).Inc()
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
@@ -637,13 +637,13 @@ func (node *Node) Start() error {
 			topicNamed,
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
-				NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
+				nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
 					// TODO (lc): block peers sending empty messages
-					NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
 
@@ -654,13 +654,13 @@ func (node *Node) Start() error {
 				case proto.Consensus:
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
-						NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_bound"}).Inc()
+						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_bound"}).Inc()
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
 						}
 						return libp2p_pubsub.ValidationReject
 					}
-					NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
 
 					// validate consensus message
 					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
@@ -688,10 +688,10 @@ func (node *Node) Start() error {
 				case proto.Node:
 					// node message is almost empty
 					if len(openBox) <= p2pNodeMsgPrefixSize {
-						NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
+						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
 						return libp2p_pubsub.ValidationReject
 					}
-					NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "node_total"}).Inc()
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "node_total"}).Inc()
 					validMsg, actionType, err := node.validateNodeMessage(
 						context.TODO(), openBox,
 					)
@@ -716,7 +716,7 @@ func (node *Node) Start() error {
 					return libp2p_pubsub.ValidationAccept
 				default:
 					// ignore garbled messages
-					NodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
 
@@ -989,7 +989,7 @@ func New(
 
 	// init metrics
 	initMetrics()
-	NodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
+	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
 	return &node
 }
