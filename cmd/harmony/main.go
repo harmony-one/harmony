@@ -335,6 +335,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 		HTTPEnabled: hc.Prometheus.Enabled,
 		HTTPIp:      hc.Prometheus.IP,
 		HTTPPort:    hc.Prometheus.Port,
+		Gateway:     hc.Prometheus.Gateway,
+		Network:     hc.Network.NetworkType,
+		Shard:       nodeConfig.ShardID,
 	}
 
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {

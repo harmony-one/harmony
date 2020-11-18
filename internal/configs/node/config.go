@@ -120,6 +120,9 @@ type PrometheusServerConfig struct {
 	HTTPEnabled bool
 	HTTPIp      string
 	HTTPPort    int
+	Gateway     string
+	Network     string
+	Shard       uint32
 }
 
 // configs is a list of node configuration.
