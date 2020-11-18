@@ -120,9 +120,10 @@ type PrometheusServerConfig struct {
 	HTTPEnabled bool
 	HTTPIp      string
 	HTTPPort    int
-	Gateway     string
-	Network     string
-	Shard       uint32
+	Gateway     string // address of the pushgateway
+	Network     string // network type, used as job prefix
+	Shard       uint32 // shard id, used as job suffix
+	Instance    string //identifier of the instance in prometheus metrics
 }
 
 // configs is a list of node configuration.

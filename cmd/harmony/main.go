@@ -338,6 +338,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 		Gateway:     hc.Prometheus.Gateway,
 		Network:     hc.Network.NetworkType,
 		Shard:       nodeConfig.ShardID,
+		Instance:    nodeconfig.GetPeerID().String(),
 	}
 
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
@@ -398,7 +399,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	if err := currentNode.StartPrometheus(nodeconfig.GetDefaultConfig().ConsensusPriKey.GetPublicKeys().SerializeToHexStr()); err != nil {
+	if err := currentNode.StartPrometheus(); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Prometheus failed")
