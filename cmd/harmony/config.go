@@ -17,22 +17,23 @@ import (
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
 type harmonyConfig struct {
-	Version   string
-	General   generalConfig
-	Network   networkConfig
-	P2P       p2pConfig
-	HTTP      httpConfig
-	WS        wsConfig
-	RPCOpt    rpcOptConfig
-	BLSKeys   blsConfig
-	TxPool    txPoolConfig
-	Pprof     pprofConfig
-	Log       logConfig
-	Sys       *sysConfig       `toml:",omitempty"`
-	Consensus *consensusConfig `toml:",omitempty"`
-	Devnet    *devnetConfig    `toml:",omitempty"`
-	Revert    *revertConfig    `toml:",omitempty"`
-	Legacy    *legacyConfig    `toml:",omitempty"`
+	Version    string
+	General    generalConfig
+	Network    networkConfig
+	P2P        p2pConfig
+	HTTP       httpConfig
+	WS         wsConfig
+	RPCOpt     rpcOptConfig
+	BLSKeys    blsConfig
+	TxPool     txPoolConfig
+	Pprof      pprofConfig
+	Log        logConfig
+	Sys        *sysConfig        `toml:",omitempty"`
+	Consensus  *consensusConfig  `toml:",omitempty"`
+	Devnet     *devnetConfig     `toml:",omitempty"`
+	Revert     *revertConfig     `toml:",omitempty"`
+	Legacy     *legacyConfig     `toml:",omitempty"`
+	Prometheus *prometheusConfig `toml:",omitempty"`
 }
 
 type networkConfig struct {
@@ -106,14 +107,11 @@ type sysConfig struct {
 }
 
 type httpConfig struct {
-	Enabled           bool
-	IP                string
-	Port              int
-	RosettaEnabled    bool
-	RosettaPort       int
-	PrometheusEnabled bool
-	PrometheusIP      string
-	PrometheusPort    int
+	Enabled        bool
+	IP             string
+	Port           int
+	RosettaEnabled bool
+	RosettaPort    int
 }
 
 type wsConfig struct {
@@ -142,6 +140,12 @@ type revertConfig struct {
 type legacyConfig struct {
 	WebHookConfig         *string `toml:",omitempty"`
 	TPBroadcastInvalidTxn *bool   `toml:",omitempty"`
+}
+
+type prometheusConfig struct {
+	Enabled bool
+	IP      string
+	Port    int
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.
@@ -264,6 +268,9 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	}
 	if config.P2P.IP == "" {
 		config.P2P.IP = defaultConfig.P2P.IP
+	}
+	if config.Prometheus == nil {
+		config.Prometheus = defaultConfig.Prometheus
 	}
 	return config, nil
 }

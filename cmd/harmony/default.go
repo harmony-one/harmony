@@ -25,14 +25,11 @@ var defaultConfig = harmonyConfig{
 		KeyFile: "./.hmykey",
 	},
 	HTTP: httpConfig{
-		Enabled:           true,
-		RosettaEnabled:    false,
-		IP:                "127.0.0.1",
-		Port:              nodeconfig.DefaultRPCPort,
-		RosettaPort:       nodeconfig.DefaultRosettaPort,
-		PrometheusEnabled: true,
-		PrometheusIP:      "0.0.0.0",
-		PrometheusPort:    nodeconfig.DefaultPrometheusPort,
+		Enabled:        true,
+		RosettaEnabled: false,
+		IP:             "127.0.0.1",
+		Port:           nodeconfig.DefaultRPCPort,
+		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: wsConfig{
 		Enabled: true,
@@ -68,6 +65,11 @@ var defaultConfig = harmonyConfig{
 		RotateSize: 100,
 		Verbosity:  3,
 	},
+	Prometheus: &prometheusConfig{
+		Enabled: true,
+		IP:      "0.0.0.0",
+		Port:    nodeconfig.DefaultPrometheusPort,
+	},
 }
 
 var defaultSysConfig = sysConfig{
@@ -94,6 +96,12 @@ var defaultLogContext = logContext{
 var defaultConsensusConfig = consensusConfig{
 	MinPeers:     6,
 	AggregateSig: true,
+}
+
+var defaultPrometheusConfig = prometheusConfig{
+	Enabled: true,
+	IP:      "0.0.0.0",
+	Port:    9900,
 }
 
 const (
@@ -133,6 +141,11 @@ func getDefaultLogContextCopy() logContext {
 
 func getDefaultConsensusConfigCopy() consensusConfig {
 	config := defaultConsensusConfig
+	return config
+}
+
+func getDefaultPrometheusConfigCopy() prometheusConfig {
+	config := defaultPrometheusConfig
 	return config
 }
 
