@@ -1195,27 +1195,27 @@ var (
 	prometheusEnabledFlag = cli.BoolFlag{
 		Name:     "prometheus",
 		Usage:    "enable HTTP / Prometheus requests",
-		DefValue: defaultConfig.Prometheus.Enabled,
+		DefValue: defaultPrometheusConfig.Enabled,
 	}
 	prometheusIPFlag = cli.StringFlag{
 		Name:     "prometheus.ip",
 		Usage:    "ip address to listen for prometheus service",
-		DefValue: defaultConfig.Prometheus.IP,
+		DefValue: defaultPrometheusConfig.IP,
 	}
 	prometheusPortFlag = cli.IntFlag{
 		Name:     "prometheus.port",
 		Usage:    "prometheus port to listen for HTTP requests",
-		DefValue: defaultConfig.Prometheus.Port,
+		DefValue: defaultPrometheusConfig.Port,
 	}
 	prometheusGatewayFlag = cli.StringFlag{
 		Name:     "prometheus.pushgateway",
 		Usage:    "prometheus pushgateway URL",
-		DefValue: defaultConfig.Prometheus.Gateway,
+		DefValue: defaultPrometheusConfig.Gateway,
 	}
 	prometheusEnablePushFlag = cli.BoolFlag{
 		Name:     "prometheus.push",
 		Usage:    "enable prometheus pushgateway",
-		DefValue: defaultConfig.Prometheus.EnablePush,
+		DefValue: defaultPrometheusConfig.EnablePush,
 	}
 )
 
