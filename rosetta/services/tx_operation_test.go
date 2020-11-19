@@ -63,12 +63,9 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
 			Currency: &common.NativeCurrency,
@@ -195,12 +192,9 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
 			Currency: &common.NativeCurrency,
@@ -259,12 +253,9 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
 			Currency: &common.NativeCurrency,
@@ -323,12 +314,9 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
 			Currency: &common.NativeCurrency,
@@ -380,12 +368,9 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
 			Currency: &common.NativeCurrency,
@@ -404,7 +389,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	}
 }
 
-func TestNewTransferNativeOperations(t *testing.T) {
+func TestGetBasicTransferOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 0, 0, 1e18, gasPrice, big.NewInt(1), []byte("test"),
@@ -431,11 +416,6 @@ func TestNewTransferNativeOperations(t *testing.T) {
 		{
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
-			},
-			RelatedOperations: []*types.OperationIdentifier{
-				{
-					Index: startingOpID.Index,
-				},
 			},
 			Type:    common.NativeTransferOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
@@ -466,7 +446,8 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	receipt := &hmytypes.Receipt{
 		Status: hmytypes.ReceiptStatusFailed,
 	}
-	operations, rosettaError := newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getBasicSameShardTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -481,7 +462,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = getBasicSameShardTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -493,7 +474,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	}
 }
 
-func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
+func TestGetCrossShardSenderTransferNativeOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 1, 0, 1e18, gasPrice, big.NewInt(1), []byte("data-does-nothing"),
@@ -527,9 +508,6 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
 			},
-			RelatedOperations: []*types.OperationIdentifier{
-				startingOpID,
-			},
 			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
@@ -540,7 +518,8 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 			Metadata: metadata,
 		},
 	}
-	operations, rosettaError := newCrossShardSenderTransferNativeOperations(startingOpID, tx, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getCrossShardSenderTransferNativeOperations(tx, senderAddr, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -552,7 +531,7 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 	}
 }
 
-func TestNewContractCreationNativeOperations(t *testing.T) {
+func TestGetContractCreationNativeOperations(t *testing.T) {
 	dummyContractKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -586,9 +565,6 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
 			},
-			RelatedOperations: []*types.OperationIdentifier{
-				startingOpID,
-			},
 			Type:    common.ContractCreationOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
@@ -619,7 +595,8 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 		Status:          hmytypes.ReceiptStatusFailed,
 		ContractAddress: contractAddr,
 	}
-	operations, rosettaError := newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -634,7 +611,7 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

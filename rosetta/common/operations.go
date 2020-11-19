@@ -10,7 +10,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// Invariant: A transaction can only contain 1 type of native operation(s) other than gas expenditure.
 const (
 	// ExpendGasOperation is an operation that only affects the native currency.
 	ExpendGasOperation = "Gas"
