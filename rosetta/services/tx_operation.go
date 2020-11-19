@@ -21,7 +21,7 @@ import (
 // contract creation, cross-shard sender, same-shard transfer with and without code execution.
 // Native operations only include operations that affect the native currency balance of an account.
 func GetNativeOperationsFromTransaction(
-	tx *hmytypes.Transaction, receipt *hmytypes.Receipt,
+	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, contractInfo *ContractInfo,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
@@ -47,8 +47,12 @@ func GetNativeOperationsFromTransaction(
 		txOperations, rosettaError = getCrossShardSenderTransferNativeOperations(
 			tx, senderAddress, &startingOpIndex,
 		)
+	} else if contractInfo.ExecutionResult != nil && len(tx.Data()) > 0 {
+		txOperations, rosettaError = getContractTransferNativeOperations(
+			tx, receipt, senderAddress, tx.To(), contractInfo, &startingOpIndex,
+		)
 	} else {
-		txOperations, rosettaError = getBasicSameShardTransferNativeOperations(
+		txOperations, rosettaError = getBasicTransferNativeOperations(
 			tx, receipt, senderAddress, tx.To(), &startingOpIndex,
 		)
 	}
@@ -118,7 +122,7 @@ func GetNativeOperationsFromStakingTransaction(
 			Index: gasOperations[0].OperationIdentifier.Index + 1,
 		},
 		Type:     tx.StakingType().String(),
-		Status:   common.SuccessOperationStatus.Status,
+		Status:   GetTransactionStatus(tx, receipt),
 		Account:  accountID,
 		Amount:   amount,
 		Metadata: metadata,
@@ -159,9 +163,30 @@ func GetSideEffectOperationsFromGenesisSpec(
 	)
 }
 
-// getBasicSameShardTransferNativeOperations extracts & formats the basic native operation(s) for plain transaction.
+// GetTransactionStatus for any valid harmony transaction given its receipt.
+func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) string {
+	if _, ok := tx.(*hmytypes.Transaction); ok {
+		status := common.SuccessOperationStatus.Status
+		if receipt.Status == hmytypes.ReceiptStatusFailed {
+			if len(tx.Data()) > 0 {
+				status = common.ContractFailureOperationStatus.Status
+			} else {
+				// Should never see a failed non-contract related transaction on chain
+				status = common.FailureOperationStatus.Status
+				utils.Logger().Error().Msgf("Failed non-contract transaction on chain: %v", tx.Hash().String())
+			}
+		}
+		return status
+	} else if _, ok := tx.(*stakingTypes.StakingTransaction); ok {
+		return common.SuccessOperationStatus.Status
+	}
+	// Type of tx unknown, so default to failure
+	return common.FailureOperationStatus.Status
+}
+
+// getBasicTransferNativeOperations extracts & formats the basic native operations for non-staking transaction.
 // Note that this does NOT include any contract related transfers (i.e: internal transactions).
-func getBasicSameShardTransferNativeOperations(
+func getBasicTransferNativeOperations(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address, toAddress *ethcommon.Address,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
@@ -170,16 +195,7 @@ func getBasicSameShardTransferNativeOperations(
 	}
 
 	// Common operation elements
-	status := common.SuccessOperationStatus.Status
-	if receipt.Status == hmytypes.ReceiptStatusFailed {
-		if len(tx.Data()) > 0 {
-			status = common.ContractFailureOperationStatus.Status
-		} else {
-			// Should never see a failed non-contract related transaction on chain
-			status = common.FailureOperationStatus.Status
-			utils.Logger().Warn().Msgf("Failed transaction on chain: %v", tx.Hash().String())
-		}
-	}
+	status := GetTransactionStatus(tx, receipt)
 	from, rosettaError := newAccountIdentifier(senderAddress)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -192,12 +208,44 @@ func getBasicSameShardTransferNativeOperations(
 	return newSameShardTransferNativeOperations(from, to, tx.Value(), status, startingOperationIndex), nil
 }
 
-// getContractCreationNativeOperations extracts & formats the native operation(s) for a contract creation tx
+// getContractTransferNativeOperations extracts & formats the native operations for any transaction involving a contract.
+// Note that this will include any native tokens that were transferred from the contract (i.e: internal transactions).
+// WARNING: order of execution matters due to operation index.
+func getContractTransferNativeOperations(
+	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address, toAddress *ethcommon.Address,
+	contractInfo *ContractInfo, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	if len(tx.Data()) == 0 || contractInfo.ExecutionResult == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "implementation error",
+		})
+	}
+
+	basicOps, rosettaError := getBasicTransferNativeOperations(
+		tx, receipt, senderAddress, toAddress, startingOperationIndex,
+	)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	status := GetTransactionStatus(tx, receipt)
+	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
+	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
+		contractInfo.ExecutionResult, status, &startingIndex,
+	)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	return append(basicOps, internalTxOps...), nil
+}
+
+// getContractCreationNativeOperations extracts & formats the native operations for a contract creation tx
 func getContractCreationNativeOperations(
 	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt, senderAddress ethcommon.Address,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	operations, rosettaError := getBasicSameShardTransferNativeOperations(
+	operations, rosettaError := getBasicTransferNativeOperations(
 		tx, txReceipt, senderAddress, &txReceipt.ContractAddress, startingOperationIndex,
 	)
 	if rosettaError != nil {
@@ -208,6 +256,16 @@ func getContractCreationNativeOperations(
 	}
 
 	return operations, nil
+}
+
+// getContractInternalTransferNativeOperations extracts & formats the native operations for a contract's internal
+// native token transfers (i.e: the sender of a transaction is the contract).
+func getContractInternalTransferNativeOperations(
+	executionResult *hmy.ExecutionResult, status string,
+	startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	// TODO: implement
+	return nil, nil
 }
 
 // getCrossShardSenderTransferNativeOperations extracts & formats the native operation(s)

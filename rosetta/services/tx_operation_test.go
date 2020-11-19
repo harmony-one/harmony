@@ -447,7 +447,7 @@ func TestGetBasicTransferOperations(t *testing.T) {
 		Status: hmytypes.ReceiptStatusFailed,
 	}
 	opIndex := startingOpID.Index + 1
-	operations, rosettaError := getBasicSameShardTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
+	operations, rosettaError := getBasicTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -462,7 +462,7 @@ func TestGetBasicTransferOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = getBasicSameShardTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
+	operations, rosettaError = getBasicTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

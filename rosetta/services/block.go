@@ -150,11 +150,24 @@ func (s *BlockAPI) BlockTransaction(
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		contractCode := []byte{}
+		contractInfo := &ContractInfo{}
 		if txInfo.tx.To() != nil {
-			contractCode = state.GetCode(*txInfo.tx.To())
+			contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
 		}
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractCode)
+		if len(txInfo.tx.Data()) > 0 {
+			// Fetch contract info with an EVM trace.
+			blk, rosettaError := getBlock(
+				ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
+			)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+		}
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractInfo)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -221,6 +234,14 @@ func (s *BlockAPI) getTransactionInfo(
 		receipt:   receipt,
 		cxReceipt: cxReceipt,
 	}, nil
+}
+
+// getTransactionTrace for the given txInfo.
+func (s *BlockAPI) getTransactionTrace(
+	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
+) (*hmy.ExecutionResult, *types.Error) {
+	// TODO: implement...
+	return nil, nil
 }
 
 // getBlock ..
