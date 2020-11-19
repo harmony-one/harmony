@@ -29,6 +29,10 @@ type PrometheusConfig struct {
 	Instance   string //identifier of the instance in prometheus metrics
 }
 
+func (p PrometheusConfig) String() string {
+	return fmt.Sprintf("%v, %v:%v, %v/%v, %v/%v:%v", p.Enabled, p.IP, p.Port, p.EnablePush, p.Gateway, p.Network, p.Shard, p.Instance)
+}
+
 // Service provides Prometheus metrics via the /metrics route. This route will
 // show all the metrics registered with the Prometheus DefaultRegisterer.
 type Service struct {
@@ -47,7 +51,7 @@ type Handler struct {
 var (
 	registryOnce sync.Once
 	svc          = &Service{}
-	config       = PrometheusConfig{}
+	config       PrometheusConfig
 )
 
 // NewService sets up a new instance for a given address host:port.
@@ -58,8 +62,17 @@ func NewService(additionalHandlers ...Handler) {
 		return
 	}
 
+	utils.Logger().Debug().Str("Config", config.String()).Msg("Prometheus")
+	if svc.registry == nil {
+		svc.registry = prometheus.NewRegistry()
+	}
+	handler := promhttp.InstrumentMetricHandler(
+		svc.registry,
+		promhttp.HandlerFor(svc.registry, promhttp.HandlerOpts{}),
+	)
+
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", handler)
 	mux.HandleFunc("/goroutinez", svc.goroutinezHandler)
 
 	// Register additional handlers.
@@ -72,9 +85,6 @@ func NewService(additionalHandlers ...Handler) {
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", config.IP, config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
-	if svc.registry == nil {
-		svc.registry = prometheus.NewRegistry()
-	}
 	if config.EnablePush {
 		utils.Logger().Info().Msg("Prometheus enabled pushgateway support ...")
 		svc.pusher = push.New(config.Gateway, fmt.Sprintf("%s/%d", config.Network, config.Shard)).
