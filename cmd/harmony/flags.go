@@ -1223,6 +1223,10 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if config.Prometheus == nil {
 		cfg := getDefaultPrometheusConfigCopy()
 		config.Prometheus = &cfg
+		// enable pushgateway for mainnet nodes by default
+		if config.Network.NetworkType == "mainnet" {
+			config.Prometheus.EnablePush = true
+		}
 	}
 
 	if cli.IsFlagChanged(cmd, prometheusIPFlag) {
