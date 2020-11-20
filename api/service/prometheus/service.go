@@ -42,6 +42,7 @@ type Service struct {
 	registry   *prometheus.Registry
 	pusher     *push.Pusher
 	failStatus error
+	config     Config
 }
 
 // Handler represents a path and handler func to serve on the same port as /metrics, /healthz, /goroutinez, etc.
@@ -53,17 +54,16 @@ type Handler struct {
 var (
 	registryOnce sync.Once
 	svc          = &Service{}
-	config       Config
 )
 
-func getJobName(config Config) string {
+func (s *Service) getJobName() string {
 	var node string
 
 	// legacy nodes are harmony nodes: s0,s1,s2,s3
-	if config.Legacy {
+	if s.config.Legacy {
 		node = "s"
 	} else {
-		if config.NodeType == "validator" {
+		if s.config.NodeType == "validator" {
 			// regular validator nodes are: v0,v1,v2,v3
 			node = "v"
 		} else {
@@ -72,18 +72,19 @@ func getJobName(config Config) string {
 		}
 	}
 
-	return fmt.Sprintf("%s/%s%d", config.Network, node, config.Shard)
+	return fmt.Sprintf("%s/%s%d", s.config.Network, node, s.config.Shard)
 }
 
 // NewService sets up a new instance for a given address host:port.
 // An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
-func NewService(additionalHandlers ...Handler) {
-	if !config.Enabled {
+func NewService(cfg Config, additionalHandlers ...Handler) {
+	if !cfg.Enabled {
 		utils.Logger().Info().Msg("Prometheus http server disabled...")
 		return
 	}
 
-	utils.Logger().Debug().Str("Config", config.String()).Msg("Prometheus")
+	utils.Logger().Debug().Str("cfg", cfg.String()).Msg("Prometheus")
+	svc.config = cfg
 	if svc.registry == nil {
 		svc.registry = prometheus.NewRegistry()
 	}
@@ -101,10 +102,10 @@ func NewService(additionalHandlers ...Handler) {
 		mux.HandleFunc(h.Path, h.Handler)
 	}
 
-	utils.Logger().Debug().Int("port", config.Port).
-		Str("ip", config.IP).
+	utils.Logger().Debug().Int("port", svc.config.Port).
+		Str("ip", svc.config.IP).
 		Msg("Starting Prometheus server")
-	endpoint := fmt.Sprintf("%s:%d", config.IP, config.Port)
+	endpoint := fmt.Sprintf("%s:%d", svc.config.IP, svc.config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
 	svc.Start()
 }
@@ -135,27 +136,27 @@ func (s *Service) Start() {
 		}
 	}()
 
-	if config.EnablePush {
-		job := getJobName(config)
+	if s.config.EnablePush {
+		job := s.getJobName()
 		utils.Logger().Info().Str("Job", job).Msg("Prometheus enabled pushgateway support ...")
-		svc.pusher = push.New(config.Gateway, job).
+		svc.pusher = push.New(s.config.Gateway, job).
 			Gatherer(svc.registry).
-			Grouping("instance", config.Instance)
+			Grouping("instance", s.config.Instance)
 
 		// start pusher to push metrics to prometheus pushgateway
 		// every minute
-		go func(config Config) {
+		go func(s *Service) {
 			ticker := time.NewTicker(time.Minute)
 			defer ticker.Stop()
 			for {
 				select {
 				case <-ticker.C:
-					if err := svc.pusher.Add(); err != nil {
+					if err := s.pusher.Add(); err != nil {
 						utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
 					}
 				}
 			}
-		}(config)
+		}(s)
 	}
 }
 
@@ -172,36 +173,6 @@ func (s *Service) Status() error {
 		return s.failStatus
 	}
 	return nil
-}
-
-// SetConfig initialize the prometheus config
-func SetConfig(
-	enabled bool,
-	ip string,
-	port int,
-	enablepush bool,
-	gateway string,
-	network string,
-	legacy bool,
-	nodetype string,
-	shard uint32,
-	instance string,
-) {
-	config.Enabled = enabled
-	config.IP = ip
-	config.Port = port
-	config.EnablePush = enablepush
-	config.Gateway = gateway
-	config.Network = network
-	config.Legacy = legacy
-	config.NodeType = nodetype
-	config.Shard = shard
-	config.Instance = instance
-}
-
-// GetConfig return the prometheus config
-func GetConfig() Config {
-	return config
 }
 
 // PromRegistry return the registry of prometheus service

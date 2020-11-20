@@ -373,18 +373,18 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
-	prometheus.SetConfig(
-		hc.Prometheus.Enabled,
-		hc.Prometheus.IP,
-		hc.Prometheus.Port,
-		hc.Prometheus.EnablePush,
-		hc.Prometheus.Gateway,
-		hc.Network.NetworkType,
-		hc.General.NoStaking,
-		hc.General.NodeType,
-		nodeConfig.ShardID,
-		myHost.GetID().Pretty(),
-	)
+	prometheusConfig := prometheus.Config{
+		Enabled:    hc.Prometheus.Enabled,
+		IP:         hc.Prometheus.IP,
+		Port:       hc.Prometheus.Port,
+		EnablePush: hc.Prometheus.EnablePush,
+		Gateway:    hc.Prometheus.Gateway,
+		Network:    hc.Network.NetworkType,
+		Legacy:     hc.General.NoStaking,
+		NodeType:   hc.General.NodeType,
+		Shard:      nodeConfig.ShardID,
+		Instance:   myHost.GetID().Pretty(),
+	}
 
 	currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
@@ -402,7 +402,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	if err := currentNode.StartPrometheus(); err != nil {
+	if err := currentNode.StartPrometheus(prometheusConfig); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Prometheus failed")
