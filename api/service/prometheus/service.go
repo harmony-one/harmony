@@ -19,20 +19,20 @@ import (
 
 // Config is the config for the prometheus service
 type Config struct {
-	enabled    bool
-	ip         string
-	port       int
-	enablePush bool   // enable pushgateway support
-	gateway    string // address of the pushgateway
-	network    string // network type, used as job prefix
-	legacy     bool   // legacy or not, legacy is harmony internal node
-	nodetype   string // node type, validator or exlorer node
-	shard      uint32 // shard id, used as job suffix
-	instance   string //identifier of the instance in prometheus metrics
+	Enabled    bool
+	IP         string
+	Port       int
+	EnablePush bool   // enable pushgateway support
+	Gateway    string // address of the pushgateway
+	Network    string // network type, used as job prefix
+	Legacy     bool   // legacy or not, legacy is harmony internal node
+	NodeType   string // node type, validator or exlorer node
+	Shard      uint32 // shard id, used as job suffix
+	Instance   string //identifier of the instance in prometheus metrics
 }
 
 func (p Config) String() string {
-	return fmt.Sprintf("%v, %v:%v, %v/%v, %v/%v/%v/%v:%v", p.enabled, p.ip, p.port, p.enablePush, p.gateway, p.network, p.legacy, p.nodetype, p.shard, p.instance)
+	return fmt.Sprintf("%v, %v:%v, %v/%v, %v/%v/%v/%v:%v", p.Enabled, p.IP, p.Port, p.EnablePush, p.Gateway, p.Network, p.Legacy, p.NodeType, p.Shard, p.Instance)
 }
 
 // Service provides Prometheus metrics via the /metrics route. This route will
@@ -60,10 +60,10 @@ func getJobName(config Config) string {
 	var node string
 
 	// legacy nodes are harmony nodes: s0,s1,s2,s3
-	if config.legacy {
+	if config.Legacy {
 		node = "s"
 	} else {
-		if config.nodetype == "validator" {
+		if config.NodeType == "validator" {
 			// regular validator nodes are: v0,v1,v2,v3
 			node = "v"
 		} else {
@@ -72,13 +72,13 @@ func getJobName(config Config) string {
 		}
 	}
 
-	return fmt.Sprintf("%s/%s%d", config.network, node, config.shard)
+	return fmt.Sprintf("%s/%s%d", config.Network, node, config.Shard)
 }
 
 // NewService sets up a new instance for a given address host:port.
 // An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
 func NewService(additionalHandlers ...Handler) {
-	if !config.enabled {
+	if !config.Enabled {
 		utils.Logger().Info().Msg("Prometheus http server disabled...")
 		return
 	}
@@ -101,10 +101,10 @@ func NewService(additionalHandlers ...Handler) {
 		mux.HandleFunc(h.Path, h.Handler)
 	}
 
-	utils.Logger().Debug().Int("port", config.port).
-		Str("ip", config.ip).
+	utils.Logger().Debug().Int("port", config.Port).
+		Str("ip", config.IP).
 		Msg("Starting Prometheus server")
-	endpoint := fmt.Sprintf("%s:%d", config.ip, config.port)
+	endpoint := fmt.Sprintf("%s:%d", config.IP, config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
 	svc.Start()
 }
@@ -135,12 +135,12 @@ func (s *Service) Start() {
 		}
 	}()
 
-	if config.enablePush {
+	if config.EnablePush {
 		job := getJobName(config)
 		utils.Logger().Info().Str("Job", job).Msg("Prometheus enabled pushgateway support ...")
-		svc.pusher = push.New(config.gateway, job).
+		svc.pusher = push.New(config.Gateway, job).
 			Gatherer(svc.registry).
-			Grouping("instance", config.instance)
+			Grouping("instance", config.Instance)
 
 		// start pusher to push metrics to prometheus pushgateway
 		// every minute
@@ -187,16 +187,16 @@ func SetConfig(
 	shard uint32,
 	instance string,
 ) {
-	config.enabled = enabled
-	config.ip = ip
-	config.port = port
-	config.enablePush = enablepush
-	config.gateway = gateway
-	config.network = network
-	config.legacy = legacy
-	config.nodetype = nodetype
-	config.shard = shard
-	config.instance = instance
+	config.Enabled = enabled
+	config.IP = ip
+	config.Port = port
+	config.EnablePush = enablepush
+	config.Gateway = gateway
+	config.Network = network
+	config.Legacy = legacy
+	config.NodeType = nodetype
+	config.Shard = shard
+	config.Instance = instance
 }
 
 // GetConfig return the prometheus config
