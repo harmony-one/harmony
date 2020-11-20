@@ -100,21 +100,29 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[OnPrepared] Unparseable validator message")
+		consensus.getLogger().Info().Err(err).Msg("[OnPrepared] Unparseable validator message")
 		return
 	}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnPrepared] Received prepared message")
 
 	if recvMsg.BlockNum < consensus.blockNum {
-		consensus.getLogger().Debug().Uint64("MsgBlockNum", recvMsg.BlockNum).
+		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
 	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Warn().Msgf("[OnPrepared] low consensus block number. Spin sync")
+		consensus.getLogger().Warn().
+			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("myBlockHash", consensus.blockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Msgf("[OnPrepared] low consensus block number. Spin sync")
 		consensus.spinUpStateSync()
 	}
 
@@ -152,8 +160,6 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
 		return
 	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
@@ -188,7 +194,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 		return
 	}
 	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
@@ -224,6 +230,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
 		return
 	}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
@@ -231,14 +240,19 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	// Ok to receive committed from last block since it could have more signatures
 	if recvMsg.BlockNum < consensus.blockNum-1 {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
 
 	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Info().Msg("[OnCommitted] low consensus block number. Spin up state sync")
+		consensus.getLogger().Info().
+			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("myBlockHash", consensus.blockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
 	}
 
@@ -252,13 +266,10 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Uint64("blockNum", recvMsg.BlockNum).
 			Uint64("viewID", recvMsg.ViewID).
 			Str("blockHash", recvMsg.BlockHash.Hex()).
@@ -295,8 +306,14 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 
 	initBn := consensus.blockNum
 	consensus.tryCatchup()
+
 	if recvMsg.BlockNum > consensus.blockNum {
-		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).Msg("[OnCommitted] OUT OF SYNC")
+		consensus.getLogger().Info().
+			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Hex("myBlockHash", consensus.blockHash[:]).
+			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
+			Msg("[OnCommitted] OUT OF SYNC")
 		return
 	}
 
