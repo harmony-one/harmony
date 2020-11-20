@@ -380,6 +380,8 @@ func setupNodeAndRun(hc harmonyConfig) {
 		hc.Prometheus.EnablePush,
 		hc.Prometheus.Gateway,
 		hc.Network.NetworkType,
+		hc.General.NoStaking,
+		hc.General.NodeType,
 		nodeConfig.ShardID,
 		myHost.GetID().Pretty(),
 	)
