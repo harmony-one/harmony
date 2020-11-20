@@ -3,6 +3,7 @@ package node
 import (
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	"sync"
 )
 
 var (
@@ -54,13 +55,16 @@ var (
 			"type",
 		},
 	)
+	onceMetrics sync.Once
 )
 
 func initMetrics() {
-	prom.PromRegistry().MustRegister(
-		nodeStringCounterVec,
-		nodeP2PMessageCounterVec,
-		nodeConsensusMessageCounterVec,
-		nodeNodeMessageCounterVec,
-	)
+	onceMetrics.Do(func() {
+		prom.PromRegistry().MustRegister(
+			nodeStringCounterVec,
+			nodeP2PMessageCounterVec,
+			nodeConsensusMessageCounterVec,
+			nodeNodeMessageCounterVec,
+		)
+	})
 }

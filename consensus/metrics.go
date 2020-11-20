@@ -3,6 +3,7 @@ package consensus
 import (
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	"sync"
 )
 
 var (
@@ -67,6 +68,8 @@ var (
 		},
 	)
 
+	onceMetrics sync.Once
+
 	// TODO: add last consensus timestamp, add view ID
 	// add last view change timestamp
 )
@@ -88,11 +91,13 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 }
 
 func initMetrics() {
-	prom.PromRegistry().MustRegister(
-		consensusCounterVec,
-		consensusVCCounterVec,
-		consensusSyncCounterVec,
-		consensusGaugeVec,
-		consensusFinalityHistogram,
-	)
+	onceMetrics.Do(func() {
+		prom.PromRegistry().MustRegister(
+			consensusCounterVec,
+			consensusVCCounterVec,
+			consensusSyncCounterVec,
+			consensusGaugeVec,
+			consensusFinalityHistogram,
+		)
+	})
 }

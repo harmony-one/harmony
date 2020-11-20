@@ -1145,7 +1145,6 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.P2P.Port = legacyPort
 		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
-		config.Prometheus.Port = nodeconfig.GetPrometheusHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 
