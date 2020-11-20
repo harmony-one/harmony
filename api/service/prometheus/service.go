@@ -106,28 +106,6 @@ func NewService(additionalHandlers ...Handler) {
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", config.ip, config.port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
-	if config.enablePush {
-		job := getJobName(config)
-		utils.Logger().Info().Str("Job", job).Msg("Prometheus enabled pushgateway support ...")
-		svc.pusher = push.New(config.gateway, job).
-			Gatherer(svc.registry).
-			Grouping("instance", config.instance)
-
-		// start pusher to push metrics to prometheus pushgateway
-		// every minute
-		go func(config Config) {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					if err := svc.pusher.Add(); err != nil {
-						utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
-					}
-				}
-			}
-		}(config)
-	}
 	svc.Start()
 }
 
@@ -156,6 +134,29 @@ func (s *Service) Start() {
 			s.failStatus = err
 		}
 	}()
+
+	if config.enablePush {
+		job := getJobName(config)
+		utils.Logger().Info().Str("Job", job).Msg("Prometheus enabled pushgateway support ...")
+		svc.pusher = push.New(config.gateway, job).
+			Gatherer(svc.registry).
+			Grouping("instance", config.instance)
+
+		// start pusher to push metrics to prometheus pushgateway
+		// every minute
+		go func(config Config) {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					if err := svc.pusher.Add(); err != nil {
+						utils.Logger().Warn().Err(err).Msg("Pushgateway Error")
+					}
+				}
+			}
+		}(config)
+	}
 }
 
 // Stop the service gracefully.
