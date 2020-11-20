@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
@@ -236,12 +238,53 @@ func (s *BlockAPI) getTransactionInfo(
 	}, nil
 }
 
+var (
+	// defaultTraceReExec is the number of blocks the tracer can go back and re-execute to produce historical state.
+	// Only 1 block is needed to check for internal transactions
+	defaultTraceReExec = uint64(1)
+	// defaultTraceTimeout is the amount of time a transaction can execute
+	defaultTraceTimeout = (10 * time.Second).String()
+	// defaultTraceLogConfig is the log config of all traces
+	defaultTraceLogConfig = vm.LogConfig{
+		DisableMemory:  false,
+		DisableStack:   false,
+		DisableStorage: false,
+		Debug:          false,
+		Limit:          0,
+	}
+	// defaultTracer is the logger type of the tracer
+	defaultTracer = "StructLogger"
+)
+
 // getTransactionTrace for the given txInfo.
 func (s *BlockAPI) getTransactionTrace(
 	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
 ) (*hmy.ExecutionResult, *types.Error) {
-	// TODO: implement...
-	return nil, nil
+	msg, vmctx, statedb, err := s.hmy.ComputeTxEnv(blk, int(txInfo.txIndex), defaultTraceReExec)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+		Tracer:    &defaultTracer,
+		LogConfig: &defaultTraceLogConfig,
+		Timeout:   &defaultTraceTimeout,
+		Reexec:    &defaultTraceReExec,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResult, ok := execResultInterface.(*hmy.ExecutionResult)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown tracer exec result type",
+		})
+	}
+
+	return execResult, nil
 }
 
 // getBlock ..
