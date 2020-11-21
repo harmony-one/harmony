@@ -19,6 +19,7 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
@@ -330,13 +331,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 		HTTPPort:    hc.HTTP.RosettaPort,
 	}
 
-	// Pares Prometheus config
-	nodeConfig.PrometheusServer = nodeconfig.PrometheusServerConfig{
-		HTTPEnabled: hc.Prometheus.Enabled,
-		HTTPIp:      hc.Prometheus.IP,
-		HTTPPort:    hc.Prometheus.Port,
-	}
-
 	if hc.Revert != nil && hc.Revert.RevertBefore != 0 && hc.Revert.RevertTo != 0 {
 		chain := currentNode.Blockchain()
 		if hc.Revert.RevertBeacon {
@@ -379,6 +373,19 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
+	prometheusConfig := prometheus.Config{
+		Enabled:    hc.Prometheus.Enabled,
+		IP:         hc.Prometheus.IP,
+		Port:       hc.Prometheus.Port,
+		EnablePush: hc.Prometheus.EnablePush,
+		Gateway:    hc.Prometheus.Gateway,
+		Network:    hc.Network.NetworkType,
+		Legacy:     hc.General.NoStaking,
+		NodeType:   hc.General.NodeType,
+		Shard:      nodeConfig.ShardID,
+		Instance:   myHost.GetID().Pretty(),
+	}
+
 	currentNode.SupportSyncing()
 	currentNode.ServiceManagerSetup()
 	currentNode.RunServices()
@@ -395,7 +402,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	if err := currentNode.StartPrometheus(); err != nil {
+	if err := currentNode.StartPrometheus(prometheusConfig); err != nil {
 		utils.Logger().Warn().
 			Err(err).
 			Msg("Start Prometheus failed")

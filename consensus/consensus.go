@@ -222,5 +222,9 @@ func New(
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
 
+	// init prometheus metrics
+	initMetrics()
+	consensus.AddPubkeyMetrics()
+
 	return &consensus, nil
 }

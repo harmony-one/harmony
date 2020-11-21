@@ -83,8 +83,8 @@ func (node *Node) StopRPC() error {
 }
 
 // StartPrometheus start promtheus metrics service
-func (node *Node) StartPrometheus() error {
-	prometheus.NewService(node.NodeConfig.PrometheusServer)
+func (node *Node) StartPrometheus(cfg prometheus.Config) error {
+	prometheus.NewService(cfg)
 	return nil
 }
 

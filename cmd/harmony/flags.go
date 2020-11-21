@@ -170,6 +170,8 @@ var (
 		prometheusEnabledFlag,
 		prometheusIPFlag,
 		prometheusPortFlag,
+		prometheusGatewayFlag,
+		prometheusEnablePushFlag,
 	}
 )
 
@@ -257,6 +259,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
 	flags = append(flags, legacyMiscFlags...)
+	flags = append(flags, prometheusFlags...)
 
 	return flags
 }
@@ -1142,7 +1145,6 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.P2P.Port = legacyPort
 		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
-		config.Prometheus.Port = nodeconfig.GetPrometheusHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
 	}
 
@@ -1192,17 +1194,27 @@ var (
 	prometheusEnabledFlag = cli.BoolFlag{
 		Name:     "prometheus",
 		Usage:    "enable HTTP / Prometheus requests",
-		DefValue: defaultConfig.Prometheus.Enabled,
+		DefValue: defaultPrometheusConfig.Enabled,
 	}
 	prometheusIPFlag = cli.StringFlag{
 		Name:     "prometheus.ip",
 		Usage:    "ip address to listen for prometheus service",
-		DefValue: defaultConfig.Prometheus.IP,
+		DefValue: defaultPrometheusConfig.IP,
 	}
 	prometheusPortFlag = cli.IntFlag{
 		Name:     "prometheus.port",
 		Usage:    "prometheus port to listen for HTTP requests",
-		DefValue: defaultConfig.Prometheus.Port,
+		DefValue: defaultPrometheusConfig.Port,
+	}
+	prometheusGatewayFlag = cli.StringFlag{
+		Name:     "prometheus.pushgateway",
+		Usage:    "prometheus pushgateway URL",
+		DefValue: defaultPrometheusConfig.Gateway,
+	}
+	prometheusEnablePushFlag = cli.BoolFlag{
+		Name:     "prometheus.push",
+		Usage:    "enable prometheus pushgateway",
+		DefValue: defaultPrometheusConfig.EnablePush,
 	}
 )
 
@@ -1210,6 +1222,10 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if config.Prometheus == nil {
 		cfg := getDefaultPrometheusConfigCopy()
 		config.Prometheus = &cfg
+		// enable pushgateway for mainnet nodes by default
+		if config.Network.NetworkType == "mainnet" {
+			config.Prometheus.EnablePush = true
+		}
 	}
 
 	if cli.IsFlagChanged(cmd, prometheusIPFlag) {
@@ -1224,4 +1240,10 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Prometheus.Enabled = cli.GetBoolFlagValue(cmd, prometheusEnabledFlag)
 	}
 
+	if cli.IsFlagChanged(cmd, prometheusGatewayFlag) {
+		config.Prometheus.Gateway = cli.GetStringFlagValue(cmd, prometheusGatewayFlag)
+	}
+	if cli.IsFlagChanged(cmd, prometheusEnablePushFlag) {
+		config.Prometheus.EnablePush = cli.GetBoolFlagValue(cmd, prometheusEnablePushFlag)
+	}
 }
