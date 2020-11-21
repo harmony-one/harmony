@@ -224,6 +224,7 @@ func New(
 
 	// init prometheus metrics
 	initMetrics()
+	consensus.AddPubkeyMetrics()
 
 	return &consensus, nil
 }

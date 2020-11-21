@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"sync"
 
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
@@ -56,6 +57,18 @@ var (
 			"consensus",
 		},
 	)
+	// consensusPubkeyVec is used to keep track of bls pubkeys
+	consensusPubkeyVec = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "hmy",
+			Subsystem: "consensus",
+			Name:      "blskeys",
+			Help:      "list of bls pubkey",
+		},
+		[]string{
+			"index", "pubkey",
+		},
+	)
 	// consensusFinalityHistogram is used to keep track of finality
 	// 10 ExponentialBuckets are in the unit of millisecond:
 	// 800, 1000, 1250, 1562, 1953, 2441, 3051, 3814, 4768, 5960, inf
@@ -91,6 +104,15 @@ func (consensus *Consensus) UpdateLeaderMetrics(numCommits float64, blockNum flo
 	consensusGaugeVec.With(prometheus.Labels{"consensus": "num_commits"}).Set(numCommits)
 }
 
+// AddPubkeyMetrics add the list of blskeys to prometheus metrics
+func (consensus *Consensus) AddPubkeyMetrics() {
+	keys := consensus.GetPublicKeys()
+	for i, key := range keys {
+		index := fmt.Sprintf("%d", i)
+		consensusPubkeyVec.With(prometheus.Labels{"index": index, "pubkey": key.Bytes.Hex()}).Set(float64(i))
+	}
+}
+
 func initMetrics() {
 	onceMetrics.Do(func() {
 		prom.PromRegistry().MustRegister(
@@ -98,6 +120,7 @@ func initMetrics() {
 			consensusVCCounterVec,
 			consensusSyncCounterVec,
 			consensusGaugeVec,
+			consensusPubkeyVec,
 			consensusFinalityHistogram,
 		)
 	})
