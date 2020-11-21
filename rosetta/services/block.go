@@ -153,11 +153,17 @@ func (s *BlockAPI) BlockTransaction(
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
 		contractInfo := &ContractInfo{}
-		if txInfo.tx.To() != nil {
-			contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
-		}
+		// If there is tx data, check contract information for formatter
 		if len(txInfo.tx.Data()) > 0 {
-			// Fetch contract info with an EVM trace.
+			if txInfo.tx.To() != nil {
+				// possible call to existing contract so fetch relevant data
+				contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
+				contractInfo.ContractAddress = txInfo.tx.To()
+			} else {
+				// contract creation, so address is in receipt
+				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
+				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
+			}
 			blk, rosettaError := getBlock(
 				ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
 			)

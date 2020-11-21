@@ -21,6 +21,9 @@ var (
 
 // ContractInfo contains all relevant data for formatting/inspecting transactions involving contracts
 type ContractInfo struct {
+	// ContractAddress is the address of the primary (or first) contract related to the tx.
+	ContractAddress *ethcommon.Address `json:"contract_hex_address"`
+	// ContractCode is the code of the primary (or first) contract related to the tx.
 	ContractCode    []byte               `json:"contract_code"`
 	ExecutionResult *hmy.ExecutionResult `json:"execution_result"`
 }
@@ -69,7 +72,7 @@ func FormatTransaction(
 			return nil, rosettaError
 		}
 		txMetadata.ContractAccountIdentifier = contractID
-	} else if len(contractInfo.ContractCode) > 0 && tx.To() != nil {
+	} else if contractInfo.ContractAddress != nil && len(contractInfo.ContractCode) > 0 {
 		// Contract code was found, so receiving account must be the contract address
 		contractID, rosettaError := newAccountIdentifier(*tx.To())
 		if rosettaError != nil {

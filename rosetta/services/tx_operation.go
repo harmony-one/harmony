@@ -9,6 +9,7 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -41,7 +42,7 @@ func GetNativeOperationsFromTransaction(
 	var txOperations []*types.Operation
 	if tx.To() == nil {
 		txOperations, rosettaError = getContractCreationNativeOperations(
-			tx, receipt, senderAddress, &startingOpIndex,
+			tx, receipt, senderAddress, contractInfo, &startingOpIndex,
 		)
 	} else if tx.ShardID() != tx.ToShardID() {
 		txOperations, rosettaError = getCrossShardSenderTransferNativeOperations(
@@ -242,21 +243,39 @@ func getContractTransferNativeOperations(
 
 // getContractCreationNativeOperations extracts & formats the native operations for a contract creation tx
 func getContractCreationNativeOperations(
-	tx *hmytypes.Transaction, txReceipt *hmytypes.Receipt, senderAddress ethcommon.Address,
+	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address, contractInfo *ContractInfo,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	operations, rosettaError := getBasicTransferNativeOperations(
-		tx, txReceipt, senderAddress, &txReceipt.ContractAddress, startingOperationIndex,
+	basicOps, rosettaError := getBasicTransferNativeOperations(
+		tx, receipt, senderAddress, &receipt.ContractAddress, startingOperationIndex,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	for _, op := range operations {
+	for _, op := range basicOps {
 		op.Type = common.ContractCreationOperation
 	}
 
-	return operations, nil
+	status := GetTransactionStatus(tx, receipt)
+	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
+	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
+		contractInfo.ExecutionResult, status, &startingIndex,
+	)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
+
+	return append(basicOps, internalTxOps...), nil
 }
+
+var (
+	// internalNativeTransferEvmOps are the EVM operations that can execute a native transfer
+	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
+	internalNativeTransferEvmOps = map[string]interface{}{
+		vm.CALL.String():     struct{}{},
+		vm.CALLCODE.String(): struct{}{},
+	}
+)
 
 // getContractInternalTransferNativeOperations extracts & formats the native operations for a contract's internal
 // native token transfers (i.e: the sender of a transaction is the contract).
@@ -264,8 +283,41 @@ func getContractInternalTransferNativeOperations(
 	executionResult *hmy.ExecutionResult, status string,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	// TODO: implement
-	return nil, nil
+	if executionResult == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "execution trace result not found",
+		})
+	}
+
+	ops := []*types.Operation{}
+	for _, log := range executionResult.StructLogs {
+		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
+			// All internalNativeTransferEvmOps have at least 7 elements on the stack.
+			topIndex := len(log.Stack) - 1
+			toAccId, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+			value, ok := new(big.Int).SetString(log.Stack[topIndex-2], 16)
+			if !ok {
+				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+					"message": fmt.Sprintf("unable to set value amount, raw: %v", log.Stack[topIndex-2]),
+				})
+			}
+			fromAccId, rosettaError := newAccountIdentifier(log.CallerAddress)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+
+			ops = append(
+				ops, newSameShardTransferNativeOperations(fromAccId, toAccId, value, status, startingOperationIndex)...,
+			)
+			nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+			startingOperationIndex = &nextOpIndex
+		}
+	}
+
+	return ops, nil
 }
 
 // getCrossShardSenderTransferNativeOperations extracts & formats the native operation(s)
