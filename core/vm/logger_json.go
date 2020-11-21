@@ -52,6 +52,8 @@ func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint
 	log := StructLog{
 		Pc:            pc,
 		Op:            op,
+		CodeAddress:   contract.CodeAddr,
+		CallerAddress: contract.CallerAddress,
 		Gas:           gas,
 		GasCost:       cost,
 		MemorySize:    memory.Len(),

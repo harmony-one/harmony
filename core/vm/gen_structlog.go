@@ -18,6 +18,8 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 	type StructLog struct {
 		Pc            uint64                      `json:"pc"`
 		Op            OpCode                      `json:"op"`
+		CallerAddress common.Address              `json:"callerAddress"`
+		CodeAddress   *common.Address             `json:"codeAddress"`
 		Gas           math.HexOrDecimal64         `json:"gas"`
 		GasCost       math.HexOrDecimal64         `json:"gasCost"`
 		Memory        hexutil.Bytes               `json:"memory"`
@@ -33,6 +35,8 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 	var enc StructLog
 	enc.Pc = s.Pc
 	enc.Op = s.Op
+	enc.CallerAddress = s.CallerAddress
+	enc.CodeAddress = s.CodeAddress
 	enc.Gas = math.HexOrDecimal64(s.Gas)
 	enc.GasCost = math.HexOrDecimal64(s.GasCost)
 	enc.Memory = s.Memory
@@ -57,6 +61,8 @@ func (s *StructLog) UnmarshalJSON(input []byte) error {
 	type StructLog struct {
 		Pc            *uint64                     `json:"pc"`
 		Op            *OpCode                     `json:"op"`
+		CallerAddress *common.Address             `json:"callerAddress"`
+		CodeAddress   *common.Address             `json:"codeAddress"`
 		Gas           *math.HexOrDecimal64        `json:"gas"`
 		GasCost       *math.HexOrDecimal64        `json:"gasCost"`
 		Memory        *hexutil.Bytes              `json:"memory"`
@@ -76,6 +82,12 @@ func (s *StructLog) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Op != nil {
 		s.Op = *dec.Op
+	}
+	if dec.CallerAddress != nil {
+		s.CallerAddress = *dec.CallerAddress
+	}
+	if dec.CodeAddress != nil {
+		s.CodeAddress = dec.CodeAddress
 	}
 	if dec.Gas != nil {
 		s.Gas = uint64(*dec.Gas)

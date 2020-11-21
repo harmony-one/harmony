@@ -58,6 +58,8 @@ type LogConfig struct {
 type StructLog struct {
 	Pc            uint64                      `json:"pc"`
 	Op            OpCode                      `json:"op"`
+	CallerAddress common.Address              `json:"callerAddress"`
+	CodeAddress   *common.Address             `json:"codeAddress"`
 	Gas           uint64                      `json:"gas"`
 	GasCost       uint64                      `json:"gasCost"`
 	Memory        []byte                      `json:"memory"`
@@ -178,7 +180,7 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 		storage = l.changedValues[contract.Address()].Copy()
 	}
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, gas, cost, mem, memory.Len(), stck, storage, depth, env.StateDB.GetRefund(), err}
+	log := StructLog{pc, op, contract.CallerAddress, contract.CodeAddr, gas, cost, mem, memory.Len(), stck, storage, depth, env.StateDB.GetRefund(), err}
 
 	l.logs = append(l.logs, log)
 	return nil
