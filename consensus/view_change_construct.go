@@ -335,7 +335,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 
 			preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{recvMsg.LeaderPubkey}
 			vc.getLogger().Info().Msg("[ProcessViewChangeMsg] New Leader Prepared Message Added")
-			fbftlog.AddMessage(&preparedMsg)
+			fbftlog.AddVerifiedMessage(&preparedMsg)
 			fbftlog.AddBlock(preparedBlock)
 		}
 		return nil

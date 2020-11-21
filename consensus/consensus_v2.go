@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/rs/zerolog"
@@ -17,7 +18,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/vdf/src/vdf_go"
@@ -28,6 +28,7 @@ import (
 var (
 	errSenderPubKeyNotLeader  = errors.New("sender pubkey doesn't match leader")
 	errVerifyMessageSignature = errors.New("verify message signature failed")
+	errParsingFBFTMessage     = errors.New("failed parsing FBFT message")
 )
 
 // timeout constant
@@ -56,57 +57,63 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		return nil
 	}
 
+	// Do easier check before signature check
+	if msg.Type == msg_pb.MessageType_ANNOUNCE || msg.Type == msg_pb.MessageType_PREPARED || msg.Type == msg_pb.MessageType_COMMITTED {
+		// Only validator needs to check whether the message is from the correct leader
+		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
+			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
+			return errSenderPubKeyNotLeader
+		}
+	}
+
+	if msg.Type != msg_pb.MessageType_PREPARE && msg.Type != msg_pb.MessageType_COMMIT {
+		// Leader doesn't need to check validator's message signature since the consensus signature will be checked
+		if !consensus.senderKeySanityChecks(msg, senderKey) {
+			return errVerifyMessageSignature
+		}
+	}
+
+	// Parse FBFT message
+	var fbftMsg *FBFTMessage
+	var err error
+	switch t := msg.Type; true {
+	case t == msg_pb.MessageType_VIEWCHANGE:
+		fbftMsg, err = ParseViewChangeMessage(msg)
+	case t == msg_pb.MessageType_NEWVIEW:
+		members := consensus.Decider.Participants()
+		fbftMsg, err = ParseNewViewMessage(msg, members)
+	default:
+		fbftMsg, err = consensus.ParseFBFTMessage(msg)
+	}
+	if err != nil || fbftMsg == nil {
+		return errors.Wrapf(err, "unable to parse consensus msg with type: %s", msg.Type)
+	}
+
 	intendedForValidator, intendedForLeader :=
 		!consensus.IsLeader(),
 		consensus.IsLeader()
 
+	// Route message to handler
 	switch t := msg.Type; true {
 	// Handle validator intended messages first
 	case t == msg_pb.MessageType_ANNOUNCE && intendedForValidator:
-		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
-			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
-			return errSenderPubKeyNotLeader
-		}
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
 		consensus.onAnnounce(msg)
 	case t == msg_pb.MessageType_PREPARED && intendedForValidator:
-		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
-			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
-			return errSenderPubKeyNotLeader
-		}
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
-		consensus.onPrepared(msg)
+		consensus.onPrepared(fbftMsg)
 	case t == msg_pb.MessageType_COMMITTED && intendedForValidator:
-		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
-			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
-			return errSenderPubKeyNotLeader
-		}
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
-		consensus.onCommitted(msg)
+		consensus.onCommitted(fbftMsg)
 
 	// Handle leader intended messages now
 	case t == msg_pb.MessageType_PREPARE && intendedForLeader:
-		consensus.onPrepare(msg)
+		consensus.onPrepare(fbftMsg)
 	case t == msg_pb.MessageType_COMMIT && intendedForLeader:
-		consensus.onCommit(msg)
+		consensus.onCommit(fbftMsg)
 
-		// Handle view change messages
+	// Handle view change messages
 	case t == msg_pb.MessageType_VIEWCHANGE:
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
-		consensus.onViewChange(msg)
+		consensus.onViewChange(fbftMsg)
 	case t == msg_pb.MessageType_NEWVIEW:
-		if !consensus.senderKeySanityChecks(msg, senderKey) {
-			return errVerifyMessageSignature
-		}
-		consensus.onNewView(msg)
+		consensus.onNewView(fbftMsg)
 	}
 
 	return nil
@@ -136,7 +143,7 @@ func (consensus *Consensus) finalCommit() {
 		network.Bytes,
 		network.FBFTMsg
 	commitSigAndBitmap := FBFTMsg.Payload
-	consensus.FBFTLog.AddMessage(FBFTMsg)
+	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
 	block := consensus.FBFTLog.GetBlockByHash(curBlockHash)
@@ -540,7 +547,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 			network.Bytes,
 			network.FBFTMsg
 		bareMinimumCommit := FBFTMsg.Payload
-		consensus.FBFTLog.AddMessage(FBFTMsg)
+		consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 

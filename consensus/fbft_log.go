@@ -33,6 +33,7 @@ type FBFTMessage struct {
 	M2Bitmap           *bls_cosi.Mask
 	M3AggSig           *bls_core.Sign
 	M3Bitmap           *bls_cosi.Mask
+	Verified           bool
 }
 
 // String ..
@@ -202,12 +203,38 @@ func (log *FBFTLog) DeleteMessagesLessThan(number uint64) {
 	}
 }
 
-// AddMessage adds a pbft message into the log
-func (log *FBFTLog) AddMessage(msg *FBFTMessage) {
+// AddVerifiedMessage adds a signature verified pbft message into the log
+func (log *FBFTLog) AddVerifiedMessage(msg *FBFTMessage) {
 	log.msgLock.Lock()
 	defer log.msgLock.Unlock()
 
+	msg.Verified = true
+
 	log.messages[msg.id()] = msg
+}
+
+// AddNotVerifiedMessage adds a not signature verified pbft message into the log
+func (log *FBFTLog) AddNotVerifiedMessage(msg *FBFTMessage) {
+	log.msgLock.Lock()
+	defer log.msgLock.Unlock()
+
+	msg.Verified = false
+
+	log.messages[msg.id()] = msg
+}
+
+// GetNotVerifiedCommittedMessages returns not verified committed pbft messages with matching blockNum, viewID and blockHash
+func (log *FBFTLog) GetNotVerifiedCommittedMessages(blockNum uint64, viewID uint64, blockHash common.Hash) []*FBFTMessage {
+	log.msgLock.RLock()
+	defer log.msgLock.RUnlock()
+
+	var found []*FBFTMessage
+	for _, msg := range log.messages {
+		if msg.MessageType == msg_pb.MessageType_COMMITTED && msg.BlockNum == blockNum && msg.ViewID == viewID && msg.BlockHash == blockHash && !msg.Verified {
+			found = append(found, msg)
+		}
+	}
+	return found
 }
 
 // GetMessagesByTypeSeqViewHash returns pbft messages with matching type, blockNum, viewID and blockHash
@@ -217,7 +244,7 @@ func (log *FBFTLog) GetMessagesByTypeSeqViewHash(typ msg_pb.MessageType, blockNu
 
 	var found []*FBFTMessage
 	for _, msg := range log.messages {
-		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.ViewID == viewID && msg.BlockHash == blockHash {
+		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.ViewID == viewID && msg.BlockHash == blockHash && msg.Verified {
 			found = append(found, msg)
 		}
 	}
@@ -231,7 +258,7 @@ func (log *FBFTLog) GetMessagesByTypeSeq(typ msg_pb.MessageType, blockNum uint64
 
 	var found []*FBFTMessage
 	for _, msg := range log.messages {
-		if msg.MessageType == typ && msg.BlockNum == blockNum {
+		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.Verified {
 			found = append(found, msg)
 		}
 	}
@@ -245,7 +272,7 @@ func (log *FBFTLog) GetMessagesByTypeSeqHash(typ msg_pb.MessageType, blockNum ui
 
 	var found []*FBFTMessage
 	for _, msg := range log.messages {
-		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.BlockHash == blockHash {
+		if msg.MessageType == typ && msg.BlockNum == blockNum && msg.BlockHash == blockHash && msg.Verified {
 			found = append(found, msg)
 		}
 	}
@@ -283,7 +310,7 @@ func (log *FBFTLog) GetMessagesByTypeSeqView(typ msg_pb.MessageType, blockNum ui
 
 	var found []*FBFTMessage
 	for _, msg := range log.messages {
-		if msg.MessageType != typ || msg.BlockNum != blockNum || msg.ViewID != viewID {
+		if msg.MessageType != typ || msg.BlockNum != blockNum || msg.ViewID != viewID && msg.Verified {
 			continue
 		}
 		found = append(found, msg)

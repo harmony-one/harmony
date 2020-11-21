@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"math/big"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,11 +27,6 @@ import (
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-)
-
-var (
-	logOnce sync.Once
-	logger  zerolog.Logger
 )
 
 // WaitForNewRandomness listens to the RndChannel to receive new VDF randomness.
@@ -621,13 +615,11 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
-	logOnce.Do(func() {
-		logger = utils.Logger().With().
-			Uint64("myBlock", consensus.blockNum).
-			Uint64("myViewID", consensus.GetCurBlockViewID()).
-			Str("phase", consensus.phase.String()).
-			Str("mode", consensus.current.Mode().String()).
-			Logger()
-	})
+	logger := utils.Logger().With().
+		Uint64("myBlock", consensus.blockNum).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
+		Str("phase", consensus.phase.String()).
+		Str("mode", consensus.current.Mode().String()).
+		Logger()
 	return &logger
 }

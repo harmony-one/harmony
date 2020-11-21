@@ -35,7 +35,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
-	consensus.FBFTLog.AddMessage(recvMsg)
+	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
@@ -97,12 +97,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
-func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
-	recvMsg, err := consensus.ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Info().Err(err).Msg("[OnPrepared] Unparseable validator message")
-		return
-	}
+func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -167,7 +162,7 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	copy(blockPayload[:], recvMsg.Block[:])
 	consensus.block = blockPayload
 	recvMsg.Block = []byte{} // save memory space
-	consensus.FBFTLog.AddMessage(recvMsg)
+	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.getLogger().Debug().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -214,22 +209,30 @@ func (consensus *Consensus) onPrepared(msg *msg_pb.Message) {
 	copy(consensus.blockHash[:], blockHash[:])
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
-	if consensus.current.Mode() != Normal {
+	if consensus.current.Mode() == Normal {
+		consensus.sendCommitMessages(&blockObj)
+		consensus.switchPhase("onPrepared", FBFTCommit)
+	} else {
 		// don't sign the block that is not verified
 		consensus.getLogger().Info().Msg("[OnPrepared] Not in normal mode, Exiting!!")
-		return
 	}
 
-	consensus.sendCommitMessages(&blockObj)
-	consensus.switchPhase("onPrepared", FBFTCommit)
+	go func() {
+		// Try process future committed messages and process them in case of receiving committed before prepared
+		curBlockNum := consensus.blockNum
+		for _, committedMsg := range consensus.FBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
+			if committedMsg != nil {
+				consensus.onCommitted(committedMsg)
+			}
+			if curBlockNum < consensus.blockNum {
+				consensus.getLogger().Info().Msg("[OnPrepared] Successfully caught up with committed message")
+				break
+			}
+		}
+	}()
 }
 
-func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
-	recvMsg, err := consensus.ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Warn().Msg("[OnCommitted] unable to parse msg")
-		return
-	}
+func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -255,6 +258,9 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 			Msg("[OnCommitted] low consensus block number. Spin up state sync")
 		consensus.spinUpStateSync()
 	}
+
+	// Optimistically add committedMessage in case of receiving committed before prepared
+	consensus.FBFTLog.AddNotVerifiedMessage(recvMsg)
 
 	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
 	if err != nil {
@@ -285,8 +291,7 @@ func (consensus *Consensus) onCommitted(msg *msg_pb.Message) {
 		return
 	}
 
-	consensus.FBFTLog.AddMessage(recvMsg)
-
+	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
 

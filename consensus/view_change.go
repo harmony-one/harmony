@@ -331,12 +331,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 }
 
 // onViewChange is called when the view change message is received.
-func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
-	recvMsg, err := ParseViewChangeMessage(msg)
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[onViewChange] Unable To Parse Viewchange Message")
-		return
-	}
+func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -431,13 +426,7 @@ func (consensus *Consensus) onViewChange(msg *msg_pb.Message) {
 // prepared message from the payload and commit it to the block
 // Or the validator will enter announce phase to wait for the new block proposed
 // from the new leader
-func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
-	members := consensus.Decider.Participants()
-	recvMsg, err := ParseNewViewMessage(msg, members)
-	if err != nil {
-		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Unable to Parse NewView Message")
-		return
-	}
+func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -510,7 +499,7 @@ func (consensus *Consensus) onNewView(msg *msg_pb.Message) {
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 
 		preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{senderKey}
-		consensus.FBFTLog.AddMessage(&preparedMsg)
+		consensus.FBFTLog.AddVerifiedMessage(&preparedMsg)
 
 		if preparedBlock != nil {
 			consensus.FBFTLog.AddBlock(preparedBlock)
