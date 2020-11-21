@@ -143,9 +143,11 @@ type legacyConfig struct {
 }
 
 type prometheusConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled    bool
+	IP         string
+	Port       int
+	EnablePush bool
+	Gateway    string
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.

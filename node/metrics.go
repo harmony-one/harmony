@@ -1,14 +1,16 @@
 package node
 
 import (
+	"sync"
+
+	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	// NodeStringCounterVec is used to add version string or other static string
+	// nodeStringCounterVec is used to add version string or other static string
 	// info into the metrics api
-	NodeStringCounterVec = promauto.NewCounterVec(
+	nodeStringCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "node",
@@ -17,8 +19,8 @@ var (
 		},
 		[]string{"key", "value"},
 	)
-	// NodeP2PMessageCounterVec is used to keep track of all p2p messages received
-	NodeP2PMessageCounterVec = promauto.NewCounterVec(
+	// nodeP2PMessageCounterVec is used to keep track of all p2p messages received
+	nodeP2PMessageCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "p2p",
@@ -29,8 +31,8 @@ var (
 			"type",
 		},
 	)
-	// NodeConsensusMessageCounterVec is used to keep track of consensus p2p messages received
-	NodeConsensusMessageCounterVec = promauto.NewCounterVec(
+	// nodeConsensusMessageCounterVec is used to keep track of consensus p2p messages received
+	nodeConsensusMessageCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "p2p",
@@ -42,8 +44,8 @@ var (
 		},
 	)
 
-	// NodeNodeMessageCounterVec is used to keep track of node p2p messages received
-	NodeNodeMessageCounterVec = promauto.NewCounterVec(
+	// nodeNodeMessageCounterVec is used to keep track of node p2p messages received
+	nodeNodeMessageCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "p2p",
@@ -54,4 +56,16 @@ var (
 			"type",
 		},
 	)
+	onceMetrics sync.Once
 )
+
+func initMetrics() {
+	onceMetrics.Do(func() {
+		prom.PromRegistry().MustRegister(
+			nodeStringCounterVec,
+			nodeP2PMessageCounterVec,
+			nodeConsensusMessageCounterVec,
+			nodeNodeMessageCounterVec,
+		)
+	})
+}
