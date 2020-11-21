@@ -48,7 +48,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	msgToSend, FPBTMsg := networkMessage.Bytes, networkMessage.FBFTMsg
 
-	consensus.FBFTLog.AddMessage(FPBTMsg)
+	consensus.FBFTLog.AddVerifiedMessage(FPBTMsg)
 	consensus.getLogger().Debug().
 		Str("MsgBlockHash", FPBTMsg.BlockHash.Hex()).
 		Uint64("MsgViewID", FPBTMsg.ViewID).
@@ -96,13 +96,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
-func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
-	recvMsg, err := consensus.ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnPrepare] Unparseable validator message")
-		return
-	}
-
+func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
 		consensus.blockNum, consensus.GetCurBlockViewID(), recvMsg.BlockHash,
@@ -147,7 +141,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	// Check BLS signature for the multi-sig
 	prepareSig := recvMsg.Payload
 	var sign bls_core.Sign
-	err = sign.Deserialize(prepareSig)
+	err := sign.Deserialize(prepareSig)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Msg("[OnPrepare] Failed to deserialize bls signature")
@@ -198,13 +192,7 @@ func (consensus *Consensus) onPrepare(msg *msg_pb.Message) {
 	//// Read - End
 }
 
-func (consensus *Consensus) onCommit(msg *msg_pb.Message) {
-	recvMsg, err := consensus.ParseFBFTMessage(msg)
-	if err != nil {
-		consensus.getLogger().Debug().Err(err).Msg("[OnCommit] Parse pbft message failed")
-		return
-	}
-
+func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	//// Read - Start

@@ -60,7 +60,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			utils.Logger().Info().
 				Uint64("msgBlock", recvMsg.BlockNum).
 				Msg("[Explorer] Haven't received the block before the committed msg")
-			node.Consensus.FBFTLog.AddMessage(recvMsg)
+			node.Consensus.FBFTLog.AddVerifiedMessage(recvMsg)
 			return errBlockBeforeCommit
 		}
 

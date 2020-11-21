@@ -36,7 +36,7 @@ func (consensus *Consensus) didReachPrepareQuorum() error {
 		networkMessage.OptionalAggregateSignature
 
 	consensus.aggregatedPrepareSig = aggSig
-	consensus.FBFTLog.AddMessage(FBFTMsg)
+	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 	// Leader add commit phase signature
 	var blockObj types.Block
 	if err := rlp.DecodeBytes(consensus.block, &blockObj); err != nil {
