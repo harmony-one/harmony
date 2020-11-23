@@ -307,7 +307,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// Disable aggregate sig at epoch TBD for mainnet (for other net, it's default to true)
+	// Enable 3s block time at the threeSecondsEpoch
 	if consensus.Blockchain.Config().IsThreeSeconds(curEpoch) {
 		consensus.BlockPeriod = 3 * time.Second
 	}
