@@ -37,7 +37,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	var testDBFactory = &shardchain.MemDBFactory{}
-	node := New(host, consensus, testDBFactory, nil, false)
+	node := New(host, consensus, testDBFactory, nil, nil)
 
 	node.Worker.UpdateCurrent()
 
