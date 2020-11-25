@@ -280,9 +280,6 @@ func (consensus *Consensus) startViewChange() {
 
 // startNewView stops the current view change
 func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper, reset bool) error {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	if !consensus.IsViewChangingMode() {
 		return errors.New("not in view changing mode anymore")
 	}
@@ -332,6 +329,9 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -427,6 +427,9 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 // Or the validator will enter announce phase to wait for the new block proposed
 // from the new leader
 func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
+	consensus.mutex.Lock()
+	consensus.mutex.Unlock()
+
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -451,6 +454,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	if !consensus.onNewViewSanityCheck(recvMsg) {
 		return
 	}
+
 	preparedBlock, err := consensus.vc.VerifyNewViewMsg(recvMsg)
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[onNewView] Verify New View Msg Failed")
@@ -481,11 +485,9 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 				Msg("[onNewView] Failed to Verify Signature for M1 (prepare) message")
 			return
 		}
-		consensus.mutex.Lock()
 		copy(consensus.blockHash[:], blockHash)
 		consensus.aggregatedPrepareSig = aggSig
 		consensus.prepareBitmap = mask
-		consensus.mutex.Unlock()
 
 		// create prepared message from newview
 		preparedMsg := FBFTMessage{
@@ -510,9 +512,6 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		consensus.getLogger().Info().Msg("Not in ViewChanging Mode.")
 		return
 	}
-
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 
