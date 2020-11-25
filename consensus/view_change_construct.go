@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -49,9 +48,6 @@ type viewChange struct {
 
 	blockVerifier      BlockVerifierFunc
 	viewChangeDuration time.Duration
-
-	// mutex for view change
-	vcLock sync.RWMutex
 }
 
 // newViewChange returns a new viewChange object
@@ -68,8 +64,6 @@ func (vc *viewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
 
 // AddViewIDKeyIfNotExist ..
 func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.PublicKeys) {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
 	if _, ok := vc.bhpSigs[viewID]; !ok {
 		vc.bhpSigs[viewID] = map[string]*bls_core.Sign{}
 	}
@@ -95,9 +89,6 @@ func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 
 // Reset reset the state for viewchange
 func (vc *viewChange) Reset() {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	vc.m1Payload = []byte{}
 	vc.bhpSigs = map[uint64]map[string]*bls_core.Sign{}
 	vc.nilSigs = map[uint64]map[string]*bls_core.Sign{}
@@ -110,9 +101,6 @@ func (vc *viewChange) Reset() {
 
 // GetPreparedBlock returns the prepared block or nil if not found
 func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
 	if vc.isM1PayloadEmpty() {
 		return nil, nil
 	}
@@ -134,9 +122,6 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
 
 // GetM2Bitmap returns the nilBitmap as M2Bitmap
 func (vc *viewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
 	sig2arr := []*bls_core.Sign{}
 	for _, sig := range vc.nilSigs[viewID] {
 		sig2arr = append(sig2arr, sig)
@@ -153,9 +138,6 @@ func (vc *viewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
 
 // GetM3Bitmap returns the viewIDBitmap as M3Bitmap
 func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
 	sig3arr := []*bls_core.Sign{}
 	for _, sig := range vc.viewIDSigs[viewID] {
 		sig3arr = append(sig3arr, sig)
@@ -172,9 +154,6 @@ func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
 
 // VerifyNewViewMsg returns true if the new view message is valid
 func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, error) {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
 		return nil, errors.New("[VerifyNewViewMsg] M3AggSig or M3Bitmap is nil")
 	}
@@ -262,9 +241,6 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	decider quorum.Decider,
 	recvMsg *FBFTMessage,
 ) error {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	preparedBlock := &types.Block{}
 	if !recvMsg.HasSingleSender() {
 		return errIncorrectSender
@@ -373,9 +349,6 @@ func (vc *viewChange) InitPayload(
 	blockNum uint64,
 	privKeys multibls.PrivateKeys,
 ) error {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	// m1 or m2 init once per viewID/key.
 	// m1 and m2 are mutually exclusive.
 	// If the node has valid prepared block, it will add m1 signature.
@@ -463,22 +436,16 @@ func (vc *viewChange) isM1PayloadEmpty() bool {
 
 // IsM1PayloadEmpty returns true if m1Payload is not set
 func (vc *viewChange) IsM1PayloadEmpty() bool {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.isM1PayloadEmpty()
 }
 
 // GetViewIDBitmap returns the viewIDBitmap
 func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.viewIDBitmap[viewID]
 }
 
 // GetM1Payload returns the m1Payload
 func (vc *viewChange) GetM1Payload() []byte {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.m1Payload
 }
 

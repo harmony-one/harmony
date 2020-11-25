@@ -550,11 +550,6 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errReadBitmapPayload
 	}
 
-	// update consensus structure when succeeded
-	// protect consensus data update logic
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	// Have to keep the block hash so the leader can finish the commit phase of prepared block
 	consensus.ResetState()
 
