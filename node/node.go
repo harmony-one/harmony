@@ -870,7 +870,7 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
-	isArchival bool,
+	isArchival map[uint32]bool,
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
@@ -895,8 +895,11 @@ func New(
 	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
 	)
-	if isArchival {
-		collection.DisableCache()
+
+	for shardID, archival := range isArchival {
+		if archival {
+			collection.DisableCache(shardID)
+		}
 	}
 	node.shardChains = collection
 	node.IsInSync = abool.NewBool(false)

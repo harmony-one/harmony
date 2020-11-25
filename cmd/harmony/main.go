@@ -534,8 +534,9 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 
 	// Set network type
 	netType := nodeconfig.NetworkType(hc.Network.NetworkType)
-	nodeconfig.SetNetworkType(netType) // sets for both global and shard configs
-	nodeConfig.SetArchival(hc.General.IsArchival)
+	nodeconfig.SetNetworkType(netType)                // sets for both global and shard configs
+	nodeConfig.SetShardID(initialAccounts[0].ShardID) // sets shard ID
+	nodeConfig.SetArchival(hc.General.IsBeaconArchival, hc.General.IsArchival)
 	nodeConfig.IsOffline = hc.General.IsOffline
 
 	// P2P private key is used for secure message transfer between p2p nodes.
@@ -615,7 +616,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, hc.General.IsArchival)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes())
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn

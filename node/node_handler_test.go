@@ -35,7 +35,7 @@ func TestAddNewBlock(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, testDBFactory, nil, false)
+	node := New(host, consensus, testDBFactory, nil, nil)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -78,7 +78,10 @@ func TestVerifyNewBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, nil, false)
+	archiveMode := make(map[uint32]bool)
+	archiveMode[0] = true
+	archiveMode[1] = false
+	node := New(host, consensus, testDBFactory, nil, archiveMode)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}

@@ -15,6 +15,7 @@ var (
 		noStakingFlag,
 		shardIDFlag,
 		isArchiveFlag,
+		isBeaconArchiveFlag,
 		isOfflineFlag,
 		dataDirFlag,
 
@@ -194,8 +195,13 @@ var (
 	}
 	isArchiveFlag = cli.BoolFlag{
 		Name:     "run.archive",
-		Usage:    "run node in archive mode",
+		Usage:    "run shard chain in archive mode",
 		DefValue: defaultConfig.General.IsArchival,
+	}
+	isBeaconArchiveFlag = cli.BoolFlag{
+		Name:     "run.beacon-archive",
+		Usage:    "run beacon chain in archive mode",
+		DefValue: defaultConfig.General.IsBeaconArchival,
 	}
 	isOfflineFlag = cli.BoolFlag{
 		Name:     "run.offline",
@@ -291,6 +297,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.General.IsArchival = cli.GetBoolFlagValue(cmd, isArchiveFlag)
 	} else if cli.IsFlagChanged(cmd, legacyIsArchiveFlag) {
 		config.General.IsArchival = cli.GetBoolFlagValue(cmd, legacyIsArchiveFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, isBeaconArchiveFlag) {
+		config.General.IsBeaconArchival = cli.GetBoolFlagValue(cmd, isBeaconArchiveFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, dataDirFlag) {
