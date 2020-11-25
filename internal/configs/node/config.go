@@ -14,6 +14,7 @@ import (
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/multibls"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
 	p2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -88,7 +89,7 @@ type ConfigType struct {
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
 	DNSZone          string
-	isArchival       bool
+	isArchival       map[uint32]bool
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
@@ -200,7 +201,7 @@ func (conf *ConfigType) GetClientGroupID() GroupID {
 
 // GetArchival returns archival mode
 func (conf *ConfigType) GetArchival() bool {
-	return conf.isArchival
+	return conf.isArchival[conf.ShardID]
 }
 
 // Role returns the role
@@ -218,8 +219,19 @@ func SetNetworkType(networkType NetworkType) {
 }
 
 // SetArchival set archival mode
-func (conf *ConfigType) SetArchival(archival bool) {
-	defaultConfig.isArchival = archival
+// for beacon chain node, the archival variable will
+// overrdie bcArchival as the shardID is the same
+func (conf *ConfigType) SetArchival(bcArchival, archival bool) {
+	if conf.isArchival == nil {
+		conf.isArchival = make(map[uint32]bool)
+	}
+	conf.isArchival[shard.BeaconChainShardID] = bcArchival
+	conf.isArchival[conf.ShardID] = archival
+}
+
+// IsArchival return the isArchival map
+func (conf *ConfigType) IsArchival() map[uint32]bool {
+	return conf.isArchival
 }
 
 // GetNetworkType gets the networkType
