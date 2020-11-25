@@ -50,11 +50,12 @@ func NewCollection(
 	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
-		dbFactory:   dbFactory,
-		dbInit:      dbInit,
-		engine:      engine,
-		pool:        make(map[uint32]*core.BlockChain),
-		chainConfig: chainConfig,
+		dbFactory:    dbFactory,
+		dbInit:       dbInit,
+		engine:       engine,
+		pool:         make(map[uint32]*core.BlockChain),
+		disableCache: make(map[uint32]bool),
+		chainConfig:  chainConfig,
 	}
 }
 

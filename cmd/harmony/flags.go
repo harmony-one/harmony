@@ -195,12 +195,12 @@ var (
 	}
 	isArchiveFlag = cli.BoolFlag{
 		Name:     "run.archive",
-		Usage:    "run node in archive mode",
+		Usage:    "run shard chain in archive mode",
 		DefValue: defaultConfig.General.IsArchival,
 	}
 	isBeaconArchiveFlag = cli.BoolFlag{
 		Name:     "run.beacon-archive",
-		Usage:    "beacon chain also in archival mode",
+		Usage:    "run beacon chain in archive mode",
 		DefValue: defaultConfig.General.IsBeaconArchival,
 	}
 	isOfflineFlag = cli.BoolFlag{

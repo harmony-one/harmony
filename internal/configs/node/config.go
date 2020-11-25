@@ -229,8 +229,8 @@ func (conf *ConfigType) SetArchival(bcArchival, archival bool) {
 	conf.isArchival[conf.ShardID] = archival
 }
 
-// IsArchival return the isArchival map
-func (conf *ConfigType) IsArchival() map[uint32]bool {
+// ArchiveModes return the map of the archive setting
+func (conf *ConfigType) ArchiveModes() map[uint32]bool {
 	return conf.isArchival
 }
 

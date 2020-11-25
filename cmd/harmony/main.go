@@ -616,7 +616,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.IsArchival())
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes())
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
