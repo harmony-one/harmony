@@ -11,12 +11,13 @@ const (
 var defaultConfig = harmonyConfig{
 	Version: tomlConfigVersion,
 	General: generalConfig{
-		NodeType:   "validator",
-		NoStaking:  false,
-		ShardID:    -1,
-		IsArchival: false,
-		IsOffline:  false,
-		DataDir:    "./",
+		NodeType:         "validator",
+		NoStaking:        false,
+		ShardID:          -1,
+		IsArchival:       false,
+		IsBeaconArchival: false,
+		IsOffline:        false,
+		DataDir:          "./",
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: p2pConfig{
