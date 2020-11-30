@@ -5,8 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -309,9 +307,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// Disable aggregate sig at epoch TBD for mainnet (for other net, it's default to true)
-	if consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) >= 0 {
-		consensus.AggregateSig = true
+	// Enable 3s block time at the threeSecondsEpoch
+	if consensus.Blockchain.Config().IsThreeSeconds(curEpoch) {
+		consensus.BlockPeriod = 3 * time.Second
 	}
 
 	isFirstTimeStaking := consensus.Blockchain.Config().IsStaking(nextEpoch) &&

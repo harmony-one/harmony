@@ -25,6 +25,11 @@ var (
 	FiveSecondsBaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(17.5*denominations.Nano), big.NewInt(denominations.Nano),
 	))
+	// ThreeSecondsBaseStakedReward is the flat-rate block reward after epoch 360.
+	// 10.5 ONE per block
+	ThreeSecondsBaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
+		big.NewInt(10.5*denominations.Nano), big.NewInt(denominations.Nano),
+	))
 	// BlockRewardStakedCase is the baseline block reward in staked case -
 	totalTokens = numeric.NewDecFromBigInt(
 		new(big.Int).Mul(big.NewInt(12600000000), big.NewInt(denominations.One)),

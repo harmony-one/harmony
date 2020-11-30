@@ -144,8 +144,9 @@ func AccumulateRewardsAndCountSigs(
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
 		defaultReward := network.BaseStakedReward
 
-		// After block time is reduced to 5 seconds, the block reward is adjusted accordingly
+		// the block reward is adjusted accordingly based on 5s and 3s block time forks
 		if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+			// Testnet:
 			// This is testnet requiring the one-off forking logic
 			if blockNum > 634644 {
 				defaultReward = network.FiveSecondsBaseStakedReward
@@ -156,8 +157,16 @@ func AccumulateRewardsAndCountSigs(
 					}
 				}
 			}
-		} else if bc.Config().IsFiveSeconds(header.Epoch()) {
-			defaultReward = network.FiveSecondsBaseStakedReward
+			if bc.Config().IsThreeSeconds(header.Epoch()) {
+				defaultReward = network.ThreeSecondsBaseStakedReward
+			}
+		} else {
+			// Mainnet (other nets):
+			if bc.Config().IsThreeSeconds(header.Epoch()) {
+				defaultReward = network.ThreeSecondsBaseStakedReward
+			} else if bc.Config().IsFiveSeconds(header.Epoch()) {
+				defaultReward = network.FiveSecondsBaseStakedReward
+			}
 		}
 
 		// Following is commented because the new econ-model has a flat-rate block reward
