@@ -308,7 +308,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.BlockPeriod = 5 * time.Second
 
 	// Enable 2s block time at the twoSecondsEpoch
-	if consensus.Blockchain.Config().IsTwoSeconds(curEpoch) {
+	if consensus.Blockchain.Config().IsTwoSeconds(nextEpoch) {
 		consensus.BlockPeriod = 2 * time.Second
 	}
 
