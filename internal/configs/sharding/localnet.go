@@ -44,26 +44,35 @@ func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 func (ls localnetSchedule) BlocksPerEpochOld() uint64 {
 	return localnetBlocksPerEpoch
 }
+
 func (ls localnetSchedule) BlocksPerEpoch() uint64 {
 	return localnetBlocksPerEpochV2
 }
 
+func (ls localnetSchedule) twoSecondsFirstBlock() uint64 {
+	if params.LocalnetChainConfig.TwoSecondsEpoch.Uint64() == 0 {
+		return 0
+	}
+	return (params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()-1)*ls.BlocksPerEpochOld() + localnetEpochBlock1
+}
+
 func (ls localnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	blocks := ls.BlocksPerEpochOld()
-	var oldEpochNumber uint64
+	var oldEpochNumber int64
 	switch {
 	case blockNum >= localnetEpochBlock1:
-		oldEpochNumber = uint64((blockNum-localnetEpochBlock1)/blocks) + 1
+		oldEpochNumber = int64((blockNum-localnetEpochBlock1)/blocks) + 1
 	default:
 		oldEpochNumber = 0
 	}
 
-	firstBlock2s := params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()*ls.BlocksPerEpochOld() + 5
+	firstBlock2s := ls.twoSecondsFirstBlock()
+
 	switch {
-	case oldEpochNumber >= params.LocalnetChainConfig.TwoSecondsEpoch.Uint64():
+	case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(oldEpochNumber)):
 		return big.NewInt(int64((blockNum-firstBlock2s)/ls.BlocksPerEpoch() + params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()))
 	default: // genesis
-		return big.NewInt(int64(oldEpochNumber))
+		return big.NewInt(oldEpochNumber)
 	}
 }
 
@@ -75,7 +84,7 @@ func (ls localnetSchedule) IsLastBlock(blockNum uint64) bool {
 	case blockNum == localnetEpochBlock1-1:
 		return true
 	default:
-		firstBlock2s := params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()*ls.BlocksPerEpochOld() + 5
+		firstBlock2s := ls.twoSecondsFirstBlock()
 		switch {
 		case blockNum >= firstBlock2s:
 			return ((blockNum-firstBlock2s)%ls.BlocksPerEpoch() == ls.BlocksPerEpoch()-1)
@@ -91,7 +100,7 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	case epochNum == 0:
 		return localnetEpochBlock1 - 1
 	default:
-		firstBlock2s := params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()*ls.BlocksPerEpochOld() + 5
+		firstBlock2s := ls.twoSecondsFirstBlock()
 		switch {
 		case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
 			return firstBlock2s - 1 + ls.BlocksPerEpoch()*(epochNum-params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()+1)
