@@ -24,10 +24,6 @@ const (
 	initSupply = int64(12600000000)
 )
 
-var (
-	blocksPeriod = shard.Schedule.BlocksPerEpoch()
-)
-
 // PublicBlockchainService provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockchainService struct {
@@ -376,8 +372,9 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
 	blockHeight := s.hmy.CurrentBlock().Number().Uint64()
-	if blockHeight >= blocksPeriod {
-		lastBlock = blockHeight - blocksPeriod + 1
+	instance := shard.Schedule.InstanceForEpoch(s.hmy.CurrentBlock().Epoch())
+	if blockHeight >= instance.BlocksPerEpoch() {
+		lastBlock = blockHeight - instance.BlocksPerEpoch() + 1
 	}
 	for i := lastBlock; i <= blockHeight; i++ {
 		signed, err := s.IsBlockSigner(ctx, BlockNumber(i), address)

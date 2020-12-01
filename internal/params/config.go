@@ -32,7 +32,7 @@ var (
 		PreStakingEpoch:   big.NewInt(185),
 		QuickUnlockEpoch:  big.NewInt(191),
 		FiveSecondsEpoch:  big.NewInt(230),
-		ThreeSecondsEpoch: big.NewInt(10000), // TBD
+		TwoSecondsEpoch:   big.NewInt(10000), // TBD
 		RedelegationEpoch: big.NewInt(290),
 		EIP155Epoch:       big.NewInt(28),
 		S3Epoch:           big.NewInt(28),
@@ -49,7 +49,7 @@ var (
 		PreStakingEpoch:   big.NewInt(1),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(16500),
-		ThreeSecondsEpoch: big.NewInt(70000),
+		TwoSecondsEpoch:   big.NewInt(73000),
 		RedelegationEpoch: big.NewInt(36500),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
@@ -67,7 +67,7 @@ var (
 		PreStakingEpoch:   big.NewInt(1),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(0),
-		ThreeSecondsEpoch: big.NewInt(0),
+		TwoSecondsEpoch:   big.NewInt(0),
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
@@ -85,7 +85,7 @@ var (
 		PreStakingEpoch:   big.NewInt(1),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(0),
-		ThreeSecondsEpoch: big.NewInt(0),
+		TwoSecondsEpoch:   big.NewInt(0),
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
@@ -103,7 +103,7 @@ var (
 		PreStakingEpoch:   big.NewInt(1),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(0),
-		ThreeSecondsEpoch: big.NewInt(0),
+		TwoSecondsEpoch:   big.NewInt(0),
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
@@ -120,7 +120,7 @@ var (
 		PreStakingEpoch:   big.NewInt(0),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(0),
-		ThreeSecondsEpoch: big.NewInt(0),
+		TwoSecondsEpoch:   big.NewInt(0),
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
@@ -139,7 +139,7 @@ var (
 		big.NewInt(0),             // PreStakingEpoch
 		big.NewInt(0),             // QuickUnlockEpoch
 		big.NewInt(0),             // FiveSecondsEpoch
-		big.NewInt(0),             // ThreeSecondsEpoch
+		big.NewInt(0),             // TwoSecondsEpoch
 		big.NewInt(0),             // RedelegationEpoch
 		big.NewInt(0),             // EIP155Epoch
 		big.NewInt(0),             // S3Epoch
@@ -158,7 +158,7 @@ var (
 		big.NewInt(0), // PreStakingEpoch
 		big.NewInt(0), // QuickUnlockEpoch
 		big.NewInt(0), // FiveSecondsEpoch
-		big.NewInt(0), // ThreeSecondsEpoch
+		big.NewInt(0), // TwoSecondsEpoch
 		big.NewInt(0), // RedelegationEpoch
 		big.NewInt(0), // EIP155Epoch
 		big.NewInt(0), // S3Epoch
@@ -212,9 +212,9 @@ type ChainConfig struct {
 	// and block rewards adjusted to 17.5 ONE/block
 	FiveSecondsEpoch *big.Int `json:"five-seconds-epoch,omitempty"`
 
-	// ThreeSecondsEpoch is the epoch when block time is reduced to 3 seconds
-	// and block rewards adjusted to 10.5 ONE/block
-	ThreeSecondsEpoch *big.Int `json:"three-seconds-epoch,omitempty"`
+	// TwoSecondsEpoch is the epoch when block time is reduced to 2 seconds
+	// and block rewards adjusted to 7 ONE/block
+	TwoSecondsEpoch *big.Int `json:"two-seconds-epoch,omitempty"`
 
 	// RedelegationEpoch is the epoch when redelegation is supported and undelegation locking time
 	// is restored to 7 epoch
@@ -280,9 +280,9 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 	return isForked(c.FiveSecondsEpoch, epoch)
 }
 
-// IsThreeSeconds determines whether it is the epoch to change to 3 seconds block time
-func (c *ChainConfig) IsThreeSeconds(epoch *big.Int) bool {
-	return isForked(c.ThreeSecondsEpoch, epoch)
+// IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
+func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
+	return isForked(c.TwoSecondsEpoch, epoch)
 }
 
 // IsRedelegation determines whether it is the epoch to support redelegation

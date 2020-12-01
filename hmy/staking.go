@@ -309,10 +309,10 @@ func (hmy *Harmony) GetValidatorInformation(
 	computed := availability.ComputeCurrentSigning(
 		snapshot.Validator, wrapper,
 	)
-	beaconChainBlocks := uint64(
-		hmy.BeaconChain.CurrentBlock().Header().Number().Int64(),
-	) % shard.Schedule.BlocksPerEpoch()
-	computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
+
+	lastBlockOfEpoch := shard.Schedule.EpochLastBlock(hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64())
+
+	computed.BlocksLeftInEpoch = lastBlockOfEpoch - hmy.BeaconChain.CurrentBlock().Header().Number().Uint64()
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{

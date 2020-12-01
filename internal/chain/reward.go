@@ -157,13 +157,13 @@ func AccumulateRewardsAndCountSigs(
 					}
 				}
 			}
-			if bc.Config().IsThreeSeconds(header.Epoch()) {
-				defaultReward = network.ThreeSecondsBaseStakedReward
+			if bc.Config().IsTwoSeconds(header.Epoch()) {
+				defaultReward = network.TwoSecondsBaseStakedReward
 			}
 		} else {
 			// Mainnet (other nets):
-			if bc.Config().IsThreeSeconds(header.Epoch()) {
-				defaultReward = network.ThreeSecondsBaseStakedReward
+			if bc.Config().IsTwoSeconds(header.Epoch()) {
+				defaultReward = network.TwoSecondsBaseStakedReward
 			} else if bc.Config().IsFiveSeconds(header.Epoch()) {
 				defaultReward = network.FiveSecondsBaseStakedReward
 			}

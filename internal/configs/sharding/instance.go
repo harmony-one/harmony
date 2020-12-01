@@ -31,6 +31,7 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
+	blocksPerEpochOld               uint64
 	blocksPerEpoch                  uint64
 }
 
@@ -40,7 +41,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, blocksE uint64,
+	reshardingEpoch []*big.Int, blocksEOld uint64, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, errors.Errorf(
@@ -81,6 +82,7 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
+		blocksPerEpochOld:               blocksEOld,
 		blocksPerEpoch:                  blocksE,
 	}, nil
 }
@@ -94,11 +96,11 @@ func MustNewInstance(
 	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
+	reshardingEpoch []*big.Int, blocksPerEpochOld uint64, blocksPerEpoch uint64,
 ) Instance {
 	sc, err := NewInstance(
 		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, harmonyVotePercent,
-		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
+		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpochOld, blocksPerEpoch,
 	)
 	if err != nil {
 		panic(err)
