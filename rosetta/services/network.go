@@ -98,7 +98,7 @@ func (s *NetworkAPI) NetworkStatus(
 
 	// Only applicable to non-archival nodes
 	var oldestBlockIdentifier *types.BlockIdentifier
-	if !nodeconfig.GetDefaultConfig().GetArchival() {
+	if !nodeconfig.GetShardConfig(s.hmy.ShardID).GetArchival() {
 		maxGarbCollectedBlockNum := s.hmy.BlockChain.GetMaxGarbageCollectedBlockNumber()
 		if maxGarbCollectedBlockNum == -1 || maxGarbCollectedBlockNum >= currentHeader.Number().Int64() {
 			oldestBlockIdentifier = currentBlockIdentifier
@@ -143,7 +143,7 @@ func (s *NetworkAPI) NetworkOptions(
 
 	// Fetch allows based on current network option
 	var allow *types.Allow
-	isArchival := nodeconfig.GetDefaultConfig().GetArchival()
+	isArchival := nodeconfig.GetShardConfig(s.hmy.ShardID).GetArchival()
 	if s.hmy.ShardID == shard.BeaconChainShardID {
 		allow = getBeaconAllow(isArchival)
 	} else {

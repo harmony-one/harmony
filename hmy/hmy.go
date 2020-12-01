@@ -164,8 +164,8 @@ func (hmy *Harmony) IsLeader() bool {
 
 // GetNodeMetadata ..
 func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
-	cfg := nodeconfig.GetDefaultConfig()
 	header := hmy.CurrentBlock().Header()
+	cfg := nodeconfig.GetShardConfig(header.ShardID())
 	var blockEpoch *uint64
 
 	if header.ShardID() == shard.BeaconChainShardID {

@@ -36,7 +36,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 	}
 	serverAsserter, err := asserter.NewServer(
 		append(common.PlainOperationTypes, common.StakingOperationTypes...),
-		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
+		nodeconfig.GetShardConfig(hmy.ShardID).Role() == nodeconfig.ExplorerNode,
 		[]*types.NetworkIdentifier{network},
 	)
 	if err != nil {
