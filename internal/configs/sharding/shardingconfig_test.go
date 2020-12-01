@@ -39,6 +39,14 @@ func TestMainnetInstanceForEpoch(t *testing.T) {
 			big.NewInt(54),
 			mainnetV1_5,
 		},
+		{
+			big.NewInt(365),
+			mainnetV2_2,
+		},
+		{
+			big.NewInt(366),
+			mainnetV3,
+		},
 	}
 
 	for _, test := range tests {
@@ -86,6 +94,26 @@ func TestCalcEpochNumber(t *testing.T) {
 			360448,
 			big.NewInt(2),
 		},
+		{
+			6207973,
+			big.NewInt(358),
+		},
+		{
+			6324223, // last block before 2s
+			big.NewInt(365),
+		},
+		{
+			6324224,
+			big.NewInt(366),
+		},
+		{
+			6389759,
+			big.NewInt(367),
+		},
+		{
+			6389777,
+			big.NewInt(368),
+		},
 	}
 
 	for i, test := range tests {
@@ -93,6 +121,125 @@ func TestCalcEpochNumber(t *testing.T) {
 		if ep.Cmp(test.epoch) != 0 {
 			t.Errorf("CalcEpochNumber error: index %v, got %v, expect %v\n", i, ep, test.epoch)
 		}
+	}
+}
+
+func TestIsLastBlock(t *testing.T) {
+	tests := []struct {
+		block  uint64
+		result bool
+	}{
+		{
+			0,
+			false,
+		},
+		{
+			1,
+			false,
+		},
+		{
+			327679,
+			false,
+		},
+		{
+			344063,
+			true,
+		},
+		{
+			344064,
+			false,
+		},
+		{
+			360447,
+			true,
+		},
+		{
+			360448,
+			false,
+		},
+		{
+			6207973,
+			false,
+		},
+		{
+			6324223, // last block of first 2s epoch
+			true,
+		},
+		{
+			6324224,
+			false,
+		},
+		{
+			6356991,
+			true,
+		},
+		{
+			6356992,
+			false,
+		},
+		{
+			6389759,
+			true,
+		},
+	}
+
+	for i, test := range tests {
+		ep := MainnetSchedule.IsLastBlock(test.block)
+		if test.result != ep {
+			t.Errorf("IsLastBlock error: index %v, got %v, expect %v\n", i, ep, test.result)
+		}
+	}
+}
+func TestEpochLastBlock(t *testing.T) {
+	tests := []struct {
+		epoch     uint64
+		lastBlock uint64
+	}{
+		{
+			0,
+			344063,
+		},
+		{
+			1,
+			360447,
+		},
+		{
+			2,
+			376831,
+		},
+		{
+			3,
+			393215,
+		},
+		{
+			358,
+			6209535,
+		},
+		{
+			365,
+			6324223, // last block before 2s
+		},
+		{
+			366,
+			6356991, // last block of first 2s epoch
+		},
+		{
+			367,
+			6389759, // last block of second 2s epoch
+		},
+	}
+
+	for i, test := range tests {
+		ep := MainnetSchedule.EpochLastBlock(test.epoch)
+		if test.lastBlock != ep {
+			t.Errorf("EpochLastBlock error: index %v, got %v, expect %v\n", i, ep, test.lastBlock)
+		}
+	}
+}
+
+func TestTwoSecondsFirstBlock(t *testing.T) {
+	if MainnetSchedule.twoSecondsFirstBlock() != 6324224 {
+		t.Errorf("twoSecondsFirstBlock error: got %v, expect %v\n", MainnetSchedule.twoSecondsFirstBlock(), 6324224)
 	}
 }
 

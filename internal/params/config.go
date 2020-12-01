@@ -32,7 +32,7 @@ var (
 		PreStakingEpoch:   big.NewInt(185),
 		QuickUnlockEpoch:  big.NewInt(191),
 		FiveSecondsEpoch:  big.NewInt(230),
-		TwoSecondsEpoch:   big.NewInt(10000), // TBD
+		TwoSecondsEpoch:   big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
 		RedelegationEpoch: big.NewInt(290),
 		EIP155Epoch:       big.NewInt(28),
 		S3Epoch:           big.NewInt(28),
