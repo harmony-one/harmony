@@ -3,8 +3,6 @@ package shardingconfig
 import (
 	"math/big"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
@@ -113,18 +111,6 @@ func MustNewInstance(
 // BlocksPerEpoch ..
 func (sc instance) BlocksPerEpoch() uint64 {
 	return sc.blocksPerEpoch
-}
-
-// BlocksPerEpoch ..
-func (sc instance) EpochLastBlock(epochNum uint64) uint64 {
-	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * sc.blocksPerEpochOld
-
-	switch {
-	case params.TestnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-		return firstBlock2s - 1 + sc.blocksPerEpoch*(epochNum-params.TestnetChainConfig.TwoSecondsEpoch.Uint64()+1)
-	default: // genesis
-		return sc.blocksPerEpochOld*(epochNum+1) - 1
-	}
 }
 
 // NumShards returns the number of shards in the network.
