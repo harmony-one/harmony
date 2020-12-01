@@ -11,7 +11,7 @@ import (
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/staking"
@@ -169,12 +169,10 @@ func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt
 	if _, ok := tx.(*hmytypes.Transaction); ok {
 		status := common.SuccessOperationStatus.Status
 		if receipt.Status == hmytypes.ReceiptStatusFailed {
-			if len(tx.Data()) > 0 {
-				status = common.ContractFailureOperationStatus.Status
-			} else {
-				// Should never see a failed non-contract related transaction on chain
+			if len(tx.Data()) == 0 && receipt.CumulativeGasUsed <= params.TxGas {
 				status = common.FailureOperationStatus.Status
-				utils.Logger().Error().Msgf("Failed non-contract transaction on chain: %v", tx.Hash().String())
+			} else {
+				status = common.ContractFailureOperationStatus.Status
 			}
 		}
 		return status
