@@ -20,16 +20,15 @@ type Schedule interface {
 	CalcEpochNumber(blockNum uint64) *big.Int
 
 	// IsLastBlock check if the block is the last block in the epoch
+	// NOTE: This method is very critical for the epoch transition logic and other checks.
 	IsLastBlock(blockNum uint64) bool
 
 	// EpochLastBlock returns the last block number of an epoch
+	// NOTE: This method id important for a few rpcs and validator APR calculation
 	EpochLastBlock(epochNum uint64) uint64
 
 	// VDFDifficulty returns number of iterations for VDF calculation
 	VdfDifficulty() int
-
-	// ConsensusRatio ratio of new nodes vs consensus total nodes
-	ConsensusRatio() float64
 
 	// TODO: remove it after randomness feature turned on mainnet
 	//RandomnessStartingEpoch returns starting epoch of randonness generation

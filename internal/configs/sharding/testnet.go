@@ -92,11 +92,6 @@ func (ts testnetSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
 }
 
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ts testnetSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
@@ -123,7 +118,7 @@ var testnetReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.TwoSecondsEpoch,
 }
 
-var testnetV0 = MustNewInstance(4, 16, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld(), TestnetSchedule.BlocksPerEpoch())
-var testnetV1 = MustNewInstance(4, 20, 15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld(), TestnetSchedule.BlocksPerEpoch())
-var testnetV2 = MustNewInstance(4, 30, 8, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld(), TestnetSchedule.BlocksPerEpoch())
-var testnetV3 = MustNewInstance(4, 30, 8, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld(), TestnetSchedule.BlocksPerEpoch())
+var testnetV0 = MustNewInstance(4, 16, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV1 = MustNewInstance(4, 20, 15, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV2 = MustNewInstance(4, 30, 8, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV3 = MustNewInstance(4, 30, 8, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())

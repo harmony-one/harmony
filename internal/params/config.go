@@ -120,7 +120,7 @@ var (
 		PreStakingEpoch:   big.NewInt(0),
 		QuickUnlockEpoch:  big.NewInt(0),
 		FiveSecondsEpoch:  big.NewInt(0),
-		TwoSecondsEpoch:   big.NewInt(0),
+		TwoSecondsEpoch:   big.NewInt(3),
 		RedelegationEpoch: big.NewInt(0),
 		EIP155Epoch:       big.NewInt(0),
 		S3Epoch:           big.NewInt(0),
