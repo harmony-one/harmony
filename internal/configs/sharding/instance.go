@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
@@ -31,6 +33,7 @@ type instance struct {
 	hmyAccounts                     []genesis.DeployAccount
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
+	blocksPerEpochOld               uint64
 	blocksPerEpoch                  uint64
 }
 
@@ -40,7 +43,7 @@ func NewInstance(
 	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, blocksE uint64,
+	reshardingEpoch []*big.Int, blocksEOld uint64, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, errors.Errorf(
@@ -81,6 +84,7 @@ func NewInstance(
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
+		blocksPerEpochOld:               blocksEOld,
 		blocksPerEpoch:                  blocksE,
 	}, nil
 }
@@ -94,11 +98,11 @@ func MustNewInstance(
 	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
-	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
+	reshardingEpoch []*big.Int, blocksPerEpochOld uint64, blocksPerEpoch uint64,
 ) Instance {
 	sc, err := NewInstance(
 		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, harmonyVotePercent,
-		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
+		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpochOld, blocksPerEpoch,
 	)
 	if err != nil {
 		panic(err)
@@ -109,6 +113,18 @@ func MustNewInstance(
 // BlocksPerEpoch ..
 func (sc instance) BlocksPerEpoch() uint64 {
 	return sc.blocksPerEpoch
+}
+
+// BlocksPerEpoch ..
+func (sc instance) EpochLastBlock(epochNum uint64) uint64 {
+	firstBlock2s := params.TestnetChainConfig.TwoSecondsEpoch.Uint64() * sc.blocksPerEpochOld
+
+	switch {
+	case params.TestnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
+		return firstBlock2s - 1 + sc.blocksPerEpoch*(epochNum-params.TestnetChainConfig.TwoSecondsEpoch.Uint64()+1)
+	default: // genesis
+		return sc.blocksPerEpochOld*(epochNum+1) - 1
+	}
 }
 
 // NumShards returns the number of shards in the network.

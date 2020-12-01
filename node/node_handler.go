@@ -384,10 +384,9 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 				computed := availability.ComputeCurrentSigning(
 					snapshot.Validator, wrapper,
 				)
-				beaconChainBlocks := uint64(
-					node.Beaconchain().CurrentBlock().Header().Number().Int64(),
-				) % shard.Schedule.BlocksPerEpoch()
-				computed.BlocksLeftInEpoch = shard.Schedule.BlocksPerEpoch() - beaconChainBlocks
+				lastBlockOfEpoch := shard.Schedule.EpochLastBlock(node.Beaconchain().CurrentBlock().Header().Epoch().Uint64())
+
+				computed.BlocksLeftInEpoch = lastBlockOfEpoch - node.Beaconchain().CurrentBlock().Header().Number().Uint64()
 
 				if err != nil && computed.IsBelowThreshold {
 					url := h.Availability.OnDroppedBelowThreshold
