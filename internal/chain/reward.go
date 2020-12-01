@@ -169,7 +169,6 @@ func AccumulateRewardsAndCountSigs(
 			}
 		}
 
-		utils.Logger().Info().Str("REward", defaultReward.String()).Msg("rewardzz")
 		// Following is commented because the new econ-model has a flat-rate block reward
 		// of 28 ONE per block assuming 4 shards and 8s block time:
 		//// TODO Use cached result in off-chain db instead of full computation
