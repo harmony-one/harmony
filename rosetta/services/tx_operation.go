@@ -289,13 +289,13 @@ func getContractInternalTransferNativeOperations(
 
 	for _, log := range executionResult.StructLogs {
 		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
-			fromAccId, rosettaError := newAccountIdentifier(log.ContractAddress)
+			fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
 			// All internalNativeTransferEvmOps have at least 7 elements on the stack.
 			topIndex := len(log.Stack) - 1
-			toAccId, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
+			toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
@@ -307,7 +307,7 @@ func getContractInternalTransferNativeOperations(
 			}
 
 			ops = append(
-				ops, newSameShardTransferNativeOperations(fromAccId, toAccId, value, status, startingOperationIndex)...,
+				ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
 			)
 			nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
 			startingOperationIndex = &nextOpIndex
