@@ -596,7 +596,7 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 		ContractAddress: contractAddr,
 	}
 	opIndex := startingOpID.Index + 1
-	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &opIndex)
+	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -611,7 +611,7 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &opIndex)
+	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
