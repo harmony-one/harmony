@@ -23,7 +23,7 @@ import (
 var listener net.Listener
 
 // StartServers starts the rosetta http server
-// TODO (dm): optimize rosetta to use single flight to avoid re-processing data
+// TODO (dm): optimize rosetta to use single flight & use extra caching type DB to avoid re-processing data
 func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
 	if !config.HTTPEnabled {
 		utils.Logger().Info().Msg("Rosetta http server disabled...")
