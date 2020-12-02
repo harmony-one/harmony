@@ -281,13 +281,12 @@ func getContractInternalTransferNativeOperations(
 	executionResult *hmy.ExecutionResult, status string,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
+	ops := []*types.Operation{}
 	if executionResult == nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "execution trace result not found",
-		})
+		// No error since nil execution result implies empty StructLogs, which is not an error.
+		return ops, nil
 	}
 
-	ops := []*types.Operation{}
 	for _, log := range executionResult.StructLogs {
 		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
 			fromAccId, rosettaError := newAccountIdentifier(log.ContractAddress)
