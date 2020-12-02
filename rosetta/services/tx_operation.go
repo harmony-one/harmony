@@ -290,6 +290,10 @@ func getContractInternalTransferNativeOperations(
 	ops := []*types.Operation{}
 	for _, log := range executionResult.StructLogs {
 		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
+			fromAccId, rosettaError := newAccountIdentifier(log.ContractAddress)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
 			// All internalNativeTransferEvmOps have at least 7 elements on the stack.
 			topIndex := len(log.Stack) - 1
 			toAccId, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
@@ -301,10 +305,6 @@ func getContractInternalTransferNativeOperations(
 				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 					"message": fmt.Sprintf("unable to set value amount, raw: %v", log.Stack[topIndex-2]),
 				})
-			}
-			fromAccId, rosettaError := newAccountIdentifier(log.CallerAddress)
-			if rosettaError != nil {
-				return nil, rosettaError
 			}
 
 			ops = append(
