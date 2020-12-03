@@ -123,6 +123,9 @@ func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
 			t.Errorf("operation %v has wrong currency", i)
 		}
 	}
+	if err := assertNativeOperationTypeUniquenessInvariant(ops); err != nil {
+		t.Error(err)
+	}
 
 	testStartingIndex := int64(12)
 	ops, rosettaError = getSideEffectOperationsFromValueMap(testPayouts, testType, &testStartingIndex)
@@ -151,6 +154,9 @@ func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
 		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
 			t.Errorf("operation %v has wrong currency", i)
 		}
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(ops); err != nil {
+		t.Error(err)
 	}
 }
 
