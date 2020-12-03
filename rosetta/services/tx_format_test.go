@@ -21,7 +21,7 @@ import (
 func assertNativeOperationTypeUniquenessInvariant(operations []*types.Operation) error {
 	foundType := ""
 	for _, op := range operations {
-		if op.Type == common.ExpendGasOperation {
+		if op.Type == common.ExpendGasOperation || op.Type == common.ContractCreationOperation {
 			continue
 		}
 		if foundType == "" {

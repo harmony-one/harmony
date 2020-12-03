@@ -48,7 +48,7 @@ func GetNativeOperationsFromTransaction(
 		txOperations, rosettaError = getCrossShardSenderTransferNativeOperations(
 			tx, senderAddress, &startingOpIndex,
 		)
-	} else if contractInfo.ExecutionResult != nil && len(tx.Data()) > 0 {
+	} else if contractInfo.ExecutionResult != nil {
 		txOperations, rosettaError = getContractTransferNativeOperations(
 			tx, receipt, senderAddress, tx.To(), contractInfo, &startingOpIndex,
 		)
@@ -207,19 +207,13 @@ func getBasicTransferNativeOperations(
 	return newSameShardTransferNativeOperations(from, to, tx.Value(), status, startingOperationIndex), nil
 }
 
-// getContractTransferNativeOperations extracts & formats the native operations for any transaction involving a contract.
+// getContractTransferNativeOperations extracts & formats the native operations for any
+// transaction involving a contract.
 // Note that this will include any native tokens that were transferred from the contract (i.e: internal transactions).
-// WARNING: order of execution matters due to operation index.
 func getContractTransferNativeOperations(
 	tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address, toAddress *ethcommon.Address,
 	contractInfo *ContractInfo, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	if len(tx.Data()) == 0 || contractInfo.ExecutionResult == nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "implementation error",
-		})
-	}
-
 	basicOps, rosettaError := getBasicTransferNativeOperations(
 		tx, receipt, senderAddress, toAddress, startingOperationIndex,
 	)
