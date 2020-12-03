@@ -4,28 +4,39 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	// txTraceCacheSize is max number of transaction traces to keep cached
+	txTraceCacheSize = 1e5
+)
+
 // BlockAPI implements the server.BlockAPIServicer interface.
 type BlockAPI struct {
-	hmy *hmy.Harmony
+	hmy          *hmy.Harmony
+	txTraceCache *lru.Cache
 }
 
 // NewBlockAPI creates a new instance of a BlockAPI.
 func NewBlockAPI(hmy *hmy.Harmony) server.BlockAPIServicer {
+	traceCache, _ := lru.New(txTraceCacheSize)
 	return &BlockAPI{
-		hmy: hmy,
+		hmy:          hmy,
+		txTraceCache: traceCache,
 	}
 }
 
@@ -150,11 +161,30 @@ func (s *BlockAPI) BlockTransaction(
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		contractCode := []byte{}
-		if txInfo.tx.To() != nil {
-			contractCode = state.GetCode(*txInfo.tx.To())
+		contractInfo := &ContractInfo{}
+		if _, ok := txInfo.tx.(*hmytypes.Transaction); ok {
+			// check for contract related operations, if it is a plain transaction.
+			if txInfo.tx.To() != nil {
+				// possible call to existing contract so fetch relevant data
+				contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
+				contractInfo.ContractAddress = txInfo.tx.To()
+			} else {
+				// contract creation, so address is in receipt
+				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
+				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
+			}
+			blk, rosettaError := getBlock(
+				ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
+			)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
 		}
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractCode)
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractInfo)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -221,6 +251,58 @@ func (s *BlockAPI) getTransactionInfo(
 		receipt:   receipt,
 		cxReceipt: cxReceipt,
 	}, nil
+}
+
+var (
+	// defaultTraceReExec is the number of blocks the tracer can go back and re-execute to produce historical state.
+	// Only 1 block is needed to check for internal transactions
+	defaultTraceReExec = uint64(1)
+	// defaultTraceTimeout is the amount of time a transaction can execute
+	defaultTraceTimeout = (10 * time.Second).String()
+	// defaultTraceLogConfig is the log config of all traces
+	defaultTraceLogConfig = vm.LogConfig{
+		DisableMemory:  false,
+		DisableStack:   false,
+		DisableStorage: false,
+		Debug:          false,
+		Limit:          0,
+	}
+)
+
+// getTransactionTrace for the given txInfo.
+func (s *BlockAPI) getTransactionTrace(
+	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
+) (*hmy.ExecutionResult, *types.Error) {
+	cacheKey := types.Hash(blk) + types.Hash(txInfo)
+	if value, ok := s.txTraceCache.Get(cacheKey); ok {
+		return value.(*hmy.ExecutionResult), nil
+	}
+
+	msg, vmctx, statedb, err := s.hmy.ComputeTxEnv(blk, int(txInfo.txIndex), defaultTraceReExec)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+		LogConfig: &defaultTraceLogConfig,
+		Timeout:   &defaultTraceTimeout,
+		Reexec:    &defaultTraceReExec,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResult, ok := execResultInterface.(*hmy.ExecutionResult)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown tracer exec result type",
+		})
+	}
+	s.txTraceCache.Add(cacheKey, execResult)
+
+	return execResult, nil
 }
 
 // getBlock ..

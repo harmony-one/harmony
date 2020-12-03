@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -63,12 +65,9 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
 			Currency: &common.NativeCurrency,
@@ -124,6 +123,9 @@ func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
 			t.Errorf("operation %v has wrong currency", i)
 		}
 	}
+	if err := assertNativeOperationTypeUniquenessInvariant(ops); err != nil {
+		t.Error(err)
+	}
 
 	testStartingIndex := int64(12)
 	ops, rosettaError = getSideEffectOperationsFromValueMap(testPayouts, testType, &testStartingIndex)
@@ -152,6 +154,9 @@ func TestGetSideEffectOperationsFromValueMap(t *testing.T) {
 		if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
 			t.Errorf("operation %v has wrong currency", i)
 		}
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(ops); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -195,12 +200,9 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
 			Currency: &common.NativeCurrency,
@@ -259,12 +261,9 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
 			Currency: &common.NativeCurrency,
@@ -323,12 +322,9 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
 			Currency: &common.NativeCurrency,
@@ -380,12 +376,9 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	refOperations := newNativeOperationsWithGas(gasFee, senderAccID)
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
-		RelatedOperations: []*types.OperationIdentifier{
-			{Index: 0},
-		},
-		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
-		Account: senderAccID,
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
 			Currency: &common.NativeCurrency,
@@ -404,7 +397,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	}
 }
 
-func TestNewTransferNativeOperations(t *testing.T) {
+func TestGetBasicTransferOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 0, 0, 1e18, gasPrice, big.NewInt(1), []byte("test"),
@@ -431,11 +424,6 @@ func TestNewTransferNativeOperations(t *testing.T) {
 		{
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
-			},
-			RelatedOperations: []*types.OperationIdentifier{
-				{
-					Index: startingOpID.Index,
-				},
 			},
 			Type:    common.NativeTransferOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
@@ -466,7 +454,8 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	receipt := &hmytypes.Receipt{
 		Status: hmytypes.ReceiptStatusFailed,
 	}
-	operations, rosettaError := newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getBasicTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -481,7 +470,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
-	operations, rosettaError = newTransferNativeOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = getBasicTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -493,7 +482,7 @@ func TestNewTransferNativeOperations(t *testing.T) {
 	}
 }
 
-func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
+func TestGetCrossShardSenderTransferNativeOperations(t *testing.T) {
 	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
 	tx, err := helpers.CreateTestTransaction(
 		signer, 0, 1, 0, 1e18, gasPrice, big.NewInt(1), []byte("data-does-nothing"),
@@ -527,9 +516,6 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
 			},
-			RelatedOperations: []*types.OperationIdentifier{
-				startingOpID,
-			},
 			Type:    common.NativeCrossShardTransferOperation,
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccID,
@@ -540,7 +526,8 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 			Metadata: metadata,
 		},
 	}
-	operations, rosettaError := newCrossShardSenderTransferNativeOperations(startingOpID, tx, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getCrossShardSenderTransferNativeOperations(tx, senderAddr, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -552,7 +539,365 @@ func TestNewCrossShardSenderTransferNativeOperations(t *testing.T) {
 	}
 }
 
-func TestNewContractCreationNativeOperations(t *testing.T) {
+var (
+	testExecResultForInternalTx = &hmy.ExecutionResult{
+		StructLogs: []hmy.StructLogRes{
+			{
+				Pc:              1316,
+				Op:              "DUP9",
+				CallerAddress:   ethcommon.HexToAddress("0x2a44f609f860d4ff8835f9ec1d9b1acdae1fd9cb"),
+				ContractAddress: ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a"),
+				Gas:             6677398,
+				GasCost:         3,
+				Depth:           1,
+				Stack: []string{
+					"0000000000000000000000000000000000000000000000000000000023024408",
+					"000000000000000000000000000000000000000000000000000000000000019a",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000050",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+				},
+				Memory: []string{
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000003",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+				},
+				Storage: map[string]string{
+					"43a43725d4b041c11b63ea10be0771546465a0c0654fd13c2712f2a8ce3f8b85": "0000000000000000000000000000000000000000000000000000000000000050",
+				},
+			},
+			{
+				Pc:              1317,
+				Op:              vm.CALL.String(),
+				CallerAddress:   ethcommon.HexToAddress("0x2a44f609f860d4ff8835f9ec1d9b1acdae1fd9cb"),
+				ContractAddress: ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a"),
+				Gas:             6677395,
+				GasCost:         9700,
+				Depth:           1,
+				Stack: []string{
+					"0000000000000000000000000000000000000000000000000000000023024408",
+					"000000000000000000000000000000000000000000000000000000000000019a",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000050",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000002710",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+				},
+				Memory: []string{
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000003",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+				},
+				Storage: map[string]string{
+					"43a43725d4b041c11b63ea10be0771546465a0c0654fd13c2712f2a8ce3f8b85": "0000000000000000000000000000000000000000000000000000000000000050",
+				},
+			},
+			{
+				Pc:              1318,
+				Op:              "SWAP4",
+				CallerAddress:   ethcommon.HexToAddress("0x2a44f609f860d4ff8835f9ec1d9b1acdae1fd9cb"),
+				ContractAddress: ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a"),
+				Gas:             6669995,
+				GasCost:         3,
+				Depth:           1,
+				Stack: []string{
+					"0000000000000000000000000000000000000000000000000000000023024408",
+					"000000000000000000000000000000000000000000000000000000000000019a",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000050",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000001",
+				},
+				Memory: []string{
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000003",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+				},
+				Storage: map[string]string{
+					"43a43725d4b041c11b63ea10be0771546465a0c0654fd13c2712f2a8ce3f8b85": "0000000000000000000000000000000000000000000000000000000000000050",
+				},
+			},
+			{
+				Pc:              1319,
+				Op:              vm.CALLCODE.String(),
+				CallerAddress:   ethcommon.HexToAddress("0x2a44f609f860d4ff8835f9ec1d9b1acdae1fd9cb"),
+				ContractAddress: ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a"),
+				Gas:             6677395,
+				GasCost:         9700,
+				Depth:           1,
+				Stack: []string{
+					"0000000000000000000000000000000000000000000000000000000023024408",
+					"000000000000000000000000000000000000000000000000000000000000019a",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000050",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"00000000000000000000000000000000000000000000021e19e0c9bab2400000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+					"0000000000000000000000000000000000000000000000000000000000002710",
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000000",
+				},
+				Memory: []string{
+					"0000000000000000000000007c41e0668b551f4f902cfaec05b5bdca68b124ce",
+					"0000000000000000000000000000000000000000000000000000000000000003",
+					"0000000000000000000000000000000000000000000000000000000000000080",
+				},
+				Storage: map[string]string{
+					"43a43725d4b041c11b63ea10be0771546465a0c0654fd13c2712f2a8ce3f8b85": "0000000000000000000000000000000000000000000000000000000000000050",
+				},
+			},
+		},
+	}
+	testExecResultForInternalTxValueSum = uint64(20000)
+)
+
+func TestGetContractInternalTransferNativeOperations(t *testing.T) {
+	refStatus := common.SuccessOperationStatus.Status
+	refStartingIndex := int64(23)
+	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+		prevIndex := int64(-1)
+		valueSum := int64(0)
+		absValueSum := uint64(0)
+		for i, op := range ops {
+			if op.OperationIdentifier.Index <= prevIndex {
+				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+					prevIndex, op.OperationIdentifier.Index, i,
+				)
+			}
+			prevIndex = op.OperationIdentifier.Index
+			if op.Status != refStatus {
+				t.Errorf("wrong status for op %v", i)
+			}
+			if op.Type != common.NativeTransferOperation {
+				t.Errorf("wrong operation type for op %v", i)
+			}
+			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+				t.Errorf("wrong currency for op %v", i)
+			}
+			val, err := types.AmountValue(op.Amount)
+			if err != nil {
+				t.Error(err)
+			}
+			valueSum += val.Int64()
+			absValueSum += val.Abs(val).Uint64()
+		}
+
+		if valueSum != 0 {
+			t.Errorf("expected sum of all non-gas values to be 0")
+		}
+		if expectedValueSum*2 != absValueSum {
+			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+		}
+	}
+
+	testOps, rosettaError := getContractInternalTransferNativeOperations(
+		testExecResultForInternalTx, refStatus, &refStartingIndex,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	baseValidation(testOps, testExecResultForInternalTxValueSum)
+	if len(testOps) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if testOps[0].OperationIdentifier.Index != refStartingIndex {
+		t.Errorf("expected starting index to be %v", refStartingIndex)
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+
+	testOps, rosettaError = getContractInternalTransferNativeOperations(
+		testExecResultForInternalTx, refStatus, nil,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	baseValidation(testOps, testExecResultForInternalTxValueSum)
+	if len(testOps) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if testOps[0].OperationIdentifier.Index != 0 {
+		t.Errorf("expected starting index to be 0")
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+
+	testOps, rosettaError = getContractInternalTransferNativeOperations(
+		nil, refStatus, nil,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	if len(testOps) != 0 {
+		t.Errorf("expected len 0 test operations for nil execution result")
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+
+	testOps, rosettaError = getContractInternalTransferNativeOperations(
+		&hmy.ExecutionResult{}, refStatus, nil,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	if len(testOps) != 0 {
+		t.Errorf("expected len 0 test operations for nil struct logs")
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetContractTransferNativeOperations(t *testing.T) {
+	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
+	refTxValue := big.NewInt(1)
+	refTx, err := helpers.CreateTestTransaction(
+		signer, 0, 0, 0, 1e18, gasPrice, refTxValue, []byte("blah-blah-blah"),
+	)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	refSenderAddr, err := refTx.SenderAddress()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	refStatus := common.SuccessOperationStatus.Status
+	refStartingIndex := int64(23)
+	refReceipt := &hmytypes.Receipt{
+		PostState: nil,
+		Status:    1,
+		GasUsed:   params.TxGas * 3, // somme arb number > TxGas
+	}
+	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+		prevIndex := int64(-1)
+		valueSum := int64(0)
+		absValueSum := uint64(0)
+		for i, op := range ops {
+			if op.OperationIdentifier.Index <= prevIndex {
+				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+					prevIndex, op.OperationIdentifier.Index, i,
+				)
+			}
+			prevIndex = op.OperationIdentifier.Index
+			if op.Status != refStatus {
+				t.Errorf("wrong status for op %v", i)
+			}
+			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+				t.Errorf("wrong currency for op %v", i)
+			}
+			if op.Type == common.ExpendGasOperation {
+				continue
+			}
+			if op.Type != common.NativeTransferOperation {
+				t.Errorf("wrong operation type for op %v", i)
+			}
+			val, err := types.AmountValue(op.Amount)
+			if err != nil {
+				t.Error(err)
+			}
+			valueSum += val.Int64()
+			absValueSum += val.Abs(val).Uint64()
+		}
+
+		if valueSum != 0 {
+			t.Errorf("expected sum of all non-gas values to be 0")
+		}
+		if expectedValueSum*2 != absValueSum {
+			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+		}
+	}
+
+	testOps, rosettaError := getContractTransferNativeOperations(
+		refTx, refReceipt, refSenderAddr, refTx.To(),
+		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, &refStartingIndex,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
+	if len(testOps) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if testOps[0].OperationIdentifier.Index != refStartingIndex {
+		t.Errorf("expected starting index to be %v", refStartingIndex)
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+
+	testOps, rosettaError = getContractTransferNativeOperations(
+		refTx, refReceipt, refSenderAddr, refTx.To(),
+		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, nil,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
+	if len(testOps) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if testOps[0].OperationIdentifier.Index != 0 {
+		t.Errorf("expected starting index to be 0")
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+
+	testOps, rosettaError = getContractTransferNativeOperations(
+		refTx, refReceipt, refSenderAddr, refTx.To(),
+		&ContractInfo{}, nil,
+	)
+	if rosettaError != nil {
+		t.Error(rosettaError)
+	}
+	baseValidation(testOps, refTxValue.Uint64())
+	if len(testOps) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if testOps[0].OperationIdentifier.Index != 0 {
+		t.Errorf("expected starting index to be 0")
+	}
+	if len(testOps) > 3 {
+		t.Errorf("expect at most 3 operations for nil ExecutionResult")
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetContractCreationNativeOperations(t *testing.T) {
 	dummyContractKey, err := crypto.GenerateKey()
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -586,9 +931,6 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: startingOpID.Index + 1,
 			},
-			RelatedOperations: []*types.OperationIdentifier{
-				startingOpID,
-			},
 			Type:    common.ContractCreationOperation,
 			Status:  common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
@@ -619,7 +961,8 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 		Status:          hmytypes.ReceiptStatusFailed,
 		ContractAddress: contractAddr,
 	}
-	operations, rosettaError := newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
+	opIndex := startingOpID.Index + 1
+	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -634,7 +977,7 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 	refOperations[0].Status = common.SuccessOperationStatus.Status
 	refOperations[1].Status = common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = newContractCreationNativeOperations(startingOpID, tx, receipt, senderAddr)
+	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -644,6 +987,62 @@ func TestNewContractCreationNativeOperations(t *testing.T) {
 	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
+
+	traceValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+		prevIndex := int64(-1)
+		valueSum := int64(0)
+		absValueSum := uint64(0)
+		for i, op := range ops {
+			if op.OperationIdentifier.Index <= prevIndex {
+				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+					prevIndex, op.OperationIdentifier.Index, i,
+				)
+			}
+			prevIndex = op.OperationIdentifier.Index
+			if op.Status != refOperations[0].Status {
+				t.Errorf("wrong status for op %v", i)
+			}
+			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+				t.Errorf("wrong currency for op %v", i)
+			}
+			if op.Type == common.ExpendGasOperation || op.Type == common.ContractCreationOperation {
+				continue
+			}
+			if op.Type != common.NativeTransferOperation {
+				t.Errorf("wrong operation type for op %v", i)
+			}
+			val, err := types.AmountValue(op.Amount)
+			if err != nil {
+				t.Error(err)
+			}
+			valueSum += val.Int64()
+			absValueSum += val.Abs(val).Uint64()
+		}
+
+		if valueSum != 0 {
+			t.Errorf("expected sum of all non-gas values to be 0")
+		}
+		if expectedValueSum*2 != absValueSum {
+			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+		}
+	}
+	operations, rosettaError = getContractCreationNativeOperations(
+		tx, receipt, senderAddr, &ContractInfo{ExecutionResult: testExecResultForInternalTx}, &opIndex,
+	)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	traceValidation(operations, testExecResultForInternalTxValueSum)
+	if len(operations) == 0 {
+		t.Errorf("expect atleast 1 operation")
+	}
+	if operations[0].OperationIdentifier.Index != opIndex {
+		t.Errorf("expect first operation to be %v", opIndex)
+	}
+	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
+		t.Error(err)
+	}
+
 }
 
 func TestNewNativeOperations(t *testing.T) {

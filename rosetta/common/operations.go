@@ -10,19 +10,18 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// Invariant: A transaction can only contain 1 type of native operation(s) other than gas expenditure.
 const (
 	// ExpendGasOperation is an operation that only affects the native currency.
 	ExpendGasOperation = "Gas"
+
+	// ContractCreationOperation is an operation that only affects the native currency.
+	ContractCreationOperation = "ContractCreation"
 
 	// NativeTransferOperation is an operation that only affects the native currency.
 	NativeTransferOperation = "NativeTransfer"
 
 	// NativeCrossShardTransferOperation is an operation that only affects the native currency.
 	NativeCrossShardTransferOperation = "NativeCrossShardTransfer"
-
-	// ContractCreationOperation is an operation that only affects the native currency.
-	ContractCreationOperation = "ContractCreation"
 
 	// GenesisFundsOperation is a side effect operation for genesis block only.
 	// Note that no transaction can be constructed with this operation.
@@ -56,6 +55,12 @@ var (
 		staking.DirectiveDelegate.String(),
 		staking.DirectiveUndelegate.String(),
 		staking.DirectiveCollectRewards.String(),
+	}
+
+	// MutuallyExclusiveOperations for invariant: A transaction can only contain 1 type of 'native' operation.
+	MutuallyExclusiveOperations = map[string]interface{}{
+		NativeTransferOperation:           struct{}{},
+		NativeCrossShardTransferOperation: struct{}{},
 	}
 )
 

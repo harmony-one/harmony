@@ -17,11 +17,10 @@ import (
 	"github.com/harmony-one/harmony/test/helpers"
 )
 
-// Invariant: A transaction can only contain 1 type of native operation(s) other than gas expenditure.
 func assertNativeOperationTypeUniquenessInvariant(operations []*types.Operation) error {
 	foundType := ""
 	for _, op := range operations {
-		if op.Type == common.ExpendGasOperation {
+		if _, ok := common.MutuallyExclusiveOperations[op.Type]; !ok {
 			continue
 		}
 		if foundType == "" {
@@ -79,7 +78,7 @@ func testFormatStakingTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, []byte{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -134,7 +133,7 @@ func testFormatPlainTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, []byte{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -191,7 +190,7 @@ func testFormatCrossShardSenderTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, []byte{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

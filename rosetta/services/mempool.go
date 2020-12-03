@@ -84,7 +84,7 @@ func (s *MempoolAPI) MempoolTransaction(
 		GasUsed:           poolTx.Gas(),
 	}
 
-	respTx, err := FormatTransaction(poolTx, estReceipt, []byte{})
+	respTx, err := FormatTransaction(poolTx, estReceipt, &ContractInfo{})
 	if err != nil {
 		return nil, err
 	}

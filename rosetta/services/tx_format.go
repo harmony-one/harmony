@@ -9,6 +9,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -18,9 +19,18 @@ var (
 	FormatDefaultSenderAddress = ethcommon.HexToAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 )
 
+// ContractInfo contains all relevant data for formatting/inspecting transactions involving contracts
+type ContractInfo struct {
+	// ContractAddress is the address of the primary (or first) contract related to the tx.
+	ContractAddress *ethcommon.Address `json:"contract_hex_address"`
+	// ContractCode is the code of the primary (or first) contract related to the tx.
+	ContractCode    []byte               `json:"contract_code"`
+	ExecutionResult *hmy.ExecutionResult `json:"execution_result"`
+}
+
 // FormatTransaction for staking, cross-shard sender, and plain transactions
 func FormatTransaction(
-	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractCode []byte,
+	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractInfo *ContractInfo,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
 	var isCrossShard, isStaking, isContractCreation bool
@@ -39,7 +49,7 @@ func FormatTransaction(
 	case *hmytypes.Transaction:
 		isStaking = false
 		plainTx := tx.(*hmytypes.Transaction)
-		operations, rosettaError = GetNativeOperationsFromTransaction(plainTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromTransaction(plainTx, receipt, contractInfo)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -62,7 +72,7 @@ func FormatTransaction(
 			return nil, rosettaError
 		}
 		txMetadata.ContractAccountIdentifier = contractID
-	} else if len(contractCode) > 0 && tx.To() != nil {
+	} else if contractInfo.ContractAddress != nil && len(contractInfo.ContractCode) > 0 {
 		// Contract code was found, so receiving account must be the contract address
 		contractID, rosettaError := newAccountIdentifier(*tx.To())
 		if rosettaError != nil {
