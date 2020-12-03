@@ -48,7 +48,7 @@ func GetNativeOperationsFromTransaction(
 		txOperations, rosettaError = getCrossShardSenderTransferNativeOperations(
 			tx, senderAddress, &startingOpIndex,
 		)
-	} else if contractInfo.ExecutionResult != nil {
+	} else if contractInfo != nil && contractInfo.ExecutionResult != nil {
 		txOperations, rosettaError = getContractTransferNativeOperations(
 			tx, receipt, senderAddress, tx.To(), contractInfo, &startingOpIndex,
 		)
@@ -190,7 +190,9 @@ func getBasicTransferNativeOperations(
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	if toAddress == nil {
-		return nil, common.NewError(common.CatchAllError, nil)
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "tx receiver not found",
+		})
 	}
 
 	// Common operation elements
@@ -263,6 +265,7 @@ func getContractCreationNativeOperations(
 var (
 	// internalNativeTransferEvmOps are the EVM operations that can execute a native transfer
 	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
+	// All operations have at least 7 elements on the stack when executed.
 	internalNativeTransferEvmOps = map[string]interface{}{
 		vm.CALL.String():     struct{}{},
 		vm.CALLCODE.String(): struct{}{},
@@ -287,7 +290,6 @@ func getContractInternalTransferNativeOperations(
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
-			// All internalNativeTransferEvmOps have at least 7 elements on the stack.
 			topIndex := len(log.Stack) - 1
 			toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
 			if rosettaError != nil {

@@ -173,7 +173,6 @@ func (s *BlockAPI) BlockTransaction(
 				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
 				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
 			}
-			// If there is tx data, check contract information for formatter
 			blk, rosettaError := getBlock(
 				ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
 			)
