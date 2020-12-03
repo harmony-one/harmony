@@ -57,11 +57,6 @@ func (ss stressnetSchedule) VdfDifficulty() int {
 	return stressnetVdfDifficulty
 }
 
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ss stressnetSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ss stressnetSchedule) RandomnessStartingEpoch() uint64 {
@@ -87,5 +82,5 @@ var stressnetReshardingEpoch = []*big.Int{
 	params.StressnetChainConfig.StakingEpoch,
 }
 
-var stressnetV0 = MustNewInstance(2, 10, 10, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch(), StressNetSchedule.BlocksPerEpoch())
-var stressnetV1 = MustNewInstance(2, 30, 10, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch(), StressNetSchedule.BlocksPerEpoch())
+var stressnetV0 = MustNewInstance(2, 10, 10, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV1 = MustNewInstance(2, 30, 10, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())

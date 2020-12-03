@@ -56,10 +56,6 @@ func (ps pangaeaSchedule) VdfDifficulty() int {
 	return pangaeaVdfDifficulty
 }
 
-func (ps pangaeaSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {
@@ -85,5 +81,5 @@ var pangaeaReshardingEpoch = []*big.Int{
 	params.PangaeaChainConfig.StakingEpoch,
 }
 
-var pangaeaV0 = MustNewInstance(4, 30, 30, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch(), PangaeaSchedule.BlocksPerEpoch())
-var pangaeaV1 = MustNewInstance(4, 110, 30, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch(), PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV0 = MustNewInstance(4, 30, 30, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())
+var pangaeaV1 = MustNewInstance(4, 110, 30, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, pangaeaReshardingEpoch, PangaeaSchedule.BlocksPerEpoch())

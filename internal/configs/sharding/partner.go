@@ -57,11 +57,6 @@ func (ps partnerSchedule) VdfDifficulty() int {
 	return partnerVdfDifficulty
 }
 
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ps partnerSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ps partnerSchedule) RandomnessStartingEpoch() uint64 {
@@ -87,5 +82,5 @@ var partnerReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.StakingEpoch,
 }
 
-var partnerV0 = MustNewInstance(2, 15, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(), PartnerSchedule.BlocksPerEpoch())
-var partnerV1 = MustNewInstance(2, 30, 15, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch(), PartnerSchedule.BlocksPerEpoch())
+var partnerV0 = MustNewInstance(2, 15, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV1 = MustNewInstance(2, 30, 15, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())

@@ -41,11 +41,6 @@ func (s fixedSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (s fixedSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (s fixedSchedule) RandomnessStartingEpoch() uint64 {
