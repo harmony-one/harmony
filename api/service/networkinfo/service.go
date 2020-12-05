@@ -18,6 +18,7 @@ import (
 	libp2pdis "github.com/libp2p/go-libp2p-discovery"
 	libp2pdht "github.com/libp2p/go-libp2p-kad-dht"
 	libp2pdhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr-net"
 	"github.com/pkg/errors"
 )
@@ -139,7 +140,21 @@ func (s *Service) Init() error {
 	}
 
 	connected := false
-	for _, peerAddr := range s.bootnodes {
+	var bnList p2p.AddrList
+	for _, maddr := range s.bootnodes {
+		if madns.Matches(maddr) {
+			mas, err := madns.Resolve(context.Background(), maddr)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("Resolve bootnode")
+				continue
+			}
+			bnList = append(bnList, mas...)
+		} else {
+			bnList = append(bnList, maddr)
+		}
+	}
+
+	for _, peerAddr := range bnList {
 		peerinfo, _ := libp2p_peer.AddrInfoFromP2pAddr(peerAddr)
 		wg.Add(1)
 		go func() {
