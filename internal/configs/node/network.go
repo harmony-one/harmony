@@ -24,7 +24,7 @@ var (
 	}
 
 	stressBootNodes = []string{
-		"/ip4/52.40.84.2/tcp/9842/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29",
+		"/dnsaddr/bootstrap.stn.hmny.io",
 	}
 
 	devnetBootNodes = []string{}
