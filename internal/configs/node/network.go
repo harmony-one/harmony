@@ -6,8 +6,7 @@ var (
 	}
 
 	testnetBootNodes = []string{
-		"/ip4/54.86.126.90/tcp/9867/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
-		"/ip4/52.40.84.2/tcp/9867/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29",
+		"/dnsaddr/bootstrap.b.hmny.io",
 	}
 
 	pangaeaBootNodes = []string{
