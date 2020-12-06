@@ -34,7 +34,6 @@ help:
 	@echo "test-rosetta - run the rosetta tests"
 	@echo "test-rosetta-attach - attach onto the rosetta testing docker container for inspection"
 	@echo "linux_static - static build the harmony binary & bootnode along with the MCL & BLS libs (for linux)"
-	@echo "arm_static - static build the harmony binary & bootnode on ARM64 platform"
 	@echo "rpm - build a harmony RPM pacakge"
 	@echo "rpmpub_dev - publish harmony RPM package to development repo"
 	@echo "rpmpub_prod - publish harmony RPM package to production repo"
@@ -100,14 +99,6 @@ linux_static:
 	make -C $(TOP)/mcl -j8
 	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -s
-
-arm_static:
-	go mod edit --require=github.com/ethereum/go-ethereum@v1.8.28
-	go mod edit -replace github.com/ethereum/go-ethereum=$(GOPATH)/src/github.com/ethereum/go-ethereum
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
-	bash ./scripts/go_executable_build.sh -a arm64 -s
-	git checkout go.mod
 
 deb_init:
 	rm -rf $(DEBBUILD)
