@@ -152,13 +152,14 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(ip string, port string, peerHash [20]byte) *StateSync {
+func CreateStateSync(ip string, port string, peerHash [20]byte, isExplorer bool) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.selfip = ip
 	stateSync.selfport = port
 	stateSync.selfPeerHash = peerHash
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
+	stateSync.isExplorer = isExplorer
 	stateSync.syncConfig = &SyncConfig{}
 	return stateSync
 }
@@ -171,6 +172,7 @@ type StateSync struct {
 	commonBlocks       map[int]*types.Block
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
+	isExplorer         bool
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
@@ -1025,9 +1027,10 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
 			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
 		}
-		// This logic is only needed for explorer node.
-		// TODO: refactor this.
-		consensus.UpdateConsensusInformation()
+		// TODO: move this to explorer handler code.
+		if ss.isExplorer {
+			consensus.UpdateConsensusInformation()
+		}
 	}
 	ss.purgeAllBlocksFromCache()
 }

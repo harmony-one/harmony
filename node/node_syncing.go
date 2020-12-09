@@ -64,9 +64,14 @@ func (node *Node) DoSyncWithoutConsensus() {
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = node.getStateSync()
 	}
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
+}
+
+func (node *Node) getStateSync() *syncing.StateSync {
+	return syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port,
+		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode)
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
@@ -198,7 +203,7 @@ func (node *Node) DoBeaconSyncing() {
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+			node.beaconSync = node.getStateSync()
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
@@ -298,7 +303,7 @@ func (node *Node) SupportSyncing() {
 	}
 
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = node.getStateSync()
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 
