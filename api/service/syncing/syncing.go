@@ -1025,6 +1025,8 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
 			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
 		}
+		// This logic is only needed for explorer node.
+		// TODO: refactor this.
 		consensus.UpdateConsensusInformation()
 	}
 	ss.purgeAllBlocksFromCache()
