@@ -40,7 +40,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.Logger().Debug().
+				utils.Logger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-readySignal:
