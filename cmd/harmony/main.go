@@ -19,6 +19,7 @@ import (
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/common/fdlimit"
@@ -302,10 +303,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 				utils.Logger().Warn().Str("signal", sig.String()).Msg("Gracefully shutting down...")
 				const msg = "Got %s signal. Gracefully shutting down...\n"
 				fmt.Fprintf(os.Stderr, msg, sig)
+				// stop block proposal service for leader
+				if node.Consensus.IsLeader() {
+					node.ServiceManager().StopService(service.BlockProposal)
+				}
 				if node.Consensus.Mode() == consensus.Normal {
 					phase := node.Consensus.GetConsensusPhase()
 					utils.Logger().Warn().Str("phase", phase).Msg("[shutdown] commit phase has to wait")
-					maxWait := time.Now().Add(time.Second * 2) // wait up to 2 seconds in commit phase
+					maxWait := time.Now().Add(2 * node.Consensus.BlockPeriod) // wait up to 2 * blockperiod in commit phase
 					for time.Now().Before(maxWait) &&
 						node.Consensus.GetConsensusPhase() == "Commit" {
 						utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
