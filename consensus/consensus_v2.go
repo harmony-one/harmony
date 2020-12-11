@@ -353,6 +353,11 @@ func (consensus *Consensus) Start(
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
 
+				if newBlock.NumberU64() < consensus.blockNum {
+					consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
+						Msg("[ConsensusMainLoop] received old block, abort")
+					continue
+				}
 				// Sleep to wait for the full block time
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
 				<-time.After(time.Until(consensus.NextBlockDue))
@@ -553,6 +558,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 
 		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+			return
 		}
 
 		// if leader successfully finalizes the block, send committed message to validators
