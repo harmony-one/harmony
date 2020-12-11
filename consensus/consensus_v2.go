@@ -354,7 +354,7 @@ func (consensus *Consensus) Start(
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
 
 				if newBlock.NumberU64() < consensus.blockNum {
-					consensus.getLogger().Info().Uint64("newBlockNum", newBlock.NumberU64()).
+					consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
 						Msg("[ConsensusMainLoop] received old block, abort")
 					continue
 				}
