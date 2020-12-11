@@ -299,7 +299,10 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	// has more signatures and if yes, override the old data.
 	// Otherwise, simply write the commit signature in db.
 	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
-	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) {
+	// Need to check whether this block actually was committed, because it could be another block
+	// with the same number that's committed and overriding its commit sig is wrong.
+	blk := consensus.Blockchain.GetBlockByHash(blockObj.Hash())
+	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) && blk != nil {
 		new := mask.CountEnabled()
 		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
 		cur := mask.CountEnabled()

@@ -117,7 +117,8 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync *abool.AtomicBool
+	IsInSync      *abool.AtomicBool
+	proposedBlock map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -944,6 +945,7 @@ func New(
 		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
+		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		chain.Engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
