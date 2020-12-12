@@ -53,7 +53,7 @@ jobs:
       - name: Set up Go 1.14
         uses: actions/setup-go@v2
         with:
-          go-version: 1.14.7
+          go-version: 1.14.13
 
       - name: Checkout dependence repo
         uses: actions/checkout@v2
@@ -109,8 +109,10 @@ jobs:
           sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
           make
           cd ./bin && mkdir ./lib && mv ./*.dylib ./lib && rm -f ./bootnode
+          gpg --detach-sign harmony
           zip -qr ./harmony-macos.zip ./*
           rm -rf `ls * | egrep -v harmony-macos.zip`
+          shasum -a 256 harmony-macos.zip >> harmony-macos.zip.sha256
         working-directory: harmony
 
       - name: Upload artifact
@@ -290,3 +292,13 @@ jobs:
           asset_path: ./harmony-macos.zip
           asset_name: harmony-macos-${{ env.build_version }}.zip
           asset_content_type: application/zip
+
+      - name: Upload sha256 signature of harmony for MacOS
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./harmony-macos.zip.sha256
+          asset_name: harmony-macos.zip.sha256
+          asset_content_type: text/plain
