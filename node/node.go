@@ -659,7 +659,7 @@ func (node *Node) Start() error {
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
 						}
-						return libp2p_pubsub.ValidationReject
+						return libp2p_pubsub.ValidationIgnore
 					}
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
 
