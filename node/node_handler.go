@@ -250,6 +250,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	if newBlock == nil || newBlock.Header() == nil {
 		return errors.New("nil header or block asked to verify")
 	}
+	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
+		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
+	}
 	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
 		utils.Logger().Error().
 			Str("blockHash", newBlock.Hash().Hex()).
