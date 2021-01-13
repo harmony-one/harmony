@@ -61,10 +61,8 @@ var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCrea
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
 	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
 
-// Signer encapsulates transaction signature handling. Note that this interface is not a
-// stable API and may change at any time to accommodate new protocol rules.
+// TransactionInterface defines the common interface for harmony and ethereum transactions.
 type TransactionInterface interface {
-	// From address
 	From() *atomic.Value
 	Nonce() uint64
 	Price() *big.Int
@@ -80,9 +78,7 @@ type TransactionInterface interface {
 	R() *big.Int
 	S() *big.Int
 
-	// This is only used when marshaling to JSON.
 	Hash() common.Hash
-
 	Protected() bool
 	ChainID() *big.Int
 }
@@ -96,7 +92,7 @@ type Transaction struct {
 	from atomic.Value
 }
 
-//String print mode string
+// String print mode string
 func (txType TransactionType) String() string {
 	if txType == SameShardTx {
 		return "SameShardTx"
