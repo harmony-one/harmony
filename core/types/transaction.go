@@ -61,6 +61,32 @@ var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCrea
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
 	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
 
+// Signer encapsulates transaction signature handling. Note that this interface is not a
+// stable API and may change at any time to accommodate new protocol rules.
+type TransactionInterface interface {
+	// From address
+	From() *atomic.Value
+	Nonce() uint64
+	Price() *big.Int
+	GasLimit() uint64
+	ShardID() uint32
+	ToShardID() uint32
+	Recipient() *common.Address
+	Amount() *big.Int
+	Payload() []byte
+
+	// Signature values
+	V() *big.Int
+	R() *big.Int
+	S() *big.Int
+
+	// This is only used when marshaling to JSON.
+	Hash() common.Hash
+
+	Protected() bool
+	ChainID() *big.Int
+}
+
 // Transaction struct.
 type Transaction struct {
 	data txdata
@@ -220,6 +246,51 @@ func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, 
 	}
 
 	return &Transaction{data: d}
+}
+
+// From returns the sender address of the transaction
+func (tx *Transaction) From() *atomic.Value {
+	return &tx.from
+}
+
+// Recipient returns the recipient address of the transaction
+func (tx *Transaction) Recipient() *common.Address {
+	return tx.data.Recipient
+}
+
+// V value of the transaction signature
+func (tx *Transaction) V() *big.Int {
+	return tx.data.V
+}
+
+// R value of the transaction signature
+func (tx *Transaction) R() *big.Int {
+	return tx.data.R
+}
+
+// S value of the transaction signature
+func (tx *Transaction) S() *big.Int {
+	return tx.data.S
+}
+
+// Amount is the amount of ONE token transfered (in Atto)
+func (tx *Transaction) Amount() *big.Int {
+	return tx.data.Amount
+}
+
+// GasLimit of the transcation
+func (tx *Transaction) GasLimit() uint64 {
+	return tx.data.GasLimit
+}
+
+// Price is the gas price of the transaction
+func (tx *Transaction) Price() *big.Int {
+	return tx.data.Price
+}
+
+// Payload of the transaction
+func (tx *Transaction) Payload() []byte {
+	return tx.data.Payload
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)
