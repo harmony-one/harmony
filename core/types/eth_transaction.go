@@ -21,6 +21,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/harmony-one/harmony/crypto/hash"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,7 +30,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-//go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go
+//go:generate gencodec -type ethTxdata -field-override ethTxdataMarshaling -out gen_eth_tx_json.go
 
 // Shard0ChainID to be reserved unique chain ID for eth compatible chains.
 const Shard0ChainID = 0
@@ -57,6 +59,17 @@ type ethTxdata struct {
 
 	// This is only used when marshaling to JSON.
 	Hash *common.Hash `json:"hash" rlp:"-"`
+}
+
+type ethTxdataMarshaling struct {
+	AccountNonce hexutil.Uint64
+	Price        *hexutil.Big
+	GasLimit     hexutil.Uint64
+	Amount       *hexutil.Big
+	Payload      hexutil.Bytes
+	V            *hexutil.Big
+	R            *hexutil.Big
+	S            *hexutil.Big
 }
 
 // NewEthTransaction returns new ethereum-compatible transaction, which works as a intra-shard transaction
