@@ -20,7 +20,7 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 		Price        *hexutil.Big    `json:"gasPrice"   gencodec:"required"`
 		GasLimit     hexutil.Uint64  `json:"gas"        gencodec:"required"`
 		ShardID      uint32          `json:"shardID"    gencodec:"required"`
-		ToShardID    uint32          `json:"toShardID"`
+		ToShardID    uint32          `json:"toShardID"  gencodec:"required"`
 		Recipient    *common.Address `json:"to"         rlp:"nil"`
 		Amount       *hexutil.Big    `json:"value"      gencodec:"required"`
 		Payload      hexutil.Bytes   `json:"input"      gencodec:"required"`
@@ -52,7 +52,7 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		Price        *hexutil.Big    `json:"gasPrice"   gencodec:"required"`
 		GasLimit     *hexutil.Uint64 `json:"gas"        gencodec:"required"`
 		ShardID      *uint32         `json:"shardID"    gencodec:"required"`
-		ToShardID    *uint32         `json:"toShardID"`
+		ToShardID    *uint32         `json:"toShardID"  gencodec:"required"`
 		Recipient    *common.Address `json:"to"         rlp:"nil"`
 		Amount       *hexutil.Big    `json:"value"      gencodec:"required"`
 		Payload      *hexutil.Bytes  `json:"input"      gencodec:"required"`
@@ -81,9 +81,10 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'shardID' for txdata")
 	}
 	t.ShardID = *dec.ShardID
-	if dec.ToShardID != nil {
-		t.ToShardID = *dec.ToShardID
+	if dec.ToShardID == nil {
+		return errors.New("missing required field 'toShardID' for txdata")
 	}
+	t.ToShardID = *dec.ToShardID
 	if dec.Recipient != nil {
 		t.Recipient = dec.Recipient
 	}
