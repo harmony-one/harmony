@@ -47,10 +47,10 @@ import (
 )
 
 const (
-	BlockV0 = "" // same as taggedrlp.LegacyTag
-	BlockV1 = "v1"
-	BlockV2 = "v2"
-	BlockV3 = "v3"
+	blockV0 = "" // same as taggedrlp.LegacyTag
+	blockV1 = "v1"
+	blockV2 = "v2"
+	blockV3 = "v3"
 )
 
 // Constants for block.
@@ -154,7 +154,7 @@ type Body struct {
 //  between header and body versions.  Replace usage with factory.
 func NewBodyForMatchingHeader(b *Block) (*Body, error) {
 	var bi BodyInterface
-	if b.Version == BlockV3 {
+	if b.Version == blockV3 {
 		bi = new(BodyV3)
 	} else {
 		switch b.header.Header.(type) {
@@ -176,7 +176,7 @@ func NewBodyForMatchingHeader(b *Block) (*Body, error) {
 // factory.  Use for unit tests.
 func NewTestBody() *Body {
 	block := new(Block)
-	block.Version = BlockV2
+	block.Version = blockV2
 	block.header = blockfactory.NewTestHeader()
 	body, err := NewBodyForMatchingHeader(block)
 	if err != nil {
@@ -218,9 +218,9 @@ var BodyRegistry = taggedrlp.NewRegistry()
 
 func init() {
 	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
-	BodyRegistry.MustRegister(BlockV1, new(BodyV1))
-	BodyRegistry.MustRegister(BlockV2, new(BodyV2))
-	BodyRegistry.MustRegister(BlockV3, new(BodyV3))
+	BodyRegistry.MustRegister(blockV1, new(BodyV1))
+	BodyRegistry.MustRegister(blockV2, new(BodyV2))
+	BodyRegistry.MustRegister(blockV3, new(BodyV3))
 }
 
 // Block represents an entire block in the Harmony blockchain.
@@ -342,9 +342,9 @@ func blockRegistry() *taggedrlp.Registry {
 	onceBlockReg.Do(func() {
 		extblockReg = taggedrlp.NewRegistry()
 		extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
-		extblockReg.MustRegister(BlockV1, &extblockV1{})
-		extblockReg.MustRegister(BlockV2, &extblockV2{})
-		extblockReg.MustRegister(BlockV3, &extblockV3{})
+		extblockReg.MustRegister(blockV1, &extblockV1{})
+		extblockReg.MustRegister(blockV2, &extblockV2{})
+		extblockReg.MustRegister(blockV3, &extblockV3{})
 	})
 
 	return extblockReg
@@ -440,16 +440,16 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	switch eb := eb.(type) {
 	case *extblockV3:
 		b.header, b.uncles, b.ethTransactions, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.EthTxs, eb.Txs, eb.IncomingReceipts, eb.Stks
-		b.Version = BlockV3
+		b.Version = blockV3
 	case *extblockV2:
 		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
-		b.Version = BlockV2
+		b.Version = blockV2
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
-		b.Version = BlockV1
+		b.Version = blockV1
 	case *extblock:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, nil
-		b.Version = BlockV0
+		b.Version = blockV0
 	default:
 		return errors.Errorf("unknown extblock type %s", taggedrlp.TypeName(reflect.TypeOf(eb)))
 	}
@@ -460,7 +460,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
-	if b.Version == BlockV3 {
+	if b.Version == blockV3 {
 		eb = extblockV3{b.header, b.ethTransactions, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
 	} else {
 		switch h := b.header.Header.(type) {
