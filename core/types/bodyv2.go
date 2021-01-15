@@ -130,6 +130,12 @@ func (b *BodyV2) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, &b.f)
 }
 
+// DecodeRLP RLP-decodes a block body from the given RLP stream into the
+// receiver.
+func (b *BodyV2) DecodeRLP(s *rlp.Stream) error {
+	return s.Decode(&b.f)
+}
+
 // EthTransactions returns the list of transactions that's ethereum-compatible.
 //
 // The returned list is a deep copy; the caller may do anything with it without
