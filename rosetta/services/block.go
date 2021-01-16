@@ -236,7 +236,7 @@ func (s *BlockAPI) getTransactionInfo(
 	}
 	if int(index) < len(receipts) {
 		receipt = receipts[index]
-		if receipt.TxHash != txHash {
+		if cxReceipt == nil && receipt.TxHash != txHash {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 				"message": "unable to find correct receipt for transaction",
 			})
