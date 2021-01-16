@@ -460,7 +460,7 @@ func getAmountFromCollectRewards(
 	}
 	if amount == nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress),
+			"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress.String()),
 		})
 	}
 	return amount, nil
