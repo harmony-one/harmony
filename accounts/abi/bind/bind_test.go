@@ -2186,7 +2186,7 @@ public class Test {
 			for _, line := range lines {
 				if strings.TrimSpace(line) != "" {
 					lines[index] = line
-					index += 1
+					index++
 				}
 			}
 			lines = lines[:index]

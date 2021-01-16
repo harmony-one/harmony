@@ -31,8 +31,10 @@ type Argument struct {
 	Indexed bool // indexed is only used by events
 }
 
+// Arguments is a list of Argument
 type Arguments []Argument
 
+// ArgumentMarshaling is a struct for argument
 type ArgumentMarshaling struct {
 	Name         string
 	Type         string
