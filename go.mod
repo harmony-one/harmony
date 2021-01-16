@@ -15,13 +15,12 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
-	github.com/ethereum/go-ethereum v1.9.25
+	github.com/ethereum/go-ethereum v1.9.23
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/gddo v0.0.0-20200831202555-721e228c7686
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.4.3
-	github.com/golang/snappy v0.0.2-0.20200707131729-196ae77b8a26 // indirect
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/mux v1.8.0
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -62,7 +61,7 @@ require (
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
-	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190213234257-ec84240a7772
+	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200619000410-60c24ae608a6
 	gopkg.in/yaml.v2 v2.3.0
 )
 
