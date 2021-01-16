@@ -54,7 +54,7 @@ func unpackSideEffectTransactionIdentifier(
 	hash := txID.Hash
 	hash = strings.TrimPrefix(hash, "0x")
 	hash = strings.TrimPrefix(hash, "0X")
-	if len(hash) < blockHashStrLen || string(hash[blockHashStrLen]) != "_" ||
+	if len(hash) <= blockHashStrLen || string(hash[blockHashStrLen]) != "_" ||
 		hash[blockHashStrLen+1:] != SideEffectTransactionSuffix {
 		return ethcommon.Hash{}, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "unknown side effect transaction ID format",
