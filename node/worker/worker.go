@@ -110,7 +110,7 @@ func (w *Worker) CommitSortedTransactions(
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
-			utils.Logger().Info().Str("sender", sender).Msg("GasLimit limit exceeded for current block")
+			utils.Logger().Info().Str("sender", sender).Msg("Gas limit exceeded for current block")
 			txs.Pop()
 
 		case core.ErrNonceTooLow:

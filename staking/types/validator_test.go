@@ -190,7 +190,7 @@ func TestValidator_SanityCheck(t *testing.T) {
 
 func TestTotalDelegation(t *testing.T) {
 	// add a delegation to validator
-	// delegation.Value = 10000
+	// delegation.Amount = 10000
 	wrapper := makeValidValidatorWrapper()
 	totalNum := wrapper.TotalDelegation()
 

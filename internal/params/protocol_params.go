@@ -9,9 +9,9 @@ const (
 	// MinGasLimit ...
 	MinGasLimit uint64 = 5000 // Minimum the gas limit may ever be.
 	// GenesisGasLimit ...
-	GenesisGasLimit uint64 = 4712388 // GasLimit limit of the Genesis block.
+	GenesisGasLimit uint64 = 4712388 // Gas limit of the Genesis block.
 	// TestGenesisGasLimit ..
-	TestGenesisGasLimit uint64 = 80000000 // A GasLimit limit in testing of the Genesis block (set same as current mainnet)
+	TestGenesisGasLimit uint64 = 80000000 // A Gas limit in testing of the Genesis block (set same as current mainnet)
 	// MaximumExtraDataSize ...
 	MaximumExtraDataSize uint64 = 32 // Maximum size extra data may be after Genesis.
 	// ExpByteGas ...
@@ -163,9 +163,9 @@ const (
 	ModExpQuadCoeffDiv  uint64 = 20   // Divisor for the quadratic particle of the big int modular exponentiation
 
 	Bn256AddGasByzantium             uint64 = 500    // Byzantium gas needed for an elliptic curve addition
-	Bn256AddGasIstanbul              uint64 = 150    // GasLimit needed for an elliptic curve addition
+	Bn256AddGasIstanbul              uint64 = 150    // Gas needed for an elliptic curve addition
 	Bn256ScalarMulGasByzantium       uint64 = 40000  // Byzantium gas needed for an elliptic curve scalar multiplication
-	Bn256ScalarMulGasIstanbul        uint64 = 6000   // GasLimit needed for an elliptic curve scalar multiplication
+	Bn256ScalarMulGasIstanbul        uint64 = 6000   // Gas needed for an elliptic curve scalar multiplication
 	Bn256PairingBaseGasByzantium     uint64 = 100000 // Byzantium base price for an elliptic curve pairing check
 	Bn256PairingBaseGasIstanbul      uint64 = 45000  // Base price for an elliptic curve pairing check
 	Bn256PairingPerPointGasByzantium uint64 = 80000  // Byzantium per-point price for an elliptic curve pairing check

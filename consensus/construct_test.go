@@ -168,7 +168,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.Payload, sig.Serialize()) != 0 {
-		test.Errorf("Data is not populated correctly")
+		test.Errorf("Payload is not populated correctly")
 	}
 
 	keys := []*bls.PrivateKeyWrapper{&priKeyWrapper1, &priKeyWrapper2}
@@ -196,7 +196,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.Payload, aggSig.Serialize()) != 0 {
-		test.Errorf("Data is not populated correctly")
+		test.Errorf("Payload is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) != 0 {
 		test.Errorf("SenderPubkeyBitmap is not populated correctly")
@@ -259,7 +259,7 @@ func TestConstructCommitMessage(test *testing.T) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.Payload, sig.Serialize()) != 0 {
-		test.Errorf("Data is not populated correctly")
+		test.Errorf("Payload is not populated correctly")
 	}
 
 	keys := []*bls.PrivateKeyWrapper{&priKeyWrapper1, &priKeyWrapper2}
@@ -287,7 +287,7 @@ func TestConstructCommitMessage(test *testing.T) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.Payload, aggSig.Serialize()) != 0 {
-		test.Errorf("Data is not populated correctly")
+		test.Errorf("Payload is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) != 0 {
 		test.Errorf("SenderPubkeyBitmap is not populated correctly")

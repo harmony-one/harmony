@@ -204,7 +204,7 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 		}
 	}
 
-	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Data) should not be empty
+	// check when M3 sigs > M2 sigs, then M1 (recvMsg.Payload) should not be empty
 	preparedBlock := &types.Block{}
 	if len(recvMsg.Payload) >= ValidPayloadLength && len(recvMsg.Block) != 0 {
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
