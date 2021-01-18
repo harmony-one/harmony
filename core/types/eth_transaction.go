@@ -185,24 +185,6 @@ func (tx *EthTransaction) ToShardID() uint32 {
 	return uint32(tx.ChainID().Uint64()) - Shard0ChainID
 }
 
-// ShardID returns which shard id this transaction was signed for (if at all)
-/*func (tx *EthTransaction) ShardID() uint32 {
-	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
-	if err != nil {
-		return 0
-	}
-	return shardID
-}
-
-// ToShardID returns the destination shard id this transaction is going to
-func (tx *EthTransaction) ToShardID() uint32 {
-	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
-	if err != nil {
-		return 0
-	}
-	return shardID
-}*/
-
 // ChainID returns which chain id this transaction was signed for (if at all)
 func (tx *EthTransaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
