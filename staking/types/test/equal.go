@@ -96,7 +96,7 @@ func checkDelegationEqual(d1, d2 staking.Delegation) error {
 			d1.DelegatorAddress, d2.DelegatorAddress)
 	}
 	if err := checkBigIntEqual(d1.Amount, d2.Amount); err != nil {
-		return fmt.Errorf(".Amount %v", err)
+		return fmt.Errorf(".Value %v", err)
 	}
 	if err := checkBigIntEqual(d1.Reward, d2.Reward); err != nil {
 		return fmt.Errorf(".Reward %v", err)
@@ -121,7 +121,7 @@ func checkUndelegationsEqual(uds1, uds2 staking.Undelegations) error {
 
 func checkUndelegationEqual(ud1, ud2 staking.Undelegation) error {
 	if err := checkBigIntEqual(ud1.Amount, ud2.Amount); err != nil {
-		return fmt.Errorf(".Amount %v", err)
+		return fmt.Errorf(".Value %v", err)
 	}
 	if err := checkBigIntEqual(ud1.Epoch, ud2.Epoch); err != nil {
 		return fmt.Errorf(".Epoch %v", err)

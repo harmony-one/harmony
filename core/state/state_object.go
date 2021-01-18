@@ -463,11 +463,11 @@ func (s *Object) Nonce() uint64 {
 	return s.data.Nonce
 }
 
-// Amount Never called, but must be present to allow stateObject to be used
+// Value Never called, but must be present to allow stateObject to be used
 // as a vm.Account interface that also satisfies the vm.ContractRef
 // interface. Interfaces are awesome.
 func (s *Object) Value() *big.Int {
-	panic("Amount on stateObject should never be called")
+	panic("Value on stateObject should never be called")
 }
 
 // IsValidator checks whether it is a validator object

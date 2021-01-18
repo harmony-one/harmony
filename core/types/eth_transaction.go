@@ -135,8 +135,8 @@ func (tx *EthTransaction) S() *big.Int {
 	return tx.data.S
 }
 
-// Amount is the amount of ONE token transfered (in Atto)
-func (tx *EthTransaction) Amount() *big.Int {
+// Value is the amount of ONE token transfered (in Atto)
+func (tx *EthTransaction) Value() *big.Int {
 	return tx.data.Amount
 }
 
@@ -145,9 +145,9 @@ func (tx *EthTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit
 }
 
-// Payload of the transaction
-func (tx *EthTransaction) Payload() []byte {
-	return tx.data.Payload
+// Data returns data payload of Transaction.
+func (tx *EthTransaction) Data() []byte {
+	return common.CopyBytes(tx.data.Payload)
 }
 
 // ShardID returns which shard id this transaction was signed for (if at all)
@@ -224,11 +224,6 @@ func (tx *EthTransaction) UnmarshalJSON(input []byte) error {
 
 	*tx = EthTransaction{data: dec}
 	return nil
-}
-
-// Payload returns data payload of Transaction.
-func (tx *EthTransaction) Data() []byte {
-	return common.CopyBytes(tx.data.Payload)
 }
 
 // GasLimit returns gas of Transaction.

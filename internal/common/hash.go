@@ -116,7 +116,7 @@ func (h *Hash) Scan(src interface{}) error {
 	return nil
 }
 
-// Amount implements valuer for database/sql.
+// Value implements valuer for database/sql.
 func (h Hash) Value() (driver.Value, error) {
 	return h[:], nil
 }

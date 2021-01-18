@@ -85,8 +85,8 @@ func FormatTransaction(
 		txMetadata.ToShardID = &toShard
 		txMetadata.FromShardID = &fromShard
 	}
-	if len(tx.Payload()) > 0 && !isStaking {
-		hexData := hex.EncodeToString(tx.Payload())
+	if len(tx.Data()) > 0 && !isStaking {
+		hexData := hex.EncodeToString(tx.Data())
 		txMetadata.Data = &hexData
 		txMetadata.Logs = receipt.Logs
 	}

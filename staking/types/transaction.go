@@ -158,7 +158,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
 	switch tx.StakingType() {
 	case DirectiveCreateValidator:
-		msg, err := RLPDecodeStakeMsg(tx.Payload(), DirectiveCreateValidator)
+		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveCreateValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		}
 		total.Add(total, stkMsg.Amount)
 	case DirectiveDelegate:
-		msg, err := RLPDecodeStakeMsg(tx.Payload(), DirectiveDelegate)
+		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -234,8 +234,8 @@ func (tx *StakingTransaction) To() *common.Address {
 	return nil
 }
 
-// Payload ..
-func (tx *StakingTransaction) Payload() []byte {
+// Data ..
+func (tx *StakingTransaction) Data() []byte {
 	data, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
 		return nil
@@ -243,8 +243,8 @@ func (tx *StakingTransaction) Payload() []byte {
 	return data
 }
 
-// Amount ..
-func (tx *StakingTransaction) Amount() *big.Int {
+// Value ..
+func (tx *StakingTransaction) Value() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 

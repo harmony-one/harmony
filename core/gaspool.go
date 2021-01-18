@@ -44,7 +44,7 @@ func (gp *GasPool) SubGas(amount uint64) error {
 	return nil
 }
 
-// GasLimit returns the amount of gas remaining in the pool.
+// Gas returns the amount of gas remaining in the pool.
 func (gp *GasPool) Gas() uint64 {
 	return uint64(*gp)
 }

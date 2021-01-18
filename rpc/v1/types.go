@@ -259,9 +259,9 @@ func NewTransaction(
 		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
-		Input:     hexutil.Bytes(tx.Payload()),
+		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
-		Value:     (*hexutil.Big)(tx.Amount()),
+		Value:     (*hexutil.Big)(tx.Value()),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
 		Timestamp: hexutil.Uint64(timestamp),
@@ -421,7 +421,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 	var rpcMsg interface{}
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCreateValidator)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCreateValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -449,7 +449,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 			SlotPubKeys:        msg.SlotPubKeys,
 		}
 	case staking.DirectiveEditValidator:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveEditValidator)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -480,7 +480,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 			SlotPubKeyToRemove: msg.SlotKeyToRemove,
 		}
 	case staking.DirectiveCollectRewards:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCollectRewards)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
 		if err != nil {
 			return nil, err
 		}
@@ -494,7 +494,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 		}
 		rpcMsg = &CollectRewardsMsg{DelegatorAddress: delegatorAddress}
 	case staking.DirectiveDelegate:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveDelegate)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -516,7 +516,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 			Amount:           (*hexutil.Big)(msg.Amount),
 		}
 	case staking.DirectiveUndelegate:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveUndelegate)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
 			return nil, err
 		}

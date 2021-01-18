@@ -81,8 +81,8 @@ type CoreTransaction interface {
 	ShardID() uint32
 	ToShardID() uint32
 	To() *common.Address
-	Amount() *big.Int
-	Payload() []byte
+	Value() *big.Int
+	Data() []byte
 
 	Hash() common.Hash
 	Protected() bool
@@ -270,8 +270,8 @@ func (tx *Transaction) S() *big.Int {
 	return tx.data.S
 }
 
-// Amount is the amount of ONE token transfered (in Atto)
-func (tx *Transaction) Amount() *big.Int {
+// Value is the amount of ONE token transfered (in Atto)
+func (tx *Transaction) Value() *big.Int {
 	return tx.data.Amount
 }
 
@@ -285,9 +285,9 @@ func (tx *Transaction) GasPrice() *big.Int {
 	return tx.data.Price
 }
 
-// Payload of the transaction
-func (tx *Transaction) Payload() []byte {
-	return tx.data.Payload
+// Data returns data payload of Transaction.
+func (tx *Transaction) Data() []byte {
+	return common.CopyBytes(tx.data.Payload)
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)
@@ -630,7 +630,7 @@ func (m Message) GasPrice() *big.Int {
 	return m.gasPrice
 }
 
-// Amount returns the value amount from Message.
+// Value returns the value amount from Message.
 func (m Message) Value() *big.Int {
 	return m.amount
 }
@@ -645,7 +645,7 @@ func (m Message) Nonce() uint64 {
 	return m.nonce
 }
 
-// Payload return data of the Message.
+// Data return data of the Message.
 func (m Message) Data() []byte {
 	return m.data
 }

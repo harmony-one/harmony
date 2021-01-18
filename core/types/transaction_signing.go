@@ -164,8 +164,8 @@ func (s EIP155Signer) Hash(tx InternalTransaction) common.Hash {
 		tx.ShardID(),
 		tx.ToShardID(),
 		tx.To(),
-		tx.Amount(),
-		tx.Payload(),
+		tx.Value(),
+		tx.Data(),
 		s.chainID, uint(0), uint(0),
 	})
 }
@@ -222,8 +222,8 @@ func (fs FrontierSigner) Hash(tx InternalTransaction) common.Hash {
 		tx.ShardID(),
 		tx.ToShardID(),
 		tx.To(),
-		tx.Amount(),
-		tx.Payload(),
+		tx.Value(),
+		tx.Data(),
 	})
 }
 

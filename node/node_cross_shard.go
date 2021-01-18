@@ -165,7 +165,7 @@ func (node *Node) ProcessReceiptMessage(msgPayload []byte) {
 	cxp := types.CXReceiptsProof{}
 	if err := rlp.DecodeBytes(msgPayload, &cxp); err != nil {
 		utils.Logger().Error().Err(err).
-			Msg("[ProcessReceiptMessage] Unable to Decode message Payload")
+			Msg("[ProcessReceiptMessage] Unable to Decode message Data")
 		return
 	}
 	utils.Logger().Debug().Interface("cxp", cxp).

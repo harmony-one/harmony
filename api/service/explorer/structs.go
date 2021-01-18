@@ -35,7 +35,7 @@ type TxRecord struct {
 // TxRecords ...
 type TxRecords []*TxRecord
 
-// Payload ...
+// Data ...
 type Data struct {
 	Addresses []string `json:"Addresses"`
 }
@@ -88,7 +88,7 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transact
 		To:        to,
 		Value:     msg.Value(),
 		Bytes:     strconv.Itoa(int(tx.Size())),
-		Data:      hex.EncodeToString(tx.Payload()),
+		Data:      hex.EncodeToString(tx.Data()),
 		GasFee:    gasFee,
 		FromShard: tx.ShardID(),
 		ToShard:   tx.ToShardID(),
@@ -118,7 +118,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 	// For other staking txns, there is no to address.
 	switch tx.StakingType() {
 	case staking.DirectiveDelegate:
-		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveDelegate)
+		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +132,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 
 		toAddress = &delegateMsg.ValidatorAddress
 	case staking.DirectiveUndelegate:
-		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveUndelegate)
+		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
 			return nil, err
 		}

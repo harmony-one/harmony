@@ -436,8 +436,8 @@ func cpTestDataSetup() {
 // 		t.Error("ValidatingPubKey does not match")
 // 	}
 
-// 	if decodedMsg.Amount.Cmp(msgCreateValidator.Amount) != 0 {
-// 		t.Error("Amount does not match")
+// 	if decodedMsg.Value.Cmp(msgCreateValidator.Value) != 0 {
+// 		t.Error("Value does not match")
 // 	}
 // }
 
@@ -507,8 +507,8 @@ func cpTestDataSetup() {
 // 		t.Error("ValidatorAddress does not match")
 // 	}
 
-// 	if decodedMsg.Amount.Cmp(msgDelegate.Amount) != 0 {
-// 		t.Error("Amount does not match")
+// 	if decodedMsg.Value.Cmp(msgDelegate.Value) != 0 {
+// 		t.Error("Value does not match")
 // 	}
 // }
 
@@ -539,8 +539,8 @@ func cpTestDataSetup() {
 // 		t.Error("ValidatorDstAddress does not match")
 // 	}
 
-// 	if decodedMsg.Amount.Cmp(msgRedelegate.Amount) != 0 {
-// 		t.Error("Amount does not match")
+// 	if decodedMsg.Value.Cmp(msgRedelegate.Value) != 0 {
+// 		t.Error("Value does not match")
 // 	}
 // }
 
@@ -567,7 +567,7 @@ func cpTestDataSetup() {
 // 		t.Error("ValidatorAddress does not match")
 // 	}
 
-// 	if decodedMsg.Amount.Cmp(msgUndelegate.Amount) != 0 {
-// 		t.Error("Amount does not match")
+// 	if decodedMsg.Value.Cmp(msgUndelegate.Value) != 0 {
+// 		t.Error("Value does not match")
 // 	}
 // }

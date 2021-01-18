@@ -35,7 +35,7 @@ var (
 	headBlockKey = []byte("LastBlock")
 	// headFastBlockKey tracks the latest known incomplete block's hash duirng fast sync.
 	headFastBlockKey = []byte("LastFast")
-	// Payload item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
+	// Data item prefixes (use single byte to avoid mixing data types, avoid `i`, used for indexes).
 	headerPrefix                 = []byte("h")  // headerPrefix + num (uint64 big endian) + hash -> header
 	headerTDSuffix               = []byte("t")  // headerPrefix + num (uint64 big endian) + hash + headerTDSuffix -> td
 	headerHashSuffix             = []byte("n")  // headerPrefix + num (uint64 big endian) + headerHashSuffix -> hash
