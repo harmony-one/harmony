@@ -61,6 +61,19 @@ type ethTxdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
+func (d *ethTxdata) CopyFrom(d2 *ethTxdata) {
+	d.AccountNonce = d2.AccountNonce
+	d.Price = new(big.Int).Set(d2.Price)
+	d.GasLimit = d2.GasLimit
+	d.Recipient = copyAddr(d2.Recipient)
+	d.Amount = new(big.Int).Set(d2.Amount)
+	d.Payload = append(d2.Payload[:0:0], d2.Payload...)
+	d.V = new(big.Int).Set(d2.V)
+	d.R = new(big.Int).Set(d2.R)
+	d.S = new(big.Int).Set(d2.S)
+	d.Hash = copyHash(d2.Hash)
+}
+
 type ethTxdataMarshaling struct {
 	AccountNonce hexutil.Uint64
 	Price        *hexutil.Big
@@ -165,6 +178,13 @@ func (tx *EthTransaction) ChainID() *big.Int {
 // Protected returns whether the transaction is protected from replay protection.
 func (tx *EthTransaction) Protected() bool {
 	return isProtectedV(tx.data.V)
+}
+
+// Copy returns a copy of the transaction.
+func (tx *EthTransaction) Copy() *EthTransaction {
+	var tx2 EthTransaction
+	tx2.data.CopyFrom(&tx.data)
+	return &tx2
 }
 
 // EncodeRLP implements rlp.Encoder
