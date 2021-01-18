@@ -58,7 +58,7 @@ type Worker struct {
 	gasCeil  uint64
 }
 
-// CommitTransactions commits transactions for new block.
+// CommitSortedTransactions commits transactions for new block.
 func (w *Worker) CommitSortedTransactions(
 	txs *types.TransactionsByPriceAndNonce,
 	coinbase common.Address,

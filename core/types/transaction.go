@@ -73,6 +73,7 @@ type InternalTransaction interface {
 	AsMessage(s Signer) (Message, error)
 }
 
+// CoreTransaction defines the core funcs of any transactions
 type CoreTransaction interface {
 	From() *atomic.Value
 	Nonce() uint64
@@ -635,7 +636,7 @@ func (m Message) Value() *big.Int {
 	return m.amount
 }
 
-// GasLimit returns gas limit of the Message.
+// Gas returns gas limit of the Message.
 func (m Message) Gas() uint64 {
 	return m.gasLimit
 }

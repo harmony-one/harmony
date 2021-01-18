@@ -226,7 +226,7 @@ func (tx *EthTransaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-// GasLimit returns gas of Transaction.
+// Gas returns gas of Transaction.
 func (tx *EthTransaction) Gas() uint64 {
 	return tx.data.GasLimit
 }

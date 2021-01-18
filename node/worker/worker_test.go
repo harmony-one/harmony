@@ -79,10 +79,11 @@ func TestCommitTransactions(t *testing.T) {
 	tx, _ := types.SignTx(types.NewTransaction(baseNonce, testBankAddress, uint32(0), big.NewInt(int64(denominations.One*randAmount)), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 
 	// Commit the tx to the worker
-	txs := make(map[common.Address]types.Transactions)
-	txs[testBankAddress] = types.Transactions{tx}
+	txs := make(map[common.Address]types.InternalTransactions)
+	txs[testBankAddress] = types.InternalTransactions{tx}
+	ethTxs := make(map[common.Address]types.InternalTransactions)
 	err := worker.CommitTransactions(
-		txs, nil, testBankAddress,
+		ethTxs, txs, nil, testBankAddress,
 	)
 	if err != nil {
 		t.Error(err)
