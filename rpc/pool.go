@@ -48,6 +48,12 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
+	/*if s.version == Eth {
+
+	} else {
+
+	}*/
+
 	// Verify transaction type & chain
 	tx := new(types.Transaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
@@ -156,7 +162,7 @@ func (s *PublicPoolService) PendingTransactions(
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1:
+			case V1, Eth:
 				tx, err = v1.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
@@ -211,7 +217,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1:
+			case V1, Eth:
 				tx, err = v1.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().

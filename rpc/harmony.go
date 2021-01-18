@@ -33,7 +33,7 @@ func (s *PublicHarmonyService) ProtocolVersion(
 ) (interface{}, error) {
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(s.hmy.ProtocolVersion()), nil
 	case V2:
 		return s.hmy.ProtocolVersion(), nil
@@ -62,7 +62,7 @@ func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error
 	// TODO(dm): add SuggestPrice API
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return (*hexutil.Big)(big.NewInt(1)), nil
 	case V2:
 		return 1, nil

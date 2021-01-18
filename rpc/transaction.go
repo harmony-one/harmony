@@ -92,7 +92,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return (hexutil.Uint64)(nonce), nil
 	case V2:
 		return nonce, nil
@@ -173,7 +173,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 
 	// Format the response according to the version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
@@ -213,7 +213,7 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 	}
 
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
@@ -348,7 +348,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.Transactions())), nil
 	case V2:
 		return len(block.Transactions()), nil
@@ -374,7 +374,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.Transactions())), nil
 	case V2:
 		return len(block.Transactions()), nil
@@ -402,7 +402,7 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -435,7 +435,7 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -472,7 +472,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.StakingTransactions())), nil
 	case V2:
 		return len(block.StakingTransactions()), nil
@@ -498,7 +498,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.StakingTransactions())), nil
 	case V2:
 		return len(block.StakingTransactions()), nil
@@ -526,7 +526,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -559,7 +559,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -608,7 +608,7 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 	// Format response according to version
 	var RPCReceipt interface{}
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		if tx == nil {
 			RPCReceipt, err = v1.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
@@ -640,7 +640,7 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), hash); cx != nil {
 		// Format response according to version
 		switch s.version {
-		case V1:
+		case V1, Eth:
 			tx, err := v1.NewCxReceipt(cx, blockHash, blockNumber)
 			if err != nil {
 				return nil, err

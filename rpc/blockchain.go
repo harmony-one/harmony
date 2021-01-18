@@ -41,10 +41,23 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	}
 }
 
+// ChainId returns the chain id of the chain - required by MetaMask
+func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, error) {
+	// Format return base on version
+	switch s.version {
+	case V1, Eth:
+		return hexutil.Uint64(s.hmy.ChainID), nil
+	case V2:
+		return s.hmy.ChainID, nil
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+}
+
 // getBlockOptions is a helper to get block args given an interface option from RPC params.
 func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common.BlockArgs, error) {
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		fullTx, ok := opts.(bool)
 		if !ok {
 			return nil, fmt.Errorf("invalid type for block arguments")
@@ -87,7 +100,7 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 
 	// Format return base on version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(header.Number().Uint64()), nil
 	case V2:
 		return header.Number().Uint64(), nil
@@ -133,7 +146,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 	var rpcBlock interface{}
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
 		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
@@ -190,7 +203,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 	var rpcBlock interface{}
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
 		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
@@ -385,7 +398,7 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 
 	// Format the response according to the version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(totalSigned), nil
 	case V2:
 		return totalSigned, nil
@@ -405,7 +418,7 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 
 	// Format the response according to the version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(epoch), nil
 	case V2:
 		return epoch, nil
@@ -463,7 +476,7 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 
 	// Format return base on version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return (*hexutil.Big)(balance), nil
 	case V2:
 		return balance, nil

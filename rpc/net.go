@@ -22,7 +22,7 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 	// manually set different namespace to preserve legacy behavior
 	var namespace string
 	switch version {
-	case V1:
+	case V1, Eth:
 		namespace = netV1Namespace
 	case V2:
 		namespace = netV2Namespace
@@ -44,7 +44,7 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(s.net.GetPeerCount()), nil
 	case V2:
 		return s.net.GetPeerCount(), nil
