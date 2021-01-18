@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/hash"
-	//nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
 //go:generate gencodec -type ethTxdata -field-override ethTxdataMarshaling -out gen_eth_tx_json.go
