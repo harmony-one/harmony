@@ -10,8 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
@@ -45,8 +47,14 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, error) {
 	// Format return base on version
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		return hexutil.Uint64(s.hmy.ChainID), nil
+	case Eth:
+		shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+		if err != nil {
+			return nil, err
+		}
+		return hexutil.Uint64(types.Shard0ChainID + shardID), nil
 	case V2:
 		return s.hmy.ChainID, nil
 	default:

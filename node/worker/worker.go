@@ -83,7 +83,7 @@ func (w *Worker) CommitTransactions(
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(w.current.signer, tx)
+		from, _ := types.Sender(w.current.signer, tx, types.HarmonyTx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {

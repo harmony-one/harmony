@@ -21,19 +21,18 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/harmony-one/harmony/crypto/hash"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/crypto/hash"
+	//nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
 //go:generate gencodec -type ethTxdata -field-override ethTxdataMarshaling -out gen_eth_tx_json.go
 
 // Shard0ChainID to be reserved unique chain ID for eth compatible chains.
-const Shard0ChainID = 0
+const Shard0ChainID = 1000000
 
 // EthTransaction ethereum-compatible transaction
 type EthTransaction struct {
@@ -112,6 +111,23 @@ func (tx *EthTransaction) Recipient() *common.Address {
 	return tx.data.Recipient
 }
 
+// SenderAddress returns the address of transaction sender
+func (tx *EthTransaction) SenderAddress() (common.Address, error) {
+	var signer Signer
+
+	if !tx.Protected() {
+		signer = HomesteadSigner{}
+	} else {
+		signer = NewEIP155Signer(tx.ChainID())
+	}
+	addr, err := Sender(signer, tx, EthereumTx)
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	return addr, nil
+}
+
 // V value of the transaction signature
 func (tx *EthTransaction) V() *big.Int {
 	return tx.data.V
@@ -156,6 +172,24 @@ func (tx *EthTransaction) ShardID() uint32 {
 func (tx *EthTransaction) ToShardID() uint32 {
 	return uint32(tx.ChainID().Uint64()) - Shard0ChainID
 }
+
+// ShardID returns which shard id this transaction was signed for (if at all)
+/*func (tx *EthTransaction) ShardID() uint32 {
+	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+	if err != nil {
+		return 0
+	}
+	return shardID
+}
+
+// ToShardID returns the destination shard id this transaction is going to
+func (tx *EthTransaction) ToShardID() uint32 {
+	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
+	if err != nil {
+		return 0
+	}
+	return shardID
+}*/
 
 // ChainID returns which chain id this transaction was signed for (if at all)
 func (tx *EthTransaction) ChainID() *big.Int {
@@ -296,7 +330,7 @@ func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 	}
 
 	var err error
-	msg.from, err = Sender(s, tx)
+	msg.from, err = Sender(s, tx, EthereumTx)
 	return msg, err
 }
 
@@ -313,10 +347,10 @@ func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (TransactionI
 }
 
 // Cost returns amount + gasprice * gaslimit.
-func (tx *EthTransaction) Cost() *big.Int {
+func (tx *EthTransaction) Cost() (*big.Int, error) {
 	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
 	total.Add(total, tx.data.Amount)
-	return total
+	return total, nil
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.

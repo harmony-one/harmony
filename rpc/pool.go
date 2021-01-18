@@ -48,34 +48,55 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
-	/*if s.version == Eth {
+	var tx types.TransactionInterface
+	var txType types.TransactionType
 
+	if s.version == Eth {
+		txType = types.EthereumTx
+		tx = new(types.EthTransaction)
+		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+			return common.Hash{}, err
+		}
+
+		// Verify transaction type & chain
+		/*c := s.hmy.ChainConfig().ChainID
+		if id := tx.ChainID(); id.Cmp(c) != 0 {
+			return common.Hash{}, errors.Wrapf(
+				ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			)
+		}*/
+
+		// Submit transaction
+		if err := s.hmy.SendEthTx(ctx, tx.(*types.EthTransaction)); err != nil {
+			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
+			return tx.Hash(), err
+		}
 	} else {
+		txType = types.HarmonyTx
+		tx = new(types.Transaction)
+		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+			return common.Hash{}, err
+		}
 
-	}*/
+		// Verify transaction type & chain
+		c := s.hmy.ChainConfig().ChainID
+		if id := tx.ChainID(); id.Cmp(c) != 0 {
+			return common.Hash{}, errors.Wrapf(
+				ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
+			)
+		}
 
-	// Verify transaction type & chain
-	tx := new(types.Transaction)
-	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
-		return common.Hash{}, err
-	}
-	c := s.hmy.ChainConfig().ChainID
-	if id := tx.ChainID(); id.Cmp(c) != 0 {
-		return common.Hash{}, errors.Wrapf(
-			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
-		)
-	}
-
-	// Submit transaction
-	if err := s.hmy.SendTx(ctx, tx); err != nil {
-		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-		return tx.Hash(), err
+		// Submit transaction
+		if err := s.hmy.SendTx(ctx, tx.(*types.Transaction)); err != nil {
+			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
+			return tx.Hash(), err
+		}
 	}
 
 	// Log submission
-	if tx.To() == nil {
+	if tx.Recipient() == nil {
 		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
-		from, err := types.Sender(signer, tx)
+		from, err := types.Sender(signer, tx, txType)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -87,7 +108,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	} else {
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
-			Str("recipient", tx.To().Hex()).
+			Str("recipient", tx.Recipient().Hex()).
 			Msg("Submitted transaction")
 	}
 

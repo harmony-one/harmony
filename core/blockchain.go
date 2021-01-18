@@ -973,7 +973,7 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
-			from, _ := types.Sender(signer, transactions[j])
+			from, _ := types.Sender(signer, transactions[j], types.HarmonyTx)
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
 		}
 		// The derived log fields can simply be set from the block and transaction

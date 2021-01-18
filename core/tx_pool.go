@@ -693,6 +693,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	// Make sure the transaction is signed properly
 	from, err := tx.SenderAddress()
+
 	if err != nil {
 		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
 			return errors.WithMessagef(ErrInvalidSender, "transaction sender is %s", b32)
@@ -732,6 +733,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if err != nil {
 		return err
 	}
+
 	stakingTx, isStakingTx := tx.(*staking.StakingTransaction)
 	if !isStakingTx || (isStakingTx && stakingTx.StakingType() != staking.DirectiveDelegate) {
 		if pool.currentState.GetBalance(from).Cmp(cost) < 0 {
@@ -1012,6 +1014,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		Interface("from", from).
 		Interface("to", tx.To()).
 		Msg("Pooled new future transaction")
+
 	return replace, nil
 }
 

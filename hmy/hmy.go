@@ -78,6 +78,7 @@ type Harmony struct {
 type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
+	AddPendingEthTransaction(newTx *types.EthTransaction) error
 	Blockchain() *core.BlockChain
 	Beaconchain() *core.BlockChain
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)

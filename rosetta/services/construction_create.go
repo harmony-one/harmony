@@ -169,7 +169,7 @@ func (s *ConstructAPI) getSigningPayload(
 	case *stakingTypes.StakingTransaction:
 		payload.Bytes = s.stakingSigner.Hash(tx.(*stakingTypes.StakingTransaction)).Bytes()
 	case *hmyTypes.Transaction:
-		payload.Bytes = s.signer.Hash(tx.(*hmyTypes.Transaction)).Bytes()
+		payload.Bytes = s.signer.Hash(tx.(*hmyTypes.Transaction), hmyTypes.HarmonyTx).Bytes()
 	default:
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": "constructed unknown or unsupported transaction",

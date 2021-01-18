@@ -26,6 +26,7 @@ const (
 	PING       // node send ip/pki to register with leader
 	ShardState // Deprecated
 	Staking
+	EthTransaction
 )
 
 // TransactionMessageType representa the types of messages used for Node/Transaction
@@ -59,18 +60,32 @@ var (
 	syncB      = byte(Sync)
 	crossLinkB = byte(CrossLink)
 	receiptB   = byte(Receipt)
+	ethTxnB    = byte(EthTransaction)
 	// H suffix means header
-	slashH           = []byte{nodeB, blockB, slashB}
-	transactionListH = []byte{nodeB, txnB, sendB}
-	stakingTxnListH  = []byte{nodeB, stakingB, sendB}
-	syncH            = []byte{nodeB, blockB, syncB}
-	crossLinkH       = []byte{nodeB, blockB, crossLinkB}
-	cxReceiptH       = []byte{nodeB, blockB, receiptB}
+	slashH              = []byte{nodeB, blockB, slashB}     // 1,1,3
+	transactionListH    = []byte{nodeB, txnB, sendB}        // 1,0,0
+	stakingTxnListH     = []byte{nodeB, stakingB, sendB}    // 1,6,0
+	ethTransactionListH = []byte{nodeB, ethTxnB, sendB}     // 1,7,0
+	syncH               = []byte{nodeB, blockB, syncB}      // 1,1,0
+	crossLinkH          = []byte{nodeB, blockB, crossLinkB} // 1,1,1
+	cxReceiptH          = []byte{nodeB, blockB, receiptB}   // 1,1,2
 )
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
 func ConstructTransactionListMessageAccount(transactions types.Transactions) []byte {
 	byteBuffer := bytes.NewBuffer(transactionListH)
+	txs, err := rlp.EncodeToBytes(transactions)
+	if err != nil {
+		log.Fatal(err)
+		return []byte{} // TODO(RJ): better handle of the error
+	}
+	byteBuffer.Write(txs)
+	return byteBuffer.Bytes()
+}
+
+// ConstructEthTransactionListMessageAccount constructs serialized eth transactions in account model
+func ConstructEthTransactionListMessageAccount(transactions types.EthTransactions) []byte {
+	byteBuffer := bytes.NewBuffer(ethTransactionListH)
 	txs, err := rlp.EncodeToBytes(transactions)
 	if err != nil {
 		log.Fatal(err)

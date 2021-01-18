@@ -62,6 +62,8 @@ func (node *Node) HandleNodeMessage(
 		node.transactionMessageHandler(msgPayload)
 	case proto_node.Staking:
 		node.stakingMessageHandler(msgPayload)
+	case proto_node.EthTransaction:
+		node.ethTransactionMessageHandler(msgPayload)
 	case proto_node.Block:
 		switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 		case proto_node.Sync:
@@ -112,6 +114,23 @@ func (node *Node) transactionMessageHandler(msgPayload []byte) {
 			return
 		}
 		node.addPendingTransactions(txs)
+	}
+}
+
+func (node *Node) ethTransactionMessageHandler(msgPayload []byte) {
+	txMessageType := proto_node.TransactionMessageType(msgPayload[0])
+
+	switch txMessageType {
+	case proto_node.Send:
+		txs := types.EthTransactions{}
+		err := rlp.Decode(bytes.NewReader(msgPayload[1:]), &txs) // skip the Send messge type
+		if err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Msg("Failed to deserialize transaction list")
+			return
+		}
+		node.addPendingEthTransactions(txs)
 	}
 }
 

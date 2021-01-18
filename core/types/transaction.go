@@ -447,7 +447,7 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 	}
 
 	var err error
-	msg.from, err = Sender(s, tx)
+	msg.from, err = Sender(s, tx, HarmonyTx)
 	return msg, err
 }
 
@@ -486,15 +486,17 @@ func (tx *Transaction) Copy() *Transaction {
 // Note that mainnet has unprotected transactions prior to Epoch 28
 func (tx *Transaction) SenderAddress() (common.Address, error) {
 	var signer Signer
+
 	if !tx.Protected() {
 		signer = HomesteadSigner{}
 	} else {
 		signer = NewEIP155Signer(tx.ChainID())
 	}
-	addr, err := Sender(signer, tx)
+	addr, err := Sender(signer, tx, HarmonyTx)
 	if err != nil {
 		return common.Address{}, err
 	}
+
 	return addr, nil
 }
 
@@ -592,7 +594,7 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 	for from, accTxs := range txs {
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
-		acc, _ := Sender(signer, accTxs[0])
+		acc, _ := Sender(signer, accTxs[0], HarmonyTx)
 		txs[acc] = accTxs[1:]
 		if from != acc {
 			delete(txs, from)
@@ -618,7 +620,7 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
-	acc, _ := Sender(t.signer, t.heads[0])
+	acc, _ := Sender(t.signer, t.heads[0], HarmonyTx)
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)
