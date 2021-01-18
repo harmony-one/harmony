@@ -100,11 +100,11 @@ func GetNativeOperationsFromStakingTransaction(
 	var amount *types.Amount
 	switch tx.StakingType() {
 	case stakingTypes.DirectiveCreateValidator:
-		if amount, rosettaError = getAmountFromCreateValidatorMessage(tx.Data()); rosettaError != nil {
+		if amount, rosettaError = getAmountFromCreateValidatorMessage(tx.Payload()); rosettaError != nil {
 			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveDelegate:
-		if amount, rosettaError = getAmountFromDelegateMessage(receipt, tx.Data()); rosettaError != nil {
+		if amount, rosettaError = getAmountFromDelegateMessage(receipt, tx.Payload()); rosettaError != nil {
 			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveCollectRewards:
@@ -169,7 +169,7 @@ func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt
 	if _, ok := tx.(*hmytypes.Transaction); ok {
 		status := common.SuccessOperationStatus.Status
 		if receipt.Status == hmytypes.ReceiptStatusFailed {
-			if len(tx.Data()) == 0 && receipt.CumulativeGasUsed <= params.TxGas {
+			if len(tx.Payload()) == 0 && receipt.CumulativeGasUsed <= params.TxGas {
 				status = common.FailureOperationStatus.Status
 			} else {
 				status = common.ContractFailureOperationStatus.Status
@@ -206,7 +206,7 @@ func getBasicTransferNativeOperations(
 		return nil, rosettaError
 	}
 
-	return newSameShardTransferNativeOperations(from, to, tx.Value(), status, startingOperationIndex), nil
+	return newSameShardTransferNativeOperations(from, to, tx.Amount(), status, startingOperationIndex), nil
 }
 
 // getContractTransferNativeOperations extracts & formats the native operations for any
@@ -356,7 +356,7 @@ func getCrossShardSenderTransferNativeOperations(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
-				Value:    negativeBigValue(tx.Value()),
+				Value:    negativeBigValue(tx.Amount()),
 				Currency: &common.NativeCurrency,
 			},
 			Metadata: metadata,

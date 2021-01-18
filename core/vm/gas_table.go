@@ -64,7 +64,7 @@ func memoryGasCost(mem *Memory, newMemSize uint64) (uint64, error) {
 // RETURNDATACOPY (stack position 2)
 func memoryCopierGas(stackpos int) gasFunc {
 	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
-		// Gas for expanding the memory
+		// GasLimit for expanding the memory
 		gas, err := memoryGasCost(mem, memorySize)
 		if err != nil {
 			return 0, err
@@ -180,7 +180,7 @@ func gasSStoreEIP2200(evm *EVM, contract *Contract, stack *Stack, mem *Memory, m
 	if contract.Gas <= params.SstoreSentryGasEIP2200 {
 		return 0, errors.New("not enough gas for reentrancy sentry")
 	}
-	// Gas sentry honoured, do the actual gas calculation based on the stored value
+	// GasLimit sentry honoured, do the actual gas calculation based on the stored value
 	var (
 		y, x    = stack.Back(1), stack.Back(0)
 		current = evm.StateDB.GetState(contract.Address(), common.BigToHash(x))

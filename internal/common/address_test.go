@@ -239,11 +239,11 @@ func TestAddress_Value(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.a.Value()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Address.Value() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Address.Amount() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Address.Value() = %v, want %v", got, tt.want)
+				t.Errorf("Address.Amount() = %v, want %v", got, tt.want)
 			}
 		})
 	}

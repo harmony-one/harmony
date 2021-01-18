@@ -99,11 +99,11 @@ func TestHash_Value(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.h.Value()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Hash.Value() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Hash.Amount() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Hash.Value() = %v, want %v", got, tt.want)
+				t.Errorf("Hash.Amount() = %v, want %v", got, tt.want)
 			}
 		})
 	}

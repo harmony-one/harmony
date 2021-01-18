@@ -130,7 +130,7 @@ func (a *Address) Scan(src interface{}) error {
 	return nil
 }
 
-// Value implements valuer for database/sql.
+// Amount implements valuer for database/sql.
 func (a Address) Value() (driver.Value, error) {
 	return a[:], nil
 }

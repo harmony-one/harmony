@@ -103,7 +103,7 @@ func (m *Memory) Len() int {
 	return len(m.store)
 }
 
-// Data returns the backing slice
+// Payload returns the backing slice
 func (m *Memory) Data() []byte {
 	return m.store
 }

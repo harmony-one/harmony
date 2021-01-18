@@ -224,8 +224,8 @@ type txList struct {
 	strict bool         // Whether nonces are strictly continuous or not
 	txs    *txSortedMap // Heap indexed sorted hash map of the transactions
 
-	costcap *big.Int // Price of the highest costing transaction (reset only if exceeds balance)
-	gascap  uint64   // Gas limit of the highest spending transaction (reset only if exceeds block limit)
+	costcap *big.Int // GasPrice of the highest costing transaction (reset only if exceeds balance)
+	gascap  uint64   // GasLimit limit of the highest spending transaction (reset only if exceeds block limit)
 }
 
 // newTxList create a new transaction list for maintaining nonce-indexable fast,
@@ -270,7 +270,7 @@ func (l *txList) Add(tx types.PoolTransaction, priceBump uint64) (bool, types.Po
 	if l.costcap.Cmp(cost) < 0 {
 		l.costcap = cost
 	}
-	if gas := tx.Gas(); l.gascap < gas {
+	if gas := tx.GasLimit(); l.gascap < gas {
 		l.gascap = gas
 	}
 	return true, old
@@ -306,7 +306,7 @@ func (l *txList) FilterValid(
 			err := txPool.validateTx(tx, false)
 			return err != nil
 		}
-		return cost.Cmp(costLimit) == 1 || tx.Gas() > gasLimit
+		return cost.Cmp(costLimit) == 1 || tx.GasLimit() > gasLimit
 	})
 }
 

@@ -6,7 +6,7 @@ import (
 
 const (
 	isValidatorKeyStr = "Harmony/IsValidator/Key/v1"
-	isValidatorStr    = "Harmony/IsValidator/Value/v1"
+	isValidatorStr    = "Harmony/IsValidator/Amount/v1"
 	collectRewardsStr = "Harmony/CollectRewards"
 	delegateStr       = "Harmony/Delegate"
 )

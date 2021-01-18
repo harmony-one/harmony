@@ -72,7 +72,7 @@ func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uin
 		c.jumpdests = make(map[common.Hash]bitvec)
 	}
 
-	// Gas should be a pointer so it can safely be reduced through the run
+	// GasLimit should be a pointer so it can safely be reduced through the run
 	// This pointer will be off the state transition
 	c.Gas = gas
 	// ensures a value is set
@@ -162,7 +162,7 @@ func (c *Contract) Address() common.Address {
 	return c.self.Address()
 }
 
-// Value returns the contracts value (sent to it from it's caller)
+// Amount returns the contracts value (sent to it from it's caller)
 func (c *Contract) Value() *big.Int {
 	return c.value
 }

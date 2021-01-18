@@ -65,7 +65,7 @@ var jsonEventMixedCase = []byte(`{
 	  }, {
 		"indexed": false, "name": "_value", "type": "uint256"
 	  }, {
-		"indexed": false, "name": "Value", "type": "uint256"
+		"indexed": false, "name": "Amount", "type": "uint256"
 	}],
 	"name": "MixedCase",
 	"type": "event"
@@ -205,7 +205,7 @@ func TestEventTupleUnpack(t *testing.T) {
 	type EventMixedCase struct {
 		Value1 *big.Int `abi:"value"`
 		Value2 *big.Int `abi:"_value"`
-		Value3 *big.Int `abi:"Value"`
+		Value3 *big.Int `abi:"Amount"`
 	}
 
 	bigint := new(big.Int)
@@ -260,7 +260,7 @@ func TestEventTupleUnpack(t *testing.T) {
 		&BadEventTransferWithEmptyTag{},
 		&BadEventTransferWithEmptyTag{},
 		jsonEventTransfer,
-		"struct: abi tag in 'Value' is empty",
+		"struct: abi tag in 'Amount' is empty",
 		"Can not unpack ERC20 Transfer event with an empty tag",
 	}, {
 		pledgeData1,

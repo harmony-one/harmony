@@ -133,7 +133,7 @@ func TestGasCost(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot create validator staking transaction, %v\n", err)
 	}
-	if stakingTx.Gas() != 600000 {
+	if stakingTx.GasLimit() != 600000 {
 		t.Errorf("gas set incorrectly \n")
 	}
 	if stakingTx.GasPrice().Int64() != big.NewInt(1).Int64() {
@@ -172,8 +172,8 @@ func TestData(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not rlp encode staking tx %v\n", err)
 	}
-	if !bytes.Equal(stakingTx.Data(), encoded) {
-		t.Error("RLPEncode and Data does not match \n")
+	if !bytes.Equal(stakingTx.Payload(), encoded) {
+		t.Error("RLPEncode and Payload does not match \n")
 	}
 	if _, err = RLPDecodeStakeMsg(encoded, DirectiveCreateValidator); err != nil {
 		t.Errorf("could not rlp decode staking tx %v\n", err)

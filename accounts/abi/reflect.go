@@ -188,7 +188,7 @@ func mapArgNamesToStructFields(argNames []string, value reflect.Value) (map[stri
 		// this abi has already been paired, skip it... unless there exists another, yet unassigned
 		// struct field with the same field name. If so, raise an error:
 		//    abi: [ { "name": "value" } ]
-		//    struct { Value  *big.Int , Value1 *big.Int `abi:"value"`}
+		//    struct { Amount  *big.Int , Value1 *big.Int `abi:"value"`}
 		if abi2struct[argName] != "" {
 			if abi2struct[argName] != structFieldName &&
 				struct2abi[structFieldName] == "" &&
@@ -210,7 +210,7 @@ func mapArgNamesToStructFields(argNames []string, value reflect.Value) (map[stri
 		} else {
 			// not paired, but annotate as used, to detect cases like
 			//   abi : [ { "name": "value" }, { "name": "_value" } ]
-			//   struct { Value *big.Int }
+			//   struct { Amount *big.Int }
 			struct2abi[structFieldName] = argName
 		}
 	}

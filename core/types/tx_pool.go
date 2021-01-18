@@ -24,21 +24,13 @@ var (
 
 // PoolTransaction is the general transaction interface used by the tx pool
 type PoolTransaction interface {
-	Hash() common.Hash
-	Nonce() uint64
-	ChainID() *big.Int
-	ShardID() uint32
-	To() *common.Address
+	CoreTransaction
+
 	SenderAddress() (common.Address, error)
 	Size() common.StorageSize
-	Data() []byte
-	GasPrice() *big.Int
-	Gas() uint64
 	Cost() (*big.Int, error)
-	Value() *big.Int
 	EncodeRLP(w io.Writer) error
 	DecodeRLP(s *rlp.Stream) error
-	Protected() bool
 }
 
 // PoolTransactions is a PoolTransactions slice type for basic sorting.

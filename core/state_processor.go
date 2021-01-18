@@ -153,7 +153,7 @@ func (p *StateProcessor) Process(
 
 // return true if it is valid
 func getTransactionType(
-	config *params.ChainConfig, header *block.Header, tx *types.Transaction,
+	config *params.ChainConfig, header *block.Header, tx types.InternalTransaction,
 ) types.TransactionType {
 	if header.ShardID() == tx.ShardID() &&
 		(!config.AcceptsCrossTx(header.Epoch()) ||
@@ -174,7 +174,7 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx types.InternalTransaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
 		return nil, nil, 0, errors.New("Invalid Transaction Type")
@@ -330,7 +330,7 @@ func StakingToMessage(
 		return types.Message{}, err
 	}
 
-	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.GasPrice(), payload, blockNum)
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.GasLimit(), tx.GasPrice(), payload, blockNum)
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
 		return types.Message{}, staking.ErrInvalidStakingKind

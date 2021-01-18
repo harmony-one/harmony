@@ -32,7 +32,7 @@ func newstack() *Stack {
 	return &Stack{data: make([]*big.Int, 0, 1024)}
 }
 
-// Data returns the underlying big.Int array.
+// Payload returns the underlying big.Int array.
 func (st *Stack) Data() []*big.Int {
 	return st.data
 }

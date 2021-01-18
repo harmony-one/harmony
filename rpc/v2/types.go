@@ -255,12 +255,12 @@ func NewTransaction(
 	v, r, s := tx.RawSignatureValues()
 
 	result := &Transaction{
-		Gas:       tx.Gas(),
+		Gas:       tx.GasLimit(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
-		Input:     hexutil.Bytes(tx.Data()),
+		Input:     hexutil.Bytes(tx.Payload()),
 		Nonce:     tx.Nonce(),
-		Value:     tx.Value(),
+		Value:     tx.Amount(),
 		ShardID:   tx.ShardID(),
 		ToShardID: tx.ToShardID(),
 		Timestamp: timestamp,
@@ -427,7 +427,7 @@ func NewStakingTransaction(
 	var rpcMsg interface{}
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCreateValidator)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCreateValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -455,7 +455,7 @@ func NewStakingTransaction(
 			SlotPubKeys:        msg.SlotPubKeys,
 		}
 	case staking.DirectiveEditValidator:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveEditValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +486,7 @@ func NewStakingTransaction(
 			SlotPubKeyToRemove: msg.SlotKeyToRemove,
 		}
 	case staking.DirectiveCollectRewards:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCollectRewards)
 		if err != nil {
 			return nil, err
 		}
@@ -500,7 +500,7 @@ func NewStakingTransaction(
 		}
 		rpcMsg = &CollectRewardsMsg{DelegatorAddress: delegatorAddress}
 	case staking.DirectiveDelegate:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveDelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -522,7 +522,7 @@ func NewStakingTransaction(
 			Amount:           msg.Amount,
 		}
 	case staking.DirectiveUndelegate:
-		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
+		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveUndelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -546,7 +546,7 @@ func NewStakingTransaction(
 	}
 
 	result := &StakingTransaction{
-		Gas:       tx.Gas(),
+		Gas:       tx.GasLimit(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
 		Nonce:     tx.Nonce(),

@@ -143,8 +143,8 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
-// Gas returns gas of StakingTransaction.
-func (tx *StakingTransaction) Gas() uint64 {
+// GasLimit returns gas of StakingTransaction.
+func (tx *StakingTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit
 }
 
@@ -158,7 +158,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
 	switch tx.StakingType() {
 	case DirectiveCreateValidator:
-		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveCreateValidator)
+		msg, err := RLPDecodeStakeMsg(tx.Payload(), DirectiveCreateValidator)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		}
 		total.Add(total, stkMsg.Amount)
 	case DirectiveDelegate:
-		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
+		msg, err := RLPDecodeStakeMsg(tx.Payload(), DirectiveDelegate)
 		if err != nil {
 			return nil, err
 		}
@@ -188,6 +188,11 @@ func (tx *StakingTransaction) ChainID() *big.Int {
 
 // ShardID returns which shard id this transaction was signed for, implicitly shard 0.
 func (tx *StakingTransaction) ShardID() uint32 {
+	return shard.BeaconChainShardID
+}
+
+// ToShardID returns which shard id this transaction was signed for, implicitly shard 0.
+func (tx *StakingTransaction) ToShardID() uint32 {
 	return shard.BeaconChainShardID
 }
 
@@ -229,8 +234,8 @@ func (tx *StakingTransaction) To() *common.Address {
 	return nil
 }
 
-// Data ..
-func (tx *StakingTransaction) Data() []byte {
+// Payload ..
+func (tx *StakingTransaction) Payload() []byte {
 	data, err := tx.RLPEncodeStakeMsg()
 	if err != nil {
 		return nil
@@ -238,8 +243,8 @@ func (tx *StakingTransaction) Data() []byte {
 	return data
 }
 
-// Value ..
-func (tx *StakingTransaction) Value() *big.Int {
+// Amount ..
+func (tx *StakingTransaction) Amount() *big.Int {
 	return new(big.Int).SetInt64(0)
 }
 
@@ -317,4 +322,9 @@ func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return addr, nil
+}
+
+// From returns the sender address of the transaction
+func (tx *StakingTransaction) From() *atomic.Value {
+	return &tx.from
 }

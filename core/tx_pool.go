@@ -684,12 +684,12 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	// Transactions can't be negative. This may never happen using RLP decoded
 	// transactions but may occur if you create a transaction using the RPC.
-	if tx.Value().Sign() < 0 {
-		return errors.WithMessagef(ErrNegativeValue, "transaction value is %s", tx.Value().String())
+	if tx.Amount().Sign() < 0 {
+		return errors.WithMessagef(ErrNegativeValue, "transaction value is %s", tx.Amount().String())
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
-	if pool.currentMaxGas < tx.Gas() {
-		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.Gas())
+	if pool.currentMaxGas < tx.GasLimit() {
+		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.GasLimit())
 	}
 	// Make sure the transaction is signed properly
 	from, err := tx.SenderAddress()
@@ -719,7 +719,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	local = local || pool.locals.contains(from) // account may be local even if the transaction arrived from the network
 	if !local && pool.gasPrice.Cmp(tx.GasPrice()) > 0 {
 		gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
-		gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
+		gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // GasLimit-price is in Nano
 		return errors.WithMessagef(ErrUnderpriced, "transaction gas-price is %.18f ONE", gasPrice)
 	}
 	// Ensure the transaction adheres to nonce ordering
@@ -744,15 +744,15 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	intrGas := uint64(0)
 	if isStakingTx {
-		intrGas, err = IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
+		intrGas, err = IntrinsicGas(tx.Payload(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
 	} else {
-		intrGas, err = IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false)
+		intrGas, err = IntrinsicGas(tx.Payload(), tx.To() == nil, pool.homestead, pool.istanbul, false)
 	}
 	if err != nil {
 		return err
 	}
-	if tx.Gas() < intrGas {
-		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.Gas())
+	if tx.GasLimit() < intrGas {
+		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.GasLimit())
 	}
 	// Do more checks if it is a staking transaction
 	if isStakingTx {
@@ -769,7 +769,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 
 	switch tx.StakingType() {
 	case staking.DirectiveCreateValidator:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCreateValidator)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCreateValidator)
 		if err != nil {
 			return err
 		}
@@ -793,7 +793,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		_, err = VerifyAndCreateValidatorFromMsg(pool.currentState, chainContext, pendingEpoch, pendingBlockNumber, stkMsg)
 		return err
 	case staking.DirectiveEditValidator:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveEditValidator)
 		if err != nil {
 			return err
 		}
@@ -817,7 +817,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		)
 		return err
 	case staking.DirectiveDelegate:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveDelegate)
 		if err != nil {
 			return err
 		}
@@ -843,7 +843,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig.IsRedelegation(pendingEpoch))
 		return err
 	case staking.DirectiveUndelegate:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveUndelegate)
 		if err != nil {
 			return err
 		}
@@ -858,7 +858,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		_, err = VerifyAndUndelegateFromMsg(pool.currentState, pool.pendingEpoch(), stkMsg)
 		return err
 	case staking.DirectiveCollectRewards:
-		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
+		msg, err := staking.RLPDecodeStakeMsg(tx.Payload(), staking.DirectiveCollectRewards)
 		if err != nil {
 			return err
 		}
@@ -926,7 +926,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		// If the new transaction is underpriced, don't accept it
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
 			gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
-			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
+			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // GasLimit-price is in Nano
 			logger.Warn().
 				Str("hash", hash.Hex()).
 				Str("price", tx.GasPrice().String()).
@@ -938,7 +938,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		drop := pool.priced.Discard(pool.all.Count()-int(pool.config.GlobalSlots+pool.config.GlobalQueue-1), pool.locals)
 		for _, tx := range drop {
 			gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
-			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
+			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // GasLimit-price is in Nano
 			pool.removeTx(tx.Hash(), false)
 			underpricedTxCounter.Inc(1)
 			pool.txErrorSink.Add(tx,

@@ -20,7 +20,7 @@ import (
 	"math/big"
 )
 
-// Gas costs
+// GasLimit costs
 const (
 	GasQuickStep   uint64 = 2
 	GasFastestStep uint64 = 3
