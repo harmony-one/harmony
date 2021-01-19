@@ -38,7 +38,7 @@ var (
 	chainConfig     = params.TestChainConfig
 	blockFactory    = blockfactory.ForTest
 	// Test transactions
-	pendingTxs []*types.Transaction
+	pendingTxs []types.InternalTransaction
 	database   = rawdb.NewMemoryDatabase()
 	gspec      = core.Genesis{
 		Config:  chainConfig,
@@ -46,7 +46,7 @@ var (
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
 		ShardID: 0,
 	}
-	txs                   []*types.Transaction
+	txs                   []types.InternalTransaction
 	contractworker        *pkgworker.Worker
 	nonce                 uint64
 	dataEnc               []byte
@@ -119,11 +119,12 @@ func fundFaucetContract(chain *core.BlockChain) {
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 
-	txmap := make(map[common.Address]types.Transactions)
+	txmap := make(map[common.Address]types.InternalTransactions)
 	txmap[FaucetAddress] = txs
 
+	ethTxmap := make(map[common.Address]types.InternalTransactions)
 	err := contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		ethTxmap, txmap, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -165,11 +166,12 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	callEnc = append(callEnc, paddedAddress...)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	txmap := make(map[common.Address]types.Transactions)
-	txmap[FaucetAddress] = types.Transactions{callfaucettx}
+	txmap := make(map[common.Address]types.InternalTransactions)
+	txmap[FaucetAddress] = types.InternalTransactions{callfaucettx}
 
+	ethTxmap := make(map[common.Address]types.InternalTransactions)
 	err = contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		ethTxmap, txmap, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -215,7 +217,7 @@ func main() {
 	}
 	poolPendingTx := types.PoolTransactions{}
 	for _, tx := range pendingTxs {
-		poolPendingTx = append(poolPendingTx, tx)
+		poolPendingTx = append(poolPendingTx, tx.(types.PoolTransaction))
 	}
 	backend.txPool.AddLocals(poolPendingTx)
 
@@ -225,7 +227,7 @@ func main() {
 		blocks, _ := core.GenerateChain(chainConfig, genesis, chain.Engine(), database, n, func(i int, gen *core.BlockGen) {
 			gen.SetCoinbase(FaucetAddress)
 			gen.SetShardID(0)
-			gen.AddTx(pendingTxs[i])
+			gen.AddTx(pendingTxs[i].(*types.Transaction))
 		})
 		if _, err := chain.InsertChain(blocks, true /* verifyHeaders */); err != nil {
 			log.Fatal(err)

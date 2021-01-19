@@ -143,8 +143,8 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
-// Gas returns gas of StakingTransaction.
-func (tx *StakingTransaction) Gas() uint64 {
+// GasLimit returns gas of StakingTransaction.
+func (tx *StakingTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit
 }
 
@@ -188,6 +188,11 @@ func (tx *StakingTransaction) ChainID() *big.Int {
 
 // ShardID returns which shard id this transaction was signed for, implicitly shard 0.
 func (tx *StakingTransaction) ShardID() uint32 {
+	return shard.BeaconChainShardID
+}
+
+// ToShardID returns which shard id this transaction was signed for, implicitly shard 0.
+func (tx *StakingTransaction) ToShardID() uint32 {
 	return shard.BeaconChainShardID
 }
 
@@ -317,4 +322,9 @@ func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return addr, nil
+}
+
+// From returns the sender address of the transaction
+func (tx *StakingTransaction) From() *atomic.Value {
+	return &tx.from
 }

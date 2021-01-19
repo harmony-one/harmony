@@ -256,7 +256,7 @@ func NewTransaction(
 	v, r, s := tx.RawSignatureValues()
 
 	result := &Transaction{
-		Gas:       hexutil.Uint64(tx.Gas()),
+		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
@@ -540,7 +540,7 @@ func NewStakingTransaction(tx *staking.StakingTransaction, blockHash common.Hash
 	}
 
 	result := &StakingTransaction{
-		Gas:       hexutil.Uint64(tx.Gas()),
+		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Nonce:     hexutil.Uint64(tx.Nonce()),

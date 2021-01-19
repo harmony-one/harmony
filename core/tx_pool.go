@@ -688,8 +688,8 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return errors.WithMessagef(ErrNegativeValue, "transaction value is %s", tx.Value().String())
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
-	if pool.currentMaxGas < tx.Gas() {
-		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.Gas())
+	if pool.currentMaxGas < tx.GasLimit() {
+		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.GasLimit())
 	}
 	// Make sure the transaction is signed properly
 	from, err := tx.SenderAddress()
@@ -751,8 +751,8 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if err != nil {
 		return err
 	}
-	if tx.Gas() < intrGas {
-		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.Gas())
+	if tx.GasLimit() < intrGas {
+		return errors.WithMessagef(ErrIntrinsicGas, "transaction gas is %d", tx.GasLimit())
 	}
 	// Do more checks if it is a staking transaction
 	if isStakingTx {

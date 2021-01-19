@@ -37,6 +37,7 @@ type environment struct {
 	state      *state.DB     // apply state changes here
 	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
+	ethTxs     []*types.EthTransaction
 	txs        []*types.Transaction
 	stakingTxs []*staking.StakingTransaction
 	receipts   []*types.Receipt
@@ -57,18 +58,11 @@ type Worker struct {
 	gasCeil  uint64
 }
 
-// CommitTransactions commits transactions for new block.
-func (w *Worker) CommitTransactions(
-	pendingNormal map[common.Address]types.Transactions,
-	pendingStaking staking.StakingTransactions, coinbase common.Address,
-) error {
-
-	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	}
-
-	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-	// NORMAL
+// CommitSortedTransactions commits transactions for new block.
+func (w *Worker) CommitSortedTransactions(
+	txs *types.TransactionsByPriceAndNonce,
+	coinbase common.Address,
+) {
 	for {
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
@@ -91,15 +85,26 @@ func (w *Worker) CommitTransactions(
 			txs.Pop()
 			continue
 		}
-		// Start executing the transaction
-		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 
 		if tx.ShardID() != w.chain.ShardID() {
 			txs.Shift()
 			continue
 		}
 
-		_, err := w.commitTransaction(tx, coinbase)
+		var err error
+
+		// Start executing the transaction
+		switch tx.(type) {
+		case *types.EthTransaction:
+			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.ethTxs))
+			_, err = w.commitEthTransaction(tx.(*types.EthTransaction), coinbase)
+		case *types.Transaction:
+			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.ethTxs)+len(w.current.txs))
+			_, err = w.commitHmyTransaction(tx.(*types.Transaction), coinbase)
+		default:
+			txs.Shift()
+			continue
+		}
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -129,6 +134,25 @@ func (w *Worker) CommitTransactions(
 			txs.Shift()
 		}
 	}
+}
+
+// CommitTransactions commits transactions for new block.
+func (w *Worker) CommitTransactions(
+	pendingEth map[common.Address]types.InternalTransactions,
+	pendingNormal map[common.Address]types.InternalTransactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
+) error {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
+
+	// ETHEREUM COMPATIBLE TXNS
+	ethTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingEth)
+	w.CommitSortedTransactions(ethTxns, coinbase)
+
+	// HARMONY TXNS
+	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
+	w.CommitSortedTransactions(normalTxns, coinbase)
 
 	// STAKING - only beaconchain process staking transaction
 	if w.chain.ShardID() == shard.BeaconChainShardID {
@@ -142,7 +166,6 @@ func (w *Worker) CommitTransactions(
 			// phase, start ignoring the sender until we do.
 			if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
 				utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
-				txs.Pop()
 				continue
 			}
 
@@ -157,7 +180,7 @@ func (w *Worker) CommitTransactions(
 					Msg("Failed committing staking transaction")
 			} else {
 				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
-					Uint64("txGasLimit", tx.Gas()).
+					Uint64("txGasLimit", tx.GasLimit()).
 					Msg("Successfully committed staking transaction")
 			}
 		}
@@ -202,9 +225,45 @@ var (
 	errNilReceipt = errors.New("nil receipt")
 )
 
-func (w *Worker) commitTransaction(
+func (w *Worker) commitEthTransaction(
+	tx *types.EthTransaction, coinbase common.Address,
+) ([]*types.Log, error) {
+	receipt, cx, err := w.commitTransaction(tx, coinbase)
+	if err == nil {
+		w.current.ethTxs = append(w.current.ethTxs, tx)
+		w.current.receipts = append(w.current.receipts, receipt)
+
+		if cx != nil {
+			w.current.outcxs = append(w.current.outcxs, cx)
+		}
+	} else {
+		return nil, err
+	}
+
+	return receipt.Logs, nil
+}
+
+func (w *Worker) commitHmyTransaction(
 	tx *types.Transaction, coinbase common.Address,
 ) ([]*types.Log, error) {
+	receipt, cx, err := w.commitTransaction(tx, coinbase)
+	if err == nil {
+		w.current.txs = append(w.current.txs, tx)
+		w.current.receipts = append(w.current.receipts, receipt)
+
+		if cx != nil {
+			w.current.outcxs = append(w.current.outcxs, cx)
+		}
+	} else {
+		return nil, err
+	}
+
+	return receipt.Logs, nil
+}
+
+func (w *Worker) commitTransaction(
+	tx types.InternalTransaction, coinbase common.Address,
+) (*types.Receipt, *types.CXReceipt, error) {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
 	receipt, cx, _, err := core.ApplyTransaction(
@@ -224,20 +283,13 @@ func (w *Worker) commitTransaction(
 		utils.Logger().Error().
 			Err(err).Interface("txn", tx).
 			Msg("Transaction failed commitment")
-		return nil, errNilReceipt
+		return nil, nil, errNilReceipt
 	}
 	if receipt == nil {
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
-		return nil, errNilReceipt
+		return nil, nil, errNilReceipt
 	}
-	w.current.txs = append(w.current.txs, tx)
-	w.current.receipts = append(w.current.receipts, receipt)
-
-	if cx != nil {
-		w.current.outcxs = append(w.current.outcxs, cx)
-	}
-
-	return receipt.Logs, nil
+	return receipt, cx, nil
 }
 
 // CommitReceipts commits a list of already verified incoming cross shard receipts

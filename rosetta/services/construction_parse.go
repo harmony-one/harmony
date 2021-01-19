@@ -51,7 +51,7 @@ func parseUnsignedTransaction(
 
 	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
-		GasUsed: tx.Gas(),
+		GasUsed: tx.GasLimit(),
 	}
 	formattedTx, rosettaError := FormatTransaction(
 		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode},
@@ -94,7 +94,7 @@ func parseSignedTransaction(
 
 	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
-		GasUsed: tx.Gas(),
+		GasUsed: tx.GasLimit(),
 	}
 	formattedTx, rosettaError := FormatTransaction(
 		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode},

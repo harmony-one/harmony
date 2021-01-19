@@ -120,11 +120,6 @@ func (tx *EthTransaction) From() *atomic.Value {
 	return &tx.from
 }
 
-// Recipient returns the recipient address of the transaction
-func (tx *EthTransaction) Recipient() *common.Address {
-	return tx.data.Recipient
-}
-
 // V value of the transaction signature
 func (tx *EthTransaction) V() *big.Int {
 	return tx.data.V
@@ -140,8 +135,8 @@ func (tx *EthTransaction) S() *big.Int {
 	return tx.data.S
 }
 
-// Amount is the amount of ONE token transfered (in Atto)
-func (tx *EthTransaction) Amount() *big.Int {
+// Value is the amount of ONE token transfered (in Atto)
+func (tx *EthTransaction) Value() *big.Int {
 	return tx.data.Amount
 }
 
@@ -150,14 +145,9 @@ func (tx *EthTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit
 }
 
-// Price is the gas price of the transaction
-func (tx *EthTransaction) Price() *big.Int {
-	return tx.data.Price
-}
-
-// Payload of the transaction
-func (tx *EthTransaction) Payload() []byte {
-	return tx.data.Payload
+// Data returns data payload of Transaction.
+func (tx *EthTransaction) Data() []byte {
+	return common.CopyBytes(tx.data.Payload)
 }
 
 // ShardID returns which shard id this transaction was signed for (if at all)
@@ -236,11 +226,6 @@ func (tx *EthTransaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-// Data returns data payload of Transaction.
-func (tx *EthTransaction) Data() []byte {
-	return common.CopyBytes(tx.data.Payload)
-}
-
 // Gas returns gas of Transaction.
 func (tx *EthTransaction) Gas() uint64 {
 	return tx.data.GasLimit
@@ -249,11 +234,6 @@ func (tx *EthTransaction) Gas() uint64 {
 // GasPrice returns gas price of Transaction.
 func (tx *EthTransaction) GasPrice() *big.Int {
 	return new(big.Int).Set(tx.data.Price)
-}
-
-// Value returns data payload of Transaction.
-func (tx *EthTransaction) Value() *big.Int {
-	return new(big.Int).Set(tx.data.Amount)
 }
 
 // Nonce returns account nonce from Transaction.
@@ -299,6 +279,29 @@ func (tx *EthTransaction) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
+// Cost returns amount + gasprice * gaslimit.
+func (tx *EthTransaction) Cost() (*big.Int, error) {
+	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
+	total.Add(total, tx.data.Amount)
+	return total, nil
+}
+
+// SenderAddress returns the address of transaction sender
+// Note that mainnet has unprotected transactions prior to Epoch 28
+func (tx *EthTransaction) SenderAddress() (common.Address, error) {
+	var signer Signer
+	if !tx.Protected() {
+		signer = HomesteadSigner{}
+	} else {
+		signer = NewEIP155Signer(tx.ChainID())
+	}
+	addr, err := Sender(signer, tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return addr, nil
+}
+
 // AsMessage returns the transaction as a core.Message.
 //
 // AsMessage requires a signer to derive the sender.
@@ -322,7 +325,7 @@ func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 
 // WithSignature returns a new transaction with the given signature.
 // This signature needs to be in the [R || S || V] format where V is 0 or 1.
-func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (TransactionInterface, error) {
+func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (InternalTransaction, error) {
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
 		return nil, err
@@ -330,13 +333,6 @@ func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (TransactionI
 	cpy := &EthTransaction{data: tx.data}
 	cpy.data.R, cpy.data.S, cpy.data.V = r, s, v
 	return cpy, nil
-}
-
-// Cost returns amount + gasprice * gaslimit.
-func (tx *EthTransaction) Cost() *big.Int {
-	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
-	total.Add(total, tx.data.Amount)
-	return total
 }
 
 // RawSignatureValues returns the V, R, S signature values of the transaction.

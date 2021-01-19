@@ -68,7 +68,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 	if tx.Value().Cmp(refComponents.Amount) != 0 {
 		t.Error("transaction value does not match")
 	}
-	if tx.Gas() != refMetadata.GasLimit {
+	if tx.GasLimit() != refMetadata.GasLimit {
 		t.Error("transaction gas limit does not match")
 	}
 	if tx.GasPrice().Cmp(refMetadata.GasPrice) != 0 {
@@ -104,7 +104,7 @@ func TestConstructPlainTransaction(t *testing.T) {
 	if tx.Value().Cmp(refComponents.Amount) != 0 {
 		t.Error("transaction value does not match")
 	}
-	if tx.Gas() != refMetadata.GasLimit {
+	if tx.GasLimit() != refMetadata.GasLimit {
 		t.Error("transaction gas limit does not match")
 	}
 	if tx.GasPrice().Cmp(refMetadata.GasPrice) != 0 {
@@ -223,7 +223,7 @@ func TestConstructCrossShardTransaction(t *testing.T) {
 	if tx.Value().Cmp(refComponents.Amount) != 0 {
 		t.Error("transaction value does not match")
 	}
-	if tx.Gas() != refMetadata.GasLimit {
+	if tx.GasLimit() != refMetadata.GasLimit {
 		t.Error("transaction gas limit does not match")
 	}
 	if tx.GasPrice().Cmp(refMetadata.GasPrice) != 0 {
@@ -373,7 +373,7 @@ func TestConstructContractCreationTransaction(t *testing.T) {
 	if tx.Value().Cmp(refComponents.Amount) != 0 {
 		t.Error("transaction value does not match")
 	}
-	if tx.Gas() != refMetadata.GasLimit {
+	if tx.GasLimit() != refMetadata.GasLimit {
 		t.Error("transaction gas limit does not match")
 	}
 	if tx.GasPrice().Cmp(refMetadata.GasPrice) != 0 {
