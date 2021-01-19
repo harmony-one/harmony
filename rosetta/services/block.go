@@ -139,9 +139,14 @@ func (s *BlockAPI) BlockTransaction(
 		return nil, err
 	}
 
-	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
+	blk, rosettaError := getBlock(
+		ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
+	)
+	if rosettaError != nil {
+		return nil, rosettaError
+	}
 	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
-	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
+	txInfo, rosettaError := s.getTransactionInfo(ctx, blk, txHash)
 	if rosettaError != nil {
 		// If no transaction info is found, check for side effect case transaction.
 		response, rosettaError2 := s.sideEffectBlockTransaction(ctx, request)
@@ -172,12 +177,6 @@ func (s *BlockAPI) BlockTransaction(
 				// contract creation, so address is in receipt
 				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
 				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
-			}
-			blk, rosettaError := getBlock(
-				ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
-			)
-			if rosettaError != nil {
-				return nil, rosettaError
 			}
 			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
 			if rosettaError != nil {
@@ -210,7 +209,7 @@ type transactionInfo struct {
 
 // getTransactionInfo given the block hash and transaction hash
 func (s *BlockAPI) getTransactionInfo(
-	ctx context.Context, blockHash, txHash ethcommon.Hash,
+	ctx context.Context, blk *hmytypes.Block, txHash ethcommon.Hash,
 ) (txInfo *transactionInfo, rosettaError *types.Error) {
 	// Look for all of the possible transactions
 	var index uint64
@@ -219,6 +218,8 @@ func (s *BlockAPI) getTransactionInfo(
 	plainTx, _, _, index = rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
 	if plainTx == nil {
 		stakingTx, _, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
+		// if there both normal and staking transactions, correct index offset.
+		index = index + uint64(blk.Transactions().Len())
 	}
 	cxReceipt, _, _, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), txHash)
 
@@ -227,7 +228,7 @@ func (s *BlockAPI) getTransactionInfo(
 	}
 
 	var receipt *hmytypes.Receipt
-	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	receipts, err := s.hmy.GetReceipts(ctx, blk.Hash())
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -235,6 +236,11 @@ func (s *BlockAPI) getTransactionInfo(
 	}
 	if int(index) < len(receipts) {
 		receipt = receipts[index]
+		if cxReceipt == nil && receipt.TxHash != txHash {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unable to find correct receipt for transaction",
+			})
+		}
 	}
 
 	// Use pool transaction for concise formatting
