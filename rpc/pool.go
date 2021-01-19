@@ -96,7 +96,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	// Log submission
 	if tx.Recipient() == nil {
 		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
-		from, err := types.Sender(signer, tx, txType)
+		from, err := types.DeriveSender(signer, tx, txType)
 		if err != nil {
 			return common.Hash{}, err
 		}

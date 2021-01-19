@@ -132,7 +132,7 @@ func (tx *EthTransaction) SenderAddress() (common.Address, error) {
 	} else {
 		signer = NewEIP155Signer(tx.ChainID())
 	}
-	addr, err := Sender(signer, tx, EthereumTx)
+	addr, err := EthSender(signer, tx)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -331,7 +331,7 @@ func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 	}
 
 	var err error
-	msg.from, err = Sender(s, tx, EthereumTx)
+	msg.from, err = EthSender(s, tx)
 	return msg, err
 }
 
