@@ -59,19 +59,19 @@ func MakeSigner(config *params.ChainConfig, epochNumber *big.Int) Signer {
 	return signer
 }
 
-// SignTx signs the transaction using the given signer and private key
+// SignTx signs the Harmony transaction using the given signer and private key
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	h := s.Hash(tx)
-	sig, err := crypto.Sign(h[:], prv)
-	if err != nil {
-		return nil, err
-	}
-	return tx.WithSignature(s, sig)
+	return SignTxForTxType(tx, HarmonyTx, s, prv)
 }
 
-// SignEthTx signs the eth transaction using the given signer and private key
+// SignEthTx signs the Ethereum transaction using the given signer and private key
 func SignEthTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	h := s.EthHash(tx)
+	return SignTxForTxType(tx, EthereumTx, s, prv)
+}
+
+// SignTxForTxType signs the Harmony or Ethereum transaction using the given signer and private key
+func SignTxForTxType(tx *Transaction, txType TransactionType, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
+	h := s.GenerateHash(tx, txType)
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
 		return nil, err
