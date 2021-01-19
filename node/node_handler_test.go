@@ -83,7 +83,7 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode[1] = false
 	node := New(host, consensus, testDBFactory, nil, archiveMode)
 
-	txs := make(map[common.Address]types.InternalTransactions)
+	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},

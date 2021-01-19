@@ -41,7 +41,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 
 	node.Worker.UpdateCurrent()
 
-	txs := make(map[common.Address]types.InternalTransactions)
+	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
