@@ -38,7 +38,7 @@ var (
 	chainConfig     = params.TestChainConfig
 	blockFactory    = blockfactory.ForTest
 	// Test transactions
-	pendingTxs []types.InternalTransaction
+	pendingTxs []types.PoolTransaction
 	database   = rawdb.NewMemoryDatabase()
 	gspec      = core.Genesis{
 		Config:  chainConfig,
@@ -46,7 +46,7 @@ var (
 		Alloc:   core.GenesisAlloc{FaucetAddress: {Balance: FaucetInitFunds}},
 		ShardID: 0,
 	}
-	txs                   []types.InternalTransaction
+	txs                   []*types.Transaction
 	contractworker        *pkgworker.Worker
 	nonce                 uint64
 	dataEnc               []byte
@@ -119,12 +119,10 @@ func fundFaucetContract(chain *core.BlockChain) {
 	tx, _ := types.SignTx(types.NewTransaction(nonce+uint64(4), randomUserAddress, 0, big.NewInt(int64(amount)), params.TxGas, nil, nil), types.HomesteadSigner{}, FaucetPriKey)
 	txs = append(txs, tx)
 
-	txmap := make(map[common.Address]types.InternalTransactions)
+	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = txs
-
-	ethTxmap := make(map[common.Address]types.InternalTransactions)
 	err := contractworker.CommitTransactions(
-		ethTxmap, txmap, nil, testUserAddress,
+		txmap, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -166,12 +164,11 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	callEnc = append(callEnc, paddedAddress...)
 	callfaucettx, _ := types.SignTx(types.NewTransaction(nonce+uint64(5), faucetContractAddress, 0, big.NewInt(0), params.TxGasContractCreation*10, nil, callEnc), types.HomesteadSigner{}, FaucetPriKey)
 
-	txmap := make(map[common.Address]types.InternalTransactions)
-	txmap[FaucetAddress] = types.InternalTransactions{callfaucettx}
+	txmap := make(map[common.Address]types.Transactions)
+	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
-	ethTxmap := make(map[common.Address]types.InternalTransactions)
 	err = contractworker.CommitTransactions(
-		ethTxmap, txmap, nil, testUserAddress,
+		txmap, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)

@@ -10,12 +10,6 @@ type BodyFieldSetter struct {
 	b *Body
 }
 
-// EthTransactions sets the EthTransactions field of the body.
-func (bfs BodyFieldSetter) EthTransactions(newTransactions []*EthTransaction) BodyFieldSetter {
-	bfs.b.SetEthTransactions(newTransactions)
-	return bfs
-}
-
 // Transactions sets the Transactions field of the body.
 func (bfs BodyFieldSetter) Transactions(newTransactions []*Transaction) BodyFieldSetter {
 	bfs.b.SetTransactions(newTransactions)

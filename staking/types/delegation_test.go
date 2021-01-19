@@ -21,7 +21,7 @@ func TestUndelegate(t *testing.T) {
 	amount1 := big.NewInt(1000)
 	delegation.Undelegate(epoch1, amount1)
 
-	// check the undelegation's Value
+	// check the undelegation's Amount
 	if delegation.Undelegations[0].Amount.Cmp(amount1) != 0 {
 		t.Errorf("undelegate failed, amount does not match")
 	}

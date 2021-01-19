@@ -269,7 +269,6 @@ func (e *engineImpl) Finalize(
 
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	// TODO: put block version and eth transaction in new block
 	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), payout, nil
 }
 
