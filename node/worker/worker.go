@@ -92,7 +92,7 @@ func (w *Worker) CommitSortedTransactions(
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
-		_, err := w.commitTransaction(tx.(*types.Transaction), coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {

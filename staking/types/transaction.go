@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -257,6 +259,11 @@ func (tx *StakingTransaction) Size() common.StorageSize {
 	rlp.Encode(&c, &tx.data)
 	tx.size.Store(common.StorageSize(c))
 	return common.StorageSize(c)
+}
+
+// IsEthCompatible returns whether the txn is ethereum compatible
+func (tx *StakingTransaction) IsEthCompatible() bool {
+	return tx.ChainID().Cmp(params.Shard0ChainID) >= 0
 }
 
 type writeCounter common.StorageSize

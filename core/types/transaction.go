@@ -24,6 +24,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -70,6 +72,7 @@ type InternalTransaction interface {
 	R() *big.Int
 	S() *big.Int
 
+	IsEthCompatible() bool
 	AsMessage(s Signer) (Message, error)
 }
 
@@ -412,6 +415,31 @@ func (tx *Transaction) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
+// IsEthCompatible returns whether the txn is ethereum compatible
+func (tx *Transaction) IsEthCompatible() bool {
+	return tx.ChainID().Cmp(params.Shard0ChainID) >= 0
+}
+
+// ConvertToEth converts hmy txn to eth txn by removing the ShardID and ToShardID fields.
+func (tx *Transaction) ConvertToEth() *EthTransaction {
+	var tx2 EthTransaction
+	d := &tx.data
+	d2 := &tx2.data
+
+	d2.AccountNonce = d.AccountNonce
+	d2.Price = new(big.Int).Set(d.Price)
+	d2.GasLimit = d.GasLimit
+	d2.Recipient = copyAddr(d.Recipient)
+	d2.Amount = new(big.Int).Set(d.Amount)
+	d2.Payload = append(d.Payload[:0:0], d.Payload...)
+	d2.V = new(big.Int).Set(d.V)
+	d2.R = new(big.Int).Set(d.R)
+	d2.S = new(big.Int).Set(d.S)
+	d2.Hash = copyHash(d.Hash)
+
+	return &tx2
+}
+
 // AsMessage returns the transaction as a core.Message.
 //
 // AsMessage requires a signer to derive the sender.
@@ -548,7 +576,7 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 }
 
 // Peek returns the next transaction by price.
-func (t *TransactionsByPriceAndNonce) Peek() InternalTransaction {
+func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 	if len(t.heads) == 0 {
 		return nil
 	}

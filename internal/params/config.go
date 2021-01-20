@@ -16,6 +16,9 @@ var (
 	StressnetChainID          = big.NewInt(5)
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
+
+	// Shard0ChainID to be reserved unique chain ID for eth compatible chains.
+	Shard0ChainID = big.NewInt(1666660000)
 )
 
 // EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
