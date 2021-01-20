@@ -64,7 +64,7 @@ var (
 		QuickUnlockEpoch:     big.NewInt(0),
 		FiveSecondsEpoch:     big.NewInt(16500),
 		TwoSecondsEpoch:      big.NewInt(73000),
-		SixtyPercentEpoch:    big.NewInt(73275),
+		SixtyPercentEpoch:    big.NewInt(73273),
 		RedelegationEpoch:    big.NewInt(36500),
 		EIP155Epoch:          big.NewInt(0),
 		S3Epoch:              big.NewInt(0),
