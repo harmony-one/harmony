@@ -403,7 +403,7 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in))
-	t.Run(fmt.Sprintf("%s-GasLimit=%d", test.name, contract.Gas), func(t *testing.T) {
+	t.Run(fmt.Sprintf("%s-Gas=%d", test.name, contract.Gas), func(t *testing.T) {
 		if res, err := RunPrecompiledContract(p, in, contract); err != nil {
 			t.Error(err)
 		} else if common.Bytes2Hex(res) != test.expected {
@@ -422,7 +422,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in)-1)
-	t.Run(fmt.Sprintf("%s-GasLimit=%d", test.name, contract.Gas), func(t *testing.T) {
+	t.Run(fmt.Sprintf("%s-Gas=%d", test.name, contract.Gas), func(t *testing.T) {
 		_, err := RunPrecompiledContract(p, in, contract)
 		if err.Error() != "out of gas" {
 			t.Errorf("Expected error [out of gas], got [%v]", err)
@@ -470,7 +470,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		data = make([]byte, len(in))
 	)
 
-	bench.Run(fmt.Sprintf("%s-GasLimit=%d", test.name, contract.Gas), func(bench *testing.B) {
+	bench.Run(fmt.Sprintf("%s-Gas=%d", test.name, contract.Gas), func(bench *testing.B) {
 		bench.ResetTimer()
 		for i := 0; i < bench.N; i++ {
 			contract.Gas = reqGas

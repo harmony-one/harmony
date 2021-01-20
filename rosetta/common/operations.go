@@ -12,7 +12,7 @@ import (
 
 const (
 	// ExpendGasOperation is an operation that only affects the native currency.
-	ExpendGasOperation = "GasLimit"
+	ExpendGasOperation = "Gas"
 
 	// ContractCreationOperation is an operation that only affects the native currency.
 	ContractCreationOperation = "ContractCreation"

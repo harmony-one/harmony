@@ -168,16 +168,12 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
 		return nil, err
 	}
-	pendingEthTxs := map[common.Address]types.InternalTransactions{}
-	pendingPlainTxs := map[common.Address]types.InternalTransactions{}
+	pendingPlainTxs := map[common.Address]types.Transactions{}
 	pendingStakingTxs := staking.StakingTransactions{}
 	for addr, poolTxs := range pendingPoolTxs {
-		plainEthTxsPerAcc := types.InternalTransactions{}
-		plainTxsPerAcc := types.InternalTransactions{}
+		plainTxsPerAcc := types.Transactions{}
 		for _, tx := range poolTxs {
-			if ethTx, ok := tx.(*types.EthTransaction); ok {
-				plainEthTxsPerAcc = append(plainEthTxsPerAcc, ethTx)
-			} else if plainTx, ok := tx.(*types.Transaction); ok {
+			if plainTx, ok := tx.(*types.Transaction); ok {
 				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
 			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 				// Only process staking transactions after pre-staking epoch happened.
@@ -190,9 +186,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				return nil, types.ErrUnknownPoolTxType
 			}
 		}
-		if plainEthTxsPerAcc.Len() > 0 {
-			pendingEthTxs[addr] = plainEthTxsPerAcc
-		}
 		if plainTxsPerAcc.Len() > 0 {
 			pendingPlainTxs[addr] = plainTxsPerAcc
 		}
@@ -202,7 +195,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	// Try commit normal and staking transactions based on the current state
 	// The successfully committed transactions will be put in the proposed block
 	if err := node.Worker.CommitTransactions(
-		pendingEthTxs, pendingPlainTxs, pendingStakingTxs, beneficiary,
+		pendingPlainTxs, pendingStakingTxs, beneficiary,
 	); err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 		return nil, err

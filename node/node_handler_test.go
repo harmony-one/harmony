@@ -37,11 +37,10 @@ func TestAddNewBlock(t *testing.T) {
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, nil, nil)
 
-	ethTxs := make(map[common.Address]types.InternalTransactions)
-	txs := make(map[common.Address]types.InternalTransactions)
+	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
-		ethTxs, txs, stks, common.Address{},
+		txs, stks, common.Address{},
 	)
 	commitSigs := make(chan []byte)
 	go func() {
@@ -84,11 +83,10 @@ func TestVerifyNewBlock(t *testing.T) {
 	archiveMode[1] = false
 	node := New(host, consensus, testDBFactory, nil, archiveMode)
 
-	ethTxs := make(map[common.Address]types.InternalTransactions)
-	txs := make(map[common.Address]types.InternalTransactions)
+	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
-		ethTxs, txs, stks, common.Address{},
+		txs, stks, common.Address{},
 	)
 	commitSigs := make(chan []byte)
 	go func() {

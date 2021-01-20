@@ -50,7 +50,6 @@ const (
 	blockV0 = "" // same as taggedrlp.LegacyTag
 	blockV1 = "v1"
 	blockV2 = "v2"
-	blockV3 = "v3"
 )
 
 // Constants for block.
@@ -88,18 +87,11 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 
 // BodyInterface is a simple accessor interface for block body.
 type BodyInterface interface {
-	// EthTransactions returns a deep copy the list of ethereum-compatible transactions in this block.
-	EthTransactions() []*EthTransaction
-
 	// Transactions returns a deep copy the list of transactions in this block.
 	Transactions() []*Transaction
 
 	// StakingTransactions returns a deep copy of staking transactions
 	StakingTransactions() []*staking.StakingTransaction
-
-	// EthTransactionAt returns the ethereum-compatible transaction at the given index in this block.
-	// It returns nil if index is out of bounds.
-	EthTransactionAt(index int) *EthTransaction
 
 	// TransactionAt returns the transaction at the given index in this block.
 	// It returns nil if index is out of bounds.
@@ -112,10 +104,6 @@ type BodyInterface interface {
 	// CXReceiptAt returns the CXReceipt given index (calculated from IncomingReceipts)
 	// It returns nil if index is out of bounds
 	CXReceiptAt(index int) *CXReceipt
-
-	// SetEthTransactions sets the list of ethereum-compatible transactions with a deep copy of the
-	// given list.
-	SetEthTransactions(newTransactions []*EthTransaction)
 
 	// SetTransactions sets the list of transactions with a deep copy of the
 	// given list.
@@ -152,22 +140,18 @@ type Body struct {
 //
 // TODO ek – this is a stopgap, and works only while there is a N:1 mapping
 //  between header and body versions.  Replace usage with factory.
-func NewBodyForMatchingHeader(b *Block) (*Body, error) {
+func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
-	if b.Version == blockV3 {
-		bi = new(BodyV3)
-	} else {
-		switch b.header.Header.(type) {
-		case *v3.Header:
-			bi = new(BodyV2)
-		case *v2.Header, *v1.Header:
-			bi = new(BodyV1)
-		case *v0.Header:
-			bi = new(BodyV0)
-		default:
-			return nil, errors.Errorf("unsupported header type %s",
-				taggedrlp.TypeName(reflect.TypeOf(b.header)))
-		}
+	switch h.Header.(type) {
+	case *v3.Header:
+		bi = new(BodyV2)
+	case *v2.Header, *v1.Header:
+		bi = new(BodyV1)
+	case *v0.Header:
+		bi = new(BodyV0)
+	default:
+		return nil, errors.Errorf("unsupported header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
 	}
 	return &Body{bi}, nil
 }
@@ -176,9 +160,8 @@ func NewBodyForMatchingHeader(b *Block) (*Body, error) {
 // factory.  Use for unit tests.
 func NewTestBody() *Body {
 	block := new(Block)
-	block.Version = blockV2
 	block.header = blockfactory.NewTestHeader()
-	body, err := NewBodyForMatchingHeader(block)
+	body, err := NewBodyForMatchingHeader(blockfactory.NewTestHeader())
 	if err != nil {
 		panic(err)
 	}
@@ -220,14 +203,12 @@ func init() {
 	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
 	BodyRegistry.MustRegister(blockV1, new(BodyV1))
 	BodyRegistry.MustRegister(blockV2, new(BodyV2))
-	BodyRegistry.MustRegister(blockV3, new(BodyV3))
 }
 
 // Block represents an entire block in the Harmony blockchain.
 type Block struct {
 	header              *block.Header
 	uncles              []*block.Header
-	ethTransactions     EthTransactions
 	transactions        Transactions
 	stakingTransactions staking.StakingTransactions
 	incomingReceipts    CXReceiptsProofs
@@ -248,9 +229,6 @@ type Block struct {
 
 	// Commit Signatures/Bitmap
 	commitSigAndBitmap []byte
-
-	// The version of the block (v0, v1...)
-	Version string
 }
 
 func (b *Block) String() string {
@@ -325,16 +303,6 @@ type extblockV2 struct {
 	IncomingReceipts CXReceiptsProofs
 }
 
-// includes eth transaction
-type extblockV3 struct {
-	Header           *block.Header
-	EthTxs           []*EthTransaction
-	Txs              []*Transaction
-	Stks             []*staking.StakingTransaction
-	Uncles           []*block.Header
-	IncomingReceipts CXReceiptsProofs
-}
-
 var onceBlockReg sync.Once
 var extblockReg *taggedrlp.Registry
 
@@ -344,7 +312,6 @@ func blockRegistry() *taggedrlp.Registry {
 		extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
 		extblockReg.MustRegister(blockV1, &extblockV1{})
 		extblockReg.MustRegister(blockV2, &extblockV2{})
-		extblockReg.MustRegister(blockV3, &extblockV3{})
 	})
 
 	return extblockReg
@@ -438,18 +405,12 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 	switch eb := eb.(type) {
-	case *extblockV3:
-		b.header, b.uncles, b.ethTransactions, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.EthTxs, eb.Txs, eb.IncomingReceipts, eb.Stks
-		b.Version = blockV3
 	case *extblockV2:
 		b.header, b.uncles, b.transactions, b.incomingReceipts, b.stakingTransactions = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts, eb.Stks
-		b.Version = blockV2
 	case *extblockV1:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, eb.IncomingReceipts
-		b.Version = blockV1
 	case *extblock:
 		b.header, b.uncles, b.transactions, b.incomingReceipts = eb.Header, eb.Uncles, eb.Txs, nil
-		b.Version = blockV0
 	default:
 		return errors.Errorf("unknown extblock type %s", taggedrlp.TypeName(reflect.TypeOf(eb)))
 	}
@@ -460,24 +421,22 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
-	if b.Version == blockV3 {
-		eb = extblockV3{b.header, b.ethTransactions, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
-	} else {
-		switch h := b.header.Header.(type) {
-		case *v3.Header:
-			eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
-		case *v2.Header, *v1.Header:
-			eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
-		case *v0.Header:
-			if len(b.incomingReceipts) > 0 {
-				return errors.New("incomingReceipts unsupported in v0 block")
-			}
-			eb = extblock{b.header, b.transactions, b.uncles}
-		default:
-			return errors.Errorf("unsupported block header type %s",
-				taggedrlp.TypeName(reflect.TypeOf(h)))
+
+	switch h := b.header.Header.(type) {
+	case *v3.Header:
+		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
+	case *v2.Header, *v1.Header:
+		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}
+	case *v0.Header:
+		if len(b.incomingReceipts) > 0 {
+			return errors.New("incomingReceipts unsupported in v0 block")
 		}
+		eb = extblock{b.header, b.transactions, b.uncles}
+	default:
+		return errors.Errorf("unsupported block header type %s",
+			taggedrlp.TypeName(reflect.TypeOf(h)))
 	}
+
 	extblockReg := blockRegistry()
 	return extblockReg.Encode(w, eb)
 }
@@ -495,11 +454,6 @@ func (b *Block) IsLastBlockInEpoch() bool {
 // Transactions returns transactions.
 func (b *Block) Transactions() Transactions {
 	return b.transactions
-}
-
-// EthTransactions returns ethereum-compatible transactions.
-func (b *Block) EthTransactions() EthTransactions {
-	return b.ethTransactions
 }
 
 // StakingTransactions returns stakingTransactions.
@@ -565,13 +519,12 @@ func (b *Block) Header() *block.Header { return CopyHeader(b.header) }
 
 // Body returns the non-header content of the block.
 func (b *Block) Body() *Body {
-	body, err := NewBodyForMatchingHeader(b)
+	body, err := NewBodyForMatchingHeader(b.header)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("cannot create block Body struct")
 		return nil
 	}
 	return body.With().
-		EthTransactions(b.ethTransactions).
 		Transactions(b.transactions).
 		StakingTransactions(b.stakingTransactions).
 		Uncles(b.uncles).
@@ -610,16 +563,14 @@ func CalcUncleHash(uncles []*block.Header) common.Hash {
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.
-func (b *Block) WithBody(ethTransactions []*EthTransaction, transactions []*Transaction, stakingTxns []*staking.StakingTransaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
+func (b *Block) WithBody(transactions []*Transaction, stakingTxns []*staking.StakingTransaction, uncles []*block.Header, incomingReceipts CXReceiptsProofs) *Block {
 	block := &Block{
 		header:              CopyHeader(b.header),
-		ethTransactions:     make([]*EthTransaction, len(ethTransactions)),
 		transactions:        make([]*Transaction, len(transactions)),
 		stakingTransactions: make([]*staking.StakingTransaction, len(stakingTxns)),
 		uncles:              make([]*block.Header, len(uncles)),
 		incomingReceipts:    make([]*CXReceiptsProof, len(incomingReceipts)),
 	}
-	copy(block.ethTransactions, ethTransactions)
 	copy(block.transactions, transactions)
 	copy(block.stakingTransactions, stakingTxns)
 	copy(block.incomingReceipts, incomingReceipts)
