@@ -158,18 +158,6 @@ func (s EIP155Signer) SignatureValues(tx InternalTransaction, sig []byte) (R, S,
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s EIP155Signer) Hash(tx InternalTransaction) common.Hash {
-	if tx.ChainID().Cmp(params.Shard0ChainID) >= 0 {
-		// This is an ethereum-compatible txn
-		return hash.FromRLP([]interface{}{
-			tx.Nonce(),
-			tx.GasPrice(),
-			tx.GasLimit(),
-			tx.To(),
-			tx.Value(),
-			tx.Data(),
-			s.chainID, uint(0), uint(0),
-		})
-	}
 	return hash.FromRLP([]interface{}{
 		tx.Nonce(),
 		tx.GasPrice(),
@@ -228,17 +216,6 @@ func (fs FrontierSigner) SignatureValues(tx InternalTransaction, sig []byte) (r,
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (fs FrontierSigner) Hash(tx InternalTransaction) common.Hash {
-	if tx.ChainID().Cmp(params.Shard0ChainID) >= 0 {
-		// This is an ethereum-compatible txn
-		return hash.FromRLP([]interface{}{
-			tx.Nonce(),
-			tx.GasPrice(),
-			tx.GasLimit(),
-			tx.To(),
-			tx.Value(),
-			tx.Data(),
-		})
-	}
 	return hash.FromRLP([]interface{}{
 		tx.Nonce(),
 		tx.GasPrice(),
