@@ -37,7 +37,7 @@ func TestAddNewBlock(t *testing.T) {
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
 	node := New(host, consensus, testDBFactory, nil, nil)
 
-	txs := make(map[common.Address]types.InternalTransactions)
+	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
