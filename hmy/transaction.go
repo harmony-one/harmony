@@ -19,15 +19,6 @@ func (hmy *Harmony) SendTx(ctx context.Context, signedTx *types.Transaction) err
 	return ErrFinalizedTransaction
 }
 
-// SendEthTx ...
-func (hmy *Harmony) SendEthTx(ctx context.Context, signedTx *types.EthTransaction) error {
-	tx, _, _, _ := rawdb.ReadTransaction(hmy.chainDb, signedTx.Hash())
-	if tx == nil {
-		return hmy.NodeAPI.AddPendingEthTransaction(signedTx)
-	}
-	return ErrFinalizedTransaction
-}
-
 // ResendCx retrieve blockHash from txID and add blockHash to CxPool for resending
 // Note that cross shard txn is only for regular txns, not for staking txns, so the input txn hash
 // is expected to be regular txn hash

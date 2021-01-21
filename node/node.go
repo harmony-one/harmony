@@ -165,22 +165,6 @@ func (node *Node) tryBroadcast(tx *types.Transaction) {
 	}
 }
 
-func (node *Node) tryBroadcastEth(tx *types.EthTransaction) {
-	msg := proto_node.ConstructEthTransactionListMessageAccount(types.EthTransactions{tx})
-
-	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
-
-	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
-		} else {
-			break
-		}
-	}
-}
-
 func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
 
@@ -201,30 +185,6 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	poolTxs := types.PoolTransactions{}
-	errs := []error{}
-	acceptCx := node.Blockchain().Config().AcceptsCrossTx(node.Blockchain().CurrentHeader().Epoch())
-	for _, tx := range newTxs {
-		if tx.ShardID() != tx.ToShardID() && !acceptCx {
-			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
-			continue
-		}
-		poolTxs = append(poolTxs, tx)
-	}
-	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
-
-	pendingCount, queueCount := node.TxPool.Stats()
-	utils.Logger().Info().
-		Interface("err", errs).
-		Int("length of newTxs", len(newTxs)).
-		Int("totalPending", pendingCount).
-		Int("totalQueued", queueCount).
-		Msg("[addPendingTransactions] Adding more transactions")
-	return errs
-}
-
-// Add new eth transactions to the pending transaction list.
-func (node *Node) addPendingEthTransactions(newTxs types.EthTransactions) []error {
 	poolTxs := types.PoolTransactions{}
 	errs := []error{}
 	acceptCx := node.Blockchain().Config().AcceptsCrossTx(node.Blockchain().CurrentHeader().Epoch())
@@ -316,28 +276,6 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		if err == nil || node.BroadcastInvalidTx {
 			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
 			node.tryBroadcast(newTx)
-		}
-		return err
-	}
-	return errors.New("shard do not match")
-}
-
-// AddPendingEthTransaction adds one new transaction to the pending transaction list.
-// This is only called from SDK.
-func (node *Node) AddPendingEthTransaction(newTx *types.EthTransaction) error {
-	if newTx.ShardID() == node.NodeConfig.ShardID {
-		errs := node.addPendingEthTransactions(types.EthTransactions{newTx})
-		var err error
-		for i := range errs {
-			if errs[i] != nil {
-				utils.Logger().Info().Err(errs[i]).Msg("[AddPendingTransaction] Failed adding new transaction")
-				err = errs[i]
-				break
-			}
-		}
-		if err == nil || node.BroadcastInvalidTx {
-			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
-			node.tryBroadcastEth(newTx)
 		}
 		return err
 	}
@@ -444,9 +382,6 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	case proto_node.Transaction:
 		// nothing much to validate transaction message unless decode the RLP
 		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "tx"}).Inc()
-	case proto_node.EthTransaction:
-		// nothing much to validate transaction message unless decode the RLP
-		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "eth_tx"}).Inc()
 	case proto_node.Staking:
 		// nothing much to validate staking message unless decode the RLP
 		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "staking_tx"}).Inc()

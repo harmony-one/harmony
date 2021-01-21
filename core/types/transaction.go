@@ -498,7 +498,6 @@ func (tx *Transaction) Copy() *Transaction {
 // Note that mainnet has unprotected transactions prior to Epoch 28
 func (tx *Transaction) SenderAddress() (common.Address, error) {
 	var signer Signer
-
 	if !tx.Protected() {
 		signer = HomesteadSigner{}
 	} else {
@@ -508,7 +507,6 @@ func (tx *Transaction) SenderAddress() (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-
 	return addr, nil
 }
 

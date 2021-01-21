@@ -48,15 +48,15 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
-	var tx types.TransactionInterface
-	var txType types.TransactionType
+	var tx *types.Transaction
 
 	if s.version == Eth {
-		txType = types.EthereumTx
-		tx = new(types.EthTransaction)
-		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+		ethTx := new(types.EthTransaction)
+		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
 			return common.Hash{}, err
 		}
+
+		tx = ethTx.ConvertToHmy()
 
 		// Verify transaction type & chain
 		/*c := s.hmy.ChainConfig().ChainID
@@ -67,12 +67,11 @@ func (s *PublicPoolService) SendRawTransaction(
 		}*/
 
 		// Submit transaction
-		if err := s.hmy.SendEthTx(ctx, tx.(*types.EthTransaction)); err != nil {
+		if err := s.hmy.SendTx(ctx, tx); err != nil {
 			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
 			return tx.Hash(), err
 		}
 	} else {
-		txType = types.HarmonyTx
 		tx = new(types.Transaction)
 		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 			return common.Hash{}, err
@@ -87,16 +86,16 @@ func (s *PublicPoolService) SendRawTransaction(
 		}
 
 		// Submit transaction
-		if err := s.hmy.SendTx(ctx, tx.(*types.Transaction)); err != nil {
+		if err := s.hmy.SendTx(ctx, tx); err != nil {
 			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
 			return tx.Hash(), err
 		}
 	}
 
 	// Log submission
-	if tx.Recipient() == nil {
+	if tx.To() == nil {
 		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
-		from, err := types.DeriveSender(signer, tx, txType)
+		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -108,7 +107,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	} else {
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
-			Str("recipient", tx.Recipient().Hex()).
+			Str("recipient", tx.To().Hex()).
 			Msg("Submitted transaction")
 	}
 
