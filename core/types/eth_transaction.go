@@ -21,6 +21,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -31,9 +33,6 @@ import (
 )
 
 //go:generate gencodec -type ethTxdata -field-override ethTxdataMarshaling -out gen_eth_tx_json.go
-
-// Shard0ChainID to be reserved unique chain ID for eth compatible chains.
-const Shard0ChainID = 0
 
 // EthTransaction ethereum-compatible transaction
 type EthTransaction struct {
@@ -152,12 +151,12 @@ func (tx *EthTransaction) Data() []byte {
 
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *EthTransaction) ShardID() uint32 {
-	return uint32(tx.ChainID().Uint64()) - Shard0ChainID
+	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
 }
 
 // ToShardID returns the destination shard id this transaction is going to
 func (tx *EthTransaction) ToShardID() uint32 {
-	return uint32(tx.ChainID().Uint64()) - Shard0ChainID
+	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)
@@ -174,6 +173,31 @@ func (tx *EthTransaction) Protected() bool {
 func (tx *EthTransaction) Copy() *EthTransaction {
 	var tx2 EthTransaction
 	tx2.data.CopyFrom(&tx.data)
+	return &tx2
+}
+
+// ConvertToHmy converts eth txn to hmy txn by filling in ShardID and ToShardID fields.
+func (tx *EthTransaction) ConvertToHmy() *Transaction {
+	var tx2 Transaction
+	d := &tx.data
+	d2 := &tx2.data
+
+	d2.AccountNonce = d.AccountNonce
+	d2.Price = new(big.Int).Set(d.Price)
+	d2.GasLimit = d.GasLimit
+	d2.Recipient = copyAddr(d.Recipient)
+	d2.Amount = new(big.Int).Set(d.Amount)
+	d2.Payload = append(d.Payload[:0:0], d.Payload...)
+	d2.V = new(big.Int).Set(d.V)
+	d2.R = new(big.Int).Set(d.R)
+	d2.S = new(big.Int).Set(d.S)
+
+	d2.ShardID = tx.ShardID()
+	d2.ToShardID = tx.ToShardID()
+
+	copy := tx2.Hash()
+	d2.Hash = &copy
+
 	return &tx2
 }
 
@@ -300,6 +324,11 @@ func (tx *EthTransaction) SenderAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return addr, nil
+}
+
+// IsEthCompatible returns whether the txn is ethereum compatible
+func (tx *EthTransaction) IsEthCompatible() bool {
+	return true
 }
 
 // AsMessage returns the transaction as a core.Message.

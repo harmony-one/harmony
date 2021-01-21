@@ -24,6 +24,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -70,6 +72,7 @@ type InternalTransaction interface {
 	R() *big.Int
 	S() *big.Int
 
+	IsEthCompatible() bool
 	AsMessage(s Signer) (Message, error)
 }
 
@@ -412,6 +415,33 @@ func (tx *Transaction) Size() common.StorageSize {
 	return common.StorageSize(c)
 }
 
+// IsEthCompatible returns whether the txn is ethereum compatible
+func (tx *Transaction) IsEthCompatible() bool {
+	return params.IsEthCompatible(tx.ChainID())
+}
+
+// ConvertToEth converts hmy txn to eth txn by removing the ShardID and ToShardID fields.
+func (tx *Transaction) ConvertToEth() *EthTransaction {
+	var tx2 EthTransaction
+	d := &tx.data
+	d2 := &tx2.data
+
+	d2.AccountNonce = d.AccountNonce
+	d2.Price = new(big.Int).Set(d.Price)
+	d2.GasLimit = d.GasLimit
+	d2.Recipient = copyAddr(d.Recipient)
+	d2.Amount = new(big.Int).Set(d.Amount)
+	d2.Payload = append(d.Payload[:0:0], d.Payload...)
+	d2.V = new(big.Int).Set(d.V)
+	d2.R = new(big.Int).Set(d.R)
+	d2.S = new(big.Int).Set(d.S)
+
+	copy := tx2.Hash()
+	d2.Hash = &copy
+
+	return &tx2
+}
+
 // AsMessage returns the transaction as a core.Message.
 //
 // AsMessage requires a signer to derive the sender.
@@ -515,9 +545,10 @@ func (s *TxByPrice) Pop() interface{} {
 // transactions in a profit-maximizing sorted order, while supporting removing
 // entire batches of transactions for non-executable accounts.
 type TransactionsByPriceAndNonce struct {
-	txs    map[common.Address]Transactions // Per account nonce-sorted list of transactions
-	heads  TxByPrice                       // Next transaction for each unique account (price heap)
-	signer Signer                          // Signer for the set of transactions
+	txs       map[common.Address]Transactions // Per account nonce-sorted list of transactions
+	heads     TxByPrice                       // Next transaction for each unique account (price heap)
+	signer    Signer                          // Signer for the set of transactions
+	ethSigner Signer                          // Signer for the set of transactions
 }
 
 // NewTransactionsByPriceAndNonce creates a transaction set that can retrieve
@@ -525,12 +556,16 @@ type TransactionsByPriceAndNonce struct {
 //
 // Note, the input map is reowned so the caller should not interact any more with
 // if after providing it to the constructor.
-func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
+func NewTransactionsByPriceAndNonce(hmySigner Signer, ethSigner Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for from, accTxs := range txs {
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
+		signer := hmySigner
+		if accTxs[0].IsEthCompatible() {
+			signer = ethSigner
+		}
 		acc, _ := Sender(signer, accTxs[0])
 		txs[acc] = accTxs[1:]
 		if from != acc {
@@ -541,14 +576,15 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 
 	// Assemble and return the transaction set
 	return &TransactionsByPriceAndNonce{
-		txs:    txs,
-		heads:  heads,
-		signer: signer,
+		txs:       txs,
+		heads:     heads,
+		signer:    hmySigner,
+		ethSigner: ethSigner,
 	}
 }
 
 // Peek returns the next transaction by price.
-func (t *TransactionsByPriceAndNonce) Peek() InternalTransaction {
+func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 	if len(t.heads) == 0 {
 		return nil
 	}
@@ -557,7 +593,11 @@ func (t *TransactionsByPriceAndNonce) Peek() InternalTransaction {
 
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
-	acc, _ := Sender(t.signer, t.heads[0])
+	signer := t.signer
+	if t.heads[0].IsEthCompatible() {
+		signer = t.ethSigner
+	}
+	acc, _ := Sender(signer, t.heads[0])
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)

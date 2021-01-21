@@ -55,6 +55,8 @@ type Harmony struct {
 	NodeAPI      NodeAPI
 	// ChainID is used to identify which network we are using
 	ChainID uint64
+	// EthCompatibleChainID is used to identify the Ethereum compatible chain ID
+	EthChainID uint64
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	ShardID   uint32
@@ -130,6 +132,7 @@ func New(
 		chainDb:                     chainDb,
 		NodeAPI:                     nodeAPI,
 		ChainID:                     nodeAPI.Blockchain().Config().ChainID.Uint64(),
+		EthChainID:                  nodeAPI.Blockchain().Config().EthCompatibleChainID.Uint64(),
 		ShardID:                     shardID,
 		leaderCache:                 leaderCache,
 		totalStakeCache:             totalStakeCache,

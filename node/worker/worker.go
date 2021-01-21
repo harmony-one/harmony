@@ -34,6 +34,7 @@ import (
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
 	signer     types.Signer
+	ethSigner  types.Signer
 	state      *state.DB     // apply state changes here
 	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
@@ -76,7 +77,11 @@ func (w *Worker) CommitSortedTransactions(
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(w.current.signer, tx)
+		signer := w.current.signer
+		if tx.IsEthCompatible() {
+			signer = w.current.ethSigner
+		}
+		from, _ := types.Sender(signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
@@ -92,7 +97,7 @@ func (w *Worker) CommitSortedTransactions(
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
-		_, err := w.commitTransaction(tx.(*types.Transaction), coinbase)
+		_, err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -134,7 +139,7 @@ func (w *Worker) CommitTransactions(
 	}
 
 	// HARMONY TXNS
-	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
+	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
 	w.CommitSortedTransactions(normalTxns, coinbase)
 
 	// STAKING - only beaconchain process staking transaction
@@ -300,9 +305,10 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 		return err
 	}
 	env := &environment{
-		signer: types.NewEIP155Signer(w.config.ChainID),
-		state:  state,
-		header: header,
+		signer:    types.NewEIP155Signer(w.config.ChainID),
+		ethSigner: types.NewEIP155Signer(w.config.EthCompatibleChainID),
+		state:     state,
+		header:    header,
 	}
 
 	w.current = env

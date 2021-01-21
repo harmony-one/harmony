@@ -187,7 +187,14 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		)
 	}
 
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))
+	var signer types.Signer
+	if tx.IsEthCompatible() {
+		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
+	} else {
+		signer = types.MakeSigner(config, header.Epoch())
+	}
+	msg, err := tx.AsMessage(signer)
+
 	// skip signer err for additiononly tx
 	if err != nil {
 		return nil, nil, 0, err
