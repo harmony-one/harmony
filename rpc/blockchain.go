@@ -51,11 +51,8 @@ func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, err
 	case V2:
 		return s.hmy.ChainID, nil
 	case Eth:
-		shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
-		if err != nil {
-			return nil, err
-		}
-		return hexutil.Uint64(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.Uint64() + uint64(shardID)), nil
+		ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+		return hexutil.Uint64(ethChainID.Uint64()), nil
 	default:
 		return nil, ErrUnknownRPCVersion
 	}

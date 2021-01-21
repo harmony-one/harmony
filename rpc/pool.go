@@ -100,8 +100,9 @@ func (s *PublicPoolService) SendRawTransaction(
 
 func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
 	nodeChainID := s.hmy.ChainConfig().ChainID
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
 
-	if tx.ChainID().Cmp(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID) == -1 && tx.ChainID().Cmp(nodeChainID) != 0 {
+	if tx.ChainID().Cmp(ethChainID) != 0 && tx.ChainID().Cmp(nodeChainID) != 0 {
 		return errors.Wrapf(
 			ErrInvalidChainID, "blockchain chain id:%s, given %s", nodeChainID.String(), tx.ChainID().String(),
 		)
