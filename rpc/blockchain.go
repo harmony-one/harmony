@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
@@ -56,7 +55,7 @@ func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, err
 		if err != nil {
 			return nil, err
 		}
-		return hexutil.Uint64(params.EthMainnetChainID.Uint64() + uint64(shardID)), nil
+		return hexutil.Uint64(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.Uint64() + uint64(shardID)), nil
 	default:
 		return nil, ErrUnknownRPCVersion
 	}

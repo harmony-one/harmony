@@ -14,7 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
@@ -101,7 +101,7 @@ func (s *PublicPoolService) SendRawTransaction(
 func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
 	nodeChainID := s.hmy.ChainConfig().ChainID
 
-	if tx.ChainID().Cmp(params.EthMainnetChainID) == -1 && tx.ChainID().Cmp(nodeChainID) != 0 {
+	if tx.ChainID().Cmp(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID) == -1 && tx.ChainID().Cmp(nodeChainID) != 0 {
 		return errors.Wrapf(
 			ErrInvalidChainID, "blockchain chain id:%s, given %s", nodeChainID.String(), tx.ChainID().String(),
 		)
