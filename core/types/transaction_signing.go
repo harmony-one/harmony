@@ -34,12 +34,6 @@ var (
 	ErrInvalidChainID = errors.New("invalid chain id for signer")
 )
 
-// TxType - the type of transaction - Harmony or Ethereum.
-const (
-	HarmonyTx TransactionType = iota
-	EthereumTx
-)
-
 // sigCache is used to cache the derived sender and contains
 // the signer used to derive it.
 type sigCache struct {
@@ -59,19 +53,9 @@ func MakeSigner(config *params.ChainConfig, epochNumber *big.Int) Signer {
 	return signer
 }
 
-// SignTx signs the Harmony transaction using the given signer and private key
+// SignTx signs the transaction using the given signer and private key
 func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	return SignTxForTxType(tx, HarmonyTx, s, prv)
-}
-
-// SignEthTx signs the Ethereum transaction using the given signer and private key
-func SignEthTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	return SignTxForTxType(tx, EthereumTx, s, prv)
-}
-
-// SignTxForTxType signs the Harmony or Ethereum transaction using the given signer and private key
-func SignTxForTxType(tx *Transaction, txType TransactionType, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	h := s.GenerateHash(tx, txType)
+	h := s.Hash(tx)
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
 		return nil, err
@@ -79,36 +63,14 @@ func SignTxForTxType(tx *Transaction, txType TransactionType, s Signer, prv *ecd
 	return tx.WithSignature(s, sig)
 }
 
-// Sender returns the address for a Harmony tranasction derived from the signature (V, R, S) using secp256k1
+// Sender returns the address derived from the signature (V, R, S) using secp256k1
 // elliptic curve and an error if it failed deriving or upon an incorrect
 // signature.
 //
 // Sender may cache the address, allowing it to be used regardless of
 // signing method. The cache is invalidated if the cached signer does
 // not match the signer used in the current call.
-func Sender(signer Signer, tx TransactionInterface) (common.Address, error) {
-	return DeriveSender(signer, tx, HarmonyTx)
-}
-
-// EthSender returns the address for an Ethereum transaction derived from the signature (V, R, S) using secp256k1
-// elliptic curve and an error if it failed deriving or upon an incorrect
-// signature.
-//
-// Sender may cache the address, allowing it to be used regardless of
-// signing method. The cache is invalidated if the cached signer does
-// not match the signer used in the current call.
-func EthSender(signer Signer, tx TransactionInterface) (common.Address, error) {
-	return DeriveSender(signer, tx, EthereumTx)
-}
-
-// DeriveSender returns the address for either a Harmony or an Ethereum transaction derived from the signature (V, R, S) using secp256k1
-// elliptic curve and an error if it failed deriving or upon an incorrect
-// signature.
-//
-// Sender may cache the address, allowing it to be used regardless of
-// signing method. The cache is invalidated if the cached signer does
-// not match the signer used in the current call.
-func DeriveSender(signer Signer, tx TransactionInterface, txType TransactionType) (common.Address, error) {
+func Sender(signer Signer, tx InternalTransaction) (common.Address, error) {
 	if sc := tx.From().Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -119,7 +81,7 @@ func DeriveSender(signer Signer, tx TransactionInterface, txType TransactionType
 		}
 	}
 
-	addr, err := signer.DeriveSender(tx, txType)
+	addr, err := signer.Sender(tx)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -130,21 +92,13 @@ func DeriveSender(signer Signer, tx TransactionInterface, txType TransactionType
 // Signer encapsulates transaction signature handling. Note that this interface is not a
 // stable API and may change at any time to accommodate new protocol rules.
 type Signer interface {
-	// Sender returns the sender address of the Harmony transaction.
-	Sender(tx TransactionInterface) (common.Address, error)
-	// EthSender returns the sender address of the Ethereum transaction.
-	EthSender(tx TransactionInterface) (common.Address, error)
-	// DeriveSender returns the sender address of the Harmony or Ethereum transaction.
-	DeriveSender(tx TransactionInterface, txType TransactionType) (common.Address, error)
+	// Sender returns the sender address of the transaction.
+	Sender(tx InternalTransaction) (common.Address, error)
 	// SignatureValues returns the raw R, S, V values corresponding to the
 	// given signature.
-	SignatureValues(tx TransactionInterface, sig []byte) (r, s, v *big.Int, err error)
-	// Hash returns the Harmony hash to be signed.
-	Hash(tx TransactionInterface) common.Hash
-	// EthHash returns the Ethereum hash to be signed.
-	EthHash(tx TransactionInterface) common.Hash
-	// Equal returns true if the given signer is the same as the receiver.
-	GenerateHash(tx TransactionInterface, txType TransactionType) common.Hash
+	SignatureValues(tx InternalTransaction, sig []byte) (r, s, v *big.Int, err error)
+	// Hash returns the hash to be signed.
+	Hash(tx InternalTransaction) common.Hash
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
 }
@@ -173,32 +127,23 @@ func (s EIP155Signer) Equal(s2 Signer) bool {
 
 var big8 = big.NewInt(8)
 
-// Sender returns the sender address of the given Harmony signer.
-func (s EIP155Signer) Sender(tx TransactionInterface) (common.Address, error) {
-	return s.DeriveSender(tx, HarmonyTx)
-}
-
-// EthSender returns the sender address of the given Ethereum signer.
-func (s EIP155Signer) EthSender(tx TransactionInterface) (common.Address, error) {
-	return s.DeriveSender(tx, EthereumTx)
-}
-
-// DeriveSender returns the sender address of the given Harmony or Ethereum signer.
-func (s EIP155Signer) DeriveSender(tx TransactionInterface, txType TransactionType) (common.Address, error) {
+// Sender returns the sender address of the given signer.
+func (s EIP155Signer) Sender(tx InternalTransaction) (common.Address, error) {
 	if !tx.Protected() {
-		return HomesteadSigner{}.DeriveSender(tx, txType)
+		return HomesteadSigner{}.Sender(tx)
 	}
+
 	if tx.ChainID().Cmp(s.chainID) != 0 {
 		return common.Address{}, ErrInvalidChainID
 	}
 	V := new(big.Int).Sub(tx.V(), s.chainIDMul)
 	V.Sub(V, big8)
-	return recoverPlain(s.GenerateHash(tx, txType), tx.R(), tx.S(), V, true)
+	return recoverPlain(s.Hash(tx), tx.R(), tx.S(), V, true)
 }
 
 // SignatureValues returns signature values. This signature
 // needs to be in the [R || S || V] format where V is 0 or 1.
-func (s EIP155Signer) SignatureValues(tx TransactionInterface, sig []byte) (R, S, V *big.Int, err error) {
+func (s EIP155Signer) SignatureValues(tx InternalTransaction, sig []byte) (R, S, V *big.Int, err error) {
 	R, S, V, err = HomesteadSigner{}.SignatureValues(tx, sig)
 	if err != nil {
 		return nil, nil, nil, err
@@ -210,25 +155,35 @@ func (s EIP155Signer) SignatureValues(tx TransactionInterface, sig []byte) (R, S
 	return R, S, V, nil
 }
 
-// Hash returns the Harmony hash to be signed by the sender.
+// Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (s EIP155Signer) Hash(tx TransactionInterface) common.Hash {
-	return generateHash(tx, HarmonyTx, s.chainID)
+func (s EIP155Signer) Hash(tx InternalTransaction) common.Hash {
+	if params.IsEthCompatible(s.chainID) {
+		// following the same logic as in go-eth implementation
+		return hash.FromRLP([]interface{}{
+			tx.Nonce(),
+			tx.GasPrice(),
+			tx.GasLimit(),
+			tx.To(),
+			tx.Value(),
+			tx.Data(),
+			s.chainID, uint(0), uint(0),
+		})
+	}
+	return hash.FromRLP([]interface{}{
+		tx.Nonce(),
+		tx.GasPrice(),
+		tx.GasLimit(),
+		tx.ShardID(),
+		tx.ToShardID(),
+		tx.To(),
+		tx.Value(),
+		tx.Data(),
+		s.chainID, uint(0), uint(0),
+	})
 }
 
-// EthHash returns the Ethereum hash to be signed by the sender.
-// It does not uniquely identify the transaction.
-func (s EIP155Signer) EthHash(tx TransactionInterface) common.Hash {
-	return generateHash(tx, EthereumTx, s.chainID)
-}
-
-// GenerateHash returns the Harmony or Ethereum hash to be signed by the sender.
-// It does not uniquely identify the transaction.
-func (s EIP155Signer) GenerateHash(tx TransactionInterface, txType TransactionType) common.Hash {
-	return generateHash(tx, txType, s.chainID)
-}
-
-// HomesteadSigner implements TransactionInterface using the
+// HomesteadSigner implements InternalTransaction using the
 // homestead rules.
 type HomesteadSigner struct{ FrontierSigner }
 
@@ -240,23 +195,13 @@ func (hs HomesteadSigner) Equal(s2 Signer) bool {
 
 // SignatureValues returns signature values. This signature
 // needs to be in the [R || S || V] format where V is 0 or 1.
-func (hs HomesteadSigner) SignatureValues(tx TransactionInterface, sig []byte) (r, s, v *big.Int, err error) {
+func (hs HomesteadSigner) SignatureValues(tx InternalTransaction, sig []byte) (r, s, v *big.Int, err error) {
 	return hs.FrontierSigner.SignatureValues(tx, sig)
 }
 
-// Sender returns the address of the Harmony sender.
-func (hs HomesteadSigner) Sender(tx TransactionInterface) (common.Address, error) {
-	return hs.DeriveSender(tx, HarmonyTx)
-}
-
-// EthSender returns the address of the Ethereum sender.
-func (hs HomesteadSigner) EthSender(tx TransactionInterface) (common.Address, error) {
-	return hs.DeriveSender(tx, EthereumTx)
-}
-
-// DeriveSender returns the sender address of the given Harmony or Ethereum signer.
-func (hs HomesteadSigner) DeriveSender(tx TransactionInterface, txType TransactionType) (common.Address, error) {
-	return recoverPlain(hs.GenerateHash(tx, txType), tx.R(), tx.S(), tx.V(), true)
+// Sender returns the address of the sender.
+func (hs HomesteadSigner) Sender(tx InternalTransaction) (common.Address, error) {
+	return recoverPlain(hs.Hash(tx), tx.R(), tx.S(), tx.V(), true)
 }
 
 // FrontierSigner ...
@@ -270,7 +215,7 @@ func (fs FrontierSigner) Equal(s2 Signer) bool {
 
 // SignatureValues returns signature values. This signature
 // needs to be in the [R || S || V] format where V is 0 or 1.
-func (fs FrontierSigner) SignatureValues(tx TransactionInterface, sig []byte) (r, s, v *big.Int, err error) {
+func (fs FrontierSigner) SignatureValues(tx InternalTransaction, sig []byte) (r, s, v *big.Int, err error) {
 	if len(sig) != 65 {
 		panic(fmt.Sprintf("wrong size for signature: got %d, want 65", len(sig)))
 	}
@@ -280,37 +225,24 @@ func (fs FrontierSigner) SignatureValues(tx TransactionInterface, sig []byte) (r
 	return r, s, v, nil
 }
 
-// Hash returns the Harmony hash to be signed by the sender.
+// Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (fs FrontierSigner) Hash(tx TransactionInterface) common.Hash {
-	return generateHash(tx, HarmonyTx, nil)
+func (fs FrontierSigner) Hash(tx InternalTransaction) common.Hash {
+	return hash.FromRLP([]interface{}{
+		tx.Nonce(),
+		tx.GasPrice(),
+		tx.GasLimit(),
+		tx.ShardID(),
+		tx.ToShardID(),
+		tx.To(),
+		tx.Value(),
+		tx.Data(),
+	})
 }
 
-// EthHash returns the Ethereum hash to be signed by the sender.
-// It does not uniquely identify the transaction.
-func (fs FrontierSigner) EthHash(tx TransactionInterface) common.Hash {
-	return generateHash(tx, EthereumTx, nil)
-}
-
-// GenerateHash returns the Harmony or Ethereum hash to be signed by the sender.
-// It does not uniquely identify the transaction.
-func (fs FrontierSigner) GenerateHash(tx TransactionInterface, txType TransactionType) common.Hash {
-	return generateHash(tx, txType, nil)
-}
-
-// Sender returns the sender address of the given Harmony transaction.
-func (fs FrontierSigner) Sender(tx TransactionInterface) (common.Address, error) {
-	return fs.DeriveSender(tx, HarmonyTx)
-}
-
-// EthSender returns the sender address of the given Ethereum transaction.
-func (fs FrontierSigner) EthSender(tx TransactionInterface) (common.Address, error) {
-	return fs.DeriveSender(tx, EthereumTx)
-}
-
-// DeriveSender returns the sender address of the given Harmony or Ethereum transaction.
-func (fs FrontierSigner) DeriveSender(tx TransactionInterface, txType TransactionType) (common.Address, error) {
-	return recoverPlain(fs.GenerateHash(tx, txType), tx.R(), tx.S(), tx.V(), false)
+// Sender returns the sender address of the given transaction.
+func (fs FrontierSigner) Sender(tx InternalTransaction) (common.Address, error) {
+	return recoverPlain(fs.Hash(tx), tx.R(), tx.S(), tx.V(), false)
 }
 
 func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (common.Address, error) {
@@ -351,29 +283,4 @@ func deriveChainID(v *big.Int) *big.Int {
 	}
 	v = new(big.Int).Sub(v, big.NewInt(35))
 	return v.Div(v, big.NewInt(2))
-}
-
-func generateHash(tx TransactionInterface, txType TransactionType, chainID *big.Int) common.Hash {
-	var hashData []interface{}
-
-	hashData = append(hashData, tx.Nonce())
-	hashData = append(hashData, tx.Price())
-	hashData = append(hashData, tx.GasLimit())
-
-	if txType == HarmonyTx {
-		hashData = append(hashData, tx.ShardID())
-		hashData = append(hashData, tx.ToShardID())
-	}
-
-	hashData = append(hashData, tx.Recipient())
-	hashData = append(hashData, tx.Amount())
-	hashData = append(hashData, tx.Payload())
-
-	if chainID != nil {
-		hashData = append(hashData, chainID)
-		hashData = append(hashData, uint(0))
-		hashData = append(hashData, uint(0))
-	}
-
-	return hash.FromRLP(hashData)
 }

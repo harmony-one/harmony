@@ -125,25 +125,3 @@ func (b *BodyV1) EncodeRLP(w io.Writer) error {
 func (b *BodyV1) DecodeRLP(s *rlp.Stream) error {
 	return s.Decode(&b.f)
 }
-
-// EthTransactions returns the list of transactions that's ethereum-compatible.
-//
-// The returned list is a deep copy; the caller may do anything with it without
-// affecting the original.
-func (b *BodyV1) EthTransactions() (txs []*EthTransaction) {
-	// not supported
-	return nil
-}
-
-// EthTransactionAt returns the ethereum-compatible transaction at the given index in this block.
-// It returns nil if index is out of bounds.
-func (b *BodyV1) EthTransactionAt(index int) *EthTransaction {
-	// not supported
-	return nil
-}
-
-// SetEthTransactions sets the list of ethereum-compatible transactions with a deep copy of the given
-// list.
-func (b *BodyV1) SetEthTransactions(newTransactions []*EthTransaction) {
-	// not supported
-}

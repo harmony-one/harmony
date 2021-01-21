@@ -133,7 +133,7 @@ func TestGasCost(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot create validator staking transaction, %v\n", err)
 	}
-	if stakingTx.Gas() != 600000 {
+	if stakingTx.GasLimit() != 600000 {
 		t.Errorf("gas set incorrectly \n")
 	}
 	if stakingTx.GasPrice().Int64() != big.NewInt(1).Int64() {

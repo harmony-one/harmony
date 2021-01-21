@@ -270,7 +270,7 @@ func (l *txList) Add(tx types.PoolTransaction, priceBump uint64) (bool, types.Po
 	if l.costcap.Cmp(cost) < 0 {
 		l.costcap = cost
 	}
-	if gas := tx.Gas(); l.gascap < gas {
+	if gas := tx.GasLimit(); l.gascap < gas {
 		l.gascap = gas
 	}
 	return true, old
@@ -306,7 +306,7 @@ func (l *txList) FilterValid(
 			err := txPool.validateTx(tx, false)
 			return err != nil
 		}
-		return cost.Cmp(costLimit) == 1 || tx.Gas() > gasLimit
+		return cost.Cmp(costLimit) == 1 || tx.GasLimit() > gasLimit
 	})
 }
 
