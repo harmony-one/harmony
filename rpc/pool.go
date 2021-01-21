@@ -56,38 +56,23 @@ func (s *PublicPoolService) SendRawTransaction(
 		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
 			return common.Hash{}, err
 		}
-
 		tx = ethTx.ConvertToHmy()
-
-		// Verify transaction type & chain
-		if err := s.verifyChainID(tx); err != nil {
-			return common.Hash{}, err
-		}
-
-		// Submit transaction
-		if err := s.hmy.SendTx(ctx, tx); err != nil {
-			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-			return tx.Hash(), err
-		}
 	} else {
 		tx = new(types.Transaction)
 		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 			return common.Hash{}, err
 		}
+	}
 
-		// Verify transaction type & chain
-		c := s.hmy.ChainConfig().ChainID
-		if id := tx.ChainID(); id.Cmp(c) != 0 {
-			return common.Hash{}, errors.Wrapf(
-				ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
-			)
-		}
+	// Verify chainID
+	if err := s.verifyChainID(tx); err != nil {
+		return common.Hash{}, err
+	}
 
-		// Submit transaction
-		if err := s.hmy.SendTx(ctx, tx); err != nil {
-			utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-			return tx.Hash(), err
-		}
+	// Submit transaction
+	if err := s.hmy.SendTx(ctx, tx); err != nil {
+		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
+		return tx.Hash(), err
 	}
 
 	// Log submission
