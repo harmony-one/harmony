@@ -18,6 +18,7 @@ import (
 const (
 	V1 Version = iota
 	V2
+	Eth
 	Debug
 )
 
@@ -39,9 +40,9 @@ const (
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netV1Namespace, netV2Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netV1Namespace, netV2Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -121,20 +122,26 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
+		NewPublicHarmonyAPI(hmy, Eth),
 		NewPublicBlockchainAPI(hmy, V1),
 		NewPublicBlockchainAPI(hmy, V2),
+		NewPublicBlockchainAPI(hmy, Eth),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
+		NewPublicContractAPI(hmy, Eth),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
+		NewPublicTransactionAPI(hmy, Eth),
 		NewPublicPoolAPI(hmy, V1),
 		NewPublicPoolAPI(hmy, V2),
+		NewPublicPoolAPI(hmy, Eth),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
 		NewPublicTracerAPI(hmy, Debug),
 		// Legacy methods (subject to removal)
-		v1.NewPublicLegacyAPI(hmy),
-		v2.NewPublicLegacyAPI(hmy),
+		v1.NewPublicLegacyAPI(hmy, "hmy"),
+		v1.NewPublicLegacyAPI(hmy, "eth"),
+		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
 	}
 
 	privateAPIs := []rpc.API{

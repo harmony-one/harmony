@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
@@ -48,16 +49,24 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
-	// Verify transaction type & chain
-	tx := new(types.Transaction)
-	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
-		return common.Hash{}, err
+	var tx *types.Transaction
+
+	if s.version == Eth {
+		ethTx := new(types.EthTransaction)
+		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
+			return common.Hash{}, err
+		}
+		tx = ethTx.ConvertToHmy()
+	} else {
+		tx = new(types.Transaction)
+		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+			return common.Hash{}, err
+		}
 	}
-	c := s.hmy.ChainConfig().ChainID
-	if id := tx.ChainID(); id.Cmp(c) != 0 {
-		return common.Hash{}, errors.Wrapf(
-			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
-		)
+
+	// Verify chainID
+	if err := s.verifyChainID(tx); err != nil {
+		return common.Hash{}, err
 	}
 
 	// Submit transaction
@@ -87,6 +96,19 @@ func (s *PublicPoolService) SendRawTransaction(
 
 	// Response output is the same for all versions
 	return tx.Hash(), nil
+}
+
+func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
+	nodeChainID := s.hmy.ChainConfig().ChainID
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+
+	if tx.ChainID().Cmp(ethChainID) != 0 && tx.ChainID().Cmp(nodeChainID) != 0 {
+		return errors.Wrapf(
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", nodeChainID.String(), tx.ChainID().String(),
+		)
+	}
+
+	return nil
 }
 
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.
@@ -156,7 +178,7 @@ func (s *PublicPoolService) PendingTransactions(
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1:
+			case V1, Eth:
 				tx, err = v1.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
@@ -211,7 +233,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1:
+			case V1, Eth:
 				tx, err = v1.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().

@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 )
 
@@ -122,7 +123,8 @@ func NewEIP155Signer(chainID *big.Int) EIP155Signer {
 // Equal checks if the given EIP155Signer is equal to another Signer.
 func (s EIP155Signer) Equal(s2 Signer) bool {
 	eip155, ok := s2.(EIP155Signer)
-	return ok && eip155.chainID.Cmp(s.chainID) == 0
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+	return ok && (eip155.chainID.Cmp(ethChainID) == 0 || eip155.chainID.Cmp(s.chainID) == 0)
 }
 
 var big8 = big.NewInt(8)
@@ -133,7 +135,8 @@ func (s EIP155Signer) Sender(tx InternalTransaction) (common.Address, error) {
 		return HomesteadSigner{}.Sender(tx)
 	}
 
-	if tx.ChainID().Cmp(s.chainID) != 0 {
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+	if tx.ChainID().Cmp(ethChainID) != 0 && tx.ChainID().Cmp(s.chainID) != 0 {
 		return common.Address{}, ErrInvalidChainID
 	}
 	V := new(big.Int).Sub(tx.V(), s.chainIDMul)

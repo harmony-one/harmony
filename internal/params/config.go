@@ -362,14 +362,14 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
-		MainnetChainConfig.EthCompatibleChainID.Add(MainnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		TestnetChainConfig.EthCompatibleChainID.Add(TestnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		PangaeaChainConfig.EthCompatibleChainID.Add(PangaeaChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		PartnerChainConfig.EthCompatibleChainID.Add(PartnerChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		StressnetChainConfig.EthCompatibleChainID.Add(StressnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		LocalnetChainConfig.EthCompatibleChainID.Add(LocalnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		AllProtocolChanges.EthCompatibleChainID.Add(AllProtocolChanges.EthCompatibleChainID, big.NewInt(int64(shardID)))
-		TestChainConfig.EthCompatibleChainID.Add(TestChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		MainnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(MainnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		TestnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(TestnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		PangaeaChainConfig.EthCompatibleChainID = big.NewInt(0).Add(PangaeaChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		PartnerChainConfig.EthCompatibleChainID = big.NewInt(0).Add(PartnerChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		StressnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(StressnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		LocalnetChainConfig.EthCompatibleChainID = big.NewInt(0).Add(LocalnetChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		AllProtocolChanges.EthCompatibleChainID = big.NewInt(0).Add(AllProtocolChanges.EthCompatibleChainID, big.NewInt(int64(shardID)))
+		TestChainConfig.EthCompatibleChainID = big.NewInt(0).Add(TestChainConfig.EthCompatibleChainID, big.NewInt(int64(shardID)))
 	})
 }
 

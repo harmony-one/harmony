@@ -21,9 +21,9 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/crypto/hash"
 
@@ -151,12 +151,17 @@ func (tx *EthTransaction) Data() []byte {
 
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *EthTransaction) ShardID() uint32 {
-	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
+	return tx.shardID()
 }
 
 // ToShardID returns the destination shard id this transaction is going to
 func (tx *EthTransaction) ToShardID() uint32 {
-	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
+	return tx.shardID()
+}
+
+func (tx *EthTransaction) shardID() uint32 {
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+	return uint32(tx.ChainID().Uint64() - ethChainID.Uint64())
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)
