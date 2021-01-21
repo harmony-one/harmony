@@ -956,7 +956,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 // SetReceiptsData computes all the non-consensus fields of the receipts
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
 	signer := types.MakeSigner(config, block.Epoch())
-	ethSigner := types.NewEIP155Signer(config.EthChainID)
+	ethSigner := types.NewEIP155Signer(config.EthCompatibleChainID)
 
 	transactions, stakingTransactions, logIndex := block.Transactions(), block.StakingTransactions(), uint(0)
 	if len(transactions)+len(stakingTransactions) != len(receipts) {

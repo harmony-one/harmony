@@ -163,7 +163,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 			// Fetch and execute the next block trace tasks
 			for task := range tasks {
 				hmySigner := types.MakeSigner(hmy.BlockChain.Config(), task.block.Number())
-				ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthChainID)
+				ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
@@ -365,7 +365,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 	// Execute all the transaction contained within the block concurrently
 	var (
 		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthChainID)
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 		txs       = block.Transactions()
 		results   = make([]*TxTraceResult, len(txs))
 
@@ -474,7 +474,7 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 	// Execute transaction, either tracing all or just the requested one
 	var (
 		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthChainID)
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 		dumps     []string
 	)
 	for i, tx := range block.Transactions() {
@@ -705,7 +705,7 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 
 	// Recompute transactions up to the target index.
 	hmySigner := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthChainID)
+	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 
 	for idx, tx := range block.Transactions() {
 		signer := hmySigner

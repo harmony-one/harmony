@@ -306,7 +306,7 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 	}
 	env := &environment{
 		signer:    types.NewEIP155Signer(w.config.ChainID),
-		ethSigner: types.NewEIP155Signer(w.config.EthChainID),
+		ethSigner: types.NewEIP155Signer(w.config.EthCompatibleChainID),
 		state:     state,
 		header:    header,
 	}

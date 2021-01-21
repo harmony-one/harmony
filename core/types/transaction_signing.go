@@ -158,6 +158,18 @@ func (s EIP155Signer) SignatureValues(tx InternalTransaction, sig []byte) (R, S,
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s EIP155Signer) Hash(tx InternalTransaction) common.Hash {
+	if params.IsEthCompatible(s.chainID) {
+		// following the same logic as in go-eth implementation
+		return hash.FromRLP([]interface{}{
+			tx.Nonce(),
+			tx.GasPrice(),
+			tx.GasLimit(),
+			tx.To(),
+			tx.Value(),
+			tx.Data(),
+			s.chainID, uint(0), uint(0),
+		})
+	}
 	return hash.FromRLP([]interface{}{
 		tx.Nonce(),
 		tx.GasPrice(),

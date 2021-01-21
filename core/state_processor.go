@@ -189,7 +189,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	var signer types.Signer
 	if tx.IsEthCompatible() {
-		signer = types.NewEIP155Signer(config.EthChainID)
+		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
 	} else {
 		signer = types.MakeSigner(config, header.Epoch())
 	}

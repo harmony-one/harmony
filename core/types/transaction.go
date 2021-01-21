@@ -417,7 +417,7 @@ func (tx *Transaction) Size() common.StorageSize {
 
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *Transaction) IsEthCompatible() bool {
-	return tx.ChainID().Cmp(params.EthMainnetChainID) >= 0
+	return params.IsEthCompatible(tx.ChainID())
 }
 
 // ConvertToEth converts hmy txn to eth txn by removing the ShardID and ToShardID fields.
@@ -435,7 +435,9 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 	d2.V = new(big.Int).Set(d.V)
 	d2.R = new(big.Int).Set(d.R)
 	d2.S = new(big.Int).Set(d.S)
-	d2.Hash = copyHash(d.Hash)
+
+	copy := tx2.Hash()
+	d2.Hash = &copy
 
 	return &tx2
 }
