@@ -3,6 +3,7 @@ package params
 import (
 	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -17,18 +18,26 @@ var (
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 
-	// Shard0ChainID to be reserved unique chain ID for eth compatible chains.
-	Shard0ChainID = big.NewInt(1666660000)
+	// EthMainnetChainID to be reserved unique chain ID for eth compatible chains.
+	EthMainnetChainID            = big.NewInt(1666600000)
+	EthTestnetChainID            = big.NewInt(1666700000)
+	EthPangaeaChainID            = big.NewInt(1666800000)
+	EthPartnerChainID            = big.NewInt(1666900000)
+	EthStressnetChainID          = big.NewInt(1661000000)
+	EthTestChainID               = big.NewInt(1661100000) // not a real network
+	EthAllProtocolChangesChainID = big.NewInt(1661200000) // not a real network
 )
 
 // EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
 // until the exact epoch is decided.
 var EpochTBD = big.NewInt(10000000)
+var once sync.Once
 
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:           MainnetChainID,
+		EthChainID:        EthMainnetChainID,
 		CrossTxEpoch:      big.NewInt(28),
 		CrossLinkEpoch:    big.NewInt(186),
 		StakingEpoch:      big.NewInt(186),
@@ -46,6 +55,7 @@ var (
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainID:           TestnetChainID,
+		EthChainID:        EthTestnetChainID,
 		CrossTxEpoch:      big.NewInt(0),
 		CrossLinkEpoch:    big.NewInt(2),
 		StakingEpoch:      big.NewInt(2),
@@ -64,6 +74,7 @@ var (
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
 		ChainID:           PangaeaChainID,
+		EthChainID:        EthPangaeaChainID,
 		CrossTxEpoch:      big.NewInt(0),
 		CrossLinkEpoch:    big.NewInt(2),
 		StakingEpoch:      big.NewInt(2),
@@ -82,6 +93,7 @@ var (
 	// All features except for CrossLink are enabled at launch.
 	PartnerChainConfig = &ChainConfig{
 		ChainID:           PartnerChainID,
+		EthChainID:        EthPartnerChainID,
 		CrossTxEpoch:      big.NewInt(0),
 		CrossLinkEpoch:    big.NewInt(2),
 		StakingEpoch:      big.NewInt(2),
@@ -100,6 +112,7 @@ var (
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
 		ChainID:           StressnetChainID,
+		EthChainID:        EthStressnetChainID,
 		CrossTxEpoch:      big.NewInt(0),
 		CrossLinkEpoch:    big.NewInt(2),
 		StakingEpoch:      big.NewInt(2),
@@ -117,6 +130,7 @@ var (
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
 		ChainID:           TestnetChainID,
+		EthChainID:        EthTestnetChainID,
 		CrossTxEpoch:      big.NewInt(0),
 		CrossLinkEpoch:    big.NewInt(2),
 		StakingEpoch:      big.NewInt(2),
@@ -135,38 +149,40 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllProtocolChanges = &ChainConfig{
-		AllProtocolChangesChainID, // ChainID
-		big.NewInt(0),             // CrossTxEpoch
-		big.NewInt(0),             // CrossLinkEpoch
-		big.NewInt(0),             // StakingEpoch
-		big.NewInt(0),             // PreStakingEpoch
-		big.NewInt(0),             // QuickUnlockEpoch
-		big.NewInt(0),             // FiveSecondsEpoch
-		big.NewInt(0),             // TwoSecondsEpoch
-		big.NewInt(0),             // RedelegationEpoch
-		big.NewInt(0),             // EIP155Epoch
-		big.NewInt(0),             // S3Epoch
-		big.NewInt(0),             // IstanbulEpoch
-		big.NewInt(0),             // ReceiptLogEpoch
+		AllProtocolChangesChainID,    // ChainID
+		EthAllProtocolChangesChainID, // EthChainID
+		big.NewInt(0),                // CrossTxEpoch
+		big.NewInt(0),                // CrossLinkEpoch
+		big.NewInt(0),                // StakingEpoch
+		big.NewInt(0),                // PreStakingEpoch
+		big.NewInt(0),                // QuickUnlockEpoch
+		big.NewInt(0),                // FiveSecondsEpoch
+		big.NewInt(0),                // TwoSecondsEpoch
+		big.NewInt(0),                // RedelegationEpoch
+		big.NewInt(0),                // EIP155Epoch
+		big.NewInt(0),                // S3Epoch
+		big.NewInt(0),                // IstanbulEpoch
+		big.NewInt(0),                // ReceiptLogEpoch
 	}
 
 	// TestChainConfig ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	TestChainConfig = &ChainConfig{
-		TestChainID,   // ChainID
-		big.NewInt(0), // CrossTxEpoch
-		big.NewInt(0), // CrossLinkEpoch
-		big.NewInt(0), // StakingEpoch
-		big.NewInt(0), // PreStakingEpoch
-		big.NewInt(0), // QuickUnlockEpoch
-		big.NewInt(0), // FiveSecondsEpoch
-		big.NewInt(0), // TwoSecondsEpoch
-		big.NewInt(0), // RedelegationEpoch
-		big.NewInt(0), // EIP155Epoch
-		big.NewInt(0), // S3Epoch
-		big.NewInt(0), // IstanbulEpoch
-		big.NewInt(0), // ReceiptLogEpoch
+		TestChainID,    // ChainID
+		EthTestChainID, // EthChainID
+		big.NewInt(0),  // CrossTxEpoch
+		big.NewInt(0),  // CrossLinkEpoch
+		big.NewInt(0),  // StakingEpoch
+		big.NewInt(0),  // PreStakingEpoch
+		big.NewInt(0),  // QuickUnlockEpoch
+		big.NewInt(0),  // FiveSecondsEpoch
+		big.NewInt(0),  // TwoSecondsEpoch
+		big.NewInt(0),  // RedelegationEpoch
+		big.NewInt(0),  // EIP155Epoch
+		big.NewInt(0),  // S3Epoch
+		big.NewInt(0),  // IstanbulEpoch
+		big.NewInt(0),  // ReceiptLogEpoch
 	}
 
 	// TestRules ...
@@ -193,6 +209,9 @@ type TrustedCheckpoint struct {
 type ChainConfig struct {
 	// ChainId identifies the current chain and is used for replay protection
 	ChainID *big.Int `json:"chain-id"`
+
+	// EthChainID identifies the chain id used for ethereum compatible transactions
+	EthChainID *big.Int `json:"eth-chain-id"`
 
 	// CrossTxEpoch is the epoch where cross-shard transaction starts being
 	// processed.
@@ -238,8 +257,9 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v}",
+	return fmt.Sprintf("{ChainID: %v EthChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v}",
 		c.ChainID,
+		c.EthChainID,
 		c.EIP155Epoch,
 		c.CrossTxEpoch,
 		c.StakingEpoch,
@@ -323,6 +343,20 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 	return isForked(c.ReceiptLogEpoch, epoch)
 }
 
+// UpdateEthChainIDByShard update the ethChainID based on shard ID.
+func UpdateEthChainIDByShard(shardID uint32) {
+	once.Do(func() {
+		MainnetChainConfig.EthChainID.Add(MainnetChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		TestnetChainConfig.EthChainID.Add(TestnetChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		PangaeaChainConfig.EthChainID.Add(PangaeaChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		PartnerChainConfig.EthChainID.Add(PartnerChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		StressnetChainConfig.EthChainID.Add(StressnetChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		LocalnetChainConfig.EthChainID.Add(LocalnetChainConfig.EthChainID, big.NewInt(int64(shardID)))
+		AllProtocolChanges.EthChainID.Add(AllProtocolChanges.EthChainID, big.NewInt(int64(shardID)))
+		TestChainConfig.EthChainID.Add(TestChainConfig.EthChainID, big.NewInt(int64(shardID)))
+	})
+}
+
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
 //
 // The returned GasTable's fields shouldn't, under any circumstances, be changed.
@@ -353,6 +387,7 @@ func isForked(s, epoch *big.Int) bool {
 // phases.
 type Rules struct {
 	ChainID                                               *big.Int
+	EthChainID                                            *big.Int
 	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
 }
 
@@ -362,8 +397,13 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 	if chainID == nil {
 		chainID = new(big.Int)
 	}
+	ethChainID := c.EthChainID
+	if ethChainID == nil {
+		ethChainID = new(big.Int)
+	}
 	return Rules{
 		ChainID:      new(big.Int).Set(chainID),
+		EthChainID:   new(big.Int).Set(ethChainID),
 		IsCrossLink:  c.IsCrossLink(epoch),
 		IsEIP155:     c.IsEIP155(epoch),
 		IsS3:         c.IsS3(epoch),

@@ -417,7 +417,7 @@ func (tx *Transaction) Size() common.StorageSize {
 
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *Transaction) IsEthCompatible() bool {
-	return tx.ChainID().Cmp(params.Shard0ChainID) >= 0
+	return tx.ChainID().Cmp(params.EthMainnetChainID) >= 0
 }
 
 // ConvertToEth converts hmy txn to eth txn by removing the ShardID and ToShardID fields.
@@ -543,9 +543,10 @@ func (s *TxByPrice) Pop() interface{} {
 // transactions in a profit-maximizing sorted order, while supporting removing
 // entire batches of transactions for non-executable accounts.
 type TransactionsByPriceAndNonce struct {
-	txs    map[common.Address]Transactions // Per account nonce-sorted list of transactions
-	heads  TxByPrice                       // Next transaction for each unique account (price heap)
-	signer Signer                          // Signer for the set of transactions
+	txs       map[common.Address]Transactions // Per account nonce-sorted list of transactions
+	heads     TxByPrice                       // Next transaction for each unique account (price heap)
+	signer    Signer                          // Signer for the set of transactions
+	ethSigner Signer                          // Signer for the set of transactions
 }
 
 // NewTransactionsByPriceAndNonce creates a transaction set that can retrieve
@@ -553,12 +554,16 @@ type TransactionsByPriceAndNonce struct {
 //
 // Note, the input map is reowned so the caller should not interact any more with
 // if after providing it to the constructor.
-func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
+func NewTransactionsByPriceAndNonce(hmySigner Signer, ethSigner Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for from, accTxs := range txs {
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
+		signer := hmySigner
+		if accTxs[0].IsEthCompatible() {
+			signer = ethSigner
+		}
 		acc, _ := Sender(signer, accTxs[0])
 		txs[acc] = accTxs[1:]
 		if from != acc {
@@ -569,9 +574,10 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 
 	// Assemble and return the transaction set
 	return &TransactionsByPriceAndNonce{
-		txs:    txs,
-		heads:  heads,
-		signer: signer,
+		txs:       txs,
+		heads:     heads,
+		signer:    hmySigner,
+		ethSigner: ethSigner,
 	}
 }
 
@@ -585,7 +591,11 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
-	acc, _ := Sender(t.signer, t.heads[0])
+	signer := t.signer
+	if t.heads[0].IsEthCompatible() {
+		signer = t.ethSigner
+	}
+	acc, _ := Sender(signer, t.heads[0])
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)

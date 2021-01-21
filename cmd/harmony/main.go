@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -278,6 +280,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 	currentNode := setupConsensusAndNode(hc, nodeConfig)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
+
+	// Update ethereum compatible chain ids
+	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
 
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)

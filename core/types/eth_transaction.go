@@ -151,12 +151,12 @@ func (tx *EthTransaction) Data() []byte {
 
 // ShardID returns which shard id this transaction was signed for (if at all)
 func (tx *EthTransaction) ShardID() uint32 {
-	return uint32(tx.ChainID().Uint64() - params.Shard0ChainID.Uint64())
+	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
 }
 
 // ToShardID returns the destination shard id this transaction is going to
 func (tx *EthTransaction) ToShardID() uint32 {
-	return uint32(tx.ChainID().Uint64() - params.Shard0ChainID.Uint64())
+	return uint32(tx.ChainID().Uint64() - params.EthMainnetChainID.Uint64())
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)
@@ -326,7 +326,7 @@ func (tx *EthTransaction) SenderAddress() (common.Address, error) {
 
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *EthTransaction) IsEthCompatible() bool {
-	return tx.ChainID().Cmp(params.Shard0ChainID) >= 0
+	return tx.ChainID().Cmp(params.EthMainnetChainID) >= 0
 }
 
 // AsMessage returns the transaction as a core.Message.

@@ -263,7 +263,7 @@ func (tx *StakingTransaction) Size() common.StorageSize {
 
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *StakingTransaction) IsEthCompatible() bool {
-	return tx.ChainID().Cmp(params.Shard0ChainID) >= 0
+	return tx.ChainID().Cmp(params.EthMainnetChainID) >= 0
 }
 
 type writeCounter common.StorageSize
