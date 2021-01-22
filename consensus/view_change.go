@@ -228,6 +228,9 @@ func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange {
 		return
 	}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
 	consensus.current.SetMode(ViewChanging)
