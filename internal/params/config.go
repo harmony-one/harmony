@@ -18,14 +18,14 @@ var (
 	TestChainID               = big.NewInt(99)  // not a real network
 	AllProtocolChangesChainID = big.NewInt(100) // not a real network
 
-	// EthMainnetChainID to be reserved unique chain ID for eth compatible chains.
-	EthMainnetChainID            = big.NewInt(1666600000)
-	EthTestnetChainID            = big.NewInt(1666700000)
-	EthPangaeaChainID            = big.NewInt(1666800000)
-	EthPartnerChainID            = big.NewInt(1666900000)
-	EthStressnetChainID          = big.NewInt(1661000000)
-	EthTestChainID               = big.NewInt(1661100000) // not a real network
-	EthAllProtocolChangesChainID = big.NewInt(1661200000) // not a real network
+	// EthMainnetShard0ChainID to be reserved unique chain ID for eth compatible chains.
+	EthMainnetShard0ChainID            = big.NewInt(1666600000)
+	EthTestnetShard0ChainID            = big.NewInt(1666700000)
+	EthPangaeaShard0ChainID            = big.NewInt(1666800000)
+	EthPartnerShard0ChainID            = big.NewInt(1666900000)
+	EthStressnetShard0ChainID          = big.NewInt(1661000000)
+	EthTestShard0ChainID               = big.NewInt(1661100000) // not a real network
+	EthAllProtocolChangesShard0ChainID = big.NewInt(1661200000) // not a real network
 )
 
 // EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
@@ -36,161 +36,177 @@ var once sync.Once
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:              MainnetChainID,
-		EthCompatibleChainID: EthMainnetChainID,
-		CrossTxEpoch:         big.NewInt(28),
-		CrossLinkEpoch:       big.NewInt(186),
-		StakingEpoch:         big.NewInt(186),
-		PreStakingEpoch:      big.NewInt(185),
-		QuickUnlockEpoch:     big.NewInt(191),
-		FiveSecondsEpoch:     big.NewInt(230),
-		TwoSecondsEpoch:      big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
-		SixtyPercentEpoch:    big.NewInt(434), // Around Friday Jan 29 2021, 10AM PST
-		RedelegationEpoch:    big.NewInt(290),
-		EIP155Epoch:          big.NewInt(28),
-		S3Epoch:              big.NewInt(28),
-		IstanbulEpoch:        big.NewInt(314),
-		ReceiptLogEpoch:      big.NewInt(101),
+		ChainID:                    MainnetChainID,
+		EthCompatibleChainID:       EthMainnetShard0ChainID,
+		EthCompatibleShard0ChainID: EthMainnetShard0ChainID,
+		EthCompatibleEpoch:         EpochTBD,
+		CrossTxEpoch:               big.NewInt(28),
+		CrossLinkEpoch:             big.NewInt(186),
+		StakingEpoch:               big.NewInt(186),
+		PreStakingEpoch:            big.NewInt(185),
+		QuickUnlockEpoch:           big.NewInt(191),
+		FiveSecondsEpoch:           big.NewInt(230),
+		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
+		SixtyPercentEpoch:          big.NewInt(434), // Around Friday Jan 29 2021, 10AM PST
+		RedelegationEpoch:          big.NewInt(290),
+		EIP155Epoch:                big.NewInt(28),
+		S3Epoch:                    big.NewInt(28),
+		IstanbulEpoch:              big.NewInt(314),
+		ReceiptLogEpoch:            big.NewInt(101),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:              TestnetChainID,
-		EthCompatibleChainID: EthTestnetChainID,
-		CrossTxEpoch:         big.NewInt(0),
-		CrossLinkEpoch:       big.NewInt(2),
-		StakingEpoch:         big.NewInt(2),
-		PreStakingEpoch:      big.NewInt(1),
-		QuickUnlockEpoch:     big.NewInt(0),
-		FiveSecondsEpoch:     big.NewInt(16500),
-		TwoSecondsEpoch:      big.NewInt(73000),
-		SixtyPercentEpoch:    big.NewInt(73280),
-		RedelegationEpoch:    big.NewInt(36500),
-		EIP155Epoch:          big.NewInt(0),
-		S3Epoch:              big.NewInt(0),
-		IstanbulEpoch:        big.NewInt(43800),
-		ReceiptLogEpoch:      big.NewInt(0),
+		ChainID:                    TestnetChainID,
+		EthCompatibleChainID:       EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		EthCompatibleEpoch:         EpochTBD,
+		CrossTxEpoch:               big.NewInt(0),
+		CrossLinkEpoch:             big.NewInt(2),
+		StakingEpoch:               big.NewInt(2),
+		PreStakingEpoch:            big.NewInt(1),
+		QuickUnlockEpoch:           big.NewInt(0),
+		FiveSecondsEpoch:           big.NewInt(16500),
+		TwoSecondsEpoch:            big.NewInt(73000),
+		SixtyPercentEpoch:          big.NewInt(73280),
+		RedelegationEpoch:          big.NewInt(36500),
+		EIP155Epoch:                big.NewInt(0),
+		S3Epoch:                    big.NewInt(0),
+		IstanbulEpoch:              big.NewInt(43800),
+		ReceiptLogEpoch:            big.NewInt(0),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
 	// All features except for CrossLink are enabled at launch.
 	PangaeaChainConfig = &ChainConfig{
-		ChainID:              PangaeaChainID,
-		EthCompatibleChainID: EthPangaeaChainID,
-		CrossTxEpoch:         big.NewInt(0),
-		CrossLinkEpoch:       big.NewInt(2),
-		StakingEpoch:         big.NewInt(2),
-		PreStakingEpoch:      big.NewInt(1),
-		QuickUnlockEpoch:     big.NewInt(0),
-		FiveSecondsEpoch:     big.NewInt(0),
-		TwoSecondsEpoch:      big.NewInt(0),
-		SixtyPercentEpoch:    big.NewInt(0),
-		RedelegationEpoch:    big.NewInt(0),
-		EIP155Epoch:          big.NewInt(0),
-		S3Epoch:              big.NewInt(0),
-		IstanbulEpoch:        big.NewInt(0),
-		ReceiptLogEpoch:      big.NewInt(0),
+		ChainID:                    PangaeaChainID,
+		EthCompatibleChainID:       EthPangaeaShard0ChainID,
+		EthCompatibleShard0ChainID: EthPangaeaShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
+		CrossTxEpoch:               big.NewInt(0),
+		CrossLinkEpoch:             big.NewInt(2),
+		StakingEpoch:               big.NewInt(2),
+		PreStakingEpoch:            big.NewInt(1),
+		QuickUnlockEpoch:           big.NewInt(0),
+		FiveSecondsEpoch:           big.NewInt(0),
+		TwoSecondsEpoch:            big.NewInt(0),
+		SixtyPercentEpoch:          big.NewInt(0),
+		RedelegationEpoch:          big.NewInt(0),
+		EIP155Epoch:                big.NewInt(0),
+		S3Epoch:                    big.NewInt(0),
+		IstanbulEpoch:              big.NewInt(0),
+		ReceiptLogEpoch:            big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
 	// All features except for CrossLink are enabled at launch.
 	PartnerChainConfig = &ChainConfig{
-		ChainID:              PartnerChainID,
-		EthCompatibleChainID: EthPartnerChainID,
-		CrossTxEpoch:         big.NewInt(0),
-		CrossLinkEpoch:       big.NewInt(2),
-		StakingEpoch:         big.NewInt(2),
-		PreStakingEpoch:      big.NewInt(1),
-		QuickUnlockEpoch:     big.NewInt(0),
-		FiveSecondsEpoch:     big.NewInt(0),
-		TwoSecondsEpoch:      big.NewInt(0),
-		SixtyPercentEpoch:    big.NewInt(0),
-		RedelegationEpoch:    big.NewInt(0),
-		EIP155Epoch:          big.NewInt(0),
-		S3Epoch:              big.NewInt(0),
-		IstanbulEpoch:        big.NewInt(0),
-		ReceiptLogEpoch:      big.NewInt(0),
+		ChainID:                    PartnerChainID,
+		EthCompatibleChainID:       EthPartnerShard0ChainID,
+		EthCompatibleShard0ChainID: EthPartnerShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
+		CrossTxEpoch:               big.NewInt(0),
+		CrossLinkEpoch:             big.NewInt(2),
+		StakingEpoch:               big.NewInt(2),
+		PreStakingEpoch:            big.NewInt(1),
+		QuickUnlockEpoch:           big.NewInt(0),
+		FiveSecondsEpoch:           big.NewInt(0),
+		TwoSecondsEpoch:            big.NewInt(0),
+		SixtyPercentEpoch:          big.NewInt(0),
+		RedelegationEpoch:          big.NewInt(0),
+		EIP155Epoch:                big.NewInt(0),
+		S3Epoch:                    big.NewInt(0),
+		IstanbulEpoch:              big.NewInt(0),
+		ReceiptLogEpoch:            big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
-		ChainID:              StressnetChainID,
-		EthCompatibleChainID: EthStressnetChainID,
-		CrossTxEpoch:         big.NewInt(0),
-		CrossLinkEpoch:       big.NewInt(2),
-		StakingEpoch:         big.NewInt(2),
-		PreStakingEpoch:      big.NewInt(1),
-		QuickUnlockEpoch:     big.NewInt(0),
-		FiveSecondsEpoch:     big.NewInt(0),
-		TwoSecondsEpoch:      big.NewInt(0),
-		SixtyPercentEpoch:    EpochTBD, // Never enable it for STN as STN has no external validator setup
-		RedelegationEpoch:    big.NewInt(0),
-		EIP155Epoch:          big.NewInt(0),
-		S3Epoch:              big.NewInt(0),
-		IstanbulEpoch:        big.NewInt(0),
-		ReceiptLogEpoch:      big.NewInt(0),
+		ChainID:                    StressnetChainID,
+		EthCompatibleChainID:       EthStressnetShard0ChainID,
+		EthCompatibleShard0ChainID: EthStressnetShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
+		CrossTxEpoch:               big.NewInt(0),
+		CrossLinkEpoch:             big.NewInt(2),
+		StakingEpoch:               big.NewInt(2),
+		PreStakingEpoch:            big.NewInt(1),
+		QuickUnlockEpoch:           big.NewInt(0),
+		FiveSecondsEpoch:           big.NewInt(0),
+		TwoSecondsEpoch:            big.NewInt(0),
+		SixtyPercentEpoch:          EpochTBD, // Never enable it for STN as STN has no external validator setup
+		RedelegationEpoch:          big.NewInt(0),
+		EIP155Epoch:                big.NewInt(0),
+		S3Epoch:                    big.NewInt(0),
+		IstanbulEpoch:              big.NewInt(0),
+		ReceiptLogEpoch:            big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:              TestnetChainID,
-		EthCompatibleChainID: EthTestnetChainID,
-		CrossTxEpoch:         big.NewInt(0),
-		CrossLinkEpoch:       big.NewInt(2),
-		StakingEpoch:         big.NewInt(2),
-		PreStakingEpoch:      big.NewInt(0),
-		QuickUnlockEpoch:     big.NewInt(0),
-		FiveSecondsEpoch:     big.NewInt(0),
-		TwoSecondsEpoch:      big.NewInt(3),
-		SixtyPercentEpoch:    EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		RedelegationEpoch:    big.NewInt(0),
-		EIP155Epoch:          big.NewInt(0),
-		S3Epoch:              big.NewInt(0),
-		IstanbulEpoch:        big.NewInt(0),
-		ReceiptLogEpoch:      big.NewInt(0),
+		ChainID:                    TestnetChainID,
+		EthCompatibleChainID:       EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
+		CrossTxEpoch:               big.NewInt(0),
+		CrossLinkEpoch:             big.NewInt(2),
+		StakingEpoch:               big.NewInt(2),
+		PreStakingEpoch:            big.NewInt(0),
+		QuickUnlockEpoch:           big.NewInt(0),
+		FiveSecondsEpoch:           big.NewInt(0),
+		TwoSecondsEpoch:            big.NewInt(3),
+		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		RedelegationEpoch:          big.NewInt(0),
+		EIP155Epoch:                big.NewInt(0),
+		S3Epoch:                    big.NewInt(0),
+		IstanbulEpoch:              big.NewInt(0),
+		ReceiptLogEpoch:            big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllProtocolChanges = &ChainConfig{
-		AllProtocolChangesChainID,    // ChainID
-		EthAllProtocolChangesChainID, // EthCompatibleChainID
-		big.NewInt(0),                // CrossTxEpoch
-		big.NewInt(0),                // CrossLinkEpoch
-		big.NewInt(0),                // StakingEpoch
-		big.NewInt(0),                // PreStakingEpoch
-		big.NewInt(0),                // QuickUnlockEpoch
-		big.NewInt(0),                // FiveSecondsEpoch
-		big.NewInt(0),                // TwoSecondsEpoch
-		big.NewInt(0),                // SixtyPercentEpoch
-		big.NewInt(0),                // RedelegationEpoch
-		big.NewInt(0),                // EIP155Epoch
-		big.NewInt(0),                // S3Epoch
-		big.NewInt(0),                // IstanbulEpoch
-		big.NewInt(0),                // ReceiptLogEpoch
+		AllProtocolChangesChainID,          // ChainID
+		EthAllProtocolChangesShard0ChainID, // EthCompatibleChainID
+		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),                      // EthCompatibleEpoch
+		big.NewInt(0),                      // CrossTxEpoch
+		big.NewInt(0),                      // CrossLinkEpoch
+		big.NewInt(0),                      // StakingEpoch
+		big.NewInt(0),                      // PreStakingEpoch
+		big.NewInt(0),                      // QuickUnlockEpoch
+		big.NewInt(0),                      // FiveSecondsEpoch
+		big.NewInt(0),                      // TwoSecondsEpoch
+		big.NewInt(0),                      // SixtyPercentEpoch
+		big.NewInt(0),                      // RedelegationEpoch
+		big.NewInt(0),                      // EIP155Epoch
+		big.NewInt(0),                      // S3Epoch
+		big.NewInt(0),                      // IstanbulEpoch
+		big.NewInt(0),                      // ReceiptLogEpoch
 	}
 
 	// TestChainConfig ...
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	TestChainConfig = &ChainConfig{
-		TestChainID,    // ChainID
-		EthTestChainID, // EthCompatibleChainID
-		big.NewInt(0),  // CrossTxEpoch
-		big.NewInt(0),  // CrossLinkEpoch
-		big.NewInt(0),  // StakingEpoch
-		big.NewInt(0),  // PreStakingEpoch
-		big.NewInt(0),  // QuickUnlockEpoch
-		big.NewInt(0),  // FiveSecondsEpoch
-		big.NewInt(0),  // TwoSecondsEpoch
-		big.NewInt(0),  // SixtyPercentEpoch
-		big.NewInt(0),  // RedelegationEpoch
-		big.NewInt(0),  // EIP155Epoch
-		big.NewInt(0),  // S3Epoch
-		big.NewInt(0),  // IstanbulEpoch
-		big.NewInt(0),  // ReceiptLogEpoch
+		TestChainID,          // ChainID
+		EthTestShard0ChainID, // EthCompatibleChainID
+		EthTestShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),        // EthCompatibleEpoch
+		big.NewInt(0),        // CrossTxEpoch
+		big.NewInt(0),        // CrossLinkEpoch
+		big.NewInt(0),        // StakingEpoch
+		big.NewInt(0),        // PreStakingEpoch
+		big.NewInt(0),        // QuickUnlockEpoch
+		big.NewInt(0),        // FiveSecondsEpoch
+		big.NewInt(0),        // TwoSecondsEpoch
+		big.NewInt(0),        // SixtyPercentEpoch
+		big.NewInt(0),        // RedelegationEpoch
+		big.NewInt(0),        // EIP155Epoch
+		big.NewInt(0),        // S3Epoch
+		big.NewInt(0),        // IstanbulEpoch
+		big.NewInt(0),        // ReceiptLogEpoch
 	}
 
 	// TestRules ...
@@ -220,6 +236,13 @@ type ChainConfig struct {
 
 	// EthCompatibleChainID identifies the chain id used for ethereum compatible transactions
 	EthCompatibleChainID *big.Int `json:"eth-compatible-chain-id"`
+
+	// EthCompatibleShard0ChainID identifies the shard 0 chain id used for ethereum compatible transactions
+	EthCompatibleShard0ChainID *big.Int `json:"eth-compatible-shard-0-chain-id"`
+
+	// EthCompatibleEpoch is the epoch where ethereum-compatible transaction starts being
+	// processed.
+	EthCompatibleEpoch *big.Int `json:"eth-compatible-epoch,omitempty"`
 
 	// CrossTxEpoch is the epoch where cross-shard transaction starts being
 	// processed.
@@ -304,6 +327,11 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
 }
 
+// IsEthCompatible determines whether it is ethereum compatible epoch
+func (c *ChainConfig) IsEthCompatible(epoch *big.Int) bool {
+	return isForked(c.EthCompatibleEpoch, epoch)
+}
+
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 	return isForked(c.StakingEpoch, epoch)
@@ -375,7 +403,7 @@ func UpdateEthChainIDByShard(shardID uint32) {
 
 // IsEthCompatible returns whether the chainID is for ethereum compatible txn or not
 func IsEthCompatible(chainID *big.Int) bool {
-	return chainID.Cmp(EthMainnetChainID) >= 0
+	return chainID.Cmp(EthMainnetShard0ChainID) >= 0
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
