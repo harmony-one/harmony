@@ -54,7 +54,7 @@ func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
 		cfg.ChainConfig = &params.ChainConfig{
 			ChainID:              big.NewInt(1),
-			EthCompatibleChainID: params.EthMainnetChainID,
+			EthCompatibleChainID: params.EthMainnetShard0ChainID,
 			CrossTxEpoch:         new(big.Int),
 			CrossLinkEpoch:       new(big.Int),
 			EIP155Epoch:          new(big.Int),

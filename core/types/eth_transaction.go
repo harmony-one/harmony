@@ -160,8 +160,8 @@ func (tx *EthTransaction) ToShardID() uint32 {
 }
 
 func (tx *EthTransaction) shardID() uint32 {
-	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
-	return uint32(tx.ChainID().Uint64() - ethChainID.Uint64())
+	ethChainIDBase := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+	return uint32(tx.ChainID().Uint64()-ethChainIDBase.Uint64()) + nodeconfig.GetDefaultConfig().ShardID
 }
 
 // ChainID returns which chain id this transaction was signed for (if at all)

@@ -279,7 +279,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		}
 		return err
 	}
-	return errors.New("shard do not match")
+	return errors.Errorf("shard do not match, txShard: %d, nodeShard: %d", newTx.ShardID(), node.NodeConfig.ShardID)
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
