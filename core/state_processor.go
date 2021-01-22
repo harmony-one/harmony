@@ -189,6 +189,9 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	var signer types.Signer
 	if tx.IsEthCompatible() {
+		if !config.IsEthCompatible(header.Epoch()) {
+			return nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
+		}
 		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
 	} else {
 		signer = types.MakeSigner(config, header.Epoch())

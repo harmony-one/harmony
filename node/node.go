@@ -193,6 +193,10 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
 			continue
 		}
+		if tx.IsEthCompatible() && !node.Blockchain().Config().IsEthCompatible(node.Blockchain().CurrentBlock().Epoch()) {
+			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
+			continue
+		}
 		poolTxs = append(poolTxs, tx)
 	}
 	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)

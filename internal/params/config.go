@@ -39,6 +39,7 @@ var (
 		ChainID:                    MainnetChainID,
 		EthCompatibleChainID:       EthMainnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthMainnetShard0ChainID,
+		EthCompatibleEpoch:         EpochTBD,
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
 		StakingEpoch:               big.NewInt(186),
@@ -59,6 +60,7 @@ var (
 		ChainID:                    TestnetChainID,
 		EthCompatibleChainID:       EthTestnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		EthCompatibleEpoch:         EpochTBD,
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
@@ -80,6 +82,7 @@ var (
 		ChainID:                    PangaeaChainID,
 		EthCompatibleChainID:       EthPangaeaShard0ChainID,
 		EthCompatibleShard0ChainID: EthPangaeaShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
@@ -101,6 +104,7 @@ var (
 		ChainID:                    PartnerChainID,
 		EthCompatibleChainID:       EthPartnerShard0ChainID,
 		EthCompatibleShard0ChainID: EthPartnerShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
@@ -122,6 +126,7 @@ var (
 		ChainID:                    StressnetChainID,
 		EthCompatibleChainID:       EthStressnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthStressnetShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
@@ -142,6 +147,7 @@ var (
 		ChainID:                    TestnetChainID,
 		EthCompatibleChainID:       EthTestnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
@@ -164,6 +170,7 @@ var (
 		AllProtocolChangesChainID,          // ChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
 		big.NewInt(0),                      // StakingEpoch
@@ -186,6 +193,7 @@ var (
 		TestChainID,          // ChainID
 		EthTestShard0ChainID, // EthCompatibleChainID
 		EthTestShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CrossLinkEpoch
 		big.NewInt(0),        // StakingEpoch
@@ -231,6 +239,10 @@ type ChainConfig struct {
 
 	// EthCompatibleShard0ChainID identifies the shard 0 chain id used for ethereum compatible transactions
 	EthCompatibleShard0ChainID *big.Int `json:"eth-compatible-shard-0-chain-id"`
+
+	// EthCompatibleEpoch is the epoch where ethereum-compatible transaction starts being
+	// processed.
+	EthCompatibleEpoch *big.Int `json:"eth-compatible-epoch,omitempty"`
 
 	// CrossTxEpoch is the epoch where cross-shard transaction starts being
 	// processed.
@@ -313,6 +325,11 @@ func (c *ChainConfig) AcceptsCrossTx(epoch *big.Int) bool {
 // cross-shard transaction fields.
 func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 	return isForked(c.CrossTxEpoch, epoch)
+}
+
+// IsEthCompatible determines whether it is ethereum compatible epoch
+func (c *ChainConfig) IsEthCompatible(epoch *big.Int) bool {
+	return isForked(c.EthCompatibleEpoch, epoch)
 }
 
 // IsStaking determines whether it is staking epoch
