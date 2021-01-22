@@ -277,12 +277,13 @@ func setupNodeAndRun(hc harmonyConfig) {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
 		os.Exit(1)
 	}
-	currentNode := setupConsensusAndNode(hc, nodeConfig)
-	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
-	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
+
+	currentNode := setupConsensusAndNode(hc, nodeConfig)
+	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
+	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)

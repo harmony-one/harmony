@@ -1,7 +1,10 @@
 package shardchain
 
 import (
+	"math/big"
 	"sync"
+
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -96,6 +99,12 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 			Msg("disable cache, running in archival mode")
 	}
 
+	chainConfig := *sc.chainConfig
+
+	if shardID == shard.BeaconChainShardID {
+		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
+		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
+	}
 	bc, err := core.NewBlockChain(
 		db, cacheConfig, sc.chainConfig, sc.engine, vm.Config{}, nil,
 	)

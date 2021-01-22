@@ -140,6 +140,7 @@ func (w *Worker) CommitTransactions(
 
 	// HARMONY TXNS
 	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
+
 	w.CommitSortedTransactions(normalTxns, coinbase)
 
 	// STAKING - only beaconchain process staking transaction

@@ -560,6 +560,9 @@ func NewTransactionsByPriceAndNonce(hmySigner Signer, ethSigner Signer, txs map[
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for from, accTxs := range txs {
+		if accTxs.Len() == 0 {
+			continue
+		}
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
 		signer := hmySigner
@@ -593,6 +596,9 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
+	if len(t.heads) == 0 {
+		return
+	}
 	signer := t.signer
 	if t.heads[0].IsEthCompatible() {
 		signer = t.ethSigner

@@ -78,6 +78,11 @@ func (s *PublicPoolService) SendRawTransaction(
 	// Log submission
 	if tx.To() == nil {
 		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
+		ethSigner := types.NewEIP155Signer(s.hmy.ChainConfig().EthCompatibleChainID)
+
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
 		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err
@@ -91,6 +96,7 @@ func (s *PublicPoolService) SendRawTransaction(
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
 			Str("recipient", tx.To().Hex()).
+			Interface("tx", tx).
 			Msg("Submitted transaction")
 	}
 
