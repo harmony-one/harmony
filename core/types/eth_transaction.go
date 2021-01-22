@@ -359,7 +359,7 @@ func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 
 // WithSignature returns a new transaction with the given signature.
 // This signature needs to be in the [R || S || V] format where V is 0 or 1.
-func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (InternalTransaction, error) {
+func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (*EthTransaction, error) {
 	r, s, v, err := signer.SignatureValues(tx, sig)
 	if err != nil {
 		return nil, err
