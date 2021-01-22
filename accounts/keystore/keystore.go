@@ -237,6 +237,23 @@ func (ks *KeyStore) SignTx(a accounts.Account, tx *types.Transaction, chainID *b
 	return types.SignTx(tx, types.HomesteadSigner{}, unlockedKey.PrivateKey)
 }
 
+// SignEthTx signs the given transaction with the requested account.
+func (ks *KeyStore) SignEthTx(a accounts.Account, tx *types.EthTransaction, chainID *big.Int) (*types.EthTransaction, error) {
+	// Look up the key to sign with and abort if it cannot be found
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	unlockedKey, found := ks.unlocked[a.Address]
+	if !found {
+		return nil, ErrLocked
+	}
+	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	if chainID != nil {
+		return types.SignEthTx(tx, types.NewEIP155Signer(chainID), unlockedKey.PrivateKey)
+	}
+	return types.SignEthTx(tx, types.HomesteadSigner{}, unlockedKey.PrivateKey)
+}
+
 // SignHashWithPassphrase signs hash if the private key matching the given address
 // can be decrypted with the given passphrase. The produced signature is in the
 // [R || S || V] format where V is 0 or 1.
@@ -277,6 +294,22 @@ func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, 
 		return types.SignTx(tx, types.NewEIP155Signer(chainID), key.PrivateKey)
 	}
 	return types.SignTx(tx, types.HomesteadSigner{}, key.PrivateKey)
+}
+
+// SignEthTxWithPassphrase signs the transaction if the private key matching the
+// given address can be decrypted with the given passphrase.
+func (ks *KeyStore) SignEthTxWithPassphrase(a accounts.Account, passphrase string, tx *types.EthTransaction, chainID *big.Int) (*types.EthTransaction, error) {
+	_, key, err := ks.GetDecryptedKey(a, passphrase)
+	if err != nil {
+		return nil, err
+	}
+	defer zeroKey(key.PrivateKey)
+
+	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	if chainID != nil {
+		return types.SignEthTx(tx, types.NewEIP155Signer(chainID), key.PrivateKey)
+	}
+	return types.SignEthTx(tx, types.HomesteadSigner{}, key.PrivateKey)
 }
 
 // Unlock unlocks the given account indefinitely.
