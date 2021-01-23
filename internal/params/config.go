@@ -47,7 +47,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(191),
 		FiveSecondsEpoch:           big.NewInt(230),
 		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
-		SixtyPercentEpoch:          big.NewInt(434), // Around Friday Jan 29 2021, 10AM PST
+		SixtyPercentEpoch:          EpochTBD,
 		RedelegationEpoch:          big.NewInt(290),
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
@@ -68,7 +68,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(16500),
 		TwoSecondsEpoch:            big.NewInt(73000),
-		SixtyPercentEpoch:          big.NewInt(73280),
+		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
