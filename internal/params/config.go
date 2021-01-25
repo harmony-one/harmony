@@ -60,7 +60,7 @@ var (
 		ChainID:                    TestnetChainID,
 		EthCompatibleChainID:       EthTestnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
-		EthCompatibleEpoch:         EpochTBD,
+		EthCompatibleEpoch:         big.NewInt(73290),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
 		StakingEpoch:               big.NewInt(2),
