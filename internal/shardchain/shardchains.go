@@ -106,7 +106,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
 	}
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, sc.chainConfig, sc.engine, vm.Config{}, nil,
+		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
