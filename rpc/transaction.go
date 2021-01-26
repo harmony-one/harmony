@@ -18,6 +18,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -173,7 +174,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 
 	// Format the response according to the version
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		tx, err := v1.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
@@ -181,6 +182,12 @@ func (s *PublicTransactionService) GetTransactionByHash(
 		return NewStructuredResponse(tx)
 	case V2:
 		tx, err := v2.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +220,7 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 	}
 
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		tx, err := v1.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
@@ -402,7 +409,7 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -410,6 +417,12 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 		return NewStructuredResponse(tx)
 	case V2:
 		tx, err := v2.NewTransactionFromBlockIndex(block, uint64(index))
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -435,7 +448,7 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		tx, err := v1.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -443,6 +456,12 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 		return NewStructuredResponse(tx)
 	case V2:
 		tx, err := v2.NewTransactionFromBlockIndex(block, uint64(index))
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
 		}
@@ -526,7 +545,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -608,7 +627,7 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 	// Format response according to version
 	var RPCReceipt interface{}
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		if tx == nil {
 			RPCReceipt, err = v1.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
@@ -623,6 +642,16 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 			RPCReceipt, err = v2.NewReceipt(stx, blockHash, blockNumber, index, receipt)
 		} else {
 			RPCReceipt, err = v2.NewReceipt(tx, blockHash, blockNumber, index, receipt)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipt)
+	case Eth:
+		if tx == nil {
+			RPCReceipt, err = eth.NewReceipt(stx, blockHash, blockNumber, index, receipt)
+		} else {
+			RPCReceipt, err = eth.NewReceipt(tx, blockHash, blockNumber, index, receipt)
 		}
 		if err != nil {
 			return nil, err
