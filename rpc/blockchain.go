@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
@@ -150,16 +151,19 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 	var rpcBlock interface{}
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
 		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+	case Eth:
+		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	response, err = NewStructuredResponse(rpcBlock)
 	if err != nil {
 		return nil, err
@@ -171,6 +175,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			response[field] = nil
 		}
 	}
+
 	return response, err
 }
 
@@ -207,10 +212,12 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
 	var rpcBlock interface{}
 	switch s.version {
-	case V1, Eth:
+	case V1:
 		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
 	case V2:
 		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+	case Eth:
+		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}

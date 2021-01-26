@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 )
@@ -34,15 +35,16 @@ const (
 	// WSPortOffset ..
 	WSPortOffset = 800
 
-	netV1Namespace = "net"
+	netNamespace   = "net"
+	netV1Namespace = "netv1"
 	netV2Namespace = "netv2"
 )
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netV1Namespace, netV2Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netV1Namespace, netV2Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -140,7 +142,7 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		NewPublicTracerAPI(hmy, Debug),
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
-		v1.NewPublicLegacyAPI(hmy, "eth"),
+		eth.NewPublicEthService(hmy, "eth"),
 		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
 	}
 

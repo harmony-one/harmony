@@ -16,6 +16,7 @@ import (
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -184,7 +185,7 @@ func (s *PublicPoolService) PendingTransactions(
 		if plainTx, ok := pending[i].(*types.Transaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1, Eth:
+			case V1:
 				tx, err = v1.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
@@ -194,6 +195,14 @@ func (s *PublicPoolService) PendingTransactions(
 				}
 			case V2:
 				tx, err = v2.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
+				if err != nil {
+					utils.Logger().Debug().
+						Err(err).
+						Msgf("%v error at %v", LogTag, "PendingTransactions")
+					continue // Legacy behavior is to not return error here
+				}
+			case Eth:
+				tx, err = eth.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
@@ -239,7 +248,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 		} else if stakingTx, ok := pending[i].(*staking.StakingTransaction); ok {
 			var tx interface{}
 			switch s.version {
-			case V1, Eth:
+			case V1:
 				tx, err = v1.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
