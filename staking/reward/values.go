@@ -1,6 +1,7 @@
 package reward
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -32,8 +33,8 @@ var (
 		big.NewInt(7*denominations.Nano), big.NewInt(denominations.Nano),
 	))
 	// TotalPreStakingTokens is the total amount of tokens in the network at the the last block of the
-	// pre-staking era (epoch < staking epoch). This should be set/change on the node's init according
-	// to the core.GenesisSpec.
+	// pre-staking era (epoch < staking epoch).
+	// This should be set/change on the node's init according to the core.GenesisSpec.
 	TotalPreStakingTokens = numeric.NewDecFromBigInt(
 		new(big.Int).Mul(big.NewInt(12600000000), big.NewInt(denominations.One)),
 	)
@@ -48,6 +49,28 @@ var (
 
 	once sync.Once
 )
+
+// getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
+// in the pre-staking era (epoch < staking epoch).
+func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *big.Int) *big.Int {
+	lastBlockInEpoch := blockNum
+
+	switch id {
+	case shardingconfig.MainNet:
+		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.MainnetSchedule.EpochLastBlock(
+			params.MainnetChainConfig.StakingEpoch.Uint64() - 1,
+		))
+	case shardingconfig.TestNet:
+		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
+			params.TestChainConfig.StakingEpoch.Uint64() - 1,
+		))
+	}
+
+	if blockNum.Cmp(lastBlockInEpoch) == 1 {
+		blockNum = lastBlockInEpoch
+	}
+	return new(big.Int).Mul(PreStakedBlocks, blockNum)
+}
 
 // WARNING: the data collected here are calculated from a consumer of the Rosetta API.
 // If data becomes mission critical, implement a cross-link based approach.
@@ -73,28 +96,7 @@ var (
 	}
 )
 
-// getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
-// in the pre-staking era (epoch < staking epoch).
-func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *big.Int) *big.Int {
-	lastBlockInEpoch := blockNum
-
-	switch id {
-	case shardingconfig.MainNet:
-		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.MainnetSchedule.EpochLastBlock(
-			params.MainnetChainConfig.StakingEpoch.Uint64() - 1,
-		))
-	case shardingconfig.TestNet:
-		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
-			params.TestChainConfig.StakingEpoch.Uint64() - 1,
-		))
-	}
-
-	if blockNum.Cmp(lastBlockInEpoch) == 1 {
-		blockNum = lastBlockInEpoch
-	}
-	return new(big.Int).Mul(PreStakedBlocks, blockNum)
-}
-
+// getTotalPreStakingNetworkRewards for given NetworkID
 func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {
 	totalRewards := big.NewInt(0)
 	if allRewards, ok := totalPreStakingNetworkRewards[id]; ok {
@@ -105,14 +107,27 @@ func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {
 	return totalRewards
 }
 
-// GetTotalTokens in the network. If it is not staking era or it is not beacon chain, best
-// value that can be returned in the total tokens prior to the staking epoch, i.e: TotalPreStakingTokens.
-func GetTotalTokens(chain engine.ChainReader) numeric.Dec {
-	if chain.ShardID() != shard.BeaconChainShardID || !chain.Config().IsStaking(chain.CurrentHeader().Epoch()) {
-		return TotalPreStakingTokens
+// GetTotalTokens in the network for all shards.
+// This can only be computed with beaconchain if in staking era.
+// If not in staking era, returns the rewards given out by the start of staking era.
+func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
+	if TotalPreStakingTokens.Int == nil {
+		return numeric.Dec{}, fmt.Errorf("TotalPreStakingTokens was not initialized")
 	}
-	// TODO: implement reading accumulator and adding it to TotalPreStakingTokens...
-	return numeric.Dec{}
+
+	currHeader := chain.CurrentHeader()
+	if !chain.Config().IsStaking(currHeader.Epoch()) {
+		return TotalPreStakingTokens, nil
+	}
+	if chain.ShardID() != shard.BeaconChainShardID {
+		return numeric.Dec{}, fmt.Errorf("beaconchain needed to compute rewards in staking era")
+	}
+
+	stakingRewards, err := chain.ReadBlockRewardAccumulator(currHeader.Number().Uint64())
+	if err != nil {
+		return numeric.Dec{}, err
+	}
+	return numeric.NewDecFromBigInt(new(big.Int).Add(stakingRewards, TotalPreStakingTokens.Int)), nil
 }
 
 // SetTotalPreStakingTokens with the given initial tokens (from genesis).
