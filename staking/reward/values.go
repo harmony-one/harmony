@@ -3,7 +3,6 @@ package reward
 import (
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -35,9 +34,7 @@ var (
 	// TotalPreStakingTokens is the total amount of tokens in the network at the the last block of the
 	// pre-staking era (epoch < staking epoch).
 	// This should be set/change on the node's init according to the core.GenesisSpec.
-	TotalPreStakingTokens = numeric.NewDecFromBigInt(
-		new(big.Int).Mul(big.NewInt(12600000000), big.NewInt(denominations.One)),
-	)
+	TotalPreStakingTokens = numeric.Dec{Int: big.NewInt(0)}
 	// None ..
 	None = big.NewInt(0)
 
@@ -46,12 +43,13 @@ var (
 	testnetLastPreStakingBlock = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
 		params.TestnetChainConfig.StakingEpoch.Uint64() - 1,
 	))
-
-	once sync.Once
 )
 
 // getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
 // in the pre-staking era (epoch < staking epoch).
+//
+// WARNING: This assumes beacon chain is at most the same block height as another shard in the
+// transition from pre-staking to staking era/epoch.
 func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *big.Int) *big.Int {
 	lastBlockInEpoch := blockNum
 
@@ -88,6 +86,7 @@ var (
 			getPreStakingRewardsFromBlockNumber(shardingconfig.MainNet, big.NewInt(3313572)),
 		},
 		shardingconfig.TestNet: {
+			// Below are all of the placeholders 'last blocks' of pre-staking era for testnet.
 			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
 			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
 			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
@@ -131,10 +130,7 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 }
 
 // SetTotalPreStakingTokens with the given initial tokens (from genesis).
-// Warning: May result in an inaccurate number if network is not in the staking era.
 func SetTotalPreStakingTokens(initTokens *big.Int) {
-	once.Do(func() {
-		totalTokens := new(big.Int).Add(initTokens, getTotalPreStakingNetworkRewards(shard.Schedule.GetNetworkID()))
-		TotalPreStakingTokens = numeric.NewDecFromBigInt(totalTokens)
-	})
+	totalTokens := new(big.Int).Add(initTokens, getTotalPreStakingNetworkRewards(shard.Schedule.GetNetworkID()))
+	TotalPreStakingTokens = numeric.NewDecFromBigInt(totalTokens)
 }
