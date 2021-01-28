@@ -1,10 +1,11 @@
 package reward
 
 import (
-	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
-	"github.com/harmony-one/harmony/numeric"
 	"math/big"
 	"testing"
+
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/numeric"
 )
 
 func TestFiveSecondsBaseStakedReward(t *testing.T) {
