@@ -69,7 +69,7 @@ func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *
 		))
 	case shardingconfig.TestNet:
 		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
-			params.TestChainConfig.StakingEpoch.Uint64() - 1,
+			params.TestnetChainConfig.StakingEpoch.Uint64() - 1,
 		))
 	case shardingconfig.LocalNet:
 		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.LocalnetSchedule.EpochLastBlock(
@@ -145,7 +145,7 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 	if err != nil {
 		return numeric.Dec{}, err
 	}
-	return numeric.NewDecFromBigInt(new(big.Int).Add(stakingRewards, TotalPreStakingTokens.Int)), nil
+	return TotalPreStakingTokens.Add(numeric.NewDecFromBigInt(stakingRewards)), nil
 }
 
 // SetTotalPreStakingTokens with the given initial tokens (from genesis).
