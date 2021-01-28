@@ -26,13 +26,13 @@ func TestFiveSecondsBaseStakedReward(t *testing.T) {
 }
 
 func TestGetPreStakingRewardsFromBlockNumber(t *testing.T) {
-	refMainnetRewards, _ := new(big.Int).SetString("319237560000000000000000000", 10)
+	refMainnetRewards, _ := new(big.Int).SetString("319237464000000000000000000", 10)
 	mainnetRewards := getTotalPreStakingNetworkRewards(shardingconfig.MainNet)
 	if refMainnetRewards.Cmp(mainnetRewards) != 0 {
 		t.Errorf("Expected mainnet rewards to be %v NOT %v", refMainnetRewards, mainnetRewards)
 	}
 
-	refTestnetRewards, _ := new(big.Int).SetString("7200000000000000000000", 10)
+	refTestnetRewards, _ := new(big.Int).SetString("7104000000000000000000", 10)
 	testnetRewards := getTotalPreStakingNetworkRewards(shardingconfig.TestNet)
 	if refTestnetRewards.Cmp(testnetRewards) != 0 {
 		t.Errorf("Expected testnet rewards to be %v NOT %v", refTestnetRewards, testnetRewards)
