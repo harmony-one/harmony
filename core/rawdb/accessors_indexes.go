@@ -112,7 +112,14 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		return nil, common.Hash{}, 0, 0
 	}
 	tx := body.TransactionAt(int(txIndex))
-	if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
+	var hashBytes []byte
+	if tx.IsEthCompatible() {
+		ethTxn := tx.ConvertToEth()
+		hashBytes = ethTxn.Hash().Bytes()
+	} else {
+		hashBytes = tx.Hash().Bytes()
+	}
+	if tx == nil || !bytes.Equal(hash.Bytes(), hashBytes) {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
