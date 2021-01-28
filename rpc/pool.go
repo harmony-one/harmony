@@ -94,11 +94,13 @@ func (s *PublicPoolService) SendRawTransaction(
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("contract", common2.MustAddressToBech32(addr)).
 			Msg("Submitted contract creation")
 	} else {
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("recipient", tx.To().Hex()).
 			Interface("tx", tx).
 			Msg("Submitted transaction")

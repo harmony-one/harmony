@@ -82,10 +82,7 @@ func TestLookupStorage(t *testing.T) {
 	}
 
 	for i, tx := range txs {
-		txnHash := tx.Hash()
-		if tx.IsEthCompatible() {
-			txnHash = tx.ConvertToEth().Hash()
-		}
+		txnHash := tx.HashByType()
 		if txn, hash, number, index := ReadTransaction(db, txnHash); txn == nil {
 			t.Fatalf("tx #%d [%x]: transaction not found", i, tx.Hash())
 		} else {
