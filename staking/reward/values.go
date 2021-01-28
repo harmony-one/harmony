@@ -32,8 +32,8 @@ var (
 		big.NewInt(7*denominations.Nano), big.NewInt(denominations.Nano),
 	))
 
-	// TotalPreStakingTokens is the total amount of tokens in the network at the the last block of the
-	// pre-staking era (epoch < staking epoch).
+	// TotalPreStakingTokens is the total amount of tokens (in ONE) in the network at the
+	// the last block of the pre-staking era (epoch < staking epoch).
 	// This should be set/change on the node's init according to the core.GenesisSpec.
 	TotalPreStakingTokens = numeric.Dec{Int: big.NewInt(0)}
 
@@ -145,11 +145,11 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 	if err != nil {
 		return numeric.Dec{}, err
 	}
-	return TotalPreStakingTokens.Add(numeric.NewDecFromBigInt(stakingRewards)), nil
+	return TotalPreStakingTokens.Add(numeric.Dec{Int: stakingRewards}), nil
 }
 
 // SetTotalPreStakingTokens with the given initial tokens (from genesis).
 func SetTotalPreStakingTokens(initTokens *big.Int) {
 	totalTokens := new(big.Int).Add(initTokens, getTotalPreStakingNetworkRewards(shard.Schedule.GetNetworkID()))
-	TotalPreStakingTokens = numeric.NewDecFromBigInt(totalTokens)
+	TotalPreStakingTokens = numeric.Dec{Int: totalTokens}
 }
