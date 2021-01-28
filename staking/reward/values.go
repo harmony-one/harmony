@@ -31,26 +31,35 @@ var (
 	TwoSecStakedBlocks = numeric.NewDecFromBigInt(new(big.Int).Mul(
 		big.NewInt(7*denominations.Nano), big.NewInt(denominations.Nano),
 	))
+
 	// TotalPreStakingTokens is the total amount of tokens in the network at the the last block of the
 	// pre-staking era (epoch < staking epoch).
 	// This should be set/change on the node's init according to the core.GenesisSpec.
 	TotalPreStakingTokens = numeric.Dec{Int: big.NewInt(0)}
+
 	// None ..
 	None = big.NewInt(0)
 
-	// testnetLastPreStakingBlock according to beacon-chain logic.
-	// May result in inaccuracies for testnet calc involving total tokens.
-	testnetLastPreStakingBlock = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
-		params.TestnetChainConfig.StakingEpoch.Uint64() - 1,
-	))
+	// ErrTotalPreStakingTokens if TotalPreStakingTokens was not initialized
+	ErrTotalPreStakingTokens = fmt.Errorf("TotalPreStakingTokens was not initialized")
+	// ErrInvalidBeaconChain if given chain is not beacon chain
+	ErrInvalidBeaconChain = fmt.Errorf("given chain is not beaconchain")
 )
 
 // getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
 // in the pre-staking era (epoch < staking epoch).
 //
+// If the block number is > than the last block of an epoch, the last block of the epoch is
+// used for the calculation by default.
+//
 // WARNING: This assumes beacon chain is at most the same block height as another shard in the
 // transition from pre-staking to staking era/epoch.
 func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *big.Int) *big.Int {
+	if blockNum.Cmp(big.NewInt(2)) == -1 {
+		// block 0 & 1 does not contain block rewards
+		return big.NewInt(0)
+	}
+
 	lastBlockInEpoch := blockNum
 
 	switch id {
@@ -62,12 +71,17 @@ func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *
 		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.TestnetSchedule.EpochLastBlock(
 			params.TestChainConfig.StakingEpoch.Uint64() - 1,
 		))
+	case shardingconfig.LocalNet:
+		lastBlockInEpoch = new(big.Int).SetUint64(shardingconfig.LocalnetSchedule.EpochLastBlock(
+			params.LocalnetChainConfig.StakingEpoch.Uint64() - 1,
+		))
 	}
 
 	if blockNum.Cmp(lastBlockInEpoch) == 1 {
 		blockNum = lastBlockInEpoch
 	}
-	return new(big.Int).Mul(PreStakedBlocks, blockNum)
+
+	return new(big.Int).Mul(PreStakedBlocks, new(big.Int).Sub(blockNum, big.NewInt(1)))
 }
 
 // WARNING: the data collected here are calculated from a consumer of the Rosetta API.
@@ -87,10 +101,15 @@ var (
 		},
 		shardingconfig.TestNet: {
 			// Below are all of the placeholders 'last blocks' of pre-staking era for testnet.
-			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
-			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
-			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
-			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, testnetLastPreStakingBlock),
+			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
+			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
+			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
+			getPreStakingRewardsFromBlockNumber(shardingconfig.TestNet, big.NewInt(999999)),
+		},
+		shardingconfig.LocalNet: {
+			// Below are all of the placeholders 'last blocks' of pre-staking era for localnet.
+			getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
+			getPreStakingRewardsFromBlockNumber(shardingconfig.LocalNet, big.NewInt(999999)),
 		},
 	}
 )
@@ -111,7 +130,7 @@ func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {
 // If not in staking era, returns the rewards given out by the start of staking era.
 func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 	if TotalPreStakingTokens.Int == nil {
-		return numeric.Dec{}, fmt.Errorf("TotalPreStakingTokens was not initialized")
+		return numeric.Dec{}, ErrTotalPreStakingTokens
 	}
 
 	currHeader := chain.CurrentHeader()
@@ -119,7 +138,7 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 		return TotalPreStakingTokens, nil
 	}
 	if chain.ShardID() != shard.BeaconChainShardID {
-		return numeric.Dec{}, fmt.Errorf("total tokens can only be computed on beaconchain in steaking era")
+		return numeric.Dec{}, ErrInvalidBeaconChain
 	}
 
 	stakingRewards, err := chain.ReadBlockRewardAccumulator(currHeader.Number().Uint64())
