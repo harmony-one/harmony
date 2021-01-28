@@ -51,18 +51,21 @@ func (s *PublicPoolService) SendRawTransaction(
 	}
 
 	var tx *types.Transaction
+	var txHash common.Hash
 
 	if s.version == Eth {
 		ethTx := new(types.EthTransaction)
 		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
 			return common.Hash{}, err
 		}
+		txHash = ethTx.Hash()
 		tx = ethTx.ConvertToHmy()
 	} else {
 		tx = new(types.Transaction)
 		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 			return common.Hash{}, err
 		}
+		txHash = tx.Hash()
 	}
 
 	// Verify chainID
@@ -102,7 +105,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	}
 
 	// Response output is the same for all versions
-	return tx.Hash(), nil
+	return txHash, nil
 }
 
 func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
