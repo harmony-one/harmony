@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -19,10 +20,7 @@ import (
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
-)
-
-const (
-	initSupply = int64(12600000000)
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
@@ -617,18 +615,37 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 func (s *PublicBlockchainService) GetTotalSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply), nil
+	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
-// GetCirculatingSupply ..
+// GetCirculatingSupply using the following formula:
+// (initialSupply * percentReleased) + injectedNetworkRewards
+//
+// WARNING: only works on beaconchain if in staking era. If not in staking era, then
+// pre-staking era 'injectedNetworkRewards' are NOT considered (for precision reasons).
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	timestamp := time.Now()
+	totalSupply, err := stakingReward.GetTotalTokens(s.hmy.BlockChain)
+	if err != nil {
+		return numeric.Dec{}, err
+	}
 
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+	initSupply, timestamp := big.NewInt(0), time.Now()
+	currHeader := s.hmy.BlockChain.CurrentHeader()
+	numShards := shard.Schedule.InstanceForEpoch(currHeader.Epoch()).NumShards()
+	for i := uint32(0); i < numShards; i++ {
+		initSupply = new(big.Int).Add(core.GetInitialFunds(i), initSupply)
+	}
+
+	releasedInitSupply := numeric.NewDecFromBigInt(initSupply).Mul(
+		reward.PercentageForTimeStamp(timestamp.Unix()),
+	)
+	injectedNetworkRewards := totalSupply.Sub(numeric.NewDecFromBigInt(initSupply))
+	if !s.hmy.IsStakingEpoch(currHeader.Epoch()) {
+		injectedNetworkRewards = numeric.NewDec(0)
+	}
+	return releasedInitSupply.Add(injectedNetworkRewards), nil
 }
 
 // GetStakingNetworkInfo ..

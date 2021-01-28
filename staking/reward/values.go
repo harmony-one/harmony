@@ -119,7 +119,7 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 		return TotalPreStakingTokens, nil
 	}
 	if chain.ShardID() != shard.BeaconChainShardID {
-		return numeric.Dec{}, fmt.Errorf("beaconchain needed to compute rewards in staking era")
+		return numeric.Dec{}, fmt.Errorf("total tokens can only be computed on beaconchain in steaking era")
 	}
 
 	stakingRewards, err := chain.ReadBlockRewardAccumulator(currHeader.Number().Uint64())
