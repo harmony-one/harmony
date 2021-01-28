@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/consensus/reward"
-	"github.com/harmony-one/harmony/core"
+
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -618,34 +617,11 @@ func (s *PublicBlockchainService) GetTotalSupply(
 	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
-// GetCirculatingSupply using the following formula:
-// (initialSupply * percentReleased) + injectedNetworkRewards
-//
-// WARNING: only works on beaconchain if in staking era. If not in staking era, then
-// pre-staking era 'injectedNetworkRewards' are NOT considered (for precision reasons).
+// GetCirculatingSupply ...
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	totalSupply, err := stakingReward.GetTotalTokens(s.hmy.BlockChain)
-	if err != nil {
-		return numeric.Dec{}, err
-	}
-
-	initSupply, timestamp := big.NewInt(0), time.Now()
-	currHeader := s.hmy.BlockChain.CurrentHeader()
-	numShards := shard.Schedule.InstanceForEpoch(currHeader.Epoch()).NumShards()
-	for i := uint32(0); i < numShards; i++ {
-		initSupply = new(big.Int).Add(core.GetInitialFunds(i), initSupply)
-	}
-
-	releasedInitSupply := numeric.NewDecFromBigInt(initSupply).Mul(
-		reward.PercentageForTimeStamp(timestamp.Unix()),
-	)
-	injectedNetworkRewards := totalSupply.Sub(numeric.NewDecFromBigInt(initSupply))
-	if !s.hmy.IsStakingEpoch(currHeader.Epoch()) {
-		injectedNetworkRewards = numeric.NewDec(0)
-	}
-	return releasedInitSupply.Add(injectedNetworkRewards), nil
+	return chain.GetCirculatingSupply(ctx, s.hmy.BlockChain)
 }
 
 // GetStakingNetworkInfo ..
