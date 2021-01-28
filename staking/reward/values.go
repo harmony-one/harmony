@@ -47,7 +47,7 @@ var (
 )
 
 // getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
-// in the pre-staking era (epoch < staking epoch).
+// in the pre-staking era (epoch < staking epoch) in ATTO.
 //
 // If the block number is > than the last block of an epoch, the last block of the epoch is
 // used for the calculation by default.
@@ -91,7 +91,7 @@ func getPreStakingRewardsFromBlockNumber(id shardingconfig.NetworkID, blockNum *
 //
 // TODO (dm): use first crosslink of all shards to compute rewards on network instead of relying on constants.
 var (
-	totalPreStakingNetworkRewards = map[shardingconfig.NetworkID][]*big.Int{
+	totalPreStakingNetworkRewardsInAtto = map[shardingconfig.NetworkID][]*big.Int{
 		shardingconfig.MainNet: {
 			// Below are all of the last blocks of pre-staking era for mainnet.
 			getPreStakingRewardsFromBlockNumber(shardingconfig.MainNet, big.NewInt(3375103)),
@@ -114,10 +114,10 @@ var (
 	}
 )
 
-// getTotalPreStakingNetworkRewards for given NetworkID
+// getTotalPreStakingNetworkRewards in ATTO for given NetworkID
 func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {
 	totalRewards := big.NewInt(0)
-	if allRewards, ok := totalPreStakingNetworkRewards[id]; ok {
+	if allRewards, ok := totalPreStakingNetworkRewardsInAtto[id]; ok {
 		for _, reward := range allRewards {
 			totalRewards = new(big.Int).Add(reward, totalRewards)
 		}
@@ -125,7 +125,7 @@ func getTotalPreStakingNetworkRewards(id shardingconfig.NetworkID) *big.Int {
 	return totalRewards
 }
 
-// GetTotalTokens in the network for all shards.
+// GetTotalTokens in the network for all shards in ONE.
 // This can only be computed with beaconchain if in staking era.
 // If not in staking era, returns the rewards given out by the start of staking era.
 func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
@@ -145,11 +145,11 @@ func GetTotalTokens(chain engine.ChainReader) (numeric.Dec, error) {
 	if err != nil {
 		return numeric.Dec{}, err
 	}
-	return TotalPreStakingTokens.Add(numeric.Dec{Int: stakingRewards}), nil
+	return TotalPreStakingTokens.Add(numeric.NewDecFromBigIntWithPrec(stakingRewards, 18)), nil
 }
 
-// SetTotalPreStakingTokens with the given initial tokens (from genesis).
-func SetTotalPreStakingTokens(initTokens *big.Int) {
-	totalTokens := new(big.Int).Add(initTokens, getTotalPreStakingNetworkRewards(shard.Schedule.GetNetworkID()))
-	TotalPreStakingTokens = numeric.Dec{Int: totalTokens}
+// SetTotalPreStakingTokens with the given initial tokens (from genesis in ATTO).
+func SetTotalPreStakingTokens(initTokensAsAtto *big.Int) {
+	totalTokens := new(big.Int).Add(initTokensAsAtto, getTotalPreStakingNetworkRewards(shard.Schedule.GetNetworkID()))
+	TotalPreStakingTokens = numeric.NewDecFromBigIntWithPrec(totalTokens, 18)
 }

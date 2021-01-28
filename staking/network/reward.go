@@ -125,7 +125,7 @@ func WhatPercentStakedNow(
 		return nil, nil, err
 	}
 
-	dole := numeric.NewDecFromBigInt(soFarDoledOut)
+	dole := numeric.NewDecFromBigIntWithPrec(soFarDoledOut, 18)
 
 	for _, electedValAdr := range active.StakedValidators().Addrs {
 		wrapper, err := beaconchain.ReadValidatorInformation(electedValAdr)
@@ -133,7 +133,7 @@ func WhatPercentStakedNow(
 			return nil, nil, err
 		}
 		stakedNow = stakedNow.Add(
-			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
+			numeric.NewDecFromBigIntWithPrec(wrapper.TotalDelegation(), 18),
 		)
 	}
 	percentage := stakedNow.Quo(stakingReward.TotalPreStakingTokens.Mul(
