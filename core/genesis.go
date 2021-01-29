@@ -42,6 +42,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 )
@@ -328,4 +329,24 @@ func (g *Genesis) MustCommit(db ethdb.Database) *types.Block {
 		panic(err)
 	}
 	return block
+}
+
+// GetGenesisSpec for a given shard
+func GetGenesisSpec(shardID uint32) *Genesis {
+	if shard.Schedule.GetNetworkID() == shardingconfig.MainNet {
+		return NewGenesisSpec(nodeconfig.Mainnet, shardID)
+	}
+	if shard.Schedule.GetNetworkID() == shardingconfig.LocalNet {
+		return NewGenesisSpec(nodeconfig.Localnet, shardID)
+	}
+	return NewGenesisSpec(nodeconfig.Testnet, shardID)
+}
+
+// GetInitialFunds for a given shard
+func GetInitialFunds(shardID uint32) *big.Int {
+	spec, total := GetGenesisSpec(shardID), big.NewInt(0)
+	for _, account := range spec.Alloc {
+		total = new(big.Int).Add(account.Balance, total)
+	}
+	return total
 }

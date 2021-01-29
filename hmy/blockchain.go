@@ -21,7 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
-	stakingNetwork "github.com/harmony-one/harmony/staking/network"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	"github.com/pkg/errors"
 )
 
@@ -136,7 +136,7 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 			rewardsForThisAddr = big.NewInt(0)
 		}
 		cur := big.NewInt(0)
-		cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+		cur.Mul(stakingReward.PreStakedBlocks, big.NewInt(int64(i+1))).Div(cur, count)
 		reward := big.NewInt(0).Sub(cur, last)
 		rewards[slot.EcdsaAddress] = new(big.Int).Add(reward, rewardsForThisAddr)
 		last = cur

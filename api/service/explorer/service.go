@@ -13,11 +13,11 @@ import (
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/consensus/reward"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
 
 // Constants for explorer service.
@@ -25,7 +25,6 @@ const (
 	explorerPortDifference = 4000
 	defaultPageSize        = "1000"
 	maxAddresses           = 100000
-	totalSupply            = 12600000000
 )
 
 // HTTPError is an HTTP error.
@@ -156,8 +155,11 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 // GetCirculatingSupply serves /circulating-supply end-point.
 func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	timestamp := time.Now().Unix()
-	circulatingSupply := reward.PercentageForTimeStamp(timestamp).Mul(numeric.NewDec(totalSupply))
+	circulatingSupply, err := chain.GetCirculatingSupply(context.Background(), s.blockchain)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("unable to fetch circulating supply")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	if err := json.NewEncoder(w).Encode(circulatingSupply); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode circulating supply")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -167,6 +169,11 @@ func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 // GetTotalSupply serves /total-supply end-point.
 func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	totalSupply, err := stakingReward.GetTotalTokens(s.blockchain)
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("unable to fetch total supply")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	if err := json.NewEncoder(w).Encode(totalSupply); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
 		w.WriteHeader(http.StatusInternalServerError)

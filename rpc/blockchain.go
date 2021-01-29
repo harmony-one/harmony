@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/consensus/reward"
+
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -20,10 +20,7 @@ import (
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
-)
-
-const (
-	initSupply = int64(12600000000)
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
@@ -624,18 +621,14 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 func (s *PublicBlockchainService) GetTotalSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply), nil
+	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
-// GetCirculatingSupply ..
+// GetCirculatingSupply ...
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	timestamp := time.Now()
-
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+	return chain.GetCirculatingSupply(ctx, s.hmy.BlockChain)
 }
 
 // GetStakingNetworkInfo ..

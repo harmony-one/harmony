@@ -29,7 +29,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking2 "github.com/harmony-one/harmony/staking"
-	"github.com/harmony-one/harmony/staking/network"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -486,21 +486,21 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
 	if st.bc == nil {
-		return network.NoReward, errors.New("[CollectRewards] No chain context provided")
+		return stakingReward.None, errors.New("[CollectRewards] No chain context provided")
 	}
 	delegations, err := st.bc.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
 	if err != nil {
-		return network.NoReward, err
+		return stakingReward.None, err
 	}
 	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
 		st.state, delegations,
 	)
 	if err != nil {
-		return network.NoReward, err
+		return stakingReward.None, err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
 		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-			return network.NoReward, err
+			return stakingReward.None, err
 		}
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)

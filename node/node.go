@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/reward"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
@@ -996,11 +997,24 @@ func New(
 		}()
 	}
 
+	// update reward values now that node is ready
+	node.updateInitialRewardValues()
+
 	// init metrics
 	initMetrics()
 	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
 	return &node
+}
+
+// updateInitialRewardValues using the node data
+func (node *Node) updateInitialRewardValues() {
+	numShards := shard.Schedule.InstanceForEpoch(node.Beaconchain().CurrentHeader().Epoch()).NumShards()
+	initTotal := big.NewInt(0)
+	for i := uint32(0); i < numShards; i++ {
+		initTotal = new(big.Int).Add(core.GetInitialFunds(i), initTotal)
+	}
+	reward.SetTotalInitialTokens(initTotal)
 }
 
 // InitConsensusWithValidators initialize shard state

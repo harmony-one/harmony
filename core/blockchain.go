@@ -2786,6 +2786,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 }
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
+// Note that block rewards are only for staking era.
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
 		return big.NewInt(0), nil
