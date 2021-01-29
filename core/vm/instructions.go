@@ -32,7 +32,7 @@ var (
 	tt255                    = math.BigPow(2, 255)
 	errWriteProtection       = errors.New("evm: write protection")
 	errReturnDataOutOfBounds = errors.New("evm: return data out of bounds")
-	errExecutionReverted     = errors.New("evm: execution reverted")
+	ErrExecutionReverted     = errors.New("evm: execution reverted")
 	errMaxCodeSizeExceeded   = errors.New("evm: max code size exceeded")
 	errInvalidJump           = errors.New("evm: invalid jump destination")
 )
@@ -712,7 +712,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memor
 	contract.Gas += returnGas
 	interpreter.intPool.put(value, offset, size)
 
-	if suberr == errExecutionReverted {
+	if suberr == ErrExecutionReverted {
 		return res, nil
 	}
 	return nil, nil
@@ -740,7 +740,7 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 	contract.Gas += returnGas
 	interpreter.intPool.put(endowment, offset, size, salt)
 
-	if suberr == errExecutionReverted {
+	if suberr == ErrExecutionReverted {
 		return res, nil
 	}
 	return nil, nil
@@ -766,7 +766,7 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory 
 	} else {
 		stack.push(interpreter.intPool.get().SetUint64(1))
 	}
-	if err == nil || err == errExecutionReverted {
+	if err == nil || err == ErrExecutionReverted {
 		memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
 	contract.Gas += returnGas
@@ -795,7 +795,7 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, contract *Contract, mem
 	} else {
 		stack.push(interpreter.intPool.get().SetUint64(1))
 	}
-	if err == nil || err == errExecutionReverted {
+	if err == nil || err == ErrExecutionReverted {
 		memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
 	contract.Gas += returnGas
@@ -820,7 +820,7 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract,
 	} else {
 		stack.push(interpreter.intPool.get().SetUint64(1))
 	}
-	if err == nil || err == errExecutionReverted {
+	if err == nil || err == ErrExecutionReverted {
 		memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
 	contract.Gas += returnGas
@@ -845,7 +845,7 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract, m
 	} else {
 		stack.push(interpreter.intPool.get().SetUint64(1))
 	}
-	if err == nil || err == errExecutionReverted {
+	if err == nil || err == ErrExecutionReverted {
 		memory.Set(retOffset.Uint64(), retSize.Uint64(), ret)
 	}
 	contract.Gas += returnGas
