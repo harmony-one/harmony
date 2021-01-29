@@ -13,7 +13,12 @@ import (
 )
 
 // GetCirculatingSupply using the following formula:
-// (TotalPreStakingTokens * percentReleased) + StakingBlockRewards
+// (TotalInitialTokens * percentReleased) + PreStakingBlockRewards + StakingBlockRewards
+//
+// Note that PreStakingBlockRewards is set to the amount of rewards given out by the
+// LAST BLOCK of the pre-staking era regardless of what the current block height is
+// if network is in the pre-staking era. This is for implementation reasons, reference
+// stakingReward.GetTotalPreStakingTokens for more details.
 //
 // WARNING: only works on beaconchain if in staking era.
 func GetCirculatingSupply(
@@ -31,8 +36,11 @@ func GetCirculatingSupply(
 		}
 	}
 
-	releasedPreStakingSupply := stakingReward.TotalInitialTokens.Mul(
+	releasedInitSupply := stakingReward.TotalInitialTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
 	)
-	return releasedPreStakingSupply.Add(numeric.NewDecFromBigIntWithPrec(stakingBlockRewards, 18)), nil
+	preStakingBlockRewards := stakingReward.GetTotalPreStakingTokens().Sub(stakingReward.TotalInitialTokens)
+	return releasedInitSupply.Add(preStakingBlockRewards).Add(
+		numeric.NewDecFromBigIntWithPrec(stakingBlockRewards, 18),
+	), nil
 }
