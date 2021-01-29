@@ -278,7 +278,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 			}
 		}
 		if err == nil || node.BroadcastInvalidTx {
-			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Str("HashByType", newTx.HashByType().Hex()).Msg("Broadcasting Tx")
 			node.tryBroadcast(newTx)
 		}
 		return err

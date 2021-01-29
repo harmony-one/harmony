@@ -133,7 +133,7 @@ func NewTransaction(
 	result := &Transaction{
 		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
-		Hash:      tx.Hash(),
+		Hash:      tx.HashByType(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
 		Value:     (*hexutil.Big)(tx.Value()),
@@ -187,7 +187,7 @@ func NewTxReceipt(
 	// Declare receipt
 	txReceipt := &TxReceipt{
 		BlockHash:         blockHash,
-		TransactionHash:   tx.Hash(),
+		TransactionHash:   tx.HashByType(),
 		BlockNumber:       hexutil.Uint64(blockNumber),
 		TransactionIndex:  hexutil.Uint64(blockIndex),
 		GasUsed:           hexutil.Uint64(receipt.GasUsed),
@@ -265,7 +265,7 @@ func NewBlockWithTxHash(
 	}
 
 	for _, tx := range b.Transactions() {
-		blk.Transactions = append(blk.Transactions, tx.Hash())
+		blk.Transactions = append(blk.Transactions, tx.HashByType())
 	}
 
 	if blockArgs.WithSigners {

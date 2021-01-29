@@ -82,14 +82,15 @@ func TestLookupStorage(t *testing.T) {
 	}
 
 	for i, tx := range txs {
-		if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
+		txnHash := tx.HashByType()
+		if txn, hash, number, index := ReadTransaction(db, txnHash); txn == nil {
 			t.Fatalf("tx #%d [%x]: transaction not found", i, tx.Hash())
 		} else {
 			if hash != block.Hash() || number != block.NumberU64() || index != uint64(i) {
-				t.Fatalf("tx #%d [%x]: positional metadata mismatch: have %x/%d/%d, want %x/%v/%v", i, tx.Hash(), hash, number, index, block.Hash(), block.NumberU64(), i)
+				t.Fatalf("tx #%d [%x]: positional metadata mismatch: have %x/%d/%d, want %x/%v/%v", i, txnHash, hash, number, index, block.Hash(), block.NumberU64(), i)
 			}
 			if tx.Hash() != txn.Hash() {
-				t.Fatalf("tx #%d [%x]: transaction mismatch: have %v, want %v", i, tx.Hash(), txn, tx)
+				t.Fatalf("tx #%d [%x]: transaction mismatch: have %v, want %v", i, txnHash, txn, tx)
 			}
 		}
 	}

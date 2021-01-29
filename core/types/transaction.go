@@ -403,6 +403,15 @@ func (tx *Transaction) Hash() common.Hash {
 	return v
 }
 
+// HashByType hashes the RLP encoding of tx in it's original format (eth or hmy)
+// It uniquely identifies the transaction.
+func (tx *Transaction) HashByType() common.Hash {
+	if tx.IsEthCompatible() {
+		return tx.ConvertToEth().Hash()
+	}
+	return tx.Hash()
+}
+
 // Size returns the true RLP encoded storage size of the transaction, either by
 // encoding and returning it, or returning a previously cached value.
 func (tx *Transaction) Size() common.StorageSize {

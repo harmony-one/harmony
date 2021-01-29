@@ -60,8 +60,7 @@ func WriteBlockTxLookUpEntries(db DatabaseWriter, block *types.Block) error {
 		}
 		if tx.IsEthCompatible() {
 			// Also put a lookup entry for eth transaction's hash
-			ethTxn := tx.ConvertToEth()
-			key := txLookupKey(ethTxn.Hash())
+			key := txLookupKey(tx.HashByType())
 			if err := db.Put(key, val); err != nil {
 				return err
 			}
@@ -102,6 +101,7 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
+
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil {
 		utils.Logger().Error().
@@ -112,7 +112,20 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		return nil, common.Hash{}, 0, 0
 	}
 	tx := body.TransactionAt(int(txIndex))
-	if tx == nil || !bytes.Equal(hash.Bytes(), tx.Hash().Bytes()) {
+	missing := false
+	if tx == nil {
+		missing = true
+	} else {
+		hmyHash := tx.Hash()
+		ethHash := tx.HashByType()
+
+		if !bytes.Equal(hash.Bytes(), hmyHash.Bytes()) && !bytes.Equal(hash.Bytes(), ethHash.Bytes()) {
+			missing = true
+		}
+
+	}
+
+	if missing {
 		utils.Logger().Error().
 			Uint64("number", blockNumber).
 			Str("hash", blockHash.Hex()).
