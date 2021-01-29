@@ -1014,7 +1014,7 @@ func (node *Node) updateInitialRewardValues() {
 	for i := uint32(0); i < numShards; i++ {
 		initTotal = new(big.Int).Add(core.GetInitialFunds(i), initTotal)
 	}
-	reward.SetTotalPreStakingTokens(initTotal)
+	reward.SetTotalInitialTokens(initTotal)
 }
 
 // InitConsensusWithValidators initialize shard state

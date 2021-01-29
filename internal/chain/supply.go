@@ -31,7 +31,7 @@ func GetCirculatingSupply(
 		}
 	}
 
-	releasedPreStakingSupply := stakingReward.TotalPreStakingTokens.Mul(
+	releasedPreStakingSupply := stakingReward.TotalInitialTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
 	)
 	return releasedPreStakingSupply.Add(numeric.NewDecFromBigIntWithPrec(stakingBlockRewards, 18)), nil
