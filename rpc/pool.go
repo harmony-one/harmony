@@ -207,7 +207,7 @@ func (s *PublicPoolService) PendingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			case Eth:
-				tx, err = eth.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
+				tx, err = eth.NewTransaction(plainTx.ConvertToEth(), common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).
