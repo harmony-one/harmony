@@ -81,8 +81,9 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transact
 	if from, err = common2.AddressToBech32(msg.From()); err != nil {
 		return nil, err
 	}
+
 	return &Transaction{
-		ID:        tx.Hash().Hex(),
+		ID:        tx.HashByType().Hex(),
 		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
 		From:      from,
 		To:        to,

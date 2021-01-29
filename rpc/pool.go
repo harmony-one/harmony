@@ -51,18 +51,21 @@ func (s *PublicPoolService) SendRawTransaction(
 	}
 
 	var tx *types.Transaction
+	var txHash common.Hash
 
 	if s.version == Eth {
 		ethTx := new(types.EthTransaction)
 		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
 			return common.Hash{}, err
 		}
+		txHash = ethTx.Hash()
 		tx = ethTx.ConvertToHmy()
 	} else {
 		tx = new(types.Transaction)
 		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 			return common.Hash{}, err
 		}
+		txHash = tx.Hash()
 	}
 
 	// Verify chainID
@@ -73,7 +76,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	// Submit transaction
 	if err := s.hmy.SendTx(ctx, tx); err != nil {
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-		return tx.Hash(), err
+		return txHash, err
 	}
 
 	// Log submission
@@ -91,18 +94,20 @@ func (s *PublicPoolService) SendRawTransaction(
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("contract", common2.MustAddressToBech32(addr)).
 			Msg("Submitted contract creation")
 	} else {
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("recipient", tx.To().Hex()).
 			Interface("tx", tx).
 			Msg("Submitted transaction")
 	}
 
 	// Response output is the same for all versions
-	return tx.Hash(), nil
+	return txHash, nil
 }
 
 func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {

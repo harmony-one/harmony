@@ -149,13 +149,14 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 	}
 	txFees := big.NewInt(0)
 	for _, tx := range blk.Transactions() {
-		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), tx.Hash())
+		txnHash := tx.HashByType()
+		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), txnHash)
 		if dbTx == nil {
-			return nil, fmt.Errorf("could not find receipt for tx: %v", tx.Hash().String())
+			return nil, fmt.Errorf("could not find receipt for tx: %v", txnHash.String())
 		}
 		if len(receipts) <= int(receiptIndex) {
 			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
-				receiptIndex, len(receipts), tx.Hash().String())
+				receiptIndex, len(receipts), txnHash.String())
 		}
 		txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
 		txFees = new(big.Int).Add(txFee, txFees)
