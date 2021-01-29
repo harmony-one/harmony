@@ -80,29 +80,9 @@ type Transaction struct {
 	To               string         `json:"to"`
 	TransactionIndex hexutil.Uint   `json:"transactionIndex"`
 	Value            *hexutil.Big   `json:"value"`
-	ShardID          uint32         `json:"shardID"`
-	ToShardID        uint32         `json:"toShardID"`
 	V                *hexutil.Big   `json:"v"`
 	R                *hexutil.Big   `json:"r"`
 	S                *hexutil.Big   `json:"s"`
-}
-
-// TxReceipt represents a transaction receipt that will serialize to the RPC representation.
-type TxReceipt struct {
-	BlockHash         common.Hash    `json:"blockHash"`
-	TransactionHash   common.Hash    `json:"transactionHash"`
-	BlockNumber       hexutil.Uint64 `json:"blockNumber"`
-	TransactionIndex  hexutil.Uint64 `json:"transactionIndex"`
-	GasUsed           hexutil.Uint64 `json:"gasUsed"`
-	CumulativeGasUsed hexutil.Uint64 `json:"cumulativeGasUsed"`
-	ContractAddress   common.Address `json:"contractAddress"`
-	Logs              []*types.Log   `json:"logs"`
-	LogsBloom         ethtypes.Bloom `json:"logsBloom"`
-	ShardID           uint32         `json:"shardID"`
-	From              string         `json:"from"`
-	To                string         `json:"to"`
-	Root              hexutil.Bytes  `json:"root"`
-	Status            hexutil.Uint   `json:"status"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -121,7 +101,7 @@ type CxReceipt struct {
 // representation, with the given location metadata set (if available).
 // Note that all txs on Harmony are replay protected (post EIP155 epoch).
 func NewTransaction(
-	tx *types.Transaction, blockHash common.Hash,
+	tx *types.EthTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) (*Transaction, error) {
 	from, err := tx.SenderAddress()
@@ -133,12 +113,10 @@ func NewTransaction(
 	result := &Transaction{
 		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
-		Hash:      tx.HashByType(),
+		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
 		Value:     (*hexutil.Big)(tx.Value()),
-		ShardID:   tx.ShardID(),
-		ToShardID: tx.ToShardID(),
 		Timestamp: hexutil.Uint64(timestamp),
 		V:         (*hexutil.Big)(v),
 		R:         (*hexutil.Big)(r),
@@ -158,22 +136,8 @@ func NewTransaction(
 	return result, nil
 }
 
-// NewReceipt returns an ETH transaction transaction that will serialize to the RPC representation.
-func NewReceipt(
-	tx interface{}, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (interface{}, error) {
-	plainTx, ok := tx.(*types.Transaction)
-	if ok {
-		return NewTxReceipt(plainTx, blockHash, blockNumber, blockIndex, receipt)
-	}
-	return nil, fmt.Errorf("unknown transaction type for RPC receipt")
-}
-
-// NewTxReceipt returns a transaction receipt that will serialize to the RPC representation
-func NewTxReceipt(
-	tx *types.Transaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt,
-) (*TxReceipt, error) {
-	// Set correct to & from address
+// NewReceipt returns the RPC data for a new receipt
+func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
 	senderAddr, err := tx.SenderAddress()
 	if err != nil {
 		return nil, err
@@ -184,33 +148,35 @@ func NewTxReceipt(
 		return nil, err
 	}
 
-	// Declare receipt
-	txReceipt := &TxReceipt{
-		BlockHash:         blockHash,
-		TransactionHash:   tx.HashByType(),
-		BlockNumber:       hexutil.Uint64(blockNumber),
-		TransactionIndex:  hexutil.Uint64(blockIndex),
-		GasUsed:           hexutil.Uint64(receipt.GasUsed),
-		CumulativeGasUsed: hexutil.Uint64(receipt.CumulativeGasUsed),
-		Logs:              receipt.Logs,
-		LogsBloom:         receipt.Bloom,
-		ShardID:           tx.ShardID(),
-		From:              sender,
-		To:                receiver,
-		Root:              receipt.PostState,
-		Status:            hexutil.Uint(receipt.Status),
+	fields := map[string]interface{}{
+		"blockHash":         blockHash,
+		"blockNumber":       hexutil.Uint64(blockNumber),
+		"transactionHash":   tx.Hash(),
+		"transactionIndex":  hexutil.Uint64(blockIndex),
+		"from":              sender,
+		"to":                receiver,
+		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
+		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+		"contractAddress":   nil,
+		"logs":              receipt.Logs,
+		"logsBloom":         receipt.Bloom,
 	}
 
-	// Set empty array for empty logs
+	// Assign receipt status or post state.
+	if len(receipt.PostState) > 0 {
+		fields["root"] = hexutil.Bytes(receipt.PostState)
+	} else {
+		fields["status"] = hexutil.Uint(receipt.Status)
+	}
 	if receipt.Logs == nil {
-		txReceipt.Logs = []*types.Log{}
+		fields["logs"] = [][]*types.Log{}
 	}
-
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
 	if receipt.ContractAddress != (common.Address{}) {
-		txReceipt.ContractAddress = receipt.ContractAddress
+		fields["contractAddress"] = receipt.ContractAddress
 	}
-	return txReceipt, nil
+
+	return fields, nil
 }
 
 // NewBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
@@ -265,7 +231,7 @@ func NewBlockWithTxHash(
 	}
 
 	for _, tx := range b.Transactions() {
-		blk.Transactions = append(blk.Transactions, tx.HashByType())
+		blk.Transactions = append(blk.Transactions, tx.Hash())
 	}
 
 	if blockArgs.WithSigners {
@@ -339,5 +305,5 @@ func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, e
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	return NewTransaction(txs[index].ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }

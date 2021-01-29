@@ -187,7 +187,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 		}
 		return NewStructuredResponse(tx)
 	case Eth:
-		tx, err := eth.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := eth.NewTransaction(tx.ConvertToEth(), blockHash, blockNumber, block.Time().Uint64(), index)
 		if err != nil {
 			return nil, err
 		}
@@ -648,10 +648,8 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 		}
 		return NewStructuredResponse(RPCReceipt)
 	case Eth:
-		if tx == nil {
-			RPCReceipt, err = eth.NewReceipt(stx, blockHash, blockNumber, index, receipt)
-		} else {
-			RPCReceipt, err = eth.NewReceipt(tx, blockHash, blockNumber, index, receipt)
+		if tx != nil {
+			RPCReceipt, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, blockNumber, index, receipt)
 		}
 		if err != nil {
 			return nil, err
