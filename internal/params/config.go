@@ -23,9 +23,9 @@ var (
 	EthTestnetShard0ChainID            = big.NewInt(1666700000)
 	EthPangaeaShard0ChainID            = big.NewInt(1666800000)
 	EthPartnerShard0ChainID            = big.NewInt(1666900000)
-	EthStressnetShard0ChainID          = big.NewInt(1661000000)
-	EthTestShard0ChainID               = big.NewInt(1661100000) // not a real network
-	EthAllProtocolChangesShard0ChainID = big.NewInt(1661200000) // not a real network
+	EthStressnetShard0ChainID          = big.NewInt(1667000000)
+	EthTestShard0ChainID               = big.NewInt(1667100000) // not a real network
+	EthAllProtocolChangesShard0ChainID = big.NewInt(1667200000) // not a real network
 )
 
 // EpochTBD is a large, “not anytime soon” epoch.  It used as a placeholder
@@ -39,7 +39,7 @@ var (
 		ChainID:                    MainnetChainID,
 		EthCompatibleChainID:       EthMainnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthMainnetShard0ChainID,
-		EthCompatibleEpoch:         EpochTBD,
+		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
 		StakingEpoch:               big.NewInt(186),
