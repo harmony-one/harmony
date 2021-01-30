@@ -765,15 +765,14 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 			if transfer == nil {
 				transfer = new(hexutil.Big)
 			}
-			//utils.Logger().Warn().("Gas estimation capped by limited funds", "original", hi, "balance", balance,
-			//	"sent", transfer.ToInt(), "gasprice", args.GasPrice.ToInt(), "fundable", allowance)
+			utils.Logger().Warn().Uint64("original", hi).Uint64("balance", balance.Uint64()).Uint64("sent", transfer.ToInt().Uint64()).Uint64("gasprice", args.GasPrice.ToInt().Uint64()).Uint64("fundable", allowance.Uint64()).Msg("Gas estimation capped by limited funds")
 			hi = allowance.Uint64()
 		}
 	}
 
 	// Recap the highest gas allowance with specified gascap.
 	if gasCap != nil && hi > gasCap.Uint64() {
-		//log.Warn("Caller gas above allowance, capping", "requested", hi, "cap", gasCap)
+		utils.Logger().Warn().Uint64("requested", hi).Uint64("cap", gasCap.Uint64()).Msg("Caller gas above allowance, capping")
 		hi = gasCap.Uint64()
 	}
 	cap = hi
