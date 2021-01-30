@@ -298,6 +298,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if curHeader.IsLastBlockInEpoch() {
 		nextShardState, err := curHeader.GetShardState()
 		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("[UpdateConsensusInformation] Error retrieving current shard state in the first block")
 			return Syncing
 		}
 		if nextShardState.Epoch != nil {
@@ -439,6 +443,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		myPubKeys := consensus.GetPublicKeys()
 		if myPubKeys.Contains(key.Object) {
 			if hasError {
+				consensus.getLogger().Error().
+					Str("myKey", myPubKeys.SerializeToHexStr()).
+					Msg("[UpdateConsensusInformation] hasError")
+
 				return Syncing
 			}
 
@@ -455,6 +463,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			return Normal
 		}
 	}
+	consensus.getLogger().Info().
+		Msg("[UpdateConsensusInformation] not in committee, Listening")
+
 	// not in committee
 	return Listening
 }

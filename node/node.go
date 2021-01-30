@@ -1050,6 +1050,9 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
+		utils.Logger().Err(err).
+			Interface("shardState", shardState).
+			Msg("[InitConsensusWithValidators] Find CommitteeByID")
 		return err
 	}
 	pubKeys, err := subComm.BLSPublicKeys()
@@ -1069,6 +1072,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
+				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
