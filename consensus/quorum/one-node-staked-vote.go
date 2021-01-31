@@ -214,6 +214,12 @@ func (v *stakedVoteWeight) SetVoters(
 	}
 	// Hold onto this calculation
 	v.roster = *roster
+
+	utils.Logger().Info().
+		Uint64("curEpoch", epoch.Uint64()).
+		Uint32("shard-id", subCommittee.ShardID).
+		Str("committee", roster.String()).
+		Msg("[SetVoters] Successfully updated voters")
 	return &TallyResult{
 		roster.OurVotingPowerTotalPercentage,
 		roster.TheirVotingPowerTotalPercentage,
