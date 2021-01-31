@@ -92,7 +92,12 @@ func (v *stakedVoteWeight) AddNewVote(
 	additionalVotePower := numeric.NewDec(0)
 
 	for _, pubKeyBytes := range pubKeysBytes {
-		additionalVotePower = additionalVotePower.Add(v.roster.Voters[pubKeyBytes].OverallPercent)
+		votingPower := v.roster.Voters[pubKeyBytes].OverallPercent
+		utils.Logger().Debug().
+			Str("signer", pubKeyBytes.Hex()).
+			Str("votingPower", votingPower.String()).
+			Msg("Signer vote counted")
+		additionalVotePower = additionalVotePower.Add(votingPower)
 	}
 
 	tallyQuorum := func() *tallyAndQuorum {
@@ -123,6 +128,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	utils.Logger().Info().
 		Str("phase", p.String()).
 		Int64("signer-count", v.SignersCount(p)).
+		Str("new-power-added", additionalVotePower.String()).
 		Str("total-power-of-signers", tallyQuorum.tally.String()).
 		Msg(msg)
 	return ballet, nil
