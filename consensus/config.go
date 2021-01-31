@@ -33,6 +33,18 @@ const (
 	timeoutBootstrap
 )
 
+func (t TimeoutType) String() string {
+	switch t {
+	case timeoutConsensus:
+		return "timeoutConsensus"
+	case timeoutViewChange:
+		return "timeoutViewChange"
+	case timeoutBootstrap:
+		return "timeoutBootstrap"
+	}
+	return "unknown"
+}
+
 var (
 	// NIL is the m2 type message, which suppose to be nil/empty, however
 	// we cannot sign on empty message, instead we sign on some default "nil" message

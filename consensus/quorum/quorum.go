@@ -75,6 +75,7 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
 }
 
@@ -241,6 +242,11 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	}
 	idx = (idx + next) % numNodes
 	return found, &s.publicKeys[idx]
+}
+
+// FirstParticipant returns the first participant of the shard
+func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
+	return &s.publicKeys[0]
 }
 
 func (s *cIdentities) Participants() multibls.PublicKeys {

@@ -184,10 +184,12 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			// viewchange happened at the first block of new epoch
 			// use the LeaderPubKey as the base of the next leader
 			// as we shouldn't use lastLeader from coinbase as the base.
-			// The LeaderPubKey should be updated to the index 0 of the committee
+			// The LeaderPubKey should be updated to the node of index 0 of the committee
+			// so, when validator joined the view change process later in the epoch block
+			// it can still sync with other validators.
 			if curHeader.IsLastBlockInEpoch() {
 				consensus.getLogger().Info().Msg("[getNextLeaderKey] view change in the first block of new epoch")
-				lastLeaderPubKey = consensus.LeaderPubKey
+				lastLeaderPubKey = consensus.Decider.FirstParticipant(shard.Schedule.InstanceForEpoch(epoch))
 			}
 		}
 	}
@@ -236,6 +238,12 @@ func (consensus *Consensus) startViewChange() {
 	consensus.current.SetMode(ViewChanging)
 	nextViewID, duration := consensus.getNextViewID()
 	consensus.SetViewChangingID(nextViewID)
+	// TODO: set the Leader PubKey to the next leader for view change
+	// this is dangerous as the leader change is not succeeded yet
+	// we use it this way as in many code we validate the messages
+	// aganist the consensus.LeaderPubKey variable.
+	// Ideally, we shall use another variable to keep track of the
+	// leader pubkey in viewchange mode
 	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
 
 	consensus.getLogger().Warn().
