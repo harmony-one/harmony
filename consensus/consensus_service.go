@@ -410,12 +410,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	consensus.getLogger().Info().
-		Uint64("block-number", curHeader.Number().Uint64()).
-		Uint64("curEpoch", curHeader.Epoch().Uint64()).
-		Uint32("shard-id", consensus.ShardID).
-		Msg("[UpdateConsensusInformation] changing committee")
-
 	// take care of possible leader change during the epoch
 	// TODO: in a very rare case, when a M1 view change happened, the block contains coinbase for last leader
 	// but the new leader is actually recognized by most of the nodes. At this time, if a node sync to this
