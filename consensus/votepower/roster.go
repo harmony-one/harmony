@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"sort"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -179,6 +181,14 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
 	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
+
+	// Testnet incident recovery
+	// Make harmony nodes having 70% voting power for epoch 73314
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73314)) == 0 {
+		harmonyPercent = numeric.MustNewDecFromStr("0.70")
+		externalPercent = numeric.MustNewDecFromStr("0.30")
+	}
+
 	for i := range staked {
 		member := AccommodateHarmonyVote{
 			PureStakedVote: PureStakedVote{
