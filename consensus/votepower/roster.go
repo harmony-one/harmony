@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/harmony-one/harmony/internal/configs/node"
 	"math/big"
 	"sort"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/harmony-one/harmony/shard"
 
