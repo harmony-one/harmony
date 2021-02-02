@@ -186,8 +186,8 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 	// Make harmony nodes having 70% voting power for epoch 73314
 	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
 		epoch.Cmp(big.NewInt(73330)) <= 0 {
-		harmonyPercent = numeric.MustNewDecFromStr("0.70")
-		externalPercent = numeric.MustNewDecFromStr("0.40") // Make sure consensus is always good.
+		harmonyPercent = numeric.MustNewDecFromStr("0.1")
+		externalPercent = numeric.MustNewDecFromStr("0.0")
 	}
 
 	for i := range staked {
