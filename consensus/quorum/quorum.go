@@ -139,11 +139,12 @@ type Registry struct {
 	Deciders      map[string]Decider `json:"quorum-deciders"`
 	ExternalCount int                `json:"external-slot-count"`
 	MedianStake   numeric.Dec        `json:"epos-median-stake"`
+	Epoch         int                `json:"epoch"`
 }
 
 // NewRegistry ..
-func NewRegistry(extern int) Registry {
-	return Registry{map[string]Decider{}, extern, numeric.ZeroDec()}
+func NewRegistry(extern int, epoch int) Registry {
+	return Registry{map[string]Decider{}, extern, numeric.ZeroDec(), epoch}
 }
 
 // Transition  ..

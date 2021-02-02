@@ -66,6 +66,11 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 
 func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 	nowE := hmy.BlockChain.CurrentHeader().Epoch()
+
+	if hmy.BlockChain.CurrentHeader().IsLastBlockInEpoch() {
+		// current epoch is current header epoch + 1 if the header was last block of prev epoch
+		nowE = new(big.Int).Add(nowE, common.Big1)
+	}
 	thenE := new(big.Int).Sub(nowE, common.Big1)
 
 	var (
@@ -86,8 +91,8 @@ func (hmy *Harmony) getSuperCommittees() (*quorum.Transition, error) {
 		shard.ExternalSlotsAvailableForEpoch(thenE)
 
 	then, now :=
-		quorum.NewRegistry(stakedSlotsThen),
-		quorum.NewRegistry(stakedSlotsNow)
+		quorum.NewRegistry(stakedSlotsThen, int(thenE.Int64())),
+		quorum.NewRegistry(stakedSlotsNow, int(nowE.Int64()))
 
 	rawStakes := []effective.SlotPurchase{}
 	validatorSpreads := map[common.Address]numeric.Dec{}

@@ -184,7 +184,8 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 	// Testnet incident recovery
 	// Make harmony nodes having 70% voting power for epoch 73314
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73314)) == 0 {
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
+		epoch.Cmp(big.NewInt(73330)) <= 0 {
 		harmonyPercent = numeric.MustNewDecFromStr("0.70")
 		externalPercent = numeric.MustNewDecFromStr("0.30")
 	}
