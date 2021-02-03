@@ -224,19 +224,23 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		}
 	}
 
-	// NOTE Enforce voting power sums to one,
-	// give diff (expect tiny amt) to last staked voter
-	if diff := numeric.OneDec().Sub(
-		ourPercentage.Add(theirPercentage),
-	); !diff.IsZero() && lastStakedVoter != nil {
-		lastStakedVoter.OverallPercent =
-			lastStakedVoter.OverallPercent.Add(diff)
-		theirPercentage = theirPercentage.Add(diff)
-	}
+	if !(nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
+		epoch.Cmp(big.NewInt(73330)) <= 0) {
 
-	if lastStakedVoter != nil &&
-		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
-		return nil, ErrVotingPowerNotEqualOne
+		// NOTE Enforce voting power sums to one,
+		// give diff (expect tiny amt) to last staked voter
+		if diff := numeric.OneDec().Sub(
+			ourPercentage.Add(theirPercentage),
+		); !diff.IsZero() && lastStakedVoter != nil {
+			lastStakedVoter.OverallPercent =
+				lastStakedVoter.OverallPercent.Add(diff)
+			theirPercentage = theirPercentage.Add(diff)
+		}
+
+		if lastStakedVoter != nil &&
+			!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
+			return nil, ErrVotingPowerNotEqualOne
+		}
 	}
 
 	roster.OurVotingPowerTotalPercentage = ourPercentage
