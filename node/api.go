@@ -118,6 +118,7 @@ func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
 			Public:    true,
 		},
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.Eth),
+		hmy_rpc.NewPublicWeb3API(),
 	}
 }
 
