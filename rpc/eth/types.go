@@ -11,7 +11,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
-	rpc_utils "github.com/harmony-one/harmony/rpc/utils"
 )
 
 // BlockWithTxHash represents a block that will serialize to the RPC representation of a block
@@ -68,33 +67,21 @@ type BlockWithFullTx struct {
 
 // Transaction represents a transaction that will serialize to the RPC representation of a transaction
 type Transaction struct {
-	BlockHash        common.Hash    `json:"blockHash"`
-	BlockNumber      *hexutil.Big   `json:"blockNumber"`
-	From             string         `json:"from"`
-	Timestamp        hexutil.Uint64 `json:"timestamp"`
-	Gas              hexutil.Uint64 `json:"gas"`
-	GasPrice         *hexutil.Big   `json:"gasPrice"`
-	Hash             common.Hash    `json:"hash"`
-	Input            hexutil.Bytes  `json:"input"`
-	Nonce            hexutil.Uint64 `json:"nonce"`
-	To               string         `json:"to"`
-	TransactionIndex hexutil.Uint   `json:"transactionIndex"`
-	Value            *hexutil.Big   `json:"value"`
-	V                *hexutil.Big   `json:"v"`
-	R                *hexutil.Big   `json:"r"`
-	S                *hexutil.Big   `json:"s"`
-}
-
-// CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
-type CxReceipt struct {
-	BlockHash   common.Hash  `json:"blockHash"`
-	BlockNumber *hexutil.Big `json:"blockNumber"`
-	TxHash      common.Hash  `json:"hash"`
-	From        string       `json:"from"`
-	To          string       `json:"to"`
-	ShardID     uint32       `json:"shardID"`
-	ToShardID   uint32       `json:"toShardID"`
-	Amount      *hexutil.Big `json:"value"`
+	BlockHash        *common.Hash    `json:"blockHash"`
+	BlockNumber      *hexutil.Big    `json:"blockNumber"`
+	From             common.Address  `json:"from"`
+	Timestamp        hexutil.Uint64  `json:"timestamp"` // Not exposed by Ethereum anymore
+	Gas              hexutil.Uint64  `json:"gas"`
+	GasPrice         *hexutil.Big    `json:"gasPrice"`
+	Hash             common.Hash     `json:"hash"`
+	Input            hexutil.Bytes   `json:"input"`
+	Nonce            hexutil.Uint64  `json:"nonce"`
+	To               *common.Address `json:"to"`
+	TransactionIndex *hexutil.Uint64 `json:"transactionIndex"`
+	Value            *hexutil.Big    `json:"value"`
+	V                *hexutil.Big    `json:"v"`
+	R                *hexutil.Big    `json:"r"`
+	S                *hexutil.Big    `json:"s"`
 }
 
 // NewTransaction returns a transaction that will serialize to the RPC
@@ -111,11 +98,13 @@ func NewTransaction(
 	v, r, s := tx.RawSignatureValues()
 
 	result := &Transaction{
+		From:      from,
 		Gas:       hexutil.Uint64(tx.GasLimit()),
 		GasPrice:  (*hexutil.Big)(tx.GasPrice()),
 		Hash:      tx.Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     hexutil.Uint64(tx.Nonce()),
+		To:        tx.To(),
 		Value:     (*hexutil.Big)(tx.Value()),
 		Timestamp: hexutil.Uint64(timestamp),
 		V:         (*hexutil.Big)(v),
@@ -123,16 +112,10 @@ func NewTransaction(
 		S:         (*hexutil.Big)(s),
 	}
 	if blockHash != (common.Hash{}) {
-		result.BlockHash = blockHash
+		result.BlockHash = &blockHash
 		result.BlockNumber = (*hexutil.Big)(new(big.Int).SetUint64(blockNumber))
-		result.TransactionIndex = hexutil.Uint(index)
+		result.TransactionIndex = (*hexutil.Uint64)(&index)
 	}
-
-	result.From, result.To, err = rpc_utils.ConvertAddresses(&from, tx.To(), false)
-	if err != nil {
-		return nil, err
-	}
-
 	return result, nil
 }
 
@@ -143,18 +126,13 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 		return nil, err
 	}
 
-	sender, receiver, err := rpc_utils.ConvertAddresses(&senderAddr, tx.To(), false)
-	if err != nil {
-		return nil, err
-	}
-
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
 		"transactionHash":   tx.Hash(),
 		"transactionIndex":  hexutil.Uint64(blockIndex),
-		"from":              sender,
-		"to":                receiver,
+		"from":              senderAddr,
+		"to":                tx.To(),
 		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
 		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
 		"contractAddress":   nil,
