@@ -38,13 +38,14 @@ const (
 	netNamespace   = "net"
 	netV1Namespace = "netv1"
 	netV2Namespace = "netv2"
+	web3Namespace  = "web3"
 )
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
