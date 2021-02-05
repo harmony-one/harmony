@@ -4,18 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
+	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/syncing"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/chain"
+	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
@@ -84,7 +88,8 @@ func (s *Service) Init() {
 // Run is to run serving explorer.
 func (s *Service) Run() *http.Server {
 	// Init address.
-	addr := net.JoinHostPort("", GetExplorerPort(s.Port))
+	port := GetExplorerPort(s.Port)
+	addr := net.JoinHostPort("", port)
 
 	s.router = mux.NewRouter()
 
@@ -94,11 +99,11 @@ func (s *Service) Run() *http.Server {
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
 
-	// Set up router for node count.
+	// Set up router for supply info
+	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
+	s.router.Path("/burn-addresses").HandlerFunc(s.GetInaccessibleAddressInfo)
 	s.router.Path("/circulating-supply").Queries().HandlerFunc(s.GetCirculatingSupply).Methods("GET")
 	s.router.Path("/circulating-supply").HandlerFunc(s.GetCirculatingSupply)
-
-	// Set up router for node count.
 	s.router.Path("/total-supply").Queries().HandlerFunc(s.GetTotalSupply).Methods("GET")
 	s.router.Path("/total-supply").HandlerFunc(s.GetTotalSupply)
 
@@ -152,7 +157,72 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+var (
+	// InaccessibleAddresses are a list of known eth addresses that cannot spend ONE tokens.
+	InaccessibleAddresses = []ethCommon.Address{
+		// one10000000000000000000000000000dead5shlag
+		ethCommon.HexToAddress("0x7bDeF7Bdef7BDeF7BDEf7bDef7bdef7bdeF6E7AD"),
+	}
+)
+
+// InaccessibleAddressInfo ..
+type InaccessibleAddressInfo struct {
+	EthAddress ethCommon.Address `json:"eth-address"`
+	Address    string            `json:"address"`
+	Balance    numeric.Dec       `json:"balance"`
+	Nonce      uint64            `json:"nonce"`
+}
+
+// getAllInaccessibleAddresses information according to InaccessibleAddresses
+func (s *Service) getAllInaccessibleAddresses() ([]*InaccessibleAddressInfo, error) {
+	state, err := s.blockchain.StateAt(s.blockchain.CurrentHeader().Root())
+	if err != nil {
+		return nil, err
+	}
+
+	accs := []*InaccessibleAddressInfo{}
+	for _, addr := range InaccessibleAddresses {
+		accs = append(accs, &InaccessibleAddressInfo{
+			EthAddress: addr,
+			Address:    common.MustAddressToBech32(addr),
+			Balance:    numeric.NewDecFromBigIntWithPrec(state.GetBalance(addr), 18),
+			Nonce:      state.GetNonce(addr),
+		})
+	}
+
+	return accs, nil
+}
+
+// getTotalInaccessibleTokens in ONE at the latest header.
+func (s *Service) getTotalInaccessibleTokens() (numeric.Dec, error) {
+	addrInfos, err := s.getAllInaccessibleAddresses()
+	if err != nil {
+		return numeric.Dec{}, err
+	}
+
+	total := numeric.NewDecFromBigIntWithPrec(big.NewInt(0), 18)
+	for _, addr := range addrInfos {
+		total = total.Add(addr.Balance)
+	}
+	return total, nil
+}
+
+// GetInaccessibleAddressInfo serves /burn-addresses end-point.
+func (s *Service) GetInaccessibleAddressInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	accInfos, err := s.getAllInaccessibleAddresses()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible addresses")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if err := json.NewEncoder(w).Encode(accInfos); err != nil {
+		utils.Logger().Warn().Msg("cannot JSON-encode inaccessible account info")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
 // GetCirculatingSupply serves /circulating-supply end-point.
+// Note that known InaccessibleAddresses have their funds removed from the supply for this endpoint.
 func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	circulatingSupply, err := chain.GetCirculatingSupply(context.Background(), s.blockchain)
@@ -160,13 +230,19 @@ func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch circulating supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	if err := json.NewEncoder(w).Encode(circulatingSupply); err != nil {
+	totalInaccessible, err := s.getTotalInaccessibleTokens()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible tokens")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if err := json.NewEncoder(w).Encode(circulatingSupply.Sub(totalInaccessible)); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode circulating supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
 // GetTotalSupply serves /total-supply end-point.
+// Note that known InaccessibleAddresses have their funds removed from the supply for this endpoint.
 func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	totalSupply, err := stakingReward.GetTotalTokens(s.blockchain)
@@ -174,7 +250,12 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch total supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	if err := json.NewEncoder(w).Encode(totalSupply); err != nil {
+	totalInaccessible, err := s.getTotalInaccessibleTokens()
+	if err != nil {
+		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible tokens")
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if err := json.NewEncoder(w).Encode(totalSupply.Sub(totalInaccessible)); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
