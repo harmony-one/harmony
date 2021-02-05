@@ -126,6 +126,7 @@ func (s *Service) Run() *http.Server {
 			utils.Logger().Warn().Err(err).Msg("[Explorer] Server error.")
 		}
 	}()
+	fmt.Printf("Started Explorer server at: %v:%v\n", s.IP, port)
 	return server
 }
 
