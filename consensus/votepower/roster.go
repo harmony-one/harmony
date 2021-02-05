@@ -185,7 +185,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 	// Testnet incident recovery
 	// Make harmony nodes having 70% voting power for epoch 73314
 	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
-		epoch.Cmp(big.NewInt(73330)) <= 0 {
+		epoch.Cmp(big.NewInt(74330)) <= 0 {
 		harmonyPercent = numeric.MustNewDecFromStr("0.70")
 		externalPercent = numeric.MustNewDecFromStr("0.40") // Make sure consensus is always good.
 	}
@@ -225,7 +225,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 	}
 
 	if !(nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
-		epoch.Cmp(big.NewInt(73330)) <= 0) {
+		epoch.Cmp(big.NewInt(74330)) <= 0) {
 
 		// NOTE Enforce voting power sums to one,
 		// give diff (expect tiny amt) to last staked voter
