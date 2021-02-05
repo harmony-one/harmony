@@ -171,6 +171,7 @@ func startHTTP(apis []rpc.API) (err error) {
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
+	fmt.Printf("Started RPC server at: %v\n", httpEndpoint)
 	return nil
 }
 
@@ -183,5 +184,6 @@ func startWS(apis []rpc.API) (err error) {
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
 		Msg("WebSocket endpoint opened")
+	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
 	return nil
 }
