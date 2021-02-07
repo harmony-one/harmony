@@ -46,7 +46,6 @@ func (t Type) String() string {
 type Service interface {
 	Start() error
 	Stop() error
-
 	APIs() []rpc.API // the list of RPC descriptors the service provides
 }
 
