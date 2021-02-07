@@ -23,29 +23,23 @@ func New(blockChannel chan *types.Block, consensus *consensus.Consensus, startCh
 	return &Service{blockChannel: blockChannel, consensus: consensus, startChan: startChan}
 }
 
-// StartService starts consensus service.
-func (s *Service) StartService() {
+// Start starts consensus service.
+func (s *Service) Start() error {
 	utils.Logger().Info().Msg("[consensus/service] Starting consensus service.")
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 	s.consensus.Start(s.blockChannel, s.stopChan, s.stoppedChan, s.startChan)
 	s.consensus.WaitForNewRandomness()
+	return nil
 }
 
-// StopService stops consensus service.
-func (s *Service) StopService() {
+// Stop stops consensus service.
+func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Stopping consensus service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.Logger().Info().Msg("Consensus service stopped.")
-}
-
-// NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {}
-
-// SetMessageChan sets up message channel to service.
-func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
-	s.messageChan = messageChan
+	return s.consensus.Close()
 }
 
 // APIs for the services.

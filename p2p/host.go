@@ -27,6 +27,9 @@ import (
 
 // Host is the client + server in p2p network.
 type Host interface {
+	Start() error
+	Close() error
+
 	GetSelfPeer() Peer
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
@@ -160,6 +163,16 @@ type HostV2 struct {
 // PubSub ..
 func (host *HostV2) PubSub() *libp2p_pubsub.PubSub {
 	return host.pubsub
+}
+
+// Start is the current placeholder
+func (host *HostV2) Start() error {
+	return nil
+}
+
+// Close is the current placeholder
+func (host *HostV2) Close() error {
+	return nil
 }
 
 // C .. -> (total known peers, connected, not connected)
