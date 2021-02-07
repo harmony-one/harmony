@@ -13,6 +13,8 @@ import (
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p/discovery"
+	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
 	libp2p_host "github.com/libp2p/go-libp2p-core/host"
@@ -29,13 +31,15 @@ import (
 type Host interface {
 	Start() error
 	Close() error
-
 	GetSelfPeer() Peer
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
 	GetP2PHost() libp2p_host.Host
+	GetDiscovery() discovery.Discovery
 	GetPeerCount() int
 	ConnectHostPeer(Peer) error
+	// AddStreamProtocol add the given protocol
+	AddStreamProtocol(protocols ...sttypes.Protocol)
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	PubSub() *libp2p_pubsub.PubSub
@@ -66,15 +70,27 @@ const (
 	MaxMessageSize = 1 << 21
 )
 
+// HostConfig is the config structure to create a new host
+type HostConfig struct {
+	Self          *Peer
+	BLSKey        libp2p_crypto.PrivKey
+	BootNodes     []string
+	DataStoreFile *string
+}
+
 // NewHost ..
-func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
+func NewHost(cfg HostConfig) (Host, error) {
+	var (
+		self = cfg.Self
+		key  = cfg.BLSKey
+	)
 	listenAddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", self.IP, self.Port))
 	if err != nil {
 		return nil, errors.Wrapf(err,
 			"cannot create listen multiaddr from port %#v", self.Port)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	p2pHost, err := libp2p.New(ctx,
 		libp2p.ListenAddrs(listenAddr),
 		libp2p.Identity(key),
@@ -83,6 +99,14 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
+	}
+
+	disc, err := discovery.NewDHTDiscovery(p2pHost, discovery.DHTConfig{
+		BootNodes:     cfg.BootNodes,
+		DataStoreFile: cfg.DataStoreFile,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
 	options := []libp2p_pubsub.Option{
@@ -95,6 +119,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 		// WithValidateThrottle sets the upper bound on the number of active validation goroutines across all topics. The default is 8192.
 		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
 		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
+		libp2p_pubsub.WithDiscovery(disc.GetRawDiscovery()),
 	}
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
@@ -120,7 +145,7 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot initialize libp2p pubsub")
+		return nil, errors.Wrapf(err, "cannot initialize libp2p pub-sub")
 	}
 
 	self.PeerID = p2pHost.ID()
@@ -128,16 +153,15 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 	// has to save the private key for host
 	h := &HostV2{
-		h:      p2pHost,
-		pubsub: pubsub,
-		joined: map[string]*libp2p_pubsub.Topic{},
-		self:   *self,
-		priKey: key,
-		logger: &subLogger,
-	}
-
-	if err != nil {
-		return nil, err
+		h:         p2pHost,
+		pubsub:    pubsub,
+		joined:    map[string]*libp2p_pubsub.Topic{},
+		self:      *self,
+		priKey:    key,
+		discovery: disc,
+		logger:    &subLogger,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 
 	utils.Logger().Info().
@@ -150,14 +174,18 @@ func NewHost(self *Peer, key libp2p_crypto.PrivKey) (Host, error) {
 
 // HostV2 is the version 2 p2p host
 type HostV2 struct {
-	h         libp2p_host.Host
-	pubsub    *libp2p_pubsub.PubSub
-	joined    map[string]*libp2p_pubsub.Topic
-	self      Peer
-	priKey    libp2p_crypto.PrivKey
-	lock      sync.Mutex
-	logger    *zerolog.Logger
-	blocklist libp2p_pubsub.Blacklist
+	h            libp2p_host.Host
+	pubsub       *libp2p_pubsub.PubSub
+	joined       map[string]*libp2p_pubsub.Topic
+	streamProtos []sttypes.Protocol
+	self         Peer
+	priKey       libp2p_crypto.PrivKey
+	lock         sync.Mutex
+	discovery    discovery.Discovery
+	logger       *zerolog.Logger
+	blocklist    libp2p_pubsub.Blacklist
+	ctx          context.Context
+	cancel       func()
 }
 
 // PubSub ..
@@ -165,14 +193,23 @@ func (host *HostV2) PubSub() *libp2p_pubsub.PubSub {
 	return host.pubsub
 }
 
-// Start is the current placeholder
+// Start start the HostV2 discovery process
+// TODO: move PubSub start handling logic here
 func (host *HostV2) Start() error {
-	return nil
+	for _, proto := range host.streamProtos {
+		proto.Start()
+	}
+	return host.discovery.Start()
 }
 
-// Close is the current placeholder
+// Close close the HostV2
 func (host *HostV2) Close() error {
-	return nil
+	for _, proto := range host.streamProtos {
+		proto.Close()
+	}
+	host.discovery.Close()
+	host.cancel()
+	return host.h.Close()
 }
 
 // C .. -> (total known peers, connected, not connected)
@@ -188,6 +225,14 @@ func (host *HostV2) C() (int, int, int) {
 		}
 	}
 	return len(peers), connected, not
+}
+
+// AddStreamProtocol adds the stream protocols to the host to be started and closed
+// when the host starts or close
+func (host *HostV2) AddStreamProtocol(protocols ...sttypes.Protocol) {
+	for _, protocol := range protocols {
+		host.streamProtos = append(host.streamProtos, protocol)
+	}
 }
 
 // GetOrJoin ..
@@ -277,6 +322,11 @@ func (host *HostV2) GetP2PHost() libp2p_host.Host {
 	return host.h
 }
 
+// GetDiscovery returns the underlying discovery
+func (host *HostV2) GetDiscovery() discovery.Discovery {
+	return host.discovery
+}
+
 // ListTopic returns the list of topic the node subscribed
 func (host *HostV2) ListTopic() []string {
 	host.lock.Lock()
@@ -344,48 +394,3 @@ func ConstructMessage(content []byte) []byte {
 	copy(message[5:], content)
 	return message
 }
-
-// AddrList is a list of multiaddress
-type AddrList []ma.Multiaddr
-
-// String is a function to print a string representation of the AddrList
-func (al *AddrList) String() string {
-	strs := make([]string, len(*al))
-	for i, addr := range *al {
-		strs[i] = addr.String()
-	}
-	return strings.Join(strs, ",")
-}
-
-// Set is a function to set the value of AddrList based on a string
-func (al *AddrList) Set(value string) error {
-	if len(*al) > 0 {
-		return fmt.Errorf("AddrList is already set")
-	}
-	for _, a := range strings.Split(value, ",") {
-		addr, err := ma.NewMultiaddr(a)
-		if err != nil {
-			return err
-		}
-		*al = append(*al, addr)
-	}
-	return nil
-}
-
-// StringsToAddrs convert a list of strings to a list of multiaddresses
-func StringsToAddrs(addrStrings []string) (maddrs []ma.Multiaddr, err error) {
-	for _, addrString := range addrStrings {
-		addr, err := ma.NewMultiaddr(addrString)
-		if err != nil {
-			return maddrs, err
-		}
-		maddrs = append(maddrs, addr)
-	}
-	return
-}
-
-// BootNodes is a list of boot nodes.
-// It is populated either from default or from user CLI input.
-// TODO: refactor p2p config into a config structure (now part of config is here, part is in
-//   nodeconfig)
-var BootNodes AddrList

@@ -16,8 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -34,6 +32,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/genesis"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -234,12 +233,7 @@ func setupPprof(config harmonyConfig) {
 
 func setupNodeAndRun(hc harmonyConfig) {
 	var err error
-	bootNodes := hc.Network.BootNodes
-	p2p.BootNodes, err = p2p.StringsToAddrs(bootNodes)
-	if err != nil {
-		utils.FatalErrMsg(err, "cannot parse bootnode list %#v",
-			bootNodes)
-	}
+
 	nodeconfigSetShardSchedule(hc)
 	nodeconfig.SetShardingSchedule(shard.Schedule)
 	nodeconfig.SetVersion(getHarmonyVersion())
@@ -397,6 +391,12 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	go listenOSSigAndShutDown(currentNode)
 
+	if err := myHost.Start(); err != nil {
+		utils.Logger().Fatal().
+			Err(err).
+			Msg("Start p2p host failed")
+	}
+
 	if err := currentNode.BootstrapConsensus(); err != nil {
 		fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
 		if !currentNode.NodeConfig.IsOffline {
@@ -543,7 +543,12 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
 
-	myHost, err = p2p.NewHost(&selfPeer, nodeConfig.P2PPriKey)
+	myHost, err = p2p.NewHost(p2p.HostConfig{
+		Self:          &selfPeer,
+		BLSKey:        nodeConfig.P2PPriKey,
+		BootNodes:     hc.Network.BootNodes,
+		DataStoreFile: hc.P2P.DHTDataStore,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
 	}
