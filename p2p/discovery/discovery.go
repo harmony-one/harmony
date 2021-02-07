@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+
 	"time"
 
 	"github.com/harmony-one/harmony/internal/utils"
