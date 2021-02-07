@@ -818,6 +818,7 @@ func (node *Node) StartPubSub() error {
 					msg := m
 					go func() {
 						defer cancel()
+
 						if semNode.TryAcquire(1) {
 							defer semNode.Release(1)
 
