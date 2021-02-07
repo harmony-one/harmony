@@ -31,7 +31,6 @@ import (
 type Host interface {
 	Start() error
 	Close() error
-
 	GetSelfPeer() Peer
 	AddPeer(*Peer) error
 	GetID() libp2p_peer.ID
