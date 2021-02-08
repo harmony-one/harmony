@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	hmy_rpc "github.com/harmony-one/harmony/rpc"
 )
 
 var (
@@ -39,7 +40,7 @@ type PublicFilterAPI struct {
 }
 
 // NewPublicFilterAPI returns a new PublicFilterAPI instance.
-func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
+func NewPublicFilterAPI(backend Backend, lightMode bool, namespace string) rpc.API {
 	api := &PublicFilterAPI{
 		backend: backend,
 		events:  NewEventSystem(backend, lightMode),
@@ -47,7 +48,12 @@ func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
 	}
 	go api.timeoutLoop()
 
-	return api
+	return rpc.API{
+		Namespace: namespace,
+		Version:   hmy_rpc.APIVersion,
+		Service:   api,
+		Public:    true,
+	}
 }
 
 // timeoutLoop runs every 5 minutes and deletes filters that have not been recently used.
