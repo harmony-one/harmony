@@ -27,7 +27,7 @@ func TestDownloader_doLongRangeSync(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !synced {
+	if synced == 0 {
 		t.Errorf("synced false")
 	}
 	if curNum := d.bc.CurrentBlock().NumberU64(); curNum != targetBN {

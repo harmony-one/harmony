@@ -727,6 +727,9 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 	s := sync.NewService(host, blockchains, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
+
+	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
+	node.Consensus.SetDownloader(d)
 }
 
 func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {

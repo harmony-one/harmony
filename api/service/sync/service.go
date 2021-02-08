@@ -7,27 +7,27 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 )
 
-// Service is simply a adapter of downloaders, which support block synchronization
+// Service is simply a adapter of Downloaders, which support block synchronization
 type Service struct {
-	downloaders *downloader.Downloaders
+	Downloaders *downloader.Downloaders
 }
 
 // NewService creates the a new downloader service
 func NewService(host p2p.Host, bcs []*core.BlockChain, config downloader.Config) *Service {
 	return &Service{
-		downloaders: downloader.NewDownloaders(host, bcs, config),
+		Downloaders: downloader.NewDownloaders(host, bcs, config),
 	}
 }
 
 // Start start the service
 func (s *Service) Start() error {
-	s.downloaders.Start()
+	s.Downloaders.Start()
 	return nil
 }
 
 // Stop stop the service
 func (s *Service) Stop() error {
-	s.downloaders.Close()
+	s.Downloaders.Close()
 	return nil
 }
 

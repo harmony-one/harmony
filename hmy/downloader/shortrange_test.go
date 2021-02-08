@@ -23,9 +23,12 @@ func TestDownloader_doShortRangeSync(t *testing.T) {
 		ctx:    context.Background(),
 		logger: zerolog.Logger{},
 	}
-	err := d.doShortRangeSync()
+	n, err := d.doShortRangeSync()
 	if err != nil {
 		t.Error(err)
+	}
+	if n == 0 {
+		t.Error("not synced")
 	}
 	if curNum := d.bc.CurrentBlock().NumberU64(); curNum != 105 {
 		t.Errorf("unexpected block number after sync: %v / %v", curNum, 105)

@@ -18,6 +18,9 @@ func NewDownloaders(host p2p.Host, bcs []*core.BlockChain, config Config) *Downl
 		if bc == nil {
 			continue
 		}
+		if _, ok := ds[bc.ShardID()]; ok {
+			continue
+		}
 		ds[bc.ShardID()] = NewDownloader(host, bc, config)
 	}
 	return &Downloaders{ds}

@@ -187,6 +187,9 @@ func (p *Protocol) advertise() time.Duration {
 			nextWait = w
 		}
 	}
+	if nextWait == 0 {
+		nextWait = 3 * time.Second
+	}
 	return nextWait
 }
 

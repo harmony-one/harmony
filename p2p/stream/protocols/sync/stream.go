@@ -55,7 +55,7 @@ func (p *Protocol) wrapStream(raw libp2p_network.Stream) *syncStream {
 }
 
 func (st *syncStream) run() {
-	go st.readMsgLoop()
+	st.readMsgLoop()
 	go st.handleReqLoop()
 	go st.handleRespLoop()
 }
