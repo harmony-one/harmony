@@ -61,6 +61,12 @@ type (
 		Discovery discovery.Discovery
 		ShardID   nodeconfig.ShardID
 		Network   nodeconfig.NetworkType
+
+		// stream manager config
+		SmSoftLowCap int
+		SmHardLowCap int
+		SmHiCap      int
+		DiscBatch    int
 	}
 )
 
@@ -77,7 +83,12 @@ func NewProtocol(config Config) *Protocol {
 		cancel: cancel,
 		closeC: make(chan struct{}),
 	}
-	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery)
+	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery, streammanager.Config{
+		SoftLoCap: config.SmSoftLowCap,
+		HardLoCap: config.SmHardLowCap,
+		HiCap:     config.SmHiCap,
+		DiscBatch: config.DiscBatch,
+	})
 	sp.rm = requestmanager.NewRequestManager(sp.sm)
 
 	sp.logger = utils.Logger().With().Str("Protocol", string(sp.ProtoID())).Logger()

@@ -42,6 +42,11 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 		Discovery: host.GetDiscovery(),
 		ShardID:   nodeconfig.ShardID(bc.ShardID()),
 		Network:   config.Network,
+
+		SmSoftLowCap: config.SmSoftLowCap,
+		SmHardLowCap: config.SmHardLowCap,
+		SmHiCap:      config.SmHiCap,
+		DiscBatch:    config.SmDiscBatch,
 	})
 	host.AddStreamProtocol(syncProtocol)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -131,7 +136,7 @@ func (d *Downloader) loop() {
 			go trigger()
 
 		case <-d.downloadC:
-			bnChanged, err := d.doDownload(initSync)
+			addedBN, err := d.doDownload(initSync)
 			if err != nil {
 				// If error happens, sleep 5 seconds and retry
 				d.logger.Warn().Err(err).Bool("bootstrap", initSync).Msg("failed to download")
@@ -142,7 +147,7 @@ func (d *Downloader) loop() {
 			}
 			d.logger.Info().Bool("initSync", initSync).Msg("sync finished")
 
-			if bnChanged {
+			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
 				go trigger()
 			}
@@ -160,21 +165,13 @@ func (d *Downloader) loop() {
 	}
 }
 
-func (d *Downloader) doDownload(initSync bool) (bnChanged bool, err error) {
-	initBN := d.bc.CurrentBlock().NumberU64()
-	defer func() {
-		if endBN := d.bc.CurrentBlock().NumberU64(); endBN != initBN {
-			bnChanged = true
-		}
-	}()
-
+func (d *Downloader) doDownload(initSync bool) (n int, err error) {
 	if initSync {
-		err = d.doLongRangeSync()
+		n, err = d.doLongRangeSync()
 	} else {
-		err = d.doShortRangeSync()
+		n, err = d.doShortRangeSync()
 	}
 	if err != nil {
-		d.logger.Warn().Err(err).Msg("failed to download")
 		return
 	}
 	return

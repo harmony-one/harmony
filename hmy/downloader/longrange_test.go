@@ -23,9 +23,12 @@ func TestDownloader_doLongRangeSync(t *testing.T) {
 		},
 		ctx: context.Background(),
 	}
-	err := d.doLongRangeSync()
+	synced, err := d.doLongRangeSync()
 	if err != nil {
 		t.Error(err)
+	}
+	if !synced {
+		t.Errorf("synced false")
 	}
 	if curNum := d.bc.CurrentBlock().NumberU64(); curNum != targetBN {
 		t.Errorf("block number not expected: %v / %v", curNum, targetBN)

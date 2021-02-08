@@ -7,11 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -49,7 +51,7 @@ func getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	neighbor.Range(func(k, v interface{}) bool {
 		p := v.(p2p.Peer)
 		t := p.Port
-		p.Port = syncing.GetSyncingPort(t)
+		p.Port = legacysync.GetSyncingPort(t)
 		tmp = append(tmp, p)
 		return true
 	})
@@ -69,8 +71,8 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
-func (node *Node) getStateSync() *syncing.StateSync {
-	return syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port,
+func (node *Node) getStateSync() *legacysync.StateSync {
+	return legacysync.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port,
 		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode)
 }
 
@@ -176,8 +178,8 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 	return peers, nil
 }
 
-// DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
-func (node *Node) DoBeaconSyncing() {
+// doBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
+func (node *Node) doBeaconSyncing() {
 	if node.NodeConfig.IsOffline {
 		return
 	}
@@ -245,7 +247,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	if node.stateSync.GetActivePeerNumber() < syncing.NumPeersLowBound {
+	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
@@ -279,13 +281,25 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	node.IsInSync.Set()
 }
 
-// SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
-func (node *Node) SupportBeaconSyncing() {
-	go node.DoBeaconSyncing()
+// SupportGRPCSyncServer do gRPC sync server
+func (node *Node) SupportGRPCSyncServer() {
+	node.InitSyncingServer()
+	node.StartSyncingServer()
 }
 
-// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) SupportSyncing() {
+// StartGRPCSyncClient start the legacy gRPC sync process
+func (node *Node) StartGRPCSyncClient() {
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		utils.Logger().Info().
+			Uint32("shardID", node.Blockchain().ShardID()).
+			Msg("SupportBeaconSyncing")
+		go node.doBeaconSyncing()
+	}
+	node.supportSyncing()
+}
+
+// supportSyncing keeps sleeping until it's doing consensus or it's a leader.
+func (node *Node) supportSyncing() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
 
@@ -321,7 +335,7 @@ func (node *Node) InitSyncingServer() {
 func (node *Node) StartSyncingServer() {
 	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+		node.downloaderServer.Start(node.SelfPeer.IP, legacysync.GetSyncingPort(node.SelfPeer.Port))
 	}
 }
 
@@ -371,7 +385,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if request.BlockHash == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
-		if request.Size == 0 || request.Size > syncing.SyncLoopBatchSize {
+		if request.Size == 0 || request.Size > legacysync.SyncLoopBatchSize {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
 		}
 		size := uint64(request.Size)
@@ -465,7 +479,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			syncPort := syncing.GetSyncingPort(port)
+			syncPort := legacysync.GetSyncingPort(port)
 			client := downloader.ClientSetup(ip, syncPort)
 			if client == nil {
 				utils.Logger().Warn().

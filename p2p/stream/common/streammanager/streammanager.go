@@ -53,15 +53,12 @@ type streamManager struct {
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
-func NewStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, opts ...Option) StreamManager {
-	return newStreamManager(pid, host, pf, opts...)
+func NewStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, c Config) StreamManager {
+	return newStreamManager(pid, host, pf, c)
 }
 
 // newStreamManager creates a new stream manager
-func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, opts ...Option) *streamManager {
-	c := defConfig
-	c.applyOptions(opts...)
-
+func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, c Config) *streamManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := utils.Logger().With().Str("module", "stream manager").

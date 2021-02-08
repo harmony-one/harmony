@@ -20,12 +20,19 @@ var (
 	testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0")
 )
 
+var defConfig = Config{
+	HardLoCap: DefHardLoCap,
+	SoftLoCap: DefSoftLoCap,
+	HiCap:     DefHiCap,
+	DiscBatch: DefDiscBatch,
+}
+
 func newTestStreamManager() *streamManager {
 	pid := testProtoID
 	host := newTestHost()
 	pf := newTestPeerFinder(makeRemotePeers(100), emptyDelayFunc)
 
-	sm := newStreamManager(pid, host, pf)
+	sm := newStreamManager(pid, host, pf, defConfig)
 	host.sm = sm
 	return sm
 }

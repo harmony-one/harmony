@@ -1,4 +1,4 @@
-package syncing
+package legacysync
 
 import "errors"
 

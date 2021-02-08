@@ -21,7 +21,7 @@ import (
 // 1. Obtain the block hashes and ompute the longest hash chain..
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
-func (d *Downloader) doShortRangeSync() error {
+func (d *Downloader) doShortRangeSync() (int, error) {
 	sh := &srHelper{
 		bc:           d.bc,
 		syncProtocol: d.syncProtocol,
@@ -31,28 +31,29 @@ func (d *Downloader) doShortRangeSync() error {
 	}
 
 	if err := sh.checkPrerequisites(); err != nil {
-		return errors.Wrap(err, "prerequisite")
+		return 0, errors.Wrap(err, "prerequisite")
 	}
 	hashChain, whitelist, err := sh.getHashChain()
 	if err != nil {
-		return errors.Wrap(err, "getHashChain")
+		return 0, errors.Wrap(err, "getHashChain")
 	}
 	if len(hashChain) == 0 {
 		// short circuit for no sync is needed
-		return nil
+		return 0, nil
 	}
 	blocks, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
 		if err != context.Canceled {
 			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
 		}
-		return errors.Wrap(err, "getBlocksByHashes")
+		return 0, errors.Wrap(err, "getBlocksByHashes")
 	}
-	if _, err := d.bc.InsertChain(blocks, true); err != nil {
+	n, err := d.bc.InsertChain(blocks, true)
+	if err != nil {
 		sh.removeStreams(whitelist)
-		return errors.Wrap(err, "InsertChain")
+		return n, errors.Wrap(err, "InsertChain")
 	}
-	return nil
+	return n, nil
 }
 
 type srHelper struct {

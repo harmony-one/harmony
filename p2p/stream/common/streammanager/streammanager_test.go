@@ -119,12 +119,12 @@ func TestStreamManager_HandleNewStream(t *testing.T) {
 	}{
 		{
 			stream:  newTestStream(makeStreamID(100), testProtoID),
-			expSize: defDiscBatch + 1,
+			expSize: DefDiscBatch + 1,
 			expErr:  nil,
 		},
 		{
 			stream:  newTestStream(makeStreamID(1), testProtoID),
-			expSize: defDiscBatch,
+			expSize: DefDiscBatch,
 			expErr:  errors.New("stream already exist"),
 		},
 	}
@@ -153,13 +153,13 @@ func TestStreamManager_HandleRemoveStream(t *testing.T) {
 	}{
 		{
 			id:      makeStreamID(1),
-			expSize: defDiscBatch - 1,
+			expSize: DefDiscBatch - 1,
 			expErr:  nil,
 		},
 		{
 			id:      makeStreamID(100),
-			expSize: defDiscBatch,
-			expErr:  errors.New("stream not exist in manager"),
+			expSize: DefDiscBatch,
+			expErr:  errors.New("stream already removed"),
 		},
 	}
 	for i, test := range tests {

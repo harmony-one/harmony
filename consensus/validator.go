@@ -402,14 +402,3 @@ func (consensus *Consensus) broadcastConsensusP2pMessages(p2pMsgs []*NetworkMess
 	}
 	return nil
 }
-
-func (consensus *Consensus) spinUpStateSync() {
-	select {
-	case consensus.BlockNumLowChan <- struct{}{}:
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	default:
-	}
-}

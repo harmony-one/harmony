@@ -190,6 +190,8 @@ func (st *testP2PStream) Write(p []byte) (n int, err error) {
 }
 
 func (st *testP2PStream) Close() error                     { return nil }
+func (st *testP2PStream) CloseRead() error                 { return nil }
+func (st *testP2PStream) CloseWrite() error                { return nil }
 func (st *testP2PStream) Reset() error                     { return nil }
 func (st *testP2PStream) SetDeadline(time.Time) error      { return nil }
 func (st *testP2PStream) SetReadDeadline(time.Time) error  { return nil }

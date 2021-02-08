@@ -16,10 +16,10 @@ import (
 // doLongRangeSync does the long range sync.
 // One LongRangeSync consists of several iterations.
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
-func (d *Downloader) doLongRangeSync() error {
+func (d *Downloader) doLongRangeSync() (int, error) {
+	var totalInserted int
 	for {
 		ctx, cancel := context.WithCancel(d.ctx)
-		initBN := d.bc.CurrentBlock().NumberU64()
 
 		iter := &lrSyncIter{
 			chain:    d.bc,
@@ -30,13 +30,14 @@ func (d *Downloader) doLongRangeSync() error {
 		}
 		if err := iter.doLongRangeSync(); err != nil {
 			cancel()
-			return err
+			return totalInserted + iter.inserted, err
 		}
 		cancel()
 
-		endBN := d.bc.CurrentBlock().NumberU64()
-		if endBN-initBN < lastMileThres {
-			return nil
+		totalInserted += iter.inserted
+
+		if iter.inserted < lastMileThres {
+			return totalInserted, nil
 		}
 	}
 }
@@ -48,7 +49,8 @@ type lrSyncIter struct {
 	chain    blockChain
 	protocol syncProtocol
 
-	gbm *getBlocksManager // initialized when finished get block number
+	gbm      *getBlocksManager // initialized when finished get block number
+	inserted int
 
 	config Config
 	ctx    context.Context
@@ -193,6 +195,7 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult) {
 	blocks := blockResultsToBlocks(results)
 
 	n, err := lsi.chain.InsertChain(blocks, true)
+	lsi.inserted += n
 	if err != nil {
 		lsi.protocol.RemoveStream(results[n].stid)
 		lsi.gbm.HandleInsertError(results, n)

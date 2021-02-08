@@ -1,4 +1,4 @@
-package syncing
+package legacysync
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ import (
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
@@ -1045,6 +1045,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	ss.purgeAllBlocksFromCache()
 }
 
+// Deprecated: this function has been moved to consensus module in new downloader logic
 func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
 	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)

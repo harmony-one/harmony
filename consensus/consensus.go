@@ -5,13 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
@@ -130,6 +131,11 @@ type Consensus struct {
 	finality int64
 	// finalityCounter keep tracks of the finality time
 	finalityCounter int64
+
+	// Trigger sync and subscribe download finished event to add last mile block
+	downloader  downloader
+	downloadCh  chan struct{}
+	downloadSub event.Subscription
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

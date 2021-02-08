@@ -102,6 +102,44 @@ var defaultPrometheusConfig = prometheusConfig{
 	Gateway:    "https://gateway.harmony.one",
 }
 
+var (
+	defaultMainnetSyncConfig = syncConfig{
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    16,
+		MinPeers:       16,
+		InitStreams:    32,
+		DiscSoftLowCap: 16,
+		DiscHardLowCap: 32,
+		DiscHighCap:    128,
+		DiscBatch:      16,
+	}
+
+	defaultTestNetSyncConfig = syncConfig{
+		LegacyServer:   false,
+		LegacyClient:   false,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
+		DiscHighCap:    1024,
+		DiscBatch:      2,
+	}
+
+	defaultElseSyncConfig = syncConfig{
+		LegacyServer:   false,
+		LegacyClient:   false,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
+		DiscHighCap:    1024,
+		DiscBatch:      2,
+	}
+)
+
 const (
 	defaultBroadcastInvalidTx = true
 )
@@ -114,6 +152,8 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 		devnet := getDefaultDevnetConfigCopy()
 		config.Devnet = &devnet
 	}
+	config.Sync = getDefaultSyncConfig(nt)
+
 	return config
 }
 

@@ -28,6 +28,7 @@ type harmonyConfig struct {
 	TxPool     txPoolConfig
 	Pprof      pprofConfig
 	Log        logConfig
+	Sync       syncConfig
 	Sys        *sysConfig        `toml:",omitempty"`
 	Consensus  *consensusConfig  `toml:",omitempty"`
 	Devnet     *devnetConfig     `toml:",omitempty"`
@@ -152,6 +153,18 @@ type prometheusConfig struct {
 	Gateway    string
 }
 
+type syncConfig struct {
+	LegacyServer   bool
+	LegacyClient   bool
+	Concurrency    int
+	MinPeers       int
+	InitStreams    int
+	DiscSoftLowCap int
+	DiscHardLowCap int
+	DiscHighCap    int
+	DiscBatch      int
+}
+
 // TODO: use specific type wise validation instead of general string types assertion.
 func validateHarmonyConfig(config harmonyConfig) error {
 	var accepts []string
@@ -211,6 +224,17 @@ func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 		LegacySyncing: false,
 		DNSZone:       zone,
 		DNSPort:       port,
+	}
+}
+
+func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
+	switch nt {
+	case nodeconfig.Mainnet:
+		return defaultMainnetSyncConfig
+	case nodeconfig.Testnet:
+		return defaultTestNetSyncConfig
+	default:
+		return defaultElseSyncConfig
 	}
 }
 

@@ -467,6 +467,8 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
+
+	go consensus.downloadFinishedLoop()
 }
 
 // Close close the consensus. If current is in normal commit phase, wait until the commit
@@ -475,6 +477,8 @@ func (consensus *Consensus) Close() error {
 	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
 		return nil
 	}
+	consensus.downloadSub.Unsubscribe()
+
 	// We only need to wait consensus is in normal commit phase
 	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
 

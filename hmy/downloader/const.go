@@ -10,7 +10,7 @@ const (
 	numBlocksByHashesUpperCap int = 10 // number of get blocks by hashes upper cap
 	numBlocksByHashesLowerCap int = 3  // number of get blocks by hashes lower cap
 
-	lastMileThres uint64 = 10
+	lastMileThres int = 10
 
 	// soft cap of size in resultQueue. When the queue size is larger than this limit,
 	// no more request will be assigned to workers to wait for InsertChain to finish.
@@ -25,6 +25,12 @@ type Config struct {
 	Concurrency int // Number of concurrent sync requests
 	MinStreams  int // Minimum number of streams to do sync
 	InitStreams int // Number of streams requirement for initial bootstrap
+
+	// stream manager config
+	SmSoftLowCap int
+	SmHardLowCap int
+	SmHiCap      int
+	SmDiscBatch  int
 }
 
 func (c *Config) fixValues() {
@@ -36,5 +42,11 @@ func (c *Config) fixValues() {
 	}
 	if c.MinStreams > c.InitStreams {
 		c.InitStreams = c.MinStreams
+	}
+	if c.MinStreams > c.SmSoftLowCap {
+		c.SmSoftLowCap = c.MinStreams
+	}
+	if c.MinStreams > c.SmHardLowCap {
+		c.SmHardLowCap = c.MinStreams
 	}
 }

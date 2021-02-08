@@ -20,13 +20,15 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/prometheus"
-	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/api/service/sync"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -204,6 +206,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
+	applySyncFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyConfig) {
@@ -354,6 +357,8 @@ func setupNodeAndRun(hc harmonyConfig) {
 		).
 		Msg(startMsg)
 
+	setupSyncService(currentNode, myHost, hc)
+
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
@@ -363,13 +368,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
 	}
 
-	// TODO: replace this legacy syncing
-	currentNode.SupportSyncing()
-	if nodeConfig.ShardID != shard.BeaconChainShardID {
-		utils.Logger().Info().
-			Uint32("shardID", currentNode.Blockchain().ShardID()).
-			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		currentNode.SupportBeaconSyncing()
+	// TODO: probably replace this legacy syncing after a hard fork
+	if hc.Sync.LegacyServer {
+		utils.Logger().Info().Msg("support gRPC sync server")
+		currentNode.SupportGRPCSyncServer()
+	}
+	if hc.Sync.LegacyClient {
+		utils.Logger().Info().Msg("go with gRPC sync client")
+		currentNode.StartGRPCSyncClient()
 	}
 
 	if err := currentNode.StartServices(); err != nil {
@@ -396,6 +402,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Err(err).
 			Msg("Start p2p host failed")
 	}
+
+	// Start the node
+	currentNode.StartServices()
 
 	if err := currentNode.BootstrapConsensus(); err != nil {
 		fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
@@ -620,6 +629,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		currentNode.BroadcastInvalidTx = defaultBroadcastInvalidTx
 	}
 
+	// TODO: Sort out these logics after replacing stream sync.
 	// Syncing provider is provided by following rules:
 	//   1. If starting with a localnet or offline, use local sync peers.
 	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
@@ -633,7 +643,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	} else if hc.Network.LegacySyncing {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, syncing.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, legacysync.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
@@ -697,6 +707,26 @@ func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
 	}
 	p := prometheus.NewService(prometheusConfig)
 	node.RegisterService(service.Prometheus, p)
+}
+
+func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
+	blockchains := []*core.BlockChain{
+		node.Blockchain(),
+		node.Beaconchain(),
+	} // The duplicate blockchain will be skipped in config parsing
+	dConfig := downloader.Config{
+		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
+		Concurrency:  hc.Sync.Concurrency,
+		MinStreams:   hc.Sync.MinPeers,
+		InitStreams:  hc.Sync.InitStreams,
+		SmSoftLowCap: hc.Sync.DiscSoftLowCap,
+		SmHardLowCap: hc.Sync.DiscHardLowCap,
+		SmHiCap:      hc.Sync.DiscHighCap,
+		SmDiscBatch:  hc.Sync.DiscBatch,
+	}
+	s := sync.NewService(host, blockchains, dConfig)
+
+	node.RegisterService(service.Synchronize, s)
 }
 
 func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {
