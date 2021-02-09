@@ -28,11 +28,10 @@ type stream struct {
 type request struct {
 	sttypes.Request // underlying request
 	// result field
-	respC chan deliverData // channel to receive response from delivered message
-	err   error
+	respC chan responseData // channel to receive response from delivered message
 	// concurrency control
-	waitCh      chan struct{} // channel to wait for the request to be canceled or answered
-	atmCanceled uint32
+	atmDone uint32
+	doneC   chan struct{}
 	// stream info
 	owner *stream // Current owner
 	// utils
@@ -42,10 +41,6 @@ type request struct {
 	priority  reqPriority
 	blacklist map[sttypes.StreamID]struct{} // banned streams
 	whitelist map[sttypes.StreamID]struct{} // allowed streams
-}
-
-func (req *request) clearOwner() {
-	req.owner = nil
 }
 
 func (req *request) ReqID() uint64 {
@@ -62,13 +57,17 @@ func (req *request) SetReqID(val uint64) {
 	req.Request.SetReqID(val)
 }
 
-func (req *request) cancel() {
-	close(req.waitCh)
-	atomic.StoreUint32(&req.atmCanceled, 1)
+func (req *request) doneWithResponse(resp responseData) {
+	notDone := atomic.CompareAndSwapUint32(&req.atmDone, 0, 1)
+	if notDone {
+		req.respC <- resp
+		close(req.respC)
+		close(req.doneC)
+	}
 }
 
-func (req *request) isCanceled() bool {
-	return atomic.LoadUint32(&req.atmCanceled) == 1
+func (req *request) isDone() bool {
+	return atomic.LoadUint32(&req.atmDone) == 1
 }
 
 func (req *request) isStreamAllowed(stid sttypes.StreamID) bool {
@@ -114,31 +113,29 @@ func (st *stream) clearPendingRequest() *request {
 	return req
 }
 
-type deliverData struct {
-	resp sttypes.Response
-	stID sttypes.StreamID
+type cancelReqData struct {
+	reqID uint64
+	err   error
 }
 
-// response is the wrapped response for stream requests
-type response struct {
-	raw  sttypes.Response
+// responseData is the wrapped response for stream requests
+type responseData struct {
+	resp sttypes.Response
 	stID sttypes.StreamID
 	err  error
 }
 
 // requestQueue is a wrapper of double linked list with Request as type
 type requestQueue struct {
-	reqsPHigh   *list.List // high priority, currently defined by upper function calls
-	reqsPMedium *list.List // medium priority, referring to the retrying requests
-	reqsPLow    *list.List // low priority, applied to all normal requests
-	lock        sync.Mutex
+	reqsPHigh *list.List // high priority, currently defined by upper function calls
+	reqsPLow  *list.List // low priority, applied to all normal requests
+	lock      sync.Mutex
 }
 
 func newRequestQueue() requestQueue {
 	return requestQueue{
-		reqsPHigh:   list.New(),
-		reqsPMedium: list.New(),
-		reqsPLow:    list.New(),
+		reqsPHigh: list.New(),
+		reqsPLow:  list.New(),
 	}
 }
 
@@ -149,9 +146,6 @@ func (q *requestQueue) Push(req *request, priority reqPriority) error {
 
 	if priority == reqPriorityHigh || req.priority == reqPriorityHigh {
 		return pushRequestToList(q.reqsPHigh, req)
-	}
-	if priority == reqPriorityMed || req.priority == reqPriorityMed {
-		return pushRequestToList(q.reqsPMedium, req)
 	}
 	if priority == reqPriorityLow {
 		return pushRequestToList(q.reqsPLow, req)
@@ -165,9 +159,6 @@ func (q *requestQueue) Pop() *request {
 	defer q.lock.Unlock()
 
 	if req := popRequestFromList(q.reqsPHigh); req != nil {
-		return req
-	}
-	if req := popRequestFromList(q.reqsPMedium); req != nil {
 		return req
 	}
 	return popRequestFromList(q.reqsPLow)

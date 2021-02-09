@@ -17,35 +17,24 @@ func TestRequestQueue_Push(t *testing.T) {
 		expErr   error
 	}{
 		{
-			initSize: []int{10, 10, 10},
+			initSize: []int{10, 10},
 			priority: reqPriorityHigh,
-			expSize:  []int{11, 10, 10},
+			expSize:  []int{11, 10},
 			expErr:   nil,
 		},
 		{
-			initSize: []int{10, 10, 10},
-			priority: reqPriorityMed,
-			expSize:  []int{10, 11, 10},
-			expErr:   nil,
-		},
-		{
-			initSize: []int{10, 10, 10},
+			initSize: []int{10, 10},
 			priority: reqPriorityLow,
-			expSize:  []int{10, 10, 11},
+			expSize:  []int{10, 11},
 			expErr:   nil,
 		},
 		{
-			initSize: []int{maxWaitingSize, maxWaitingSize, maxWaitingSize},
+			initSize: []int{maxWaitingSize, maxWaitingSize},
 			priority: reqPriorityLow,
 			expErr:   ErrQueueFull,
 		},
 		{
-			initSize: []int{maxWaitingSize, maxWaitingSize, maxWaitingSize},
-			priority: reqPriorityMed,
-			expErr:   ErrQueueFull,
-		},
-		{
-			initSize: []int{maxWaitingSize, maxWaitingSize, maxWaitingSize},
+			initSize: []int{maxWaitingSize, maxWaitingSize},
 			priority: reqPriorityHigh,
 			expErr:   ErrQueueFull,
 		},
@@ -76,27 +65,21 @@ func TestRequestQueue_Pop(t *testing.T) {
 		expSizes  []int
 	}{
 		{
-			initSizes: []int{10, 10, 10},
+			initSizes: []int{10, 10},
 			expNil:    false,
 			expIndex:  0,
-			expSizes:  []int{9, 10, 10},
+			expSizes:  []int{9, 10},
 		},
 		{
-			initSizes: []int{0, 10, 10},
+			initSizes: []int{0, 10},
 			expNil:    false,
 			expIndex:  0,
-			expSizes:  []int{0, 9, 10},
+			expSizes:  []int{0, 9},
 		},
 		{
-			initSizes: []int{0, 0, 10},
-			expNil:    false,
-			expIndex:  0,
-			expSizes:  []int{0, 0, 9},
-		},
-		{
-			initSizes: []int{0, 0, 0},
+			initSizes: []int{0, 0},
 			expNil:    true,
-			expSizes:  []int{0, 0, 0},
+			expSizes:  []int{0, 0},
 		},
 	}
 	for i, test := range tests {
@@ -120,7 +103,7 @@ func TestRequestQueue_Pop(t *testing.T) {
 }
 
 func makeTestRequestQueue(sizes []int) requestQueue {
-	if len(sizes) != 3 {
+	if len(sizes) != 2 {
 		panic("unexpected sizes")
 	}
 	q := newRequestQueue()
@@ -131,10 +114,6 @@ func makeTestRequestQueue(sizes []int) requestQueue {
 		index++
 	}
 	for i := 0; i != sizes[1]; i++ {
-		q.reqsPMedium.PushBack(wrapRequestFromRaw(makeTestRequest(uint64(index))))
-		index++
-	}
-	for i := 0; i != sizes[2]; i++ {
 		q.reqsPLow.PushBack(wrapRequestFromRaw(makeTestRequest(uint64(index))))
 		index++
 	}
@@ -160,16 +139,13 @@ func getTestRequestFromElem(elem *list.Element) (*testRequest, error) {
 }
 
 func (q *requestQueue) checkSizes(sizes []int) error {
-	if len(sizes) != 3 {
-		panic("expect 3 sizes")
+	if len(sizes) != 2 {
+		panic("expect 2 sizes")
 	}
 	if q.reqsPHigh.Len() != sizes[0] {
 		return fmt.Errorf("high priority %v / %v", q.reqsPHigh.Len(), sizes[0])
 	}
-	if q.reqsPMedium.Len() != sizes[1] {
-		return fmt.Errorf("medium priority %v / %v", q.reqsPMedium.Len(), sizes[1])
-	}
-	if q.reqsPLow.Len() != sizes[2] {
+	if q.reqsPLow.Len() != sizes[1] {
 		return fmt.Errorf("low priority %v / %v", q.reqsPLow.Len(), sizes[2])
 	}
 	return nil

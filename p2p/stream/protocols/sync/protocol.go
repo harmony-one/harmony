@@ -83,12 +83,15 @@ func NewProtocol(config Config) *Protocol {
 		cancel: cancel,
 		closeC: make(chan struct{}),
 	}
-	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery, streammanager.Config{
+	smConfig := streammanager.Config{
 		SoftLoCap: config.SmSoftLowCap,
 		HardLoCap: config.SmHardLowCap,
 		HiCap:     config.SmHiCap,
 		DiscBatch: config.DiscBatch,
-	})
+	}
+	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery,
+		sp.HandleStream, smConfig)
+
 	sp.rm = requestmanager.NewRequestManager(sp.sm)
 
 	sp.logger = utils.Logger().With().Str("Protocol", string(sp.ProtoID())).Logger()
@@ -187,8 +190,8 @@ func (p *Protocol) advertise() time.Duration {
 			nextWait = w
 		}
 	}
-	if nextWait == 0 {
-		nextWait = 3 * time.Second
+	if nextWait < minAdvertiseInterval {
+		nextWait = minAdvertiseInterval
 	}
 	return nextWait
 }

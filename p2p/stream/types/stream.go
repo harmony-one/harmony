@@ -1,8 +1,11 @@
 package sttypes
 
 import (
-	"io/ioutil"
+	"bufio"
+	"encoding/binary"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 )
@@ -21,6 +24,7 @@ type Stream interface {
 // BaseStream is the wrapper around
 type BaseStream struct {
 	raw libp2p_network.Stream
+	rw  *bufio.ReadWriter
 
 	// parse protocol spec fields
 	spec     ProtoSpec
@@ -30,8 +34,10 @@ type BaseStream struct {
 
 // NewBaseStream creates BaseStream as the wrapper of libp2p Stream
 func NewBaseStream(st libp2p_network.Stream) *BaseStream {
+	rw := bufio.NewReadWriter(bufio.NewReader(st), bufio.NewWriter(st))
 	return &BaseStream{
 		raw: st,
+		rw:  rw,
 	}
 }
 
@@ -41,7 +47,7 @@ type StreamID string
 
 // Meta return the StreamID of the stream
 func (st *BaseStream) ID() StreamID {
-	return StreamID(st.raw.ID())
+	return StreamID(st.raw.Conn().ID())
 }
 
 // ProtoID return the remote protocol ID of the stream
@@ -62,17 +68,53 @@ func (st *BaseStream) Close() error {
 	return st.raw.Reset()
 }
 
-// WriteBytes write the bytes to the stream
+const (
+	maxMsgBytes = 20 * 1024 * 1024 // 20MB
+	sizeBytes   = 4                // uint32
+)
+
+// WriteBytes write the bytes to the stream.
+// First 4 bytes is used as the size bytes, and the rest is the content
 func (st *BaseStream) WriteBytes(b []byte) error {
-	_, err := st.raw.Write(b)
-	return err
+	if len(b) > maxMsgBytes {
+		return errors.New("message too long")
+	}
+	if _, err := st.rw.Write(intToBytes(len(b))); err != nil {
+		return errors.Wrap(err, "write size bytes")
+	}
+	if _, err := st.rw.Write(b); err != nil {
+		return errors.Wrap(err, "write content")
+	}
+	return st.rw.Flush()
 }
 
 // ReadMsg read the bytes from the stream
 func (st *BaseStream) ReadBytes() ([]byte, error) {
-	b, err := ioutil.ReadAll(st.raw)
+	sb := make([]byte, sizeBytes)
+	_, err := st.rw.Read(sb)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "read size")
 	}
-	return b, nil
+	size := bytesToInt(sb)
+
+	cb := make([]byte, size)
+	n, err := st.rw.Read(cb)
+	if err != nil {
+		return nil, errors.Wrap(err, "read content")
+	}
+	if n != size {
+		return nil, errors.New("ReadBytes sanity failed: byte size")
+	}
+	return cb, nil
+}
+
+func intToBytes(val int) []byte {
+	b := make([]byte, sizeBytes) // uint32
+	binary.LittleEndian.PutUint32(b, uint32(val))
+	return b
+}
+
+func bytesToInt(b []byte) int {
+	val := binary.LittleEndian.Uint32(b)
+	return int(val)
 }

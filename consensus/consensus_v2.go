@@ -474,11 +474,15 @@ func (consensus *Consensus) Start(
 // Close close the consensus. If current is in normal commit phase, wait until the commit
 // phase end.
 func (consensus *Consensus) Close() error {
-	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
-		return nil
-	}
 	consensus.downloadSub.Unsubscribe()
+	consensus.waitForCommit()
+	return nil
+}
 
+func (consensus *Consensus) waitForCommit() {
+	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
+		return
+	}
 	// We only need to wait consensus is in normal commit phase
 	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
 
@@ -487,7 +491,6 @@ func (consensus *Consensus) Close() error {
 		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
 		time.Sleep(time.Millisecond * 100)
 	}
-	return nil
 }
 
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.

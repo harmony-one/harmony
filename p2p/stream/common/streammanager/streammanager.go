@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/pkg/errors"
@@ -37,8 +38,9 @@ type streamManager struct {
 	// protocol ID (e.g. different version)
 	streams *streamSet
 	// libp2p utilities
-	host host
-	pf   peerFinder
+	host         host
+	pf           peerFinder
+	handleStream func(stream network.Stream)
 	// incoming task channels
 	addStreamCh chan addStreamTask
 	rmStreamCh  chan rmStreamTask
@@ -53,12 +55,12 @@ type streamManager struct {
 }
 
 // NewStreamManager creates a new stream manager for the given proto ID
-func NewStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, c Config) StreamManager {
-	return newStreamManager(pid, host, pf, c)
+func NewStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStream func(network.Stream), c Config) StreamManager {
+	return newStreamManager(pid, host, pf, handleStream, c)
 }
 
 // newStreamManager creates a new stream manager
-func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, c Config) *streamManager {
+func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStream func(network.Stream), c Config) *streamManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	logger := utils.Logger().With().Str("module", "stream manager").
@@ -67,16 +69,17 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, c Config) *
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
 	return &streamManager{
-		myProtoID:   pid,
-		myProtoSpec: protoSpec,
-		config:      c,
-		streams:     newStreamSet(),
-		host:        host,
-		pf:          pf,
-		addStreamCh: make(chan addStreamTask),
-		rmStreamCh:  make(chan rmStreamTask),
-		stopCh:      make(chan stopTask),
-		discCh:      make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
+		myProtoID:    pid,
+		myProtoSpec:  protoSpec,
+		config:       c,
+		streams:      newStreamSet(),
+		host:         host,
+		pf:           pf,
+		handleStream: handleStream,
+		addStreamCh:  make(chan addStreamTask),
+		rmStreamCh:   make(chan rmStreamTask),
+		stopCh:       make(chan stopTask),
+		discCh:       make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
 
 		logger: logger,
 		ctx:    ctx,
@@ -302,8 +305,14 @@ func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_pee
 	nCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
-	_, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.myProtoID))
-	return err
+	st, err := sm.host.NewStream(nCtx, pid, protocol.ID(sm.myProtoID))
+	if err != nil {
+		return err
+	}
+	if sm.handleStream != nil {
+		sm.handleStream(st)
+	}
+	return nil
 }
 
 func (sm *streamManager) softHaveEnoughStreams() bool {

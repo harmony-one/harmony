@@ -31,7 +31,7 @@ func TestRequestManager_Request_Normal(t *testing.T) {
 		t.Errorf("unexpected error: %v", res.err)
 		return
 	}
-	if err := req.checkResponse(res.raw); err != nil {
+	if err := req.checkResponse(res.resp); err != nil {
 		t.Error(err)
 	}
 	if res.stID == "" {
@@ -58,36 +58,8 @@ func TestRequestManager_Request_Cancel(t *testing.T) {
 	if res.err != context.Canceled {
 		t.Errorf("unexpected error: %v", res.err)
 	}
-	if res.stID != "" {
-		t.Errorf("unexpected stid")
-	}
-}
-
-// request is timed out and retried
-func TestRequestManager_Request_Retry(t *testing.T) {
-	// Block for first try and
-	delayF := makeOnceBlockDelayFunc(150 * time.Millisecond)
-	respF := makeDefaultResponseFunc()
-
-	ts := newTestSuite(delayF, respF, 3)
-	ts.Start()
-	defer ts.Close()
-
-	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	resC := ts.rm.doRequestAsync(ctx, req)
-
-	time.Sleep(defTestSleep)
-
-	res := <-resC
-	if res.err != nil {
-		t.Errorf("unexpected error: %v", res.err)
-	}
-	if err := req.checkResponse(res.raw); err != nil {
-		t.Error(err)
-	}
 	if res.stID == "" {
-		t.Errorf("unexpected stid")
+		t.Errorf("unexpected canceled request should also have stid")
 	}
 }
 
@@ -129,14 +101,8 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 
 	// the request is rescheduled thus there is supposed to be no errors
 	res := <-resC
-	if res.err != nil {
-		t.Errorf("unexpected error: %v", res.err)
-	}
-	if err := req.checkResponse(res.raw); err != nil {
-		t.Error(err)
-	}
-	if res.stID == "" {
-		t.Errorf("unexpected stid")
+	if res.err == nil {
+		t.Errorf("unexpected error: %v", errors.New("stream removed when doing request"))
 	}
 
 	ts.rm.lock.Lock()
@@ -237,7 +203,7 @@ func TestRequestManager_Request_Blacklist(t *testing.T) {
 		t.Errorf("unexpected error: %v", res.err)
 		return
 	}
-	if err := req.checkResponse(res.raw); err != nil {
+	if err := req.checkResponse(res.resp); err != nil {
 		t.Error(err)
 	}
 	if res.stID != makeStreamID(3) {
@@ -262,7 +228,7 @@ func TestRequestManager_Request_Whitelist(t *testing.T) {
 		t.Errorf("unexpected error: %v", res.err)
 		return
 	}
-	if err := req.checkResponse(res.raw); err != nil {
+	if err := req.checkResponse(res.resp); err != nil {
 		t.Error(err)
 	}
 	if res.stID != makeStreamID(3) {
