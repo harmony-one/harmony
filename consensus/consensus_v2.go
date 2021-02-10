@@ -555,17 +555,17 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return err
 	}
 
-	go func() {
-		msgToSend, FBFTMsg :=
-			network.Bytes,
-			network.FBFTMsg
-		bareMinimumCommit := FBFTMsg.Payload
-		consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
+	msgToSend, FBFTMsg :=
+		network.Bytes,
+		network.FBFTMsg
+	bareMinimumCommit := FBFTMsg.Payload
+	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
-		if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
-			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] failed verifying last commit sig")
-			return
-		}
+	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
+		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
+	}
+
+	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
 		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
