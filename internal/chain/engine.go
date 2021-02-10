@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -194,6 +196,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 
 	lastCommitPayload := signature.ConstructCommitPayload(chain,
 		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && header.ShardID() == 0 && header.Number().Int64() == 5698545 {
+		// Testnet hack to workaround a bad block with invalid multi-signature in shard 0.
+		return nil
+	}
 	if !aggSig.VerifyHash(mask.AggregatePublic, lastCommitPayload) {
 		const msg = "[VerifySeal] Unable to verify aggregated signature from last block: %x"
 		return errors.Errorf(msg, payload)

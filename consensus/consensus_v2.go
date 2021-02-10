@@ -7,6 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/signature"
+
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -154,6 +157,10 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
+	if err := consensus.verifyLastCommitSig(commitSigAndBitmap, block); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
+		return
+	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
@@ -198,6 +205,7 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
+			Hex("lastCommitSig", commitSigAndBitmap).
 			Msg("[finalCommit] Queued Committed Message")
 	}
 
@@ -554,6 +562,10 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		bareMinimumCommit := FBFTMsg.Payload
 		consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
+		if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
+			consensus.getLogger().Warn().Err(err).Msg("[preCommitAndPropose] failed verifying last commit sig")
+			return
+		}
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
 		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
@@ -573,6 +585,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 			consensus.getLogger().Info().
 				Str("blockHash", blk.Hash().Hex()).
 				Uint64("blockNum", consensus.blockNum).
+				Hex("lastCommitSig", bareMinimumCommit).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
@@ -584,6 +597,30 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		consensus.ReadySignal <- AsyncProposal
 	}()
 
+	return nil
+}
+
+func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
+	if len(lastCommitSig) < bls.BLSSignatureSizeInBytes {
+		return errors.New("lastCommitSig not have enough length")
+	}
+
+	aggSigBytes := lastCommitSig[0:bls.BLSSignatureSizeInBytes]
+
+	aggSig := bls2.Sign{}
+	err := aggSig.Deserialize(aggSigBytes)
+
+	if err != nil {
+		return errors.New("unable to deserialize multi-signature from payload")
+	}
+	aggPubKey := consensus.commitBitmap.AggregatePublic
+
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+		blk.Epoch(), blk.Hash(), blk.NumberU64(), blk.Header().ViewID().Uint64())
+
+	if !aggSig.VerifyHash(aggPubKey, commitPayload) {
+		return errors.New("Failed to verify the multi signature for last commit sig")
+	}
 	return nil
 }
 
