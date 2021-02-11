@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/mmr"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -114,6 +115,9 @@ type NodeAPI interface {
 	GetConfig() commonRPC.Config
 	ShutDown()
 	GetLastSigningPower() (float64, error)
+
+	// mmr APIs
+	GetProof(txHash common.Hash, blockHash common.Hash, blockNumber, withRespectTo uint64) mmr.MmrProof
 }
 
 // New creates a new Harmony object (including the

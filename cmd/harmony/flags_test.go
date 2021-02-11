@@ -80,6 +80,9 @@ func TestHarmonyFlags(t *testing.T) {
 					IP:      "127.0.0.1",
 					Port:    9800,
 				},
+				MMR: harmonyconfig.MmrConfig{
+					DbDir: "./db/mmr",
+				},
 				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
 					AggregateSig: true,

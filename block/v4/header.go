@@ -1,4 +1,4 @@
-package v2
+package v4
 
 import (
 	"io"
@@ -6,17 +6,21 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/rs/zerolog"
+
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/rs/zerolog"
 )
 
-// Header is the V2 block header.
+// Header is the V4 block header.
+// V4 block header is exactly the same
+// we copy the code instead of embedded v3 header into v4
+// when we do type checking in NewBodyForMatchingHeader
+// the embedded structure will return v3 header type instead of v4 type
 type Header struct {
 	fields headerFields
 }
@@ -57,16 +61,17 @@ type headerFields struct {
 	Extra               []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
-	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID             uint32      `json:"shardID"          gencodec:"required"`
-	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	Vrf                 []byte      `json:"vrf"`
-	Vdf                 []byte      `json:"vdf"`
-	ShardState          []byte      `json:"shardState"`
-	CrossLinks          []byte      `json:"crossLink"`
+	ViewID              *big.Int `json:"viewID"           gencodec:"required"`
+	Epoch               *big.Int `json:"epoch"            gencodec:"required"`
+	ShardID             uint32   `json:"shardID"          gencodec:"required"`
+	LastCommitSignature [96]byte `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap    []byte   `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
+	Vrf                 []byte   `json:"vrf"`
+	Vdf                 []byte   `json:"vdf"`
+	ShardState          []byte   `json:"shardState"`
+	CrossLinks          []byte   `json:"crossLink"`
+	Slashes             []byte   `json:slashes`
+	MMRRoot             []byte   `json:mmrRoot`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -80,8 +85,8 @@ func (h *Header) SetParentHash(newParentHash common.Hash) {
 	h.fields.ParentHash = newParentHash
 }
 
-// Coinbase is the address of the node that proposed this block and all
-// transactions in it.
+// Coinbase is now the first 20 bytes of the SHA256 hash of the leader's
+// public BLS key. This is required for EVM compatibility.
 func (h *Header) Coinbase() common.Address {
 	return h.fields.Coinbase
 }
@@ -296,12 +301,14 @@ func (h *Header) SetLastCommitBitmap(newLastCommitBitmap []byte) {
 
 // ShardStateHash is the shard state hash.
 func (h *Header) ShardStateHash() common.Hash {
-	return h.fields.ShardStateHash
+	return common.Hash{}
 }
 
 // SetShardStateHash sets the shard state hash.
 func (h *Header) SetShardStateHash(newShardStateHash common.Hash) {
-	h.fields.ShardStateHash = newShardStateHash
+	h.Logger(utils.Logger()).Warn().
+		Str("shardStateHash", newShardStateHash.Hex()).
+		Msg("cannot store ShardStateHash in V4 header")
 }
 
 // Vrf is the output of the VRF for the epoch.
@@ -366,42 +373,23 @@ func (h *Header) SetCrossLinks(newCrossLinks []byte) {
 
 // Slashes ..
 func (h *Header) Slashes() []byte {
-	h.Logger(utils.Logger()).Info().
-		Msg("No slashes in V2 header")
-	return nil
+	return append(h.fields.Slashes[:0:0], h.fields.Slashes...)
 }
 
 // SetSlashes ..
 func (h *Header) SetSlashes(newSlashes []byte) {
-	h.Logger(utils.Logger()).Error().
-		Hex("slashes", newSlashes).
-		Msg("cannot store slashes in V2 header")
+	h.fields.Slashes = append(newSlashes[:0:0], newSlashes...)
 }
 
 // MMRRoot is the root of the Merkle Mountain Range tree formed
 // using the block hashes of the current epoch
 func (h *Header) MMRRoot() []byte {
-	h.Logger(utils.Logger()).Error().
-		Msg("No MMRRoot in V2 header")
-	return nil
+	return append(h.fields.MMRRoot[:0:0], h.fields.MMRRoot...)
 }
 
 // SetMMRRoot sets the updated MMR root after appending the parentHash
 func (h *Header) SetMMRRoot(newMMRRoot []byte) {
-	h.Logger(utils.Logger()).Error().
-		Hex("mmrRoot", newMMRRoot).
-		Msg("cannot store mmrRoot in V2 header")
-}
-
-// field type overrides for gencodec
-type headerMarshaling struct {
-	Difficulty *hexutil.Big
-	Number     *hexutil.Big
-	GasLimit   hexutil.Uint64
-	GasUsed    hexutil.Uint64
-	Time       *hexutil.Big
-	Extra      hexutil.Bytes
-	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	h.fields.MMRRoot = append(newMMRRoot[:0:0], newMMRRoot...)
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
@@ -414,7 +402,10 @@ func (h *Header) Hash() common.Hash {
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
 	// TODO: update with new fields
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra())+(h.Number().BitLen()+h.Time().BitLen())/8)
+	return common.StorageSize(unsafe.Sizeof(*h)) +
+		common.StorageSize(len(h.Extra())+(h.Number().BitLen()+
+			h.Time().BitLen())/8,
+		)
 }
 
 // Logger returns a sub-logger with block contexts added.

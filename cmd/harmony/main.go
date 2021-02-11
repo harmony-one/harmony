@@ -219,6 +219,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyWSFlags(cmd, config)
 	applyRPCOptFlags(cmd, config)
 	applyBLSFlags(cmd, config)
+	applyMmrFlags(cmd, config)
 	applyConsensusFlags(cmd, config)
 	applyTxPoolFlags(cmd, config)
 	applyPprofFlags(cmd, config)
@@ -590,6 +591,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	}
 
 	nodeConfig.DBDir = hc.General.DataDir
+	nodeConfig.MmrDbDir = hc.MMR.DbDir
 
 	if hc.Legacy != nil && hc.Legacy.WebHookConfig != nil && len(*hc.Legacy.WebHookConfig) != 0 {
 		p := *hc.Legacy.WebHookConfig

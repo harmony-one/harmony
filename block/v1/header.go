@@ -379,6 +379,21 @@ func (h *Header) SetSlashes(newSlashes []byte) {
 		Msg("cannot store slashes in V1 header")
 }
 
+// MMRRoot is the root of the Merkle Mountain Range tree formed
+// using the block hashes of the current epoch
+func (h *Header) MMRRoot() []byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("No MMRRoot in V1 header")
+	return nil
+}
+
+// SetMMRRoot sets the updated MMR root after appending the parentHash
+func (h *Header) SetMMRRoot(newMMRRoot []byte) {
+	h.Logger(utils.Logger()).Error().
+		Hex("mmrRoot", newMMRRoot).
+		Msg("cannot store mmrRoot in V1 header")
+}
+
 // field type overrides for gencodec
 type headerMarshaling struct {
 	Difficulty *hexutil.Big

@@ -64,6 +64,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(101),
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
+		CrossChainEpoch:            big.NewInt(12345678),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -96,6 +97,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
+		CrossChainEpoch:            big.NewInt(12345678),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -129,6 +131,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -162,6 +165,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -195,6 +199,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -227,6 +232,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -261,6 +267,7 @@ var (
 		big.NewInt(0),                      // ReceiptLogEpoch
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
+		big.NewInt(0),                      // CrossChainEpoch
 	}
 
 	// TestChainConfig ...
@@ -295,6 +302,7 @@ var (
 		big.NewInt(0),        // ReceiptLogEpoch
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
+		big.NewInt(0),        // CrossChainEpoch
 	}
 
 	// TestRules ...
@@ -348,6 +356,9 @@ type ChainConfig struct {
 
 	// PreStakingEpoch is the epoch we allow staking transactions
 	PreStakingEpoch *big.Int `json:"prestaking-epoch,omitempty"`
+
+	// CrossChainEpoch is the epoch we start adding MMR root to block header
+	CrossChainEpoch *big.Int `json:"crosschain-epoch,omitempty"`
 
 	// QuickUnlockEpoch is the epoch when undelegation will be unlocked at the current epoch
 	QuickUnlockEpoch *big.Int `json:"quick-unlock-epoch,omitempty"`
@@ -518,6 +529,11 @@ func (c *ChainConfig) IsEPoSBound35(epoch *big.Int) bool {
 // IsPreStaking determines whether staking transactions are allowed
 func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
 	return isForked(c.PreStakingEpoch, epoch)
+}
+
+// IsCrossChain determines whether it is the epoch to support MMR root in the block header
+func (c *ChainConfig) IsCrossChain(epoch *big.Int) bool {
+	return isForked(c.CrossChainEpoch, epoch)
 }
 
 // IsQuickUnlock determines whether it's the epoch when the undelegation should be unlocked at end of current epoch
