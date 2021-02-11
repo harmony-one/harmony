@@ -5,10 +5,6 @@ import (
 	"math/big"
 	"sort"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
-	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -17,6 +13,8 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
@@ -46,16 +44,7 @@ func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 // Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
-	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
-	if parentHeader == nil {
-		return engine.ErrUnknownAncestor
-	}
-	if seal {
-		if err := e.VerifySeal(chain, header); err != nil {
-			return err
-		}
-	}
-	return nil
+	return e.verifyHeader(chain, header, seal, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -66,7 +55,7 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 
 	go func() {
 		for i, header := range headers {
-			err := e.VerifyHeader(chain, header, seals[i])
+			err := e.verifyHeader(chain, header, seals[i], headers[:i])
 
 			select {
 			case <-abort:
@@ -77,6 +66,24 @@ func (e *engineImpl) VerifyHeaders(chain engine.ChainReader, headers []*block.He
 	}()
 
 	return abort, results
+}
+
+func (e *engineImpl) verifyHeader(chain engine.ChainReader, header *block.Header, seal bool, parents []*block.Header) error {
+	var parent *block.Header
+	if len(parents) > 0 {
+		parent = parents[len(parents)-1]
+	} else {
+		parent = chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
+	}
+	if parent == nil {
+		return engine.ErrUnknownAncestor
+	}
+	if seal {
+		if err := e.verifySeal(chain, header, parent); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ReadPublicKeysFromLastBlock finds the public keys of last block's committee
@@ -128,14 +135,25 @@ func (e *engineImpl) VerifyShardState(
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 // Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) error {
-	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
-		return nil
-	}
+	return e.verifySeal(chain, header, nil)
+}
+
+func (e *engineImpl) verifySeal(chain engine.ChainReader, header *block.Header, parent *block.Header) error {
 	if header == nil {
 		return errors.New("[VerifySeal] nil block header")
 	}
-	publicKeys, err := ReadPublicKeysFromLastBlock(chain, header)
+	if parent == nil {
+		parent = chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
+		if parent == nil {
+			return engine.ErrUnknownAncestor
+		}
+	}
 
+	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
+		return nil
+	}
+
+	publicKeys, err := GetPublicKeys(chain, parent, false)
 	if err != nil {
 		return errors.New("[VerifySeal] Cannot retrieve publickeys from last block")
 	}
@@ -148,19 +166,13 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 				" and LastCommitBitmap in Block Header",
 		)
 	}
-	parentHash := header.ParentHash()
-	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
-	if parentHeader == nil {
-		return errors.New(
-			"[VerifySeal] no parent header found",
-		)
-	}
-	if chain.Config().IsStaking(parentHeader.Epoch()) {
-		slotList, err := chain.ReadShardState(parentHeader.Epoch())
+
+	if chain.Config().IsStaking(parent.Epoch()) {
+		slotList, err := chain.ReadShardState(parent.Epoch())
 		if err != nil {
 			return errors.Wrapf(err, "cannot decoded shard state")
 		}
-		subComm, err := slotList.FindCommitteeByID(parentHeader.ShardID())
+		subComm, err := slotList.FindCommitteeByID(parent.ShardID())
 		if err != nil {
 			return err
 		}
@@ -181,7 +193,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 			)
 		}
 	} else {
-		parentQuorum, err := QuorumForBlock(chain, parentHeader, false)
+		parentQuorum, err := QuorumForBlock(chain, parent, false)
 		if err != nil {
 			return errors.Wrapf(err,
 				"cannot calculate quorum for block %s", header.Number())
@@ -195,7 +207,7 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	}
 
 	lastCommitPayload := signature.ConstructCommitPayload(chain,
-		parentHeader.Epoch(), parentHeader.Hash(), parentHeader.Number().Uint64(), parentHeader.ViewID().Uint64())
+		parent.Epoch(), parent.Hash(), parent.Number().Uint64(), parent.ViewID().Uint64())
 	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && header.ShardID() == 0 && header.Number().Int64() == 5698545 {
 		// Testnet hack to workaround a bad block with invalid multi-signature in shard 0.
 		return nil

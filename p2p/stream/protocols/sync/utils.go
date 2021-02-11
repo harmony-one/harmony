@@ -33,7 +33,7 @@ func (resp *syncResponse) GetProtobufMsg() protobuf.Message {
 }
 
 func (resp *syncResponse) String() string {
-	return fmt.Sprintf("[SyncResponse %v]", resp.String())
+	return fmt.Sprintf("[SyncResponse %v]", resp.pb.String())
 }
 
 // EpochStateResult is the result for GetEpochStateQuery

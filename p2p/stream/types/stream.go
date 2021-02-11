@@ -3,11 +3,11 @@ package sttypes
 import (
 	"bufio"
 	"encoding/binary"
+	"io"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
+	"github.com/pkg/errors"
 )
 
 // Stream is the interface for streams implemented in each service.
@@ -98,7 +98,7 @@ func (st *BaseStream) ReadBytes() ([]byte, error) {
 	size := bytesToInt(sb)
 
 	cb := make([]byte, size)
-	n, err := st.rw.Read(cb)
+	n, err := io.ReadFull(st.rw, cb)
 	if err != nil {
 		return nil, errors.Wrap(err, "read content")
 	}
