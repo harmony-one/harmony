@@ -56,6 +56,14 @@ func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, err
 	}
 }
 
+// Accounts returns the collection of accounts this node manages
+// While this JSON-RPC method is supported, it will not return any accounts.
+// Similar to e.g. Infura "unlocking" accounts isn't supported.
+// Instead, users should send already signed raw transactions using hmy_sendRawTransaction or eth_sendRawTransaction
+func (s *PublicBlockchainService) Accounts() []common.Address {
+	return []common.Address{}
+}
+
 // getBlockOptions is a helper to get block args given an interface option from RPC params.
 func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common.BlockArgs, error) {
 	switch s.version {
