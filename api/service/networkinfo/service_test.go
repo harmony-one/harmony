@@ -31,7 +31,7 @@ func TestService(t *testing.T) {
 		t.Fatalf("New() failed: %s", err)
 	}
 
-	s.StartService()
+	s.Start()
 	time.Sleep(2 * time.Second)
-	s.StopService()
+	s.Stop()
 }

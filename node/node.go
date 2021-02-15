@@ -106,7 +106,6 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan  map[service.Type]chan *msg_pb.Message
 	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
@@ -125,6 +124,10 @@ type Node struct {
 	committeeCache *lru.Cache
 
 	Metrics metrics.Registry
+
+	// context control for pub-sub handling
+	psCtx    context.Context
+	psCancel func()
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -548,8 +551,10 @@ var (
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
-// Start kicks off the node message handling
-func (node *Node) Start() error {
+// StartPubSub kicks off the node message handling
+func (node *Node) StartPubSub() error {
+	node.psCtx, node.psCancel = context.WithCancel(context.Background())
+
 	// groupID and whether this topic is used for consensus
 	type t struct {
 		tp    nodeconfig.GroupID
@@ -725,10 +730,10 @@ func (node *Node) Start() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-
 				select {
 				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+						errors.Is(ctx.Err(), context.Canceled) {
 						utils.Logger().Warn().
 							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
 					}
@@ -740,6 +745,7 @@ func (node *Node) Start() error {
 				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
+			// TODO: Currently this timeout is useless. Verify me.
 			libp2p_pubsub.WithValidatorTimeout(250*time.Millisecond),
 			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
@@ -756,40 +762,47 @@ func (node *Node) Start() error {
 
 		// goroutine to handle consensus messages
 		go func() {
-			for m := range msgChanConsensus {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
+			for {
+				select {
+				case <-node.psCtx.Done():
+					return
+				case m := <-msgChanConsensus:
+					// should not take more than 10 seconds to process one message
+					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
 
-					if semConsensus.TryAcquire(1) {
-						defer semConsensus.Release(1)
+						if semConsensus.TryAcquire(1) {
+							defer semConsensus.Release(1)
 
-						if isThisNodeAnExplorerNode {
-							if err := node.explorerMessageHandler(
-								ctx, msg.handleCArg,
-							); err != nil {
-								errChan <- withError{err, nil}
-							}
-						} else {
-							if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-								errChan <- withError{err, msg.senderPubKey}
+							if isThisNodeAnExplorerNode {
+								if err := node.explorerMessageHandler(
+									ctx, msg.handleCArg,
+								); err != nil {
+									errChan <- withError{err, nil}
+								}
+							} else {
+								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
+									errChan <- withError{err, msg.senderPubKey}
+								}
 							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+						select {
+						// FIXME: wrong use of context. This message have already passed handle actually.
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				}
 			}
 		}()
 
@@ -798,39 +811,46 @@ func (node *Node) Start() error {
 
 		// goroutine to handle node messages
 		go func() {
-			for m := range msgChanNode {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
-					if semNode.TryAcquire(1) {
-						defer semNode.Release(1)
+			for {
+				select {
+				case m := <-msgChanNode:
+					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
+						if semNode.TryAcquire(1) {
+							defer semNode.Release(1)
 
-						if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
-							errChan <- withError{err, nil}
+							if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
+								errChan <- withError{err, nil}
+							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+						select {
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				case <-node.psCtx.Done():
+					return
+				}
 			}
 		}()
 
 		go func() {
-
 			for {
-				nextMsg, err := sub.Next(context.Background())
+				nextMsg, err := sub.Next(node.psCtx)
 				if err != nil {
+					if err == context.Canceled {
+						return
+					}
 					errChan <- withError{errors.WithStack(err), nil}
 					continue
 				}
@@ -855,14 +875,27 @@ func (node *Node) Start() error {
 		}()
 	}
 
-	for e := range errChan {
-		utils.SampledLogger().Info().
-			Interface("item", e.payload).
-			Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
-	}
-	// NOTE never gets here
-	return nil
+	go func() {
+		for {
+			select {
+			case <-node.psCtx.Done():
+				return
+			case e := <-errChan:
+				utils.SampledLogger().Info().
+					Interface("item", e.payload).
+					Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
+			}
+		}
+	}()
 
+	return nil
+}
+
+// StopPubSub stops the pubsub handling
+func (node *Node) StopPubSub() {
+	if node.psCancel != nil {
+		node.psCancel()
+	}
 }
 
 // GetSyncID returns the syncID of this node
@@ -1004,6 +1037,8 @@ func New(
 	initMetrics()
 	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
+	node.serviceManager = service.NewManager()
+
 	return &node
 }
 
@@ -1136,6 +1171,30 @@ func (node *Node) ServiceManager() *service.Manager {
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
+
+	if err := node.StopRPC(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop RPC")
+	}
+
+	utils.Logger().Info().Msg("stopping rosetta")
+	if err := node.StopRosetta(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop rosetta")
+	}
+
+	utils.Logger().Info().Msg("stopping services")
+	if err := node.StopServices(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop services")
+	}
+
+	// Currently pubSub need to be stopped after consensus.
+	utils.Logger().Info().Msg("stopping pub-sub")
+	node.StopPubSub()
+
+	utils.Logger().Info().Msg("stopping host")
+	if err := node.host.Close(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop p2p host")
+	}
+
 	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
