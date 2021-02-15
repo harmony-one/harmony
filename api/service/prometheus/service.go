@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -43,6 +44,8 @@ type Service struct {
 	pusher     *push.Pusher
 	failStatus error
 	config     Config
+
+	registryOnce sync.Once
 }
 
 // Handler represents a path and handler func to serve on the same port as /metrics, /healthz, /goroutinez, etc.
@@ -52,8 +55,8 @@ type Handler struct {
 }
 
 var (
-	registryOnce sync.Once
-	svc          = &Service{}
+	initOnce sync.Once
+	svc      = &Service{}
 )
 
 func (s *Service) getJobName() string {
@@ -76,11 +79,18 @@ func (s *Service) getJobName() string {
 }
 
 // NewService sets up a new instance for a given address host:port.
-// An empty host will match with any IP so an address like ":19000" is perfectly acceptable.
-func NewService(cfg Config, additionalHandlers ...Handler) {
+// Anq empty host will match with any IP so an address like ":19000" is perfectly acceptable.
+func NewService(cfg Config, additionalHandlers ...Handler) *Service {
+	initOnce.Do(func() {
+		svc = newService(cfg, additionalHandlers...)
+	})
+	return svc
+}
+
+func newService(cfg Config, additionalHandlers ...Handler) *Service {
 	if !cfg.Enabled {
 		utils.Logger().Info().Msg("Prometheus http server disabled...")
-		return
+		return nil
 	}
 
 	utils.Logger().Debug().Str("cfg", cfg.String()).Msg("Prometheus")
@@ -107,26 +117,11 @@ func NewService(cfg Config, additionalHandlers ...Handler) {
 		Msg("Starting Prometheus server")
 	endpoint := fmt.Sprintf("%s:%d", svc.config.IP, svc.config.Port)
 	svc.server = &http.Server{Addr: endpoint, Handler: mux}
-	svc.Start()
+	return svc
 }
 
-// StopService stop the Prometheus service
-func StopService() error {
-	return svc.Stop()
-}
-
-func (s *Service) goroutinezHandler(w http.ResponseWriter, _ *http.Request) {
-	stack := debug.Stack()
-	if _, err := w.Write(stack); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to write goroutines stack")
-	}
-	if err := pprof.Lookup("goroutine").WriteTo(w, 2); err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to write pprof goroutines")
-	}
-}
-
-// Start the prometheus service.
-func (s *Service) Start() {
+// Start start the prometheus service
+func (s *Service) Start() error {
 	go func() {
 		utils.Logger().Info().Str("address", s.server.Addr).Msg("Starting prometheus service")
 		err := s.server.ListenAndServe()
@@ -158,13 +153,24 @@ func (s *Service) Start() {
 			}
 		}(s)
 	}
+	return nil
 }
 
-// Stop the service gracefully.
+// Stop stop the Prometheus service
 func (s *Service) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	return s.server.Shutdown(ctx)
+}
+
+func (s *Service) goroutinezHandler(w http.ResponseWriter, _ *http.Request) {
+	stack := debug.Stack()
+	if _, err := w.Write(stack); err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to write goroutines stack")
+	}
+	if err := pprof.Lookup("goroutine").WriteTo(w, 2); err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to write pprof goroutines")
+	}
 }
 
 // Status checks for any service failure conditions.
@@ -175,12 +181,21 @@ func (s *Service) Status() error {
 	return nil
 }
 
-// PromRegistry return the registry of prometheus service
-func PromRegistry() *prometheus.Registry {
-	registryOnce.Do(func() {
+// APIs returns the RPC apis of the prometheus service
+func (s *Service) APIs() []rpc.API {
+	return nil
+}
+
+func (s *Service) getRegistry() *prometheus.Registry {
+	s.registryOnce.Do(func() {
 		if svc.registry == nil {
 			svc.registry = prometheus.NewRegistry()
 		}
 	})
-	return svc.registry
+	return s.registry
+}
+
+// PromRegistry return the registry of prometheus service
+func PromRegistry() *prometheus.Registry {
+	return svc.getRegistry()
 }

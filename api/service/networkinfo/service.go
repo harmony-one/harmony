@@ -109,15 +109,16 @@ func MustNew(
 	return service
 }
 
-// StartService starts network info service.
-func (s *Service) StartService() {
+// Start starts network info service.
+func (s *Service) Start() error {
 	err := s.Init()
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Service Init Failed")
-		return
+		return nil
 	}
 	s.Run()
 	s.started = true
+	return nil
 }
 
 // Init initializes role conversion service.
@@ -277,27 +278,20 @@ func (s *Service) findPeers(ctx context.Context) {
 	utils.Logger().Info().Msg("PeerInfo Channel Closed")
 }
 
-// StopService stops network info service.
-func (s *Service) StopService() {
+// Stop stops network info service.
+func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Stopping network info service")
 	defer s.cancel()
 
 	if !s.started {
 		utils.Logger().Info().Msg("Service didn't started. Exit")
-		return
+		return nil
 	}
 
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.Logger().Info().Msg("Network info service stopped")
-}
-
-// NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {}
-
-// SetMessageChan sets up message channel to service.
-func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
-	s.messageChan = messageChan
+	return nil
 }
 
 // APIs for the services.

@@ -300,34 +300,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 		utils.Logger().Warn().Err(err).Msg("Check Local Time Accuracy Error")
 	}
 
-	// Prepare for graceful shutdown from os signals
-	osSignal := make(chan os.Signal)
-	signal.Notify(osSignal, os.Interrupt, syscall.SIGTERM)
-	go func(node *node.Node) {
-		for sig := range osSignal {
-			if sig == syscall.SIGTERM || sig == os.Interrupt {
-				utils.Logger().Warn().Str("signal", sig.String()).Msg("Gracefully shutting down...")
-				const msg = "Got %s signal. Gracefully shutting down...\n"
-				fmt.Fprintf(os.Stderr, msg, sig)
-				// stop block proposal service for leader
-				if node.Consensus.IsLeader() {
-					node.ServiceManager().StopService(service.BlockProposal)
-				}
-				if node.Consensus.Mode() == consensus.Normal {
-					phase := node.Consensus.GetConsensusPhase()
-					utils.Logger().Warn().Str("phase", phase).Msg("[shutdown] commit phase has to wait")
-					maxWait := time.Now().Add(2 * node.Consensus.BlockPeriod) // wait up to 2 * blockperiod in commit phase
-					for time.Now().Before(maxWait) &&
-						node.Consensus.GetConsensusPhase() == "Commit" {
-						utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
-						time.Sleep(time.Millisecond * 100)
-					}
-				}
-				currentNode.ShutDown()
-			}
-		}
-	}(currentNode)
-
 	// Parse RPC config
 	nodeConfig.RPCServer = nodeconfig.RPCServerConfig{
 		HTTPEnabled:  hc.HTTP.Enabled,
@@ -394,22 +366,22 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
-	prometheusConfig := prometheus.Config{
-		Enabled:    hc.Prometheus.Enabled,
-		IP:         hc.Prometheus.IP,
-		Port:       hc.Prometheus.Port,
-		EnablePush: hc.Prometheus.EnablePush,
-		Gateway:    hc.Prometheus.Gateway,
-		Network:    hc.Network.NetworkType,
-		Legacy:     hc.General.NoStaking,
-		NodeType:   hc.General.NodeType,
-		Shard:      nodeConfig.ShardID,
-		Instance:   myHost.GetID().Pretty(),
+	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
+		currentNode.RegisterValidatorServices()
+	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		currentNode.RegisterExplorerServices()
+	}
+	if hc.Prometheus.Enabled {
+		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
 	}
 
+	// TODO: replace this legacy syncing
 	currentNode.SupportSyncing()
-	currentNode.ServiceManagerSetup()
-	currentNode.RunServices()
+
+	if err := currentNode.StartServices(); err != nil {
+		fmt.Fprint(os.Stderr, err.Error())
+		os.Exit(-1)
+	}
 
 	if err := currentNode.StartRPC(); err != nil {
 		utils.Logger().Warn().
@@ -423,23 +395,21 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start Rosetta failed")
 	}
 
-	if err := currentNode.StartPrometheus(prometheusConfig); err != nil {
-		utils.Logger().Warn().
-			Err(err).
-			Msg("Start Prometheus failed")
-	}
+	go listenOSSigAndShutDown(currentNode)
 
 	if err := currentNode.BootstrapConsensus(); err != nil {
-		fmt.Println("could not bootstrap consensus", err.Error())
+		fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
 		if !currentNode.NodeConfig.IsOffline {
 			os.Exit(-1)
 		}
 	}
 
-	if err := currentNode.Start(); err != nil {
-		fmt.Println("could not begin network message handling for node", err.Error())
+	if err := currentNode.StartPubSub(); err != nil {
+		fmt.Fprint(os.Stderr, "could not begin network message handling for node", err.Error())
 		os.Exit(-1)
 	}
+
+	select {}
 }
 
 func nodeconfigSetShardSchedule(config harmonyConfig) {
@@ -707,6 +677,23 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	return currentNode
 }
 
+func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
+	prometheusConfig := prometheus.Config{
+		Enabled:    hc.Prometheus.Enabled,
+		IP:         hc.Prometheus.IP,
+		Port:       hc.Prometheus.Port,
+		EnablePush: hc.Prometheus.EnablePush,
+		Gateway:    hc.Prometheus.Gateway,
+		Network:    hc.Network.NetworkType,
+		Legacy:     hc.General.NoStaking,
+		NodeType:   hc.General.NodeType,
+		Shard:      sid,
+		Instance:   myHost.GetID().Pretty(),
+	}
+	p := prometheus.NewService(prometheusConfig)
+	node.RegisterService(service.Prometheus, p)
+}
+
 func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
 	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
@@ -725,4 +712,25 @@ func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {
 		}
 	}
 	return addrMap, nil
+}
+
+func listenOSSigAndShutDown(node *node.Node) {
+	// Prepare for graceful shutdown from os signals
+	osSignal := make(chan os.Signal)
+	signal.Notify(osSignal, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-osSignal
+	utils.Logger().Warn().Str("signal", sig.String()).Msg("Gracefully shutting down...")
+	const msg = "Got %s signal. Gracefully shutting down...\n"
+	fmt.Fprintf(os.Stderr, msg, sig)
+
+	go node.ShutDown()
+
+	for i := 10; i > 0; i-- {
+		<-osSignal
+		if i > 1 {
+			fmt.Printf("Already shutting down, interrupt more to force quit: (times=%v)\n", i-1)
+		}
+	}
+	fmt.Println("Forced QUIT.")
+	os.Exit(-1)
 }

@@ -54,21 +54,23 @@ func New(selfPeer *p2p.Peer, ss *syncing.StateSync, bc *core.BlockChain) *Servic
 	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
 }
 
-// StartService starts explorer service.
-func (s *Service) StartService() {
+// Start starts explorer service.
+func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	return nil
 }
 
-// StopService shutdowns explorer service.
-func (s *Service) StopService() {
+// Stop shutdowns explorer service.
+func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Shutting down explorer service.")
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when shutting down explorer server")
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	return nil
 }
 
 // GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.
