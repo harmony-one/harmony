@@ -346,6 +346,9 @@ func (consensus *Consensus) Start(
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
+				} else if consensus.Mode() == Syncing {
+					mode := consensus.UpdateConsensusInformation()
+					consensus.SetMode(mode)
 				}
 				consensus.mutex.Unlock()
 
