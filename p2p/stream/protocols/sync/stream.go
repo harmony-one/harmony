@@ -140,24 +140,28 @@ func (st *syncStream) handleRespLoop() {
 
 // Close stops the stream handling and closes the underlying stream
 func (st *syncStream) Close() error {
-	// Hack here: Close is called in two cases:
-	// 1. error happened when running the stream (readMsgLoop, handleMsgLoop)
-	// 2. error happened when validating the result delivered by the stream, thus
-	//    close the stream at stream manager.
-	// Thus we only need to close for only once to prevent recursive call of the
-	// Close method (syncStream -> StreamManager -> syncStream -> ...)
 	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
 	}
-	err := st.BaseStream.Close()
 	if err := st.protocol.sm.RemoveStream(st.ID()); err != nil {
 		st.logger.Err(err).Str("stream ID", string(st.ID())).
 			Msg("failed to remove sync stream on close")
 	}
 	close(st.closeC)
-	return err
+	return st.BaseStream.Close()
+}
+
+// ResetOnClose reset the stream on close
+func (st *syncStream) ResetOnClose() error {
+	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
+	if !notClosed {
+		// Already closed by another goroutine. Directly return
+		return nil
+	}
+	close(st.closeC)
+	return st.BaseStream.ResetOnClose()
 }
 
 func (st *syncStream) handleReq(req *syncpb.Request) error {

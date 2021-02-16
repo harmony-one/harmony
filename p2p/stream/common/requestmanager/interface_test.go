@@ -75,6 +75,10 @@ func (st *testStream) Close() error {
 	return nil
 }
 
+func (st *testStream) ResetOnClose() error {
+	return nil
+}
+
 func makeStreamID(index int) sttypes.StreamID {
 	return sttypes.StreamID(strconv.Itoa(index))
 }

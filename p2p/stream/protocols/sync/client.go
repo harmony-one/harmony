@@ -33,7 +33,7 @@ func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...
 	// Parse and return blocks
 	blocks, err := req.getBlocksFromResponse(resp)
 	if err != nil {
-		p.sm.RemoveStream(stid)
+		p.RemoveStream(stid)
 		return nil, stid, err
 	}
 	return blocks, stid, nil
@@ -52,7 +52,7 @@ func (p *Protocol) GetEpochState(ctx context.Context, epoch uint64, opts ...Opti
 
 	res, err := epochStateResultFromResponse(resp)
 	if err != nil {
-		p.sm.RemoveStream(stid)
+		p.RemoveStream(stid)
 		return nil, stid, err
 	}
 	return res, stid, nil
@@ -69,7 +69,7 @@ func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (u
 
 	bn, err := req.getNumberFromResponse(resp)
 	if err != nil {
-		p.sm.RemoveStream(stid)
+		p.RemoveStream(stid)
 		return bn, stid, err
 	}
 	return bn, stid, nil
@@ -89,7 +89,7 @@ func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Opt
 	}
 	hashes, err := req.getHashesFromResponse(resp)
 	if err != nil {
-		p.sm.RemoveStream(stid)
+		p.RemoveStream(stid)
 		return nil, stid, err
 	}
 	return hashes, stid, nil
@@ -107,7 +107,7 @@ func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts
 	}
 	blocks, err := req.getBlocksFromResponse(resp)
 	if err != nil {
-		p.sm.RemoveStream(stid)
+		p.RemoveStream(stid)
 		return nil, stid, err
 	}
 	return blocks, stid, nil

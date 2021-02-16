@@ -3,7 +3,6 @@ package streammanager
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -46,6 +45,7 @@ type streamManager struct {
 	rmStreamCh  chan rmStreamTask
 	stopCh      chan stopTask
 	discCh      chan discTask
+	curTask     interface{}
 	// utils
 	addStreamFeed    event.Feed
 	removeStreamFeed event.Feed
@@ -170,9 +170,13 @@ func (sm *streamManager) RemoveStream(stID sttypes.StreamID) error {
 }
 
 // GetStreams return the streams.
-// Do not use Write or Read for the returned stream. Define them in the protocol level.
 func (sm *streamManager) GetStreams() []sttypes.Stream {
 	return sm.streams.getStreams()
+}
+
+// GetStreamByID return the stream with the given id.
+func (sm *streamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool) {
+	return sm.streams.get(id)
 }
 
 type (
@@ -242,7 +246,7 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 		}
 	}
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
-	return st.Close()
+	return nil
 }
 
 func (sm *streamManager) removeAllStreamOnClose() {
@@ -252,8 +256,7 @@ func (sm *streamManager) removeAllStreamOnClose() {
 		wg.Add(1)
 		go func(st sttypes.Stream) {
 			defer wg.Done()
-			// Close hack here.
-			err := st.(io.Closer).Close()
+			err := st.ResetOnClose()
 			if err != nil {
 				sm.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 					Msg("failed to close stream")
@@ -310,7 +313,7 @@ func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_pee
 		return err
 	}
 	if sm.handleStream != nil {
-		sm.handleStream(st)
+		go sm.handleStream(st)
 	}
 	return nil
 }

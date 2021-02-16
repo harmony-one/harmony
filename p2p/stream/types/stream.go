@@ -18,7 +18,8 @@ type Stream interface {
 	ProtoSpec() (ProtoSpec, error)
 	WriteBytes([]byte) error
 	ReadBytes() ([]byte, error)
-	Close() error // Make sure streams can handle multiple calls of Close
+	Close() error
+	ResetOnClose() error
 }
 
 // BaseStream is the wrapper around
@@ -65,7 +66,7 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 
 // Close close the stream on both sides.
 func (st *BaseStream) Close() error {
-	return st.raw.Reset()
+	return st.raw.Close()
 }
 
 const (
@@ -106,6 +107,11 @@ func (st *BaseStream) ReadBytes() ([]byte, error) {
 		return nil, errors.New("ReadBytes sanity failed: byte size")
 	}
 	return cb, nil
+}
+
+// ResetOnClose reset the stream during the shutdown of the node
+func (st *BaseStream) ResetOnClose() error {
+	return st.raw.Reset()
 }
 
 func intToBytes(val int) []byte {

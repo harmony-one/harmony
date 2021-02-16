@@ -489,6 +489,10 @@ func (sm *testStreamManager) GetStreams() []sttypes.Stream {
 	return nil
 }
 
+func (sm *testStreamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool) {
+	return nil, false
+}
+
 func assertError(got, expect error) error {
 	if (got == nil) != (expect == nil) {
 		return fmt.Errorf("unexpected error: %v / %v", got, expect)

@@ -403,9 +403,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 			Msg("Start p2p host failed")
 	}
 
-	// Start the node
-	currentNode.StartServices()
-
 	if err := currentNode.BootstrapConsensus(); err != nil {
 		fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
 		if !currentNode.NodeConfig.IsOffline {

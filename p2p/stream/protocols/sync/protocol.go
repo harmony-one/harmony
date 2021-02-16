@@ -221,8 +221,11 @@ func (p *Protocol) protoIDByVersion(v *version.Version) sttypes.ProtoID {
 }
 
 // RemoveStream removes the stream of the given stream ID
-func (p *Protocol) RemoveStream(stID sttypes.StreamID) error {
-	return p.sm.RemoveStream(stID)
+func (p *Protocol) RemoveStream(stID sttypes.StreamID) {
+	st, exist := p.sm.GetStreamByID(stID)
+	if exist && st != nil {
+		st.Close()
+	}
 }
 
 // NumStreams return the streams with minimum version.

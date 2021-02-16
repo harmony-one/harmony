@@ -32,7 +32,7 @@ func newTestStreamManager() *streamManager {
 	host := newTestHost()
 	pf := newTestPeerFinder(makeRemotePeers(100), emptyDelayFunc)
 
-	sm := newStreamManager(pid, host, pf, defConfig)
+	sm := newStreamManager(pid, host, pf, nil, defConfig)
 	host.sm = sm
 	return sm
 }
@@ -64,6 +64,14 @@ func (st *testStream) ReadBytes() ([]byte, error) {
 }
 
 func (st *testStream) Close() error {
+	if st.closed {
+		return errors.New("already closed")
+	}
+	st.closed = true
+	return nil
+}
+
+func (st *testStream) ResetOnClose() error {
 	if st.closed {
 		return errors.New("already closed")
 	}

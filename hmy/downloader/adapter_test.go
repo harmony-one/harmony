@@ -167,7 +167,7 @@ func (sp *testSyncProtocol) GetBlocksByHashes(ctx context.Context, hs []common.H
 	return res, sp.nextStreamID(), nil
 }
 
-func (sp *testSyncProtocol) RemoveStream(target sttypes.StreamID) error {
+func (sp *testSyncProtocol) RemoveStream(target sttypes.StreamID) {
 	sp.lock.Lock()
 	defer sp.lock.Unlock()
 
@@ -185,7 +185,6 @@ func (sp *testSyncProtocol) RemoveStream(target sttypes.StreamID) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (sp *testSyncProtocol) NumStreams() int {

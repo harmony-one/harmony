@@ -18,6 +18,7 @@ type StreamManager interface {
 	Subscriber
 
 	GetStreams() []sttypes.Stream
+	GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool)
 }
 
 // StreamOperator handles new stream or remove stream
