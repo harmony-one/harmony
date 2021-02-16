@@ -55,7 +55,7 @@ func TestProtocol_advertiseLoop(t *testing.T) {
 			len(p.supportedVersions()))
 	}
 	for _, cnt := range disc.advCnt {
-		if cnt <= 1 {
+		if cnt < 1 {
 			t.Errorf("unexpected discovery count: %v", cnt)
 		}
 	}
