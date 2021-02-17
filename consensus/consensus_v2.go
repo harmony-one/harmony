@@ -468,13 +468,17 @@ func (consensus *Consensus) Start(
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
 
-	go consensus.downloadFinishedLoop()
+	if consensus.dHelper != nil {
+		consensus.dHelper.start()
+	}
 }
 
 // Close close the consensus. If current is in normal commit phase, wait until the commit
 // phase end.
 func (consensus *Consensus) Close() error {
-	consensus.downloadSub.Unsubscribe()
+	if consensus.dHelper != nil {
+		consensus.dHelper.close()
+	}
 	consensus.waitForCommit()
 	return nil
 }

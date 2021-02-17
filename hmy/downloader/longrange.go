@@ -18,6 +18,10 @@ import (
 // For each iteration, estimate the current block number, then fetch block & insert to blockchain
 func (d *Downloader) doLongRangeSync() (int, error) {
 	var totalInserted int
+
+	d.evtDownloadStarted.Send(struct{}{})
+	defer d.evtDownloadFinished.Send(struct{}{})
+
 	for {
 		ctx, cancel := context.WithCancel(d.ctx)
 

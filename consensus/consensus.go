@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -133,9 +131,7 @@ type Consensus struct {
 	finalityCounter int64
 
 	// Trigger sync and subscribe download finished event to add last mile block
-	downloader  downloader
-	downloadCh  chan struct{}
-	downloadSub event.Subscription
+	dHelper *downloadHelper
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

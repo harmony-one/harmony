@@ -25,15 +25,23 @@ func TestDownloader_Integration(t *testing.T) {
 	}
 
 	// subscribe download event
-	ch := make(chan struct{})
-	sub := d.SubscribeDownloadFinished(ch)
-	defer sub.Unsubscribe()
+	finishedCh := make(chan struct{}, 1)
+	finishedSub := d.SubscribeDownloadFinished(finishedCh)
+	startedCh := make(chan struct{}, 1)
+	startedSub := d.SubscribeDownloadStarted(startedCh)
+	defer finishedSub.Unsubscribe()
+	defer startedSub.Unsubscribe()
 
 	// Start the downloader
 	d.Start()
 	defer d.Close()
 
-	if err := checkReceiveChanMulTimes(ch, 1, 10*time.Second); err != nil {
+	// During bootstrap, trigger two download task: one long range, one short range.
+	// The second one will not trigger start / finish events.
+	if err := checkReceiveChanMulTimes(startedCh, 1, 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkReceiveChanMulTimes(finishedCh, 1, 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	if curBN := d.bc.CurrentBlock().NumberU64(); curBN != 1000 {
@@ -44,7 +52,10 @@ func TestDownloader_Integration(t *testing.T) {
 	sp.changeBlockNumber(1010)
 	d.DownloadAsync()
 	// We shall do short range test twice
-	if err := checkReceiveChanMulTimes(ch, 2, 10*time.Second); err != nil {
+	if err := checkReceiveChanMulTimes(startedCh, 1, 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkReceiveChanMulTimes(finishedCh, 1, 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
 	if curBN := d.bc.CurrentBlock().NumberU64(); curBN != 1010 {
@@ -53,7 +64,10 @@ func TestDownloader_Integration(t *testing.T) {
 
 	// Remote block number unchanged, and trigger one download task manually
 	d.DownloadAsync()
-	if err := checkReceiveChanMulTimes(ch, 1, 10*time.Second); err != nil {
+	if err := checkReceiveChanMulTimes(startedCh, 0, 10*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkReceiveChanMulTimes(finishedCh, 0, 10*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,6 +86,11 @@ func checkReceiveChanMulTimes(ch chan struct{}, times int, timeout time.Duration
 		case <-t:
 			return fmt.Errorf("timed out %v", timeout)
 		}
+	}
+	select {
+	case <-ch:
+		return fmt.Errorf("received an extra event")
+	case <-time.After(100 * time.Millisecond):
 	}
 	return nil
 }

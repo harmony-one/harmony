@@ -41,6 +41,10 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		// short circuit for no sync is needed
 		return 0, nil
 	}
+
+	d.evtDownloadStarted.Send(struct{}{})
+	defer d.evtDownloadFinished.Send(struct{}{})
+
 	blocks, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
 		if err != context.Canceled {

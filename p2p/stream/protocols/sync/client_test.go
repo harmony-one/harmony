@@ -64,10 +64,9 @@ var (
 
 func TestProtocol_GetBlocksByNumber(t *testing.T) {
 	tests := []struct {
-		getResponse   getResponseFn
-		expErr        error
-		expStID       sttypes.StreamID
-		streamRemoved bool
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
 	}{
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -75,9 +74,8 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 					pb: testBlockResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        nil,
-			expStID:       makeTestStreamID(0),
-			streamRemoved: false,
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -85,15 +83,13 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 					pb: testEpochStateResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("not GetBlockByNumber"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("not GetBlockByNumber"),
+			expStID: makeTestStreamID(0),
 		},
 		{
-			getResponse:   nil,
-			expErr:        errors.New("get response error"),
-			expStID:       "",
-			streamRemoved: true, // Does not exist at the first place
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -101,9 +97,8 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 					pb: testErrorResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("test error"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
 		},
 	}
 
@@ -118,10 +113,6 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 		if stid != test.expStID {
 			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
 		}
-		streamExist := protocol.sm.(*testStreamManager).isStreamExist(stid)
-		if streamExist == test.streamRemoved {
-			t.Errorf("Test %v: after request stream exist: %v / %v", i, streamExist, !test.streamRemoved)
-		}
 		if test.expErr == nil && (len(blocks) == 0) {
 			t.Errorf("Test %v: zero blocks delivered", i)
 		}
@@ -130,10 +121,9 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 
 func TestProtocol_GetEpochState(t *testing.T) {
 	tests := []struct {
-		getResponse   getResponseFn
-		expErr        error
-		expStID       sttypes.StreamID
-		streamRemoved bool
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
 	}{
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -141,9 +131,8 @@ func TestProtocol_GetEpochState(t *testing.T) {
 					pb: testEpochStateResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        nil,
-			expStID:       makeTestStreamID(0),
-			streamRemoved: false,
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -151,15 +140,13 @@ func TestProtocol_GetEpochState(t *testing.T) {
 					pb: testBlockResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("not GetEpochStateResponse"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("not GetEpochStateResponse"),
+			expStID: makeTestStreamID(0),
 		},
 		{
-			getResponse:   nil,
-			expErr:        errors.New("get response error"),
-			expStID:       "",
-			streamRemoved: true, // Does not exist at the first place
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -167,9 +154,8 @@ func TestProtocol_GetEpochState(t *testing.T) {
 					pb: testErrorResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("test error"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
 		},
 	}
 
@@ -184,10 +170,6 @@ func TestProtocol_GetEpochState(t *testing.T) {
 		if stid != test.expStID {
 			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
 		}
-		streamExist := protocol.sm.(*testStreamManager).isStreamExist(stid)
-		if streamExist == test.streamRemoved {
-			t.Errorf("Test %v: after request stream exist: %v / %v", i, streamExist, !test.streamRemoved)
-		}
 		if test.expErr == nil {
 			if gotEpoch := res.State.Epoch; gotEpoch.Cmp(new(big.Int).SetUint64(1)) != 0 {
 				t.Errorf("Test %v: unexpected epoch delivered: %v / %v", i, gotEpoch.String(), 1)
@@ -198,10 +180,9 @@ func TestProtocol_GetEpochState(t *testing.T) {
 
 func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 	tests := []struct {
-		getResponse   getResponseFn
-		expErr        error
-		expStID       sttypes.StreamID
-		streamRemoved bool
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
 	}{
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -209,9 +190,8 @@ func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 					pb: testBlockNumberResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        nil,
-			expStID:       makeTestStreamID(0),
-			streamRemoved: false,
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -219,15 +199,13 @@ func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 					pb: testBlockResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("not GetBlockNumber"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("not GetBlockNumber"),
+			expStID: makeTestStreamID(0),
 		},
 		{
-			getResponse:   nil,
-			expErr:        errors.New("get response error"),
-			expStID:       "",
-			streamRemoved: true, // Does not exist at the first place
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -235,9 +213,8 @@ func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 					pb: testErrorResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("test error"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
 		},
 	}
 
@@ -252,10 +229,6 @@ func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 		if stid != test.expStID {
 			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
 		}
-		streamExist := protocol.sm.(*testStreamManager).isStreamExist(stid)
-		if streamExist == test.streamRemoved {
-			t.Errorf("Test %v: after request stream exist: %v / %v", i, streamExist, !test.streamRemoved)
-		}
 		if test.expErr == nil {
 			if res != testCurBlockNumber {
 				t.Errorf("Test %v: block number not expected: %v / %v", i, res, testCurBlockNumber)
@@ -266,10 +239,9 @@ func TestProtocol_GetCurrentBlockNumber(t *testing.T) {
 
 func TestProtocol_GetBlockHashes(t *testing.T) {
 	tests := []struct {
-		getResponse   getResponseFn
-		expErr        error
-		expStID       sttypes.StreamID
-		streamRemoved bool
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
 	}{
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -277,9 +249,8 @@ func TestProtocol_GetBlockHashes(t *testing.T) {
 					pb: testBlockHashesResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        nil,
-			expStID:       makeTestStreamID(0),
-			streamRemoved: false,
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -287,15 +258,13 @@ func TestProtocol_GetBlockHashes(t *testing.T) {
 					pb: testBlockResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("not GetBlockHashes"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("not GetBlockHashes"),
+			expStID: makeTestStreamID(0),
 		},
 		{
-			getResponse:   nil,
-			expErr:        errors.New("get response error"),
-			expStID:       "",
-			streamRemoved: true, // Does not exist at the first place
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -303,9 +272,8 @@ func TestProtocol_GetBlockHashes(t *testing.T) {
 					pb: testErrorResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("test error"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
 		},
 	}
 
@@ -320,10 +288,6 @@ func TestProtocol_GetBlockHashes(t *testing.T) {
 		if stid != test.expStID {
 			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
 		}
-		streamExist := protocol.sm.(*testStreamManager).isStreamExist(stid)
-		if streamExist == test.streamRemoved {
-			t.Errorf("Test %v: after request stream exist: %v / %v", i, streamExist, !test.streamRemoved)
-		}
 		if test.expErr == nil {
 			if len(res) != 1 {
 				t.Errorf("Test %v: size not 1", i)
@@ -337,10 +301,9 @@ func TestProtocol_GetBlockHashes(t *testing.T) {
 
 func TestProtocol_GetBlocksByHashes(t *testing.T) {
 	tests := []struct {
-		getResponse   getResponseFn
-		expErr        error
-		expStID       sttypes.StreamID
-		streamRemoved bool
+		getResponse getResponseFn
+		expErr      error
+		expStID     sttypes.StreamID
 	}{
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -348,9 +311,8 @@ func TestProtocol_GetBlocksByHashes(t *testing.T) {
 					pb: testBlocksByHashesResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        nil,
-			expStID:       makeTestStreamID(0),
-			streamRemoved: false,
+			expErr:  nil,
+			expStID: makeTestStreamID(0),
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -358,15 +320,13 @@ func TestProtocol_GetBlocksByHashes(t *testing.T) {
 					pb: testBlockResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("not GetBlocksByHashes"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("not GetBlocksByHashes"),
+			expStID: makeTestStreamID(0),
 		},
 		{
-			getResponse:   nil,
-			expErr:        errors.New("get response error"),
-			expStID:       "",
-			streamRemoved: true, // Does not exist at the first place
+			getResponse: nil,
+			expErr:      errors.New("get response error"),
+			expStID:     "",
 		},
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
@@ -374,9 +334,8 @@ func TestProtocol_GetBlocksByHashes(t *testing.T) {
 					pb: testErrorResponse,
 				}, makeTestStreamID(0)
 			},
-			expErr:        errors.New("test error"),
-			expStID:       makeTestStreamID(0),
-			streamRemoved: true,
+			expErr:  errors.New("test error"),
+			expStID: makeTestStreamID(0),
 		},
 	}
 
@@ -390,10 +349,6 @@ func TestProtocol_GetBlocksByHashes(t *testing.T) {
 		}
 		if stid != test.expStID {
 			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
-		}
-		streamExist := protocol.sm.(*testStreamManager).isStreamExist(stid)
-		if streamExist == test.streamRemoved {
-			t.Errorf("Test %v: after request stream exist: %v / %v", i, streamExist, !test.streamRemoved)
 		}
 		if test.expErr == nil {
 			if len(blocks) != 1 {

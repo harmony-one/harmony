@@ -26,6 +26,7 @@ type (
 		cancel    func()
 
 		evtDownloadFinished event.Feed // channel for each download task finished
+		evtDownloadStarted  event.Feed // channel for each download has started
 
 		config Config
 		logger zerolog.Logger
@@ -83,6 +84,11 @@ func (d *Downloader) DownloadAsync() {
 	case d.downloadC <- struct{}{}:
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// SubscribeDownloadStarted subscribe download started
+func (d *Downloader) SubscribeDownloadStarted(ch chan struct{}) event.Subscription {
+	return d.evtDownloadStarted.Subscribe(ch)
 }
 
 // SubscribeDownloadFinishedEvent subscribe the download finished
@@ -165,12 +171,6 @@ func (d *Downloader) loop() {
 				// If block number has been changed, trigger another sync
 				go trigger()
 			}
-			if !initSync {
-				// If we are doing short sync, we may want consensus to help us with
-				// a couple of latest blocks
-				d.evtDownloadFinished.Send(struct{}{})
-			}
-
 			initSync = false
 
 		case <-d.closeC:
