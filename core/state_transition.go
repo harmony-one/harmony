@@ -284,7 +284,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		ret, st.gas, vmErr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmErr != nil {
-		utils.Logger().Info().Err(vmErr).Msg("VM returned with error")
+		utils.Logger().Debug().Err(vmErr).Msg("VM returned with error")
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.

@@ -225,10 +225,13 @@ func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
 
 var (
 	epochBlocksMap = map[common.Address]map[uint64]staking.EpochSigningEntry{}
+	mapLock        = sync.Mutex{}
 )
 
 func (hmy *Harmony) getEpochSigning(epoch *big.Int, addr common.Address) (staking.EpochSigningEntry, error) {
 	entry := staking.EpochSigningEntry{}
+	mapLock.Lock()
+	defer mapLock.Unlock()
 	if validatorMap, ok := epochBlocksMap[addr]; ok {
 		if val, ok := validatorMap[epoch.Uint64()]; ok {
 			return val, nil
