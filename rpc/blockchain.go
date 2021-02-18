@@ -137,51 +137,56 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 	blockArgs.InclTx = true
 
-	// Fetch the block
-	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
+	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
+	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
+	// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
+
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if err != nil {
-		return nil, err
-	}
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
+	if blk != nil && err == nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Format the response according to version
+		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+		var rpcBlock interface{}
+		switch s.version {
+		case V1:
+			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
+		case V2:
+			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+		case Eth:
+			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	// Format the response according to version
-	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	var rpcBlock interface{}
-	switch s.version {
-	case V1:
-		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-	case V2:
-		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-	case Eth:
-		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	response, err = NewStructuredResponse(rpcBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pending blocks need to nil out a few fields
-	if blockNum == rpc.PendingBlockNumber {
-		for _, field := range []string{"hash", "nonce", "miner"} {
-			response[field] = nil
+		response, err = NewStructuredResponse(rpcBlock)
+		if err != nil {
+			return nil, err
 		}
+
+		// Pending blocks need to nil out a few fields
+		if blockNum == rpc.PendingBlockNumber {
+			for _, field := range []string{"hash", "nonce", "miner"} {
+				response[field] = nil
+			}
+		}
+
+		return response, err
 	}
 
-	return response, err
+	return nil, err
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
@@ -203,33 +208,34 @@ func (s *PublicBlockchainService) GetBlockByHash(
 
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
+	if blk != nil && err == nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Format the response according to version
+		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+		var rpcBlock interface{}
+		switch s.version {
+		case V1:
+			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
+		case V2:
+			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+		case Eth:
+			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
 		if err != nil {
 			return nil, err
 		}
+		return NewStructuredResponse(rpcBlock)
 	}
 
-	// Format the response according to version
-	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	var rpcBlock interface{}
-	switch s.version {
-	case V1:
-		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-	case V2:
-		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-	case Eth:
-		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	return NewStructuredResponse(rpcBlock)
+	return nil, err
 }
 
 // GetBlockByNumberNew is an alias for GetBlockByNumber using rpc_common.BlockArgs
@@ -556,19 +562,18 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Ensure valid block number
-	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
 
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
-	if err != nil {
-		return nil, err
+	if header != nil && err == nil {
+		// Response output is the same for all versions
+		leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
+		return NewStructuredResponse(NewHeaderInformation(header, leader))
 	}
-
-	// Response output is the same for all versions
-	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
-	return NewStructuredResponse(NewHeaderInformation(header, leader))
+	return nil, err
 }
 
 // GetCurrentUtilityMetrics ..
