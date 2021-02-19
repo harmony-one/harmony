@@ -124,7 +124,7 @@ var (
 		DiscSoftLowCap: 2,
 		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      2,
+		DiscBatch:      5,
 	}
 
 	defaultElseSyncConfig = syncConfig{
@@ -136,7 +136,7 @@ var (
 		DiscSoftLowCap: 2,
 		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      2,
+		DiscBatch:      5,
 	}
 )
 

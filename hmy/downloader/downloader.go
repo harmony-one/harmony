@@ -165,7 +165,11 @@ func (d *Downloader) loop() {
 				}()
 				continue
 			}
-			d.logger.Info().Bool("initSync", initSync).Msg("sync finished")
+			d.logger.Info().Int("block added", addedBN).
+				Uint64("current height", d.bc.CurrentBlock().NumberU64()).
+				Bool("initSync", initSync).
+				Uint32("shard", d.bc.ShardID()).
+				Msg("sync finished")
 
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync

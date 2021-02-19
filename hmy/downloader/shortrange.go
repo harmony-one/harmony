@@ -57,7 +57,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		sh.removeStreams(whitelist)
 		return n, errors.Wrap(err, "InsertChain")
 	}
-	return n, nil
+	return len(blocks), nil
 }
 
 type srHelper struct {

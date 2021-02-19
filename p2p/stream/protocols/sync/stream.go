@@ -55,6 +55,9 @@ func (p *Protocol) wrapStream(raw libp2p_network.Stream) *syncStream {
 }
 
 func (st *syncStream) run() {
+	st.logger.Info().Str("StreamID", string(st.ID())).Msg("running sync protocol on stream")
+	defer st.logger.Info().Str("StreamID", string(st.ID())).Msg("end running sync protocol on stream")
+
 	go st.handleReqLoop()
 	go st.handleRespLoop()
 	st.readMsgLoop()
