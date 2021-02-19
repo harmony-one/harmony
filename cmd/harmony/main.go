@@ -368,7 +368,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
 	}
 
-	// TODO: probably replace this legacy syncing after a hard fork
 	if hc.Sync.LegacyServer {
 		utils.Logger().Info().Msg("support gRPC sync server")
 		currentNode.SupportGRPCSyncServer()
