@@ -139,7 +139,7 @@ func (d *Downloader) waitForBootFinish() {
 }
 
 func (d *Downloader) loop() {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	initSync := true
 	trigger := func() {
 		select {
