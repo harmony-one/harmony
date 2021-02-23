@@ -134,7 +134,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(0),
-		SixtyPercentEpoch:          EpochTBD, // Never enable it for STN as STN has no external validator setup
+		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
