@@ -216,7 +216,7 @@ func (v *stakedVoteWeight) SetVoters(
 	// Hold onto this calculation
 	v.roster = *roster
 
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Uint64("curEpoch", epoch.Uint64()).
 		Uint32("shard-id", subCommittee.ShardID).
 		Str("committee", roster.String()).
