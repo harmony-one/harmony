@@ -182,6 +182,29 @@ func TestPrioritizedBlocks(t *testing.T) {
 		}
 		prevBN = b
 	}
+	if last := bns.pop(); last != 0 {
+		t.Errorf("last elem is not 0")
+	}
+}
+
+func TestBlocksByNumber(t *testing.T) {
+	addBNs := []uint64{4, 7, 6, 9}
+
+	bns := newBlocksByNumber(10)
+	for _, bn := range addBNs {
+		bns.push(makeTestBlock(bn))
+	}
+	prevBN := uint64(0)
+	for len(*bns.q) > 0 {
+		b := bns.pop()
+		if b.NumberU64() < prevBN {
+			t.Errorf("number not incrementing")
+		}
+		prevBN = b.NumberU64()
+	}
+	if lastBlock := bns.pop(); lastBlock != nil {
+		t.Errorf("last block is not nil")
+	}
 }
 
 func TestPriorityQueue(t *testing.T) {

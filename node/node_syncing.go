@@ -35,6 +35,13 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// BeaconSyncHook is the hook function called after inserted beacon in downloader
+func (node *Node) BeaconSyncHook() {
+	if node.Consensus.IsLeader() {
+		node.BroadcastCrossLink()
+	}
+}
+
 // GenerateRandomString generates a random string with given length
 func GenerateRandomString(n int) string {
 	b := make([]rune, n)
@@ -183,23 +190,6 @@ func (node *Node) doBeaconSyncing() {
 	if node.NodeConfig.IsOffline {
 		return
 	}
-
-	go func(node *Node) {
-		// TODO ek – infinite loop; add shutdown/cleanup logic
-		for beaconBlock := range node.BeaconBlockChannel {
-			if node.beaconSync != nil {
-				err := node.beaconSync.UpdateBlockAndStatus(
-					beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
-				)
-				if err != nil {
-					node.beaconSync.AddLastMileBlock(beaconBlock)
-				} else if node.Consensus.IsLeader() {
-					// Only leader broadcast crosslink to avoid spamming p2p
-					node.BroadcastCrossLink()
-				}
-			}
-		}
-	}(node)
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {

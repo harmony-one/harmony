@@ -19,6 +19,7 @@ type (
 	Downloader struct {
 		bc           blockChain
 		syncProtocol syncProtocol
+		bh           *beaconHelper
 
 		downloadC chan struct{}
 		closeC    chan struct{}
@@ -37,7 +38,7 @@ type (
 func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloader {
 	config.fixValues()
 
-	syncProtocol := sync.NewProtocol(sync.Config{
+	sp := sync.NewProtocol(sync.Config{
 		Chain:     bc,
 		Host:      host.GetP2PHost(),
 		Discovery: host.GetDiscovery(),
@@ -49,12 +50,19 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 		SmHiCap:      config.SmHiCap,
 		DiscBatch:    config.SmDiscBatch,
 	})
-	host.AddStreamProtocol(syncProtocol)
+	host.AddStreamProtocol(sp)
+
+	var bh *beaconHelper
+	if config.BHConfig != nil && bc.ShardID() == 0 {
+		bh = newBeaconHelper(bc, config.BHConfig.BlockC, config.BHConfig.InsertHook)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Downloader{
 		bc:           bc,
-		syncProtocol: syncProtocol,
+		syncProtocol: sp,
+		bh:           bh,
 
 		downloadC: make(chan struct{}),
 		closeC:    make(chan struct{}),
@@ -69,12 +77,20 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 // Start start the downloader
 func (d *Downloader) Start() {
 	go d.run()
+
+	if d.bh != nil {
+		d.bh.start()
+	}
 }
 
 // Close close the downloader
 func (d *Downloader) Close() {
 	close(d.closeC)
 	d.cancel()
+
+	if d.bh != nil {
+		d.bh.close()
+	}
 }
 
 // DownloadAsync triggers the download async. If there is already a download task that is
@@ -173,7 +189,11 @@ func (d *Downloader) loop() {
 
 			if addedBN != 0 {
 				// If block number has been changed, trigger another sync
+				// and try to add last mile from pub-sub (blocking)
 				go trigger()
+				if d.bh != nil {
+					d.bh.insertSync()
+				}
 			}
 			initSync = false
 

@@ -168,6 +168,49 @@ func (pbs *prioritizedNumbers) length() int {
 	return len(*pbs.q)
 }
 
+type (
+	blockByNumber types.Block
+
+	// blocksByNumber is the priority queue ordered by number
+	blocksByNumber struct {
+		q   *priorityQueue
+		cap int
+	}
+)
+
+func (b *blockByNumber) getBlockNumber() uint64 {
+	raw := (*types.Block)(b)
+	return raw.NumberU64()
+}
+
+func newBlocksByNumber(cap int) *blocksByNumber {
+	pqs := make(priorityQueue, 0)
+	heap.Init(&pqs)
+	return &blocksByNumber{
+		q:   &pqs,
+		cap: cap,
+	}
+}
+
+func (bs *blocksByNumber) push(b *types.Block) {
+	heap.Push(bs.q, (*blockByNumber)(b))
+	for bs.q.Len() > bs.cap {
+		heap.Pop(bs.q)
+	}
+}
+
+func (bs *blocksByNumber) pop() *types.Block {
+	if bs.q.Len() == 0 {
+		return nil
+	}
+	item := heap.Pop(bs.q)
+	return (*types.Block)(item.(*blockByNumber))
+}
+
+func (bs *blocksByNumber) len() int {
+	return bs.q.Len()
+}
+
 // priorityQueue is a priorityQueue with lowest block number with highest priority
 type priorityQueue []bnPrioritizedItem
 
@@ -201,6 +244,9 @@ func (q *priorityQueue) Push(x interface{}) {
 func (q *priorityQueue) Pop() interface{} {
 	prev := *q
 	n := len(prev)
+	if n == 0 {
+		return nil
+	}
 	res := prev[n-1]
 	*q = prev[0 : n-1]
 	return res

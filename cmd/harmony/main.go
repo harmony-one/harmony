@@ -720,6 +720,14 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 		SmHiCap:      hc.Sync.DiscHighCap,
 		SmDiscBatch:  hc.Sync.DiscBatch,
 	}
+	// If we are running side chain, we will need to do some extra works for beacon
+	// sync
+	if node.NodeConfig.ShardID != 0 {
+		dConfig.BHConfig = &downloader.BeaconHelperConfig{
+			BlockC:     node.BeaconBlockChannel,
+			InsertHook: node.BeaconSyncHook,
+		}
+	}
 	s := sync.NewService(host, blockchains, dConfig)
 
 	node.RegisterService(service.Synchronize, s)

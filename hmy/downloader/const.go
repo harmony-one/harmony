@@ -1,6 +1,9 @@
 package downloader
 
-import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+import (
+	"github.com/harmony-one/harmony/core/types"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+)
 
 const (
 	numBlocksByNumPerRequest int = 10 // number of blocks for each request
@@ -19,19 +22,32 @@ const (
 	defaultConcurrency = 16
 )
 
-// Config is the downloader config
-type Config struct {
-	Network     nodeconfig.NetworkType
-	Concurrency int // Number of concurrent sync requests
-	MinStreams  int // Minimum number of streams to do sync
-	InitStreams int // Number of streams requirement for initial bootstrap
+type (
+	// Config is the downloader config
+	Config struct {
+		// parameters
+		Network     nodeconfig.NetworkType
+		Concurrency int // Number of concurrent sync requests
+		MinStreams  int // Minimum number of streams to do sync
+		InitStreams int // Number of streams requirement for initial bootstrap
 
-	// stream manager config
-	SmSoftLowCap int
-	SmHardLowCap int
-	SmHiCap      int
-	SmDiscBatch  int
-}
+		// stream manager config
+		SmSoftLowCap int
+		SmHardLowCap int
+		SmHiCap      int
+		SmDiscBatch  int
+
+		// config for beacon config
+		BHConfig *BeaconHelperConfig
+	}
+
+	// BeaconHelperConfig is the extra config used for beaconHelper which uses
+	// pub-sub block message to do sync.
+	BeaconHelperConfig struct {
+		BlockC     <-chan *types.Block
+		InsertHook func()
+	}
+)
 
 func (c *Config) fixValues() {
 	if c.Concurrency == 0 {
