@@ -54,7 +54,9 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	}
 	n, err := d.bc.InsertChain(blocks, true)
 	if err != nil {
-		sh.removeStreams(whitelist)
+		if err != context.Canceled {
+			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
+		}
 		return n, errors.Wrap(err, "InsertChain")
 	}
 	return len(blocks), nil
