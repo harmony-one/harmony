@@ -42,6 +42,7 @@ var (
 		p2pPortFlag,
 		p2pIPFlag,
 		p2pKeyFileFlag,
+		p2pDHTDataStoreFlag,
 
 		legacyKeyFileFlag,
 	}
@@ -411,6 +412,12 @@ var (
 		Usage:    "the p2p key file of the harmony node",
 		DefValue: defaultConfig.P2P.KeyFile,
 	}
+	p2pDHTDataStoreFlag = cli.StringFlag{
+		Name:     "p2p.dht.datastore",
+		Usage:    "the datastore file to persist the dht routing table",
+		DefValue: "",
+		Hidden:   true,
+	}
 	legacyKeyFileFlag = cli.StringFlag{
 		Name:       "key",
 		Usage:      "the p2p key file of the harmony node",
@@ -434,6 +441,11 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, p2pKeyFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyKeyFileFlag) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, legacyKeyFileFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDHTDataStoreFlag) {
+		ds := cli.GetStringFlagValue(cmd, p2pDHTDataStoreFlag)
+		config.P2P.DHTDataStore = &ds
 	}
 }
 

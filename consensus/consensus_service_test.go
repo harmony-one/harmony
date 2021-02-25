@@ -16,7 +16,10 @@ import (
 func TestSignAndMarshalConsensusMessage(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   &leader,
+		BLSKey: priKey,
+	})
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -45,7 +48,10 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 func TestSetViewID(t *testing.T) {
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   &leader,
+		BLSKey: priKey,
+	})
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
