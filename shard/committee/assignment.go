@@ -350,6 +350,10 @@ func eposStakedCommittee(
 		)
 	}
 
+	if len(completedEPoSRound.AuctionWinners) == 0 {
+		utils.Logger().Warn().Msg("No elected validators in the new epoch!!! Reuse old shard state.")
+		return stakerReader.ReadShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
+	}
 	return shardState, nil
 }
 
