@@ -194,6 +194,9 @@ func TestBlocksByNumber(t *testing.T) {
 	for _, bn := range addBNs {
 		bns.push(makeTestBlock(bn))
 	}
+	if bns.len() != len(addBNs) {
+		t.Errorf("size unexpected: %v / %v", bns.len(), len(addBNs))
+	}
 	prevBN := uint64(0)
 	for len(*bns.q) > 0 {
 		b := bns.pop()

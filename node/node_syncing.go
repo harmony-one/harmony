@@ -36,6 +36,7 @@ func init() {
 }
 
 // BeaconSyncHook is the hook function called after inserted beacon in downloader
+// TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
 func (node *Node) BeaconSyncHook() {
 	if node.Consensus.IsLeader() {
 		node.BroadcastCrossLink()

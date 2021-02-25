@@ -18,9 +18,8 @@ type (
 	beaconHelper struct {
 		bc     blockChain
 		blockC <-chan *types.Block
-		// TODO: refactor this ugly hook to consensus module. We'd better put it in
-		//   consensus module with a subscription. Also a lot of legacy code in hook
-		//   refactor later.
+		// TODO: refactor this hook to consensus module. We'd better put it in
+		//   consensus module under a subscription.
 		insertHook func()
 
 		lastMileCache *blocksByNumber
@@ -40,7 +39,7 @@ func newBeaconHelper(bc blockChain, blockC <-chan *types.Block, insertHook func(
 		blockC:        blockC,
 		insertHook:    insertHook,
 		lastMileCache: newBlocksByNumber(lastMileCap),
-		insertC:       make(chan insertTask),
+		insertC:       make(chan insertTask, 1),
 		closeC:        make(chan struct{}),
 		logger: utils.Logger().With().
 			Str("module", "downloader").
@@ -123,6 +122,7 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 			bn--
 			return
 		}
+		bh.logger.Info().Uint64("number", b.NumberU64()).Msg("Inserted block from beacon pub-sub")
 		if bh.insertHook != nil {
 			bh.insertHook()
 		}
