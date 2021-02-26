@@ -116,7 +116,7 @@ var (
 	}
 
 	defaultTestNetSyncConfig = syncConfig{
-		LegacyServer:   false,
+		LegacyServer:   true,
 		LegacyClient:   false,
 		Concurrency:    2,
 		MinPeers:       2,
@@ -128,7 +128,7 @@ var (
 	}
 
 	defaultElseSyncConfig = syncConfig{
-		LegacyServer:   false,
+		LegacyServer:   true,
 		LegacyClient:   false,
 		Concurrency:    2,
 		MinPeers:       2,
