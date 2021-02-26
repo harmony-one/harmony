@@ -89,7 +89,7 @@ type NodeAPI interface {
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64)
-	SyncPeers() map[uint32]int
+	SyncPeers() map[string]int
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof

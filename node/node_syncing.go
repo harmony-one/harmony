@@ -570,12 +570,18 @@ func (node *Node) IsOutOfSync(shardID uint32) bool {
 }
 
 // SyncPeers return connected sync peers for each shard
-func (node *Node) SyncPeers() map[uint32]int {
+func (node *Node) SyncPeers() map[string]int {
 	ds := node.getDownloaders()
 	if ds == nil {
 		return nil
 	}
-	return ds.NumPeers()
+	nums := ds.NumPeers()
+	res := make(map[string]int)
+	for sid, num := range nums {
+		s := fmt.Sprintf("shard-%v", sid)
+		res[s] = num
+	}
+	return res
 }
 
 func (node *Node) getDownloaders() *downloader.Downloaders {
