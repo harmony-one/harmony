@@ -19,18 +19,19 @@ import (
 func (d *Downloader) doLongRangeSync() (int, error) {
 	var totalInserted int
 
-	d.evtDownloadStarted.Send(struct{}{})
-	defer d.evtDownloadFinished.Send(struct{}{})
+	d.startSyncing()
+	defer d.finishSyncing()
 
 	for {
 		ctx, cancel := context.WithCancel(d.ctx)
 
 		iter := &lrSyncIter{
-			chain:    d.bc,
-			protocol: d.syncProtocol,
-			ctx:      ctx,
-			config:   d.config,
-			logger:   d.logger.With().Str("mode", "long range").Logger(),
+			chain:      d.bc,
+			protocol:   d.syncProtocol,
+			downloader: d,
+			ctx:        ctx,
+			config:     d.config,
+			logger:     d.logger.With().Str("mode", "long range").Logger(),
 		}
 		if err := iter.doLongRangeSync(); err != nil {
 			cancel()
@@ -50,8 +51,9 @@ func (d *Downloader) doLongRangeSync() (int, error) {
 // First get a rough estimate of the current block height, and then sync to this
 // block number
 type lrSyncIter struct {
-	chain    blockChain
-	protocol syncProtocol
+	chain      blockChain
+	protocol   syncProtocol
+	downloader *Downloader
 
 	gbm      *getBlocksManager // initialized when finished get block number
 	inserted int
@@ -69,6 +71,8 @@ func (lsi *lrSyncIter) doLongRangeSync() error {
 	if err != nil {
 		return err
 	}
+	lsi.downloader.status.setTargetBN(bn)
+
 	return lsi.fetchAndInsertBlocks(bn)
 }
 

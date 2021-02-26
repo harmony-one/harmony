@@ -37,7 +37,7 @@ func TestDownloader_doShortRangeSync(t *testing.T) {
 
 func TestSrHelper_getHashChain(t *testing.T) {
 	tests := []struct {
-		localBC      blockChain
+		curBN        uint64
 		syncProtocol syncProtocol
 		config       Config
 
@@ -45,7 +45,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 		expStSize        int
 	}{
 		{
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(1000, 32, nil),
 			config: Config{
 				Concurrency: 16,
@@ -55,7 +55,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 			expStSize:        16, // Concurrency
 		},
 		{
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(100, 32, nil),
 			config: Config{
 				Concurrency: 16,
@@ -65,7 +65,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 			expStSize:        0,
 		},
 		{
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(110, 32, nil),
 			config: Config{
 				Concurrency: 16,
@@ -76,7 +76,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 		},
 		{
 			// stream size is smaller than concurrency
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(1000, 10, nil),
 			config: Config{
 				Concurrency: 16,
@@ -87,7 +87,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 		},
 		{
 			// one stream reports an error, else are fine
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(1000, 32, makeOnceErrorFunc()),
 			config: Config{
 				Concurrency: 16,
@@ -98,7 +98,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 		},
 		{
 			// error happens at one block number, all stream removed
-			localBC: newTestBlockChain(100, nil),
+			curBN: 100,
 			syncProtocol: newTestSyncProtocol(1000, 32, func(bn uint64) error {
 				if bn == 110 {
 					return errors.New("test error")
@@ -113,7 +113,7 @@ func TestSrHelper_getHashChain(t *testing.T) {
 			expStSize:        0,
 		},
 		{
-			localBC:      newTestBlockChain(100, nil),
+			curBN:        100,
 			syncProtocol: newTestSyncProtocol(1000, 32, nil),
 			config: Config{
 				Concurrency: 16,
@@ -126,12 +126,11 @@ func TestSrHelper_getHashChain(t *testing.T) {
 
 	for i, test := range tests {
 		sh := &srHelper{
-			bc:           test.localBC,
 			syncProtocol: test.syncProtocol,
 			ctx:          context.Background(),
 			config:       test.config,
 		}
-		hashChain, wl, err := sh.getHashChain()
+		hashChain, wl, err := sh.getHashChain(test.curBN)
 		if err != nil {
 			t.Error(err)
 		}

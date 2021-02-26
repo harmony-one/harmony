@@ -29,6 +29,7 @@ type (
 		evtDownloadFinished event.Feed // channel for each download task finished
 		evtDownloadStarted  event.Feed // channel for each download has started
 
+		status status
 		config Config
 		logger zerolog.Logger
 	}
@@ -69,6 +70,7 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 		ctx:       ctx,
 		cancel:    cancel,
 
+		status: newStatus(),
 		config: config,
 		logger: utils.Logger().With().Str("module", "downloader").Logger(),
 	}
@@ -100,6 +102,20 @@ func (d *Downloader) DownloadAsync() {
 	case d.downloadC <- struct{}{}:
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// NumPeers returns the number of peers connected of a specific shard.
+func (d *Downloader) NumPeers() int {
+	return d.syncProtocol.NumStreams()
+}
+
+// IsSyncing return the current sync status
+func (d *Downloader) SyncStatus() (bool, uint64) {
+	syncing, target := d.status.get()
+	if !syncing {
+		target = d.bc.CurrentBlock().NumberU64()
+	}
+	return syncing, target
 }
 
 // SubscribeDownloadStarted subscribe download started
@@ -213,4 +229,14 @@ func (d *Downloader) doDownload(initSync bool) (n int, err error) {
 		return
 	}
 	return
+}
+
+func (d *Downloader) startSyncing() {
+	d.status.startSyncing()
+	d.evtDownloadStarted.Send(struct{}{})
+}
+
+func (d *Downloader) finishSyncing() {
+	d.status.finishSyncing()
+	d.evtDownloadFinished.Send(struct{}{})
 }

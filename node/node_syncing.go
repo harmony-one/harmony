@@ -7,12 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/api/service/synchronize"
+
+	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/hmy/downloader"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/legacysync"
-	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -20,6 +23,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
+	"github.com/harmony-one/harmony/shard"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
@@ -318,7 +322,7 @@ func (node *Node) supportSyncing() {
 // InitSyncingServer starts downloader server.
 func (node *Node) InitSyncingServer() {
 	if node.downloaderServer == nil {
-		node.downloaderServer = downloader.NewServer(node)
+		node.downloaderServer = legdownloader.NewServer(node)
 	}
 }
 
@@ -471,7 +475,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
 			syncPort := legacysync.GetSyncingPort(port)
-			client := downloader.ClientSetup(ip, syncPort)
+			client := legdownloader.ClientSetup(ip, syncPort)
 			if client == nil {
 				utils.Logger().Warn().
 					Str("ip", ip).
@@ -545,12 +549,43 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	return b, nil
 }
 
-// GetMaxPeerHeight ...
-func (node *Node) GetMaxPeerHeight() uint64 {
-	return node.stateSync.GetMaxPeerHeight()
+// SyncStatus return the syncing status, including whether node is syncing
+// and the target block number.
+func (node *Node) SyncStatus(shardID uint32) (bool, uint64) {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return false, 0
+	}
+	return ds.SyncStatus(shardID)
 }
 
-// IsOutOfSync ...
-func (node *Node) IsOutOfSync(bc *core.BlockChain) bool {
-	return node.stateSync.IsOutOfSync(bc, false)
+// IsOutOfSync return whether the node is out of sync of the given hsardID
+func (node *Node) IsOutOfSync(shardID uint32) bool {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return false
+	}
+	isSyncing, _ := ds.SyncStatus(shardID)
+	return !isSyncing
+}
+
+// SyncPeers return connected sync peers for each shard
+func (node *Node) SyncPeers() map[uint32]int {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return nil
+	}
+	return ds.NumPeers()
+}
+
+func (node *Node) getDownloaders() *downloader.Downloaders {
+	syncService := node.serviceManager.GetService(service.Synchronize)
+	if syncService == nil {
+		return nil
+	}
+	dsService, ok := syncService.(*synchronize.Service)
+	if !ok {
+		return nil
+	}
+	return dsService.Downloaders
 }

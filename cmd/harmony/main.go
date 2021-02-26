@@ -22,7 +22,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/prometheus"
-	"github.com/harmony-one/harmony/api/service/sync"
+	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
@@ -728,7 +728,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 			InsertHook: node.BeaconSyncHook,
 		}
 	}
-	s := sync.NewService(host, blockchains, dConfig)
+	s := synchronize.NewService(host, blockchains, dConfig)
 
 	node.RegisterService(service.Synchronize, s)
 

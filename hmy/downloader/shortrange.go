@@ -23,7 +23,6 @@ import (
 // 3. Insert the blocks to blockchain.
 func (d *Downloader) doShortRangeSync() (int, error) {
 	sh := &srHelper{
-		bc:           d.bc,
 		syncProtocol: d.syncProtocol,
 		ctx:          d.ctx,
 		config:       d.config,
@@ -33,7 +32,8 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	if err := sh.checkPrerequisites(); err != nil {
 		return 0, errors.Wrap(err, "prerequisite")
 	}
-	hashChain, whitelist, err := sh.getHashChain()
+	curBN := d.bc.CurrentBlock().NumberU64()
+	hashChain, whitelist, err := sh.getHashChain(curBN)
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -42,8 +42,10 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		return 0, nil
 	}
 
-	d.evtDownloadStarted.Send(struct{}{})
-	defer d.evtDownloadFinished.Send(struct{}{})
+	d.startSyncing()
+	expEndBN := curBN + uint64(len(hashChain)) - 1
+	d.status.setTargetBN(expEndBN)
+	defer d.finishSyncing()
 
 	blocks, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
@@ -63,7 +65,6 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 }
 
 type srHelper struct {
-	bc           blockChain
 	syncProtocol syncProtocol
 
 	ctx    context.Context
@@ -71,8 +72,8 @@ type srHelper struct {
 	logger zerolog.Logger
 }
 
-func (sh *srHelper) getHashChain() ([]common.Hash, []sttypes.StreamID, error) {
-	bns := sh.prepareBlockHashNumbers()
+func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamID, error) {
+	bns := sh.prepareBlockHashNumbers(curBN)
 	results := newBlockHashResults(bns)
 
 	var wg sync.WaitGroup
@@ -167,9 +168,8 @@ func (sh *srHelper) checkPrerequisites() error {
 	return nil
 }
 
-func (sh *srHelper) prepareBlockHashNumbers() []uint64 {
+func (sh *srHelper) prepareBlockHashNumbers(curNumber uint64) []uint64 {
 	res := make([]uint64, 0, numBlockHashesPerRequest)
-	curNumber := sh.bc.CurrentBlock().NumberU64()
 
 	for bn := curNumber + 1; bn <= curNumber+uint64(numBlockHashesPerRequest); bn++ {
 		res = append(res, bn)

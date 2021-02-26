@@ -1,4 +1,4 @@
-package sync
+package synchronize
 
 import (
 	"github.com/ethereum/go-ethereum/rpc"

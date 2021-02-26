@@ -13,6 +13,45 @@ var (
 	emptyHash common.Hash
 )
 
+type status struct {
+	isSyncing bool
+	targetBN  uint64
+	lock      sync.Mutex
+}
+
+func newStatus() status {
+	return status{}
+}
+
+func (s *status) startSyncing() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.isSyncing = true
+}
+
+func (s *status) setTargetBN(val uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.targetBN = val
+}
+
+func (s *status) finishSyncing() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.isSyncing = false
+	s.targetBN = 0
+}
+
+func (s *status) get() (bool, uint64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.isSyncing, s.targetBN
+}
+
 type getBlocksResult struct {
 	bns    []uint64
 	blocks []*types.Block

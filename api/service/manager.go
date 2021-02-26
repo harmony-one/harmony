@@ -85,6 +85,11 @@ func (m *Manager) GetServices() []Service {
 	return m.services
 }
 
+// GetService get the specified service
+func (m *Manager) GetService(t Type) Service {
+	return m.serviceMap[t]
+}
+
 // StartServices run all registered services. If one of the starting service returns
 // an error, closing all started services.
 func (m *Manager) StartServices() (err error) {
