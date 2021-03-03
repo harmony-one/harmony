@@ -193,7 +193,7 @@ func NewBlockWithTxHash(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 	}
 
 	for _, tx := range b.Transactions() {
-		blkWithTxs.Transactions = append(blkWithTxs.Transactions, tx.Hash())
+		blkWithTxs.Transactions = append(blkWithTxs.Transactions, tx.ConvertToEth().Hash())
 	}
 
 	if blockArgs.WithSigners {
@@ -214,8 +214,8 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 		Transactions: []*Transaction{},
 	}
 
-	for idx, _ := range b.Transactions() {
-		fmtTx, err := NewTransactionFromBlockIndex(b, uint64(idx))
+	for idx, tx := range b.Transactions() {
+		fmtTx, err := NewTransaction(tx.ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx))
 		if err != nil {
 			return nil, err
 		}
@@ -227,15 +227,4 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 	}
 
 	return blkWithTxs, nil
-}
-
-// NewTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
-func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, error) {
-	txs := b.Transactions()
-	if index >= uint64(len(txs)) {
-		return nil, fmt.Errorf(
-			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
-		)
-	}
-	return NewTransaction(txs[index].ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
 }
