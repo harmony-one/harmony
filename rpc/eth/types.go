@@ -228,3 +228,14 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 
 	return blkWithTxs, nil
 }
+
+// NewTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
+func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, error) {
+	txs := b.Transactions()
+	if index >= uint64(len(txs)) {
+		return nil, fmt.Errorf(
+			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
+		)
+	}
+	return NewTransaction(txs[index].ConvertToEth(), b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+}
