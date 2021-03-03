@@ -58,12 +58,10 @@ func WriteBlockTxLookUpEntries(db DatabaseWriter, block *types.Block) error {
 		if err := db.Put(key, val); err != nil {
 			return err
 		}
-		if tx.IsEthCompatible() {
-			// Also put a lookup entry for eth transaction's hash
-			key := txLookupKey(tx.HashByType())
-			if err := db.Put(key, val); err != nil {
-				return err
-			}
+		// Also put a lookup entry for eth transaction's hash
+		key = txLookupKey(tx.ConvertToEth().Hash())
+		if err := db.Put(key, val); err != nil {
+			return err
 		}
 	}
 	return nil

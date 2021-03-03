@@ -214,8 +214,8 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 		Transactions: []*Transaction{},
 	}
 
-	for _, tx := range b.Transactions() {
-		fmtTx, err := NewTransactionFromBlockHash(b, tx.Hash())
+	for idx, _ := range b.Transactions() {
+		fmtTx, err := NewTransactionFromBlockIndex(b, uint64(idx))
 		if err != nil {
 			return nil, err
 		}
@@ -227,16 +227,6 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 	}
 
 	return blkWithTxs, nil
-}
-
-// NewTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
-func NewTransactionFromBlockHash(b *types.Block, hash common.Hash) (*Transaction, error) {
-	for idx, tx := range b.Transactions() {
-		if tx.Hash() == hash {
-			return NewTransactionFromBlockIndex(b, uint64(idx))
-		}
-	}
-	return nil, fmt.Errorf("tx %v not found in block %v", hash, b.Hash().String())
 }
 
 // NewTransactionFromBlockIndex returns a transaction that will serialize to the RPC representation.
