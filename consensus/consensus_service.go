@@ -101,7 +101,10 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
-	consensus.ResetViewChangeState()
+	// do not reset view change state if it is in view changing mode
+	if !consensus.IsViewChangingMode() {
+		consensus.ResetViewChangeState()
+	}
 	return consensus.Decider.ParticipantsCount()
 }
 
