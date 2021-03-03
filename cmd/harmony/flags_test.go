@@ -297,6 +297,8 @@ func TestNetworkFlags(t *testing.T) {
 	}
 }
 
+var defDataStore = ".dht-127.0.0.1"
+
 func TestP2PFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
@@ -308,11 +310,13 @@ func TestP2PFlags(t *testing.T) {
 			expConfig: defaultConfig.P2P,
 		},
 		{
-			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file"},
+			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
+				defDataStore},
 			expConfig: p2pConfig{
-				Port:    9001,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				KeyFile: "./key.file",
+				Port:         9001,
+				IP:           nodeconfig.DefaultPublicListenIP,
+				KeyFile:      "./key.file",
+				DHTDataStore: &defDataStore,
 			},
 		},
 		{

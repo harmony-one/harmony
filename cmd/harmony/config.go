@@ -46,9 +46,10 @@ type networkConfig struct {
 }
 
 type p2pConfig struct {
-	Port    int
-	IP      string
-	KeyFile string
+	Port         int
+	IP           string
+	KeyFile      string
+	DHTDataStore *string `toml:",omitempty"`
 }
 
 type generalConfig struct {

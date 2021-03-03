@@ -1,4 +1,4 @@
-package v1
+package eth
 
 import (
 	"fmt"
@@ -8,30 +8,31 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/core/types"
+	hmytypes "github.com/harmony-one/harmony/core/types"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 )
 
 // Block represents a basic block which is further amended by BlockWithTxHash or BlockWithFullTx
 type Block struct {
-	Number     *hexutil.Big `json:"number"`
-	Hash       common.Hash  `json:"hash"`
-	ParentHash common.Hash  `json:"parentHash"`
-	Nonce      uint64       `json:"nonce"`
-	MixHash    common.Hash  `json:"mixHash"`
-	//UncleHash   common.Hash    `json:"sha3Uncles" - used in Ethereum RPC:s
-	LogsBloom        ethtypes.Bloom `json:"logsBloom"`
-	StateRoot        common.Hash    `json:"stateRoot"`
-	Miner            common.Address `json:"miner"`
-	Difficulty       *hexutil.Big   `json:"difficulty"`
-	ExtraData        hexutil.Bytes  `json:"extraData"`
-	Size             hexutil.Uint64 `json:"size"`
-	GasLimit         hexutil.Uint64 `json:"gasLimit"`
-	GasUsed          hexutil.Uint64 `json:"gasUsed"`
-	Timestamp        hexutil.Uint64 `json:"timestamp"`
-	TransactionsRoot common.Hash    `json:"transactionsRoot"`
-	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
-	Uncles           []common.Hash  `json:"uncles"`
+	Number           *hexutil.Big        `json:"number"`
+	Hash             common.Hash         `json:"hash"`
+	ParentHash       common.Hash         `json:"parentHash"`
+	Nonce            hmytypes.BlockNonce `json:"nonce"`
+	MixHash          common.Hash         `json:"mixHash"`
+	UncleHash        common.Hash         `json:"sha3Uncles"`
+	LogsBloom        ethtypes.Bloom      `json:"logsBloom"`
+	StateRoot        common.Hash         `json:"stateRoot"`
+	Miner            common.Address      `json:"miner"`
+	Difficulty       *hexutil.Big        `json:"difficulty"`
+	ExtraData        hexutil.Bytes       `json:"extraData"`
+	Size             hexutil.Uint64      `json:"size"`
+	GasLimit         hexutil.Uint64      `json:"gasLimit"`
+	GasUsed          hexutil.Uint64      `json:"gasUsed"`
+	Timestamp        hexutil.Uint64      `json:"timestamp"`
+	TransactionsRoot common.Hash         `json:"transactionsRoot"`
+	ReceiptsRoot     common.Hash         `json:"receiptsRoot"`
+	Uncles           []common.Hash       `json:"uncles"`
 }
 
 // BlockWithTxHash represents a block that will serialize to the RPC representation of a block
@@ -161,12 +162,13 @@ func newBlock(b *types.Block, leader common.Address) *Block {
 		Number:           (*hexutil.Big)(head.Number()),
 		Hash:             b.Hash(),
 		ParentHash:       head.ParentHash(),
-		Nonce:            0, // Remove this because we don't have it in our header
+		Nonce:            hmytypes.BlockNonce{}, // Legacy comment from hmy -> eth RPC porting: "Remove this because we don't have it in our header"
 		MixHash:          head.MixDigest(),
+		UncleHash:        hmytypes.CalcUncleHash(b.Uncles()),
 		LogsBloom:        head.Bloom(),
 		StateRoot:        head.Root(),
 		Miner:            leader,
-		Difficulty:       (*hexutil.Big)(big.NewInt(0)), // Remove this because we don't have it in our header
+		Difficulty:       (*hexutil.Big)(big.NewInt(0)), // Legacy comment from hmy -> eth RPC porting: "Remove this because we don't have it in our header"
 		ExtraData:        hexutil.Bytes(head.Extra()),
 		Size:             hexutil.Uint64(b.Size()),
 		GasLimit:         hexutil.Uint64(head.GasLimit()),
