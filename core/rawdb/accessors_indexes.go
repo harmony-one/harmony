@@ -115,12 +115,11 @@ func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, c
 		missing = true
 	} else {
 		hmyHash := tx.Hash()
-		ethHash := tx.HashByType()
+		ethHash := tx.ConvertToEth().Hash()
 
 		if !bytes.Equal(hash.Bytes(), hmyHash.Bytes()) && !bytes.Equal(hash.Bytes(), ethHash.Bytes()) {
 			missing = true
 		}
-
 	}
 
 	if missing {
