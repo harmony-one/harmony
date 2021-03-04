@@ -26,7 +26,7 @@ const (
 	GroupIDShardPrefix       GroupID = "%s/0.0.1/node/shard/%s"
 	GroupIDShardClientPrefix GroupID = "%s/0.0.1/client/shard/%s"
 	GroupIDGlobal            GroupID = "%s/0.0.1/node/global"
-	GroupIDGlobalClient      GroupID = "%s/0.0.1/node/global"
+	GroupIDGlobalClient      GroupID = "%s/0.0.1/node/client"
 	GroupIDUnknown           GroupID = "%s/B1acKh0lE"
 )
 
