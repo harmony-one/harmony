@@ -258,14 +258,16 @@ func (consensus *Consensus) startViewChange() {
 	defer consensus.consensusTimeout[timeoutViewChange].Start()
 
 	// update the dictionary key if the viewID is first time received
-	consensus.vc.AddViewIDKeyIfNotExist(nextViewID, consensus.Decider.Participants())
+	members := consensus.Decider.Participants()
+	consensus.vc.AddViewIDKeyIfNotExist(nextViewID, members)
 
 	// init my own payload
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
 		nextViewID,
 		consensus.blockNum,
-		consensus.priKey); err != nil {
+		consensus.priKey,
+		members); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
 	}
 
@@ -387,7 +389,8 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	if err := consensus.vc.InitPayload(consensus.FBFTLog,
 		recvMsg.ViewID,
 		recvMsg.BlockNum,
-		consensus.priKey); err != nil {
+		consensus.priKey,
+		members); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[onViewChange] Init Payload Error")
 		return
 	}

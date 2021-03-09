@@ -767,8 +767,8 @@ func (node *Node) StartPubSub() error {
 				case <-node.psCtx.Done():
 					return
 				case m := <-msgChanConsensus:
-					// should not take more than 10 seconds to process one message
-					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					// should not take more than 30 seconds to process one message
+					ctx, cancel := context.WithTimeout(node.psCtx, 30*time.Second)
 					msg := m
 					go func() {
 						defer cancel()

@@ -39,7 +39,7 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, blockNum rpc.BlockNumber) (*block.Header, error)
 	HeaderByHash(ctx context.Context, blockHash common.Hash) (*block.Header, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
-	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
+	GetLogs(ctx context.Context, blockHash common.Hash, isEth bool) ([][]*types.Log, error)
 
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
@@ -62,11 +62,12 @@ type Filter struct {
 	begin, end int64       // Range interval if filtering multiple blocks
 
 	matcher *bloombits.Matcher
+	isEth   bool // Whether this is used for eth_ rpc.
 }
 
 // NewRangeFilter creates a new filter which uses a bloom filter on blocks to
 // figure out whether a particular block is interesting or not.
-func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Address, topics [][]common.Hash, isEth bool) *Filter {
 	// Flatten the address and topic filter clauses into a single bloombits filter
 	// system. Since the bloombits are not positional, nil topics are permitted,
 	// which get flattened into a nil byte slice.
@@ -88,7 +89,7 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 	size, _ := backend.BloomStatus()
 
 	// Create a generic filter and convert it into a range filter
-	filter := newFilter(backend, addresses, topics)
+	filter := newFilter(backend, addresses, topics, isEth)
 
 	filter.matcher = bloombits.NewMatcher(size, filters)
 	filter.begin = begin
@@ -99,20 +100,21 @@ func NewRangeFilter(backend Backend, begin, end int64, addresses []common.Addres
 
 // NewBlockFilter creates a new filter which directly inspects the contents of
 // a block to figure out whether it is interesting or not.
-func NewBlockFilter(backend Backend, block common.Hash, addresses []common.Address, topics [][]common.Hash) *Filter {
+func NewBlockFilter(backend Backend, block common.Hash, addresses []common.Address, topics [][]common.Hash, isEth bool) *Filter {
 	// Create a generic filter and convert it into a block filter
-	filter := newFilter(backend, addresses, topics)
+	filter := newFilter(backend, addresses, topics, isEth)
 	filter.block = block
 	return filter
 }
 
 // newFilter creates a generic filter that can either filter based on a block hash,
 // or based on range queries. The search criteria needs to be explicitly set.
-func newFilter(backend Backend, addresses []common.Address, topics [][]common.Hash) *Filter {
+func newFilter(backend Backend, addresses []common.Address, topics [][]common.Hash, isEth bool) *Filter {
 	return &Filter{
 		backend:   backend,
 		addresses: addresses,
 		topics:    topics,
+		isEth:     isEth,
 	}
 }
 
@@ -247,7 +249,7 @@ func (f *Filter) blockLogs(ctx context.Context, header *block.Header) (logs []*t
 // match the filter criteria. This function is called when the bloom filter signals a potential match.
 func (f *Filter) checkMatches(ctx context.Context, header *block.Header) (logs []*types.Log, err error) {
 	// Get the logs of the block
-	logsList, err := f.backend.GetLogs(ctx, header.Hash())
+	logsList, err := f.backend.GetLogs(ctx, header.Hash(), f.isEth)
 	if err != nil {
 		return nil, err
 	}
