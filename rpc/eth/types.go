@@ -112,10 +112,16 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 		return nil, err
 	}
 
+	ethTxHash := tx.Hash()
+	for i, _ := range receipt.Logs {
+		// Override log txHash with receipt's
+		receipt.Logs[i].TxHash = ethTxHash
+	}
+
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
 		"blockNumber":       hexutil.Uint64(blockNumber),
-		"transactionHash":   tx.Hash(),
+		"transactionHash":   ethTxHash,
 		"transactionIndex":  hexutil.Uint64(blockIndex),
 		"from":              senderAddr,
 		"to":                tx.To(),
