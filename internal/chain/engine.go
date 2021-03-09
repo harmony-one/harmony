@@ -312,7 +312,7 @@ func payoutUndelegations(
 		countTrack[validator] = len(wrapper.Delegations)
 	}
 
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Uint64("epoch", header.Epoch().Uint64()).
 		Uint64("block-number", header.Number().Uint64()).
 		Interface("count-track", countTrack).
