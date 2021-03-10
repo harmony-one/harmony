@@ -690,7 +690,6 @@ func (consensus *Consensus) tryCatchup() error {
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
 	if consensus.Blockchain.CurrentBlock().NumberU64() < blk.NumberU64() {
-		consensus.FBFTLog.IsBlockVerified(blk)
 		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk)); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
