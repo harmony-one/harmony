@@ -315,7 +315,7 @@ func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bo
 	}
 	if isEth {
 		block := hmy.BlockChain.GetBlockByHash(blockHash)
-		if block != nil {
+		if block == nil {
 			return nil, errors.New("Missing block data")
 		}
 		txns := block.Transactions()
