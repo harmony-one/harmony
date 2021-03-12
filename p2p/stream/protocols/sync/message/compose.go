@@ -112,36 +112,38 @@ func MakeGetBlockHashesResponse(rid uint64, hs []common.Hash) *Response {
 }
 
 // MakeGetBlocksByNumResponseMessage makes the GetBlocksByNumResponse of Message type
-func MakeGetBlocksByNumResponseMessage(rid uint64, blocksBytes [][]byte) *Message {
-	resp := MakeGetBlocksByNumResponse(rid, blocksBytes)
+func MakeGetBlocksByNumResponseMessage(rid uint64, blocksBytes, sigs [][]byte) *Message {
+	resp := MakeGetBlocksByNumResponse(rid, blocksBytes, sigs)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetBlocksByNumResponseMessage make the GetBlocksByNumResponse of Response type
-func MakeGetBlocksByNumResponse(rid uint64, blocksBytes [][]byte) *Response {
+func MakeGetBlocksByNumResponse(rid uint64, blocksBytes, sigs [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetBlocksByNumResponse{
 			GetBlocksByNumResponse: &GetBlocksByNumResponse{
 				BlocksBytes: blocksBytes,
+				CommitSig:   sigs,
 			},
 		},
 	}
 }
 
 // MakeGetBlocksByHashesResponseMessage makes the GetBlocksByHashesResponse of Message type
-func MakeGetBlocksByHashesResponseMessage(rid uint64, blocksBytes [][]byte) *Message {
-	resp := MakeGetBlocksByHashesResponse(rid, blocksBytes)
+func MakeGetBlocksByHashesResponseMessage(rid uint64, blocksBytes, sigs [][]byte) *Message {
+	resp := MakeGetBlocksByHashesResponse(rid, blocksBytes, sigs)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetBlocksByHashesResponse make the GetBlocksByHashesResponse of Response type
-func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte) *Response {
+func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte, sigs [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetBlocksByHashesResponse{
 			GetBlocksByHashesResponse: &GetBlocksByHashesResponse{
 				BlocksBytes: blocksBytes,
+				CommitSig:   sigs,
 			},
 		},
 	}

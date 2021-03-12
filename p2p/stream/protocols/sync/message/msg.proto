@@ -65,10 +65,12 @@ message GetBlockHashesResponse {
 
 message GetBlocksByNumResponse {
   repeated bytes blocks_bytes = 1;
+  repeated bytes commit_sig = 2;
 }
 
 message GetBlocksByHashesResponse {
   repeated bytes blocks_bytes = 1;
+  repeated bytes commit_sig = 2;
 }
 
 message GetEpochStateResponse {
