@@ -371,7 +371,7 @@ func makeTestProtocol(f getResponseFn) *Protocol {
 	copy(streamIDs, initStreamIDs)
 	sm := &testStreamManager{streamIDs}
 
-	rl := ratelimiter.NewRateLimiter(10, 10)
+	rl := ratelimiter.NewRateLimiter(sm, 10, 10)
 
 	return &Protocol{
 		rm: rm,
