@@ -430,6 +430,8 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 // consensus block hashes.  Caller shall ensure mtx is locked for RW.
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
+
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] before cleanUpPeers")
 	for i := 0; i < len(sc.peers); i++ {
 		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
@@ -441,6 +443,7 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] post cleanUpPeers")
 }
 
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
@@ -455,14 +458,17 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() error {
 		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
 	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
-	utils.Logger().Info().
-		Int("maxFirstID", maxFirstID).
-		Int("maxCount", maxCount).
-		Msg("[SYNC] block consensus hashes")
 
 	if maxFirstID == -1 {
 		return errors.New("invalid peer index -1 for block hashes query")
 	}
+	utils.Logger().Info().
+		Int("maxFirstID", maxFirstID).
+		Str("targetPeerIP", sc.peers[maxFirstID].ip).
+		Int("maxCount", maxCount).
+		Int("hashSize", len(sc.peers[maxFirstID].blockHashes)).
+		Msg("[SYNC] block consensus hashes")
+
 	sc.cleanUpPeers(maxFirstID)
 	return nil
 }
@@ -484,6 +490,10 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
 				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
+			utils.Logger().Info().Uint32("queried blockHash size", size).
+				Int("got blockHashSize", len(response.Payload)).
+				Str("PeerIP", peerConfig.ip).
+				Msg("[SYNC] GetBlockHashes")
 			if len(response.Payload) > int(size+1) {
 				utils.Logger().Warn().
 					Uint32("requestSize", size).
@@ -931,6 +941,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
 	var wg sync.WaitGroup
+
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
 		go func() {
@@ -943,6 +954,8 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
+			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
+				Msg("[SYNC] getMaxPeerHeight")
 			ss.syncMux.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
 				maxHeight = response.BlockHeight
