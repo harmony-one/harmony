@@ -17,7 +17,6 @@ message Request {
     GetBlockHashesRequest get_block_hashes_request = 3;
     GetBlocksByNumRequest get_blocks_by_num_request = 4;
     GetBlocksByHashesRequest get_blocks_by_hashes_request = 5;
-    GetEpochStateRequest get_epoch_state_request = 6;
   }
 }
 
@@ -35,10 +34,6 @@ message GetBlocksByHashesRequest {
   repeated bytes block_hashes = 1;
 }
 
-message GetEpochStateRequest {
-  uint64 epoch = 1;
-}
-
 message Response {
   uint64 req_id = 1;
   oneof response {
@@ -47,7 +42,6 @@ message Response {
     GetBlockHashesResponse get_block_hashes_response = 4;
     GetBlocksByNumResponse get_blocks_by_num_response = 5;
     GetBlocksByHashesResponse get_blocks_by_hashes_response = 6;
-    GetEpochStateResponse get_epoch_state_response = 7;
   }
 }
 
@@ -71,11 +65,6 @@ message GetBlocksByNumResponse {
 message GetBlocksByHashesResponse {
   repeated bytes blocks_bytes = 1;
   repeated bytes commit_sig = 2;
-}
-
-message GetEpochStateResponse {
-  bytes header_bytes = 1;
-  bytes shard_state = 2;
 }
 
 

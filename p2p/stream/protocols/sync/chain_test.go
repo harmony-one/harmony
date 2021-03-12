@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
-	"github.com/harmony-one/harmony/shard"
 )
 
 type testChainHelper struct{}
@@ -28,19 +27,6 @@ func (tch *testChainHelper) getBlocksByNumber(bns []uint64) ([]*types.Block, err
 		blocks = append(blocks, makeTestBlock(bn))
 	}
 	return blocks, nil
-}
-
-func (tch *testChainHelper) getEpochState(epoch uint64) (*EpochStateResult, error) {
-	header := &block.Header{Header: testHeader.Copy()}
-	header.SetEpoch(big.NewInt(int64(epoch - 1)))
-
-	state := testEpochState.DeepCopy()
-	state.Epoch = big.NewInt(int64(epoch))
-
-	return &EpochStateResult{
-		Header: header,
-		State:  state,
-	}, nil
 }
 
 func (tch *testChainHelper) getBlockHashes(bns []uint64) []common.Hash {
@@ -115,34 +101,6 @@ func decodeBlocksBytes(bbs [][]byte) ([]*types.Block, error) {
 		blocks = append(blocks, block)
 	}
 	return blocks, nil
-}
-
-func checkEpochStateResult(epoch uint64, b []byte) error {
-	var msg = &syncpb.Message{}
-	if err := protobuf.Unmarshal(b, msg); err != nil {
-		return err
-	}
-	geResp, err := msg.GetEpochStateResponse()
-	if err != nil {
-		return err
-	}
-	var (
-		header     *block.Header
-		epochState *shard.State
-	)
-	if err := rlp.DecodeBytes(geResp.HeaderBytes, &header); err != nil {
-		return err
-	}
-	if err := rlp.DecodeBytes(geResp.ShardState, &epochState); err != nil {
-		return err
-	}
-	if header.Epoch().Uint64() != epoch-1 {
-		return fmt.Errorf("unexpected epoch of header %v / %v", header.Epoch(), epoch-1)
-	}
-	if epochState.Epoch.Uint64() != epoch {
-		return fmt.Errorf("unexpected epoch of shard state %v / %v", epochState.Epoch.Uint64(), epoch)
-	}
-	return nil
 }
 
 func checkBlockNumberResult(b []byte) error {

@@ -38,24 +38,6 @@ func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...
 	return blocks, stid, nil
 }
 
-// GetEpochState get the epoch block from querying the remote node running sync stream protocol.
-// Currently, this method is only supported by beacon syncer.
-// Note: use this after epoch chain is implemented.
-func (p *Protocol) GetEpochState(ctx context.Context, epoch uint64, opts ...Option) (*EpochStateResult, sttypes.StreamID, error) {
-	req := newGetEpochBlockRequest(epoch)
-
-	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
-	if err != nil {
-		return nil, stid, err
-	}
-
-	res, err := epochStateResultFromResponse(resp)
-	if err != nil {
-		return nil, stid, err
-	}
-	return res, stid, nil
-}
-
 // GetCurrentBlockNumber get the current block number from remote node
 func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (uint64, sttypes.StreamID, error) {
 	req := newGetBlockNumberRequest()
@@ -185,40 +167,6 @@ func (req *getBlocksByNumberRequest) parseBlockBytesAndSigs(resp *syncResponse) 
 			len(gbResp.CommitSig), len(gbResp.BlocksBytes))
 	}
 	return gbResp.BlocksBytes, gbResp.CommitSig, nil
-}
-
-type getEpochBlockRequest struct {
-	epoch uint64
-	pbReq *syncpb.Request
-}
-
-func newGetEpochBlockRequest(epoch uint64) *getEpochBlockRequest {
-	pbReq := syncpb.MakeGetEpochStateRequest(epoch)
-	return &getEpochBlockRequest{
-		epoch: epoch,
-		pbReq: pbReq,
-	}
-}
-
-func (req *getEpochBlockRequest) ReqID() uint64 {
-	return req.pbReq.GetReqId()
-}
-
-func (req *getEpochBlockRequest) SetReqID(val uint64) {
-	req.pbReq.ReqId = val
-}
-
-func (req *getEpochBlockRequest) String() string {
-	return fmt.Sprintf("REQUEST [GetEpochBlock: %v]", req.epoch)
-}
-
-func (req *getEpochBlockRequest) IsSupportedByProto(target sttypes.ProtoSpec) bool {
-	return target.Version.GreaterThanOrEqual(MinVersion)
-}
-
-func (req *getEpochBlockRequest) Encode() ([]byte, error) {
-	msg := syncpb.MakeMessageFromRequest(req.pbReq)
-	return protobuf.Marshal(msg)
 }
 
 type getBlockNumberRequest struct {

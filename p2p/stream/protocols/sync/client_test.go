@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"testing"
 
@@ -18,12 +17,10 @@ import (
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	syncpb "github.com/harmony-one/harmony/p2p/stream/protocols/sync/message"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
-	"github.com/harmony-one/harmony/shard"
 )
 
 var (
 	_ sttypes.Request  = &getBlocksByNumberRequest{}
-	_ sttypes.Request  = &getEpochBlockRequest{}
 	_ sttypes.Request  = &getBlockNumberRequest{}
 	_ sttypes.Response = &syncResponse{&syncpb.Response{}}
 )
@@ -43,13 +40,6 @@ var (
 	testHeaderBytes, _ = rlp.EncodeToBytes(testHeader)
 	testBlockBytes, _  = rlp.EncodeToBytes(testBlock)
 	testBlockResponse  = syncpb.MakeGetBlocksByNumResponse(0, [][]byte{testBlockBytes}, make([][]byte, 1))
-
-	testEpochState = &shard.State{
-		Epoch:  new(big.Int).SetInt64(1),
-		Shards: []shard.Committee{},
-	}
-	testEpochStateBytes, _ = rlp.EncodeToBytes(testEpochState)
-	testEpochStateResponse = syncpb.MakeGetEpochStateResponse(0, testHeaderBytes, testEpochStateBytes)
 
 	testCurBlockNumber      uint64 = 100
 	testBlockNumberResponse        = syncpb.MakeGetBlockNumberResponse(0, testCurBlockNumber)
@@ -80,7 +70,7 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 		{
 			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
 				return &syncResponse{
-					pb: testEpochStateResponse,
+					pb: testBlockNumberResponse,
 				}, makeTestStreamID(0)
 			},
 			expErr:  errors.New("not GetBlockByNumber"),
@@ -115,65 +105,6 @@ func TestProtocol_GetBlocksByNumber(t *testing.T) {
 		}
 		if test.expErr == nil && (len(blocks) == 0) {
 			t.Errorf("Test %v: zero blocks delivered", i)
-		}
-	}
-}
-
-func TestProtocol_GetEpochState(t *testing.T) {
-	tests := []struct {
-		getResponse getResponseFn
-		expErr      error
-		expStID     sttypes.StreamID
-	}{
-		{
-			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
-				return &syncResponse{
-					pb: testEpochStateResponse,
-				}, makeTestStreamID(0)
-			},
-			expErr:  nil,
-			expStID: makeTestStreamID(0),
-		},
-		{
-			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
-				return &syncResponse{
-					pb: testBlockResponse,
-				}, makeTestStreamID(0)
-			},
-			expErr:  errors.New("not GetEpochStateResponse"),
-			expStID: makeTestStreamID(0),
-		},
-		{
-			getResponse: nil,
-			expErr:      errors.New("get response error"),
-			expStID:     "",
-		},
-		{
-			getResponse: func(request sttypes.Request) (sttypes.Response, sttypes.StreamID) {
-				return &syncResponse{
-					pb: testErrorResponse,
-				}, makeTestStreamID(0)
-			},
-			expErr:  errors.New("test error"),
-			expStID: makeTestStreamID(0),
-		},
-	}
-
-	for i, test := range tests {
-		protocol := makeTestProtocol(test.getResponse)
-		res, stid, err := protocol.GetEpochState(context.Background(), 0)
-
-		if assErr := assertError(err, test.expErr); assErr != nil {
-			t.Errorf("Test %v: %v", i, assErr)
-			continue
-		}
-		if stid != test.expStID {
-			t.Errorf("Test %v: unexpected st id: %v / %v", i, stid, test.expStID)
-		}
-		if test.expErr == nil {
-			if gotEpoch := res.State.Epoch; gotEpoch.Cmp(new(big.Int).SetUint64(1)) != 0 {
-				t.Errorf("Test %v: unexpected epoch delivered: %v / %v", i, gotEpoch.String(), 1)
-			}
 		}
 	}
 }

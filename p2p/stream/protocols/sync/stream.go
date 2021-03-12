@@ -180,9 +180,6 @@ func (st *syncStream) handleReq(req *syncpb.Request) error {
 	if bhReq := req.GetGetBlocksByHashesRequest(); bhReq != nil {
 		return st.handleGetBlocksByHashesRequest(req.ReqId, bhReq)
 	}
-	if esReq := req.GetGetEpochStateRequest(); esReq != nil {
-		return st.handleEpochStateRequest(req.ReqId, esReq)
-	}
 	// unsupported request type
 	resp := syncpb.MakeErrorResponseMessage(req.ReqId, errUnknownReqType)
 	return st.writeMsg(resp)
@@ -240,21 +237,6 @@ func (st *syncStream) handleGetBlocksByHashesRequest(rid uint64, req *syncpb.Get
 		}
 	}
 	return errors.Wrap(err, "[GetBlocksByHashes]")
-}
-
-func (st *syncStream) handleEpochStateRequest(rid uint64, req *syncpb.GetEpochStateRequest) error {
-	resp, err := st.computeEpochStateResp(rid, req.Epoch)
-	if err != nil {
-		resp = syncpb.MakeErrorResponseMessage(rid, err)
-	}
-	if writeErr := st.writeMsg(resp); writeErr != nil {
-		if err == nil {
-			err = writeErr
-		} else {
-			err = fmt.Errorf("%v; [writeMsg] %v", err.Error(), writeErr)
-		}
-	}
-	return errors.Wrap(err, "[GetEpochState]")
 }
 
 func (st *syncStream) handleResp(resp *syncpb.Response) {
@@ -353,17 +335,6 @@ func (st *syncStream) computeRespFromBlockHashes(rid uint64, hs []common.Hash) (
 		sigs = append(sigs, sig)
 	}
 	return syncpb.MakeGetBlocksByHashesResponseMessage(rid, blocksBytes, sigs), nil
-}
-
-func (st *syncStream) computeEpochStateResp(rid uint64, epoch uint64) (*syncpb.Message, error) {
-	if epoch == 0 {
-		return nil, errors.New("Epoch 0 does not have shard state")
-	}
-	esRes, err := st.chain.getEpochState(epoch)
-	if err != nil {
-		return nil, err
-	}
-	return esRes.toMessage(rid)
 }
 
 func bytesToHashes(bs [][]byte) []common.Hash {

@@ -1,9 +1,6 @@
 package sync
 
 import (
-	"fmt"
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -18,7 +15,6 @@ type chainHelper interface {
 	getBlockHashes(bns []uint64) []common.Hash
 	getBlocksByNumber(bns []uint64) ([]*types.Block, error)
 	getBlocksByHashes(hs []common.Hash) ([]*types.Block, error)
-	getEpochState(epoch uint64) (*EpochStateResult, error)
 }
 
 type chainHelperImpl struct {
@@ -136,34 +132,4 @@ func (ch *chainHelperImpl) getBlockSigFromNextBlock(header *block.Header) []byte
 
 func (ch *chainHelperImpl) getBlockSigFromDB(header *block.Header) ([]byte, error) {
 	return ch.chain.ReadCommitSig(header.Number().Uint64())
-}
-
-func (ch *chainHelperImpl) getEpochState(epoch uint64) (*EpochStateResult, error) {
-	if ch.chain.ShardID() != 0 {
-		return nil, errors.New("get epoch state currently unavailable on side chain")
-	}
-	if epoch == 0 {
-		return nil, errors.New("nil shard state for epoch 0")
-	}
-	res := &EpochStateResult{}
-
-	targetBN := ch.schedule.EpochLastBlock(epoch - 1)
-	res.Header = ch.chain.GetHeaderByNumber(targetBN)
-	if res.Header == nil {
-		// we still don't have the given epoch
-		return res, nil
-	}
-	epochBI := new(big.Int).SetUint64(epoch)
-	if ch.chain.Config().IsPreStaking(epochBI) {
-		// For epoch before preStaking, only hash is stored in header
-		ss, err := ch.chain.ReadShardState(epochBI)
-		if err != nil {
-			return nil, err
-		}
-		if ss == nil {
-			return nil, fmt.Errorf("missing shard state for [EPOCH-%v]", epoch)
-		}
-		res.State = ss
-	}
-	return res, nil
 }

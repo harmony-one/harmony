@@ -24,10 +24,6 @@ var (
 	testGetBlockRequest    = syncpb.MakeGetBlocksByNumRequest(testGetBlockNumbers)
 	testGetBlockRequestMsg = syncpb.MakeMessageFromRequest(testGetBlockRequest)
 
-	testEpoch                uint64 = 20
-	testEpochStateRequest           = syncpb.MakeGetEpochStateRequest(testEpoch)
-	testEpochStateRequestMsg        = syncpb.MakeMessageFromRequest(testEpochStateRequest)
-
 	testCurrentNumberRequest    = syncpb.MakeGetBlockNumberRequest()
 	testCurrentNumberRequestMsg = syncpb.MakeMessageFromRequest(testCurrentNumberRequest)
 
@@ -63,27 +59,6 @@ func TestSyncStream_HandleGetBlocksByRequest(t *testing.T) {
 	receivedBytes, _ := remoteSt.ReadBytes()
 
 	if err := checkBlocksResult(testGetBlockNumbers, receivedBytes); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSyncStream_HandleEpochStateRequest(t *testing.T) {
-	st, remoteSt := makeTestSyncStream()
-
-	go st.run()
-	defer close(st.closeC)
-
-	req := testEpochStateRequestMsg
-	b, _ := protobuf.Marshal(req)
-	err := remoteSt.WriteBytes(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(200 * time.Millisecond)
-	receivedBytes, _ := remoteSt.ReadBytes()
-
-	if err := checkEpochStateResult(testEpoch, receivedBytes); err != nil {
 		t.Fatal(err)
 	}
 }
