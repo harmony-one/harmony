@@ -17,6 +17,7 @@ type (
 	// insert the latest blocks to the beacon chain.
 	beaconHelper struct {
 		bc     blockChain
+		ih     insertHelper
 		blockC <-chan *types.Block
 		// TODO: refactor this hook to consensus module. We'd better put it in
 		//   consensus module under a subscription.
@@ -33,9 +34,10 @@ type (
 	}
 )
 
-func newBeaconHelper(bc blockChain, blockC <-chan *types.Block, insertHook func()) *beaconHelper {
+func newBeaconHelper(bc blockChain, ih insertHelper, blockC <-chan *types.Block, insertHook func()) *beaconHelper {
 	return &beaconHelper{
 		bc:            bc,
+		ih:            ih,
 		blockC:        blockC,
 		insertHook:    insertHook,
 		lastMileCache: newBlocksByNumber(lastMileCap),
@@ -118,7 +120,7 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 			bn--
 			return
 		}
-		if _, err = bh.bc.InsertChain(types.Blocks{b}, true); err != nil {
+		if err = bh.ih.verifyAndInsertBlock(b); err != nil {
 			bn--
 			return
 		}

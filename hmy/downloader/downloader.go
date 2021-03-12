@@ -58,7 +58,7 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 
 	var bh *beaconHelper
 	if config.BHConfig != nil && bc.ShardID() == 0 {
-		bh = newBeaconHelper(bc, config.BHConfig.BlockC, config.BHConfig.InsertHook)
+		bh = newBeaconHelper(bc, ih, config.BHConfig.BlockC, config.BHConfig.InsertHook)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
