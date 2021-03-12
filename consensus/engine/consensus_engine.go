@@ -65,6 +65,9 @@ type ChainReader interface {
 	SuperCommitteeForNextEpoch(
 		beacon ChainReader, header *block.Header, isVerify bool,
 	) (*shard.State, error)
+
+	// ReadCommitSig read the commit sig of a given block number
+	ReadCommitSig(blockNum uint64) ([]byte, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

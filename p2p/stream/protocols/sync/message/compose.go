@@ -46,17 +46,6 @@ func MakeGetBlocksByHashesRequest(hashes []common.Hash) *Request {
 	}
 }
 
-// MakeGetEpochStateRequest make GetEpochBlock request
-func MakeGetEpochStateRequest(epoch uint64) *Request {
-	return &Request{
-		Request: &Request_GetEpochStateRequest{
-			GetEpochStateRequest: &GetEpochStateRequest{
-				Epoch: epoch,
-			},
-		},
-	}
-}
-
 // MakeErrorResponse makes the error response
 func MakeErrorResponseMessage(rid uint64, err error) *Message {
 	resp := MakeErrorResponse(rid, err)
@@ -144,25 +133,6 @@ func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte, sigs [][]by
 			GetBlocksByHashesResponse: &GetBlocksByHashesResponse{
 				BlocksBytes: blocksBytes,
 				CommitSig:   sigs,
-			},
-		},
-	}
-}
-
-// MakeGetEpochStateResponse makes GetEpochStateResponse as message
-func MakeGetEpochStateResponseMessage(rid uint64, headerBytes []byte, ssBytes []byte) *Message {
-	resp := MakeGetEpochStateResponse(rid, headerBytes, ssBytes)
-	return makeMessageFromResponse(resp)
-}
-
-// MakeEpochStateResponse makes GetEpochStateResponse as response
-func MakeGetEpochStateResponse(rid uint64, headerBytes []byte, ssBytes []byte) *Response {
-	return &Response{
-		ReqId: rid,
-		Response: &Response_GetEpochStateResponse{
-			GetEpochStateResponse: &GetEpochStateResponse{
-				HeaderBytes: headerBytes,
-				ShardState:  ssBytes,
 			},
 		},
 	}
