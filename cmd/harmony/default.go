@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.3"
+const tomlConfigVersion = "1.0.4"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -106,13 +106,13 @@ var (
 	defaultMainnetSyncConfig = syncConfig{
 		LegacyServer:   true,
 		LegacyClient:   false,
-		Concurrency:    16,
-		MinPeers:       16,
-		InitStreams:    32,
-		DiscSoftLowCap: 16,
-		DiscHardLowCap: 32,
+		Concurrency:    6,
+		MinPeers:       6,
+		InitStreams:    8,
+		DiscSoftLowCap: 8,
+		DiscHardLowCap: 6,
 		DiscHighCap:    128,
-		DiscBatch:      16,
+		DiscBatch:      8,
 	}
 
 	defaultTestNetSyncConfig = syncConfig{
@@ -152,6 +152,8 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 		devnet := getDefaultDevnetConfigCopy()
 		config.Devnet = &devnet
 	}
+	config.Sync = getDefaultSyncConfig(nt)
+
 	return config
 }
 
