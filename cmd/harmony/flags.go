@@ -175,6 +175,18 @@ var (
 		prometheusGatewayFlag,
 		prometheusEnablePushFlag,
 	}
+
+	syncFlags = []cli.Flag{
+		syncLegacyClientFlag,
+		syncLegacyServerFlag,
+		syncConcurrencyFlag,
+		syncMinPeersFlag,
+		syncInitStreamsFlag,
+		syncDiscSoftLowFlag,
+		syncDiscHardLowFlag,
+		syncDiscHighFlag,
+		syncDiscBatchFlag,
+	}
 )
 
 var (
@@ -267,6 +279,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, revertFlags...)
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
+	flags = append(flags, syncFlags...)
 
 	return flags
 }
@@ -1267,5 +1280,99 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, prometheusEnablePushFlag) {
 		config.Prometheus.EnablePush = cli.GetBoolFlagValue(cmd, prometheusEnablePushFlag)
+	}
+}
+
+var (
+	syncLegacyServerFlag = cli.BoolFlag{
+		Name:     "sync.legacy.server",
+		Usage:    "Enable the gRPC sync server for backward compatibility",
+		Hidden:   true,
+		DefValue: true,
+	}
+	syncLegacyClientFlag = cli.BoolFlag{
+		Name:     "sync.legacy.client",
+		Usage:    "Enable the legacy centralized sync service for block synchronization",
+		Hidden:   true,
+		DefValue: false,
+	}
+	syncConcurrencyFlag = cli.IntFlag{
+		Name:   "sync.concurrency",
+		Usage:  "Concurrency when doing p2p sync requests",
+		Hidden: true,
+	}
+	syncMinPeersFlag = cli.IntFlag{
+		Name:   "sync.min-peers",
+		Usage:  "Minimum peers check for each shard-wise sync loop",
+		Hidden: true,
+	}
+	syncInitStreamsFlag = cli.IntFlag{
+		Name:   "sync.init-peers",
+		Usage:  "Initial shard-wise number of peers to start syncing",
+		Hidden: true,
+	}
+	syncDiscSoftLowFlag = cli.IntFlag{
+		Name:   "sync.disc.soft-low-cap",
+		Usage:  "Soft low cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscHardLowFlag = cli.IntFlag{
+		Name:   "sync.disc.hard-low-cap",
+		Usage:  "Hard low cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscHighFlag = cli.IntFlag{
+		Name:   "sync.disc.hi-cap",
+		Usage:  "High cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscBatchFlag = cli.IntFlag{
+		Name:   "sync.disc.batch",
+		Usage:  "batch size of the sync discovery",
+		Hidden: true,
+	}
+)
+
+// applySyncFlags apply the sync flags.
+func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if config.Sync == (syncConfig{}) {
+		nt := nodeconfig.NetworkType(config.Network.NetworkType)
+		config.Sync = getDefaultSyncConfig(nt)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {
+		config.Sync.LegacyServer = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyClientFlag) {
+		config.Sync.LegacyClient = cli.GetBoolFlagValue(cmd, syncLegacyClientFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {
+		config.Sync.Concurrency = cli.GetIntFlagValue(cmd, syncConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncMinPeersFlag) {
+		config.Sync.MinPeers = cli.GetIntFlagValue(cmd, syncMinPeersFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncInitStreamsFlag) {
+		config.Sync.InitStreams = cli.GetIntFlagValue(cmd, syncInitStreamsFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscSoftLowFlag) {
+		config.Sync.DiscSoftLowCap = cli.GetIntFlagValue(cmd, syncDiscSoftLowFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscHardLowFlag) {
+		config.Sync.DiscHardLowCap = cli.GetIntFlagValue(cmd, syncDiscHardLowFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscHighFlag) {
+		config.Sync.DiscHighCap = cli.GetIntFlagValue(cmd, syncDiscHighFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
+		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
 	}
 }

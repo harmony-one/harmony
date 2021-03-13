@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/shard"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/legacysync"
@@ -31,6 +33,14 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
+}
+
+// BeaconSyncHook is the hook function called after inserted beacon in downloader
+// TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
+func (node *Node) BeaconSyncHook() {
+	if node.Consensus.IsLeader() {
+		node.BroadcastCrossLink()
+	}
 }
 
 // GenerateRandomString generates a random string with given length
@@ -176,28 +186,11 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 	return peers, nil
 }
 
-// DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
-func (node *Node) DoBeaconSyncing() {
+// doBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
+func (node *Node) doBeaconSyncing() {
 	if node.NodeConfig.IsOffline {
 		return
 	}
-
-	go func(node *Node) {
-		// TODO ek – infinite loop; add shutdown/cleanup logic
-		for beaconBlock := range node.BeaconBlockChannel {
-			if node.beaconSync != nil {
-				err := node.beaconSync.UpdateBlockAndStatus(
-					beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
-				)
-				if err != nil {
-					node.beaconSync.AddLastMileBlock(beaconBlock)
-				} else if node.Consensus.IsLeader() {
-					// Only leader broadcast crosslink to avoid spamming p2p
-					node.BroadcastCrossLink()
-				}
-			}
-		}
-	}(node)
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
@@ -279,16 +272,25 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	node.IsInSync.Set()
 }
 
-// SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
-func (node *Node) SupportBeaconSyncing() {
-	go node.DoBeaconSyncing()
-}
-
-// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) SupportSyncing() {
+// SupportGRPCSyncServer do gRPC sync server
+func (node *Node) SupportGRPCSyncServer() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+}
 
+// StartGRPCSyncClient start the legacy gRPC sync process
+func (node *Node) StartGRPCSyncClient() {
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		utils.Logger().Info().
+			Uint32("shardID", node.Blockchain().ShardID()).
+			Msg("SupportBeaconSyncing")
+		go node.doBeaconSyncing()
+	}
+	node.supportSyncing()
+}
+
+// supportSyncing keeps sleeping until it's doing consensus or it's a leader.
+func (node *Node) supportSyncing() {
 	joinConsensus := false
 	// Check if the current node is explorer node.
 	switch node.NodeConfig.Role() {

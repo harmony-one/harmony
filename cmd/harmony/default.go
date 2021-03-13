@@ -102,6 +102,44 @@ var defaultPrometheusConfig = prometheusConfig{
 	Gateway:    "https://gateway.harmony.one",
 }
 
+var (
+	defaultMainnetSyncConfig = syncConfig{
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    16,
+		MinPeers:       16,
+		InitStreams:    32,
+		DiscSoftLowCap: 16,
+		DiscHardLowCap: 32,
+		DiscHighCap:    128,
+		DiscBatch:      16,
+	}
+
+	defaultTestNetSyncConfig = syncConfig{
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+
+	defaultElseSyncConfig = syncConfig{
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+)
+
 const (
 	defaultBroadcastInvalidTx = true
 )

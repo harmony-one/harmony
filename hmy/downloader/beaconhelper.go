@@ -120,7 +120,9 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 			bn--
 			return
 		}
-		if err = bh.ih.verifyAndInsertBlock(b); err != nil {
+		// TODO: Instruct the beacon helper to verify signatures. This may require some forks
+		//       in pub-sub message (add commit sigs in node.block.sync messages)
+		if _, err = bh.bc.InsertChain(types.Blocks{b}, true); err != nil {
 			bn--
 			return
 		}
