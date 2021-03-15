@@ -14,19 +14,25 @@ import (
 var testProtoID = sttypes.ProtoID("harmony/sync/unitest/0/1.0.0")
 
 type testStreamManager struct {
+	streams map[sttypes.StreamID]sttypes.Stream
+
 	newStreamFeed event.Feed
 	rmStreamFeed  event.Feed
 }
 
 func newTestStreamManager() *testStreamManager {
-	return &testStreamManager{}
+	return &testStreamManager{
+		streams: make(map[sttypes.StreamID]sttypes.Stream),
+	}
 }
 
 func (sm *testStreamManager) addNewStream(st sttypes.Stream) {
+	sm.streams[st.ID()] = st
 	sm.newStreamFeed.Send(streammanager.EvtStreamAdded{Stream: st})
 }
 
 func (sm *testStreamManager) rmStream(stid sttypes.StreamID) {
+	delete(sm.streams, stid)
 	sm.rmStreamFeed.Send(streammanager.EvtStreamRemoved{ID: stid})
 }
 
@@ -36,6 +42,20 @@ func (sm *testStreamManager) SubscribeAddStreamEvent(ch chan<- streammanager.Evt
 
 func (sm *testStreamManager) SubscribeRemoveStreamEvent(ch chan<- streammanager.EvtStreamRemoved) event.Subscription {
 	return sm.rmStreamFeed.Subscribe(ch)
+}
+
+func (sm *testStreamManager) GetStreams() []sttypes.Stream {
+	sts := make([]sttypes.Stream, 0, len(sm.streams))
+
+	for _, st := range sm.streams {
+		sts = append(sts, st)
+	}
+	return sts
+}
+
+func (sm *testStreamManager) GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool) {
+	st, exist := sm.streams[id]
+	return st, exist
 }
 
 type testStream struct {
@@ -77,6 +97,29 @@ func (st *testStream) Close() error {
 
 func (st *testStream) ResetOnClose() error {
 	return nil
+}
+
+func makeDummyTestStreams(indexes []int) []sttypes.Stream {
+	sts := make([]sttypes.Stream, 0, len(indexes))
+
+	for _, index := range indexes {
+		sts = append(sts, &testStream{
+			id: makeStreamID(index),
+		})
+	}
+	return sts
+}
+
+func makeDummyStreamSets(indexes []int) map[sttypes.StreamID]*stream {
+	m := make(map[sttypes.StreamID]*stream)
+
+	for _, index := range indexes {
+		st := &testStream{
+			id: makeStreamID(index),
+		}
+		m[st.ID()] = &stream{Stream: st}
+	}
+	return m
 }
 
 func makeStreamID(index int) sttypes.StreamID {

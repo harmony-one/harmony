@@ -2,6 +2,7 @@ package requestmanager
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -303,6 +304,95 @@ func TestGenReqID(t *testing.T) {
 	}
 }
 
+func TestCheckStreamUpdates(t *testing.T) {
+	tests := []struct {
+		exists            map[sttypes.StreamID]*stream
+		targets           []sttypes.Stream
+		expAddedIndexes   []int
+		expRemovedIndexes []int
+	}{
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{2, 3, 4, 5}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{1},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{1, 2, 3, 4, 5, 6}),
+			expAddedIndexes:   []int{6},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{}),
+			targets:           makeDummyTestStreams([]int{}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{}),
+			targets:           makeDummyTestStreams([]int{1, 2, 3, 4, 5}),
+			expAddedIndexes:   []int{1, 2, 3, 4, 5},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{1, 2, 3, 4, 5},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{6, 7, 8, 9, 10}),
+			expAddedIndexes:   []int{6, 7, 8, 9, 10},
+			expRemovedIndexes: []int{1, 2, 3, 4, 5},
+		},
+	}
+
+	for i, test := range tests {
+		added, removed := checkStreamUpdates(test.exists, test.targets)
+
+		if err := checkStreamIDsEqual(added, test.expAddedIndexes); err != nil {
+			t.Errorf("Test %v: check added: %v", i, err)
+		}
+		if err := checkStreamIDsEqual2(removed, test.expRemovedIndexes); err != nil {
+			t.Errorf("Test %v: check removed: %v", i, err)
+		}
+	}
+}
+
+func checkStreamIDsEqual(sts []sttypes.Stream, expIndexes []int) error {
+	if len(sts) != len(expIndexes) {
+		return fmt.Errorf("size not equal")
+	}
+	expM := make(map[sttypes.StreamID]struct{})
+	for _, index := range expIndexes {
+		expM[makeStreamID(index)] = struct{}{}
+	}
+	for _, st := range sts {
+		if _, ok := expM[st.ID()]; !ok {
+			return fmt.Errorf("stream not exist in exp: %v", st.ID())
+		}
+	}
+	return nil
+}
+
+func checkStreamIDsEqual2(sts []*stream, expIndexes []int) error {
+	if len(sts) != len(expIndexes) {
+		return fmt.Errorf("size not equal")
+	}
+	expM := make(map[sttypes.StreamID]struct{})
+	for _, index := range expIndexes {
+		expM[makeStreamID(index)] = struct{}{}
+	}
+	for _, st := range sts {
+		if _, ok := expM[st.ID()]; !ok {
+			return fmt.Errorf("stream not exist in exp: %v", st.ID())
+		}
+	}
+	return nil
+}
+
 type testSuite struct {
 	rm          *requestManager
 	sm          *testStreamManager
@@ -330,7 +420,8 @@ func newTestSuite(delayF delayFunc, respF responseFunc, numStreams int) *testSui
 		cancel:      cancel,
 	}
 	for i := 0; i != numStreams; i++ {
-		ts.bootStreams = append(ts.bootStreams, ts.makeTestStream(i))
+		st := ts.makeTestStream(i)
+		ts.bootStreams = append(ts.bootStreams, st)
 	}
 	return ts
 }
