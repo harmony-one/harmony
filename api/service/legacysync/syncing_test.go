@@ -1,4 +1,4 @@
-package syncing
+package legacysync
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
