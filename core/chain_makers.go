@@ -305,3 +305,5 @@ func (cr *fakeChainReader) ReadValidatorStats(
 ) (*staking.ValidatorStats, error) {
 	return nil, nil
 }
+
+func (cr *fakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }

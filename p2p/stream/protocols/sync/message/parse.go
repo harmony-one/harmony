@@ -79,19 +79,3 @@ func (msg *Message) GetBlocksByHashesResponse() (*GetBlocksByHashesResponse, err
 	}
 	return gbResp, nil
 }
-
-// GetEpochStateResponse parse the message to GetEpochStateResponse
-func (msg *Message) GetEpochStateResponse() (*GetEpochStateResponse, error) {
-	resp := msg.GetResp()
-	if resp == nil {
-		return nil, errors.New("not response message")
-	}
-	if errResp := resp.GetErrorResponse(); errResp != nil {
-		return nil, &ResponseError{errResp.Error}
-	}
-	gesResp := resp.GetGetEpochStateResponse()
-	if gesResp == nil {
-		return nil, errors.New("not GetEpochStateResponse")
-	}
-	return gesResp, nil
-}

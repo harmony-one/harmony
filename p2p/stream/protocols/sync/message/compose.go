@@ -46,17 +46,6 @@ func MakeGetBlocksByHashesRequest(hashes []common.Hash) *Request {
 	}
 }
 
-// MakeGetEpochStateRequest make GetEpochBlock request
-func MakeGetEpochStateRequest(epoch uint64) *Request {
-	return &Request{
-		Request: &Request_GetEpochStateRequest{
-			GetEpochStateRequest: &GetEpochStateRequest{
-				Epoch: epoch,
-			},
-		},
-	}
-}
-
 // MakeErrorResponse makes the error response
 func MakeErrorResponseMessage(rid uint64, err error) *Message {
 	resp := MakeErrorResponse(rid, err)
@@ -112,55 +101,38 @@ func MakeGetBlockHashesResponse(rid uint64, hs []common.Hash) *Response {
 }
 
 // MakeGetBlocksByNumResponseMessage makes the GetBlocksByNumResponse of Message type
-func MakeGetBlocksByNumResponseMessage(rid uint64, blocksBytes [][]byte) *Message {
-	resp := MakeGetBlocksByNumResponse(rid, blocksBytes)
+func MakeGetBlocksByNumResponseMessage(rid uint64, blocksBytes, sigs [][]byte) *Message {
+	resp := MakeGetBlocksByNumResponse(rid, blocksBytes, sigs)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetBlocksByNumResponseMessage make the GetBlocksByNumResponse of Response type
-func MakeGetBlocksByNumResponse(rid uint64, blocksBytes [][]byte) *Response {
+func MakeGetBlocksByNumResponse(rid uint64, blocksBytes, sigs [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetBlocksByNumResponse{
 			GetBlocksByNumResponse: &GetBlocksByNumResponse{
 				BlocksBytes: blocksBytes,
+				CommitSig:   sigs,
 			},
 		},
 	}
 }
 
 // MakeGetBlocksByHashesResponseMessage makes the GetBlocksByHashesResponse of Message type
-func MakeGetBlocksByHashesResponseMessage(rid uint64, blocksBytes [][]byte) *Message {
-	resp := MakeGetBlocksByHashesResponse(rid, blocksBytes)
+func MakeGetBlocksByHashesResponseMessage(rid uint64, blocksBytes, sigs [][]byte) *Message {
+	resp := MakeGetBlocksByHashesResponse(rid, blocksBytes, sigs)
 	return makeMessageFromResponse(resp)
 }
 
 // MakeGetBlocksByHashesResponse make the GetBlocksByHashesResponse of Response type
-func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte) *Response {
+func MakeGetBlocksByHashesResponse(rid uint64, blocksBytes [][]byte, sigs [][]byte) *Response {
 	return &Response{
 		ReqId: rid,
 		Response: &Response_GetBlocksByHashesResponse{
 			GetBlocksByHashesResponse: &GetBlocksByHashesResponse{
 				BlocksBytes: blocksBytes,
-			},
-		},
-	}
-}
-
-// MakeGetEpochStateResponse makes GetEpochStateResponse as message
-func MakeGetEpochStateResponseMessage(rid uint64, headerBytes []byte, ssBytes []byte) *Message {
-	resp := MakeGetEpochStateResponse(rid, headerBytes, ssBytes)
-	return makeMessageFromResponse(resp)
-}
-
-// MakeEpochStateResponse makes GetEpochStateResponse as response
-func MakeGetEpochStateResponse(rid uint64, headerBytes []byte, ssBytes []byte) *Response {
-	return &Response{
-		ReqId: rid,
-		Response: &Response_GetEpochStateResponse{
-			GetEpochStateResponse: &GetEpochStateResponse{
-				HeaderBytes: headerBytes,
-				ShardState:  ssBytes,
+				CommitSig:   sigs,
 			},
 		},
 	}
