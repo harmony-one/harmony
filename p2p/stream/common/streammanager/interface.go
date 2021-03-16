@@ -14,13 +14,19 @@ import (
 // StreamManager is the interface for streamManager
 type StreamManager interface {
 	p2ptypes.LifeCycle
-	StreamOperator
+	Operator
 	Subscriber
-	StreamReader
+	Reader
 }
 
-// StreamOperator handles new stream or remove stream
-type StreamOperator interface {
+// ReaderSubscriber reads stream and subscribe stream events
+type ReaderSubscriber interface {
+	Reader
+	Subscriber
+}
+
+// Operator handles new stream or remove stream
+type Operator interface {
 	NewStream(stream sttypes.Stream) error
 	RemoveStream(stID sttypes.StreamID) error
 }
@@ -31,8 +37,8 @@ type Subscriber interface {
 	SubscribeRemoveStreamEvent(ch chan<- EvtStreamRemoved) event.Subscription
 }
 
-// StreamReader is the interface to read stream in stream manager
-type StreamReader interface {
+// Reader is the interface to read stream in stream manager
+type Reader interface {
 	GetStreams() []sttypes.Stream
 	GetStreamByID(id sttypes.StreamID) (sttypes.Stream, bool)
 }
