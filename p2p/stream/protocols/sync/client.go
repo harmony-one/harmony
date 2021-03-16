@@ -18,6 +18,9 @@ import (
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.
 // Return the block as result, target stream id, and error
 func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) ([]*types.Block, sttypes.StreamID, error) {
+	if len(bns) == 0 {
+		return nil, "", fmt.Errorf("zero block numbers requested")
+	}
 	if len(bns) > GetBlocksByNumAmountCap {
 		return nil, "", fmt.Errorf("number of blocks exceed cap of %v", GetBlocksByNumAmountCap)
 	}
@@ -57,6 +60,9 @@ func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (u
 // GetBlockHashes do getBlockHashesRequest through sync stream protocol.
 // Return the hash of the given block number. If a block is unknown, the hash will be emptyHash.
 func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Option) ([]common.Hash, sttypes.StreamID, error) {
+	if len(bns) == 0 {
+		return nil, "", fmt.Errorf("zero block numbers requested")
+	}
 	if len(bns) > GetBlockHashesAmountCap {
 		return nil, "", fmt.Errorf("number of requested numbers exceed limit")
 	}
@@ -75,6 +81,9 @@ func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Opt
 
 // GetBlocksByHashes do getBlocksByHashesRequest through sync stream protocol.
 func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) ([]*types.Block, sttypes.StreamID, error) {
+	if len(hs) == 0 {
+		return nil, "", fmt.Errorf("zero block hashes requested")
+	}
 	if len(hs) > GetBlocksByHashesAmountCap {
 		return nil, "", fmt.Errorf("number of requested hashes exceed limit")
 	}
