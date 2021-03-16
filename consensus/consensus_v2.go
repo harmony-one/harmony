@@ -334,6 +334,8 @@ func (consensus *Consensus) Start(
 						break
 					}
 				}
+
+			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.mutex.Lock()
@@ -352,6 +354,7 @@ func (consensus *Consensus) Start(
 				}
 				consensus.mutex.Unlock()
 
+			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
@@ -467,13 +470,26 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
+
+	if consensus.dHelper != nil {
+		consensus.dHelper.start()
+	}
 }
 
 // Close close the consensus. If current is in normal commit phase, wait until the commit
 // phase end.
 func (consensus *Consensus) Close() error {
+	if consensus.dHelper != nil {
+		consensus.dHelper.close()
+	}
+	consensus.waitForCommit()
+	return nil
+}
+
+// waitForCommit wait extra 2 seconds for commit phase to finish
+func (consensus *Consensus) waitForCommit() {
 	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
-		return nil
+		return
 	}
 	// We only need to wait consensus is in normal commit phase
 	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
@@ -483,7 +499,6 @@ func (consensus *Consensus) Close() error {
 		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
 		time.Sleep(time.Millisecond * 100)
 	}
-	return nil
 }
 
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
