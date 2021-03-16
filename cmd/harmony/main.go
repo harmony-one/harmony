@@ -709,10 +709,11 @@ func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
 }
 
 func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
-	blockchains := []*core.BlockChain{
-		node.Blockchain(),
-		node.Beaconchain(),
-	} // The duplicate blockchain will be skipped in config parsing
+	blockchains := []*core.BlockChain{node.Blockchain()}
+	if node.NodeConfig.ShardID != 0 {
+		blockchains = append(blockchains, node.Beaconchain())
+	}
+
 	dConfig := downloader.Config{
 		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
 		Concurrency:  hc.Sync.Concurrency,
