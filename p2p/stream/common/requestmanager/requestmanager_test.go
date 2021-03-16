@@ -2,6 +2,7 @@ package requestmanager
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -132,7 +133,7 @@ func TestRequestManager_UnknownDelivery(t *testing.T) {
 	req := makeTestRequest(100)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	resC := ts.rm.doRequestAsync(ctx, req)
-	time.Sleep(6 * time.Second)
+	time.Sleep(2 * time.Second)
 	cancel()
 
 	// Since the reqID is not delivered, the result is not delivered to the request
@@ -161,6 +162,79 @@ func TestRequestManager_StaleDelivery(t *testing.T) {
 	res := <-resC
 	if res.err != context.DeadlineExceeded {
 		t.Errorf("unexpected error: %v", res.err)
+	}
+}
+
+// TestRequestManager_cancelWaitings test the scenario of request being canceled
+// while still in waitings. In order to do this,
+// 1. Set number of streams to 1
+// 2. Occupy the stream with a request, and block
+// 3. Do the second request. This request will be in waitings.
+// 4. Cancel the second request. Request shall be removed from waitings.
+// 5. Unblock the first request
+// 6. Request 1 finished, request 2 canceled
+func TestRequestManager_cancelWaitings(t *testing.T) {
+	req1 := makeTestRequest(1)
+	req2 := makeTestRequest(2)
+
+	var req1Block sync.Mutex
+	req1Block.Lock()
+	unblockReq1 := func() { req1Block.Unlock() }
+
+	delayF := makeDefaultDelayFunc(150 * time.Millisecond)
+	respF := func(req *testRequest) *testResponse {
+		if req.index == req1.index {
+			req1Block.Lock()
+		}
+		return makeDefaultResponseFunc()(req)
+	}
+	ts := newTestSuite(delayF, respF, 1)
+	ts.Start()
+	defer ts.Close()
+
+	ctx1, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
+	resC1 := ts.rm.doRequestAsync(ctx1, req1)
+	resC2 := ts.rm.doRequestAsync(ctx2, req2)
+
+	cancel2()
+	unblockReq1()
+
+	var (
+		res1 responseData
+		res2 responseData
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+
+		select {
+		case res1 = <-resC1:
+		case <-time.After(1 * time.Second):
+			t.Errorf("req1 timed out")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+
+		select {
+		case res2 = <-resC2:
+		case <-time.After(1 * time.Second):
+			t.Errorf("req2 timed out")
+		}
+	}()
+	wg.Wait()
+
+	if res1.err != nil {
+		t.Errorf("request 1 shall return nil error")
+	}
+	if res2.err != context.Canceled {
+		t.Errorf("request 2 shall be canceled")
+	}
+	if ts.rm.waitings.reqsPLow.len() != 0 || ts.rm.waitings.reqsPHigh.len() != 0 {
+		t.Errorf("waitings shall be clean")
 	}
 }
 
@@ -303,6 +377,95 @@ func TestGenReqID(t *testing.T) {
 	}
 }
 
+func TestCheckStreamUpdates(t *testing.T) {
+	tests := []struct {
+		exists            map[sttypes.StreamID]*stream
+		targets           []sttypes.Stream
+		expAddedIndexes   []int
+		expRemovedIndexes []int
+	}{
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{2, 3, 4, 5}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{1},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{1, 2, 3, 4, 5, 6}),
+			expAddedIndexes:   []int{6},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{}),
+			targets:           makeDummyTestStreams([]int{}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{}),
+			targets:           makeDummyTestStreams([]int{1, 2, 3, 4, 5}),
+			expAddedIndexes:   []int{1, 2, 3, 4, 5},
+			expRemovedIndexes: []int{},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{}),
+			expAddedIndexes:   []int{},
+			expRemovedIndexes: []int{1, 2, 3, 4, 5},
+		},
+		{
+			exists:            makeDummyStreamSets([]int{1, 2, 3, 4, 5}),
+			targets:           makeDummyTestStreams([]int{6, 7, 8, 9, 10}),
+			expAddedIndexes:   []int{6, 7, 8, 9, 10},
+			expRemovedIndexes: []int{1, 2, 3, 4, 5},
+		},
+	}
+
+	for i, test := range tests {
+		added, removed := checkStreamUpdates(test.exists, test.targets)
+
+		if err := checkStreamIDsEqual(added, test.expAddedIndexes); err != nil {
+			t.Errorf("Test %v: check added: %v", i, err)
+		}
+		if err := checkStreamIDsEqual2(removed, test.expRemovedIndexes); err != nil {
+			t.Errorf("Test %v: check removed: %v", i, err)
+		}
+	}
+}
+
+func checkStreamIDsEqual(sts []sttypes.Stream, expIndexes []int) error {
+	if len(sts) != len(expIndexes) {
+		return fmt.Errorf("size not equal")
+	}
+	expM := make(map[sttypes.StreamID]struct{})
+	for _, index := range expIndexes {
+		expM[makeStreamID(index)] = struct{}{}
+	}
+	for _, st := range sts {
+		if _, ok := expM[st.ID()]; !ok {
+			return fmt.Errorf("stream not exist in exp: %v", st.ID())
+		}
+	}
+	return nil
+}
+
+func checkStreamIDsEqual2(sts []*stream, expIndexes []int) error {
+	if len(sts) != len(expIndexes) {
+		return fmt.Errorf("size not equal")
+	}
+	expM := make(map[sttypes.StreamID]struct{})
+	for _, index := range expIndexes {
+		expM[makeStreamID(index)] = struct{}{}
+	}
+	for _, st := range sts {
+		if _, ok := expM[st.ID()]; !ok {
+			return fmt.Errorf("stream not exist in exp: %v", st.ID())
+		}
+	}
+	return nil
+}
+
 type testSuite struct {
 	rm          *requestManager
 	sm          *testStreamManager
@@ -330,7 +493,8 @@ func newTestSuite(delayF delayFunc, respF responseFunc, numStreams int) *testSui
 		cancel:      cancel,
 	}
 	for i := 0; i != numStreams; i++ {
-		ts.bootStreams = append(ts.bootStreams, ts.makeTestStream(i))
+		st := ts.makeTestStream(i)
+		ts.bootStreams = append(ts.bootStreams, st)
 	}
 	return ts
 }
