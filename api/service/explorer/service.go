@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
@@ -45,12 +45,12 @@ type Service struct {
 	Storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
-	stateSync   *syncing.StateSync
+	stateSync   *legacysync.StateSync
 	blockchain  *core.BlockChain
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, ss *syncing.StateSync, bc *core.BlockChain) *Service {
+func New(selfPeer *p2p.Peer, ss *legacysync.StateSync, bc *core.BlockChain) *Service {
 	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
 }
 

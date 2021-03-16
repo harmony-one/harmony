@@ -17,8 +17,8 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -90,7 +90,7 @@ type Node struct {
 	downloaderServer     *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *syncing.StateSync
+	stateSync, beaconSync  *legacysync.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages

@@ -23,9 +23,10 @@ type requestManager struct {
 	streams   map[sttypes.StreamID]*stream  // All streams
 	available map[sttypes.StreamID]struct{} // Streams that are available for request
 	pendings  map[uint64]*request           // requests that are sent but not received response
-	waitings  requestQueue                  // double linked list of requests that are on the waiting list
+	waitings  requestQueues                 // double linked list of requests that are on the waiting list
 
 	// Stream events
+	sm         streammanager.Reader
 	newStreamC <-chan streammanager.EvtStreamAdded
 	rmStreamC  <-chan streammanager.EvtStreamRemoved
 	// Request events
@@ -40,11 +41,11 @@ type requestManager struct {
 }
 
 // NewRequestManager creates a new request manager
-func NewRequestManager(sm streammanager.Subscriber) RequestManager {
+func NewRequestManager(sm streammanager.ReaderSubscriber) RequestManager {
 	return newRequestManager(sm)
 }
 
-func newRequestManager(sm streammanager.Subscriber) *requestManager {
+func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 	// subscribe at initialize to prevent misuse of upper function which might cause
 	// the bootstrap peers are ignored
 	newStreamC := make(chan streammanager.EvtStreamAdded)
@@ -58,8 +59,9 @@ func newRequestManager(sm streammanager.Subscriber) *requestManager {
 		streams:   make(map[sttypes.StreamID]*stream),
 		available: make(map[sttypes.StreamID]struct{}),
 		pendings:  make(map[uint64]*request),
-		waitings:  newRequestQueue(),
+		waitings:  newRequestQueues(),
 
+		sm:          sm,
 		newStreamC:  newStreamC,
 		rmStreamC:   rmStreamC,
 		cancelReqC:  make(chan cancelReqData, 16),
@@ -102,8 +104,8 @@ func (rm *requestManager) doRequestAsync(ctx context.Context, raw sttypes.Reques
 		select {
 		case <-ctx.Done(): // canceled or timeout in upper function calls
 			rm.cancelReqC <- cancelReqData{
-				reqID: req.ReqID(),
-				err:   ctx.Err(),
+				req: req,
+				err: ctx.Err(),
 			}
 		case <-req.doneC:
 		}
@@ -182,13 +184,11 @@ func (rm *requestManager) loop() {
 		case data := <-rm.cancelReqC:
 			rm.handleCancelRequest(data)
 
-		case evt := <-rm.newStreamC:
-			rm.logger.Info().Str("streamID", string(evt.Stream.ID())).Msg("add new stream")
-			rm.addNewStream(evt.Stream)
+		case <-rm.newStreamC:
+			rm.refreshStreams()
 
-		case evt := <-rm.rmStreamC:
-			rm.logger.Info().Str("streamID", string(evt.ID)).Msg("remove stream")
-			rm.removeStream(evt.ID)
+		case <-rm.rmStreamC:
+			rm.refreshStreams()
 
 		case <-rm.stopC:
 			rm.logger.Info().Msg("request manager stopped")
@@ -255,21 +255,20 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 	rm.lock.Lock()
 	defer rm.lock.Unlock()
 
-	req, ok := rm.pendings[data.reqID]
-	if !ok {
-		return
-	}
+	var (
+		req = data.req
+		err = data.err
+	)
+	rm.waitings.Remove(req)
 	rm.removePendingRequest(req)
-
 	var stid sttypes.StreamID
 	if req.owner != nil {
 		stid = req.owner.ID()
 	}
-
 	req.doneWithResponse(responseData{
 		resp: nil,
 		stID: stid,
-		err:  data.err,
+		err:  err,
 	})
 }
 
@@ -290,7 +289,7 @@ func (rm *requestManager) getNextRequest() (*request, *stream) {
 
 	st, err := rm.pickAvailableStream(req)
 	if err != nil {
-		rm.logger.Debug().Msg("No available streams.")
+		rm.logger.Debug().Err(err).Str("request", req.String()).Msg("Pick available streams.")
 		rm.addRequestToWaitings(req, reqPriorityHigh)
 		return nil, nil
 	}
@@ -349,26 +348,49 @@ func (rm *requestManager) pickAvailableStream(req *request) (*stream, error) {
 	return nil, errors.New("no more available streams")
 }
 
-func (rm *requestManager) addNewStream(st sttypes.Stream) {
+func (rm *requestManager) refreshStreams() {
 	rm.lock.Lock()
 	defer rm.lock.Unlock()
 
-	if _, ok := rm.streams[st.ID()]; !ok {
-		rm.streams[st.ID()] = &stream{Stream: st}
-		rm.available[st.ID()] = struct{}{}
+	added, removed := checkStreamUpdates(rm.streams, rm.sm.GetStreams())
+
+	for _, st := range added {
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("add new stream")
+		rm.addNewStream(st)
+	}
+	for _, st := range removed {
+		rm.logger.Info().Str("streamID", string(st.ID())).Msg("remove stream")
+		rm.removeStream(st)
 	}
 }
 
-// removeStream remove the stream from request manager, clear the pending request
-// of the stream. Return whether a pending request is canceled in the stream,
-func (rm *requestManager) removeStream(id sttypes.StreamID) {
-	rm.lock.Lock()
-	defer rm.lock.Unlock()
+func checkStreamUpdates(exists map[sttypes.StreamID]*stream, targets []sttypes.Stream) (added []sttypes.Stream, removed []*stream) {
+	targetM := make(map[sttypes.StreamID]sttypes.Stream)
 
-	st, ok := rm.streams[id]
-	if !ok {
-		return
+	for _, target := range targets {
+		id := target.ID()
+		targetM[id] = target
+		if _, ok := exists[id]; !ok {
+			added = append(added, target)
+		}
 	}
+	for id, exist := range exists {
+		if _, ok := targetM[id]; !ok {
+			removed = append(removed, exist)
+		}
+	}
+	return
+}
+
+func (rm *requestManager) addNewStream(st sttypes.Stream) {
+	rm.streams[st.ID()] = &stream{Stream: st}
+	rm.available[st.ID()] = struct{}{}
+}
+
+// removeStream remove the stream from request manager, clear the pending request
+// of the stream.
+func (rm *requestManager) removeStream(st *stream) {
+	id := st.ID()
 	delete(rm.available, id)
 	delete(rm.streams, id)
 
@@ -394,7 +416,7 @@ func (rm *requestManager) close() {
 	rm.pendings = make(map[uint64]*request)
 	rm.available = make(map[sttypes.StreamID]struct{})
 	rm.streams = make(map[sttypes.StreamID]*stream)
-	rm.waitings = newRequestQueue()
+	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
 

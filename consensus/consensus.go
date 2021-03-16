@@ -130,6 +130,8 @@ type Consensus struct {
 	finality int64
 	// finalityCounter keep tracks of the finality time
 	finalityCounter int64
+
+	dHelper *downloadHelper
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,

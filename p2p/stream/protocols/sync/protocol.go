@@ -91,7 +91,7 @@ func NewProtocol(config Config) *Protocol {
 	sp.sm = streammanager.NewStreamManager(sp.ProtoID(), config.Host, config.Discovery,
 		sp.HandleStream, smConfig)
 
-	sp.rl = ratelimiter.NewRateLimiter(sp.sm, 50, 10)
+	sp.rl = ratelimiter.NewRateLimiter(sp.sm, rateLimiterGlobalRequestPerSecond, rateLimiterSingleRequestsPerSecond)
 
 	sp.rm = requestmanager.NewRequestManager(sp.sm)
 
