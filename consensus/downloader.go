@@ -65,7 +65,7 @@ func (dh *downloadHelper) downloadStartedLoop() {
 		case <-dh.startedCh:
 			dh.c.BlocksNotSynchronized()
 
-		case err := <-dh.finishedSub.Err():
+		case err := <-dh.startedSub.Err():
 			dh.c.getLogger().Info().Err(err).Msg("consensus download finished loop closed")
 			return
 		}
