@@ -289,7 +289,7 @@ func (rm *requestManager) getNextRequest() (*request, *stream) {
 
 	st, err := rm.pickAvailableStream(req)
 	if err != nil {
-		rm.logger.Debug().Msg("No available streams.")
+		rm.logger.Debug().Err(err).Str("request", req.String()).Msg("Pick available streams.")
 		rm.addRequestToWaitings(req, reqPriorityHigh)
 		return nil, nil
 	}
