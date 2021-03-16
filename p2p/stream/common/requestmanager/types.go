@@ -114,8 +114,8 @@ func (st *stream) clearPendingRequest() *request {
 }
 
 type cancelReqData struct {
-	reqID uint64
-	err   error
+	req *request
+	err error
 }
 
 // responseData is the wrapped response for stream requests
@@ -125,58 +125,97 @@ type responseData struct {
 	err  error
 }
 
-// requestQueue is a wrapper of double linked list with Request as type
-type requestQueue struct {
-	reqsPHigh *list.List // high priority, currently defined by upper function calls
-	reqsPLow  *list.List // low priority, applied to all normal requests
-	lock      sync.Mutex
+// requestQueues is a wrapper of double linked list with Request as type
+type requestQueues struct {
+	reqsPHigh *requestQueue // high priority, currently defined by upper function calls
+	reqsPLow  *requestQueue // low priority, applied to all normal requests
 }
 
-func newRequestQueue() requestQueue {
-	return requestQueue{
-		reqsPHigh: list.New(),
-		reqsPLow:  list.New(),
+func newRequestQueues() requestQueues {
+	return requestQueues{
+		reqsPHigh: newRequestQueue(),
+		reqsPLow:  newRequestQueue(),
 	}
 }
 
-// Push add a new request to requestQueue.
-func (q *requestQueue) Push(req *request, priority reqPriority) error {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
+// Push add a new request to requestQueues.
+func (q *requestQueues) Push(req *request, priority reqPriority) error {
 	if priority == reqPriorityHigh || req.priority == reqPriorityHigh {
-		return pushRequestToList(q.reqsPHigh, req)
+		return q.reqsPHigh.push(req)
 	}
-	if priority == reqPriorityLow {
-		return pushRequestToList(q.reqsPLow, req)
-	}
-	return nil
+	return q.reqsPLow.push(req)
 }
 
 // Pop will first pop the request from high priority, and then pop from low priority
-func (q *requestQueue) Pop() *request {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	if req := popRequestFromList(q.reqsPHigh); req != nil {
+func (q *requestQueues) Pop() *request {
+	if req := q.reqsPHigh.pop(); req != nil {
 		return req
 	}
-	return popRequestFromList(q.reqsPLow)
+	return q.reqsPLow.pop()
 }
 
-func pushRequestToList(l *list.List, req *request) error {
-	if l.Len() >= maxWaitingSize {
+func (q *requestQueues) Remove(req *request) {
+	q.reqsPHigh.remove(req)
+	q.reqsPLow.remove(req)
+}
+
+// requestQueue is a thread safe request double linked list
+type requestQueue struct {
+	l     *list.List
+	elemM map[*request]*list.Element // Yes, pointer as map key
+	lock  sync.Mutex
+}
+
+func newRequestQueue() *requestQueue {
+	return &requestQueue{
+		l:     list.New(),
+		elemM: make(map[*request]*list.Element),
+	}
+}
+
+func (rl *requestQueue) push(req *request) error {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	if rl.l.Len() >= maxWaitingSize {
 		return ErrQueueFull
 	}
-	l.PushBack(req)
+	elem := rl.l.PushBack(req)
+	rl.elemM[req] = elem
 	return nil
 }
 
-func popRequestFromList(l *list.List) *request {
-	elem := l.Front()
+func (rl *requestQueue) pop() *request {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	elem := rl.l.Front()
 	if elem == nil {
 		return nil
 	}
-	l.Remove(elem)
-	return elem.Value.(*request)
+	rl.l.Remove(elem)
+
+	req := elem.Value.(*request)
+	delete(rl.elemM, req)
+	return req
+}
+
+func (rl *requestQueue) remove(req *request) {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	elem := rl.elemM[req]
+	if elem == nil {
+		// Already removed
+		return
+	}
+	rl.l.Remove(elem)
+	delete(rl.elemM, req)
+}
+
+func (rl *requestQueue) len() int {
+	rl.lock.Lock()
+	defer rl.lock.Unlock()
+
+	return rl.l.Len()
 }

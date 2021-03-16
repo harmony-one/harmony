@@ -133,7 +133,7 @@ func TestRequestManager_UnknownDelivery(t *testing.T) {
 	req := makeTestRequest(100)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	resC := ts.rm.doRequestAsync(ctx, req)
-	time.Sleep(6 * time.Second)
+	time.Sleep(2 * time.Second)
 	cancel()
 
 	// Since the reqID is not delivered, the result is not delivered to the request
@@ -162,6 +162,79 @@ func TestRequestManager_StaleDelivery(t *testing.T) {
 	res := <-resC
 	if res.err != context.DeadlineExceeded {
 		t.Errorf("unexpected error: %v", res.err)
+	}
+}
+
+// TestRequestManager_cancelWaitings test the scenario of request being canceled
+// while still in waitings. In order to do this,
+// 1. Set number of streams to 1
+// 2. Occupy the stream with a request, and block
+// 3. Do the second request. This request will be in waitings.
+// 4. Cancel the second request. Request shall be removed from waitings.
+// 5. Unblock the first request
+// 6. Request 1 finished, request 2 canceled
+func TestRequestManager_cancelWaitings(t *testing.T) {
+	req1 := makeTestRequest(1)
+	req2 := makeTestRequest(2)
+
+	var req1Block sync.Mutex
+	req1Block.Lock()
+	unblockReq1 := func() { req1Block.Unlock() }
+
+	delayF := makeDefaultDelayFunc(150 * time.Millisecond)
+	respF := func(req *testRequest) *testResponse {
+		if req.index == req1.index {
+			req1Block.Lock()
+		}
+		return makeDefaultResponseFunc()(req)
+	}
+	ts := newTestSuite(delayF, respF, 1)
+	ts.Start()
+	defer ts.Close()
+
+	ctx1, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
+	resC1 := ts.rm.doRequestAsync(ctx1, req1)
+	resC2 := ts.rm.doRequestAsync(ctx2, req2)
+
+	cancel2()
+	unblockReq1()
+
+	var (
+		res1 responseData
+		res2 responseData
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+
+		select {
+		case res1 = <-resC1:
+		case <-time.After(1 * time.Second):
+			t.Errorf("req1 timed out")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+
+		select {
+		case res2 = <-resC2:
+		case <-time.After(1 * time.Second):
+			t.Errorf("req2 timed out")
+		}
+	}()
+	wg.Wait()
+
+	if res1.err != nil {
+		t.Errorf("request 1 shall return nil error")
+	}
+	if res2.err != context.Canceled {
+		t.Errorf("request 2 shall be canceled")
+	}
+	if ts.rm.waitings.reqsPLow.len() != 0 || ts.rm.waitings.reqsPHigh.len() != 0 {
+		t.Errorf("waitings shall be clean")
 	}
 }
 

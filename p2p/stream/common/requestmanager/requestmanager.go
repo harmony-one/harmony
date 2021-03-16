@@ -23,7 +23,7 @@ type requestManager struct {
 	streams   map[sttypes.StreamID]*stream  // All streams
 	available map[sttypes.StreamID]struct{} // Streams that are available for request
 	pendings  map[uint64]*request           // requests that are sent but not received response
-	waitings  requestQueue                  // double linked list of requests that are on the waiting list
+	waitings  requestQueues                 // double linked list of requests that are on the waiting list
 
 	// Stream events
 	sm         streammanager.Reader
@@ -59,7 +59,7 @@ func newRequestManager(sm streammanager.ReaderSubscriber) *requestManager {
 		streams:   make(map[sttypes.StreamID]*stream),
 		available: make(map[sttypes.StreamID]struct{}),
 		pendings:  make(map[uint64]*request),
-		waitings:  newRequestQueue(),
+		waitings:  newRequestQueues(),
 
 		sm:          sm,
 		newStreamC:  newStreamC,
@@ -104,8 +104,8 @@ func (rm *requestManager) doRequestAsync(ctx context.Context, raw sttypes.Reques
 		select {
 		case <-ctx.Done(): // canceled or timeout in upper function calls
 			rm.cancelReqC <- cancelReqData{
-				reqID: req.ReqID(),
-				err:   ctx.Err(),
+				req: req,
+				err: ctx.Err(),
 			}
 		case <-req.doneC:
 		}
@@ -255,21 +255,20 @@ func (rm *requestManager) handleCancelRequest(data cancelReqData) {
 	rm.lock.Lock()
 	defer rm.lock.Unlock()
 
-	req, ok := rm.pendings[data.reqID]
-	if !ok {
-		return
-	}
+	var (
+		req = data.req
+		err = data.err
+	)
+	rm.waitings.Remove(req)
 	rm.removePendingRequest(req)
-
 	var stid sttypes.StreamID
 	if req.owner != nil {
 		stid = req.owner.ID()
 	}
-
 	req.doneWithResponse(responseData{
 		resp: nil,
 		stID: stid,
-		err:  data.err,
+		err:  err,
 	})
 }
 
@@ -417,7 +416,7 @@ func (rm *requestManager) close() {
 	rm.pendings = make(map[uint64]*request)
 	rm.available = make(map[sttypes.StreamID]struct{})
 	rm.streams = make(map[sttypes.StreamID]*stream)
-	rm.waitings = newRequestQueue()
+	rm.waitings = newRequestQueues()
 	close(rm.stopC)
 }
 
