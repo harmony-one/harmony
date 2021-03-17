@@ -81,13 +81,14 @@ func TestV1_0_0Config(t *testing.T) {
   BlacklistFile = "./.hmy/blacklist.txt"
 
 [Sync]
+  Downloader = false
   Concurrency = 6
   DiscBatch = 8
   DiscHardLowCap = 6
   DiscHighCap = 128
   DiscSoftLowCap = 8
   InitStreams = 8
-  LegacyClient = false
+  LegacyClient = true
   LegacyServer = true
   MinPeers = 6
 

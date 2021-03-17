@@ -981,7 +981,7 @@ func TestSyncFlags(t *testing.T) {
 			}(),
 		},
 		{
-			args: []string{"--sync.concurrency", "10", "--sync.min-peers", "10",
+			args: []string{"--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
 				"--sync.init-peers", "10", "--sync.disc.soft-low-cap", "10",
 				"--sync.disc.hard-low-cap", "10", "--sync.disc.hi-cap", "10",
 				"--sync.disc.batch", "10",
@@ -989,6 +989,7 @@ func TestSyncFlags(t *testing.T) {
 			network: "mainnet",
 			expConfig: func() syncConfig {
 				cfg := defaultMainnetSyncConfig
+				cfg.Downloader = true
 				cfg.Concurrency = 10
 				cfg.MinPeers = 10
 				cfg.InitStreams = 10
