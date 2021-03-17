@@ -25,6 +25,10 @@ const (
 type (
 	// Config is the downloader config
 	Config struct {
+		// Only run stream sync protocol as a server.
+		// TODO: remove this when stream sync is fully up.
+		ServerOnly bool
+
 		// parameters
 		Network     nodeconfig.NetworkType
 		Concurrency int // Number of concurrent sync requests

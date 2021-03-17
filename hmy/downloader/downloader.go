@@ -82,6 +82,10 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 
 // Start start the downloader
 func (d *Downloader) Start() {
+	if d.config.ServerOnly {
+		return
+	}
+
 	go d.run()
 
 	if d.bh != nil {
@@ -91,6 +95,10 @@ func (d *Downloader) Start() {
 
 // Close close the downloader
 func (d *Downloader) Close() {
+	if d.config.ServerOnly {
+		return
+	}
+
 	close(d.closeC)
 	d.cancel()
 

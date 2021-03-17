@@ -177,6 +177,7 @@ var (
 	}
 
 	syncFlags = []cli.Flag{
+		syncDownloaderFlag,
 		syncLegacyClientFlag,
 		syncLegacyServerFlag,
 		syncConcurrencyFlag,
@@ -1284,6 +1285,13 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 }
 
 var (
+	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
+	syncDownloaderFlag = cli.BoolFlag{
+		Name:     "sync.downloader",
+		Usage:    "Enable the downloader module to sync through stream sync protocol",
+		Hidden:   true,
+		DefValue: false,
+	}
 	syncLegacyServerFlag = cli.BoolFlag{
 		Name:     "sync.legacy.server",
 		Usage:    "Enable the gRPC sync server for backward compatibility",
@@ -1338,6 +1346,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if config.Sync == (syncConfig{}) {
 		nt := nodeconfig.NetworkType(config.Network.NetworkType)
 		config.Sync = getDefaultSyncConfig(nt)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
+		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {

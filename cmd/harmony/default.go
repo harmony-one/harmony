@@ -104,8 +104,9 @@ var defaultPrometheusConfig = prometheusConfig{
 
 var (
 	defaultMainnetSyncConfig = syncConfig{
+		Downloader:     false,
 		LegacyServer:   true,
-		LegacyClient:   false,
+		LegacyClient:   true,
 		Concurrency:    6,
 		MinPeers:       6,
 		InitStreams:    8,
@@ -116,8 +117,9 @@ var (
 	}
 
 	defaultTestNetSyncConfig = syncConfig{
+		Downloader:     false,
 		LegacyServer:   true,
-		LegacyClient:   false,
+		LegacyClient:   true,
 		Concurrency:    4,
 		MinPeers:       4,
 		InitStreams:    4,
@@ -128,6 +130,7 @@ var (
 	}
 
 	defaultElseSyncConfig = syncConfig{
+		Downloader:     true,
 		LegacyServer:   true,
 		LegacyClient:   false,
 		Concurrency:    4,

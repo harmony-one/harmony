@@ -154,6 +154,8 @@ type prometheusConfig struct {
 }
 
 type syncConfig struct {
+	// TODO: Remove this bool after stream sync is fully up.
+	Downloader     bool // start the sync downloader client
 	LegacyServer   bool // provide the gRPC sync protocol server
 	LegacyClient   bool // aside from stream sync protocol, also run gRPC client to get blocks
 	Concurrency    int  // concurrency used for stream sync protocol
@@ -199,6 +201,11 @@ func validateHarmonyConfig(config harmonyConfig) error {
 
 	if config.General.IsOffline && config.P2P.IP != nodeconfig.DefaultLocalListenIP {
 		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
+	}
+
+	if !config.Sync.Downloader && !config.Sync.LegacyClient {
+		// There is no module up for sync
+		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
 	}
 
 	return nil

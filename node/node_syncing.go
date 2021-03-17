@@ -195,6 +195,26 @@ func (node *Node) doBeaconSyncing() {
 		return
 	}
 
+	if !node.NodeConfig.Downloader {
+		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
+		go func(node *Node) {
+			// TODO ek – infinite loop; add shutdown/cleanup logic
+			for beaconBlock := range node.BeaconBlockChannel {
+				if node.beaconSync != nil {
+					err := node.beaconSync.UpdateBlockAndStatus(
+						beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
+					)
+					if err != nil {
+						node.beaconSync.AddLastMileBlock(beaconBlock)
+					} else if node.Consensus.IsLeader() {
+						// Only leader broadcast crosslink to avoid spamming p2p
+						node.BroadcastCrossLink()
+					}
+				}
+			}
+		}(node)
+	}
+
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.beaconSync == nil {
