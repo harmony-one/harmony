@@ -9,6 +9,7 @@ import (
 
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Stream is the interface for streams implemented in each service.
@@ -77,26 +78,43 @@ const (
 
 // WriteBytes write the bytes to the stream.
 // First 4 bytes is used as the size bytes, and the rest is the content
-func (st *BaseStream) WriteBytes(b []byte) error {
+func (st *BaseStream) WriteBytes(b []byte) (err error) {
+	defer func() {
+		msgWriteCounter.Inc()
+		if err != nil {
+			msgWriteFailedCounterVec.With(prometheus.Labels{"error": err.Error()}).Inc()
+		}
+	}()
+
 	if len(b) > maxMsgBytes {
 		return errors.New("message too long")
 	}
-	if _, err := st.rw.Write(intToBytes(len(b))); err != nil {
+	if _, err = st.rw.Write(intToBytes(len(b))); err != nil {
 		return errors.Wrap(err, "write size bytes")
 	}
-	if _, err := st.rw.Write(b); err != nil {
+	bytesWriteCounter.Add(sizeBytes)
+	if _, err = st.rw.Write(b); err != nil {
 		return errors.Wrap(err, "write content")
 	}
+	bytesWriteCounter.Add(float64(len(b)))
 	return st.rw.Flush()
 }
 
 // ReadMsg read the bytes from the stream
-func (st *BaseStream) ReadBytes() ([]byte, error) {
+func (st *BaseStream) ReadBytes() (b []byte, err error) {
+	defer func() {
+		msgReadCounter.Inc()
+		if err != nil {
+			msgReadFailedCounterVec.With(prometheus.Labels{"error": err.Error()}).Inc()
+		}
+	}()
+
 	sb := make([]byte, sizeBytes)
-	_, err := st.rw.Read(sb)
+	_, err = st.rw.Read(sb)
 	if err != nil {
 		return nil, errors.Wrap(err, "read size")
 	}
+	bytesReadCounter.Add(sizeBytes)
 	size := bytesToInt(sb)
 	if size > maxMsgBytes {
 		return nil, fmt.Errorf("message size exceed max: %v > %v", size, maxMsgBytes)
@@ -107,6 +125,7 @@ func (st *BaseStream) ReadBytes() ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "read content")
 	}
+	bytesReadCounter.Add(float64(n))
 	if n != size {
 		return nil, errors.New("ReadBytes sanity failed: byte size")
 	}

@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
@@ -229,6 +231,8 @@ func (sm *streamManager) handleAddStream(st sttypes.Stream) error {
 	sm.streams.addStream(st)
 
 	sm.addStreamFeed.Send(EvtStreamAdded{st})
+	addedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	return nil
 }
 
@@ -246,7 +250,10 @@ func (sm *streamManager) handleRemoveStream(id sttypes.StreamID) error {
 		default:
 		}
 	}
+
 	sm.removeStreamFeed.Send(EvtStreamRemoved{id})
+	removedStreamsCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+	numStreamsGaugeVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Set(float64(sm.streams.size()))
 	return nil
 }
 
@@ -275,10 +282,13 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to discover")
 	}
+	discoverCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+
 	for peer := range peers {
 		if peer.ID == sm.host.ID() {
 			continue
 		}
+		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 		go func(pid libp2p_peer.ID) {
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
@@ -306,6 +316,9 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 }
 
 func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_peer.ID) error {
+	timer := prometheus.NewTimer(setupStreamDuration.With(prometheus.Labels{"topic": string(sm.myProtoID)}))
+	defer timer.ObserveDuration()
+
 	nCtx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 
