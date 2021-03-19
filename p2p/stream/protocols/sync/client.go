@@ -17,12 +17,17 @@ import (
 
 // GetBlocksByNumber do getBlocksByNumberRequest through sync stream protocol.
 // Return the block as result, target stream id, and error
-func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) ([]*types.Block, sttypes.StreamID, error) {
+func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlocksByNumber")
+	defer p.doMetricPostClientRequest("getBlocksByNumber", err, timer)
+
 	if len(bns) == 0 {
-		return nil, "", fmt.Errorf("zero block numbers requested")
+		err = fmt.Errorf("zero block numbers requested")
+		return
 	}
 	if len(bns) > GetBlocksByNumAmountCap {
-		return nil, "", fmt.Errorf("number of blocks exceed cap of %v", GetBlocksByNumAmountCap)
+		err = fmt.Errorf("number of blocks exceed cap of %v", GetBlocksByNumAmountCap)
+		return
 	}
 
 	req := newGetBlocksByNumberRequest(bns)
@@ -30,19 +35,19 @@ func (p *Protocol) GetBlocksByNumber(ctx context.Context, bns []uint64, opts ...
 	if err != nil {
 		// At this point, error can be context canceled, context timed out, or waiting queue
 		// is already full.
-		return nil, stid, err
+		return
 	}
 
 	// Parse and return blocks
-	blocks, err := req.getBlocksFromResponse(resp)
-	if err != nil {
-		return nil, stid, err
-	}
-	return blocks, stid, nil
+	blocks, err = req.getBlocksFromResponse(resp)
+	return
 }
 
 // GetCurrentBlockNumber get the current block number from remote node
-func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (uint64, sttypes.StreamID, error) {
+func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (bn uint64, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlockNumber")
+	defer p.doMetricPostClientRequest("getBlockNumber", err, timer)
+
 	req := newGetBlockNumberRequest()
 
 	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
@@ -50,53 +55,54 @@ func (p *Protocol) GetCurrentBlockNumber(ctx context.Context, opts ...Option) (u
 		return 0, stid, err
 	}
 
-	bn, err := req.getNumberFromResponse(resp)
-	if err != nil {
-		return bn, stid, err
-	}
-	return bn, stid, nil
+	bn, err = req.getNumberFromResponse(resp)
+	return
 }
 
 // GetBlockHashes do getBlockHashesRequest through sync stream protocol.
 // Return the hash of the given block number. If a block is unknown, the hash will be emptyHash.
-func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Option) ([]common.Hash, sttypes.StreamID, error) {
+func (p *Protocol) GetBlockHashes(ctx context.Context, bns []uint64, opts ...Option) (hashes []common.Hash, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlockHashes")
+	defer p.doMetricPostClientRequest("getBlockHashes", err, timer)
+
 	if len(bns) == 0 {
-		return nil, "", fmt.Errorf("zero block numbers requested")
+		err = fmt.Errorf("zero block numbers requested")
+		return
 	}
 	if len(bns) > GetBlockHashesAmountCap {
-		return nil, "", fmt.Errorf("number of requested numbers exceed limit")
+		err = fmt.Errorf("number of requested numbers exceed limit")
+		return
 	}
 
 	req := newGetBlockHashesRequest(bns)
 	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
 	if err != nil {
-		return nil, stid, err
+		return
 	}
-	hashes, err := req.getHashesFromResponse(resp)
-	if err != nil {
-		return nil, stid, err
-	}
-	return hashes, stid, nil
+	hashes, err = req.getHashesFromResponse(resp)
+	return
 }
 
 // GetBlocksByHashes do getBlocksByHashesRequest through sync stream protocol.
-func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) ([]*types.Block, sttypes.StreamID, error) {
+func (p *Protocol) GetBlocksByHashes(ctx context.Context, hs []common.Hash, opts ...Option) (blocks []*types.Block, stid sttypes.StreamID, err error) {
+	timer := p.doMetricClientRequest("getBlocksByHashes")
+	defer p.doMetricPostClientRequest("getBlocksByHashes", err, timer)
+
 	if len(hs) == 0 {
-		return nil, "", fmt.Errorf("zero block hashes requested")
+		err = fmt.Errorf("zero block hashes requested")
+		return
 	}
 	if len(hs) > GetBlocksByHashesAmountCap {
-		return nil, "", fmt.Errorf("number of requested hashes exceed limit")
+		err = fmt.Errorf("number of requested hashes exceed limit")
+		return
 	}
 	req := newGetBlocksByHashesRequest(hs)
 	resp, stid, err := p.rm.DoRequest(ctx, req, opts...)
 	if err != nil {
-		return nil, stid, err
+		return
 	}
-	blocks, err := req.getBlocksFromResponse(resp)
-	if err != nil {
-		return nil, stid, err
-	}
-	return blocks, stid, nil
+	blocks, err = req.getBlocksFromResponse(resp)
+	return
 }
 
 // getBlocksByNumberRequest is the request for get block by numbers which implements

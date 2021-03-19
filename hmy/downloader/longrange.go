@@ -210,6 +210,9 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult, targetBN uint64) {
 			lsi.logger.Warn().Err(err).Uint64("target block", targetBN).
 				Uint64("block number", block.NumberU64()).
 				Msg("insert blocks failed in long range")
+			pl := lsi.d.promLabels()
+			pl["error"] = err.Error()
+			longRangeFailInsertedBlockCounterVec.With(pl).Inc()
 
 			lsi.p.RemoveStream(results[i].stid)
 			lsi.gbm.HandleInsertError(results, i)
@@ -217,6 +220,7 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult, targetBN uint64) {
 		}
 
 		lsi.inserted++
+		longRangeSyncedBlockCounterVec.With(lsi.d.promLabels()).Inc()
 	}
 	lsi.gbm.HandleInsertResult(results)
 }

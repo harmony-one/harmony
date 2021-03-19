@@ -76,6 +76,7 @@ func (bh *beaconHelper) loop() {
 
 		case it := <-bh.insertC:
 			inserted, bn, err := bh.insertLastMileBlocks()
+			numBlocksInsertedBeaconHelperCounter.Add(float64(inserted))
 			if err != nil {
 				bh.logger.Warn().Err(err).Msg("insert last mile blocks error")
 				continue

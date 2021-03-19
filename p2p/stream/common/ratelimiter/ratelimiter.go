@@ -3,6 +3,8 @@ package ratelimiter
 import (
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
@@ -78,6 +80,10 @@ func (rl *rateLimiter) rmStreamLoop(rmStC chan streammanager.EvtStreamRemoved, s
 }
 
 func (rl *rateLimiter) LimitRequest(stid sttypes.StreamID) {
+	serverRequestCounter.Inc()
+	timer := prometheus.NewTimer(serverRequestDelayDuration)
+	defer timer.ObserveDuration()
+
 	rl.lock.RLock()
 	limiter, ok := rl.limiters[stid]
 	rl.lock.RUnlock()
