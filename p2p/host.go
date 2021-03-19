@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/protocol"
+
 	"github.com/harmony-one/bls/ffi/go/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -230,8 +232,9 @@ func (host *HostV2) C() (int, int, int) {
 // AddStreamProtocol adds the stream protocols to the host to be started and closed
 // when the host starts or close
 func (host *HostV2) AddStreamProtocol(protocols ...sttypes.Protocol) {
-	for _, protocol := range protocols {
-		host.streamProtos = append(host.streamProtos, protocol)
+	for _, proto := range protocols {
+		host.streamProtos = append(host.streamProtos, proto)
+		host.h.SetStreamHandlerMatch(protocol.ID(proto.ProtoID()), proto.Match, proto.HandleStream)
 	}
 }
 
