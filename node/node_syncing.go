@@ -42,6 +42,8 @@ func init() {
 // TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
 func (node *Node) BeaconSyncHook() {
 	if node.Consensus.IsLeader() {
+		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
+		//       not have much idle resources.
 		node.BroadcastCrossLink()
 	}
 }
