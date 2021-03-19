@@ -712,7 +712,7 @@ func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
 
 func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 	blockchains := []*core.BlockChain{node.Blockchain()}
-	if node.NodeConfig.ShardID != 0 {
+	if !node.IsRunningBeaconChain() {
 		blockchains = append(blockchains, node.Beaconchain())
 	}
 
@@ -729,7 +729,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 	}
 	// If we are running side chain, we will need to do some extra works for beacon
 	// sync
-	if node.NodeConfig.ShardID != 0 {
+	if !node.IsRunningBeaconChain() {
 		dConfig.BHConfig = &downloader.BeaconHelperConfig{
 			BlockC:     node.BeaconBlockChannel,
 			InsertHook: node.BeaconSyncHook,
