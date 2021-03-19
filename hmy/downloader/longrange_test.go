@@ -129,7 +129,7 @@ func TestLrSyncIter_FetchAndInsertBlocks(t *testing.T) {
 	lsi := &lrSyncIter{
 		bc:  chain,
 		ih:  &testInsertHelper{chain},
-		d:   &Downloader{},
+		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
 		config: Config{
@@ -162,7 +162,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrRequest(t *testing.T) {
 	lsi := &lrSyncIter{
 		bc:  chain,
 		ih:  &testInsertHelper{chain},
-		d:   &Downloader{},
+		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
 		config: Config{
@@ -195,7 +195,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrInsert(t *testing.T) {
 	lsi := &lrSyncIter{
 		bc:  chain,
 		ih:  &testInsertHelper{chain},
-		d:   &Downloader{},
+		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
 		config: Config{
@@ -228,7 +228,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_RandomErr(t *testing.T) {
 	lsi := &lrSyncIter{
 		bc:  chain,
 		ih:  &testInsertHelper{chain},
-		d:   &Downloader{},
+		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
 		config: Config{
