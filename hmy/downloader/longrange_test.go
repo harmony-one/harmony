@@ -299,7 +299,7 @@ func TestComputeBNMaxVote(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		res := computeBNMaxVote(test.votes)
+		res := computeBlockNumberByMaxVote(test.votes)
 		if res != test.exp {
 			t.Errorf("Test %v: unexpected bn %v / %v", i, res, test.exp)
 		}

@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var emptySigVerifyError *sigVerifyError
+
 // doShortRangeSync does the short range sync.
 // Compared with long range sync, short range sync is more focused on syncing to the latest block.
 // It consist of 3 steps:
@@ -60,7 +62,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	n, err := d.ih.verifyAndInsertBlocks(blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
-		if !errors.As(err, &sigVerifyError{}) {
+		if !errors.As(err, &emptySigVerifyError) {
 			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
 		}
 		return n, errors.Wrap(err, "InsertChain")

@@ -119,7 +119,7 @@ func (lsi *lrSyncIter) estimateCurrentNumber() (uint64, error) {
 		}
 		return 0, errors.New("zero block number response from remote nodes")
 	}
-	bn := computeBNMaxVote(cnResults)
+	bn := computeBlockNumberByMaxVote(cnResults)
 	return bn, nil
 }
 
@@ -432,6 +432,7 @@ func (gbm *getBlocksManager) PullContinuousBlocks(cap int) []*blockResult {
 	return results
 }
 
+// getBatchFromRetries get the block number batch to be requested from retries.
 func (gbm *getBlocksManager) getBatchFromRetries(cap int) []uint64 {
 	var (
 		requestBNs []uint64
@@ -450,6 +451,7 @@ func (gbm *getBlocksManager) getBatchFromRetries(cap int) []uint64 {
 	return requestBNs
 }
 
+// getBatchFromRetries get the block number batch to be requested from unprocessed.
 func (gbm *getBlocksManager) getBatchFromUnprocessed(cap int) []uint64 {
 	var (
 		requestBNs []uint64
@@ -494,7 +496,8 @@ func validateGetBlocksResult(requested []uint64, result []*types.Block) error {
 	return nil
 }
 
-func computeBNMaxVote(votes map[sttypes.StreamID]uint64) uint64 {
+// computeBlockNumberByMaxVote compute the target block number by max vote.
+func computeBlockNumberByMaxVote(votes map[sttypes.StreamID]uint64) uint64 {
 	var (
 		nm     = make(map[uint64]int)
 		res    uint64

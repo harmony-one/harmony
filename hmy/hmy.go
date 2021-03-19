@@ -87,8 +87,9 @@ type NodeAPI interface {
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
-	IsOutOfSync(*core.BlockChain) bool
-	GetMaxPeerHeight() uint64
+	IsOutOfSync(shardID uint32) bool
+	SyncStatus(shardID uint32) (bool, uint64)
+	SyncPeers() map[string]int
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof
@@ -186,6 +187,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 	c := commonRPC.C{}
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
 
+	syncPeers := hmy.NodeAPI.SyncPeers()
 	consensusInternal := hmy.NodeAPI.GetConsensusInternal()
 
 	return commonRPC.NodeMetadata{
@@ -204,6 +206,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		PeerID:         nodeconfig.GetPeerID(),
 		Consensus:      consensusInternal,
 		C:              c,
+		SyncPeers:      syncPeers,
 	}
 }
 
