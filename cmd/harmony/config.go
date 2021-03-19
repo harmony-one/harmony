@@ -28,6 +28,7 @@ type harmonyConfig struct {
 	TxPool     txPoolConfig
 	Pprof      pprofConfig
 	Log        logConfig
+	Sync       syncConfig
 	Sys        *sysConfig        `toml:",omitempty"`
 	Consensus  *consensusConfig  `toml:",omitempty"`
 	Devnet     *devnetConfig     `toml:",omitempty"`
@@ -152,6 +153,20 @@ type prometheusConfig struct {
 	Gateway    string
 }
 
+type syncConfig struct {
+	// TODO: Remove this bool after stream sync is fully up.
+	Downloader     bool // start the sync downloader client
+	LegacyServer   bool // provide the gRPC sync protocol server
+	LegacyClient   bool // aside from stream sync protocol, also run gRPC client to get blocks
+	Concurrency    int  // concurrency used for stream sync protocol
+	MinPeers       int  // minimum streams to start a sync task.
+	InitStreams    int  // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int  // upper limit of streams in one sync protocol
+	DiscBatch      int  // size of each discovery
+}
+
 // TODO: use specific type wise validation instead of general string types assertion.
 func validateHarmonyConfig(config harmonyConfig) error {
 	var accepts []string
@@ -186,6 +201,11 @@ func validateHarmonyConfig(config harmonyConfig) error {
 
 	if config.General.IsOffline && config.P2P.IP != nodeconfig.DefaultLocalListenIP {
 		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
+	}
+
+	if !config.Sync.Downloader && !config.Sync.LegacyClient {
+		// There is no module up for sync
+		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
 	}
 
 	return nil
@@ -232,6 +252,17 @@ func parseNetworkType(nt string) nodeconfig.NetworkType {
 		return nodeconfig.Devnet
 	default:
 		return ""
+	}
+}
+
+func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
+	switch nt {
+	case nodeconfig.Mainnet:
+		return defaultMainnetSyncConfig
+	case nodeconfig.Testnet:
+		return defaultTestNetSyncConfig
+	default:
+		return defaultElseSyncConfig
 	}
 }
 

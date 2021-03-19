@@ -217,7 +217,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		if node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 			poolTxs := types.PoolTransactions{}
 			for _, tx := range newStakingTxs {
@@ -245,7 +245,7 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction,
 ) error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 		var err error
 		for i := range errs {
@@ -404,7 +404,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		case proto_node.SlashCandidate:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
 			// only beacon chain node process slash candidate messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+			if !node.IsRunningBeaconChain() {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.Receipt:
@@ -412,7 +412,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		case proto_node.CrossLink:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
 			// only beacon chain node process crosslink messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
+			if !node.IsRunningBeaconChain() ||
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
@@ -1016,7 +1016,7 @@ func New(
 						go func() { webhooks.DoPost(url, &doubleSign) }()
 					}
 				}
-				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+				if !node.IsRunningBeaconChain() {
 					go node.BroadcastSlash(&doubleSign)
 				} else {
 					records := slash.Records{doubleSign}
@@ -1281,4 +1281,9 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	}
 	// self addresses map can never be nil
 	return node.KeysToAddrs
+}
+
+// IsRunningBeaconChain returns whether the node is running on beacon chain.
+func (node *Node) IsRunningBeaconChain() bool {
+	return node.NodeConfig.ShardID == shard.BeaconChainShardID
 }
