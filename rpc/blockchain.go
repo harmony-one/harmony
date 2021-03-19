@@ -92,7 +92,10 @@ func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common
 func (s *PublicBlockchainService) getBalanceByBlockNumber(
 	ctx context.Context, address string, blockNum rpc.BlockNumber,
 ) (*big.Int, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
 		return nil, err

@@ -5,10 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
-	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -51,15 +48,4 @@ func (node *Node) SetupGenesisBlock(db ethdb.Database, shardID uint32, myShardSt
 	gspec.ShardState = *myShardState.DeepCopy()
 	// Store genesis block into db.
 	gspec.MustCommit(db)
-}
-
-// AddNodeAddressesToGenesisAlloc adds to the genesis block allocation the accounts used for network validators/nodes,
-// including the account used by the nodes of the initial beacon chain and later new nodes.
-func AddNodeAddressesToGenesisAlloc(genesisAlloc core.GenesisAlloc) {
-	for _, account := range genesis.HarmonyAccounts {
-		testBankFunds := big.NewInt(core.InitFreeFund)
-		testBankFunds = testBankFunds.Mul(testBankFunds, big.NewInt(denominations.One))
-		address := common2.ParseAddr(account.Address)
-		genesisAlloc[address] = core.GenesisAccount{Balance: testBankFunds}
-	}
 }
