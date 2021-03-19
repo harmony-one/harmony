@@ -102,19 +102,19 @@ func TestRequestQueue_Pop(t *testing.T) {
 	}
 }
 
-func makeTestRequestQueue(sizes []int) requestQueue {
+func makeTestRequestQueue(sizes []int) requestQueues {
 	if len(sizes) != 2 {
 		panic("unexpected sizes")
 	}
-	q := newRequestQueue()
+	q := newRequestQueues()
 
 	index := 0
 	for i := 0; i != sizes[0]; i++ {
-		q.reqsPHigh.PushBack(wrapRequestFromRaw(makeTestRequest(uint64(index))))
+		q.reqsPHigh.push(wrapRequestFromRaw(makeTestRequest(uint64(index))))
 		index++
 	}
 	for i := 0; i != sizes[1]; i++ {
-		q.reqsPLow.PushBack(wrapRequestFromRaw(makeTestRequest(uint64(index))))
+		q.reqsPLow.push(wrapRequestFromRaw(makeTestRequest(uint64(index))))
 		index++
 	}
 	return q
@@ -138,15 +138,15 @@ func getTestRequestFromElem(elem *list.Element) (*testRequest, error) {
 	return raw, nil
 }
 
-func (q *requestQueue) checkSizes(sizes []int) error {
+func (q *requestQueues) checkSizes(sizes []int) error {
 	if len(sizes) != 2 {
 		panic("expect 2 sizes")
 	}
-	if q.reqsPHigh.Len() != sizes[0] {
-		return fmt.Errorf("high priority %v / %v", q.reqsPHigh.Len(), sizes[0])
+	if q.reqsPHigh.len() != sizes[0] {
+		return fmt.Errorf("high priority %v / %v", q.reqsPHigh.len(), sizes[0])
 	}
-	if q.reqsPLow.Len() != sizes[1] {
-		return fmt.Errorf("low priority %v / %v", q.reqsPLow.Len(), sizes[2])
+	if q.reqsPLow.len() != sizes[1] {
+		return fmt.Errorf("low priority %v / %v", q.reqsPLow.len(), sizes[2])
 	}
 	return nil
 }

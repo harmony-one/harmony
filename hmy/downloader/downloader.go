@@ -107,8 +107,7 @@ func (d *Downloader) Close() {
 	}
 }
 
-// DownloadAsync triggers the download async. If there is already a download task that is
-// in progress, return ErrDownloadInProgress.
+// DownloadAsync triggers the download async.
 func (d *Downloader) DownloadAsync() {
 	select {
 	case d.downloadC <- struct{}{}:
