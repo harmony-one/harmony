@@ -174,6 +174,9 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
+	consensus.getLogger().Debug().
+		Str("Mode", m.String()).
+		Msg("[SetMode]")
 	consensus.current.SetMode(m)
 }
 
