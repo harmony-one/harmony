@@ -62,7 +62,7 @@ func (consensus *Consensus) construct(
 	p msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper,
 ) (*NetworkMessage, error) {
 	if len(priKeys) == 0 {
-		return nil, errors.New("No private keys provided")
+		return nil, errors.New("no elected bls keys provided")
 	}
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
