@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.3"
+const tomlConfigVersion = "1.0.4"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -102,6 +102,47 @@ var defaultPrometheusConfig = prometheusConfig{
 	Gateway:    "https://gateway.harmony.one",
 }
 
+var (
+	defaultMainnetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    6,
+		MinPeers:       6,
+		InitStreams:    8,
+		DiscSoftLowCap: 8,
+		DiscHardLowCap: 6,
+		DiscHighCap:    128,
+		DiscBatch:      8,
+	}
+
+	defaultTestNetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+
+	defaultElseSyncConfig = syncConfig{
+		Downloader:     true,
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+)
+
 const (
 	defaultBroadcastInvalidTx = true
 )
@@ -114,6 +155,8 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 		devnet := getDefaultDevnetConfigCopy()
 		config.Devnet = &devnet
 	}
+	config.Sync = getDefaultSyncConfig(nt)
+
 	return config
 }
 

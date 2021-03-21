@@ -16,6 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/api/service/synchronize"
+	"github.com/harmony-one/harmony/hmy/downloader"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -204,6 +207,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
+	applySyncFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyConfig) {
@@ -278,6 +282,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	currentNode := setupConsensusAndNode(hc, nodeConfig)
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
+	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
 
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
@@ -303,12 +308,6 @@ func setupNodeAndRun(hc harmonyConfig) {
 		WSIp:         hc.WS.IP,
 		WSPort:       hc.WS.Port,
 		DebugEnabled: hc.RPCOpt.DebugEnabled,
-	}
-	if nodeConfig.ShardID != shard.BeaconChainShardID {
-		utils.Logger().Info().
-			Uint32("shardID", currentNode.Blockchain().ShardID()).
-			Uint32("shardID", nodeConfig.ShardID).Msg("SupportBeaconSyncing")
-		currentNode.SupportBeaconSyncing()
 	}
 
 	// Parse rosetta config
@@ -360,6 +359,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
+	// Setup services
+	setupSyncService(currentNode, myHost, hc)
+
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
@@ -369,8 +371,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
 	}
 
-	// TODO: replace this legacy syncing
-	currentNode.SupportSyncing()
+	if hc.Sync.LegacyServer && !hc.General.IsOffline {
+		utils.Logger().Info().Msg("support gRPC sync server")
+		currentNode.SupportGRPCSyncServer()
+	}
+	if hc.Sync.LegacyClient && !hc.General.IsOffline {
+		utils.Logger().Info().Msg("go with gRPC sync client")
+		currentNode.StartGRPCSyncClient()
+	}
 
 	if err := currentNode.StartServices(); err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
@@ -391,22 +399,24 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	go listenOSSigAndShutDown(currentNode)
 
-	if err := myHost.Start(); err != nil {
-		utils.Logger().Fatal().
-			Err(err).
-			Msg("Start p2p host failed")
-	}
+	if !hc.General.IsOffline {
+		if err := myHost.Start(); err != nil {
+			utils.Logger().Fatal().
+				Err(err).
+				Msg("Start p2p host failed")
+		}
 
-	if err := currentNode.BootstrapConsensus(); err != nil {
-		fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
-		if !currentNode.NodeConfig.IsOffline {
+		if err := currentNode.BootstrapConsensus(); err != nil {
+			fmt.Fprint(os.Stderr, "could not bootstrap consensus", err.Error())
+			if !currentNode.NodeConfig.IsOffline {
+				os.Exit(-1)
+			}
+		}
+
+		if err := currentNode.StartPubSub(); err != nil {
+			fmt.Fprint(os.Stderr, "could not begin network message handling for node", err.Error())
 			os.Exit(-1)
 		}
-	}
-
-	if err := currentNode.StartPubSub(); err != nil {
-		fmt.Fprint(os.Stderr, "could not begin network message handling for node", err.Error())
-		os.Exit(-1)
 	}
 
 	select {}
@@ -529,6 +539,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	nodeConfig.SetShardID(initialAccounts[0].ShardID) // sets shard ID
 	nodeConfig.SetArchival(hc.General.IsBeaconArchival, hc.General.IsArchival)
 	nodeConfig.IsOffline = hc.General.IsOffline
+	nodeConfig.Downloader = hc.Sync.Downloader
 
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)
@@ -697,6 +708,39 @@ func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
 	}
 	p := prometheus.NewService(prometheusConfig)
 	node.RegisterService(service.Prometheus, p)
+}
+
+func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
+	blockchains := []*core.BlockChain{node.Blockchain()}
+	if !node.IsRunningBeaconChain() {
+		blockchains = append(blockchains, node.Beaconchain())
+	}
+
+	dConfig := downloader.Config{
+		ServerOnly:   !hc.Sync.Downloader,
+		Network:      nodeconfig.NetworkType(hc.Network.NetworkType),
+		Concurrency:  hc.Sync.Concurrency,
+		MinStreams:   hc.Sync.MinPeers,
+		InitStreams:  hc.Sync.InitStreams,
+		SmSoftLowCap: hc.Sync.DiscSoftLowCap,
+		SmHardLowCap: hc.Sync.DiscHardLowCap,
+		SmHiCap:      hc.Sync.DiscHighCap,
+		SmDiscBatch:  hc.Sync.DiscBatch,
+	}
+	// If we are running side chain, we will need to do some extra works for beacon
+	// sync
+	if !node.IsRunningBeaconChain() {
+		dConfig.BHConfig = &downloader.BeaconHelperConfig{
+			BlockC:     node.BeaconBlockChannel,
+			InsertHook: node.BeaconSyncHook,
+		}
+	}
+	s := synchronize.NewService(host, blockchains, dConfig)
+
+	node.RegisterService(service.Synchronize, s)
+
+	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
+	node.Consensus.SetDownloader(d)
 }
 
 func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {

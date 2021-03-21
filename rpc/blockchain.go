@@ -685,12 +685,12 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain), nil
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain.ShardID()), nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain), nil
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain.ShardID()), nil
 }
 
 func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
