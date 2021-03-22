@@ -171,7 +171,7 @@ func (node *Node) BroadcastCrossLink() {
 		return
 	}
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID ||
+	if node.IsRunningBeaconChain() ||
 		!node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
 		// no need to broadcast crosslink if it's beacon chain or it's not crosslink epoch
 		return
@@ -308,7 +308,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	// Verify cross links
 	// TODO: move into ValidateNewBlock
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
 			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
@@ -336,7 +336,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
-		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		if node.IsRunningBeaconChain() {
 			node.BroadcastNewBlock(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock)
@@ -360,7 +360,7 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			rnd := rand.Intn(100)
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+				if node.IsRunningBeaconChain() {
 					node.BroadcastNewBlock(newBlock)
 				}
 				node.BroadcastCXReceipts(newBlock)

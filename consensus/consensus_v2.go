@@ -317,9 +317,26 @@ func (consensus *Consensus) Start(
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
-					if consensus.current.Mode() == Syncing ||
-						consensus.current.Mode() == Listening {
+					// stop timer in listening mode
+					if consensus.current.Mode() == Listening {
 						v.Stop()
+						continue
+					}
+
+					if consensus.current.Mode() == Syncing {
+						// never stop bootstrap timer here in syncing mode as it only starts once
+						// if it is stopped, bootstrap will be stopped and nodes
+						// can't start view change or join consensus
+						// the bootstrap timer will be stopped once consensus is reached or view change
+						// is succeeded
+						if k != timeoutBootstrap {
+							consensus.getLogger().Debug().
+								Str("k", k.String()).
+								Str("Mode", consensus.current.Mode().String()).
+								Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
+							v.Stop()
+							continue
+						}
 					}
 					if !v.CheckExpire() {
 						continue

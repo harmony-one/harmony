@@ -21,6 +21,7 @@ const (
 	BlockProposal
 	NetworkInfo
 	Prometheus
+	Synchronize
 )
 
 func (t Type) String() string {
@@ -37,6 +38,8 @@ func (t Type) String() string {
 		return "NetworkInfo"
 	case Prometheus:
 		return "Prometheus"
+	case Synchronize:
+		return "Synchronize"
 	default:
 		return "Unknown"
 	}
@@ -80,6 +83,11 @@ func (m *Manager) Register(t Type, service Service) {
 // GetServices returns all registered services.
 func (m *Manager) GetServices() []Service {
 	return m.services
+}
+
+// GetService get the specified service
+func (m *Manager) GetService(t Type) Service {
+	return m.serviceMap[t]
 }
 
 // StartServices run all registered services. If one of the starting service returns

@@ -80,6 +80,7 @@ type ConfigType struct {
 	RPCServer       RPCServerConfig     // RPC server port and ip
 	RosettaServer   RosettaServerConfig // rosetta server port and ip
 	IsOffline       bool
+	Downloader      bool // Whether stream downloader is running; TODO: remove this after sync up
 	NtpServer       string
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
