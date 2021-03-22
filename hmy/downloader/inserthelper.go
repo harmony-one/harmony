@@ -85,7 +85,7 @@ func (ch *insertHelperImpl) verifyAndInsertBlock(block *types.Block) error {
 func (ch *insertHelperImpl) verifyBlockSignature(block *types.Block) error {
 	// TODO: This is the duplicate logic to the implementation of verifySeal and consensus.
 	//  Better refactor to the blockchain or engine structure
-	decider, err := ch.readDeciderByEpoch(block.Epoch())
+	decider, err := ch.getDeciderByEpoch(block.Epoch())
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (ch *insertHelperImpl) getDeciderByEpoch(epoch *big.Int) (quorum.Decider, e
 	if decider, ok := ch.deciderCache.Get(epochUint); ok && decider != nil {
 		return decider.(quorum.Decider), nil
 	}
-	decider, err := ch.getDeciderByEpoch(epoch)
+	decider, err := ch.readDeciderByEpoch(epoch)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read quorum of epoch %v", epoch.Uint64())
 	}
