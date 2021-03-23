@@ -257,7 +257,7 @@ var (
 )
 
 // This is the shard state computation logic before staking epoch.
-func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
+func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error) {
 	shardNum := int(s.NumShards())
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 	shardSize := s.NumNodesPerShard()
@@ -274,8 +274,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 			pubKey := bls.SerializedPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
+			addr, err := common2.ParseAddr(hmyAccounts[index].Address)
+			if err != nil {
+				return nil, err
+			}
 			curNodeID := shard.Slot{
-				common2.ParseAddr(hmyAccounts[index].Address),
+				addr,
 				pubKey,
 				nil,
 			}
@@ -289,8 +293,12 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 			pubKey := bls.SerializedPublicKey{}
 			pubKey.FromLibBLSPublicKey(pub)
 			// TODO: directly read address for bls too
+			addr, err := common2.ParseAddr(fnAccounts[index].Address)
+			if err != nil {
+				return nil, err
+			}
 			curNodeID := shard.Slot{
-				common2.ParseAddr(fnAccounts[index].Address),
+				addr,
 				pubKey,
 				nil,
 			}
@@ -298,7 +306,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) *shard.State {
 		}
 		shardState.Shards = append(shardState.Shards, com)
 	}
-	return shardState
+	return shardState, nil
 }
 
 func eposStakedCommittee(
@@ -322,8 +330,13 @@ func eposStakedCommittee(
 			if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
 				return nil, err
 			}
+
+			addr, err := common2.ParseAddr(hAccounts[index].Address)
+			if err != nil {
+				return nil, err
+			}
 			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
-				common2.ParseAddr(hAccounts[index].Address),
+				addr,
 				pubKey,
 				nil,
 			})
@@ -380,7 +393,7 @@ func (def partialStakingEnabled) Compute(
 	instance := shard.Schedule.InstanceForEpoch(epoch)
 	if preStaking {
 		// Pre-staking shard state doesn't need to set epoch (backward compatible)
-		return preStakingEnabledCommittee(instance), nil
+		return preStakingEnabledCommittee(instance)
 	}
 	// Sanity check, can't compute against epochs in past
 	if e := stakerReader.CurrentHeader().Epoch(); epoch.Cmp(e) == -1 {

@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"database/sql/driver"
 	"encoding/hex"
@@ -222,13 +223,18 @@ func MustAddressToBech32(addr ethCommon.Address) string {
 }
 
 // ParseAddr parses the given address, either as bech32 or as hex.
-// The result can be 0x00..00 if the passing param is not a correct address.
-func ParseAddr(s string) ethCommon.Address {
+// Return error if the address is invalid.
+func ParseAddr(s string) (ethCommon.Address, error) {
 	if addr, err := Bech32ToAddress(s); err == nil {
-		return addr
+		return addr, nil
 	}
 	// The result can be 0x00...00 if the passing param is not a correct address.
-	return ethCommon.HexToAddress(s)
+	hex := ethCommon.HexToAddress(s)
+	emptyAddr := ethCommon.Address{}
+	if bytes.Compare(hex[:], emptyAddr[:]) == 0 {
+		return hex, errors.Errorf("invalid address: %s", s)
+	}
+	return hex, nil
 }
 
 // MustGeneratePrivateKey generates a random private key for an address. It panics on error.

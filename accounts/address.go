@@ -6,11 +6,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ParseAddrH is a wrapper to cast ethCommon.Address to harmony's common.Address
-func ParseAddrH(s string) common.Address {
-	return common.Address(common.ParseAddr(s))
-}
-
 // MustBech32ToAddressH is a wrapper for casting ethCommon.Address to harmony's common.Address
 func MustBech32ToAddressH(b32 string) common.Address {
 	return common.Address(common.MustBech32ToAddress(b32))

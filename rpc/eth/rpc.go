@@ -34,7 +34,10 @@ func NewPublicEthService(hmy *hmy.Harmony, namespace string) rpc.API {
 func (s *PublicEthService) GetBalance(
 	ctx context.Context, address string, blockNr rpc.BlockNumber,
 ) (*hexutil.Big, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNr)
 	if err != nil {
 		return nil, err
