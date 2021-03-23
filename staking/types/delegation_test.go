@@ -161,7 +161,7 @@ func TestNoEarlyUnlock(t *testing.T) {
 	amount4 := big.NewInt(4000)
 	delegation.Undelegate(epoch4, amount4)
 
-	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, false)
+	result := delegation.RemoveUnlockedUndelegations(curEpoch, lastEpochInCommittee, 7, true)
 	if result.Cmp(big.NewInt(0)) != 0 {
 		t.Errorf("should not allow early unlock")
 	}
