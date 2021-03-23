@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
@@ -181,11 +183,15 @@ func (st *syncStream) handleReq(req *syncpb.Request) error {
 		return st.handleGetBlocksByHashesRequest(req.ReqId, bhReq)
 	}
 	// unsupported request type
-	resp := syncpb.MakeErrorResponseMessage(req.ReqId, errUnknownReqType)
-	return st.writeMsg(resp)
+	return st.handleUnknownRequest(req.ReqId)
 }
 
 func (st *syncStream) handleGetBlockNumberRequest(rid uint64) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getBlockNumber",
+	}).Inc()
+
 	resp := st.computeBlockNumberResp(rid)
 	if err := st.writeMsg(resp); err != nil {
 		return errors.Wrap(err, "[GetBlockNumber]: writeMsg")
@@ -194,6 +200,11 @@ func (st *syncStream) handleGetBlockNumberRequest(rid uint64) error {
 }
 
 func (st *syncStream) handleGetBlockHashesRequest(rid uint64, req *syncpb.GetBlockHashesRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getBlockHashes",
+	}).Inc()
+
 	resp, err := st.computeGetBlockHashesResp(rid, req.Nums)
 	if err != nil {
 		resp = syncpb.MakeErrorResponseMessage(rid, err)
@@ -209,6 +220,11 @@ func (st *syncStream) handleGetBlockHashesRequest(rid uint64, req *syncpb.GetBlo
 }
 
 func (st *syncStream) handleGetBlocksByNumRequest(rid uint64, req *syncpb.GetBlocksByNumRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getBlocksByNumber",
+	}).Inc()
+
 	resp, err := st.computeRespFromBlockNumber(rid, req.Nums)
 	if resp == nil && err != nil {
 		resp = syncpb.MakeErrorResponseMessage(rid, err)
@@ -224,6 +240,11 @@ func (st *syncStream) handleGetBlocksByNumRequest(rid uint64, req *syncpb.GetBlo
 }
 
 func (st *syncStream) handleGetBlocksByHashesRequest(rid uint64, req *syncpb.GetBlocksByHashesRequest) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "getBlocksByHashes",
+	}).Inc()
+
 	hashes := bytesToHashes(req.BlockHashes)
 	resp, err := st.computeRespFromBlockHashes(rid, hashes)
 	if resp == nil && err != nil {
@@ -237,6 +258,15 @@ func (st *syncStream) handleGetBlocksByHashesRequest(rid uint64, req *syncpb.Get
 		}
 	}
 	return errors.Wrap(err, "[GetBlocksByHashes]")
+}
+
+func (st *syncStream) handleUnknownRequest(rid uint64) error {
+	serverRequestCounterVec.With(prometheus.Labels{
+		"topic":        string(st.ProtoID()),
+		"request_type": "unknown",
+	}).Inc()
+	resp := syncpb.MakeErrorResponseMessage(rid, errUnknownReqType)
+	return st.writeMsg(resp)
 }
 
 func (st *syncStream) handleResp(resp *syncpb.Response) {

@@ -3,12 +3,12 @@ package sttypes
 import (
 	"bufio"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"sync"
 
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Stream is the interface for streams implemented in each service.
@@ -77,40 +77,63 @@ const (
 
 // WriteBytes write the bytes to the stream.
 // First 4 bytes is used as the size bytes, and the rest is the content
-func (st *BaseStream) WriteBytes(b []byte) error {
+func (st *BaseStream) WriteBytes(b []byte) (err error) {
+	defer func() {
+		msgWriteCounter.Inc()
+		if err != nil {
+			msgWriteFailedCounterVec.With(prometheus.Labels{"error": err.Error()}).Inc()
+		}
+	}()
+
 	if len(b) > maxMsgBytes {
-		return errors.New("message too long")
+		err = errors.New("message too long")
+		return
 	}
-	if _, err := st.rw.Write(intToBytes(len(b))); err != nil {
-		return errors.Wrap(err, "write size bytes")
+	if _, err = st.rw.Write(intToBytes(len(b))); err != nil {
+		return
 	}
-	if _, err := st.rw.Write(b); err != nil {
-		return errors.Wrap(err, "write content")
+	bytesWriteCounter.Add(sizeBytes)
+	if _, err = st.rw.Write(b); err != nil {
+		return
 	}
+	bytesWriteCounter.Add(float64(len(b)))
 	return st.rw.Flush()
 }
 
 // ReadMsg read the bytes from the stream
-func (st *BaseStream) ReadBytes() ([]byte, error) {
+func (st *BaseStream) ReadBytes() (cb []byte, err error) {
+	defer func() {
+		msgReadCounter.Inc()
+		if err != nil {
+			msgReadFailedCounterVec.With(prometheus.Labels{"error": err.Error()}).Inc()
+		}
+	}()
+
 	sb := make([]byte, sizeBytes)
-	_, err := st.rw.Read(sb)
+	_, err = st.rw.Read(sb)
 	if err != nil {
-		return nil, errors.Wrap(err, "read size")
+		err = errors.Wrap(err, "read size")
+		return
 	}
+	bytesReadCounter.Add(sizeBytes)
 	size := bytesToInt(sb)
 	if size > maxMsgBytes {
-		return nil, fmt.Errorf("message size exceed max: %v > %v", size, maxMsgBytes)
+		err = errors.New("message size exceed max")
+		return nil, err
 	}
 
-	cb := make([]byte, size)
+	cb = make([]byte, size)
 	n, err := io.ReadFull(st.rw, cb)
 	if err != nil {
-		return nil, errors.Wrap(err, "read content")
+		err = errors.Wrap(err, "read content")
+		return
 	}
+	bytesReadCounter.Add(float64(n))
 	if n != size {
-		return nil, errors.New("ReadBytes sanity failed: byte size")
+		err = errors.New("ReadBytes sanity failed: byte size")
+		return
 	}
-	return cb, nil
+	return
 }
 
 // ResetOnClose reset the stream during the shutdown of the node

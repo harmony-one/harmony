@@ -24,6 +24,8 @@ var emptySigVerifyError *sigVerifyError
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
 func (d *Downloader) doShortRangeSync() (int, error) {
+	numShortRangeCounterVec.With(d.promLabels()).Inc()
+
 	sh := &srHelper{
 		syncProtocol: d.syncProtocol,
 		ctx:          d.ctx,
@@ -56,7 +58,9 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		}
 		return 0, errors.Wrap(err, "getBlocksByHashes")
 	}
+
 	n, err := d.ih.verifyAndInsertBlocks(blocks)
+	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
 		if !errors.As(err, &emptySigVerifyError) {
 			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
