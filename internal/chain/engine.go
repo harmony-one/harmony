@@ -302,10 +302,11 @@ func payoutUndelegations(
 			)
 		}
 		lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
+		noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
-				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod,
+				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
 			)
 			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
 		}
