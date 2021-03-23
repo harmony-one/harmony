@@ -49,6 +49,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
 		SixtyPercentEpoch:          EpochTBD,
 		RedelegationEpoch:          big.NewInt(290),
+		NoEarlyUnlockEpoch:         EpochTBD,
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
@@ -70,6 +71,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(73000),
 		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
+		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(43800),
@@ -92,6 +94,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
+		NoEarlyUnlockEpoch:         big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -114,6 +117,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
+		NoEarlyUnlockEpoch:         big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -136,6 +140,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
+		NoEarlyUnlockEpoch:         big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -157,6 +162,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(3),
 		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:          big.NewInt(0),
+		NoEarlyUnlockEpoch:         big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -180,6 +186,7 @@ var (
 		big.NewInt(0),                      // TwoSecondsEpoch
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
+		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
 		big.NewInt(0),                      // IstanbulEpoch
@@ -203,6 +210,7 @@ var (
 		big.NewInt(0),        // TwoSecondsEpoch
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
+		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
 		big.NewInt(0),        // IstanbulEpoch
@@ -275,6 +283,10 @@ type ChainConfig struct {
 	// RedelegationEpoch is the epoch when redelegation is supported and undelegation locking time
 	// is restored to 7 epoch
 	RedelegationEpoch *big.Int `json:"redelegation-epoch,omitempty"`
+
+	// NoEarlyUnlockEpoch is the epoch when the early unlock of undelegated token from validators who were elected for
+	// more than 7 epochs is disabled
+	NoEarlyUnlockEpoch *big.Int `json:"no-early-unlock-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -355,6 +367,11 @@ func (c *ChainConfig) IsSixtyPercent(epoch *big.Int) bool {
 // IsRedelegation determines whether it is the epoch to support redelegation
 func (c *ChainConfig) IsRedelegation(epoch *big.Int) bool {
 	return isForked(c.RedelegationEpoch, epoch)
+}
+
+// IsNoEarlyUnlock determines whether it is the epoch to stop early unlock
+func (c *ChainConfig) IsNoEarlyUnlock(epoch *big.Int) bool {
+	return isForked(c.NoEarlyUnlockEpoch, epoch)
 }
 
 // IsPreStaking determines whether staking transactions are allowed
