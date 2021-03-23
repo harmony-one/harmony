@@ -34,7 +34,10 @@ func NewPublicLegacyAPI(hmy *hmy.Harmony, namespace string) rpc.API {
 func (s *PublicLegacyService) GetBalance(
 	ctx context.Context, address string,
 ) (*big.Int, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumber(-1))
 	if err != nil {
 		return nil, err

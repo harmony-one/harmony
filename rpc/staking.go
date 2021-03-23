@@ -39,7 +39,10 @@ func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicStakingService) getBalanceByBlockNumber(
 	ctx context.Context, address string, blockNum rpc.BlockNumber,
 ) (*big.Int, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
 		return nil, err
@@ -299,7 +302,11 @@ func (s *PublicStakingService) GetValidatorInformation(
 	}
 
 	// Fetch validator information
-	validatorInfo, err := s.hmy.GetValidatorInformation(internal_common.ParseAddr(address), blk)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
+	validatorInfo, err := s.hmy.GetValidatorInformation(addr, blk)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +335,11 @@ func (s *PublicStakingService) GetValidatorInformationByBlockNumber(
 	}
 
 	// Fetch validator info
-	validatorInfo, err := s.hmy.GetValidatorInformation(internal_common.ParseAddr(address), blk)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
+	validatorInfo, err := s.hmy.GetValidatorInformation(addr, blk)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +358,11 @@ func (s *PublicStakingService) GetValidatorSelfDelegation(
 	}
 
 	// Fetch self delegation
-	selfDelegation := s.hmy.GetValidatorSelfDelegation(internal_common.ParseAddr(address)).Uint64()
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
+	selfDelegation := s.hmy.GetValidatorSelfDelegation(addr).Uint64()
 
 	// Format the response according to the version
 	switch s.version {
@@ -370,7 +385,11 @@ func (s *PublicStakingService) GetValidatorTotalDelegation(
 	}
 
 	// Fetch delegations & sum
-	delegations := s.hmy.GetDelegationsByValidator(internal_common.ParseAddr(address))
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
+	delegations := s.hmy.GetDelegationsByValidator(addr)
 	totalStake := big.NewInt(0)
 	for _, delegation := range delegations {
 		totalStake.Add(totalStake, delegation.Amount)
@@ -443,7 +462,10 @@ func (s *PublicStakingService) GetDelegationsByDelegator(
 	}
 
 	// Fetch delegation
-	delegatorAddress := internal_common.ParseAddr(address)
+	delegatorAddress, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	validators, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddress)
 
 	// Format response
@@ -492,7 +514,10 @@ func (s *PublicStakingService) GetDelegationsByDelegatorByBlockNumber(
 	}
 
 	// Fetch delegation for block number
-	delegatorAddress := internal_common.ParseAddr(address)
+	delegatorAddress, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
@@ -539,7 +564,10 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 	}
 
 	// Fetch delegations
-	validatorAddress := internal_common.ParseAddr(address)
+	validatorAddress, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	delegations := s.hmy.GetDelegationsByValidator(validatorAddress)
 
 	// Format response
@@ -582,8 +610,14 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 	}
 
 	// Fetch delegations
-	delegatorAddress := internal_common.ParseAddr(address)
-	validatorAddress := internal_common.ParseAddr(validator)
+	delegatorAddress, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
+	validatorAddress, err := internal_common.ParseAddr(validator)
+	if err != nil {
+		return nil, err
+	}
 	validators, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddress)
 
 	// Format response
@@ -625,7 +659,10 @@ func (s *PublicStakingService) GetAvailableRedelegationBalance(
 
 	currEpoch := s.hmy.BlockChain.CurrentHeader().Epoch()
 
-	delegatorAddr := internal_common.ParseAddr(address)
+	delegatorAddr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	_, delegations := s.hmy.GetDelegationsByDelegator(delegatorAddr)
 
 	redelegationTotal := big.NewInt(0)

@@ -55,7 +55,10 @@ func (s *PublicTransactionService) GetAccountNonce(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Response output is the same for all versions
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return 0, err
+	}
 	return s.hmy.GetAccountNonce(ctx, addr, blockNum)
 }
 
@@ -68,7 +71,10 @@ func (s *PublicTransactionService) GetTransactionCount(
 ) (response interface{}, err error) {
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
-	address := internal_common.ParseAddr(addr)
+	address, err := internal_common.ParseAddr(addr)
+	if err != nil {
+		return nil, err
+	}
 
 	// Fetch transaction count
 	var nonce uint64
@@ -110,7 +116,10 @@ func (s *PublicTransactionService) GetTransactionsCount(
 ) (count uint64, err error) {
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
-		addr := internal_common.ParseAddr(address)
+		addr, err := internal_common.ParseAddr(address)
+		if err != nil {
+			return 0, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return 0, err
@@ -127,7 +136,10 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 ) (count uint64, err error) {
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
-		addr := internal_common.ParseAddr(address)
+		addr, err := internal_common.ParseAddr(address)
+		if err != nil {
+			return 0, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return 0, err
@@ -250,7 +262,10 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
 	} else {
-		addr := internal_common.ParseAddr(args.Address)
+		addr, err := internal_common.ParseAddr(args.Address)
+		if err != nil {
+			return nil, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return nil, err
@@ -295,7 +310,10 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
 	} else {
-		addr := internal_common.ParseAddr(args.Address)
+		addr, err := internal_common.ParseAddr(args.Address)
+		if err != nil {
+			return nil, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			utils.Logger().Debug().

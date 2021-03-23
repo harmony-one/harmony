@@ -153,7 +153,10 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 // returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
 // transaction hashes.
 func NewBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leaderAddress string) (interface{}, error) {
-	leader := internal_common.ParseAddr(leaderAddress)
+	leader, err := internal_common.ParseAddr(leaderAddress)
+	if err != nil {
+		return nil, err
+	}
 
 	if blockArgs.FullTx {
 		return NewBlockWithFullTx(b, blockArgs, leader)
