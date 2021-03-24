@@ -26,9 +26,10 @@ var emptySigVerifyError *sigVerifyError
 func (d *Downloader) doShortRangeSync() (int, error) {
 	numShortRangeCounterVec.With(d.promLabels()).Inc()
 
+	srCtx, _ := context.WithTimeout(d.ctx, shortRangeTimeout)
 	sh := &srHelper{
 		syncProtocol: d.syncProtocol,
-		ctx:          d.ctx,
+		ctx:          srCtx,
 		config:       d.config,
 		logger:       d.logger.With().Str("mode", "short range").Logger(),
 	}
@@ -46,10 +47,17 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		return 0, nil
 	}
 
+	expEndBN := curBN + uint64(len(hashChain))
+	d.logger.Info().Uint64("current number", curBN).
+		Uint64("target number", expEndBN).
+		Interface("hashChain", hashChain).
+		Msg("short range start syncing")
 	d.startSyncing()
-	expEndBN := curBN + uint64(len(hashChain)) - 1
 	d.status.setTargetBN(expEndBN)
-	defer d.finishSyncing()
+	defer func() {
+		d.logger.Info().Msg("short range finished syncing")
+		d.finishSyncing()
+	}()
 
 	blocks, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
@@ -118,8 +126,13 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 		errLock sync.Mutex
 	)
 
-	wg.Add(sh.config.Concurrency)
-	for i := 0; i != sh.config.Concurrency; i++ {
+	concurrency := sh.config.Concurrency
+	if concurrency > m.numRequests() {
+		concurrency = m.numRequests()
+	}
+
+	wg.Add(concurrency)
+	for i := 0; i != concurrency; i++ {
 		go func() {
 			defer wg.Done()
 			defer cancel() // it's ok to cancel context more than once
@@ -189,6 +202,7 @@ func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttype
 
 	hashes, stid, err := sh.syncProtocol.GetBlockHashes(ctx, bns)
 	if err != nil {
+		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to doGetBlockHashesRequest")
 		return nil, stid, err
 	}
 	if len(hashes) != len(bns) {
@@ -207,6 +221,7 @@ func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []com
 	blocks, stid, err := sh.syncProtocol.GetBlocksByHashes(ctx, hashes,
 		syncProto.WithWhitelist(wl))
 	if err != nil {
+		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to getBlockByHashes")
 		return nil, stid, err
 	}
 	if err := checkGetBlockByHashesResult(blocks, hashes); err != nil {
@@ -383,6 +398,10 @@ func (m *getBlocksByHashManager) numBlocksPerRequest() int {
 		val = numBlocksByHashesUpperCap
 	}
 	return val
+}
+
+func (m *getBlocksByHashManager) numRequests() int {
+	return divideCeil(len(m.hashes), m.numBlocksPerRequest())
 }
 
 func (m *getBlocksByHashManager) addResult(hashes []common.Hash, blocks []*types.Block, stid sttypes.StreamID) {
