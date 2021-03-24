@@ -18,6 +18,7 @@ message DownloaderRequest {
     REGISTERTIMEOUT = 5;
     UNKNOWN = 6;
     BLOCKHEADER = 7;
+    BLOCKWITHSIG = 8;
   }
 
   // Request type.

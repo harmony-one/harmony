@@ -449,6 +449,18 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			}
 		}
 
+	case downloader_pb.DownloaderRequest_BLOCKWITHSIG:
+		var hash common.Hash
+		for _, bytes := range request.Hashes {
+			hash.SetBytes(bytes)
+			encoded, err := node.getEncodedBlockWithSigByHash(hash)
+			if err != nil {
+				utils.Logger().Info().Err(err).Str("hash", hash.String()).Msg("failed to get block with sig")
+				continue
+			}
+			response.Payload = append(response.Payload, encoded)
+		}
+
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
 		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
@@ -513,19 +525,23 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 				Int("number", count).
 				Msg("[SYNC] extra node registered")
 		}
+
 	}
+
 	return response, nil
 }
 
 const (
-	headerCacheSize = 10000
-	blockCacheSize  = 10000
+	headerCacheSize       = 10000
+	blockCacheSize        = 10000
+	blockWithSigCacheSize = 10000
 )
 
 var (
 	// Cached fields for block header and block requests
-	headerReqCache, _ = lru.New(headerCacheSize)
-	blockReqCache, _  = lru.New(blockCacheSize)
+	headerReqCache, _       = lru.New(headerCacheSize)
+	blockReqCache, _        = lru.New(blockCacheSize)
+	blockWithSigReqCache, _ = lru.New(blockWithSigCacheSize)
 
 	errHeaderNotExist = errors.New("header not exist")
 	errBlockNotExist  = errors.New("block not exist")
@@ -561,6 +577,52 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	}
 	blockReqCache.Add(hash, b)
 	return b, nil
+}
+
+func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error) {
+	if b, ok := blockWithSigReqCache.Get(hash); ok {
+		return b.([]byte), nil
+	}
+	blk := node.Blockchain().GetBlockByHash(hash)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	sab, err := node.getCommitSigAndBitmap(blk)
+	if err != nil {
+		return nil, err
+	}
+	bwh := legacysync.BlockWithSig{
+		Block:              blk,
+		CommitSigAndBitmap: sab,
+	}
+	b, err := rlp.EncodeToBytes(bwh)
+	if err != nil {
+		return nil, err
+	}
+	blockWithSigReqCache.Add(hash, b)
+	return b, nil
+}
+
+func (node *Node) getCommitSigAndBitmap(block *types.Block) ([]byte, error) {
+	child := node.Blockchain().GetBlockByNumber(block.NumberU64() + 1)
+	if child == nil {
+		return node.getCommitSigFromChild(block, child)
+	}
+	return node.getCommitSigFromDB(block)
+}
+
+func (node *Node) getCommitSigFromChild(parent, child *types.Block) ([]byte, error) {
+	if child.ParentHash() != parent.Hash() {
+		return nil, fmt.Errorf("child's parent hash unexpected: %v / %v",
+			child.ParentHash().String(), parent.Hash().String())
+	}
+	sig := child.Header().LastCommitSignature()
+	bitmap := child.Header().LastCommitBitmap()
+	return append(sig[:], bitmap...), nil
+}
+
+func (node *Node) getCommitSigFromDB(block *types.Block) ([]byte, error) {
+	return node.Blockchain().ReadCommitSig(block.NumberU64())
 }
 
 // SyncStatus return the syncing status, including whether node is syncing

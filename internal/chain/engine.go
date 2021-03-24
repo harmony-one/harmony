@@ -395,6 +395,9 @@ func applySlashes(
 // i.e. this header verification api is more flexible since the caller specifies which commit signature and bitmap to use
 // for verifying the block header, which is necessary for cross-shard block header verification. Example of such is cross-shard transaction.
 func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
+	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
+		return nil
+	}
 	return e.verifyHeaderSignatureCached(chain, header, commitSig, commitBitmap)
 }
 

@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -280,9 +282,16 @@ func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) in
 	return 0
 }
 
+// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
+// The block is encoded as block + commit signature
+type BlockWithSig struct {
+	Block              *types.Block
+	CommitSigAndBitmap []byte
+}
+
 // GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
-	response := peerConfig.client.GetBlocks(hashes)
+	response := peerConfig.client.GetBlocksAndSigs(hashes)
 	if response == nil {
 		return nil, ErrGetBlock
 	}
@@ -620,8 +629,8 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 	}
 
 	for i, blockBytes := range payload {
-		var blockObj types.Block
-		if err := rlp.DecodeBytes(blockBytes, &blockObj); err != nil {
+		var bws BlockWithSig
+		if err := rlp.DecodeBytes(blockBytes, &bws); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Int("taskIndex", tasks[i].index).
@@ -630,6 +639,8 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			failedTasks = append(failedTasks, tasks[i])
 			continue
 		}
+		blockObj := bws.Block
+		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
 		gotHash := blockObj.Hash()
 		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
 			utils.Logger().Warn().
@@ -640,7 +651,7 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			continue
 		}
 		ss.syncMux.Lock()
-		ss.commonBlocks[tasks[i].index] = &blockObj
+		ss.commonBlocks[tasks[i].index] = blockObj
 		ss.syncMux.Unlock()
 	}
 	return failedTasks
@@ -771,6 +782,15 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		if verifyAllSig {
 			verifySig = true
 		}
+		if verifySig {
+			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
+			if err != nil {
+				return errors.Wrap(err, "parse commitSigAndBitmap")
+			}
+			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
+			}
+		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
 		if err == engine.ErrUnknownAncestor {
 			return err
@@ -807,6 +827,12 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Str("blockHex", block.Hash().Hex()).
 		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
+
+	if verifyAllSig {
+		if err := bc.WriteCommitSig(block.NumberU64(), block.GetCurrentCommitSig()); err != nil {
+			return err
+		}
+	}
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Info().
 			Msgf(
@@ -822,16 +848,19 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	parentHash := bc.CurrentBlock().Hash()
 
 	var err error
-	for {
-		block := ss.getBlockFromOldBlocksByParentHash(parentHash)
+	for block := ss.getBlockFromOldBlocksByParentHash(parentHash); ; {
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		next := ss.getBlockFromOldBlocksByParentHash(block.Hash())
+		// Enforce sig check for the last block in a batch
+		enforceSigCheck := next == nil
+
+		err = ss.UpdateBlockAndStatus(block, bc, worker, enforceSigCheck)
 		if err != nil {
 			break
 		}
-		parentHash = block.Hash()
+		block = next
 	}
 	ss.syncMux.Lock()
 	ss.commonBlocks = make(map[int]*types.Block)
@@ -844,7 +873,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, true)
 		if err != nil {
 			break
 		}
@@ -865,7 +894,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, true)
 		if err != nil {
 			break
 		}

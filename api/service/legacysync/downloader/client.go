@@ -91,6 +91,23 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	return response
 }
 
+// GetBlocksAndSigs get blockWithSig in serialization byte array by calling a grpc request
+func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKWITHSIG}
+	request.Hashes = make([][]byte, len(hashes))
+	for i := range hashes {
+		request.Hashes[i] = make([]byte, len(hashes[i]))
+		copy(request.Hashes[i], hashes[i])
+	}
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocksAndSigs query failed")
+	}
+	return response
+}
+
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
 func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
