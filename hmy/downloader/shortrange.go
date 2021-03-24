@@ -15,8 +15,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var emptySigVerifyError *sigVerifyError
-
 // doShortRangeSync does the short range sync.
 // Compared with long range sync, short range sync is more focused on syncing to the latest block.
 // It consist of 3 steps:
@@ -59,7 +57,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		d.finishSyncing()
 	}()
 
-	blocks, err := sh.getBlocksByHashes(hashChain, whitelist)
+	blocks, stids, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
@@ -67,13 +65,17 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		return 0, errors.Wrap(err, "getBlocksByHashes")
 	}
 
-	n, err := d.ih.verifyAndInsertBlocks(blocks)
+	n, err := verifyAndInsertBlocks(d.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
-		if !errors.As(err, &emptySigVerifyError) {
+		if sh.blameAllStreams(blocks, n, err) {
 			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
+		} else {
+			// It is the last block gives a wrong commit sig. Blame the provider of the last block.
+			criminal := stids[len(stids)-1]
+			sh.removeStreams([]sttypes.StreamID{criminal})
 		}
-		return n, errors.Wrap(err, "InsertChain")
+		return n, err
 	}
 	return len(blocks), nil
 }
@@ -116,7 +118,7 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 	return hashChain, wl, nil
 }
 
-func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, error) {
+func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
 	ctx, cancel := context.WithCancel(sh.ctx)
 	m := newGetBlocksByHashManager(hashes, whitelist)
 
@@ -169,11 +171,11 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 	wg.Wait()
 
 	if gErr != nil {
-		return nil, gErr
+		return nil, nil, gErr
 	}
 	select {
 	case <-sh.ctx.Done():
-		return nil, sh.ctx.Err()
+		return nil, nil, sh.ctx.Err()
 	default:
 	}
 
@@ -236,6 +238,14 @@ func (sh *srHelper) removeStreams(sts []sttypes.StreamID) {
 	for _, st := range sts {
 		sh.syncProtocol.RemoveStream(st)
 	}
+}
+
+// Only not to blame all whitelisted streams when the it's not the last block signature verification failed.
+func (sh *srHelper) blameAllStreams(blocks types.Blocks, errIndex int, err error) bool {
+	if errors.As(err, &emptySigVerifyErr) && errIndex == len(blocks)-1 {
+		return false
+	}
+	return true
 }
 
 func checkGetBlockByHashesResult(blocks []*types.Block, hashes []common.Hash) error {
@@ -429,18 +439,20 @@ func (m *getBlocksByHashManager) handleResultError(hashes []common.Hash, stid st
 	}
 }
 
-func (m *getBlocksByHashManager) getResults() ([]*types.Block, error) {
+func (m *getBlocksByHashManager) getResults() ([]*types.Block, []sttypes.StreamID, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	blocks := make([]*types.Block, 0, len(m.hashes))
+	stids := make([]sttypes.StreamID, 0, len(m.hashes))
 	for _, hash := range m.hashes {
 		if m.results[hash].block == nil {
-			return nil, errors.New("SANITY: nil block found")
+			return nil, nil, errors.New("SANITY: nil block found")
 		}
 		blocks = append(blocks, m.results[hash].block)
+		stids = append(stids, m.results[hash].stid)
 	}
-	return blocks, nil
+	return blocks, stids, nil
 }
 
 func (m *getBlocksByHashManager) isDone() bool {

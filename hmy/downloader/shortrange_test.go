@@ -17,7 +17,6 @@ func TestDownloader_doShortRangeSync(t *testing.T) {
 
 	d := &Downloader{
 		bc:           chain,
-		ih:           &testInsertHelper{chain},
 		syncProtocol: newTestSyncProtocol(105, 32, nil),
 		config: Config{
 			Concurrency: 16,
@@ -209,7 +208,7 @@ func TestSrHelper_GetBlocksByHashes(t *testing.T) {
 			ctx:          context.Background(),
 			config:       test.config,
 		}
-		blocks, err := sh.getBlocksByHashes(test.hashes, makeStreamIDs(5))
+		blocks, _, err := sh.getBlocksByHashes(test.hashes, makeStreamIDs(5))
 		if (err == nil) != (test.expErr == nil) {
 			t.Errorf("Test %v: unexpected error %v / %v", i, err, test.expErr)
 		}
