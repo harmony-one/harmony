@@ -46,7 +46,7 @@ type viewChange struct {
 
 	m1Payload []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 
-	blockVerifier      BlockVerifierFunc
+	verifyBlock        VerifyBlockFunc
 	viewChangeDuration time.Duration
 }
 
@@ -57,9 +57,9 @@ func newViewChange() *viewChange {
 	return &vc
 }
 
-// SetBlockVerifier ..
-func (vc *viewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
-	vc.blockVerifier = verifier
+// SetVerifyBlock ..
+func (vc *viewChange) SetVerifyBlock(verifyBlock VerifyBlockFunc) {
+	vc.verifyBlock = verifyBlock
 }
 
 // AddViewIDKeyIfNotExist ..
@@ -216,8 +216,8 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 		if !bytes.Equal(preparedBlockHash[:], blockHash) {
 			return nil, errors.New("[VerifyNewViewMsg] Prepared block hash doesn't match msg block hash")
 		}
-		if err := vc.blockVerifier(preparedBlock); err != nil {
-			return nil, errors.New("[VerifyNewViewMsg] Prepared block verification failed")
+		if err := vc.verifyBlock(preparedBlock); err != nil {
+			return nil, err
 		}
 		return preparedBlock, nil
 	}
@@ -257,7 +257,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			return err
 		}
-		if err := vc.blockVerifier(preparedBlock); err != nil {
+		if err := vc.verifyBlock(preparedBlock); err != nil {
 			return err
 		}
 		_, ok := vc.bhpSigs[recvMsg.ViewID][senderKeyStr]
@@ -406,7 +406,7 @@ func (vc *viewChange) InitPayload(
 		hasBlock := false
 		if preparedMsg != nil {
 			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
-				if err := vc.blockVerifier(preparedBlock); err == nil {
+				if err := vc.verifyBlock(preparedBlock); err == nil {
 					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M1 (prepared) type messaage")
 					msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 					for _, key := range privKeys {
