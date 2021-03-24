@@ -701,12 +701,9 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
-		if !consensus.FBFTLog.IsBlockVerified(blk) {
-			if err := consensus.BlockVerifier(blk); err != nil {
-				consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
-				return err
-			}
-			consensus.FBFTLog.MarkBlockVerified(blk)
+		if err := consensus.VerifyBlock(blk); err != nil {
+			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
+			return err
 		}
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
 		if err := consensus.commitBlock(blk, msgs[i]); err != nil {

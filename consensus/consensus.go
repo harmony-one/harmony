@@ -36,8 +36,8 @@ const (
 	AsyncProposal
 )
 
-// BlockVerifierFunc is a function used to verify the block
-type BlockVerifierFunc func(*types.Block) error
+// VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
+type VerifyBlockFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -94,7 +94,7 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
 	// The verifier func passed from Node object
-	BlockVerifier BlockVerifierFunc
+	BlockVerifier VerifyBlockFunc
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
@@ -132,6 +132,17 @@ type Consensus struct {
 	finalityCounter int64
 
 	dHelper *downloadHelper
+}
+
+// VerifyBlock is a function used to verify the block and keep trace of verified blocks
+func (consensus *Consensus) VerifyBlock(block *types.Block) error {
+	if !consensus.FBFTLog.IsBlockVerified(block) {
+		if err := consensus.BlockVerifier(block); err != nil {
+			return errors.New("Block verification failed")
+		}
+		consensus.FBFTLog.MarkBlockVerified(block)
+	}
+	return nil
 }
 
 // SetCommitDelay sets the commit message delay.  If set to non-zero,
@@ -177,9 +188,9 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 }
 
 // SetBlockVerifier sets the block verifier
-func (consensus *Consensus) SetBlockVerifier(verifier BlockVerifierFunc) {
+func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.BlockVerifier = verifier
-	consensus.vc.SetBlockVerifier(verifier)
+	consensus.vc.SetVerifyBlock(consensus.VerifyBlock)
 }
 
 // New create a new Consensus record
