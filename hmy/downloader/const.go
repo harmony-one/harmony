@@ -1,6 +1,8 @@
 package downloader
 
 import (
+	"time"
+
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -19,7 +21,12 @@ const (
 	// no more request will be assigned to workers to wait for InsertChain to finish.
 	softQueueCap int = 100
 
-	defaultConcurrency = 16
+	// defaultConcurrency is the default settings for concurrency
+	defaultConcurrency = 4
+
+	// shortRangeTimeout is the timeout for each short range sync, which allow short range sync
+	// to restart automatically when stuck in `getBlockHashes`
+	shortRangeTimeout = 1 * time.Minute
 )
 
 type (

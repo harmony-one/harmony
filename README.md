@@ -196,7 +196,7 @@ make test-rosetta-attach
 
 ## License
 
-Harmony is licensed under the MIT License. See [`LICENSE`](LICENSE) file for
+Harmony is licensed under GNU Lesser General Public License v3.0. See [`LICENSE`](LICENSE) file for
 the terms and conditions.
 
 Harmony includes third-party open-source code. In general, a source subtree
