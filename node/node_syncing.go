@@ -34,14 +34,10 @@ const (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 // BeaconSyncHook is the hook function called after inserted beacon in downloader
 // TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
 func (node *Node) BeaconSyncHook() {
-	if node.Consensus.IsLeader() {
+	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
 		//       not have much idle resources.
 		node.BroadcastCrossLink()
@@ -208,8 +204,8 @@ func (node *Node) doBeaconSyncing() {
 					)
 					if err != nil {
 						node.beaconSync.AddLastMileBlock(beaconBlock)
-					} else if node.Consensus.IsLeader() {
-						// Only leader broadcast crosslink to avoid spamming p2p
+					} else if node.Consensus.IsLeader() || rand.Intn(100) <= 1 {
+						// Only leader or 2% of validators broadcast crosslink to avoid spamming p2p
 						node.BroadcastCrossLink()
 					}
 				}

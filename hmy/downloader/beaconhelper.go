@@ -128,9 +128,12 @@ func (bh *beaconHelper) insertLastMileBlocks() (inserted int, bn uint64, err err
 			return
 		}
 		bh.logger.Info().Uint64("number", b.NumberU64()).Msg("Inserted block from beacon pub-sub")
-		if bh.insertHook != nil {
-			bh.insertHook()
-		}
+		// TODO: clean up insertHook since for beacon chain sync, we shouldn't broadcast crosslinks for all sync nodes.
+		// Crosslink broadcasting is a live operation relative to the beacon consensus, which should only
+		// be triggered when there is a new beacon block produced.
+		//if bh.insertHook != nil {
+		//	bh.insertHook()
+		//}
 		inserted++
 		bn++
 	}

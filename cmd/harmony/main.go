@@ -87,6 +87,7 @@ var configFlag = cli.StringFlag{
 }
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	cli.SetParseErrorHandle(func(err error) {
 		os.Exit(128) // 128 - invalid command line arguments
 	})
@@ -140,8 +141,6 @@ func prepareRootCmd(cmd *cobra.Command) error {
 	os.Setenv("GODEBUG", "netdns=go")
 	// Don't set higher than num of CPU. It will make go scheduler slower.
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	// Set up randomization seed.
-	rand.Seed(int64(time.Now().Nanosecond()))
 	// Raise fd limits
 	return raiseFdLimits()
 }
