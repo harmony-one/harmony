@@ -605,7 +605,7 @@ func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error)
 
 func (node *Node) getCommitSigAndBitmap(block *types.Block) ([]byte, error) {
 	child := node.Blockchain().GetBlockByNumber(block.NumberU64() + 1)
-	if child == nil {
+	if child != nil {
 		return node.getCommitSigFromChild(block, child)
 	}
 	return node.getCommitSigFromDB(block)

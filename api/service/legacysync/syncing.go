@@ -593,7 +593,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					if count > downloadBlocksRetryLimit {
 						break
 					}
-					if err := ss.stateSyncTaskQueue.Put(failedTasks); err != nil {
+					if err := taskQueue.put(failedTasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
 							Interface("taskIndexes", failedTasks.indexes()).
