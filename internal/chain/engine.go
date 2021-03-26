@@ -418,7 +418,7 @@ func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *blo
 	if err != nil {
 		return err
 	}
-	shardComm, err := ss.FindCommitteeByID(chain.ShardID())
+	shardComm, err := ss.FindCommitteeByID(header.ShardID())
 	if err != nil {
 		return err
 	}
