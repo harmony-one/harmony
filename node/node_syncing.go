@@ -352,7 +352,7 @@ func (node *Node) StartSyncingServer() {
 func (node *Node) SendNewBlockToUnsync() {
 	for {
 		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
+		blockBytes, err := rlp.EncodeToBytes(block)
 		if err != nil {
 			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
 			continue
@@ -367,7 +367,7 @@ func (node *Node) SendNewBlockToUnsync() {
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			response, err := config.client.PushNewBlock(node.GetSyncID(), blockBytes, false)
 			// close the connection if cannot push new block to unsync node
 			if err != nil {
 				node.peerRegistrationRecord[peerID].client.Close()

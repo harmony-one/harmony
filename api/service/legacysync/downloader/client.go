@@ -126,13 +126,13 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 }
 
 // PushNewBlock will send the lastest verified block to registered nodes
-func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, timeout bool) (*pb.DownloaderResponse, error) {
+func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout bool) (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
-	request.BlockHash = make([]byte, len(blockHash))
-	copy(request.BlockHash, blockHash)
+	request.BlockHash = make([]byte, len(blockBytes))
+	copy(request.BlockHash, blockBytes)
 	request.PeerHash = make([]byte, len(selfPeerHash))
 	copy(request.PeerHash, selfPeerHash[:])
 
