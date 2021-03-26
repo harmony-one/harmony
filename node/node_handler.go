@@ -337,6 +337,8 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
 		if node.IsRunningBeaconChain() {
+			// TODO: consider removing this and letting other nodes broadcast new blocks.
+			// But need to make sure there is at least 1 node that will do the job.
 			node.BroadcastNewBlock(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock)
@@ -356,7 +358,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			node.Consensus.UpdateValidatorMetrics(numSig, float64(newBlock.NumberU64()))
 
 			// 1% of the validator also need to do broadcasting
-			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
