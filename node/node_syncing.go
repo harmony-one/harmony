@@ -200,7 +200,7 @@ func (node *Node) doBeaconSyncing() {
 			for beaconBlock := range node.BeaconBlockChannel {
 				if node.beaconSync != nil {
 					err := node.beaconSync.UpdateBlockAndStatus(
-						beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
+						beaconBlock, node.Beaconchain(), true, false,
 					)
 					if err != nil {
 						node.beaconSync.AddLastMileBlock(beaconBlock)

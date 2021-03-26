@@ -802,7 +802,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker, verifyAllSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig, haveCurrentSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
@@ -811,11 +811,9 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
-		verifySig := block.NumberU64()%verifyHeaderBatchSize == 0
-		if verifyAllSig {
-			verifySig = true
-		}
-		if verifySig {
+		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
+		verifyCurrentSig := verifyAllSig && verifySeal
+		if haveCurrentSig {
 			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 			if err != nil {
 				return errors.Wrap(err, "parse commitSigAndBitmap")
@@ -824,7 +822,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
 		}
-		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
+		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {
@@ -861,7 +859,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
 
-	if verifyAllSig {
+	if verifyAllSig && haveCurrentSig {
 		if err := bc.WriteCommitSig(block.NumberU64(), block.GetCurrentCommitSig()); err != nil {
 			return err
 		}
@@ -890,7 +888,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		}
 		// Enforce sig check for the last block in a batch
 		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, worker, enforceSigCheck)
+		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck, true)
 		if err != nil {
 			break
 		}
@@ -907,7 +905,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, true)
+		err = ss.UpdateBlockAndStatus(block, bc, true, true)
 		if err != nil {
 			break
 		}
@@ -928,7 +926,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, false, false)
 		if err != nil {
 			break
 		}
