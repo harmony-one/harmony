@@ -907,7 +907,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, worker, true)
 		if err != nil {
 			break
 		}

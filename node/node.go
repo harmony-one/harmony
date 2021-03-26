@@ -66,6 +66,8 @@ const (
 type syncConfig struct {
 	timestamp int64
 	client    *downloader.Client
+	// Determine to send encoded BlockWithSig or Block
+	withSig bool
 }
 
 // Node represents a protocol-participating node in the network

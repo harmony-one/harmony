@@ -31,6 +31,7 @@ message DownloaderRequest {
   string ip = 5;
   string port = 6;
   uint32 size = 7;
+  bool registerWithSig = 8; // Expect to have NEWBLOCK response of block along with current signature
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.

@@ -113,7 +113,7 @@ func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER, RegisterWithSig: true}
 	request.PeerHash = make([]byte, len(hash))
 	copy(request.PeerHash, hash)
 	request.Ip = ip
