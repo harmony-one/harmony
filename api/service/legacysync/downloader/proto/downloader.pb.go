@@ -160,7 +160,7 @@ type DownloaderRequest struct {
 	Ip              string   `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
 	Port            string   `protobuf:"bytes,6,opt,name=port,proto3" json:"port,omitempty"`
 	Size            uint32   `protobuf:"varint,7,opt,name=size,proto3" json:"size,omitempty"`
-	RegisterWithSig bool     `protobuf:"varint,8,opt,name=registerWithSig,proto3" json:"registerWithSig,omitempty"` // Expect to have NEWBLOCK response with signature
+	RegisterWithSig bool     `protobuf:"varint,8,opt,name=registerWithSig,proto3" json:"registerWithSig,omitempty"` // Expect to have NEWBLOCK response of block along with current signature
 }
 
 func (x *DownloaderRequest) Reset() {
