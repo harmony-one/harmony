@@ -599,7 +599,7 @@ func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error)
 	if blk == nil {
 		return nil, errBlockNotExist
 	}
-	sab, err := node.getCommitSigAndBitmap(blk)
+	sab, err := node.getCommitSigAndBitmapFromChildOrDB(blk)
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +623,7 @@ func (node *Node) getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, e
 	return rlp.EncodeToBytes(bwh)
 }
 
-func (node *Node) getCommitSigAndBitmap(block *types.Block) ([]byte, error) {
+func (node *Node) getCommitSigAndBitmapFromChildOrDB(block *types.Block) ([]byte, error) {
 	child := node.Blockchain().GetBlockByNumber(block.NumberU64() + 1)
 	if child != nil {
 		return node.getCommitSigFromChild(block, child)

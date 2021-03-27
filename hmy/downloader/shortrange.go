@@ -72,8 +72,8 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
 		} else {
 			// It is the last block gives a wrong commit sig. Blame the provider of the last block.
-			criminal := stids[len(stids)-1]
-			sh.removeStreams([]sttypes.StreamID{criminal})
+			st2Blame := stids[len(stids)-1]
+			sh.removeStreams([]sttypes.StreamID{st2Blame})
 		}
 		return n, err
 	}
