@@ -320,6 +320,9 @@ func (rm *requestManager) addPendingRequest(req *request, st *stream) {
 }
 
 func (rm *requestManager) removePendingRequest(req *request) {
+	if _, ok := rm.pendings[req.ReqID()]; !ok {
+		return
+	}
 	delete(rm.pendings, req.ReqID())
 
 	if st := req.owner; st != nil {
