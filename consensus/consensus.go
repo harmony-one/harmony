@@ -48,8 +48,6 @@ type Consensus struct {
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-	// How long to delay sending commit messages.
-	delayCommit time.Duration
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
@@ -143,12 +141,6 @@ func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 		consensus.FBFTLog.MarkBlockVerified(block)
 	}
 	return nil
-}
-
-// SetCommitDelay sets the commit message delay.  If set to non-zero,
-// validator delays commit message by the amount.
-func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
-	consensus.delayCommit = delay
 }
 
 // BlocksSynchronized lets the main loop know that block synchronization finished

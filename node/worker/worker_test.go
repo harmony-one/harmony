@@ -38,17 +38,18 @@ func TestNewWorker(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
+		engine = chain2.NewEngine(10)
 	)
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, err := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	chain, err := core.NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 
 	if err != nil {
 		t.Error(err)
 	}
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, chain2.Engine)
+	worker := New(params.TestChainConfig, chain, engine)
 
 	if worker.GetCurrentState().GetBalance(crypto.PubkeyToAddress(testBankKey.PublicKey)).Cmp(testBankFunds) != 0 {
 		t.Error("Worker state is not setup correctly")
@@ -65,13 +66,14 @@ func TestCommitTransactions(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}
+		engine = chain2.NewEngine(0)
 	)
 
 	gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 
 	// Create a new worker
-	worker := New(params.TestChainConfig, chain, chain2.Engine)
+	worker := New(params.TestChainConfig, chain, engine)
 
 	// Generate a test tx
 	baseNonce := worker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(testBankKey.PublicKey))

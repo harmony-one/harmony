@@ -146,6 +146,8 @@ func prepareOrders(
 	}
 
 	for i := range candidates {
+		// TODO: reading validator wrapper from DB could be a bottle net when there are hundreds of validators
+		// with thousands of delegator data.
 		validator, err := stakedReader.ReadValidatorInformation(
 			candidates[i],
 		)

@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -280,9 +281,16 @@ func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) in
 	return 0
 }
 
+// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
+// The block is encoded as block + commit signature
+type BlockWithSig struct {
+	Block              *types.Block
+	CommitSigAndBitmap []byte
+}
+
 // GetBlocks gets blocks by calling grpc request to the corresponding peer.
 func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
-	response := peerConfig.client.GetBlocks(hashes)
+	response := peerConfig.client.GetBlocksAndSigs(hashes)
 	if response == nil {
 		return nil, ErrGetBlock
 	}
@@ -584,7 +592,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 					if count > downloadBlocksRetryLimit {
 						break
 					}
-					if err := ss.stateSyncTaskQueue.Put(failedTasks); err != nil {
+					if err := taskQueue.put(failedTasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
 							Interface("taskIndexes", failedTasks.indexes()).
@@ -620,8 +628,8 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 	}
 
 	for i, blockBytes := range payload {
-		var blockObj types.Block
-		if err := rlp.DecodeBytes(blockBytes, &blockObj); err != nil {
+		var bws BlockWithSig
+		if err := rlp.DecodeBytes(blockBytes, &bws); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Int("taskIndex", tasks[i].index).
@@ -630,6 +638,8 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			failedTasks = append(failedTasks, tasks[i])
 			continue
 		}
+		blockObj := bws.Block
+		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
 		gotHash := blockObj.Hash()
 		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
 			utils.Logger().Warn().
@@ -640,7 +650,7 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			continue
 		}
 		ss.syncMux.Lock()
-		ss.commonBlocks[tasks[i].index] = &blockObj
+		ss.commonBlocks[tasks[i].index] = blockObj
 		ss.syncMux.Unlock()
 	}
 	return failedTasks
@@ -747,6 +757,40 @@ func (ss *StateSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) *
 	return nil
 }
 
+func (ss *StateSync) getCommonBlockIter(parentHash common.Hash) *commonBlockIter {
+	return newCommonBlockIter(ss.commonBlocks, parentHash)
+}
+
+type commonBlockIter struct {
+	parentToChild map[common.Hash]*types.Block
+	curParentHash common.Hash
+}
+
+func newCommonBlockIter(blocks map[int]*types.Block, startHash common.Hash) *commonBlockIter {
+	m := make(map[common.Hash]*types.Block)
+	for _, block := range blocks {
+		m[block.ParentHash()] = block
+	}
+	return &commonBlockIter{
+		parentToChild: m,
+		curParentHash: startHash,
+	}
+}
+
+func (iter *commonBlockIter) Next() *types.Block {
+	curBlock, ok := iter.parentToChild[iter.curParentHash]
+	if !ok || curBlock == nil {
+		return nil
+	}
+	iter.curParentHash = curBlock.Hash()
+	return curBlock
+}
+
+func (iter *commonBlockIter) HasNext() bool {
+	_, ok := iter.parentToChild[iter.curParentHash]
+	return ok
+}
+
 func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
 	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
@@ -758,7 +802,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, worker *worker.Worker, verifyAllSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig, haveCurrentSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
@@ -767,11 +811,18 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
-		verifySig := block.NumberU64()%verifyHeaderBatchSize == 0
-		if verifyAllSig {
-			verifySig = true
+		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
+		verifyCurrentSig := verifyAllSig && verifySeal
+		if verifyCurrentSig {
+			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
+			if err != nil {
+				return errors.Wrap(err, "parse commitSigAndBitmap")
+			}
+			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
+				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
+			}
 		}
-		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySig)
+		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {
@@ -807,6 +858,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Str("blockHex", block.Hash().Hex()).
 		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
+
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Info().
 			Msgf(
@@ -822,17 +874,21 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	parentHash := bc.CurrentBlock().Hash()
 
 	var err error
+
+	commonIter := ss.getCommonBlockIter(parentHash)
 	for {
-		block := ss.getBlockFromOldBlocksByParentHash(parentHash)
+		block := commonIter.Next()
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		// Enforce sig check for the last block in a batch
+		enforceSigCheck := !commonIter.HasNext()
+		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck, true)
 		if err != nil {
 			break
 		}
-		parentHash = block.Hash()
 	}
+
 	ss.syncMux.Lock()
 	ss.commonBlocks = make(map[int]*types.Block)
 	ss.syncMux.Unlock()
@@ -844,7 +900,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, true, true)
 		if err != nil {
 			break
 		}
@@ -865,7 +921,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, worker, false)
+		err = ss.UpdateBlockAndStatus(block, bc, false, false)
 		if err != nil {
 			break
 		}

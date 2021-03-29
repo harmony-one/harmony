@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	headerV3 "github.com/harmony-one/harmony/block/v3"
 	"github.com/harmony-one/harmony/core/types"
+	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 )
 
@@ -244,7 +245,11 @@ func makeTestBlocks(bns []uint64) []*types.Block {
 func makeTestBlock(bn uint64) *types.Block {
 	testHeader := &block.Header{Header: headerV3.NewHeader()}
 	testHeader.SetNumber(big.NewInt(int64(bn)))
-	return types.NewBlockWithHeader(testHeader)
+	testHeader.SetLastCommitSignature(bls_cosi.SerializedSignature{})
+	testHeader.SetLastCommitBitmap(make([]byte, 10))
+	block := types.NewBlockWithHeader(testHeader)
+	block.SetCurrentCommitSig(make([]byte, 106))
+	return block
 }
 
 func assertError(got, expect error) error {

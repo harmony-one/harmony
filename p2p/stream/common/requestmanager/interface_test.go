@@ -110,7 +110,7 @@ func (st *testStream) Close() error {
 	return nil
 }
 
-func (st *testStream) ResetOnClose() error {
+func (st *testStream) CloseOnExit() error {
 	return nil
 }
 

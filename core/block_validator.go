@@ -25,12 +25,14 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
-	"github.com/pkg/errors"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
@@ -245,5 +247,7 @@ func (v *BlockValidator) ValidateCXReceiptsProof(cxp *types.CXReceiptsProof) err
 	}
 
 	// (4) verify blockHeader with seal
-	return v.engine.VerifyHeaderWithSignature(v.bc, cxp.Header, cxp.CommitSig, cxp.CommitBitmap, true)
+	var commitSig bls.SerializedSignature
+	copy(commitSig[:], cxp.CommitSig)
+	return v.engine.VerifyHeaderSignature(v.bc, cxp.Header, commitSig, cxp.CommitBitmap)
 }
