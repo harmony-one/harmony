@@ -17,7 +17,6 @@ func TestDownloader_doLongRangeSync(t *testing.T) {
 
 	d := &Downloader{
 		bc:           bc,
-		ih:           &testInsertHelper{bc},
 		syncProtocol: newTestSyncProtocol(targetBN, 32, nil),
 		config: Config{
 			Concurrency: 16,
@@ -128,7 +127,6 @@ func TestLrSyncIter_FetchAndInsertBlocks(t *testing.T) {
 
 	lsi := &lrSyncIter{
 		bc:  chain,
-		ih:  &testInsertHelper{chain},
 		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
@@ -161,7 +159,6 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrRequest(t *testing.T) {
 
 	lsi := &lrSyncIter{
 		bc:  chain,
-		ih:  &testInsertHelper{chain},
 		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
@@ -194,7 +191,6 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrInsert(t *testing.T) {
 
 	lsi := &lrSyncIter{
 		bc:  chain,
-		ih:  &testInsertHelper{chain},
 		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,
@@ -227,7 +223,6 @@ func TestLrSyncIter_FetchAndInsertBlocks_RandomErr(t *testing.T) {
 
 	lsi := &lrSyncIter{
 		bc:  chain,
-		ih:  &testInsertHelper{chain},
 		d:   &Downloader{bc: chain},
 		p:   protocol,
 		gbm: nil,

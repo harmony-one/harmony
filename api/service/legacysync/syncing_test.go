@@ -3,11 +3,16 @@ package legacysync
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/block"
+	headerV3 "github.com/harmony-one/harmony/block/v3"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/stretchr/testify/assert"
 )
@@ -169,6 +174,28 @@ func TestLimitPeersWithBound_random(t *testing.T) {
 	}
 }
 
+func TestCommonBlockIter(t *testing.T) {
+	size := 10
+	blocks := makeTestBlocks(size)
+	iter := newCommonBlockIter(blocks, testGenesis.Hash())
+
+	itCnt := 0
+	for {
+		hasNext := iter.HasNext()
+		b := iter.Next()
+		if (b == nil) == hasNext {
+			t.Errorf("has next unexpected: %v / %v", hasNext, b != nil)
+		}
+		if b == nil {
+			break
+		}
+		itCnt++
+	}
+	if itCnt != size {
+		t.Errorf("unexpected iteration count: %v / %v", itCnt, size)
+	}
+}
+
 func makePeersForTest(size int) []p2p.Peer {
 	ps := make([]p2p.Peer, 0, size)
 	for i := 0; i != size; i++ {
@@ -198,4 +225,26 @@ func assertTestError(got, expect error) error {
 		return fmt.Errorf("unexpected error: [%v] / [%v]", got, expect)
 	}
 	return nil
+}
+
+func makeTestBlocks(size int) map[int]*types.Block {
+	m := make(map[int]*types.Block)
+	parentHash := testGenesis.Hash()
+	for i := 0; i != size; i++ {
+		b := makeTestBlock(uint64(i)+1, parentHash)
+		parentHash = b.Hash()
+
+		m[i] = b
+	}
+	return m
+}
+
+var testGenesis = makeTestBlock(0, common.Hash{})
+
+func makeTestBlock(bn uint64, parentHash common.Hash) *types.Block {
+	testHeader := &block.Header{Header: headerV3.NewHeader()}
+	testHeader.SetNumber(big.NewInt(int64(bn)))
+	testHeader.SetParentHash(parentHash)
+	block := types.NewBlockWithHeader(testHeader)
+	return block
 }
