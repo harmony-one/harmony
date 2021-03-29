@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"encoding/hex"
-	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -196,11 +195,6 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		return
 	}
 
-	// this is a temp fix for allows FN nodes to earning reward
-	if consensus.delayCommit > 0 {
-		time.Sleep(consensus.delayCommit)
-	}
-
 	// add preparedSig field
 	consensus.aggregatedPrepareSig = aggSig
 	consensus.prepareBitmap = mask
@@ -284,6 +278,8 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	}
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+
+	// TODO(jacky): cache the result of signature verification to reuse in next block's last-sig verification
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
