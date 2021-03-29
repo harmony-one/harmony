@@ -6,20 +6,22 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/harmony-one/harmony/consensus/engine"
-	staking "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/harmony-one/harmony/block"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/consensus/reward"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/p2p/stream/common/streammanager"
 	syncproto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/slash"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 type testBlockChain struct {
@@ -96,7 +98,7 @@ func (bc *testBlockChain) ReadValidatorList() ([]common.Address, error)         
 func (bc *testBlockChain) ReadCommitSig(blockNum uint64) ([]byte, error)            { return nil, nil }
 func (bc *testBlockChain) ReadBlockRewardAccumulator(uint64) (*big.Int, error)      { return nil, nil }
 func (bc *testBlockChain) ValidatorCandidates() []common.Address                    { return nil }
-func (bc *testBlockChain) Engine() engine.Engine                                    { return nil }
+func (bc *testBlockChain) Engine() engine.Engine                                    { return &dummyEngine{} }
 func (bc *testBlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
@@ -111,6 +113,33 @@ func (bc *testBlockChain) ReadValidatorStats(addr common.Address) (*staking.Vali
 }
 func (bc *testBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
 	return nil, nil
+}
+
+type dummyEngine struct{}
+
+func (e *dummyEngine) VerifyHeader(engine.ChainReader, *block.Header, bool) error {
+	return nil
+}
+func (e *dummyEngine) VerifyHeaderSignature(engine.ChainReader, *block.Header, bls.SerializedSignature, []byte) error {
+	return nil
+}
+func (e *dummyEngine) VerifyHeaders(engine.ChainReader, []*block.Header, []bool) (chan<- struct{}, <-chan error) {
+	return nil, nil
+}
+func (e *dummyEngine) VerifySeal(engine.ChainReader, *block.Header) error { return nil }
+func (e *dummyEngine) VerifyShardState(engine.ChainReader, engine.ChainReader, *block.Header) error {
+	return nil
+}
+func (e *dummyEngine) Beaconchain() engine.ChainReader   { return nil }
+func (e *dummyEngine) SetBeaconchain(engine.ChainReader) {}
+func (e *dummyEngine) Finalize(
+	chain engine.ChainReader, header *block.Header,
+	state *state.DB, txs []*types.Transaction,
+	receipts []*types.Receipt, outcxs []*types.CXReceipt,
+	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
+	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
+) (*types.Block, reward.Reader, error) {
+	return nil, nil, nil
 }
 
 type testInsertHelper struct {

@@ -157,7 +157,8 @@ func createBlockChain() *BlockChain {
 	database := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	blockchain, _ := NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	engine := chain2.NewEngine(0)
+	blockchain, _ := NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 	return blockchain
 }
 

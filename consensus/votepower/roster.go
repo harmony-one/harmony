@@ -261,3 +261,20 @@ func NewRoster(shardID uint32) *Roster {
 		ShardID: shardID,
 	}
 }
+
+// VotePowerByMask return the vote power with the given BLS mask. The result is a number between 0 and 1.
+func (r *Roster) VotePowerByMask(mask *bls.Mask) numeric.Dec {
+	res := numeric.ZeroDec()
+
+	for key, index := range mask.PublicsIndex {
+		if enabled, err := mask.IndexEnabled(index); err != nil || !enabled {
+			continue
+		}
+		voter, ok := r.Voters[key]
+		if !ok {
+			continue
+		}
+		res = res.Add(voter.OverallPercent)
+	}
+	return res
+}

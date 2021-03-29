@@ -16,7 +16,6 @@ func TestDownloader_Integration(t *testing.T) {
 
 	d := &Downloader{
 		bc:           bc,
-		ih:           &testInsertHelper{bc},
 		syncProtocol: sp,
 		downloadC:    make(chan struct{}),
 		closeC:       make(chan struct{}),

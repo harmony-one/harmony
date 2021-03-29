@@ -264,7 +264,7 @@ func (sm *streamManager) removeAllStreamOnClose() {
 		wg.Add(1)
 		go func(st sttypes.Stream) {
 			defer wg.Done()
-			err := st.ResetOnClose()
+			err := st.CloseOnExit()
 			if err != nil {
 				sm.logger.Warn().Err(err).Str("stream ID", string(st.ID())).
 					Msg("failed to close stream")

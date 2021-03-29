@@ -91,12 +91,29 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 	return response
 }
 
+// GetBlocksAndSigs get blockWithSig in serialization byte array by calling a grpc request
+func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKWITHSIG}
+	request.Hashes = make([][]byte, len(hashes))
+	for i := range hashes {
+		request.Hashes[i] = make([]byte, len(hashes[i]))
+		copy(request.Hashes[i], hashes[i])
+	}
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocksAndSigs query failed")
+	}
+	return response
+}
+
 // Register will register node's ip/port information to peers receive newly created blocks in future
 // hash is the bytes of "ip:port" string representation
 func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_REGISTER, RegisterWithSig: true}
 	request.PeerHash = make([]byte, len(hash))
 	copy(request.PeerHash, hash)
 	request.Ip = ip
@@ -109,13 +126,13 @@ func (client *Client) Register(hash []byte, ip, port string) *pb.DownloaderRespo
 }
 
 // PushNewBlock will send the lastest verified block to registered nodes
-func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockHash []byte, timeout bool) (*pb.DownloaderResponse, error) {
+func (client *Client) PushNewBlock(selfPeerHash [20]byte, blockBytes []byte, timeout bool) (*pb.DownloaderResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_NEWBLOCK}
-	request.BlockHash = make([]byte, len(blockHash))
-	copy(request.BlockHash, blockHash)
+	request.BlockHash = make([]byte, len(blockBytes))
+	copy(request.BlockHash, blockBytes)
 	request.PeerHash = make([]byte, len(selfPeerHash))
 	copy(request.PeerHash, selfPeerHash[:])
 
