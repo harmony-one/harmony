@@ -312,5 +312,5 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
 		return errors.Wrap(err, "[InsertChain]")
 	}
-	return bc.WriteCommitSig(block.NumberU64(), block.GetCurrentCommitSig())
+	return nil
 }

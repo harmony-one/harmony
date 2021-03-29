@@ -859,11 +859,6 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		Uint32("ShardID", block.ShardID()).
 		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
 
-	if verifyAllSig && haveCurrentSig {
-		if err := bc.WriteCommitSig(block.NumberU64(), block.GetCurrentCommitSig()); err != nil {
-			return err
-		}
-	}
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Info().
 			Msgf(
