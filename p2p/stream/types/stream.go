@@ -65,7 +65,7 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 	return st.spec, st.specErr
 }
 
-// Close close the stream on both sides.
+// Close reset the stream, and close the connection for both sides.
 func (st *BaseStream) Close() error {
 	return st.raw.Reset()
 }
