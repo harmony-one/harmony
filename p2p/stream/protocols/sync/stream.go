@@ -158,15 +158,15 @@ func (st *syncStream) Close() error {
 	return st.BaseStream.Close()
 }
 
-// ResetOnClose reset the stream on close
-func (st *syncStream) ResetOnClose() error {
+// CloseOnExit reset the stream on exiting node
+func (st *syncStream) CloseOnExit() error {
 	notClosed := atomic.CompareAndSwapUint32(&st.closeStat, 0, 1)
 	if !notClosed {
 		// Already closed by another goroutine. Directly return
 		return nil
 	}
 	close(st.closeC)
-	return st.BaseStream.ResetOnClose()
+	return st.BaseStream.CloseOnExit()
 }
 
 func (st *syncStream) handleReq(req *syncpb.Request) error {

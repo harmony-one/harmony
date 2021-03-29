@@ -20,7 +20,7 @@ type Stream interface {
 	WriteBytes([]byte) error
 	ReadBytes() ([]byte, error)
 	Close() error
-	ResetOnClose() error
+	CloseOnExit() error
 }
 
 // BaseStream is the wrapper around
@@ -67,7 +67,7 @@ func (st *BaseStream) ProtoSpec() (ProtoSpec, error) {
 
 // Close close the stream on both sides.
 func (st *BaseStream) Close() error {
-	return st.raw.Close()
+	return st.raw.Reset()
 }
 
 const (
@@ -136,8 +136,8 @@ func (st *BaseStream) ReadBytes() (cb []byte, err error) {
 	return
 }
 
-// ResetOnClose reset the stream during the shutdown of the node
-func (st *BaseStream) ResetOnClose() error {
+// CloseOnExit reset the stream during the shutdown of the node
+func (st *BaseStream) CloseOnExit() error {
 	return st.raw.Reset()
 }
 
