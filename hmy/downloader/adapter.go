@@ -30,9 +30,3 @@ type blockChain interface {
 	InsertChain(chain types.Blocks, verifyHeaders bool) (int, error)
 	WriteCommitSig(blockNum uint64, lastCommits []byte) error
 }
-
-// insertHelper is the interface help to verify and insert a block.
-type insertHelper interface {
-	verifyAndInsertBlocks(blocks types.Blocks) (int, error)
-	verifyAndInsertBlock(block *types.Block) error
-}

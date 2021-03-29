@@ -28,7 +28,6 @@ func (d *Downloader) doLongRangeSync() (int, error) {
 		iter := &lrSyncIter{
 			bc:     d.bc,
 			p:      d.syncProtocol,
-			ih:     d.ih,
 			d:      d,
 			ctx:    ctx,
 			config: d.config,
@@ -54,7 +53,6 @@ func (d *Downloader) doLongRangeSync() (int, error) {
 type lrSyncIter struct {
 	bc blockChain
 	p  syncProtocol
-	ih insertHelper
 	d  *Downloader
 
 	gbm      *getBlocksManager // initialized when finished get block number
@@ -206,7 +204,7 @@ func (lsi *lrSyncIter) processBlocks(results []*blockResult, targetBN uint64) {
 	blocks := blockResultsToBlocks(results)
 
 	for i, block := range blocks {
-		if err := lsi.ih.verifyAndInsertBlock(block); err != nil {
+		if err := verifyAndInsertBlock(lsi.bc, block); err != nil {
 			lsi.logger.Warn().Err(err).Uint64("target block", targetBN).
 				Uint64("block number", block.NumberU64()).
 				Msg("insert blocks failed in long range")
