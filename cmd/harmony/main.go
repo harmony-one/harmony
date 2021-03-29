@@ -599,8 +599,6 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		os.Exit(1)
 	}
 
-	currentConsensus.SetCommitDelay(time.Duration(0))
-
 	// Parse minPeers from harmonyConfig
 	var minPeers int
 	var aggregateSig bool

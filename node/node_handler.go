@@ -250,16 +250,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	if newBlock == nil || newBlock.Header() == nil {
 		return errors.New("nil header or block asked to verify")
 	}
-	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
-		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
-	}
-	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot validate header for the new block")
-		return err
-	}
 
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		utils.Logger().Error().
@@ -267,6 +257,18 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Uint32("new block's shard ID", newBlock.ShardID()).
 			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
 		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
+	}
+
+	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
+		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
+	}
+	// TODO(jacky): make sure this uses the cached result from last consensus (if any)
+	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("[VerifyNewBlock] Cannot validate header for the new block")
+		return err
 	}
 
 	if err := node.Blockchain().Engine().VerifyShardState(
