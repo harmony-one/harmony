@@ -812,7 +812,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
 		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
-		verifyCurrentSig := verifyAllSig && verifySeal
+		verifyCurrentSig := verifyAllSig && haveCurrentSig
 		if verifyCurrentSig {
 			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 			if err != nil {
