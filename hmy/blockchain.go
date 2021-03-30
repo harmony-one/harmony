@@ -308,11 +308,29 @@ func (hmy *Harmony) GetLeaderAddress(coinbaseAddr common.Address, epoch *big.Int
 // Filter related APIs
 
 // GetLogs ...
-func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
+func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bool) ([][]*types.Log, error) {
 	receipts := hmy.BlockChain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
 		return nil, errors.New("Missing receipts")
 	}
+	if isEth {
+		block := hmy.BlockChain.GetBlockByHash(blockHash)
+		if block == nil {
+			return nil, errors.New("Missing block data")
+		}
+		txns := block.Transactions()
+		for i, _ := range receipts {
+			if i < len(txns) {
+				ethHash := txns[i].ConvertToEth().Hash()
+				receipts[i].TxHash = ethHash
+				for j, _ := range receipts[i].Logs {
+					// Override log txHash with receipt's
+					receipts[i].Logs[j].TxHash = ethHash
+				}
+			}
+		}
+	}
+
 	logs := make([][]*types.Log, len(receipts))
 	for i, receipt := range receipts {
 		logs[i] = receipt.Logs

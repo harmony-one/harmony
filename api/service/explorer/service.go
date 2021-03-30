@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/api/service/syncing"
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
@@ -45,30 +45,32 @@ type Service struct {
 	Storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
-	stateSync   *syncing.StateSync
+	stateSync   *legacysync.StateSync
 	blockchain  *core.BlockChain
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, ss *syncing.StateSync, bc *core.BlockChain) *Service {
+func New(selfPeer *p2p.Peer, ss *legacysync.StateSync, bc *core.BlockChain) *Service {
 	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
 }
 
-// StartService starts explorer service.
-func (s *Service) StartService() {
+// Start starts explorer service.
+func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	return nil
 }
 
-// StopService shutdowns explorer service.
-func (s *Service) StopService() {
+// Stop shutdowns explorer service.
+func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Shutting down explorer service.")
 	if err := s.server.Shutdown(context.Background()); err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when shutting down explorer server")
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	return nil
 }
 
 // GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.

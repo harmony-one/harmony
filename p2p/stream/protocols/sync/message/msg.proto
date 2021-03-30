@@ -1,0 +1,71 @@
+syntax = "proto3";
+package harmony.stream.sync.message ;
+
+option go_package = "message";
+
+message Message {
+  oneof req_or_resp {
+    Request req = 1;
+    Response resp = 2;
+  }
+}
+
+message Request {
+  uint64 req_id = 1;
+  oneof request {
+    GetBlockNumberRequest get_block_number_request = 2;
+    GetBlockHashesRequest get_block_hashes_request = 3;
+    GetBlocksByNumRequest get_blocks_by_num_request = 4;
+    GetBlocksByHashesRequest get_blocks_by_hashes_request = 5;
+  }
+}
+
+message GetBlockNumberRequest {}
+
+message GetBlockHashesRequest {
+  repeated uint64 nums = 1 [packed=true];
+}
+
+message GetBlocksByNumRequest {
+  repeated uint64 nums = 1 [packed=true];
+}
+
+message GetBlocksByHashesRequest {
+  repeated bytes block_hashes = 1;
+}
+
+message Response {
+  uint64 req_id = 1;
+  oneof response {
+    ErrorResponse error_response = 2;
+    GetBlockNumberResponse get_block_number_response = 3;
+    GetBlockHashesResponse get_block_hashes_response = 4;
+    GetBlocksByNumResponse get_blocks_by_num_response = 5;
+    GetBlocksByHashesResponse get_blocks_by_hashes_response = 6;
+  }
+}
+
+message ErrorResponse {
+  string error = 1;
+}
+
+message GetBlockNumberResponse {
+  uint64 number = 1;
+}
+
+message GetBlockHashesResponse {
+  repeated bytes hashes = 1;
+}
+
+message GetBlocksByNumResponse {
+  repeated bytes blocks_bytes = 1;
+  repeated bytes commit_sig = 2;
+}
+
+message GetBlocksByHashesResponse {
+  repeated bytes blocks_bytes = 1;
+  repeated bytes commit_sig = 2;
+}
+
+
+

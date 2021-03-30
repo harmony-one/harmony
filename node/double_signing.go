@@ -3,13 +3,12 @@ package node
 import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 )
 
 // ProcessSlashCandidateMessage ..
 func (node *Node) processSlashCandidateMessage(msgPayload []byte) {
-	if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+	if !node.IsRunningBeaconChain() {
 		return
 	}
 	candidates := slash.Records{}

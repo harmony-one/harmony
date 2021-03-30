@@ -3,81 +3,47 @@ package node
 import (
 	"fmt"
 
-	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/blockproposal"
 	"github.com/harmony-one/harmony/api/service/consensus"
 	"github.com/harmony-one/harmony/api/service/explorer"
-	"github.com/harmony-one/harmony/api/service/networkinfo"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
-func (node *Node) setupForValidator() {
-	_, chanPeer, _ := node.initNodeConfiguration()
-	// Register networkinfo service. "0" is the beacon shard ID
-	node.serviceManager.RegisterService(
-		service.NetworkInfo,
-		networkinfo.MustNew(
-			node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil, node.networkInfoDHTPath(),
-		),
-	)
+// RegisterValidatorServices register the validator services.
+func (node *Node) RegisterValidatorServices() {
 	// Register consensus service.
-	node.serviceManager.RegisterService(
+	node.serviceManager.Register(
 		service.Consensus,
 		consensus.New(node.BlockChannel, node.Consensus, node.startConsensus),
 	)
 	// Register new block service.
-	node.serviceManager.RegisterService(
+	node.serviceManager.Register(
 		service.BlockProposal,
 		blockproposal.New(node.Consensus.ReadySignal, node.Consensus.CommitSigChannel, node.WaitForConsensusReadyV2),
 	)
 }
 
-func (node *Node) setupForExplorerNode() {
-	_, chanPeer, _ := node.initNodeConfiguration()
-
-	// Register networkinfo service.
-	node.serviceManager.RegisterService(
-		service.NetworkInfo,
-		networkinfo.MustNew(
-			node.host, node.NodeConfig.GetShardGroupID(), chanPeer, nil, node.networkInfoDHTPath()),
-	)
+// RegisterExplorerServices register the explorer services
+func (node *Node) RegisterExplorerServices() {
 	// Register explorer service.
-	node.serviceManager.RegisterService(
+	node.serviceManager.Register(
 		service.SupportExplorer, explorer.New(&node.SelfPeer, node.stateSync, node.Blockchain()),
 	)
 }
 
-// ServiceManagerSetup setups service store.
-func (node *Node) ServiceManagerSetup() {
-	node.serviceManager = &service.Manager{}
-	node.serviceMessageChan = make(map[service.Type]chan *msg_pb.Message)
-	switch node.NodeConfig.Role() {
-	case nodeconfig.Validator:
-		node.setupForValidator()
-	case nodeconfig.ExplorerNode:
-		node.setupForExplorerNode()
-	}
-	node.serviceManager.SetupServiceMessageChan(node.serviceMessageChan)
+// RegisterService register a service to the node service manager
+func (node *Node) RegisterService(st service.Type, s service.Service) {
+	node.serviceManager.Register(st, s)
 }
 
-// RunServices runs registered services.
-func (node *Node) RunServices() {
-	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
-		return
-	}
-	node.serviceManager.RunServices()
+// StartServices runs registered services.
+func (node *Node) StartServices() error {
+	return node.serviceManager.StartServices()
 }
 
 // StopServices runs registered services.
-func (node *Node) StopServices() {
-	if node.serviceManager == nil {
-		utils.Logger().Info().Msg("Service manager is not set up yet.")
-		return
-	}
-	node.serviceManager.StopServicesByRole([]service.Type{})
+func (node *Node) StopServices() error {
+	return node.serviceManager.StopServices()
 }
 
 func (node *Node) networkInfoDHTPath() string {

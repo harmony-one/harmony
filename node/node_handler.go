@@ -171,7 +171,7 @@ func (node *Node) BroadcastCrossLink() {
 		return
 	}
 
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID ||
+	if node.IsRunningBeaconChain() ||
 		!node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
 		// no need to broadcast crosslink if it's beacon chain or it's not crosslink epoch
 		return
@@ -250,16 +250,6 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	if newBlock == nil || newBlock.Header() == nil {
 		return errors.New("nil header or block asked to verify")
 	}
-	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
-		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
-	}
-	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
-		utils.Logger().Error().
-			Str("blockHash", newBlock.Hash().Hex()).
-			Err(err).
-			Msg("[VerifyNewBlock] Cannot validate header for the new block")
-		return err
-	}
 
 	if newBlock.ShardID() != node.Blockchain().ShardID() {
 		utils.Logger().Error().
@@ -267,6 +257,18 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Uint32("new block's shard ID", newBlock.ShardID()).
 			Msg("[VerifyNewBlock] Wrong shard ID of the new block")
 		return errors.New("[VerifyNewBlock] Wrong shard ID of the new block")
+	}
+
+	if newBlock.NumberU64() <= node.Blockchain().CurrentBlock().NumberU64() {
+		return errors.Errorf("block with the same block number is already committed: %d", newBlock.NumberU64())
+	}
+	// TODO(jacky): make sure this uses the cached result from last consensus (if any)
+	if err := node.Blockchain().Validator().ValidateHeader(newBlock, true); err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("[VerifyNewBlock] Cannot validate header for the new block")
+		return err
 	}
 
 	if err := node.Blockchain().Engine().VerifyShardState(
@@ -308,7 +310,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 
 	// Verify cross links
 	// TODO: move into ValidateNewBlock
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		err := node.VerifyBlockCrossLinks(newBlock)
 		if err != nil {
 			utils.Logger().Debug().Err(err).Msg("ops2 VerifyBlockCrossLinks Failed")
@@ -336,7 +338,9 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 // 3. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
-		if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		if node.IsRunningBeaconChain() {
+			// TODO: consider removing this and letting other nodes broadcast new blocks.
+			// But need to make sure there is at least 1 node that will do the job.
 			node.BroadcastNewBlock(newBlock)
 		}
 		node.BroadcastCXReceipts(newBlock)
@@ -356,11 +360,10 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 			node.Consensus.UpdateValidatorMetrics(numSig, float64(newBlock.NumberU64()))
 
 			// 1% of the validator also need to do broadcasting
-			rand.Seed(time.Now().UTC().UnixNano())
 			rnd := rand.Intn(100)
 			if rnd < 1 {
 				// Beacon validators also broadcast new blocks to make sure beacon sync is strong.
-				if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+				if node.IsRunningBeaconChain() {
 					node.BroadcastNewBlock(newBlock)
 				}
 				node.BroadcastCXReceipts(newBlock)

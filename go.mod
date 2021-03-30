@@ -14,11 +14,9 @@ require (
 	github.com/coinbase/rosetta-sdk-go v0.4.6
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/ethereum/go-ethereum v1.9.23
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
-	github.com/golang/gddo v0.0.0-20200831202555-721e228c7686
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.4.3
 	github.com/golangci/golangci-lint v1.22.2
@@ -28,6 +26,7 @@ require (
 	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
+	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/libp2p/go-libp2p v0.13.0
@@ -38,7 +37,6 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.4.0
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/multiformats/go-multiaddr-dns v0.2.0
-	github.com/multiformats/go-multiaddr-net v0.2.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml v1.2.0
@@ -53,6 +51,7 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
 	github.com/syndtr/goleveldb v1.0.1-0.20200815110645-5c35d600f0ca
+	go.uber.org/ratelimit v0.1.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208

@@ -101,7 +101,10 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
-	consensus.ResetViewChangeState()
+	// do not reset view change state if it is in view changing mode
+	if !consensus.IsViewChangingMode() {
+		consensus.ResetViewChangeState()
+	}
 	return consensus.Decider.ParticipantsCount()
 }
 
@@ -171,6 +174,9 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
+	consensus.getLogger().Debug().
+		Str("Mode", m.String()).
+		Msg("[SetMode]")
 	consensus.current.SetMode(m)
 }
 

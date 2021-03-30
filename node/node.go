@@ -13,12 +13,20 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	lru "github.com/hashicorp/golang-lru"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -38,14 +46,6 @@ import (
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	lru "github.com/hashicorp/golang-lru"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sync/semaphore"
-
-	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -66,6 +66,8 @@ const (
 type syncConfig struct {
 	timestamp int64
 	client    *downloader.Client
+	// Determine to send encoded BlockWithSig or Block
+	withSig bool
 }
 
 // Node represents a protocol-participating node in the network
@@ -90,7 +92,7 @@ type Node struct {
 	downloaderServer     *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *syncing.StateSync
+	stateSync, beaconSync  *legacysync.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -106,7 +108,6 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan  map[service.Type]chan *msg_pb.Message
 	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
@@ -125,6 +126,10 @@ type Node struct {
 	committeeCache *lru.Cache
 
 	Metrics metrics.Registry
+
+	// context control for pub-sub handling
+	psCtx    context.Context
+	psCancel func()
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -214,7 +219,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		if node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 			poolTxs := types.PoolTransactions{}
 			for _, tx := range newStakingTxs {
@@ -242,7 +247,7 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction,
 ) error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 		var err error
 		for i := range errs {
@@ -401,7 +406,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		case proto_node.SlashCandidate:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
 			// only beacon chain node process slash candidate messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+			if !node.IsRunningBeaconChain() {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.Receipt:
@@ -409,7 +414,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		case proto_node.CrossLink:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
 			// only beacon chain node process crosslink messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
+			if !node.IsRunningBeaconChain() ||
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
@@ -548,8 +553,10 @@ var (
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
-// Start kicks off the node message handling
-func (node *Node) Start() error {
+// StartPubSub kicks off the node message handling
+func (node *Node) StartPubSub() error {
+	node.psCtx, node.psCancel = context.WithCancel(context.Background())
+
 	// groupID and whether this topic is used for consensus
 	type t struct {
 		tp    nodeconfig.GroupID
@@ -725,10 +732,10 @@ func (node *Node) Start() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-
 				select {
 				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+						errors.Is(ctx.Err(), context.Canceled) {
 						utils.Logger().Warn().
 							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
 					}
@@ -740,6 +747,7 @@ func (node *Node) Start() error {
 				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
+			// TODO: Currently this timeout is useless. Verify me.
 			libp2p_pubsub.WithValidatorTimeout(250*time.Millisecond),
 			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
@@ -756,40 +764,47 @@ func (node *Node) Start() error {
 
 		// goroutine to handle consensus messages
 		go func() {
-			for m := range msgChanConsensus {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
+			for {
+				select {
+				case <-node.psCtx.Done():
+					return
+				case m := <-msgChanConsensus:
+					// should not take more than 30 seconds to process one message
+					ctx, cancel := context.WithTimeout(node.psCtx, 30*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
 
-					if semConsensus.TryAcquire(1) {
-						defer semConsensus.Release(1)
+						if semConsensus.TryAcquire(1) {
+							defer semConsensus.Release(1)
 
-						if isThisNodeAnExplorerNode {
-							if err := node.explorerMessageHandler(
-								ctx, msg.handleCArg,
-							); err != nil {
-								errChan <- withError{err, nil}
-							}
-						} else {
-							if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-								errChan <- withError{err, msg.senderPubKey}
+							if isThisNodeAnExplorerNode {
+								if err := node.explorerMessageHandler(
+									ctx, msg.handleCArg,
+								); err != nil {
+									errChan <- withError{err, nil}
+								}
+							} else {
+								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
+									errChan <- withError{err, msg.senderPubKey}
+								}
 							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+						select {
+						// FIXME: wrong use of context. This message have already passed handle actually.
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				}
 			}
 		}()
 
@@ -798,39 +813,46 @@ func (node *Node) Start() error {
 
 		// goroutine to handle node messages
 		go func() {
-			for m := range msgChanNode {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
-					if semNode.TryAcquire(1) {
-						defer semNode.Release(1)
+			for {
+				select {
+				case m := <-msgChanNode:
+					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
+						if semNode.TryAcquire(1) {
+							defer semNode.Release(1)
 
-						if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
-							errChan <- withError{err, nil}
+							if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
+								errChan <- withError{err, nil}
+							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+						select {
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				case <-node.psCtx.Done():
+					return
+				}
 			}
 		}()
 
 		go func() {
-
 			for {
-				nextMsg, err := sub.Next(context.Background())
+				nextMsg, err := sub.Next(node.psCtx)
 				if err != nil {
+					if err == context.Canceled {
+						return
+					}
 					errChan <- withError{errors.WithStack(err), nil}
 					continue
 				}
@@ -855,14 +877,27 @@ func (node *Node) Start() error {
 		}()
 	}
 
-	for e := range errChan {
-		utils.SampledLogger().Info().
-			Interface("item", e.payload).
-			Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
-	}
-	// NOTE never gets here
-	return nil
+	go func() {
+		for {
+			select {
+			case <-node.psCtx.Done():
+				return
+			case e := <-errChan:
+				utils.SampledLogger().Info().
+					Interface("item", e.payload).
+					Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
+			}
+		}
+	}()
 
+	return nil
+}
+
+// StopPubSub stops the pubsub handling
+func (node *Node) StopPubSub() {
+	if node.psCancel != nil {
+		node.psCancel()
+	}
 }
 
 // GetSyncID returns the syncID of this node
@@ -898,8 +933,10 @@ func New(
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
+	engine := chain.NewEngine(consensusObj.ShardID)
+
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
+		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
 	)
 
 	for shardID, archival := range isArchival {
@@ -938,21 +975,21 @@ func New(
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, engine)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, chain.Engine,
+				node.Beaconchain().Config(), beaconChain, engine,
 			)
 		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
-		chain.Engine.SetBeaconchain(beaconChain)
+		engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
@@ -983,7 +1020,7 @@ func New(
 						go func() { webhooks.DoPost(url, &doubleSign) }()
 					}
 				}
-				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+				if !node.IsRunningBeaconChain() {
 					go node.BroadcastSlash(&doubleSign)
 				} else {
 					records := slash.Records{doubleSign}
@@ -1003,6 +1040,8 @@ func New(
 	// init metrics
 	initMetrics()
 	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
+
+	node.serviceManager = service.NewManager()
 
 	return &node
 }
@@ -1136,6 +1175,30 @@ func (node *Node) ServiceManager() *service.Manager {
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
+
+	if err := node.StopRPC(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop RPC")
+	}
+
+	utils.Logger().Info().Msg("stopping rosetta")
+	if err := node.StopRosetta(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop rosetta")
+	}
+
+	utils.Logger().Info().Msg("stopping services")
+	if err := node.StopServices(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop services")
+	}
+
+	// Currently pubSub need to be stopped after consensus.
+	utils.Logger().Info().Msg("stopping pub-sub")
+	node.StopPubSub()
+
+	utils.Logger().Info().Msg("stopping host")
+	if err := node.host.Close(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop p2p host")
+	}
+
 	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
@@ -1222,4 +1285,9 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	}
 	// self addresses map can never be nil
 	return node.KeysToAddrs
+}
+
+// IsRunningBeaconChain returns whether the node is running on beacon chain.
+func (node *Node) IsRunningBeaconChain() bool {
+	return node.NodeConfig.ShardID == shard.BeaconChainShardID
 }

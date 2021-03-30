@@ -30,7 +30,7 @@ func init() {
 }
 
 func TestV1_0_0Config(t *testing.T) {
-	testConfig := `Version = "1.0.3"
+	testConfig := `Version = "1.0.4"
 
 [BLSKeys]
   KMSConfigFile = ""
@@ -80,6 +80,18 @@ func TestV1_0_0Config(t *testing.T) {
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
 
+[Sync]
+  Downloader = false
+  Concurrency = 6
+  DiscBatch = 8
+  DiscHardLowCap = 6
+  DiscHighCap = 128
+  DiscSoftLowCap = 8
+  InitStreams = 8
+  LegacyClient = true
+  LegacyServer = true
+  MinPeers = 6
+
 [WS]
   Enabled = true
   IP = "127.0.0.1"
@@ -96,20 +108,21 @@ func TestV1_0_0Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defConf := getDefaultHmyConfigCopy(nodeconfig.Mainnet)
 	if config.HTTP.RosettaEnabled {
 		t.Errorf("Expected rosetta http server to be disabled when loading old config")
 	}
 	if config.General.IsOffline {
 		t.Errorf("Expect node to de online when loading old config")
 	}
-	if config.P2P.IP != defaultConfig.P2P.IP {
+	if config.P2P.IP != defConf.P2P.IP {
 		t.Errorf("Expect default p2p IP if old config is provided")
 	}
-	if config.Version != "1.0.3" {
-		t.Errorf("Expected config version: 1.0.3, not %v", config.Version)
+	if config.Version != "1.0.4" {
+		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
-	config.Version = defaultConfig.Version // Shortcut for testing, value checked above
-	if !reflect.DeepEqual(config, defaultConfig) {
+	config.Version = defConf.Version // Shortcut for testing, value checked above
+	if !reflect.DeepEqual(config, defConf) {
 		t.Errorf("Unexpected config \n\t%+v \n\t%+v", config, defaultConfig)
 	}
 }

@@ -59,6 +59,9 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 
 // StopServers stops the rosetta http server
 func StopServers() error {
+	if listener == nil {
+		return nil
+	}
 	if err := listener.Close(); err != nil {
 		return err
 	}

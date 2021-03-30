@@ -34,7 +34,11 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 
 		utils.Logger().Debug().
 			Msg("Waiting for Consensus ready")
-		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+		select {
+		case <-time.After(30 * time.Second):
+		case <-stopChan:
+			return
+		}
 
 		for {
 			// keep waiting for Consensus ready

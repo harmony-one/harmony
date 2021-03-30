@@ -7,6 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/consensus/signature"
+
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -154,6 +157,10 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 
+	if err := consensus.verifyLastCommitSig(commitSigAndBitmap, block); err != nil {
+		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
+		return
+	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
@@ -198,6 +205,7 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
 			Uint64("blockNum", consensus.blockNum).
+			Hex("lastCommitSig", commitSigAndBitmap).
 			Msg("[finalCommit] Queued Committed Message")
 	}
 
@@ -309,9 +317,26 @@ func (consensus *Consensus) Start(
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
-					if consensus.current.Mode() == Syncing ||
-						consensus.current.Mode() == Listening {
+					// stop timer in listening mode
+					if consensus.current.Mode() == Listening {
 						v.Stop()
+						continue
+					}
+
+					if consensus.current.Mode() == Syncing {
+						// never stop bootstrap timer here in syncing mode as it only starts once
+						// if it is stopped, bootstrap will be stopped and nodes
+						// can't start view change or join consensus
+						// the bootstrap timer will be stopped once consensus is reached or view change
+						// is succeeded
+						if k != timeoutBootstrap {
+							consensus.getLogger().Debug().
+								Str("k", k.String()).
+								Str("Mode", consensus.current.Mode().String()).
+								Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
+							v.Stop()
+							continue
+						}
 					}
 					if !v.CheckExpire() {
 						continue
@@ -326,6 +351,8 @@ func (consensus *Consensus) Start(
 						break
 					}
 				}
+
+			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.mutex.Lock()
@@ -338,9 +365,18 @@ func (consensus *Consensus) Start(
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
 					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
+				} else if consensus.Mode() == Syncing {
+					// Corner case where sync is triggered before `onCommitted` and there is a race
+					// for block insertion between consensus and downloader.
+					mode := consensus.UpdateConsensusInformation()
+					consensus.SetMode(mode)
+					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
+					consensus.consensusTimeout[timeoutConsensus].Start()
+					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 				}
 				consensus.mutex.Unlock()
 
+			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncNotReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
 				consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
@@ -456,6 +492,35 @@ func (consensus *Consensus) Start(
 		}
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
+
+	if consensus.dHelper != nil {
+		consensus.dHelper.start()
+	}
+}
+
+// Close close the consensus. If current is in normal commit phase, wait until the commit
+// phase end.
+func (consensus *Consensus) Close() error {
+	if consensus.dHelper != nil {
+		consensus.dHelper.close()
+	}
+	consensus.waitForCommit()
+	return nil
+}
+
+// waitForCommit wait extra 2 seconds for commit phase to finish
+func (consensus *Consensus) waitForCommit() {
+	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
+		return
+	}
+	// We only need to wait consensus is in normal commit phase
+	utils.Logger().Warn().Str("phase", consensus.phase.String()).Msg("[shutdown] commit phase has to wait")
+
+	maxWait := time.Now().Add(2 * consensus.BlockPeriod)
+	for time.Now().Before(maxWait) && consensus.GetConsensusPhase() == "Commit" {
+		utils.Logger().Warn().Msg("[shutdown] wait for consensus finished")
+		time.Sleep(time.Millisecond * 100)
+	}
 }
 
 // LastMileBlockIter is the iterator to iterate over the last mile blocks in consensus cache.
@@ -547,16 +612,20 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return err
 	}
 
-	go func() {
-		msgToSend, FBFTMsg :=
-			network.Bytes,
-			network.FBFTMsg
-		bareMinimumCommit := FBFTMsg.Payload
-		consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
+	msgToSend, FBFTMsg :=
+		network.Bytes,
+		network.FBFTMsg
+	bareMinimumCommit := FBFTMsg.Payload
+	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
+	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
+		return errors.Wrap(err, "[preCommitAndPropose] failed verifying last commit sig")
+	}
+
+	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk)); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 			return
 		}
@@ -573,6 +642,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 			consensus.getLogger().Info().
 				Str("blockHash", blk.Hash().Hex()).
 				Uint64("blockNum", consensus.blockNum).
+				Hex("lastCommitSig", bareMinimumCommit).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
@@ -584,6 +654,30 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		consensus.ReadySignal <- AsyncProposal
 	}()
 
+	return nil
+}
+
+func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
+	if len(lastCommitSig) < bls.BLSSignatureSizeInBytes {
+		return errors.New("lastCommitSig not have enough length")
+	}
+
+	aggSigBytes := lastCommitSig[0:bls.BLSSignatureSizeInBytes]
+
+	aggSig := bls2.Sign{}
+	err := aggSig.Deserialize(aggSigBytes)
+
+	if err != nil {
+		return errors.New("unable to deserialize multi-signature from payload")
+	}
+	aggPubKey := consensus.commitBitmap.AggregatePublic
+
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+		blk.Epoch(), blk.Hash(), blk.NumberU64(), blk.Header().ViewID().Uint64())
+
+	if !aggSig.VerifyHash(aggPubKey, commitPayload) {
+		return errors.New("Failed to verify the multi signature for last commit sig")
+	}
 	return nil
 }
 
@@ -607,12 +701,9 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
-		if !consensus.FBFTLog.IsBlockVerified(blk) {
-			if err := consensus.BlockVerifier(blk); err != nil {
-				consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
-				return err
-			}
-			consensus.FBFTLog.MarkBlockVerified(blk)
+		if err := consensus.VerifyBlock(blk); err != nil {
+			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
+			return err
 		}
 		consensus.getLogger().Info().Msg("[TryCatchup] Adding block to chain")
 		if err := consensus.commitBlock(blk, msgs[i]); err != nil {
@@ -620,6 +711,7 @@ func (consensus *Consensus) tryCatchup() error {
 			return err
 		}
 		select {
+		// TODO(jacky): check if this is still needed.
 		case consensus.VerifiedNewBlock <- blk:
 		default:
 			consensus.getLogger().Info().
@@ -633,7 +725,7 @@ func (consensus *Consensus) tryCatchup() error {
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
 	if consensus.Blockchain.CurrentBlock().NumberU64() < blk.NumberU64() {
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, true); err != nil {
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk)); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
 		}

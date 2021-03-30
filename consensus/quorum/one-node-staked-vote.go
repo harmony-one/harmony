@@ -130,6 +130,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		Int64("signer-count", v.SignersCount(p)).
 		Str("new-power-added", additionalVotePower.String()).
 		Str("total-power-of-signers", tallyQuorum.tally.String()).
+		Str("ballot", ballet.String()).
 		Msg(msg)
 	return ballet, nil
 }
@@ -215,7 +216,7 @@ func (v *stakedVoteWeight) SetVoters(
 	// Hold onto this calculation
 	v.roster = *roster
 
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Uint64("curEpoch", epoch.Uint64()).
 		Uint32("shard-id", subCommittee.ShardID).
 		Str("committee", roster.String()).

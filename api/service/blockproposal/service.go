@@ -22,38 +22,26 @@ func New(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, wa
 	return &Service{readySignal: readySignal, commitSigsChan: commitSigsChan, waitForConsensusReady: waitForConsensusReady}
 }
 
-// StartService starts block proposal service.
-func (s *Service) StartService() {
+// Start starts block proposal service.
+func (s *Service) Start() error {
 	s.stopChan = make(chan struct{})
 	s.stoppedChan = make(chan struct{})
 
-	s.Init()
-	s.Run(s.stopChan, s.stoppedChan)
+	s.run(s.stopChan, s.stoppedChan)
+	return nil
 }
 
-// Init initializes block proposal service.
-func (s *Service) Init() {
-}
-
-// Run runs block proposal.
-func (s *Service) Run(stopChan chan struct{}, stoppedChan chan struct{}) {
+func (s *Service) run(stopChan chan struct{}, stoppedChan chan struct{}) {
 	s.waitForConsensusReady(s.readySignal, s.commitSigsChan, s.stopChan, s.stoppedChan)
 }
 
-// StopService stops block proposal service.
-func (s *Service) StopService() {
+// Stop stops block proposal service.
+func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Stopping block proposal service.")
 	s.stopChan <- struct{}{}
 	<-s.stoppedChan
 	utils.Logger().Info().Msg("Role conversion stopped.")
-}
-
-// NotifyService notify service
-func (s *Service) NotifyService(params map[string]interface{}) {}
-
-// SetMessageChan sets up message channel to service.
-func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
-	s.messageChan = messageChan
+	return nil
 }
 
 // APIs for the services.

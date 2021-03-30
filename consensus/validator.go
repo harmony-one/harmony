@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"encoding/hex"
-	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -173,11 +172,11 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
 		return
 	}
-	if err := consensus.BlockVerifier(&blockObj); err != nil {
+
+	if err := consensus.VerifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
 		return
 	}
-	consensus.FBFTLog.MarkBlockVerified(&blockObj)
 
 	if consensus.checkViewID(recvMsg) != nil {
 		if consensus.current.Mode() == Normal {
@@ -194,11 +193,6 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			Uint64("blockNum", consensus.blockNum).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
 		return
-	}
-
-	// this is a temp fix for allows FN nodes to earning reward
-	if consensus.delayCommit > 0 {
-		time.Sleep(consensus.delayCommit)
 	}
 
 	// add preparedSig field
@@ -284,6 +278,8 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	}
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+
+	// TODO(jacky): cache the result of signature verification to reuse in next block's last-sig verification
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		consensus.getLogger().Error().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -401,15 +397,4 @@ func (consensus *Consensus) broadcastConsensusP2pMessages(p2pMsgs []*NetworkMess
 		}
 	}
 	return nil
-}
-
-func (consensus *Consensus) spinUpStateSync() {
-	select {
-	case consensus.BlockNumLowChan <- struct{}{}:
-		consensus.current.SetMode(Syncing)
-		for _, v := range consensus.consensusTimeout {
-			v.Stop()
-		}
-	default:
-	}
 }
