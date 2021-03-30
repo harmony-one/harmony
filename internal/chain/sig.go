@@ -15,7 +15,7 @@ func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.Public
 	if err != nil {
 		return nil, nil, err
 	}
-	return decodeSigBitmap(sig, bitmap, publicKeys)
+	return DecodeSigBitmap(sig, bitmap, publicKeys)
 }
 
 // ParseCommitSigAndBitmap parse the commitSigAndBitmap to signature + bitmap
@@ -33,8 +33,8 @@ func ParseCommitSigAndBitmap(payload []byte) (bls.SerializedSignature, []byte, e
 	return sig, bitmap, nil
 }
 
-// decodeSigBitmap decode and parse the signature, bitmap with the given public keys
-func decodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
+// DecodeSigBitmap decode and parse the signature, bitmap with the given public keys
+func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
 	aggSig := bls_core.Sign{}
 	err := aggSig.Deserialize(sigBytes[:])
 	if err != nil {

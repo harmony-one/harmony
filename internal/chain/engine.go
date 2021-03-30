@@ -426,7 +426,7 @@ func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *blo
 	if err != nil {
 		return err
 	}
-	aggSig, mask, err := decodeSigBitmap(commitSig, commitBitmap, pubKeys)
+	aggSig, mask, err := DecodeSigBitmap(commitSig, commitBitmap, pubKeys)
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
