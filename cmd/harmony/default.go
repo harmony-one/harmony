@@ -129,6 +129,19 @@ var (
 		DiscBatch:      8,
 	}
 
+	defaultLocalNetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+
 	defaultElseSyncConfig = syncConfig{
 		Downloader:     true,
 		LegacyServer:   true,
