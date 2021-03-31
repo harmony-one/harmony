@@ -261,6 +261,8 @@ func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
 		return defaultMainnetSyncConfig
 	case nodeconfig.Testnet:
 		return defaultTestNetSyncConfig
+	case nodeconfig.Localnet:
+		return defaultLocalNetSyncConfig
 	default:
 		return defaultElseSyncConfig
 	}
