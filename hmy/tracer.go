@@ -391,8 +391,8 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 
 				msg, _ := txs[task.index].AsMessage(signer)
 				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
-
-				task.statedb.Prepare(txs[task.index].Hash(), blockHash, task.index)
+				ethTx := txs[task.index].ConvertToEth()
+				task.statedb.Prepare(ethTx.Hash(), blockHash, task.index)
 				res, err := hmy.TraceTx(ctx, msg, vmctx, task.statedb, config)
 				if err != nil {
 					results[task.index] = &TxTraceResult{Error: err.Error()}
