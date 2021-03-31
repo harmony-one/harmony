@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -53,11 +54,45 @@ func (s *AccountAPI) AccountBalance(
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
-	if err != nil {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": "invalid address",
-		})
+	balance := new(big.Int)
+
+	// delegated balance
+	if request.AccountIdentifier.SubAccount != nil {
+		subAccount := request.AccountIdentifier.SubAccount
+		ty, exist := subAccount.Metadata["type"]
+
+		if exist && ty.(string) == "delegation" {
+			validatorAddr := subAccount.Address
+			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+			for index, validator := range validators {
+				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+					balance = new(big.Int).Add(balance, delegations[index].Amount)
+				}
+			}
+			// pending undelegated balance
+		} else if exist && ty.(string) == "undelegation" {
+			validatorAddr := subAccount.Address
+			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+			for index, validator := range validators {
+				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+					undelegations := delegations[index].Undelegations
+					for _, undelegate := range undelegations {
+						balance = new(big.Int).Add(balance, undelegate.Amount)
+					}
+				}
+			}
+		} else {
+			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+				"message": "invalid sub account or type",
+			})
+		}
+	} else {
+		balance, err = s.hmy.GetBalance(ctx, addr, blockNum)
+		if err != nil {
+			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+				"message": "invalid address",
+			})
+		}
 	}
 
 	amount := types.Amount{

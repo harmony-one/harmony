@@ -118,7 +118,7 @@ func GetNativeOperationsFromStakingTransaction(
 		}
 	}
 
-	return append(gasOperations, &types.Operation{
+	operations := append(gasOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{
 			Index: gasOperations[0].OperationIdentifier.Index + 1,
 		},
@@ -127,7 +127,86 @@ func GetNativeOperationsFromStakingTransaction(
 		Account:  accountID,
 		Amount:   amount,
 		Metadata: metadata,
-	}), nil
+	})
+
+	// expose delegated balance
+	if tx.StakingType() == stakingTypes.DirectiveDelegate {
+		op2 := GetDelegateOperationForSubAccount(tx, operations[1])
+		return append(operations, op2), nil
+	}
+
+	if tx.StakingType() == stakingTypes.DirectiveUndelegate {
+		// set sub account
+		validatorAddress := operations[1].Metadata["validatorAddress"]
+		operations[1].Account.SubAccount = &types.SubAccountIdentifier{
+			Address: validatorAddress.(string),
+			Metadata: map[string]interface{}{
+				"type": "delegation",
+			},
+		}
+
+		op2 := &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: operations[1].OperationIdentifier.Index + 1,
+			},
+			Type:   tx.StakingType().String(),
+			Status: GetTransactionStatus(tx, receipt),
+			Account: &types.AccountIdentifier{
+				Address: operations[1].Account.Address,
+				SubAccount: &types.SubAccountIdentifier{
+					Address: validatorAddress.(string),
+					Metadata: map[string]interface{}{
+						"type": "undelegation",
+					},
+				},
+				Metadata: operations[1].Account.Metadata,
+			},
+			Amount:   operations[1].Amount,
+			Metadata: operations[1].Metadata,
+		}
+
+		return append(operations, op2), nil
+	}
+
+	return operations, nil
+
+}
+
+func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, delegateOperation *types.Operation) *types.Operation {
+	amt, _ := new(big.Int).SetString(delegateOperation.Amount.Value, 10)
+	delegateAmt := new(big.Int).Sub(new(big.Int).SetUint64(0), amt)
+	validatorAddress := delegateOperation.Metadata["validatorAddress"]
+	delegation := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: delegateOperation.OperationIdentifier.Index + 1,
+		},
+		RelatedOperations: []*types.OperationIdentifier{
+			{
+				Index: delegateOperation.OperationIdentifier.Index,
+			},
+		},
+		Type:   tx.StakingType().String(),
+		Status: delegateOperation.Status,
+		Account: &types.AccountIdentifier{
+			Address: delegateOperation.Account.Address,
+			SubAccount: &types.SubAccountIdentifier{
+				Address: validatorAddress.(string),
+				Metadata: map[string]interface{}{
+					"type": "delegation",
+				},
+			},
+			Metadata: delegateOperation.Account.Metadata,
+		},
+		Amount: &types.Amount{
+			Value:    delegateAmt.String(),
+			Currency: delegateOperation.Amount.Currency,
+			Metadata: delegateOperation.Amount.Metadata,
+		},
+		Metadata: delegateOperation.Metadata,
+	}
+
+	return delegation
+
 }
 
 // GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
