@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/state"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,7 +40,11 @@ type Reader interface {
 // StakingCandidatesReader ..
 type StakingCandidatesReader interface {
 	CurrentBlock() *types.Block
+	StateAt(root common.Hash) (*state.DB, error)
 	ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error)
+	ReadValidatorInformationAtState(
+		addr common.Address, state *state.DB,
+	) (*staking.ValidatorWrapper, error)
 	ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error)
 	ValidatorCandidates() []common.Address
 }
@@ -145,11 +151,15 @@ func prepareOrders(
 		blsKeys[pubKey] = struct{}{}
 	}
 
+	state, err := stakedReader.StateAt(stakedReader.CurrentBlock().Root())
+	if err != nil || state == nil {
+		return nil, errors.Wrapf(err, "not state found at root: %s", stakedReader.CurrentBlock().Root().Hex())
+	}
 	for i := range candidates {
 		// TODO: reading validator wrapper from DB could be a bottle net when there are hundreds of validators
 		// with thousands of delegator data.
-		validator, err := stakedReader.ReadValidatorInformation(
-			candidates[i],
+		validator, err := stakedReader.ReadValidatorInformationAtState(
+			candidates[i], state,
 		)
 		if err != nil {
 			return nil, err

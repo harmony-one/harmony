@@ -282,7 +282,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	addr common.Address, block *types.Block,
 ) (*staking.ValidatorRPCEnhanced, error) {
 	bc := hmy.BlockChain
-	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
+	wrapper, err := bc.ReadValidatorInformationAtRoot(addr, block.Root())
 	if err != nil {
 		s, _ := internalCommon.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
@@ -469,7 +469,7 @@ func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []*staki
 func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
 	validator common.Address, block *types.Block,
 ) []*staking.Delegation {
-	wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, block.Root())
+	wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, block.Root())
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -501,7 +501,7 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(
 			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
@@ -548,7 +548,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 
 	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
 	for _, validator := range hmy.GetAllValidatorAddresses() {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, undelegationPayoutBlock.Root())
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, undelegationPayoutBlock.Root())
 		if err != nil || wrapper == nil {
 			continue // Not a validator at this epoch or unable to fetch validator info because of pruned state.
 		}
