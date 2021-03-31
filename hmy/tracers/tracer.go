@@ -526,7 +526,7 @@ func wrapError(context string, err error) error {
 }
 
 // CaptureStart implements the Tracer interface to initialize the tracing operation.
-func (jst *Tracer) CaptureStart(from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
+func (jst *Tracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	jst.ctx["type"] = "CALL"
 	if create {
 		jst.ctx["type"] = "CREATE"
@@ -536,7 +536,9 @@ func (jst *Tracer) CaptureStart(from common.Address, to common.Address, create b
 	jst.ctx["input"] = input
 	jst.ctx["gas"] = gas
 	jst.ctx["value"] = value
-
+	jst.ctx["blockHash"] = env.StateDB.BlockHash()
+	jst.ctx["transactionPosition"] = uint64(env.StateDB.TxIndex())
+	jst.ctx["transactionHash"] = env.StateDB.TxHash()
 	return nil
 }
 
@@ -626,6 +628,10 @@ func (jst *Tracer) GetResult() (json.RawMessage, error) {
 		case common.Address:
 			ptr := jst.vm.PushFixedBuffer(20)
 			copy(makeSlice(ptr, 20), val[:])
+
+		case common.Hash:
+			ptr := jst.vm.PushFixedBuffer(32)
+			copy(makeSlice(ptr, 32), val[:])
 
 		case *big.Int:
 			pushBigInt(val, jst.vm)

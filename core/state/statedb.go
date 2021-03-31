@@ -259,6 +259,10 @@ func (db *DB) TxIndex() int {
 	return db.txIndex
 }
 
+func (s *DB) TxHash() common.Hash {
+	return s.thash
+}
+
 // BlockHash returns the current block hash set by Prepare.
 func (db *DB) BlockHash() common.Hash {
 	return db.bhash
