@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -27,22 +28,24 @@ import (
 
 const (
 	verifiedSigCache = 20
+	epochCtxCache    = 20
 )
 
 type engineImpl struct {
-	beacon  engine.ChainReader
-	shardID uint32
+	beacon engine.ChainReader
 
 	// Caching field
+	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
 }
 
 // NewEngine creates Engine with some cache
-func NewEngine(shardID uint32) *engineImpl {
+func NewEngine() *engineImpl {
 	sigCache, _ := lru.New(verifiedSigCache)
+	epochCtxCache, _ := lru.New(epochCtxCache)
 	return &engineImpl{
 		beacon:           nil,
-		shardID:          shardID,
+		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
 	}
 }
@@ -414,28 +417,24 @@ func (e *engineImpl) verifyHeaderSignatureCached(chain engine.ChainReader, heade
 }
 
 func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
-	ss, err := e.getShardState(chain, header.Epoch(), header.ShardID())
-	if err != nil {
-		return err
+	ec, ok := e.getCachedEpochCtx(header)
+	if !ok {
+		// Epoch context not in cache, read from chain
+		var err error
+		ec, err = readEpochCtxFromChain(chain, header.Epoch(), header.ShardID())
+		if err != nil {
+			return err
+		}
 	}
-	shardComm, err := ss.FindCommitteeByID(header.ShardID())
-	if err != nil {
-		return err
-	}
-	pubKeys, err := shardComm.BLSPublicKeys()
-	if err != nil {
-		return err
-	}
+
+	var (
+		pubKeys    = ec.pubKeys
+		qrVerifier = ec.qrVerifier
+	)
 	aggSig, mask, err := DecodeSigBitmap(commitSig, commitBitmap, pubKeys)
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	isStaking := chain.Config().IsStaking(header.Epoch())
-	qrVerifier, err := quorum.NewVerifier(shardComm, header.Epoch(), isStaking)
-	if err != nil {
-		return err
-	}
-
 	// Verify signature, mask against quorum.Verifier and publicKeys
 	if !qrVerifier.IsQuorumAchievedByMask(mask) {
 		return errors.New("not enough signature collected")
@@ -449,32 +448,13 @@ func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *blo
 	return nil
 }
 
-func (e *engineImpl) getShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*shard.State, error) {
-	// (TODO) For now, when doing cross shard, we need recalcualte the shard state since we don't have
-	//    hard state of other shards
-	if e.needRecalculateStateShard(chain, epoch, targetShardID) {
-		shardState, err := committee.WithStakingEnabled.Compute(epoch, chain)
-		if err != nil {
-			return nil, errors.Wrapf(err, "compute shard state for epoch %v", epoch)
-		}
-		return shardState, nil
-
-	} else {
-		shardState, err := chain.ReadShardState(epoch)
-		if err != nil {
-			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
-		}
-		return shardState, nil
+func (e *engineImpl) getCachedEpochCtx(header *block.Header) (*epochCtx, bool) {
+	ecKey := newEpochCtxKeyFromHeader(header)
+	ec, ok := e.epochCtxCache.Get(ecKey)
+	if !ok || ec == nil {
+		return nil, false
 	}
-}
-
-// only recalculate for non-staking epoch and targetShardID is not the same
-// as engine
-func (e *engineImpl) needRecalculateStateShard(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) bool {
-	if chain.Config().IsStaking(epoch) {
-		return false
-	}
-	return targetShardID != e.shardID
+	return ec.(*epochCtx), true
 }
 
 // Support 512 at most validator nodes
@@ -496,6 +476,80 @@ func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, 
 		signature: sig,
 		bitmap:    keyBM,
 	}
+}
+
+type (
+	// epochCtxKey is the key for caching epochCtx
+	epochCtxKey struct {
+		shardID uint32
+		epoch   uint64
+	}
+
+	// epochCtx is the epoch's context used for signature verification.
+	// The value is fixed for each epoch and is cached in engineImpl.
+	epochCtx struct {
+		qrVerifier quorum.Verifier
+		pubKeys    []bls.PublicKeyWrapper
+	}
+)
+
+func newEpochCtxKeyFromHeader(header *block.Header) epochCtxKey {
+	return epochCtxKey{
+		shardID: header.ShardID(),
+		epoch:   header.Epoch().Uint64(),
+	}
+}
+
+func readEpochCtxFromChain(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*epochCtx, error) {
+	ss, err := readShardState(chain, epoch, targetShardID)
+	if err != nil {
+		return nil, err
+	}
+	shardComm, err := ss.FindCommitteeByID(targetShardID)
+	if err != nil {
+		return nil, err
+	}
+	pubKeys, err := shardComm.BLSPublicKeys()
+	if err != nil {
+		return nil, err
+	}
+	isStaking := chain.Config().IsStaking(epoch)
+	qrVerifier, err := quorum.NewVerifier(shardComm, epoch, isStaking)
+	if err != nil {
+		return nil, err
+	}
+	return &epochCtx{
+		qrVerifier: qrVerifier,
+		pubKeys:    pubKeys,
+	}, nil
+}
+
+func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*shard.State, error) {
+	// When doing cross shard, we need recalcualte the shard state since we don't have
+	// shard state of other shards
+	if needRecalculateStateShard(chain, epoch, targetShardID) {
+		shardState, err := committee.WithStakingEnabled.Compute(epoch, chain)
+		if err != nil {
+			return nil, errors.Wrapf(err, "compute shard state for epoch %v", epoch)
+		}
+		return shardState, nil
+
+	} else {
+		shardState, err := chain.ReadShardState(epoch)
+		if err != nil {
+			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
+		}
+		return shardState, nil
+	}
+}
+
+// only recalculate for non-staking epoch and targetShardID is not the same
+// as engine
+func needRecalculateStateShard(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) bool {
+	if chain.Config().IsStaking(epoch) {
+		return false
+	}
+	return targetShardID != chain.ShardID()
 }
 
 // GetLockPeriodInEpoch returns the delegation lock period for the given chain
