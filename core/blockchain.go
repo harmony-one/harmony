@@ -293,15 +293,6 @@ func IsEpochBlock(block *types.Block) bool {
 	return shard.Schedule.IsLastBlock(block.NumberU64() - 1)
 }
 
-// EpochFirstBlock returns the block number of the first block of an epoch.
-// TODO: instead of using fixed epoch schedules, determine the first block by epoch changes.
-func EpochFirstBlock(epoch *big.Int) *big.Int {
-	if epoch.Cmp(big.NewInt(GenesisEpoch)) == 0 {
-		return big.NewInt(GenesisEpoch)
-	}
-	return big.NewInt(int64(shard.Schedule.EpochLastBlock(epoch.Uint64()-1) + 1))
-}
-
 func (bc *BlockChain) getProcInterrupt() bool {
 	return atomic.LoadInt32(&bc.procInterrupt) == 1
 }
@@ -965,6 +956,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 // SetReceiptsData computes all the non-consensus fields of the receipts
 func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
 	signer := types.MakeSigner(config, block.Epoch())
+	ethSigner := types.NewEIP155Signer(config.EthCompatibleChainID)
 
 	transactions, stakingTransactions, logIndex := block.Transactions(), block.StakingTransactions(), uint(0)
 	if len(transactions)+len(stakingTransactions) != len(receipts) {
@@ -982,7 +974,12 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
-			from, _ := types.Sender(signer, transactions[j])
+			var from common.Address
+			if transactions[j].IsEthCompatible() {
+				from, _ = types.Sender(ethSigner, transactions[j])
+			} else {
+				from, _ = types.Sender(signer, transactions[j])
+			}
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
 		}
 		// The derived log fields can simply be set from the block and transaction
@@ -2789,6 +2786,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 }
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
+// Note that block rewards are only for staking era.
 func (bc *BlockChain) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
 		return big.NewInt(0), nil

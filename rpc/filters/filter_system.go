@@ -104,6 +104,7 @@ type EventSystem struct {
 	logsCh    chan []*types.Log          // Channel to receive new log event
 	rmLogsCh  chan core.RemovedLogsEvent // Channel to receive removed log event
 	chainCh   chan core.ChainEvent       // Channel to receive new chain event
+	isEth     bool
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -112,7 +113,7 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
+func NewEventSystem(backend Backend, lightMode bool, isEth bool) *EventSystem {
 	m := &EventSystem{
 		mux:       backend.EventMux(),
 		backend:   backend,
@@ -123,6 +124,7 @@ func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 		logsCh:    make(chan []*types.Log, logsChanSize),
 		rmLogsCh:  make(chan core.RemovedLogsEvent, rmLogsChanSize),
 		chainCh:   make(chan core.ChainEvent, chainEvChanSize),
+		isEth:     isEth,
 	}
 
 	// Subscribe events
@@ -346,7 +348,7 @@ func (es *EventSystem) broadcast(filters filterIndex, ev interface{}) {
 	case core.NewTxsEvent:
 		hashes := make([]common.Hash, 0, len(e.Txs))
 		for _, tx := range e.Txs {
-			hashes = append(hashes, tx.Hash())
+			hashes = append(hashes, tx.HashByType())
 		}
 		for _, f := range filters[PendingTransactionsSubscription] {
 			f.hashes <- hashes
@@ -406,7 +408,7 @@ func (es *EventSystem) lightFilterLogs(header *block.Header, addresses []common.
 		// Get the logs of the block
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		logsList, err := es.backend.GetLogs(ctx, header.Hash())
+		logsList, err := es.backend.GetLogs(ctx, header.Hash(), es.isEth)
 		if err != nil {
 			return nil
 		}

@@ -14,7 +14,9 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -48,27 +50,43 @@ func (s *PublicPoolService) SendRawTransaction(
 		return common.Hash{}, err
 	}
 
-	// Verify transaction type & chain
-	tx := new(types.Transaction)
-	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
-		return common.Hash{}, err
+	var tx *types.Transaction
+	var txHash common.Hash
+
+	if s.version == Eth {
+		ethTx := new(types.EthTransaction)
+		if err := rlp.DecodeBytes(encodedTx, ethTx); err != nil {
+			return common.Hash{}, err
+		}
+		txHash = ethTx.Hash()
+		tx = ethTx.ConvertToHmy()
+	} else {
+		tx = new(types.Transaction)
+		if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
+			return common.Hash{}, err
+		}
+		txHash = tx.Hash()
 	}
-	c := s.hmy.ChainConfig().ChainID
-	if id := tx.ChainID(); id.Cmp(c) != 0 {
-		return common.Hash{}, errors.Wrapf(
-			ErrInvalidChainID, "blockchain chain id:%s, given %s", c.String(), id.String(),
-		)
+
+	// Verify chainID
+	if err := s.verifyChainID(tx); err != nil {
+		return common.Hash{}, err
 	}
 
 	// Submit transaction
 	if err := s.hmy.SendTx(ctx, tx); err != nil {
 		utils.Logger().Warn().Err(err).Msg("Could not submit transaction")
-		return tx.Hash(), err
+		return txHash, err
 	}
 
 	// Log submission
 	if tx.To() == nil {
 		signer := types.MakeSigner(s.hmy.ChainConfig(), s.hmy.CurrentBlock().Epoch())
+		ethSigner := types.NewEIP155Signer(s.hmy.ChainConfig().EthCompatibleChainID)
+
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
 		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err
@@ -76,17 +94,33 @@ func (s *PublicPoolService) SendRawTransaction(
 		addr := crypto.CreateAddress(from, tx.Nonce())
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("contract", common2.MustAddressToBech32(addr)).
 			Msg("Submitted contract creation")
 	} else {
 		utils.Logger().Info().
 			Str("fullhash", tx.Hash().Hex()).
+			Str("hashByType", tx.HashByType().Hex()).
 			Str("recipient", tx.To().Hex()).
+			Interface("tx", tx).
 			Msg("Submitted transaction")
 	}
 
 	// Response output is the same for all versions
-	return tx.Hash(), nil
+	return txHash, nil
+}
+
+func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
+	nodeChainID := s.hmy.ChainConfig().ChainID
+	ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+
+	if tx.ChainID().Cmp(ethChainID) != 0 && tx.ChainID().Cmp(nodeChainID) != 0 {
+		return errors.Wrapf(
+			ErrInvalidChainID, "blockchain chain id:%s, given %s", nodeChainID.String(), tx.ChainID().String(),
+		)
+	}
+
+	return nil
 }
 
 // SendRawStakingTransaction will add the signed transaction to the transaction pool.
@@ -166,6 +200,14 @@ func (s *PublicPoolService) PendingTransactions(
 				}
 			case V2:
 				tx, err = v2.NewTransaction(plainTx, common.Hash{}, 0, 0, 0)
+				if err != nil {
+					utils.Logger().Debug().
+						Err(err).
+						Msgf("%v error at %v", LogTag, "PendingTransactions")
+					continue // Legacy behavior is to not return error here
+				}
+			case Eth:
+				tx, err = eth.NewTransaction(plainTx.ConvertToEth(), common.Hash{}, 0, 0, 0)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).

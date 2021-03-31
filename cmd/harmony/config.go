@@ -17,22 +17,24 @@ import (
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
 type harmonyConfig struct {
-	Version   string
-	General   generalConfig
-	Network   networkConfig
-	P2P       p2pConfig
-	HTTP      httpConfig
-	WS        wsConfig
-	RPCOpt    rpcOptConfig
-	BLSKeys   blsConfig
-	TxPool    txPoolConfig
-	Pprof     pprofConfig
-	Log       logConfig
-	Sys       *sysConfig       `toml:",omitempty"`
-	Consensus *consensusConfig `toml:",omitempty"`
-	Devnet    *devnetConfig    `toml:",omitempty"`
-	Revert    *revertConfig    `toml:",omitempty"`
-	Legacy    *legacyConfig    `toml:",omitempty"`
+	Version    string
+	General    generalConfig
+	Network    networkConfig
+	P2P        p2pConfig
+	HTTP       httpConfig
+	WS         wsConfig
+	RPCOpt     rpcOptConfig
+	BLSKeys    blsConfig
+	TxPool     txPoolConfig
+	Pprof      pprofConfig
+	Log        logConfig
+	Sync       syncConfig
+	Sys        *sysConfig        `toml:",omitempty"`
+	Consensus  *consensusConfig  `toml:",omitempty"`
+	Devnet     *devnetConfig     `toml:",omitempty"`
+	Revert     *revertConfig     `toml:",omitempty"`
+	Legacy     *legacyConfig     `toml:",omitempty"`
+	Prometheus *prometheusConfig `toml:",omitempty"`
 }
 
 type networkConfig struct {
@@ -45,18 +47,20 @@ type networkConfig struct {
 }
 
 type p2pConfig struct {
-	Port    int
-	IP      string
-	KeyFile string
+	Port         int
+	IP           string
+	KeyFile      string
+	DHTDataStore *string `toml:",omitempty"`
 }
 
 type generalConfig struct {
-	NodeType   string
-	NoStaking  bool
-	ShardID    int
-	IsArchival bool
-	IsOffline  bool
-	DataDir    string
+	NodeType         string
+	NoStaking        bool
+	ShardID          int
+	IsArchival       bool
+	IsBeaconArchival bool
+	IsOffline        bool
+	DataDir          string
 }
 
 type consensusConfig struct {
@@ -141,6 +145,28 @@ type legacyConfig struct {
 	TPBroadcastInvalidTxn *bool   `toml:",omitempty"`
 }
 
+type prometheusConfig struct {
+	Enabled    bool
+	IP         string
+	Port       int
+	EnablePush bool
+	Gateway    string
+}
+
+type syncConfig struct {
+	// TODO: Remove this bool after stream sync is fully up.
+	Downloader     bool // start the sync downloader client
+	LegacyServer   bool // provide the gRPC sync protocol server
+	LegacyClient   bool // aside from stream sync protocol, also run gRPC client to get blocks
+	Concurrency    int  // concurrency used for stream sync protocol
+	MinPeers       int  // minimum streams to start a sync task.
+	InitStreams    int  // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int  // upper limit of streams in one sync protocol
+	DiscBatch      int  // size of each discovery
+}
+
 // TODO: use specific type wise validation instead of general string types assertion.
 func validateHarmonyConfig(config harmonyConfig) error {
 	var accepts []string
@@ -175,6 +201,11 @@ func validateHarmonyConfig(config harmonyConfig) error {
 
 	if config.General.IsOffline && config.P2P.IP != nodeconfig.DefaultLocalListenIP {
 		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
+	}
+
+	if !config.Sync.Downloader && !config.Sync.LegacyClient {
+		// There is no module up for sync
+		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
 	}
 
 	return nil
@@ -224,6 +255,19 @@ func parseNetworkType(nt string) nodeconfig.NetworkType {
 	}
 }
 
+func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
+	switch nt {
+	case nodeconfig.Mainnet:
+		return defaultMainnetSyncConfig
+	case nodeconfig.Testnet:
+		return defaultTestNetSyncConfig
+	case nodeconfig.Localnet:
+		return defaultLocalNetSyncConfig
+	default:
+		return defaultElseSyncConfig
+	}
+}
+
 var dumpConfigCmd = &cobra.Command{
 	Use:   "dumpconfig [config_file]",
 	Short: "dump the config file for harmony binary configurations",
@@ -261,6 +305,9 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 	}
 	if config.P2P.IP == "" {
 		config.P2P.IP = defaultConfig.P2P.IP
+	}
+	if config.Prometheus == nil {
+		config.Prometheus = defaultConfig.Prometheus
 	}
 	return config, nil
 }

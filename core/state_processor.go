@@ -142,7 +142,7 @@ func (p *StateProcessor) Process(
 	}()
 	_, payout, err := p.engine.Finalize(
 		p.bc, header, statedb, block.Transactions(),
-		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady,
+		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
 		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")
@@ -187,7 +187,17 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		)
 	}
 
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Epoch()))
+	var signer types.Signer
+	if tx.IsEthCompatible() {
+		if !config.IsEthCompatible(header.Epoch()) {
+			return nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
+		}
+		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
+	} else {
+		signer = types.MakeSigner(config, header.Epoch())
+	}
+	msg, err := tx.AsMessage(signer)
+
 	// skip signer err for additiononly tx
 	if err != nil {
 		return nil, nil, 0, err
@@ -330,7 +340,7 @@ func StakingToMessage(
 		return types.Message{}, err
 	}
 
-	msg := types.NewStakingMessage(from, tx.Nonce(), tx.Gas(), tx.GasPrice(), payload, blockNum)
+	msg := types.NewStakingMessage(from, tx.Nonce(), tx.GasLimit(), tx.GasPrice(), payload, blockNum)
 	stkType := tx.StakingType()
 	if _, ok := types.StakingTypeMap[stkType]; !ok {
 		return types.Message{}, staking.ErrInvalidStakingKind

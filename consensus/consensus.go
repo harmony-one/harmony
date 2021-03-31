@@ -36,8 +36,8 @@ const (
 	AsyncProposal
 )
 
-// BlockVerifierFunc is a function used to verify the block
-type BlockVerifierFunc func(*types.Block) error
+// VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
+type VerifyBlockFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
@@ -48,10 +48,6 @@ type Consensus struct {
 	phase FBFTPhase
 	// current indicates what state a node is in
 	current State
-	// How long to delay sending commit messages.
-	delayCommit time.Duration
-	// Consensus rounds whose commit phase finished
-	commitFinishChan chan uint64
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
@@ -96,7 +92,7 @@ type Consensus struct {
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
 	// The verifier func passed from Node object
-	BlockVerifier BlockVerifierFunc
+	BlockVerifier VerifyBlockFunc
 	// verified block to state sync broadcast
 	VerifiedNewBlock chan *types.Block
 	// will trigger state syncing when blockNum is low
@@ -132,12 +128,19 @@ type Consensus struct {
 	finality int64
 	// finalityCounter keep tracks of the finality time
 	finalityCounter int64
+
+	dHelper *downloadHelper
 }
 
-// SetCommitDelay sets the commit message delay.  If set to non-zero,
-// validator delays commit message by the amount.
-func (consensus *Consensus) SetCommitDelay(delay time.Duration) {
-	consensus.delayCommit = delay
+// VerifyBlock is a function used to verify the block and keep trace of verified blocks
+func (consensus *Consensus) VerifyBlock(block *types.Block) error {
+	if !consensus.FBFTLog.IsBlockVerified(block) {
+		if err := consensus.BlockVerifier(block); err != nil {
+			return errors.New("Block verification failed")
+		}
+		consensus.FBFTLog.MarkBlockVerified(block)
+	}
+	return nil
 }
 
 // BlocksSynchronized lets the main loop know that block synchronization finished
@@ -177,9 +180,9 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 }
 
 // SetBlockVerifier sets the block verifier
-func (consensus *Consensus) SetBlockVerifier(verifier BlockVerifierFunc) {
+func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.BlockVerifier = verifier
-	consensus.vc.SetBlockVerifier(verifier)
+	consensus.vc.SetVerifyBlock(consensus.VerifyBlock)
 }
 
 // New create a new Consensus record
@@ -216,7 +219,6 @@ func New(
 	consensus.syncReadyChan = make(chan struct{})
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
-	consensus.commitFinishChan = make(chan uint64)
 	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)
 	// channel for receiving newly generated VDF
@@ -224,6 +226,10 @@ func New(
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)
 	// Make Sure Verifier is not null
 	consensus.vc = newViewChange()
+
+	// init prometheus metrics
+	initMetrics()
+	consensus.AddPubkeyMetrics()
 
 	return &consensus, nil
 }

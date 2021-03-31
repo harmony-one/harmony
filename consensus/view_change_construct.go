@@ -3,7 +3,6 @@ package consensus
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -47,11 +46,8 @@ type viewChange struct {
 
 	m1Payload []byte // message payload for type m1 := |vcBlockHash|prepared_agg_sigs|prepared_bitmap|, new leader only need one
 
-	blockVerifier      BlockVerifierFunc
+	verifyBlock        VerifyBlockFunc
 	viewChangeDuration time.Duration
-
-	// mutex for view change
-	vcLock sync.RWMutex
 }
 
 // newViewChange returns a new viewChange object
@@ -61,15 +57,13 @@ func newViewChange() *viewChange {
 	return &vc
 }
 
-// SetBlockVerifier ..
-func (vc *viewChange) SetBlockVerifier(verifier BlockVerifierFunc) {
-	vc.blockVerifier = verifier
+// SetVerifyBlock ..
+func (vc *viewChange) SetVerifyBlock(verifyBlock VerifyBlockFunc) {
+	vc.verifyBlock = verifyBlock
 }
 
 // AddViewIDKeyIfNotExist ..
 func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.PublicKeys) {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
 	if _, ok := vc.bhpSigs[viewID]; !ok {
 		vc.bhpSigs[viewID] = map[string]*bls_core.Sign{}
 	}
@@ -95,9 +89,6 @@ func (vc *viewChange) AddViewIDKeyIfNotExist(viewID uint64, members multibls.Pub
 
 // Reset reset the state for viewchange
 func (vc *viewChange) Reset() {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	vc.m1Payload = []byte{}
 	vc.bhpSigs = map[uint64]map[string]*bls_core.Sign{}
 	vc.nilSigs = map[uint64]map[string]*bls_core.Sign{}
@@ -109,15 +100,16 @@ func (vc *viewChange) Reset() {
 }
 
 // GetPreparedBlock returns the prepared block or nil if not found
-func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
+func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog) ([]byte, []byte) {
 	if vc.isM1PayloadEmpty() {
 		return nil, nil
 	}
 
-	if block := fbftlog.GetBlockByHash(hash); block != nil {
+	blockHash := [32]byte{}
+	// First 32 bytes of m1 payload is the correct block hash
+	copy(blockHash[:], vc.GetM1Payload())
+
+	if block := fbftlog.GetBlockByHash(blockHash); block != nil {
 		encodedBlock, err := rlp.EncodeToBytes(block)
 		if err != nil || len(encodedBlock) == 0 {
 			return nil, nil
@@ -130,9 +122,6 @@ func (vc *viewChange) GetPreparedBlock(fbftlog *FBFTLog, hash [32]byte) ([]byte,
 
 // GetM2Bitmap returns the nilBitmap as M2Bitmap
 func (vc *viewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
 	sig2arr := []*bls_core.Sign{}
 	for _, sig := range vc.nilSigs[viewID] {
 		sig2arr = append(sig2arr, sig)
@@ -149,9 +138,6 @@ func (vc *viewChange) GetM2Bitmap(viewID uint64) ([]byte, []byte) {
 
 // GetM3Bitmap returns the viewIDBitmap as M3Bitmap
 func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
-
 	sig3arr := []*bls_core.Sign{}
 	for _, sig := range vc.viewIDSigs[viewID] {
 		sig3arr = append(sig3arr, sig)
@@ -168,9 +154,6 @@ func (vc *viewChange) GetM3Bitmap(viewID uint64) ([]byte, []byte) {
 
 // VerifyNewViewMsg returns true if the new view message is valid
 func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, error) {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	if recvMsg.M3AggSig == nil || recvMsg.M3Bitmap == nil {
 		return nil, errors.New("[VerifyNewViewMsg] M3AggSig or M3Bitmap is nil")
 	}
@@ -202,6 +185,10 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 	binary.LittleEndian.PutUint64(viewIDBytes, recvMsg.ViewID)
 
 	if !m3Sig.VerifyHash(m3Mask.AggregatePublic, viewIDBytes) {
+		vc.getLogger().Warn().
+			Bytes("viewIDBytes", viewIDBytes).
+			Interface("AggregatePublic", m3Mask.AggregatePublic).
+			Msg("m3Sig.VerifyHash Failed")
 		return nil, errors.New("[VerifyNewViewMsg] Unable to Verify Aggregated Signature of M3 (ViewID) payload")
 	}
 
@@ -209,6 +196,10 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 	if recvMsg.M2AggSig != nil {
 		m2Sig := recvMsg.M2AggSig
 		if !m2Sig.VerifyHash(m2Mask.AggregatePublic, NIL) {
+			vc.getLogger().Warn().
+				Bytes("NIL", NIL).
+				Interface("AggregatePublic", m2Mask.AggregatePublic).
+				Msg("m2Sig.VerifyHash Failed")
 			return nil, errors.New("[VerifyNewViewMsg] Unable to Verify Aggregated Signature of M2 (NIL) payload")
 		}
 	}
@@ -225,8 +216,8 @@ func (vc *viewChange) VerifyNewViewMsg(recvMsg *FBFTMessage) (*types.Block, erro
 		if !bytes.Equal(preparedBlockHash[:], blockHash) {
 			return nil, errors.New("[VerifyNewViewMsg] Prepared block hash doesn't match msg block hash")
 		}
-		if err := vc.blockVerifier(preparedBlock); err != nil {
-			return nil, errors.New("[VerifyNewViewMsg] Prepared block verification failed")
+		if err := vc.verifyBlock(preparedBlock); err != nil {
+			return nil, err
 		}
 		return preparedBlock, nil
 	}
@@ -250,9 +241,6 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	decider quorum.Decider,
 	recvMsg *FBFTMessage,
 ) error {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	preparedBlock := &types.Block{}
 	if !recvMsg.HasSingleSender() {
 		return errIncorrectSender
@@ -269,7 +257,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		if err := rlp.DecodeBytes(recvMsg.Block, preparedBlock); err != nil {
 			return err
 		}
-		if err := vc.blockVerifier(preparedBlock); err != nil {
+		if err := vc.verifyBlock(preparedBlock); err != nil {
 			return err
 		}
 		_, ok := vc.bhpSigs[recvMsg.ViewID][senderKeyStr]
@@ -297,14 +285,30 @@ func (vc *viewChange) ProcessViewChangeMsg(
 		vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 			Str("validatorPubKey", senderKeyStr).
 			Msg("[ProcessViewChangeMsg] Add M1 (prepared) type message")
+
+		if _, ok := vc.bhpSigs[recvMsg.ViewID]; !ok {
+			vc.bhpSigs[recvMsg.ViewID] = map[string]*bls_core.Sign{}
+		}
 		vc.bhpSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
+		if _, ok := vc.bhpBitmap[recvMsg.ViewID]; !ok {
+			bhpBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+			vc.bhpBitmap[recvMsg.ViewID] = bhpBitmap
+		}
 		vc.bhpBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
 
 		vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 			Str("validatorPubKey", senderKeyStr).
 			Msg("[ProcessViewChangeMsg] Add M3 (ViewID) type message")
 
+		if _, ok := vc.viewIDSigs[recvMsg.ViewID]; !ok {
+			vc.viewIDSigs[recvMsg.ViewID] = map[string]*bls_core.Sign{}
+		}
 		vc.viewIDSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewidSig
+
+		if _, ok := vc.viewIDBitmap[recvMsg.ViewID]; !ok {
+			viewIDBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+			vc.viewIDBitmap[recvMsg.ViewID] = viewIDBitmap
+		}
 		// Set the bitmap indicating that this validator signed.
 		vc.viewIDBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true)
 
@@ -323,7 +327,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 
 			preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{recvMsg.LeaderPubkey}
 			vc.getLogger().Info().Msg("[ProcessViewChangeMsg] New Leader Prepared Message Added")
-			fbftlog.AddMessage(&preparedMsg)
+			fbftlog.AddVerifiedMessage(&preparedMsg)
 			fbftlog.AddBlock(preparedBlock)
 		}
 		return nil
@@ -340,15 +344,32 @@ func (vc *viewChange) ProcessViewChangeMsg(
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 		Str("validatorPubKey", senderKeyStr).
 		Msg("[ProcessViewChangeMsg] Add M2 (NIL) type message")
+
+	if _, ok := vc.nilSigs[recvMsg.ViewID]; !ok {
+		vc.nilSigs[recvMsg.ViewID] = map[string]*bls_core.Sign{}
+	}
 	vc.nilSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewchangeSig
+
+	if _, ok := vc.nilBitmap[recvMsg.ViewID]; !ok {
+		nilBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+		vc.nilBitmap[recvMsg.ViewID] = nilBitmap
+	}
 	vc.nilBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true) // Set the bitmap indicating that this validator signed.
 
 	vc.getLogger().Info().Uint64("viewID", recvMsg.ViewID).
 		Str("validatorPubKey", senderKeyStr).
 		Msg("[ProcessViewChangeMsg] Add M3 (ViewID) type message")
 
+	if _, ok := vc.viewIDSigs[recvMsg.ViewID]; !ok {
+		vc.viewIDSigs[recvMsg.ViewID] = map[string]*bls_core.Sign{}
+	}
 	vc.viewIDSigs[recvMsg.ViewID][senderKeyStr] = recvMsg.ViewidSig
+
 	// Set the bitmap indicating that this validator signed.
+	if _, ok := vc.viewIDBitmap[recvMsg.ViewID]; !ok {
+		viewIDBitmap, _ := bls_cosi.NewMask(decider.Participants(), nil)
+		vc.viewIDBitmap[recvMsg.ViewID] = viewIDBitmap
+	}
 	vc.viewIDBitmap[recvMsg.ViewID].SetKey(senderKey.Bytes, true)
 
 	return nil
@@ -360,10 +381,8 @@ func (vc *viewChange) InitPayload(
 	viewID uint64,
 	blockNum uint64,
 	privKeys multibls.PrivateKeys,
+	members multibls.PublicKeys,
 ) error {
-	vc.vcLock.Lock()
-	defer vc.vcLock.Unlock()
-
 	// m1 or m2 init once per viewID/key.
 	// m1 and m2 are mutually exclusive.
 	// If the node has valid prepared block, it will add m1 signature.
@@ -387,13 +406,21 @@ func (vc *viewChange) InitPayload(
 		hasBlock := false
 		if preparedMsg != nil {
 			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
-				if err := vc.blockVerifier(preparedBlock); err == nil {
+				if err := vc.verifyBlock(preparedBlock); err == nil {
 					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M1 (prepared) type messaage")
 					msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 					for _, key := range privKeys {
+						// update the dictionary key if the viewID is first time received
+						if _, ok := vc.bhpBitmap[viewID]; !ok {
+							bhpBitmap, _ := bls_cosi.NewMask(members, nil)
+							vc.bhpBitmap[viewID] = bhpBitmap
+						}
 						if err := vc.bhpBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
 							vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] bhpBitmap setkey failed")
 							continue
+						}
+						if _, ok := vc.bhpSigs[viewID]; !ok {
+							vc.bhpSigs[viewID] = map[string]*bls_core.Sign{}
 						}
 						vc.bhpSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(msgToSign)
 					}
@@ -408,9 +435,16 @@ func (vc *viewChange) InitPayload(
 		if !hasBlock {
 			vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M2 (NIL) type messaage")
 			for _, key := range privKeys {
+				if _, ok := vc.nilBitmap[viewID]; !ok {
+					nilBitmap, _ := bls_cosi.NewMask(members, nil)
+					vc.nilBitmap[viewID] = nilBitmap
+				}
 				if err := vc.nilBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
 					vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] nilBitmap setkey failed")
 					continue
+				}
+				if _, ok := vc.nilSigs[viewID]; !ok {
+					vc.nilSigs[viewID] = map[string]*bls_core.Sign{}
 				}
 				vc.nilSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(NIL)
 			}
@@ -432,9 +466,16 @@ func (vc *viewChange) InitPayload(
 		binary.LittleEndian.PutUint64(viewIDBytes, viewID)
 		vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M3 (ViewID) type messaage")
 		for _, key := range privKeys {
+			if _, ok := vc.viewIDBitmap[viewID]; !ok {
+				viewIDBitmap, _ := bls_cosi.NewMask(members, nil)
+				vc.viewIDBitmap[viewID] = viewIDBitmap
+			}
 			if err := vc.viewIDBitmap[viewID].SetKey(key.Pub.Bytes, true); err != nil {
 				vc.getLogger().Warn().Str("key", key.Pub.Bytes.Hex()).Msg("[InitPayload] viewIDBitmap setkey failed")
 				continue
+			}
+			if _, ok := vc.viewIDSigs[viewID]; !ok {
+				vc.viewIDSigs[viewID] = map[string]*bls_core.Sign{}
 			}
 			vc.viewIDSigs[viewID][key.Pub.Bytes.Hex()] = key.Pri.SignHash(viewIDBytes)
 		}
@@ -451,22 +492,16 @@ func (vc *viewChange) isM1PayloadEmpty() bool {
 
 // IsM1PayloadEmpty returns true if m1Payload is not set
 func (vc *viewChange) IsM1PayloadEmpty() bool {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.isM1PayloadEmpty()
 }
 
 // GetViewIDBitmap returns the viewIDBitmap
 func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.viewIDBitmap[viewID]
 }
 
 // GetM1Payload returns the m1Payload
 func (vc *viewChange) GetM1Payload() []byte {
-	vc.vcLock.RLock()
-	defer vc.vcLock.RUnlock()
 	return vc.m1Payload
 }
 

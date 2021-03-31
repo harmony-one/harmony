@@ -4,6 +4,9 @@ language: go
 go:
   - 1.14
 go_import_path: github.com/harmony-one/harmony
+cache:
+  directories:
+    - docker_images
 env:
   - TEST="make"
   - TEST="bash ./scripts/travis_go_checker.sh"

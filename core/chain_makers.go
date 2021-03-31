@@ -196,7 +196,7 @@ func GenerateChain(
 		if b.engine != nil {
 			// Finalize and seal the block
 			block, _, err := b.engine.Finalize(
-				chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil, nil,
+				chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil, nil, func() uint64 { return 0 },
 			)
 			if err != nil {
 				panic(err)
@@ -305,3 +305,5 @@ func (cr *fakeChainReader) ReadValidatorStats(
 ) (*staking.ValidatorStats, error) {
 	return nil, nil
 }
+
+func (cr *fakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }

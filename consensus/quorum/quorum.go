@@ -75,6 +75,7 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
 }
 
@@ -138,11 +139,12 @@ type Registry struct {
 	Deciders      map[string]Decider `json:"quorum-deciders"`
 	ExternalCount int                `json:"external-slot-count"`
 	MedianStake   numeric.Dec        `json:"epos-median-stake"`
+	Epoch         int                `json:"epoch"`
 }
 
 // NewRegistry ..
-func NewRegistry(extern int) Registry {
-	return Registry{map[string]Decider{}, extern, numeric.ZeroDec()}
+func NewRegistry(extern int, epoch int) Registry {
+	return Registry{map[string]Decider{}, extern, numeric.ZeroDec(), epoch}
 }
 
 // Transition  ..
@@ -241,6 +243,11 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	}
 	idx = (idx + next) % numNodes
 	return found, &s.publicKeys[idx]
+}
+
+// FirstParticipant returns the first participant of the shard
+func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
+	return &s.publicKeys[0]
 }
 
 func (s *cIdentities) Participants() multibls.PublicKeys {

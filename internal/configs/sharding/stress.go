@@ -16,8 +16,8 @@ var StressNetSchedule stressnetSchedule
 type stressnetSchedule struct{}
 
 const (
-	// ~304 sec epochs for P2 of open staking
-	stressnetBlocksPerEpoch = 38
+	// ~0.5 hour per epoch
+	stressnetBlocksPerEpoch = 1024
 
 	stressnetVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -29,6 +29,8 @@ const (
 
 func (ss stressnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.StressnetChainConfig.IsSixtyPercent(epoch):
+		return stressnetV2
 	case epoch.Cmp(params.StressnetChainConfig.StakingEpoch) >= 0:
 		return stressnetV1
 	default: // genesis
@@ -55,11 +57,6 @@ func (ss stressnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 
 func (ss stressnetSchedule) VdfDifficulty() int {
 	return stressnetVdfDifficulty
-}
-
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ss stressnetSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
 }
 
 // TODO: remove it after randomness feature turned on mainnet
@@ -89,3 +86,4 @@ var stressnetReshardingEpoch = []*big.Int{
 
 var stressnetV0 = MustNewInstance(2, 10, 10, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
 var stressnetV1 = MustNewInstance(2, 30, 10, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())
+var stressnetV2 = MustNewInstance(2, 30, 10, numeric.MustNewDecFromStr("0.6"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, stressnetReshardingEpoch, StressNetSchedule.BlocksPerEpoch())

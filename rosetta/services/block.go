@@ -4,28 +4,39 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	"github.com/harmony-one/harmony/rpc"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	// txTraceCacheSize is max number of transaction traces to keep cached
+	txTraceCacheSize = 1e5
+)
+
 // BlockAPI implements the server.BlockAPIServicer interface.
 type BlockAPI struct {
-	hmy *hmy.Harmony
+	hmy          *hmy.Harmony
+	txTraceCache *lru.Cache
 }
 
 // NewBlockAPI creates a new instance of a BlockAPI.
 func NewBlockAPI(hmy *hmy.Harmony) server.BlockAPIServicer {
+	traceCache, _ := lru.New(txTraceCacheSize)
 	return &BlockAPI{
-		hmy: hmy,
+		hmy:          hmy,
+		txTraceCache: traceCache,
 	}
 }
 
@@ -48,31 +59,34 @@ func (s *BlockAPI) Block(
 		return nil, rosettaError
 	}
 
-	// Format genesis block if it is requested.
-	if blk.Number().Uint64() == 0 {
-		return s.genesisBlock(ctx, request, blk)
-	}
-
 	currBlockID = &types.BlockIdentifier{
 		Index: blk.Number().Int64(),
 		Hash:  blk.Hash().String(),
 	}
-	prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
-	}
-	prevBlockID = &types.BlockIdentifier{
-		Index: prevBlock.Number().Int64(),
-		Hash:  prevBlock.Hash().String(),
+
+	if blk.NumberU64() == 0 {
+		prevBlockID = currBlockID
+	} else {
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
+		if err != nil {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+		prevBlockID = &types.BlockIdentifier{
+			Index: prevBlock.Number().Int64(),
+			Hash:  prevBlock.Hash().String(),
+		}
 	}
 
-	// Report undelegation payouts as transactions to fit API.
-	// Report all transactions here since all undelegation payout amounts are known after fetching payouts.
-	transactions, rosettaError := s.getAllUndelegationPayoutTransactions(ctx, blk)
-	if rosettaError != nil {
-		return nil, rosettaError
+	// Report any side effect transaction now as it can be computed & cached on block fetch.
+	transactions := []*types.Transaction{}
+	if s.containsSideEffectTransaction(ctx, blk) {
+		tx, rosettaError := s.getSideEffectTransaction(ctx, blk)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+		transactions = append(transactions, tx)
 	}
 
 	metadata, err := types.MarshalMap(BlockMetadata{
@@ -110,14 +124,6 @@ func (s *BlockAPI) Block(
 			})
 		}
 	}
-	// Report pre-staking era block rewards as transactions to fit API.
-	if !s.hmy.IsStakingEpoch(blk.Epoch()) {
-		preStakingRewardTxIDs, rosettaError := s.getPreStakingRewardTransactionIdentifiers(ctx, blk)
-		if rosettaError != nil {
-			return nil, rosettaError
-		}
-		otherTransactions = append(otherTransactions, preStakingRewardTxIDs...)
-	}
 
 	return &types.BlockResponse{
 		Block:             responseBlock,
@@ -133,17 +139,17 @@ func (s *BlockAPI) BlockTransaction(
 		return nil, err
 	}
 
-	// Format genesis block transaction request
-	if request.BlockIdentifier.Index == 0 {
-		return s.specialGenesisBlockTransaction(ctx, request)
-	}
-
-	blockHash := ethcommon.HexToHash(request.BlockIdentifier.Hash)
-	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
-	txInfo, rosettaError := s.getTransactionInfo(ctx, blockHash, txHash)
+	blk, rosettaError := getBlock(
+		ctx, s.hmy, &types.PartialBlockIdentifier{Hash: &request.BlockIdentifier.Hash},
+	)
 	if rosettaError != nil {
-		// If no transaction info is found, check for special case transactions.
-		response, rosettaError2 := s.specialBlockTransaction(ctx, request)
+		return nil, rosettaError
+	}
+	txHash := ethcommon.HexToHash(request.TransactionIdentifier.Hash)
+	txInfo, rosettaError := s.getTransactionInfo(ctx, blk, txHash)
+	if rosettaError != nil {
+		// If no transaction info is found, check for side effect case transaction.
+		response, rosettaError2 := s.sideEffectBlockTransaction(ctx, request)
 		if rosettaError2 != nil && rosettaError2.Code != common.TransactionNotFoundError.Code {
 			return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
 				"from_error": rosettaError2,
@@ -160,11 +166,24 @@ func (s *BlockAPI) BlockTransaction(
 
 	var transaction *types.Transaction
 	if txInfo.tx != nil && txInfo.receipt != nil {
-		contractCode := []byte{}
-		if txInfo.tx.To() != nil {
-			contractCode = state.GetCode(*txInfo.tx.To())
+		contractInfo := &ContractInfo{}
+		if _, ok := txInfo.tx.(*hmytypes.Transaction); ok {
+			// check for contract related operations, if it is a plain transaction.
+			if txInfo.tx.To() != nil {
+				// possible call to existing contract so fetch relevant data
+				contractInfo.ContractCode = state.GetCode(*txInfo.tx.To())
+				contractInfo.ContractAddress = txInfo.tx.To()
+			} else {
+				// contract creation, so address is in receipt
+				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
+				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
+			}
+			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
 		}
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractCode)
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractInfo)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -190,7 +209,7 @@ type transactionInfo struct {
 
 // getTransactionInfo given the block hash and transaction hash
 func (s *BlockAPI) getTransactionInfo(
-	ctx context.Context, blockHash, txHash ethcommon.Hash,
+	ctx context.Context, blk *hmytypes.Block, txHash ethcommon.Hash,
 ) (txInfo *transactionInfo, rosettaError *types.Error) {
 	// Look for all of the possible transactions
 	var index uint64
@@ -199,6 +218,8 @@ func (s *BlockAPI) getTransactionInfo(
 	plainTx, _, _, index = rawdb.ReadTransaction(s.hmy.ChainDb(), txHash)
 	if plainTx == nil {
 		stakingTx, _, _, index = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), txHash)
+		// if there both normal and staking transactions, correct index offset.
+		index = index + uint64(blk.Transactions().Len())
 	}
 	cxReceipt, _, _, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), txHash)
 
@@ -207,7 +228,7 @@ func (s *BlockAPI) getTransactionInfo(
 	}
 
 	var receipt *hmytypes.Receipt
-	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	receipts, err := s.hmy.GetReceipts(ctx, blk.Hash())
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -215,6 +236,11 @@ func (s *BlockAPI) getTransactionInfo(
 	}
 	if int(index) < len(receipts) {
 		receipt = receipts[index]
+		if cxReceipt == nil && receipt.TxHash != txHash {
+			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unable to find correct receipt for transaction",
+			})
+		}
 	}
 
 	// Use pool transaction for concise formatting
@@ -231,6 +257,58 @@ func (s *BlockAPI) getTransactionInfo(
 		receipt:   receipt,
 		cxReceipt: cxReceipt,
 	}, nil
+}
+
+var (
+	// defaultTraceReExec is the number of blocks the tracer can go back and re-execute to produce historical state.
+	// Only 1 block is needed to check for internal transactions
+	defaultTraceReExec = uint64(1)
+	// defaultTraceTimeout is the amount of time a transaction can execute
+	defaultTraceTimeout = (10 * time.Second).String()
+	// defaultTraceLogConfig is the log config of all traces
+	defaultTraceLogConfig = vm.LogConfig{
+		DisableMemory:  false,
+		DisableStack:   false,
+		DisableStorage: false,
+		Debug:          false,
+		Limit:          0,
+	}
+)
+
+// getTransactionTrace for the given txInfo.
+func (s *BlockAPI) getTransactionTrace(
+	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
+) (*hmy.ExecutionResult, *types.Error) {
+	cacheKey := types.Hash(blk) + types.Hash(txInfo)
+	if value, ok := s.txTraceCache.Get(cacheKey); ok {
+		return value.(*hmy.ExecutionResult), nil
+	}
+
+	msg, vmctx, statedb, err := s.hmy.ComputeTxEnv(blk, int(txInfo.txIndex), defaultTraceReExec)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+		LogConfig: &defaultTraceLogConfig,
+		Timeout:   &defaultTraceTimeout,
+		Reexec:    &defaultTraceReExec,
+	})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	execResult, ok := execResultInterface.(*hmy.ExecutionResult)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unknown tracer exec result type",
+		})
+	}
+	s.txTraceCache.Add(cacheKey, execResult)
+
+	return execResult, nil
 }
 
 // getBlock ..

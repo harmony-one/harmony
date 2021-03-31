@@ -36,15 +36,15 @@ func TestParseUnsignedTransaction(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 	refTestReceipt := &hmytypes.Receipt{
-		GasUsed: testTx.Gas(),
+		GasUsed: testTx.GasLimit(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, []byte{})
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	refUnsignedTx := hmytypes.NewCrossShardTransaction(
 		testTx.Nonce(), &refSender, testTx.ShardID(), testTx.ToShardID(), testTx.Value(),
-		testTx.Gas(), gasPrice, testTx.Data(),
+		testTx.GasLimit(), gasPrice, testTx.Data(),
 	)
 
 	// Test valid plain transaction
@@ -99,9 +99,9 @@ func TestParseSignedTransaction(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 	refTestReceipt := &hmytypes.Receipt{
-		GasUsed: testTx.Gas(),
+		GasUsed: testTx.GasLimit(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, []byte{})
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

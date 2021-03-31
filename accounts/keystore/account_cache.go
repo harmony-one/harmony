@@ -263,7 +263,7 @@ func (ac *accountCache) scanAccounts() error {
 		// Parse the address.
 		key.Address = ""
 		err = json.NewDecoder(buf).Decode(&key)
-		addr := common2.ParseAddr(key.Address)
+		addr, _ := common2.ParseAddr(key.Address)
 		switch {
 		case err != nil:
 			utils.Logger().Debug().

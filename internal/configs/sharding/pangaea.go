@@ -56,10 +56,6 @@ func (ps pangaeaSchedule) VdfDifficulty() int {
 	return pangaeaVdfDifficulty
 }
 
-func (ps pangaeaSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {

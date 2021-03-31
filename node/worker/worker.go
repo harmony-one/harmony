@@ -34,6 +34,7 @@ import (
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
 	signer     types.Signer
+	ethSigner  types.Signer
 	state      *state.DB     // apply state changes here
 	gasPool    *core.GasPool // available gas used to pack transactions
 	header     *block.Header
@@ -57,18 +58,11 @@ type Worker struct {
 	gasCeil  uint64
 }
 
-// CommitTransactions commits transactions for new block.
-func (w *Worker) CommitTransactions(
-	pendingNormal map[common.Address]types.Transactions,
-	pendingStaking staking.StakingTransactions, coinbase common.Address,
-) error {
-
-	if w.current.gasPool == nil {
-		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
-	}
-
-	txs := types.NewTransactionsByPriceAndNonce(w.current.signer, pendingNormal)
-	// NORMAL
+// CommitSortedTransactions commits transactions for new block.
+func (w *Worker) CommitSortedTransactions(
+	txs *types.TransactionsByPriceAndNonce,
+	coinbase common.Address,
+) {
 	for {
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
@@ -83,7 +77,11 @@ func (w *Worker) CommitTransactions(
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(w.current.signer, tx)
+		signer := w.current.signer
+		if tx.IsEthCompatible() {
+			signer = w.current.ethSigner
+		}
+		from, _ := types.Sender(signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
@@ -91,14 +89,14 @@ func (w *Worker) CommitTransactions(
 			txs.Pop()
 			continue
 		}
-		// Start executing the transaction
-		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 
 		if tx.ShardID() != w.chain.ShardID() {
 			txs.Shift()
 			continue
 		}
 
+		// Start executing the transaction
+		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 		_, err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
@@ -129,6 +127,21 @@ func (w *Worker) CommitTransactions(
 			txs.Shift()
 		}
 	}
+}
+
+// CommitTransactions commits transactions for new block.
+func (w *Worker) CommitTransactions(
+	pendingNormal map[common.Address]types.Transactions,
+	pendingStaking staking.StakingTransactions, coinbase common.Address,
+) error {
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
+	}
+
+	// HARMONY TXNS
+	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
+
+	w.CommitSortedTransactions(normalTxns, coinbase)
 
 	// STAKING - only beaconchain process staking transaction
 	if w.chain.ShardID() == shard.BeaconChainShardID {
@@ -142,7 +155,6 @@ func (w *Worker) CommitTransactions(
 			// phase, start ignoring the sender until we do.
 			if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
 				utils.Logger().Info().Str("hash", tx.Hash().Hex()).Str("eip155Epoch", w.config.EIP155Epoch.String()).Msg("Ignoring reply protected transaction")
-				txs.Pop()
 				continue
 			}
 
@@ -157,7 +169,7 @@ func (w *Worker) CommitTransactions(
 					Msg("Failed committing staking transaction")
 			} else {
 				utils.Logger().Info().Str("stakingTxId", tx.Hash().Hex()).
-					Uint64("txGasLimit", tx.Gas()).
+					Uint64("txGasLimit", tx.GasLimit()).
 					Msg("Successfully committed staking transaction")
 			}
 		}
@@ -230,13 +242,13 @@ func (w *Worker) commitTransaction(
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
 		return nil, errNilReceipt
 	}
+
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
 	}
-
 	return receipt.Logs, nil
 }
 
@@ -294,9 +306,10 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 		return err
 	}
 	env := &environment{
-		signer: types.NewEIP155Signer(w.config.ChainID),
-		state:  state,
-		header: header,
+		signer:    types.NewEIP155Signer(w.config.ChainID),
+		ethSigner: types.NewEIP155Signer(w.config.EthCompatibleChainID),
+		state:     state,
+		header:    header,
 	}
 
 	w.current = env
@@ -427,11 +440,10 @@ func (w *Worker) verifySlashes(
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
-	commitSigs chan []byte, viewID uint64, coinbase common.Address,
+	commitSigs chan []byte, viewID func() uint64, coinbase common.Address,
 	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
 	w.current.header.SetCoinbase(coinbase)
-	w.current.header.SetViewID(new(big.Int).SetUint64(viewID))
 
 	// Put crosslinks into header
 	if len(crossLinks) > 0 {
@@ -515,7 +527,7 @@ func (w *Worker) FinalizeNewBlock(
 	block, _, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
-		w.current.slashes, sigsReady,
+		w.current.slashes, sigsReady, viewID,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot finalize block")

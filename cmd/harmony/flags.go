@@ -15,6 +15,7 @@ var (
 		noStakingFlag,
 		shardIDFlag,
 		isArchiveFlag,
+		isBeaconArchiveFlag,
 		isOfflineFlag,
 		dataDirFlag,
 
@@ -41,6 +42,7 @@ var (
 		p2pPortFlag,
 		p2pIPFlag,
 		p2pKeyFileFlag,
+		p2pDHTDataStoreFlag,
 
 		legacyKeyFileFlag,
 	}
@@ -165,6 +167,27 @@ var (
 		legacyWebHookConfigFlag,
 		legacyTPBroadcastInvalidTxFlag,
 	}
+
+	prometheusFlags = []cli.Flag{
+		prometheusEnabledFlag,
+		prometheusIPFlag,
+		prometheusPortFlag,
+		prometheusGatewayFlag,
+		prometheusEnablePushFlag,
+	}
+
+	syncFlags = []cli.Flag{
+		syncDownloaderFlag,
+		syncLegacyClientFlag,
+		syncLegacyServerFlag,
+		syncConcurrencyFlag,
+		syncMinPeersFlag,
+		syncInitStreamsFlag,
+		syncDiscSoftLowFlag,
+		syncDiscHardLowFlag,
+		syncDiscHighFlag,
+		syncDiscBatchFlag,
+	}
 )
 
 var (
@@ -186,8 +209,13 @@ var (
 	}
 	isArchiveFlag = cli.BoolFlag{
 		Name:     "run.archive",
-		Usage:    "run node in archive mode",
+		Usage:    "run shard chain in archive mode",
 		DefValue: defaultConfig.General.IsArchival,
+	}
+	isBeaconArchiveFlag = cli.BoolFlag{
+		Name:     "run.beacon-archive",
+		Usage:    "run beacon chain in archive mode",
+		DefValue: defaultConfig.General.IsBeaconArchival,
 	}
 	isOfflineFlag = cli.BoolFlag{
 		Name:     "run.offline",
@@ -251,6 +279,8 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
 	flags = append(flags, legacyMiscFlags...)
+	flags = append(flags, prometheusFlags...)
+	flags = append(flags, syncFlags...)
 
 	return flags
 }
@@ -282,6 +312,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.General.IsArchival = cli.GetBoolFlagValue(cmd, isArchiveFlag)
 	} else if cli.IsFlagChanged(cmd, legacyIsArchiveFlag) {
 		config.General.IsArchival = cli.GetBoolFlagValue(cmd, legacyIsArchiveFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, isBeaconArchiveFlag) {
+		config.General.IsBeaconArchival = cli.GetBoolFlagValue(cmd, isBeaconArchiveFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, dataDirFlag) {
@@ -392,6 +426,12 @@ var (
 		Usage:    "the p2p key file of the harmony node",
 		DefValue: defaultConfig.P2P.KeyFile,
 	}
+	p2pDHTDataStoreFlag = cli.StringFlag{
+		Name:     "p2p.dht.datastore",
+		Usage:    "the datastore file to persist the dht routing table",
+		DefValue: "",
+		Hidden:   true,
+	}
 	legacyKeyFileFlag = cli.StringFlag{
 		Name:       "key",
 		Usage:      "the p2p key file of the harmony node",
@@ -415,6 +455,11 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, p2pKeyFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyKeyFileFlag) {
 		config.P2P.KeyFile = cli.GetStringFlagValue(cmd, legacyKeyFileFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDHTDataStoreFlag) {
+		ds := cli.GetStringFlagValue(cmd, p2pDHTDataStoreFlag)
+		config.P2P.DHTDataStore = &ds
 	}
 }
 
@@ -476,6 +521,7 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
 	} else if isRPCSpecified {
 		config.HTTP.Enabled = true
 	}
+
 }
 
 // ws flags
@@ -1178,4 +1224,167 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		}
 	}
 
+}
+
+var (
+	prometheusEnabledFlag = cli.BoolFlag{
+		Name:     "prometheus",
+		Usage:    "enable HTTP / Prometheus requests",
+		DefValue: defaultPrometheusConfig.Enabled,
+	}
+	prometheusIPFlag = cli.StringFlag{
+		Name:     "prometheus.ip",
+		Usage:    "ip address to listen for prometheus service",
+		DefValue: defaultPrometheusConfig.IP,
+	}
+	prometheusPortFlag = cli.IntFlag{
+		Name:     "prometheus.port",
+		Usage:    "prometheus port to listen for HTTP requests",
+		DefValue: defaultPrometheusConfig.Port,
+	}
+	prometheusGatewayFlag = cli.StringFlag{
+		Name:     "prometheus.pushgateway",
+		Usage:    "prometheus pushgateway URL",
+		DefValue: defaultPrometheusConfig.Gateway,
+	}
+	prometheusEnablePushFlag = cli.BoolFlag{
+		Name:     "prometheus.push",
+		Usage:    "enable prometheus pushgateway",
+		DefValue: defaultPrometheusConfig.EnablePush,
+	}
+)
+
+func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if config.Prometheus == nil {
+		cfg := getDefaultPrometheusConfigCopy()
+		config.Prometheus = &cfg
+		// enable pushgateway for mainnet nodes by default
+		if config.Network.NetworkType == "mainnet" {
+			config.Prometheus.EnablePush = true
+		}
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusIPFlag) {
+		config.Prometheus.IP = cli.GetStringFlagValue(cmd, prometheusIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusPortFlag) {
+		config.Prometheus.Port = cli.GetIntFlagValue(cmd, prometheusPortFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusEnabledFlag) {
+		config.Prometheus.Enabled = cli.GetBoolFlagValue(cmd, prometheusEnabledFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, prometheusGatewayFlag) {
+		config.Prometheus.Gateway = cli.GetStringFlagValue(cmd, prometheusGatewayFlag)
+	}
+	if cli.IsFlagChanged(cmd, prometheusEnablePushFlag) {
+		config.Prometheus.EnablePush = cli.GetBoolFlagValue(cmd, prometheusEnablePushFlag)
+	}
+}
+
+var (
+	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
+	syncDownloaderFlag = cli.BoolFlag{
+		Name:     "sync.downloader",
+		Usage:    "Enable the downloader module to sync through stream sync protocol",
+		Hidden:   true,
+		DefValue: false,
+	}
+	syncLegacyServerFlag = cli.BoolFlag{
+		Name:     "sync.legacy.server",
+		Usage:    "Enable the gRPC sync server for backward compatibility",
+		Hidden:   true,
+		DefValue: true,
+	}
+	syncLegacyClientFlag = cli.BoolFlag{
+		Name:     "sync.legacy.client",
+		Usage:    "Enable the legacy centralized sync service for block synchronization",
+		Hidden:   true,
+		DefValue: false,
+	}
+	syncConcurrencyFlag = cli.IntFlag{
+		Name:   "sync.concurrency",
+		Usage:  "Concurrency when doing p2p sync requests",
+		Hidden: true,
+	}
+	syncMinPeersFlag = cli.IntFlag{
+		Name:   "sync.min-peers",
+		Usage:  "Minimum peers check for each shard-wise sync loop",
+		Hidden: true,
+	}
+	syncInitStreamsFlag = cli.IntFlag{
+		Name:   "sync.init-peers",
+		Usage:  "Initial shard-wise number of peers to start syncing",
+		Hidden: true,
+	}
+	syncDiscSoftLowFlag = cli.IntFlag{
+		Name:   "sync.disc.soft-low-cap",
+		Usage:  "Soft low cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscHardLowFlag = cli.IntFlag{
+		Name:   "sync.disc.hard-low-cap",
+		Usage:  "Hard low cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscHighFlag = cli.IntFlag{
+		Name:   "sync.disc.hi-cap",
+		Usage:  "High cap for sync stream management",
+		Hidden: true,
+	}
+	syncDiscBatchFlag = cli.IntFlag{
+		Name:   "sync.disc.batch",
+		Usage:  "batch size of the sync discovery",
+		Hidden: true,
+	}
+)
+
+// applySyncFlags apply the sync flags.
+func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if config.Sync == (syncConfig{}) {
+		nt := nodeconfig.NetworkType(config.Network.NetworkType)
+		config.Sync = getDefaultSyncConfig(nt)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
+		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {
+		config.Sync.LegacyServer = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyClientFlag) {
+		config.Sync.LegacyClient = cli.GetBoolFlagValue(cmd, syncLegacyClientFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {
+		config.Sync.Concurrency = cli.GetIntFlagValue(cmd, syncConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncMinPeersFlag) {
+		config.Sync.MinPeers = cli.GetIntFlagValue(cmd, syncMinPeersFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncInitStreamsFlag) {
+		config.Sync.InitStreams = cli.GetIntFlagValue(cmd, syncInitStreamsFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscSoftLowFlag) {
+		config.Sync.DiscSoftLowCap = cli.GetIntFlagValue(cmd, syncDiscSoftLowFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscHardLowFlag) {
+		config.Sync.DiscHardLowCap = cli.GetIntFlagValue(cmd, syncDiscHardLowFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscHighFlag) {
+		config.Sync.DiscHighCap = cli.GetIntFlagValue(cmd, syncDiscHighFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
+		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
 }

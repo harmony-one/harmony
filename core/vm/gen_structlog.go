@@ -16,23 +16,27 @@ var _ = (*structLogMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (s StructLog) MarshalJSON() ([]byte, error) {
 	type StructLog struct {
-		Pc            uint64                      `json:"pc"`
-		Op            OpCode                      `json:"op"`
-		Gas           math.HexOrDecimal64         `json:"gas"`
-		GasCost       math.HexOrDecimal64         `json:"gasCost"`
-		Memory        hexutil.Bytes               `json:"memory"`
-		MemorySize    int                         `json:"memSize"`
-		Stack         []*math.HexOrDecimal256     `json:"stack"`
-		Storage       map[common.Hash]common.Hash `json:"-"`
-		Depth         int                         `json:"depth"`
-		RefundCounter uint64                      `json:"refund"`
-		Err           error                       `json:"-"`
-		OpName        string                      `json:"opName"`
-		ErrorString   string                      `json:"error"`
+		Pc              uint64                      `json:"pc"`
+		Op              OpCode                      `json:"op"`
+		CallerAddress   common.Address              `json:"callerAddress"`
+		ContractAddress common.Address              `json:"contractAddress"`
+		Gas             math.HexOrDecimal64         `json:"gas"`
+		GasCost         math.HexOrDecimal64         `json:"gasCost"`
+		Memory          hexutil.Bytes               `json:"memory"`
+		MemorySize      int                         `json:"memSize"`
+		Stack           []*math.HexOrDecimal256     `json:"stack"`
+		Storage         map[common.Hash]common.Hash `json:"-"`
+		Depth           int                         `json:"depth"`
+		RefundCounter   uint64                      `json:"refund"`
+		Err             error                       `json:"-"`
+		OpName          string                      `json:"opName"`
+		ErrorString     string                      `json:"error"`
 	}
 	var enc StructLog
 	enc.Pc = s.Pc
 	enc.Op = s.Op
+	enc.CallerAddress = s.CallerAddress
+	enc.ContractAddress = s.ContractAddress
 	enc.Gas = math.HexOrDecimal64(s.Gas)
 	enc.GasCost = math.HexOrDecimal64(s.GasCost)
 	enc.Memory = s.Memory
@@ -55,17 +59,19 @@ func (s StructLog) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (s *StructLog) UnmarshalJSON(input []byte) error {
 	type StructLog struct {
-		Pc            *uint64                     `json:"pc"`
-		Op            *OpCode                     `json:"op"`
-		Gas           *math.HexOrDecimal64        `json:"gas"`
-		GasCost       *math.HexOrDecimal64        `json:"gasCost"`
-		Memory        *hexutil.Bytes              `json:"memory"`
-		MemorySize    *int                        `json:"memSize"`
-		Stack         []*math.HexOrDecimal256     `json:"stack"`
-		Storage       map[common.Hash]common.Hash `json:"-"`
-		Depth         *int                        `json:"depth"`
-		RefundCounter *uint64                     `json:"refund"`
-		Err           error                       `json:"-"`
+		Pc              *uint64                     `json:"pc"`
+		Op              *OpCode                     `json:"op"`
+		CallerAddress   *common.Address             `json:"callerAddress"`
+		ContractAddress *common.Address             `json:"contractAddress"`
+		Gas             *math.HexOrDecimal64        `json:"gas"`
+		GasCost         *math.HexOrDecimal64        `json:"gasCost"`
+		Memory          *hexutil.Bytes              `json:"memory"`
+		MemorySize      *int                        `json:"memSize"`
+		Stack           []*math.HexOrDecimal256     `json:"stack"`
+		Storage         map[common.Hash]common.Hash `json:"-"`
+		Depth           *int                        `json:"depth"`
+		RefundCounter   *uint64                     `json:"refund"`
+		Err             error                       `json:"-"`
 	}
 	var dec StructLog
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -76,6 +82,12 @@ func (s *StructLog) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Op != nil {
 		s.Op = *dec.Op
+	}
+	if dec.CallerAddress != nil {
+		s.CallerAddress = *dec.CallerAddress
+	}
+	if dec.ContractAddress != nil {
+		s.ContractAddress = *dec.ContractAddress
 	}
 	if dec.Gas != nil {
 		s.Gas = uint64(*dec.Gas)

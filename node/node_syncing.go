@@ -9,17 +9,22 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
-	downloader_pb "github.com/harmony-one/harmony/api/service/syncing/downloader/proto"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
+
+	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	legdownloader "github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	downloader_pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
+	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy/downloader"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/pkg/errors"
+	"github.com/harmony-one/harmony/shard"
 )
 
 // Constants related to doing syncing.
@@ -29,8 +34,14 @@ const (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
+// BeaconSyncHook is the hook function called after inserted beacon in downloader
+// TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
+func (node *Node) BeaconSyncHook() {
+	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
+		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
+		//       not have much idle resources.
+		node.BroadcastCrossLink()
+	}
 }
 
 // GenerateRandomString generates a random string with given length
@@ -49,7 +60,7 @@ func getNeighborPeers(neighbor *sync.Map) []p2p.Peer {
 	neighbor.Range(func(k, v interface{}) bool {
 		p := v.(p2p.Peer)
 		t := p.Port
-		p.Port = syncing.GetSyncingPort(t)
+		p.Port = legacysync.GetSyncingPort(t)
 		tmp = append(tmp, p)
 		return true
 	})
@@ -64,9 +75,14 @@ func (node *Node) DoSyncWithoutConsensus() {
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = node.getStateSync()
 	}
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
+}
+
+func (node *Node) getStateSync() *legacysync.StateSync {
+	return legacysync.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port,
+		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode)
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
@@ -171,34 +187,37 @@ func (p *LocalSyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Pee
 	return peers, nil
 }
 
-// DoBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
-func (node *Node) DoBeaconSyncing() {
+// doBeaconSyncing update received beaconchain blocks and downloads missing beacon chain blocks
+func (node *Node) doBeaconSyncing() {
 	if node.NodeConfig.IsOffline {
 		return
 	}
 
-	go func(node *Node) {
-		// TODO ek – infinite loop; add shutdown/cleanup logic
-		for beaconBlock := range node.BeaconBlockChannel {
-			if node.beaconSync != nil {
-				err := node.beaconSync.UpdateBlockAndStatus(
-					beaconBlock, node.Beaconchain(), node.BeaconWorker, true,
-				)
-				if err != nil {
-					node.beaconSync.AddLastMileBlock(beaconBlock)
-				} else if node.Consensus.IsLeader() {
-					// Only leader broadcast crosslink to avoid spamming p2p
-					node.BroadcastCrossLink()
+	if !node.NodeConfig.Downloader {
+		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
+		go func(node *Node) {
+			// TODO ek – infinite loop; add shutdown/cleanup logic
+			for beaconBlock := range node.BeaconBlockChannel {
+				if node.beaconSync != nil {
+					err := node.beaconSync.UpdateBlockAndStatus(
+						beaconBlock, node.Beaconchain(), true, false,
+					)
+					if err != nil {
+						node.beaconSync.AddLastMileBlock(beaconBlock)
+					} else if node.Consensus.IsLeader() || rand.Intn(100) <= 1 {
+						// Only leader or 2% of validators broadcast crosslink to avoid spamming p2p
+						node.BroadcastCrossLink()
+					}
 				}
 			}
-		}
-	}(node)
+		}(node)
+	}
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+			node.beaconSync = node.getStateSync()
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
@@ -240,7 +259,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
 func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
-	if node.stateSync.GetActivePeerNumber() < syncing.NumPeersLowBound {
+	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
 		if err != nil {
@@ -274,16 +293,25 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 	node.IsInSync.Set()
 }
 
-// SupportBeaconSyncing sync with beacon chain for archival node in beacon chan or non-beacon node
-func (node *Node) SupportBeaconSyncing() {
-	go node.DoBeaconSyncing()
-}
-
-// SupportSyncing keeps sleeping until it's doing consensus or it's a leader.
-func (node *Node) SupportSyncing() {
+// SupportGRPCSyncServer do gRPC sync server
+func (node *Node) SupportGRPCSyncServer() {
 	node.InitSyncingServer()
 	node.StartSyncingServer()
+}
 
+// StartGRPCSyncClient start the legacy gRPC sync process
+func (node *Node) StartGRPCSyncClient() {
+	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		utils.Logger().Info().
+			Uint32("shardID", node.Blockchain().ShardID()).
+			Msg("SupportBeaconSyncing")
+		go node.doBeaconSyncing()
+	}
+	node.supportSyncing()
+}
+
+// supportSyncing keeps sleeping until it's doing consensus or it's a leader.
+func (node *Node) supportSyncing() {
 	joinConsensus := false
 	// Check if the current node is explorer node.
 	switch node.NodeConfig.Role() {
@@ -298,7 +326,7 @@ func (node *Node) SupportSyncing() {
 	}
 
 	if node.stateSync == nil {
-		node.stateSync = syncing.CreateStateSync(node.SelfPeer.IP, node.SelfPeer.Port, node.GetSyncID())
+		node.stateSync = node.getStateSync()
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 
@@ -308,7 +336,7 @@ func (node *Node) SupportSyncing() {
 // InitSyncingServer starts downloader server.
 func (node *Node) InitSyncingServer() {
 	if node.downloaderServer == nil {
-		node.downloaderServer = downloader.NewServer(node)
+		node.downloaderServer = legdownloader.NewServer(node)
 	}
 }
 
@@ -316,7 +344,7 @@ func (node *Node) InitSyncingServer() {
 func (node *Node) StartSyncingServer() {
 	utils.Logger().Info().Msg("[SYNC] support_syncing: StartSyncingServer")
 	if node.downloaderServer.GrpcServer == nil {
-		node.downloaderServer.Start(node.SelfPeer.IP, syncing.GetSyncingPort(node.SelfPeer.Port))
+		node.downloaderServer.Start(node.SelfPeer.IP, legacysync.GetSyncingPort(node.SelfPeer.Port))
 	}
 }
 
@@ -324,9 +352,14 @@ func (node *Node) StartSyncingServer() {
 func (node *Node) SendNewBlockToUnsync() {
 	for {
 		block := <-node.Consensus.VerifiedNewBlock
-		blockHash, err := rlp.EncodeToBytes(block)
+		blockBytes, err := rlp.EncodeToBytes(block)
 		if err != nil {
 			utils.Logger().Warn().Msg("[SYNC] unable to encode block to hashes")
+			continue
+		}
+		blockWithSigBytes, err := node.getEncodedBlockWithSigFromBlock(block)
+		if err != nil {
+			utils.Logger().Warn().Err(err).Msg("[SYNC] rlp encode BlockWithSig")
 			continue
 		}
 
@@ -339,7 +372,11 @@ func (node *Node) SendNewBlockToUnsync() {
 				delete(node.peerRegistrationRecord, peerID)
 				continue
 			}
-			response, err := config.client.PushNewBlock(node.GetSyncID(), blockHash, false)
+			sendBytes := blockBytes
+			if config.withSig {
+				sendBytes = blockWithSigBytes
+			}
+			response, err := config.client.PushNewBlock(node.GetSyncID(), sendBytes, false)
 			// close the connection if cannot push new block to unsync node
 			if err != nil {
 				node.peerRegistrationRecord[peerID].client.Close()
@@ -366,7 +403,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if request.BlockHash == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
-		if request.Size == 0 || request.Size > syncing.SyncLoopBatchSize {
+		if request.Size == 0 || request.Size > legacysync.SyncLoopBatchSize {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request contains invalid Size %v", request.Size)
 		}
 		size := uint64(request.Size)
@@ -421,6 +458,18 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			}
 		}
 
+	case downloader_pb.DownloaderRequest_BLOCKWITHSIG:
+		var hash common.Hash
+		for _, bytes := range request.Hashes {
+			hash.SetBytes(bytes)
+			encoded, err := node.getEncodedBlockWithSigByHash(hash)
+			if err != nil {
+				utils.Logger().Info().Err(err).Str("hash", hash.String()).Msg("failed to get block with sig")
+				continue
+			}
+			response.Payload = append(response.Payload, encoded)
+		}
+
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
 		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
@@ -430,18 +479,21 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
-		var blockObj types.Block
-		err := rlp.DecodeBytes(request.BlockHash, &blockObj)
+		var bws legacysync.BlockWithSig
+		err := rlp.DecodeBytes(request.BlockHash, &bws)
 		if err != nil {
 			utils.Logger().Warn().Msg("[SYNC] unable to decode received new block")
 			return response, err
 		}
-		node.stateSync.AddNewBlock(request.PeerHash, &blockObj)
+		blockObj := bws.Block
+		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+		node.stateSync.AddNewBlock(request.PeerHash, blockObj)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
 		peerID := string(request.PeerHash[:])
 		ip := request.Ip
 		port := request.Port
+		withSig := request.RegisterWithSig
 		node.stateMutex.Lock()
 		defer node.stateMutex.Unlock()
 		if _, ok := node.peerRegistrationRecord[peerID]; ok {
@@ -460,8 +512,8 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			return response, nil
 		} else {
 			response.Type = downloader_pb.DownloaderResponse_FAIL
-			syncPort := syncing.GetSyncingPort(port)
-			client := downloader.ClientSetup(ip, syncPort)
+			syncPort := legacysync.GetSyncingPort(port)
+			client := legdownloader.ClientSetup(ip, syncPort)
 			if client == nil {
 				utils.Logger().Warn().
 					Str("ip", ip).
@@ -469,7 +521,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 					Msg("[SYNC] unable to setup client for peerID")
 				return response, nil
 			}
-			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client}
+			config := &syncConfig{timestamp: time.Now().UnixNano(), client: client, withSig: withSig}
 			node.peerRegistrationRecord[peerID] = config
 			utils.Logger().Debug().
 				Str("ip", ip).
@@ -485,19 +537,23 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 				Int("number", count).
 				Msg("[SYNC] extra node registered")
 		}
+
 	}
+
 	return response, nil
 }
 
 const (
-	headerCacheSize = 10000
-	blockCacheSize  = 10000
+	headerCacheSize       = 10000
+	blockCacheSize        = 10000
+	blockWithSigCacheSize = 10000
 )
 
 var (
 	// Cached fields for block header and block requests
-	headerReqCache, _ = lru.New(headerCacheSize)
-	blockReqCache, _  = lru.New(blockCacheSize)
+	headerReqCache, _       = lru.New(headerCacheSize)
+	blockReqCache, _        = lru.New(blockCacheSize)
+	blockWithSigReqCache, _ = lru.New(blockWithSigCacheSize)
 
 	errHeaderNotExist = errors.New("header not exist")
 	errBlockNotExist  = errors.New("block not exist")
@@ -535,12 +591,103 @@ func (node *Node) getEncodedBlockByHash(hash common.Hash) ([]byte, error) {
 	return b, nil
 }
 
-// GetMaxPeerHeight ...
-func (node *Node) GetMaxPeerHeight() uint64 {
-	return node.stateSync.GetMaxPeerHeight()
+func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error) {
+	if b, ok := blockWithSigReqCache.Get(hash); ok {
+		return b.([]byte), nil
+	}
+	blk := node.Blockchain().GetBlockByHash(hash)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	sab, err := node.getCommitSigAndBitmapFromChildOrDB(blk)
+	if err != nil {
+		return nil, err
+	}
+	bwh := legacysync.BlockWithSig{
+		Block:              blk,
+		CommitSigAndBitmap: sab,
+	}
+	b, err := rlp.EncodeToBytes(bwh)
+	if err != nil {
+		return nil, err
+	}
+	blockWithSigReqCache.Add(hash, b)
+	return b, nil
 }
 
-// IsOutOfSync ...
-func (node *Node) IsOutOfSync(bc *core.BlockChain) bool {
-	return node.stateSync.IsOutOfSync(bc, false)
+func (node *Node) getEncodedBlockWithSigFromBlock(block *types.Block) ([]byte, error) {
+	bwh := legacysync.BlockWithSig{
+		Block:              block,
+		CommitSigAndBitmap: block.GetCurrentCommitSig(),
+	}
+	return rlp.EncodeToBytes(bwh)
+}
+
+func (node *Node) getCommitSigAndBitmapFromChildOrDB(block *types.Block) ([]byte, error) {
+	child := node.Blockchain().GetBlockByNumber(block.NumberU64() + 1)
+	if child != nil {
+		return node.getCommitSigFromChild(block, child)
+	}
+	return node.getCommitSigFromDB(block)
+}
+
+func (node *Node) getCommitSigFromChild(parent, child *types.Block) ([]byte, error) {
+	if child.ParentHash() != parent.Hash() {
+		return nil, fmt.Errorf("child's parent hash unexpected: %v / %v",
+			child.ParentHash().String(), parent.Hash().String())
+	}
+	sig := child.Header().LastCommitSignature()
+	bitmap := child.Header().LastCommitBitmap()
+	return append(sig[:], bitmap...), nil
+}
+
+func (node *Node) getCommitSigFromDB(block *types.Block) ([]byte, error) {
+	return node.Blockchain().ReadCommitSig(block.NumberU64())
+}
+
+// SyncStatus return the syncing status, including whether node is syncing
+// and the target block number.
+func (node *Node) SyncStatus(shardID uint32) (bool, uint64) {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return false, 0
+	}
+	return ds.SyncStatus(shardID)
+}
+
+// IsOutOfSync return whether the node is out of sync of the given hsardID
+func (node *Node) IsOutOfSync(shardID uint32) bool {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return false
+	}
+	isSyncing, _ := ds.SyncStatus(shardID)
+	return !isSyncing
+}
+
+// SyncPeers return connected sync peers for each shard
+func (node *Node) SyncPeers() map[string]int {
+	ds := node.getDownloaders()
+	if ds == nil {
+		return nil
+	}
+	nums := ds.NumPeers()
+	res := make(map[string]int)
+	for sid, num := range nums {
+		s := fmt.Sprintf("shard-%v", sid)
+		res[s] = num
+	}
+	return res
+}
+
+func (node *Node) getDownloaders() *downloader.Downloaders {
+	syncService := node.serviceManager.GetService(service.Synchronize)
+	if syncService == nil {
+		return nil
+	}
+	dsService, ok := syncService.(*synchronize.Service)
+	if !ok {
+		return nil
+	}
+	return dsService.Downloaders
 }

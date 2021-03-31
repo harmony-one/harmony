@@ -10,6 +10,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 )
@@ -18,6 +19,7 @@ import (
 const (
 	V1 Version = iota
 	V2
+	Eth
 	Debug
 )
 
@@ -33,15 +35,17 @@ const (
 	// WSPortOffset ..
 	WSPortOffset = 800
 
-	netV1Namespace = "net"
+	netNamespace   = "net"
+	netV1Namespace = "netv1"
 	netV2Namespace = "netv2"
+	web3Namespace  = "web3"
 )
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "debug", netV1Namespace, netV2Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -121,20 +125,26 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
+		NewPublicHarmonyAPI(hmy, Eth),
 		NewPublicBlockchainAPI(hmy, V1),
 		NewPublicBlockchainAPI(hmy, V2),
+		NewPublicBlockchainAPI(hmy, Eth),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
+		NewPublicContractAPI(hmy, Eth),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
+		NewPublicTransactionAPI(hmy, Eth),
 		NewPublicPoolAPI(hmy, V1),
 		NewPublicPoolAPI(hmy, V2),
+		NewPublicPoolAPI(hmy, Eth),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
 		NewPublicTracerAPI(hmy, Debug),
 		// Legacy methods (subject to removal)
-		v1.NewPublicLegacyAPI(hmy),
-		v2.NewPublicLegacyAPI(hmy),
+		v1.NewPublicLegacyAPI(hmy, "hmy"),
+		eth.NewPublicEthService(hmy, "eth"),
+		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
 	}
 
 	privateAPIs := []rpc.API{
@@ -161,6 +171,7 @@ func startHTTP(apis []rpc.API) (err error) {
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
+	fmt.Printf("Started RPC server at: %v\n", httpEndpoint)
 	return nil
 }
 
@@ -173,5 +184,6 @@ func startWS(apis []rpc.API) (err error) {
 	utils.Logger().Info().
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
 		Msg("WebSocket endpoint opened")
+	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
 	return nil
 }

@@ -4,28 +4,23 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/harmony-one/harmony/consensus/reward"
+
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
-)
-
-const (
-	initSupply = int64(12600000000)
-)
-
-var (
-	blocksPeriod = shard.Schedule.BlocksPerEpoch()
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
@@ -45,10 +40,34 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	}
 }
 
+// ChainId returns the chain id of the chain - required by MetaMask
+func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, error) {
+	// Format return base on version
+	switch s.version {
+	case V1:
+		return hexutil.Uint64(s.hmy.ChainID), nil
+	case V2:
+		return s.hmy.ChainID, nil
+	case Eth:
+		ethChainID := nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID
+		return hexutil.Uint64(ethChainID.Uint64()), nil
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+}
+
+// Accounts returns the collection of accounts this node manages
+// While this JSON-RPC method is supported, it will not return any accounts.
+// Similar to e.g. Infura "unlocking" accounts isn't supported.
+// Instead, users should send already signed raw transactions using hmy_sendRawTransaction or eth_sendRawTransaction
+func (s *PublicBlockchainService) Accounts() []common.Address {
+	return []common.Address{}
+}
+
 // getBlockOptions is a helper to get block args given an interface option from RPC params.
 func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common.BlockArgs, error) {
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		fullTx, ok := opts.(bool)
 		if !ok {
 			return nil, fmt.Errorf("invalid type for block arguments")
@@ -73,7 +92,10 @@ func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common
 func (s *PublicBlockchainService) getBalanceByBlockNumber(
 	ctx context.Context, address string, blockNum rpc.BlockNumber,
 ) (*big.Int, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
 	if err != nil {
 		return nil, err
@@ -91,7 +113,7 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 
 	// Format return base on version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(header.Number().Uint64()), nil
 	case V2:
 		return header.Number().Uint64(), nil
@@ -118,47 +140,56 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 	blockArgs.InclTx = true
 
-	// Fetch the block
-	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
+	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
+	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
+	// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
+
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if err != nil {
-		return nil, err
-	}
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
+	if blk != nil && err == nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Format the response according to version
+		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+		var rpcBlock interface{}
+		switch s.version {
+		case V1:
+			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
+		case V2:
+			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+		case Eth:
+			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	// Format the response according to version
-	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	var rpcBlock interface{}
-	switch s.version {
-	case V1:
-		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-	case V2:
-		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	response, err = NewStructuredResponse(rpcBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pending blocks need to nil out a few fields
-	if blockNum == rpc.PendingBlockNumber {
-		for _, field := range []string{"hash", "nonce", "miner"} {
-			response[field] = nil
+		response, err = NewStructuredResponse(rpcBlock)
+		if err != nil {
+			return nil, err
 		}
+
+		// Pending blocks need to nil out a few fields
+		if blockNum == rpc.PendingBlockNumber {
+			for _, field := range []string{"hash", "nonce", "miner"} {
+				response[field] = nil
+			}
+		}
+
+		return response, err
 	}
-	return response, err
+
+	return nil, err
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
@@ -180,31 +211,34 @@ func (s *PublicBlockchainService) GetBlockByHash(
 
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
+	if blk != nil && err == nil {
+		if blockArgs.WithSigners {
+			blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Format the response according to version
+		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+		var rpcBlock interface{}
+		switch s.version {
+		case V1:
+			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
+		case V2:
+			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+		case Eth:
+			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
 		if err != nil {
 			return nil, err
 		}
+		return NewStructuredResponse(rpcBlock)
 	}
 
-	// Format the response according to version
-	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	var rpcBlock interface{}
-	switch s.version {
-	case V1:
-		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-	case V2:
-		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	return NewStructuredResponse(rpcBlock)
+	return nil, err
 }
 
 // GetBlockByNumberNew is an alias for GetBlockByNumber using rpc_common.BlockArgs
@@ -376,8 +410,9 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 	totalSigned := uint64(0)
 	lastBlock := uint64(0)
 	blockHeight := s.hmy.CurrentBlock().Number().Uint64()
-	if blockHeight >= blocksPeriod {
-		lastBlock = blockHeight - blocksPeriod + 1
+	instance := shard.Schedule.InstanceForEpoch(s.hmy.CurrentBlock().Epoch())
+	if blockHeight >= instance.BlocksPerEpoch() {
+		lastBlock = blockHeight - instance.BlocksPerEpoch() + 1
 	}
 	for i := lastBlock; i <= blockHeight; i++ {
 		signed, err := s.IsBlockSigner(ctx, BlockNumber(i), address)
@@ -388,7 +423,7 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 
 	// Format the response according to the version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(totalSigned), nil
 	case V2:
 		return totalSigned, nil
@@ -408,7 +443,7 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 
 	// Format the response according to the version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint64(epoch), nil
 	case V2:
 		return epoch, nil
@@ -466,7 +501,7 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 
 	// Format return base on version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return (*hexutil.Big)(balance), nil
 	case V2:
 		return balance, nil
@@ -530,19 +565,18 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Ensure valid block number
-	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
 
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
-	if err != nil {
-		return nil, err
+	if header != nil && err == nil {
+		// Response output is the same for all versions
+		leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
+		return NewStructuredResponse(NewHeaderInformation(header, leader))
 	}
-
-	// Response output is the same for all versions
-	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
-	return NewStructuredResponse(NewHeaderInformation(header, leader))
+	return nil, err
 }
 
 // GetCurrentUtilityMetrics ..
@@ -603,18 +637,14 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 func (s *PublicBlockchainService) GetTotalSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply), nil
+	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
-// GetCirculatingSupply ..
+// GetCirculatingSupply ...
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	timestamp := time.Now()
-
-	// Response output is the same for all versions
-	return numeric.NewDec(initSupply).Mul(reward.PercentageForTimeStamp(timestamp.Unix())), nil
+	return chain.GetCirculatingSupply(ctx, s.hmy.BlockChain)
 }
 
 // GetStakingNetworkInfo ..
@@ -658,12 +688,12 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain), nil
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain.ShardID()), nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain), nil
+	return !s.hmy.NodeAPI.IsOutOfSync(s.hmy.BeaconChain.ShardID()), nil
 }
 
 func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {

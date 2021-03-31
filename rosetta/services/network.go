@@ -82,12 +82,12 @@ func (s *NetworkAPI) NetworkStatus(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	targetHeight := int64(s.hmy.NodeAPI.GetMaxPeerHeight())
+	isSyncing, targetHeight := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	syncStatus := common.SyncingFinish
-	if s.hmy.NodeAPI.IsOutOfSync(s.hmy.BlockChain) {
-		syncStatus = common.SyncingNewBlock
-	} else if targetHeight == 0 {
+	if targetHeight == 0 {
 		syncStatus = common.SyncingUnknown
+	} else if isSyncing {
+		syncStatus = common.SyncingNewBlock
 	}
 	stage := syncStatus.String()
 
@@ -98,7 +98,7 @@ func (s *NetworkAPI) NetworkStatus(
 
 	// Only applicable to non-archival nodes
 	var oldestBlockIdentifier *types.BlockIdentifier
-	if !nodeconfig.GetDefaultConfig().GetArchival() {
+	if !nodeconfig.GetShardConfig(s.hmy.ShardID).GetArchival() {
 		maxGarbCollectedBlockNum := s.hmy.BlockChain.GetMaxGarbageCollectedBlockNumber()
 		if maxGarbCollectedBlockNum == -1 || maxGarbCollectedBlockNum >= currentHeader.Number().Int64() {
 			oldestBlockIdentifier = currentBlockIdentifier
@@ -116,6 +116,13 @@ func (s *NetworkAPI) NetworkStatus(
 		}
 	}
 
+	targetInt := int64(targetHeight)
+	ss := &types.SyncStatus{
+		CurrentIndex: currentHeader.Number().Int64(),
+		TargetIndex:  &targetInt,
+		Stage:        &stage,
+	}
+
 	return &types.NetworkStatusResponse{
 		CurrentBlockIdentifier: currentBlockIdentifier,
 		OldestBlockIdentifier:  oldestBlockIdentifier,
@@ -124,12 +131,8 @@ func (s *NetworkAPI) NetworkStatus(
 			Index: genesisHeader.Number().Int64(),
 			Hash:  genesisHeader.Hash().String(),
 		},
-		Peers: peers,
-		SyncStatus: &types.SyncStatus{
-			CurrentIndex: currentHeader.Number().Int64(),
-			TargetIndex:  &targetHeight,
-			Stage:        &stage,
-		},
+		Peers:      peers,
+		SyncStatus: ss,
 	}, nil
 }
 
@@ -143,7 +146,7 @@ func (s *NetworkAPI) NetworkOptions(
 
 	// Fetch allows based on current network option
 	var allow *types.Allow
-	isArchival := nodeconfig.GetDefaultConfig().GetArchival()
+	isArchival := nodeconfig.GetShardConfig(s.hmy.ShardID).GetArchival()
 	if s.hmy.ShardID == shard.BeaconChainShardID {
 		allow = getBeaconAllow(isArchival)
 	} else {

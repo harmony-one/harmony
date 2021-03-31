@@ -25,13 +25,14 @@ import (
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/network"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	"github.com/pkg/errors"
 )
 
 // timeout constant
 const (
 	// AsyncBlockProposalTimeout is the timeout which will abort the async block proposal.
-	AsyncBlockProposalTimeout = 5 * time.Second
+	AsyncBlockProposalTimeout = 9 * time.Second
 )
 
 func ballotResultBeaconchain(
@@ -142,22 +143,31 @@ func AccumulateRewardsAndCountSigs(
 	// After staking
 	if headerE := header.Epoch(); bc.Config().IsStaking(headerE) &&
 		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		defaultReward := network.BaseStakedReward
+		defaultReward := stakingReward.StakedBlocks
 
-		// After block time is reduced to 5 seconds, the block reward is adjusted accordingly
+		// the block reward is adjusted accordingly based on 5s and 3s block time forks
 		if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+			// Testnet:
 			// This is testnet requiring the one-off forking logic
 			if blockNum > 634644 {
-				defaultReward = network.FiveSecondsBaseStakedReward
+				defaultReward = stakingReward.FiveSecStakedBlocks
 				if blockNum > 636507 {
-					defaultReward = network.BaseStakedReward
+					defaultReward = stakingReward.StakedBlocks
 					if blockNum > 639341 {
-						defaultReward = network.FiveSecondsBaseStakedReward
+						defaultReward = stakingReward.FiveSecStakedBlocks
 					}
 				}
 			}
-		} else if bc.Config().IsFiveSeconds(header.Epoch()) {
-			defaultReward = network.FiveSecondsBaseStakedReward
+			if bc.Config().IsTwoSeconds(header.Epoch()) {
+				defaultReward = stakingReward.TwoSecStakedBlocks
+			}
+		} else {
+			// Mainnet (other nets):
+			if bc.Config().IsTwoSeconds(header.Epoch()) {
+				defaultReward = stakingReward.TwoSecStakedBlocks
+			} else if bc.Config().IsFiveSeconds(header.Epoch()) {
+				defaultReward = stakingReward.FiveSecStakedBlocks
+			}
 		}
 
 		// Following is commented because the new econ-model has a flat-rate block reward
@@ -451,7 +461,7 @@ func AccumulateRewardsAndCountSigs(
 		count := big.NewInt(int64(len(signers)))
 		for i, account := range signers {
 			cur := big.NewInt(0)
-			cur.Mul(network.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+			cur.Mul(stakingReward.PreStakedBlocks, big.NewInt(int64(i+1))).Div(cur, count)
 			diff := big.NewInt(0).Sub(cur, last)
 			state.AddBalance(account.EcdsaAddress, diff)
 			totalAmount.Add(totalAmount, diff)
@@ -459,9 +469,9 @@ func AccumulateRewardsAndCountSigs(
 		}
 	}
 
-	if totalAmount.Cmp(network.BlockReward) != 0 {
+	if totalAmount.Cmp(stakingReward.PreStakedBlocks) != 0 {
 		utils.Logger().Error().
-			Int64("block-reward", network.BlockReward.Int64()).
+			Int64("block-reward", stakingReward.PreStakedBlocks.Int64()).
 			Int64("total-amount-paid-out", totalAmount.Int64()).
 			Msg("Total paid out was not equal to block-reward")
 		return nil, errors.Wrapf(

@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.2"
+const tomlConfigVersion = "1.0.4"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -11,12 +11,13 @@ const (
 var defaultConfig = harmonyConfig{
 	Version: tomlConfigVersion,
 	General: generalConfig{
-		NodeType:   "validator",
-		NoStaking:  false,
-		ShardID:    -1,
-		IsArchival: false,
-		IsOffline:  false,
-		DataDir:    "./",
+		NodeType:         "validator",
+		NoStaking:        false,
+		ShardID:          -1,
+		IsArchival:       false,
+		IsBeaconArchival: false,
+		IsOffline:        false,
+		DataDir:          "./",
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: p2pConfig{
@@ -93,6 +94,68 @@ var defaultConsensusConfig = consensusConfig{
 	AggregateSig: true,
 }
 
+var defaultPrometheusConfig = prometheusConfig{
+	Enabled:    true,
+	IP:         "0.0.0.0",
+	Port:       9900,
+	EnablePush: false,
+	Gateway:    "https://gateway.harmony.one",
+}
+
+var (
+	defaultMainnetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    6,
+		MinPeers:       6,
+		InitStreams:    8,
+		DiscSoftLowCap: 8,
+		DiscHardLowCap: 6,
+		DiscHighCap:    128,
+		DiscBatch:      8,
+	}
+
+	defaultTestNetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+
+	defaultLocalNetSyncConfig = syncConfig{
+		Downloader:     false,
+		LegacyServer:   true,
+		LegacyClient:   true,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+
+	defaultElseSyncConfig = syncConfig{
+		Downloader:     true,
+		LegacyServer:   true,
+		LegacyClient:   false,
+		Concurrency:    4,
+		MinPeers:       4,
+		InitStreams:    4,
+		DiscSoftLowCap: 4,
+		DiscHardLowCap: 4,
+		DiscHighCap:    1024,
+		DiscBatch:      8,
+	}
+)
+
 const (
 	defaultBroadcastInvalidTx = true
 )
@@ -105,6 +168,8 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 		devnet := getDefaultDevnetConfigCopy()
 		config.Devnet = &devnet
 	}
+	config.Sync = getDefaultSyncConfig(nt)
+
 	return config
 }
 
@@ -130,6 +195,11 @@ func getDefaultLogContextCopy() logContext {
 
 func getDefaultConsensusConfigCopy() consensusConfig {
 	config := defaultConsensusConfig
+	return config
+}
+
+func getDefaultPrometheusConfigCopy() prometheusConfig {
+	config := defaultPrometheusConfig
 	return config
 }
 

@@ -7,19 +7,26 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	lru "github.com/hashicorp/golang-lru"
+	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
+	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/syncing"
-	"github.com/harmony-one/harmony/api/service/syncing/downloader"
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -35,16 +42,10 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
+	"github.com/harmony-one/harmony/staking/reward"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/harmony-one/harmony/webhooks"
-	lru "github.com/hashicorp/golang-lru"
-	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
-	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/pkg/errors"
-	"golang.org/x/sync/semaphore"
-
-	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -65,6 +66,8 @@ const (
 type syncConfig struct {
 	timestamp int64
 	client    *downloader.Client
+	// Determine to send encoded BlockWithSig or Block
+	withSig bool
 }
 
 // Node represents a protocol-participating node in the network
@@ -89,7 +92,7 @@ type Node struct {
 	downloaderServer     *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *syncing.StateSync
+	stateSync, beaconSync  *legacysync.StateSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -105,7 +108,6 @@ type Node struct {
 	// Chain configuration.
 	chainConfig params.ChainConfig
 	// map of service type to its message channel.
-	serviceMessageChan  map[service.Type]chan *msg_pb.Message
 	isFirstTime         bool // the node was started with a fresh database
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
@@ -117,31 +119,17 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync *abool.AtomicBool
+	IsInSync      *abool.AtomicBool
+	proposedBlock map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
 
 	Metrics metrics.Registry
 
-	// metrics of p2p messages
-	NumP2PMessages     uint32
-	NumTotalMessages   uint32
-	NumValidMessages   uint32
-	NumInvalidMessages uint32
-	NumSlotMessages    uint32
-	NumIgnoredMessages uint32
-
-	// metrics of node messages
-	NumTotalNodeMsg   uint32
-	NumInvalidNodeMsg uint32
-	NumOversizedMsg   uint32
-	NumTransactionMsg uint32
-	NumStakingMsg     uint32
-	NumBlockSyncMsg   uint32
-	NumSlashMsg       uint32
-	NumReceiptMsg     uint32
-	NumCrossLinkMsg   uint32
+	// context control for pub-sub handling
+	psCtx    context.Context
+	psCancel func()
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -211,6 +199,10 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 			errs = append(errs, errors.WithMessage(errInvalidEpoch, "cross-shard tx not accepted yet"))
 			continue
 		}
+		if tx.IsEthCompatible() && !node.Blockchain().Config().IsEthCompatible(node.Blockchain().CurrentBlock().Epoch()) {
+			errs = append(errs, errors.WithMessage(errInvalidEpoch, "ethereum tx not accepted yet"))
+			continue
+		}
 		poolTxs = append(poolTxs, tx)
 	}
 	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
@@ -227,7 +219,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 
 // Add new staking transactions to the pending staking transaction list.
 func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTransactions) []error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		if node.Blockchain().Config().IsPreStaking(node.Blockchain().CurrentHeader().Epoch()) {
 			poolTxs := types.PoolTransactions{}
 			for _, tx := range newStakingTxs {
@@ -255,7 +247,7 @@ func (node *Node) addPendingStakingTransactions(newStakingTxs staking.StakingTra
 func (node *Node) AddPendingStakingTransaction(
 	newStakingTx *staking.StakingTransaction,
 ) error {
-	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+	if node.IsRunningBeaconChain() {
 		errs := node.addPendingStakingTransactions(staking.StakingTransactions{newStakingTx})
 		var err error
 		for i := range errs {
@@ -292,12 +284,12 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 			}
 		}
 		if err == nil || node.BroadcastInvalidTx {
-			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Msg("Broadcasting Tx")
+			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Str("HashByType", newTx.HashByType().Hex()).Msg("Broadcasting Tx")
 			node.tryBroadcast(newTx)
 		}
 		return err
 	}
-	return errors.New("shard do not match")
+	return errors.Errorf("shard do not match, txShard: %d, nodeShard: %d", newTx.ShardID(), node.NodeConfig.ShardID)
 }
 
 // AddPendingReceipts adds one receipt message to pending list.
@@ -384,13 +376,12 @@ var (
 // validateNodeMessage validate node message
 func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	[]byte, proto_node.MessageType, error) {
-	atomic.AddUint32(&node.NumTotalNodeMsg, 1)
 
 	// length of payload must > p2pNodeMsgPrefixSize
 
 	// reject huge node messages
 	if len(payload) >= types.MaxEncodedPoolTransactionSize {
-		atomic.AddUint32(&node.NumOversizedMsg, 1)
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_oversized"}).Inc()
 		return nil, 0, core.ErrOversizedData
 	}
 
@@ -400,39 +391,39 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	switch msgType {
 	case proto_node.Transaction:
 		// nothing much to validate transaction message unless decode the RLP
-		atomic.AddUint32(&node.NumTransactionMsg, 1)
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "tx"}).Inc()
 	case proto_node.Staking:
 		// nothing much to validate staking message unless decode the RLP
-		atomic.AddUint32(&node.NumStakingMsg, 1)
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "staking_tx"}).Inc()
 	case proto_node.Block:
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
-			atomic.AddUint32(&node.NumBlockSyncMsg, 1)
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
 			// only non-beacon nodes process the beacon block sync messages
 			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.SlashCandidate:
-			atomic.AddUint32(&node.NumSlashMsg, 1)
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
 			// only beacon chain node process slash candidate messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+			if !node.IsRunningBeaconChain() {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.Receipt:
-			atomic.AddUint32(&node.NumReceiptMsg, 1)
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
 		case proto_node.CrossLink:
-			atomic.AddUint32(&node.NumCrossLinkMsg, 1)
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
 			// only beacon chain node process crosslink messages
-			if node.NodeConfig.ShardID != shard.BeaconChainShardID ||
+			if !node.IsRunningBeaconChain() ||
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		default:
-			atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
 		}
 	default:
-		atomic.AddUint32(&node.NumInvalidNodeMsg, 1)
+		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_node_type"}).Inc()
 		return nil, 0, errInvalidNodeMsg
 	}
 
@@ -449,10 +440,8 @@ func (node *Node) validateShardBoundMessage(
 	var (
 		m msg_pb.Message
 	)
-	atomic.AddUint32(&node.NumTotalMessages, 1)
-
 	if err := protobuf.Unmarshal(payload, &m); err != nil {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
+		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_unmarshal"}).Inc()
 		return nil, nil, true, errors.WithStack(err)
 	}
 
@@ -465,7 +454,7 @@ func (node *Node) validateShardBoundMessage(
 			msg_pb.MessageType_COMMIT,
 			msg_pb.MessageType_VIEWCHANGE,
 			msg_pb.MessageType_NEWVIEW:
-			atomic.AddUint32(&node.NumIgnoredMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -477,12 +466,14 @@ func (node *Node) validateShardBoundMessage(
 	if node.Consensus.IsViewChangingMode() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	} else {
 		// ignore viewchange/newview message if the node is not in viewchanging mode
 		switch m.Type {
 		case msg_pb.MessageType_NEWVIEW, msg_pb.MessageType_VIEWCHANGE:
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -491,7 +482,7 @@ func (node *Node) validateShardBoundMessage(
 	if node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_ANNOUNCE, msg_pb.MessageType_PREPARED, msg_pb.MessageType_COMMITTED:
-			atomic.AddUint32(&node.NumIgnoredMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -502,7 +493,7 @@ func (node *Node) validateShardBoundMessage(
 
 	if maybeCon != nil {
 		if maybeCon.ShardId != node.Consensus.ShardID {
-			atomic.AddUint32(&node.NumInvalidMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeCon.SenderPubkey
@@ -512,12 +503,12 @@ func (node *Node) validateShardBoundMessage(
 		}
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
-			atomic.AddUint32(&node.NumInvalidMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
 	} else {
-		atomic.AddUint32(&node.NumInvalidMessages, 1)
+		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
 	}
 
@@ -526,7 +517,7 @@ func (node *Node) validateShardBoundMessage(
 	if !node.Consensus.IsLeader() {
 		switch m.Type {
 		case msg_pb.MessageType_PREPARE, msg_pb.MessageType_COMMIT:
-			atomic.AddUint32(&node.NumIgnoredMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 			return nil, nil, true, nil
 		}
 	}
@@ -534,23 +525,24 @@ func (node *Node) validateShardBoundMessage(
 	serializedKey := bls.SerializedPublicKey{}
 	if len(senderKey) > 0 {
 		if len(senderKey) != bls.PublicKeySizeInBytes {
-			atomic.AddUint32(&node.NumInvalidMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_key_size"}).Inc()
 			return nil, nil, true, errors.WithStack(errNotRightKeySize)
 		}
 
 		copy(serializedKey[:], senderKey)
 		if !node.Consensus.IsValidatorInCommittee(serializedKey) {
-			atomic.AddUint32(&node.NumSlotMessages, 1)
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_committee"}).Inc()
 			return nil, nil, true, errors.WithStack(shard.ErrValidNotInCommittee)
 		}
 	} else {
 		count := node.Consensus.Decider.ParticipantsCount()
 		if (count+7)>>3 != int64(len(senderBitmap)) {
+			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_participant_count"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongSizeOfBitmap)
 		}
 	}
 
-	atomic.AddUint32(&node.NumValidMessages, 1)
+	nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "valid"}).Inc()
 
 	// serializedKey will be empty for multiSig sender
 	return &m, &serializedKey, false, nil
@@ -561,8 +553,10 @@ var (
 	errConsensusMessageOnUnexpectedTopic = errors.New("received consensus on wrong topic")
 )
 
-// Start kicks off the node message handling
-func (node *Node) Start() error {
+// StartPubSub kicks off the node message handling
+func (node *Node) StartPubSub() error {
+	node.psCtx, node.psCancel = context.WithCancel(context.Background())
+
 	// groupID and whether this topic is used for consensus
 	type t struct {
 		tp    nodeconfig.GroupID
@@ -636,6 +630,7 @@ func (node *Node) Start() error {
 	}
 
 	isThisNodeAnExplorerNode := node.NodeConfig.Role() == nodeconfig.ExplorerNode
+	nodeStringCounterVec.WithLabelValues("peerid", nodeconfig.GetPeerID().String()).Inc()
 
 	for i := range allTopics {
 		sub, err := allTopics[i].Topic.Subscribe()
@@ -655,12 +650,13 @@ func (node *Node) Start() error {
 			topicNamed,
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
-				atomic.AddUint32(&node.NumP2PMessages, 1)
+				nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message
 				if len(hmyMsg) < p2pMsgPrefixSize {
 					// TODO (lc): block peers sending empty messages
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
 
@@ -669,14 +665,15 @@ func (node *Node) Start() error {
 				// validate message category
 				switch proto.MessageCategory(openBox[proto.MessageCategoryBytes-1]) {
 				case proto.Consensus:
-
 					// received consensus message in non-consensus bound topic
 					if !isConsensusBound {
+						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_bound"}).Inc()
 						errChan <- withError{
 							errors.WithStack(errConsensusMessageOnUnexpectedTopic), msg,
 						}
 						return libp2p_pubsub.ValidationReject
 					}
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "consensus_total"}).Inc()
 
 					// validate consensus message
 					validMsg, senderPubKey, ignore, err := node.validateShardBoundMessage(
@@ -704,8 +701,10 @@ func (node *Node) Start() error {
 				case proto.Node:
 					// node message is almost empty
 					if len(openBox) <= p2pNodeMsgPrefixSize {
+						nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "invalid_size"}).Inc()
 						return libp2p_pubsub.ValidationReject
 					}
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "node_total"}).Inc()
 					validMsg, actionType, err := node.validateNodeMessage(
 						context.TODO(), openBox,
 					)
@@ -730,13 +729,13 @@ func (node *Node) Start() error {
 					return libp2p_pubsub.ValidationAccept
 				default:
 					// ignore garbled messages
-					atomic.AddUint32(&node.NumIgnoredMessages, 1)
+					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-
 				select {
 				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+						errors.Is(ctx.Err(), context.Canceled) {
 						utils.Logger().Warn().
 							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
 					}
@@ -748,6 +747,7 @@ func (node *Node) Start() error {
 				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
+			// TODO: Currently this timeout is useless. Verify me.
 			libp2p_pubsub.WithValidatorTimeout(250*time.Millisecond),
 			// WithValidatorConcurrency set the concurernt validator, default is 1024
 			libp2p_pubsub.WithValidatorConcurrency(p2p.SetAsideForConsensus),
@@ -764,40 +764,47 @@ func (node *Node) Start() error {
 
 		// goroutine to handle consensus messages
 		go func() {
-			for m := range msgChanConsensus {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
+			for {
+				select {
+				case <-node.psCtx.Done():
+					return
+				case m := <-msgChanConsensus:
+					// should not take more than 30 seconds to process one message
+					ctx, cancel := context.WithTimeout(node.psCtx, 30*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
 
-					if semConsensus.TryAcquire(1) {
-						defer semConsensus.Release(1)
+						if semConsensus.TryAcquire(1) {
+							defer semConsensus.Release(1)
 
-						if isThisNodeAnExplorerNode {
-							if err := node.explorerMessageHandler(
-								ctx, msg.handleCArg,
-							); err != nil {
-								errChan <- withError{err, nil}
-							}
-						} else {
-							if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
-								errChan <- withError{err, msg.senderPubKey}
+							if isThisNodeAnExplorerNode {
+								if err := node.explorerMessageHandler(
+									ctx, msg.handleCArg,
+								); err != nil {
+									errChan <- withError{err, nil}
+								}
+							} else {
+								if err := msg.handleC(ctx, msg.handleCArg, msg.senderPubKey); err != nil {
+									errChan <- withError{err, msg.senderPubKey}
+								}
 							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+						select {
+						// FIXME: wrong use of context. This message have already passed handle actually.
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded consensus message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				}
 			}
 		}()
 
@@ -806,39 +813,46 @@ func (node *Node) Start() error {
 
 		// goroutine to handle node messages
 		go func() {
-			for m := range msgChanNode {
-				// should not take more than 10 seconds to process one message
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				msg := m
-				go func() {
-					defer cancel()
-					if semNode.TryAcquire(1) {
-						defer semNode.Release(1)
+			for {
+				select {
+				case m := <-msgChanNode:
+					ctx, cancel := context.WithTimeout(node.psCtx, 10*time.Second)
+					msg := m
+					go func() {
+						defer cancel()
+						if semNode.TryAcquire(1) {
+							defer semNode.Release(1)
 
-						if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
-							errChan <- withError{err, nil}
+							if err := msg.handleE(ctx, msg.handleEArg, msg.actionType); err != nil {
+								errChan <- withError{err, nil}
+							}
 						}
-					}
 
-					select {
-					case <-ctx.Done():
-						if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-							utils.Logger().Warn().
-								Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+						select {
+						case <-ctx.Done():
+							if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
+								errors.Is(ctx.Err(), context.Canceled) {
+								utils.Logger().Warn().
+									Str("topic", topicNamed).Msg("[context] exceeded node message handler deadline")
+							}
+							errChan <- withError{errors.WithStack(ctx.Err()), nil}
+						default:
+							return
 						}
-						errChan <- withError{errors.WithStack(ctx.Err()), nil}
-					default:
-						return
-					}
-				}()
+					}()
+				case <-node.psCtx.Done():
+					return
+				}
 			}
 		}()
 
 		go func() {
-
 			for {
-				nextMsg, err := sub.Next(context.Background())
+				nextMsg, err := sub.Next(node.psCtx)
 				if err != nil {
+					if err == context.Canceled {
+						return
+					}
 					errChan <- withError{errors.WithStack(err), nil}
 					continue
 				}
@@ -863,14 +877,27 @@ func (node *Node) Start() error {
 		}()
 	}
 
-	for e := range errChan {
-		utils.SampledLogger().Info().
-			Interface("item", e.payload).
-			Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
-	}
-	// NOTE never gets here
-	return nil
+	go func() {
+		for {
+			select {
+			case <-node.psCtx.Done():
+				return
+			case e := <-errChan:
+				utils.SampledLogger().Info().
+					Interface("item", e.payload).
+					Msgf("[p2p]: issue while handling incoming p2p message: %v", e.err)
+			}
+		}
+	}()
 
+	return nil
+}
+
+// StopPubSub stops the pubsub handling
+func (node *Node) StopPubSub() {
+	if node.psCancel != nil {
+		node.psCancel()
+	}
 }
 
 // GetSyncID returns the syncID of this node
@@ -884,7 +911,7 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
-	isArchival bool,
+	isArchival map[uint32]bool,
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
@@ -906,11 +933,16 @@ func New(
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
+	engine := chain.NewEngine(consensusObj.ShardID)
+
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, chain.Engine, &chainConfig,
+		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
 	)
-	if isArchival {
-		collection.DisableCache()
+
+	for shardID, archival := range isArchival {
+		if archival {
+			collection.DisableCache(shardID)
+		}
 	}
 	node.shardChains = collection
 	node.IsInSync = abool.NewBool(false)
@@ -943,20 +975,21 @@ func New(
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
-		node.Worker = worker.New(node.Blockchain().Config(), blockchain, chain.Engine)
+		node.Worker = worker.New(node.Blockchain().Config(), blockchain, engine)
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
 
 		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, chain.Engine,
+				node.Beaconchain().Config(), beaconChain, engine,
 			)
 		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
+		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
-		chain.Engine.SetBeaconchain(beaconChain)
+		engine.SetBeaconchain(beaconChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
@@ -987,7 +1020,7 @@ func New(
 						go func() { webhooks.DoPost(url, &doubleSign) }()
 					}
 				}
-				if node.NodeConfig.ShardID != shard.BeaconChainShardID {
+				if !node.IsRunningBeaconChain() {
 					go node.BroadcastSlash(&doubleSign)
 				} else {
 					records := slash.Records{doubleSign}
@@ -1000,54 +1033,27 @@ func New(
 			}
 		}()
 	}
-	go func() {
-		ticker := time.NewTicker(time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				utils.Logger().Info().
-					Uint32("P2PMessage", node.NumP2PMessages).
-					Uint32("TotalMessage", node.NumTotalMessages).
-					Uint32("ValidMessage", node.NumValidMessages).
-					Uint32("InvalidMessage", node.NumInvalidMessages).
-					Uint32("SlotMessage", node.NumSlotMessages).
-					Uint32("IgnoredMessage", node.NumIgnoredMessages).
-					Msg("MsgValidator")
-				atomic.StoreUint32(&node.NumInvalidMessages, 0)
-				atomic.StoreUint32(&node.NumSlotMessages, 0)
-				atomic.StoreUint32(&node.NumIgnoredMessages, 0)
-				atomic.StoreUint32(&node.NumValidMessages, 0)
-				atomic.StoreUint32(&node.NumTotalMessages, 0)
-				atomic.StoreUint32(&node.NumP2PMessages, 0)
 
-				utils.Logger().Info().
-					Uint32("TotalNodeMsg", node.NumTotalNodeMsg).
-					Uint32("InvalidNodeMsg", node.NumInvalidNodeMsg).
-					Uint32("OversizedMsg", node.NumOversizedMsg).
-					Uint32("TransactionMsg", node.NumTransactionMsg).
-					Uint32("StakingMsg", node.NumStakingMsg).
-					Uint32("BlockSyncMsg", node.NumBlockSyncMsg).
-					Uint32("SlashMsg", node.NumSlashMsg).
-					Uint32("ReceiptMsg", node.NumReceiptMsg).
-					Uint32("CrossLinkMsg", node.NumCrossLinkMsg).
-					Msg("NodeMessageValidator")
+	// update reward values now that node is ready
+	node.updateInitialRewardValues()
 
-				atomic.StoreUint32(&node.NumTotalNodeMsg, 0)
-				atomic.StoreUint32(&node.NumInvalidNodeMsg, 0)
-				atomic.StoreUint32(&node.NumOversizedMsg, 0)
-				atomic.StoreUint32(&node.NumTransactionMsg, 0)
-				atomic.StoreUint32(&node.NumStakingMsg, 0)
-				atomic.StoreUint32(&node.NumBlockSyncMsg, 0)
-				atomic.StoreUint32(&node.NumSlashMsg, 0)
-				atomic.StoreUint32(&node.NumReceiptMsg, 0)
-				atomic.StoreUint32(&node.NumCrossLinkMsg, 0)
+	// init metrics
+	initMetrics()
+	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
-			}
-		}
-	}()
+	node.serviceManager = service.NewManager()
 
 	return &node
+}
+
+// updateInitialRewardValues using the node data
+func (node *Node) updateInitialRewardValues() {
+	numShards := shard.Schedule.InstanceForEpoch(node.Beaconchain().CurrentHeader().Epoch()).NumShards()
+	initTotal := big.NewInt(0)
+	for i := uint32(0); i < numShards; i++ {
+		initTotal = new(big.Int).Add(core.GetInitialFunds(i), initTotal)
+	}
+	reward.SetTotalInitialTokens(initTotal)
 }
 
 // InitConsensusWithValidators initialize shard state
@@ -1083,6 +1089,9 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
+		utils.Logger().Err(err).
+			Interface("shardState", shardState).
+			Msg("[InitConsensusWithValidators] Find CommitteeByID")
 		return err
 	}
 	pubKeys, err := subComm.BLSPublicKeys()
@@ -1102,6 +1111,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
+				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
 			node.Consensus.UpdatePublicKeys(pubKeys)
 			node.Consensus.SetMode(consensus.Normal)
@@ -1165,6 +1175,30 @@ func (node *Node) ServiceManager() *service.Manager {
 func (node *Node) ShutDown() {
 	node.Blockchain().Stop()
 	node.Beaconchain().Stop()
+
+	if err := node.StopRPC(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop RPC")
+	}
+
+	utils.Logger().Info().Msg("stopping rosetta")
+	if err := node.StopRosetta(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop rosetta")
+	}
+
+	utils.Logger().Info().Msg("stopping services")
+	if err := node.StopServices(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop services")
+	}
+
+	// Currently pubSub need to be stopped after consensus.
+	utils.Logger().Info().Msg("stopping pub-sub")
+	node.StopPubSub()
+
+	utils.Logger().Info().Msg("stopping host")
+	if err := node.host.Close(); err != nil {
+		utils.Logger().Error().Err(err).Msg("failed to stop p2p host")
+	}
+
 	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
 	fmt.Print(msg)
@@ -1251,4 +1285,9 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 	}
 	// self addresses map can never be nil
 	return node.KeysToAddrs
+}
+
+// IsRunningBeaconChain returns whether the node is running on beacon chain.
+func (node *Node) IsRunningBeaconChain() bool {
+	return node.NodeConfig.ShardID == shard.BeaconChainShardID
 }

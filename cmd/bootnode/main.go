@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -12,9 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
-	badger "github.com/ipfs/go-ds-badger"
 	net "github.com/libp2p/go-libp2p-core/network"
-	kaddht "github.com/libp2p/go-libp2p-kad-dht"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -117,8 +114,15 @@ func main() {
 		utils.FatalErrMsg(err, "cannot load key from %s", *keyFile)
 	}
 
+	// For bootstrap nodes, we shall keep .dht file.
+	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
 	selfPeer := p2p.Peer{IP: *ip, Port: *port}
-	host, err := p2p.NewHost(&selfPeer, privKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:          &selfPeer,
+		BLSKey:        privKey,
+		BootNodes:     nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
+		DataStoreFile: &dataStorePath,
+	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")
 	}
@@ -127,19 +131,10 @@ func main() {
 		fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", *ip, *port, host.GetID().Pretty()),
 	)
 
+	host.Start()
+
 	if *logConn {
 		host.GetP2PHost().Network().Notify(NewConnLogger(utils.GetLogInstance()))
-	}
-
-	dataStorePath := fmt.Sprintf(".dht-%s-%s", *ip, *port)
-	dataStore, err := badger.NewDatastore(dataStorePath, nil)
-	if err != nil {
-		utils.FatalErrMsg(err, "cannot initialize DHT cache at %s", dataStorePath)
-	}
-	dht := kaddht.NewDHT(context.Background(), host.GetP2PHost(), dataStore)
-
-	if err := dht.Bootstrap(context.Background()); err != nil {
-		utils.FatalErrMsg(err, "cannot bootstrap DHT")
 	}
 
 	select {}

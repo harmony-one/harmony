@@ -10,7 +10,6 @@ import (
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -20,9 +19,18 @@ var (
 	FormatDefaultSenderAddress = ethcommon.HexToAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 )
 
+// ContractInfo contains all relevant data for formatting/inspecting transactions involving contracts
+type ContractInfo struct {
+	// ContractAddress is the address of the primary (or first) contract related to the tx.
+	ContractAddress *ethcommon.Address `json:"contract_hex_address"`
+	// ContractCode is the code of the primary (or first) contract related to the tx.
+	ContractCode    []byte               `json:"contract_code"`
+	ExecutionResult *hmy.ExecutionResult `json:"execution_result"`
+}
+
 // FormatTransaction for staking, cross-shard sender, and plain transactions
 func FormatTransaction(
-	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractCode []byte,
+	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractInfo *ContractInfo,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
 	var isCrossShard, isStaking, isContractCreation bool
@@ -32,7 +40,7 @@ func FormatTransaction(
 	case *stakingTypes.StakingTransaction:
 		isStaking = true
 		stakingTx := tx.(*stakingTypes.StakingTransaction)
-		operations, rosettaError = GetOperationsFromStakingTransaction(stakingTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromStakingTransaction(stakingTx, receipt)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -41,7 +49,7 @@ func FormatTransaction(
 	case *hmytypes.Transaction:
 		isStaking = false
 		plainTx := tx.(*hmytypes.Transaction)
-		operations, rosettaError = GetNativeOperationsFromTransaction(plainTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromTransaction(plainTx, receipt, contractInfo)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -64,7 +72,7 @@ func FormatTransaction(
 			return nil, rosettaError
 		}
 		txMetadata.ContractAccountIdentifier = contractID
-	} else if len(contractCode) > 0 && tx.To() != nil {
+	} else if contractInfo.ContractAddress != nil && len(contractInfo.ContractCode) > 0 {
 		// Contract code was found, so receiving account must be the contract address
 		contractID, rosettaError := newAccountIdentifier(*tx.To())
 		if rosettaError != nil {
@@ -148,111 +156,6 @@ func FormatCrossShardReceiverTransaction(
 			},
 		},
 	}, nil
-}
-
-// FormatGenesisTransaction for genesis block's initial balances
-func FormatGenesisTransaction(
-	txID *types.TransactionIdentifier, targetAddr ethcommon.Address, shardID uint32,
-) (fmtTx *types.Transaction, rosettaError *types.Error) {
-	var b32Addr string
-	targetB32Addr := internalCommon.MustAddressToBech32(targetAddr)
-	for _, tx := range getPseudoTransactionForGenesis(getGenesisSpec(shardID)) {
-		if tx.To() == nil {
-			return nil, common.NewError(common.CatchAllError, nil)
-		}
-		b32Addr = internalCommon.MustAddressToBech32(*tx.To())
-		if targetB32Addr == b32Addr {
-			accID, rosettaError := newAccountIdentifier(*tx.To())
-			if rosettaError != nil {
-				return nil, rosettaError
-			}
-			return &types.Transaction{
-				TransactionIdentifier: txID,
-				Operations: []*types.Operation{
-					{
-						OperationIdentifier: &types.OperationIdentifier{
-							Index: 0,
-						},
-						Type:    common.GenesisFundsOperation,
-						Status:  common.SuccessOperationStatus.Status,
-						Account: accID,
-						Amount: &types.Amount{
-							Value:    tx.Value().String(),
-							Currency: &common.NativeCurrency,
-						},
-					},
-				},
-			}, nil
-		}
-	}
-	return nil, &common.TransactionNotFoundError
-}
-
-// FormatPreStakingRewardTransaction for block rewards in pre-staking era for a given Bech-32 address.
-func FormatPreStakingRewardTransaction(
-	txID *types.TransactionIdentifier, rewards hmy.PreStakingBlockRewards, address ethcommon.Address,
-) (*types.Transaction, *types.Error) {
-	accID, rosettaError := newAccountIdentifier(address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	value, ok := rewards[address]
-	if !ok {
-		return nil, common.NewError(common.TransactionNotFoundError, map[string]interface{}{
-			"message": fmt.Sprintf("%v does not have any rewards for block",
-				internalCommon.MustAddressToBech32(address)),
-		})
-	}
-
-	return &types.Transaction{
-		TransactionIdentifier: txID,
-		Operations: []*types.Operation{
-			{
-				OperationIdentifier: &types.OperationIdentifier{
-					Index: 0,
-				},
-				Type:    common.PreStakingBlockRewardOperation,
-				Status:  common.SuccessOperationStatus.Status,
-				Account: accID,
-				Amount: &types.Amount{
-					Value:    value.String(),
-					Currency: &common.NativeCurrency,
-				},
-			},
-		},
-	}, nil
-}
-
-// FormatUndelegationPayoutTransaction for undelegation payouts at committee selection block
-func FormatUndelegationPayoutTransaction(
-	txID *types.TransactionIdentifier, delegatorPayouts hmy.UndelegationPayouts, address ethcommon.Address,
-) (*types.Transaction, *types.Error) {
-	accID, rosettaError := newAccountIdentifier(address)
-	if rosettaError != nil {
-		return nil, rosettaError
-	}
-	payout, ok := delegatorPayouts[address]
-	if !ok {
-		return nil, &common.TransactionNotFoundError
-	}
-	return &types.Transaction{
-		TransactionIdentifier: txID,
-		Operations: []*types.Operation{
-			{
-				OperationIdentifier: &types.OperationIdentifier{
-					Index: 0,
-				},
-				Type:    common.UndelegationPayoutOperation,
-				Status:  common.SuccessOperationStatus.Status,
-				Account: accID,
-				Amount: &types.Amount{
-					Value:    payout.String(),
-					Currency: &common.NativeCurrency,
-				},
-			},
-		},
-	}, nil
-
 }
 
 // negativeBigValue formats a transaction value as a string

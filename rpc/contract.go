@@ -64,7 +64,10 @@ func (s *PublicContractService) GetCode(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
-	address := hmyCommon.ParseAddr(addr)
+	address, err := hmyCommon.ParseAddr(addr)
+	if err != nil {
+		return nil, err
+	}
 	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
 		return nil, err
@@ -89,7 +92,10 @@ func (s *PublicContractService) GetStorageAt(
 	if state == nil || err != nil {
 		return nil, err
 	}
-	address := hmyCommon.ParseAddr(addr)
+	address, err := hmyCommon.ParseAddr(addr)
+	if err != nil {
+		return nil, err
+	}
 	res := state.GetState(address, common.HexToHash(key))
 
 	// Response output is the same for all versions

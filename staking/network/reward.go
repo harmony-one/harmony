@@ -10,35 +10,19 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 )
 
 var (
-	// BlockReward is the block reward, to be split evenly among block signers in pre-staking era.
-	BlockReward = new(big.Int).Mul(big.NewInt(24), big.NewInt(denominations.One))
-	// BaseStakedReward is the flat-rate block reward for epos staking launch.
-	// 28 ONE per block
-	BaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(28), big.NewInt(denominations.One),
-	))
-	// FiveSecondsBaseStakedReward is the flat-rate block reward after epoch 230.
-	// 17.5 ONE per block
-	FiveSecondsBaseStakedReward = numeric.NewDecFromBigInt(new(big.Int).Mul(
-		big.NewInt(17.5*denominations.Nano), big.NewInt(denominations.Nano),
-	))
-	// BlockRewardStakedCase is the baseline block reward in staked case -
-	totalTokens = numeric.NewDecFromBigInt(
-		new(big.Int).Mul(big.NewInt(12600000000), big.NewInt(denominations.One)),
-	)
-	targetStakedPercentage = numeric.MustNewDecFromStr("0.35")
-	dynamicAdjust          = numeric.MustNewDecFromStr("0.4")
 	// ErrPayoutNotEqualBlockReward ..
 	ErrPayoutNotEqualBlockReward = errors.New(
 		"total payout not equal to blockreward",
 	)
-	// NoReward ..
-	NoReward = big.NewInt(0)
 	// EmptyPayout ..
 	EmptyPayout = noReward{}
+
+	targetStakedPercentage = numeric.MustNewDecFromStr("0.35")
+	dynamicAdjust          = numeric.MustNewDecFromStr("0.4")
 )
 
 type ignoreMissing struct{}
@@ -141,7 +125,7 @@ func WhatPercentStakedNow(
 		return nil, nil, err
 	}
 
-	dole := numeric.NewDecFromBigInt(soFarDoledOut)
+	dole := numeric.NewDecFromBigIntWithPrec(soFarDoledOut, 18)
 
 	for _, electedValAdr := range active.StakedValidators().Addrs {
 		wrapper, err := beaconchain.ReadValidatorInformation(electedValAdr)
@@ -149,10 +133,10 @@ func WhatPercentStakedNow(
 			return nil, nil, err
 		}
 		stakedNow = stakedNow.Add(
-			numeric.NewDecFromBigInt(wrapper.TotalDelegation()),
+			numeric.NewDecFromBigIntWithPrec(wrapper.TotalDelegation(), 18),
 		)
 	}
-	percentage := stakedNow.Quo(totalTokens.Mul(
+	percentage := stakedNow.Quo(stakingReward.TotalInitialTokens.Mul(
 		reward.PercentageForTimeStamp(timestamp),
 	).Add(dole))
 	utils.Logger().Info().

@@ -23,7 +23,10 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   &leader,
+		BLSKey: priKey,
+	})
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -37,7 +40,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 	var testDBFactory = &shardchain.MemDBFactory{}
-	node := New(host, consensus, testDBFactory, nil, false)
+	node := New(host, consensus, testDBFactory, nil, nil)
 
 	node.Worker.UpdateCurrent()
 
@@ -52,7 +55,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	}()
 
 	block, _ := node.Worker.FinalizeNewBlock(
-		commitSigs, 0, common.Address{}, nil, nil,
+		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
 	if err := node.VerifyNewBlock(block); err != nil {
@@ -64,7 +67,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	node.Worker.UpdateCurrent()
 
 	_, err = node.Worker.FinalizeNewBlock(
-		commitSigs, 0, common.Address{}, nil, nil,
+		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
 	)
 
 	if !strings.Contains(err.Error(), "cannot finalize block") {

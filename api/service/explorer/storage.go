@@ -164,7 +164,7 @@ func computeAccountsTransactionsMapForBlock(
 	for _, tx := range block.Transactions() {
 		explorerTransaction, err := GetTransaction(tx, block)
 		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
+			utils.Logger().Error().Err(err).Str("txHash", tx.HashByType().String()).
 				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
 			continue
 		}

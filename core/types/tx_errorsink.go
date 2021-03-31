@@ -60,6 +60,17 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
 			Msgf("Added plain transaction error message")
+	} else if ethTx, ok := tx.(*EthTransaction); ok {
+		hash := ethTx.Hash().String()
+		sink.failedPlainTxs.Add(hash, &TransactionErrorReport{
+			TxHashID:             hash,
+			TimestampOfRejection: time.Now().Unix(),
+			ErrMessage:           err.Error(),
+		})
+		utils.Logger().Debug().
+			Str("tag", logTag).
+			Interface("tx-hash-id", hash).
+			Msgf("Added eth transaction error message")
 	} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 		hash := stakingTx.Hash().String()
 		sink.failedStakingTxs.Add(hash, &TransactionErrorReport{
@@ -90,6 +101,13 @@ func (sink *TransactionErrorSink) Contains(hash string) bool {
 func (sink *TransactionErrorSink) Remove(tx PoolTransaction) {
 	if plainTx, ok := tx.(*Transaction); ok {
 		hash := plainTx.Hash().String()
+		sink.failedPlainTxs.Remove(hash)
+		utils.Logger().Debug().
+			Str("tag", logTag).
+			Interface("tx-hash-id", hash).
+			Msgf("Removed plain transaction error message")
+	} else if ethTx, ok := tx.(*EthTransaction); ok {
+		hash := ethTx.Hash().String()
 		sink.failedPlainTxs.Remove(hash)
 		utils.Logger().Debug().
 			Str("tag", logTag).

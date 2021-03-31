@@ -55,8 +55,12 @@ func GenerateHost(address string, port string) (p2p.Host, *bls.PublicKey, error)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	host, err := p2p.NewHost(&peer, nodePrivateKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:          &peer,
+		BLSKey:        nodePrivateKey,
+		BootNodes:     nil,
+		DataStoreFile: nil,
+	})
 	if err != nil {
 		return nil, nil, err
 	}

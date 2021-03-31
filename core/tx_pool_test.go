@@ -157,7 +157,8 @@ func createBlockChain() *BlockChain {
 	database := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	blockchain, _ := NewBlockChain(database, nil, gspec.Config, chain2.Engine, vm.Config{}, nil)
+	engine := chain2.NewEngine(0)
+	blockchain, _ := NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 	return blockchain
 }
 
@@ -292,7 +293,7 @@ func TestInvalidTransactions(t *testing.T) {
 		t.Error("expected", ErrInsufficientFunds)
 	}
 
-	balance := new(big.Int).Add(tx.Value(), new(big.Int).Mul(new(big.Int).SetUint64(tx.Gas()), tx.GasPrice()))
+	balance := new(big.Int).Add(tx.Value(), new(big.Int).Mul(new(big.Int).SetUint64(tx.GasLimit()), tx.GasPrice()))
 	pool.currentState.AddBalance(from, balance)
 	if err := pool.AddRemote(tx); err != ErrIntrinsicGas {
 		t.Error("expected", ErrIntrinsicGas, "got", err)

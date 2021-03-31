@@ -34,13 +34,17 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 
 		utils.Logger().Debug().
 			Msg("Waiting for Consensus ready")
-		time.Sleep(30 * time.Second) // Wait for other nodes to be ready (test-only)
+		select {
+		case <-time.After(30 * time.Second):
+		case <-stopChan:
+			return
+		}
 
 		for {
 			// keep waiting for Consensus ready
 			select {
 			case <-stopChan:
-				utils.Logger().Debug().
+				utils.Logger().Warn().
 					Msg("Consensus new block proposal: STOPPED!")
 				return
 			case proposalType := <-readySignal:
@@ -49,6 +53,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					time.Sleep(SleepPeriod)
 					utils.Logger().Info().
 						Uint64("blockNum", node.Blockchain().CurrentBlock().NumberU64()+1).
+						Bool("asyncProposal", proposalType == consensus.AsyncProposal).
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
@@ -83,6 +88,11 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 
 					if err == nil {
+						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
+							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
+								Msg("Block with the same number was already proposed, abort.")
+							break
+						}
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
 							Uint64("epoch", newBlock.Epoch().Uint64()).
@@ -93,6 +103,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							Msg("=========Successfully Proposed New Block==========")
 
 						// Send the new block to Consensus so it can be confirmed.
+						node.proposedBlock[newBlock.NumberU64()] = newBlock
+						delete(node.proposedBlock, newBlock.NumberU64()-10)
 						node.BlockChannel <- newBlock
 						break
 					} else {
@@ -123,15 +135,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
+	leaderKey := node.Consensus.LeaderPubKey
 	var (
-		coinbase    = node.GetAddressForBLSKey(node.Consensus.LeaderPubKey.Object, header.Epoch())
+		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase
 		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
-		blsPubKeyBytes := node.Consensus.LeaderPubKey.Object.GetAddress()
+		blsPubKeyBytes := leaderKey.Object.GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 
@@ -261,8 +274,11 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		return nil, err
 	}
 
+	viewIDFunc := func() uint64 {
+		return node.Consensus.GetCurBlockViewID()
+	}
 	finalizedBlock, err := node.Worker.FinalizeNewBlock(
-		commitSigs, node.Consensus.GetCurBlockViewID(),
+		commitSigs, viewIDFunc,
 		coinbase, crossLinksToPropose, shardState,
 	)
 	if err != nil {

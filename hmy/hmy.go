@@ -55,6 +55,8 @@ type Harmony struct {
 	NodeAPI      NodeAPI
 	// ChainID is used to identify which network we are using
 	ChainID uint64
+	// EthCompatibleChainID is used to identify the Ethereum compatible chain ID
+	EthChainID uint64
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	ShardID   uint32
@@ -85,8 +87,9 @@ type NodeAPI interface {
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
-	IsOutOfSync(*core.BlockChain) bool
-	GetMaxPeerHeight() uint64
+	IsOutOfSync(shardID uint32) bool
+	SyncStatus(shardID uint32) (bool, uint64)
+	SyncPeers() map[string]int
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
 	PendingCXReceipts() []*types.CXReceiptsProof
@@ -130,6 +133,7 @@ func New(
 		chainDb:                     chainDb,
 		NodeAPI:                     nodeAPI,
 		ChainID:                     nodeAPI.Blockchain().Config().ChainID.Uint64(),
+		EthChainID:                  nodeAPI.Blockchain().Config().EthCompatibleChainID.Uint64(),
 		ShardID:                     shardID,
 		leaderCache:                 leaderCache,
 		totalStakeCache:             totalStakeCache,
@@ -164,8 +168,8 @@ func (hmy *Harmony) IsLeader() bool {
 
 // GetNodeMetadata ..
 func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
-	cfg := nodeconfig.GetDefaultConfig()
 	header := hmy.CurrentBlock().Header()
+	cfg := nodeconfig.GetShardConfig(header.ShardID())
 	var blockEpoch *uint64
 
 	if header.ShardID() == shard.BeaconChainShardID {
@@ -183,6 +187,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 	c := commonRPC.C{}
 	c.TotalKnownPeers, c.Connected, c.NotConnected = hmy.NodeAPI.PeerConnectivity()
 
+	syncPeers := hmy.NodeAPI.SyncPeers()
 	consensusInternal := hmy.NodeAPI.GetConsensusInternal()
 
 	return commonRPC.NodeMetadata{
@@ -201,6 +206,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		PeerID:         nodeconfig.GetPeerID(),
 		Consensus:      consensusInternal,
 		C:              c,
+		SyncPeers:      syncPeers,
 	}
 }
 

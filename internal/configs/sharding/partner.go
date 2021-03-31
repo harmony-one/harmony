@@ -57,11 +57,6 @@ func (ps partnerSchedule) VdfDifficulty() int {
 	return partnerVdfDifficulty
 }
 
-// ConsensusRatio ratio of new nodes vs consensus total nodes
-func (ps partnerSchedule) ConsensusRatio() float64 {
-	return mainnetConsensusRatio
-}
-
 // TODO: remove it after randomness feature turned on mainnet
 //RandonnessStartingEpoch returns starting epoch of randonness generation
 func (ps partnerSchedule) RandomnessStartingEpoch() uint64 {

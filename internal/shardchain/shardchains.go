@@ -1,7 +1,10 @@
 package shardchain
 
 import (
+	"math/big"
 	"sync"
+
+	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -35,7 +38,7 @@ type CollectionImpl struct {
 	engine       engine.Engine
 	mtx          sync.Mutex
 	pool         map[uint32]*core.BlockChain
-	disableCache bool
+	disableCache map[uint32]bool
 	chainConfig  *params.ChainConfig
 }
 
@@ -50,11 +53,12 @@ func NewCollection(
 	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
-		dbFactory:   dbFactory,
-		dbInit:      dbInit,
-		engine:      engine,
-		pool:        make(map[uint32]*core.BlockChain),
-		chainConfig: chainConfig,
+		dbFactory:    dbFactory,
+		dbInit:       dbInit,
+		engine:       engine,
+		pool:         make(map[uint32]*core.BlockChain),
+		disableCache: make(map[uint32]bool),
+		chainConfig:  chainConfig,
 	}
 }
 
@@ -88,12 +92,21 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		}
 	}
 	var cacheConfig *core.CacheConfig
-	if sc.disableCache {
+	if sc.disableCache[shardID] {
 		cacheConfig = &core.CacheConfig{Disabled: true}
+		utils.Logger().Info().
+			Uint32("shardID", shardID).
+			Msg("disable cache, running in archival mode")
 	}
 
+	chainConfig := *sc.chainConfig
+
+	if shardID == shard.BeaconChainShardID {
+		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
+		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
+	}
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, sc.chainConfig, sc.engine, vm.Config{}, nil,
+		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
@@ -106,8 +119,11 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 // DisableCache disables caching mode for newly opened chains.
 // It does not affect already open chains.  For best effect,
 // use this immediately after creating collection.
-func (sc *CollectionImpl) DisableCache() {
-	sc.disableCache = true
+func (sc *CollectionImpl) DisableCache(shardID uint32) {
+	if sc.disableCache == nil {
+		sc.disableCache = make(map[uint32]bool)
+	}
+	sc.disableCache[shardID] = true
 }
 
 // CloseShardChain closes the given shard chain.

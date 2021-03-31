@@ -16,9 +16,13 @@ type PublicLegacyService struct {
 }
 
 // NewPublicLegacyAPI creates a new API for the RPC interface
-func NewPublicLegacyAPI(hmy *hmy.Harmony) rpc.API {
+func NewPublicLegacyAPI(hmy *hmy.Harmony, namespace string) rpc.API {
+	if namespace == "" {
+		namespace = "hmy"
+	}
+
 	return rpc.API{
-		Namespace: "hmy",
+		Namespace: namespace,
 		Version:   "1.0",
 		Service:   &PublicLegacyService{hmy},
 		Public:    true,
@@ -31,7 +35,10 @@ func NewPublicLegacyAPI(hmy *hmy.Harmony) rpc.API {
 func (s *PublicLegacyService) GetBalance(
 	ctx context.Context, address string, blockNr rpc.BlockNumber,
 ) (*hexutil.Big, error) {
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return nil, err
+	}
 	balance, err := s.hmy.GetBalance(ctx, addr, blockNr)
 	if err != nil {
 		return nil, err

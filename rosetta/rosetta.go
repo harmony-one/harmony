@@ -23,7 +23,7 @@ import (
 var listener net.Listener
 
 // StartServers starts the rosetta http server
-// TODO (dm): optimize rosetta to use single flight to avoid re-processing data
+// TODO (dm): optimize rosetta to use single flight & use extra caching type DB to avoid re-processing data
 func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
 	if !config.HTTPEnabled {
 		utils.Logger().Info().Msg("Rosetta http server disabled...")
@@ -36,7 +36,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 	}
 	serverAsserter, err := asserter.NewServer(
 		append(common.PlainOperationTypes, common.StakingOperationTypes...),
-		nodeconfig.GetDefaultConfig().Role() == nodeconfig.ExplorerNode,
+		nodeconfig.GetShardConfig(hmy.ShardID).Role() == nodeconfig.ExplorerNode,
 		[]*types.NetworkIdentifier{network},
 	)
 	if err != nil {
@@ -59,6 +59,9 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 
 // StopServers stops the rosetta http server
 func StopServers() error {
+	if listener == nil {
+		return nil
+	}
 	if err := listener.Close(); err != nil {
 		return err
 	}

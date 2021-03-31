@@ -31,7 +31,7 @@ fi
 
 echo "Running golint..."
 golint_output="${tmpdir}/golint_output.txt"
-if "${progdir}/golint.sh" -set_exit_status > "${golint_output}" 2>&1
+if "${progdir}/golint.sh" > "${golint_output}" 2>&1
 then
 	echo "golint passed."
 else

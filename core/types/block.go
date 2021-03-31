@@ -46,6 +46,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	blockV0 = "" // same as taggedrlp.LegacyTag
+	blockV1 = "v1"
+	blockV2 = "v2"
+)
+
 // Constants for block.
 var (
 	EmptyRootHash  = DeriveSha(Transactions{})
@@ -153,6 +159,8 @@ func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 // NewTestBody creates a new, empty body object for epoch 0 using the test
 // factory.  Use for unit tests.
 func NewTestBody() *Body {
+	block := new(Block)
+	block.header = blockfactory.NewTestHeader()
 	body, err := NewBodyForMatchingHeader(blockfactory.NewTestHeader())
 	if err != nil {
 		panic(err)
@@ -193,8 +201,8 @@ var BodyRegistry = taggedrlp.NewRegistry()
 
 func init() {
 	BodyRegistry.MustRegister(taggedrlp.LegacyTag, new(BodyV0))
-	BodyRegistry.MustRegister("v1", new(BodyV1))
-	BodyRegistry.MustRegister("v2", new(BodyV2))
+	BodyRegistry.MustRegister(blockV1, new(BodyV1))
+	BodyRegistry.MustRegister(blockV2, new(BodyV2))
 }
 
 // Block represents an entire block in the Harmony blockchain.
@@ -302,8 +310,8 @@ func blockRegistry() *taggedrlp.Registry {
 	onceBlockReg.Do(func() {
 		extblockReg = taggedrlp.NewRegistry()
 		extblockReg.MustRegister(taggedrlp.LegacyTag, &extblock{})
-		extblockReg.MustRegister("v1", &extblockV1{})
-		extblockReg.MustRegister("v2", &extblockV2{})
+		extblockReg.MustRegister(blockV1, &extblockV1{})
+		extblockReg.MustRegister(blockV2, &extblockV2{})
 	})
 
 	return extblockReg
@@ -413,6 +421,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 // EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
+
 	switch h := b.header.Header.(type) {
 	case *v3.Header:
 		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
@@ -427,6 +436,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 		return errors.Errorf("unsupported block header type %s",
 			taggedrlp.TypeName(reflect.TypeOf(h)))
 	}
+
 	extblockReg := blockRegistry()
 	return extblockReg.Encode(w, eb)
 }
@@ -454,16 +464,6 @@ func (b *Block) StakingTransactions() staking.StakingTransactions {
 // IncomingReceipts returns verified outgoing receipts
 func (b *Block) IncomingReceipts() CXReceiptsProofs {
 	return b.incomingReceipts
-}
-
-// Transaction returns Transaction.
-func (b *Block) Transaction(hash common.Hash) *Transaction {
-	for _, transaction := range b.transactions {
-		if transaction.Hash() == hash {
-			return transaction
-		}
-	}
-	return nil
 }
 
 // Number returns header number.
@@ -560,18 +560,6 @@ func (c *writeCounter) Write(b []byte) (int, error) {
 // CalcUncleHash returns rlp hash of uncles.
 func CalcUncleHash(uncles []*block.Header) common.Hash {
 	return hash.FromRLP(uncles)
-}
-
-// WithSeal returns a new block with the data from b but the header replaced with
-// the sealed one.
-func (b *Block) WithSeal(header *block.Header) *Block {
-	cpy := *header
-
-	return &Block{
-		header:       &cpy,
-		transactions: b.transactions,
-		uncles:       b.uncles,
-	}
 }
 
 // WithBody returns a new block with the given transaction and uncle contents.

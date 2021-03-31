@@ -24,6 +24,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -61,6 +63,36 @@ var StakingTypeMap = map[staking.Directive]TransactionType{staking.DirectiveCrea
 	staking.DirectiveEditValidator: StakeEditVal, staking.DirectiveDelegate: Delegate,
 	staking.DirectiveUndelegate: Undelegate, staking.DirectiveCollectRewards: CollectRewards}
 
+// InternalTransaction defines the common interface for harmony and ethereum transactions.
+type InternalTransaction interface {
+	CoreTransaction
+
+	// Signature values
+	V() *big.Int
+	R() *big.Int
+	S() *big.Int
+
+	IsEthCompatible() bool
+	AsMessage(s Signer) (Message, error)
+}
+
+// CoreTransaction defines the core funcs of any transactions
+type CoreTransaction interface {
+	From() *atomic.Value
+	Nonce() uint64
+	GasPrice() *big.Int
+	GasLimit() uint64
+	ShardID() uint32
+	ToShardID() uint32
+	To() *common.Address
+	Value() *big.Int
+	Data() []byte
+
+	Hash() common.Hash
+	Protected() bool
+	ChainID() *big.Int
+}
+
 // Transaction struct.
 type Transaction struct {
 	data txdata
@@ -70,7 +102,7 @@ type Transaction struct {
 	from atomic.Value
 }
 
-//String print mode string
+// String print mode string
 func (txType TransactionType) String() string {
 	if txType == SameShardTx {
 		return "SameShardTx"
@@ -222,6 +254,46 @@ func newCrossShardTransaction(nonce uint64, to *common.Address, shardID uint32, 
 	return &Transaction{data: d}
 }
 
+// From returns the sender address of the transaction
+func (tx *Transaction) From() *atomic.Value {
+	return &tx.from
+}
+
+// V value of the transaction signature
+func (tx *Transaction) V() *big.Int {
+	return tx.data.V
+}
+
+// R value of the transaction signature
+func (tx *Transaction) R() *big.Int {
+	return tx.data.R
+}
+
+// S value of the transaction signature
+func (tx *Transaction) S() *big.Int {
+	return tx.data.S
+}
+
+// Value is the amount of ONE token transfered (in Atto)
+func (tx *Transaction) Value() *big.Int {
+	return tx.data.Amount
+}
+
+// GasLimit of the transcation
+func (tx *Transaction) GasLimit() uint64 {
+	return tx.data.GasLimit
+}
+
+// GasPrice is the gas price of the transaction
+func (tx *Transaction) GasPrice() *big.Int {
+	return tx.data.Price
+}
+
+// Data returns data payload of Transaction.
+func (tx *Transaction) Data() []byte {
+	return common.CopyBytes(tx.data.Payload)
+}
+
 // ChainID returns which chain id this transaction was signed for (if at all)
 func (tx *Transaction) ChainID() *big.Int {
 	return deriveChainID(tx.data.V)
@@ -300,26 +372,6 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-// Data returns data payload of Transaction.
-func (tx *Transaction) Data() []byte {
-	return common.CopyBytes(tx.data.Payload)
-}
-
-// Gas returns gas of Transaction.
-func (tx *Transaction) Gas() uint64 {
-	return tx.data.GasLimit
-}
-
-// GasPrice returns gas price of Transaction.
-func (tx *Transaction) GasPrice() *big.Int {
-	return new(big.Int).Set(tx.data.Price)
-}
-
-// Value returns data payload of Transaction.
-func (tx *Transaction) Value() *big.Int {
-	return new(big.Int).Set(tx.data.Amount)
-}
-
 // Nonce returns account nonce from Transaction.
 func (tx *Transaction) Nonce() uint64 {
 	return tx.data.AccountNonce
@@ -351,6 +403,15 @@ func (tx *Transaction) Hash() common.Hash {
 	return v
 }
 
+// HashByType hashes the RLP encoding of tx in it's original format (eth or hmy)
+// It uniquely identifies the transaction.
+func (tx *Transaction) HashByType() common.Hash {
+	if tx.IsEthCompatible() {
+		return tx.ConvertToEth().Hash()
+	}
+	return tx.Hash()
+}
+
 // Size returns the true RLP encoded storage size of the transaction, either by
 // encoding and returning it, or returning a previously cached value.
 func (tx *Transaction) Size() common.StorageSize {
@@ -361,6 +422,33 @@ func (tx *Transaction) Size() common.StorageSize {
 	rlp.Encode(&c, &tx.data)
 	tx.size.Store(common.StorageSize(c))
 	return common.StorageSize(c)
+}
+
+// IsEthCompatible returns whether the txn is ethereum compatible
+func (tx *Transaction) IsEthCompatible() bool {
+	return params.IsEthCompatible(tx.ChainID())
+}
+
+// ConvertToEth converts hmy txn to eth txn by removing the ShardID and ToShardID fields.
+func (tx *Transaction) ConvertToEth() *EthTransaction {
+	var tx2 EthTransaction
+	d := &tx.data
+	d2 := &tx2.data
+
+	d2.AccountNonce = d.AccountNonce
+	d2.Price = new(big.Int).Set(d.Price)
+	d2.GasLimit = d.GasLimit
+	d2.Recipient = copyAddr(d.Recipient)
+	d2.Amount = new(big.Int).Set(d.Amount)
+	d2.Payload = append(d.Payload[:0:0], d.Payload...)
+	d2.V = new(big.Int).Set(d.V)
+	d2.R = new(big.Int).Set(d.R)
+	d2.S = new(big.Int).Set(d.S)
+
+	copy := tx2.Hash()
+	d2.Hash = &copy
+
+	return &tx2
 }
 
 // AsMessage returns the transaction as a core.Message.
@@ -431,56 +519,13 @@ func (tx *Transaction) SenderAddress() (common.Address, error) {
 	return addr, nil
 }
 
-// Transactions is a Transaction slice type for basic sorting.
-type Transactions []*Transaction
-
-// Len returns the length of s.
-func (s Transactions) Len() int { return len(s) }
-
-// Swap swaps the i'th and the j'th element in s.
-func (s Transactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-
-// GetRlp implements Rlpable and returns the i'th element of s in rlp.
-func (s Transactions) GetRlp(i int) []byte {
-	enc, _ := rlp.EncodeToBytes(s[i])
-	return enc
-}
-
-// ToShardID returns the destination shardID of given transaction
-func (s Transactions) ToShardID(i int) uint32 {
-	return s[i].data.ToShardID
-}
-
-// MaxToShardID returns 0, arbitrary value, NOT use
-func (s Transactions) MaxToShardID() uint32 {
-	return 0
-}
-
-// TxDifference returns a new set which is the difference between a and b.
-func TxDifference(a, b Transactions) Transactions {
-	keep := make(Transactions, 0, len(a))
-
-	remove := make(map[common.Hash]struct{})
-	for _, tx := range b {
-		remove[tx.Hash()] = struct{}{}
-	}
-
-	for _, tx := range a {
-		if _, ok := remove[tx.Hash()]; !ok {
-			keep = append(keep, tx)
-		}
-	}
-
-	return keep
-}
-
 // TxByNonce implements the sort interface to allow sorting a list of transactions
 // by their nonces. This is usually only useful for sorting transactions from a
 // single account, otherwise a nonce comparison doesn't make much sense.
 type TxByNonce Transactions
 
 func (s TxByNonce) Len() int           { return len(s) }
-func (s TxByNonce) Less(i, j int) bool { return s[i].data.AccountNonce < s[j].data.AccountNonce }
+func (s TxByNonce) Less(i, j int) bool { return s[i].Nonce() < s[j].Nonce() }
 func (s TxByNonce) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // TxByPrice implements both the sort and the heap interface, making it useful
@@ -488,7 +533,7 @@ func (s TxByNonce) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 type TxByPrice Transactions
 
 func (s TxByPrice) Len() int           { return len(s) }
-func (s TxByPrice) Less(i, j int) bool { return s[i].data.Price.Cmp(s[j].data.Price) > 0 }
+func (s TxByPrice) Less(i, j int) bool { return s[i].GasPrice().Cmp(s[j].GasPrice()) > 0 }
 func (s TxByPrice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // Push pushes a transaction.
@@ -509,9 +554,10 @@ func (s *TxByPrice) Pop() interface{} {
 // transactions in a profit-maximizing sorted order, while supporting removing
 // entire batches of transactions for non-executable accounts.
 type TransactionsByPriceAndNonce struct {
-	txs    map[common.Address]Transactions // Per account nonce-sorted list of transactions
-	heads  TxByPrice                       // Next transaction for each unique account (price heap)
-	signer Signer                          // Signer for the set of transactions
+	txs       map[common.Address]Transactions // Per account nonce-sorted list of transactions
+	heads     TxByPrice                       // Next transaction for each unique account (price heap)
+	signer    Signer                          // Signer for the set of transactions
+	ethSigner Signer                          // Signer for the set of transactions
 }
 
 // NewTransactionsByPriceAndNonce creates a transaction set that can retrieve
@@ -519,12 +565,19 @@ type TransactionsByPriceAndNonce struct {
 //
 // Note, the input map is reowned so the caller should not interact any more with
 // if after providing it to the constructor.
-func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
+func NewTransactionsByPriceAndNonce(hmySigner Signer, ethSigner Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for from, accTxs := range txs {
+		if accTxs.Len() == 0 {
+			continue
+		}
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
+		signer := hmySigner
+		if accTxs[0].IsEthCompatible() {
+			signer = ethSigner
+		}
 		acc, _ := Sender(signer, accTxs[0])
 		txs[acc] = accTxs[1:]
 		if from != acc {
@@ -535,9 +588,10 @@ func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transa
 
 	// Assemble and return the transaction set
 	return &TransactionsByPriceAndNonce{
-		txs:    txs,
-		heads:  heads,
-		signer: signer,
+		txs:       txs,
+		heads:     heads,
+		signer:    hmySigner,
+		ethSigner: ethSigner,
 	}
 }
 
@@ -551,7 +605,14 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 
 // Shift replaces the current best head with the next one from the same account.
 func (t *TransactionsByPriceAndNonce) Shift() {
-	acc, _ := Sender(t.signer, t.heads[0])
+	if len(t.heads) == 0 {
+		return
+	}
+	signer := t.signer
+	if t.heads[0].IsEthCompatible() {
+		signer = t.ethSigner
+	}
+	acc, _ := Sender(signer, t.heads[0])
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)
@@ -690,4 +751,44 @@ func (btc BlockTxsCounts) String() string {
 	}
 	ret += " }"
 	return ret
+}
+
+// Transactions is a Transactions slice type for basic sorting.
+type Transactions []*Transaction
+
+// Len returns the length of s.
+func (s Transactions) Len() int { return len(s) }
+
+// Swap swaps the i'th and the j'th element in s.
+func (s Transactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+// GetRlp implements Rlpable and returns the i'th element of s in rlp.
+func (s Transactions) GetRlp(i int) []byte {
+	enc, _ := rlp.EncodeToBytes(s[i])
+	return enc
+}
+
+// InternalTransactions is a InternalTransaction slice type for basic sorting.
+type InternalTransactions []InternalTransaction
+
+// Len returns the length of s.
+func (s InternalTransactions) Len() int { return len(s) }
+
+// Swap swaps the i'th and the j'th element in s.
+func (s InternalTransactions) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+// GetRlp implements Rlpable and returns the i'th element of s in rlp.
+func (s InternalTransactions) GetRlp(i int) []byte {
+	enc, _ := rlp.EncodeToBytes(s[i])
+	return enc
+}
+
+// ToShardID returns the destination shardID of given transaction
+func (s InternalTransactions) ToShardID(i int) uint32 {
+	return s[i].ToShardID()
+}
+
+// MaxToShardID returns 0, arbitrary value, NOT use
+func (s InternalTransactions) MaxToShardID() uint32 {
+	return 0
 }

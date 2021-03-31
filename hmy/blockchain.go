@@ -21,7 +21,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/availability"
-	stakingNetwork "github.com/harmony-one/harmony/staking/network"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	"github.com/pkg/errors"
 )
 
@@ -136,7 +136,7 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 			rewardsForThisAddr = big.NewInt(0)
 		}
 		cur := big.NewInt(0)
-		cur.Mul(stakingNetwork.BlockReward, big.NewInt(int64(i+1))).Div(cur, count)
+		cur.Mul(stakingReward.PreStakedBlocks, big.NewInt(int64(i+1))).Div(cur, count)
 		reward := big.NewInt(0).Sub(cur, last)
 		rewards[slot.EcdsaAddress] = new(big.Int).Add(reward, rewardsForThisAddr)
 		last = cur
@@ -149,13 +149,14 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 	}
 	txFees := big.NewInt(0)
 	for _, tx := range blk.Transactions() {
-		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), tx.Hash())
+		txnHash := tx.HashByType()
+		dbTx, _, _, receiptIndex := rawdb.ReadTransaction(hmy.ChainDb(), txnHash)
 		if dbTx == nil {
-			return nil, fmt.Errorf("could not find receipt for tx: %v", tx.Hash().String())
+			return nil, fmt.Errorf("could not find receipt for tx: %v", txnHash.String())
 		}
 		if len(receipts) <= int(receiptIndex) {
 			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
-				receiptIndex, len(receipts), tx.Hash().String())
+				receiptIndex, len(receipts), txnHash.String())
 		}
 		txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
 		txFees = new(big.Int).Add(txFee, txFees)
@@ -307,11 +308,29 @@ func (hmy *Harmony) GetLeaderAddress(coinbaseAddr common.Address, epoch *big.Int
 // Filter related APIs
 
 // GetLogs ...
-func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error) {
+func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bool) ([][]*types.Log, error) {
 	receipts := hmy.BlockChain.GetReceiptsByHash(blockHash)
 	if receipts == nil {
 		return nil, errors.New("Missing receipts")
 	}
+	if isEth {
+		block := hmy.BlockChain.GetBlockByHash(blockHash)
+		if block == nil {
+			return nil, errors.New("Missing block data")
+		}
+		txns := block.Transactions()
+		for i, _ := range receipts {
+			if i < len(txns) {
+				ethHash := txns[i].ConvertToEth().Hash()
+				receipts[i].TxHash = ethHash
+				for j, _ := range receipts[i].Logs {
+					// Override log txHash with receipt's
+					receipts[i].Logs[j].TxHash = ethHash
+				}
+			}
+		}
+	}
+
 	logs := make([][]*types.Log, len(receipts))
 	for i, receipt := range receipts {
 		logs[i] = receipt.Logs

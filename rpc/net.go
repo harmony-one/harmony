@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -26,6 +27,8 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 		namespace = netV1Namespace
 	case V2:
 		namespace = netV2Namespace
+	case Eth:
+		namespace = netNamespace
 	default:
 		utils.Logger().Error().Msgf("Unknown version %v, ignoring API.", version)
 		return rpc.API{}
@@ -44,7 +47,7 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(s.net.GetPeerCount()), nil
 	case V2:
 		return s.net.GetPeerCount(), nil
@@ -54,6 +57,11 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 }
 
 // Version returns the network version, i.e. ChainID identifying which network we are using
-func (s *PublicNetService) Version(ctx context.Context) string {
-	return fmt.Sprintf("%d", s.chainID)
+func (s *PublicNetService) Version(ctx context.Context) interface{} {
+	switch s.version {
+	case Eth:
+		return hexutil.Uint64(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.Uint64())
+	default:
+		return fmt.Sprintf("%d", s.chainID)
+	}
 }

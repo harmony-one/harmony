@@ -29,7 +29,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking2 "github.com/harmony-one/harmony/staking"
-	"github.com/harmony-one/harmony/staking/network"
+	stakingReward "github.com/harmony-one/harmony/staking/reward"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
@@ -101,6 +101,33 @@ type ExecutionResult struct {
 	ReturnData []byte
 	UsedGas    uint64
 	VMErr      error
+}
+
+// Unwrap returns the internal evm error which allows us for further
+// analysis outside.
+func (result *ExecutionResult) Unwrap() error {
+	return result.VMErr
+}
+
+// Failed returns the indicator whether the execution is successful or not
+func (result *ExecutionResult) Failed() bool { return result.VMErr != nil }
+
+// Return is a helper function to help caller distinguish between revert reason
+// and function return. Return returns the data after execution if no error occurs.
+func (result *ExecutionResult) Return() []byte {
+	if result.VMErr != nil {
+		return nil
+	}
+	return common.CopyBytes(result.ReturnData)
+}
+
+// Revert returns the concrete revert reason if the execution is aborted by `REVERT`
+// opcode. Note the reason can be nil if no data supplied with revert opcode.
+func (result *ExecutionResult) Revert() []byte {
+	if result.VMErr != vm.ErrExecutionReverted {
+		return nil
+	}
+	return common.CopyBytes(result.ReturnData)
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
@@ -257,7 +284,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		ret, st.gas, vmErr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmErr != nil {
-		utils.Logger().Info().Err(vmErr).Msg("VM returned with error")
+		utils.Logger().Debug().Err(vmErr).Msg("VM returned with error")
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
 		// balance transfer may never fail.
@@ -486,21 +513,21 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
 	if st.bc == nil {
-		return network.NoReward, errors.New("[CollectRewards] No chain context provided")
+		return stakingReward.None, errors.New("[CollectRewards] No chain context provided")
 	}
 	delegations, err := st.bc.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
 	if err != nil {
-		return network.NoReward, err
+		return stakingReward.None, err
 	}
 	updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
 		st.state, delegations,
 	)
 	if err != nil {
-		return network.NoReward, err
+		return stakingReward.None, err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
 		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
-			return network.NoReward, err
+			return stakingReward.None, err
 		}
 	}
 	st.state.AddBalance(collectRewards.DelegatorAddress, totalRewards)

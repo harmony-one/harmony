@@ -105,6 +105,14 @@ func TestHarmonyFlags(t *testing.T) {
 				Legacy: &legacyConfig{
 					TPBroadcastInvalidTxn: &trueBool,
 				},
+				Prometheus: &prometheusConfig{
+					Enabled:    true,
+					IP:         "0.0.0.0",
+					Port:       9900,
+					EnablePush: true,
+					Gateway:    "https://gateway.harmony.one",
+				},
+				Sync: defaultMainnetSyncConfig,
 			},
 		},
 	}
@@ -290,6 +298,8 @@ func TestNetworkFlags(t *testing.T) {
 	}
 }
 
+var defDataStore = ".dht-127.0.0.1"
+
 func TestP2PFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
@@ -301,11 +311,13 @@ func TestP2PFlags(t *testing.T) {
 			expConfig: defaultConfig.P2P,
 		},
 		{
-			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file"},
+			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
+				defDataStore},
 			expConfig: p2pConfig{
-				Port:    9001,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				KeyFile: "./key.file",
+				Port:         9001,
+				IP:           nodeconfig.DefaultPublicListenIP,
+				KeyFile:      "./key.file",
+				DHTDataStore: &defDataStore,
 			},
 		},
 		{
@@ -931,6 +943,79 @@ func TestRevertFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc.Revert, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Revert, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
+func TestSyncFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		network   string
+		expConfig syncConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			network:   "mainnet",
+			expConfig: defaultMainnetSyncConfig,
+		},
+		{
+			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
+			network: "mainnet",
+			expConfig: func() syncConfig {
+				cfg := defaultMainnetSyncConfig
+				cfg.LegacyClient = true
+				cfg.LegacyServer = true
+				return cfg
+			}(),
+		},
+		{
+			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
+			network: "testnet",
+			expConfig: func() syncConfig {
+				cfg := defaultTestNetSyncConfig
+				cfg.LegacyClient = true
+				cfg.LegacyServer = true
+				return cfg
+			}(),
+		},
+		{
+			args: []string{"--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
+				"--sync.init-peers", "10", "--sync.disc.soft-low-cap", "10",
+				"--sync.disc.hard-low-cap", "10", "--sync.disc.hi-cap", "10",
+				"--sync.disc.batch", "10",
+			},
+			network: "mainnet",
+			expConfig: func() syncConfig {
+				cfg := defaultMainnetSyncConfig
+				cfg.Downloader = true
+				cfg.Concurrency = 10
+				cfg.MinPeers = 10
+				cfg.InitStreams = 10
+				cfg.DiscSoftLowCap = 10
+				cfg.DiscHardLowCap = 10
+				cfg.DiscHighCap = 10
+				cfg.DiscBatch = 10
+				return cfg
+			}(),
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *harmonyConfig) {
+			config.Network.NetworkType = test.network
+			applySyncFlags(command, config)
+		})
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.Sync, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sync, test.expConfig)
 		}
 		ts.tearDown()
 	}

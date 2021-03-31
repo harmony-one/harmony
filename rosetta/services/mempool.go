@@ -76,15 +76,15 @@ func (s *MempoolAPI) MempoolTransaction(
 	estReceipt := &hmyTypes.Receipt{
 		PostState:         []byte{},
 		Status:            hmyTypes.ReceiptStatusSuccessful, // Assume transaction will succeed
-		CumulativeGasUsed: poolTx.Gas(),
+		CumulativeGasUsed: poolTx.GasLimit(),
 		Bloom:             [256]byte{},
 		Logs:              []*hmyTypes.Log{estLog},
 		TxHash:            poolTx.Hash(),
 		ContractAddress:   ethCommon.Address{},
-		GasUsed:           poolTx.Gas(),
+		GasUsed:           poolTx.GasLimit(),
 	}
 
-	respTx, err := FormatTransaction(poolTx, estReceipt, []byte{})
+	respTx, err := FormatTransaction(poolTx, estReceipt, &ContractInfo{})
 	if err != nil {
 		return nil, err
 	}

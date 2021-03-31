@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -18,6 +20,7 @@ import (
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	eth "github.com/harmony-one/harmony/rpc/eth"
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -52,7 +55,10 @@ func (s *PublicTransactionService) GetAccountNonce(
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Response output is the same for all versions
-	addr := internal_common.ParseAddr(address)
+	addr, err := internal_common.ParseAddr(address)
+	if err != nil {
+		return 0, err
+	}
 	return s.hmy.GetAccountNonce(ctx, addr, blockNum)
 }
 
@@ -65,7 +71,10 @@ func (s *PublicTransactionService) GetTransactionCount(
 ) (response interface{}, err error) {
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
-	address := internal_common.ParseAddr(addr)
+	address, err := internal_common.ParseAddr(addr)
+	if err != nil {
+		return nil, err
+	}
 
 	// Fetch transaction count
 	var nonce uint64
@@ -92,7 +101,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return (hexutil.Uint64)(nonce), nil
 	case V2:
 		return nonce, nil
@@ -107,7 +116,10 @@ func (s *PublicTransactionService) GetTransactionsCount(
 ) (count uint64, err error) {
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
-		addr := internal_common.ParseAddr(address)
+		addr, err := internal_common.ParseAddr(address)
+		if err != nil {
+			return 0, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return 0, err
@@ -124,7 +136,10 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 ) (count uint64, err error) {
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
-		addr := internal_common.ParseAddr(address)
+		addr, err := internal_common.ParseAddr(address)
+		if err != nil {
+			return 0, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return 0, err
@@ -185,6 +200,12 @@ func (s *PublicTransactionService) GetTransactionByHash(
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransaction(tx.ConvertToEth(), blockHash, blockNumber, block.Time().Uint64(), index)
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -241,7 +262,10 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
 	} else {
-		addr := internal_common.ParseAddr(args.Address)
+		addr, err := internal_common.ParseAddr(args.Address)
+		if err != nil {
+			return nil, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			return nil, err
@@ -286,7 +310,10 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 	if strings.HasPrefix(args.Address, "one1") {
 		address = args.Address
 	} else {
-		addr := internal_common.ParseAddr(args.Address)
+		addr, err := internal_common.ParseAddr(args.Address)
+		if err != nil {
+			return nil, err
+		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
 			utils.Logger().Debug().
@@ -348,7 +375,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.Transactions())), nil
 	case V2:
 		return len(block.Transactions()), nil
@@ -374,7 +401,7 @@ func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.Transactions())), nil
 	case V2:
 		return len(block.Transactions()), nil
@@ -414,6 +441,12 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransactionFromBlockIndex(block, uint64(index))
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -447,6 +480,12 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
+	case Eth:
+		tx, err := eth.NewTransactionFromBlockIndex(block, uint64(index))
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(tx)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -472,7 +511,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.StakingTransactions())), nil
 	case V2:
 		return len(block.StakingTransactions()), nil
@@ -498,7 +537,7 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		return hexutil.Uint(len(block.StakingTransactions())), nil
 	case V2:
 		return len(block.StakingTransactions()), nil
@@ -559,7 +598,7 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 
 	// Format response according to version
 	switch s.version {
-	case V1:
+	case V1, Eth:
 		tx, err := v1.NewStakingTransactionFromBlockIndex(block, uint64(index))
 		if err != nil {
 			return nil, err
@@ -628,6 +667,14 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 			return nil, err
 		}
 		return NewStructuredResponse(RPCReceipt)
+	case Eth:
+		if tx != nil {
+			RPCReceipt, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, blockNumber, index, receipt)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipt)
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -640,7 +687,7 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), hash); cx != nil {
 		// Format response according to version
 		switch s.version {
-		case V1:
+		case V1, Eth:
 			tx, err := v1.NewCxReceipt(cx, blockHash, blockNumber)
 			if err != nil {
 				return nil, err
@@ -689,64 +736,141 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 	return hashes[size*pageIndex : size*pageIndex+size]
 }
 
-// EstimateGas ..
-// TODO: fix contract creation gas estimation, it currently underestimates.
-func EstimateGas(
-	ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int,
-) (uint64, error) {
+// EstimateGas - estimate gas cost for a given operation
+func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
-		lo  = params.TxGas - 1
+		lo  uint64 = params.TxGas - 1
 		hi  uint64
-		max uint64
+		cap uint64
 	)
 	blockNum := rpc.LatestBlockNumber
+	// Use zero address if sender unspecified.
+	if args.From == nil {
+		args.From = new(common.Address)
+	}
+	// Determine the highest gas limit can be used during the estimation.
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		hi = uint64(*args.Gas)
 	} else {
-		// Retrieve the blk to act as the gas ceiling
+
+		// Retrieve the block to act as the gas ceiling
 		blk, err := hmy.BlockByNumber(ctx, blockNum)
 		if err != nil {
 			return 0, err
 		}
 		hi = blk.GasLimit()
 	}
+	// Recap the highest gas limit with account's available balance.
+	if args.GasPrice != nil && args.GasPrice.ToInt().BitLen() != 0 {
+		state, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
+		if err != nil {
+			return 0, err
+		}
+		balance := state.GetBalance(*args.From) // from can't be nil
+		available := new(big.Int).Set(balance)
+		if args.Value != nil {
+			if args.Value.ToInt().Cmp(available) >= 0 {
+				return 0, errors.New("insufficient funds for transfer")
+			}
+			available.Sub(available, args.Value.ToInt())
+		}
+		allowance := new(big.Int).Div(available, args.GasPrice.ToInt())
+
+		// If the allowance is larger than maximum uint64, skip checking
+		if allowance.IsUint64() && hi > allowance.Uint64() {
+			transfer := args.Value
+			if transfer == nil {
+				transfer = new(hexutil.Big)
+			}
+			utils.Logger().Warn().Uint64("original", hi).Uint64("balance", balance.Uint64()).Uint64("sent", transfer.ToInt().Uint64()).Uint64("gasprice", args.GasPrice.ToInt().Uint64()).Uint64("fundable", allowance.Uint64()).Msg("Gas estimation capped by limited funds")
+			hi = allowance.Uint64()
+		}
+	}
+
+	// Recap the highest gas allowance with specified gascap.
 	if gasCap != nil && hi > gasCap.Uint64() {
+		utils.Logger().Warn().Uint64("requested", hi).Uint64("cap", gasCap.Uint64()).Msg("Caller gas above allowance, capping")
 		hi = gasCap.Uint64()
 	}
-	max = hi
-
-	// Use zero-address if none other is available
-	if args.From == nil {
-		args.From = &common.Address{}
-	}
+	cap = hi
 
 	// Create a helper to check if a gas allowance results in an executable transaction
-	executable := func(gas uint64) bool {
+	executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
 		result, err := DoEVMCall(ctx, hmy, args, blockNum, 0)
-		if err != nil || result.VMErr == vm.ErrCodeStoreOutOfGas || result.VMErr == vm.ErrOutOfGas {
-			return false
+		if err != nil {
+			if errors.Is(err, core.ErrIntrinsicGas) {
+				return true, nil, nil // Special case, raise gas limit
+			}
+			return true, nil, err // Bail out
 		}
-		return true
+		return result.Failed(), &result, nil
 	}
-
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
-		if !executable(mid) {
+		failed, _, err := executable(mid)
+
+		// If the error is not nil(consensus error), it means the provided message
+		// call or transaction will never be accepted no matter how much gas it is
+		// assigned. Return the error directly, don't struggle any more.
+		if err != nil {
+			return 0, err
+		}
+		if failed {
 			lo = mid
 		} else {
 			hi = mid
 		}
 	}
-
 	// Reject the transaction as invalid if it still fails at the highest allowance
-	if hi == max {
-		if !executable(hi) {
-			return 0, fmt.Errorf("gas required exceeds allowance (%d) or always failing transaction", max)
+	if hi == cap {
+		failed, result, err := executable(hi)
+		if err != nil {
+			return 0, err
+		}
+		if failed {
+			if result != nil && result.VMErr != vm.ErrOutOfGas {
+				if len(result.Revert()) > 0 {
+					return 0, newRevertError(result)
+				}
+				return 0, result.VMErr
+			}
+			// Otherwise, the specified gas cap is too low
+			return 0, fmt.Errorf("gas required exceeds allowance (%d)", cap)
 		}
 	}
 	return hi, nil
+}
+
+func newRevertError(result *core.ExecutionResult) *revertError {
+	reason, errUnpack := abi.UnpackRevert(result.Revert())
+	err := errors.New("execution reverted")
+	if errUnpack == nil {
+		err = fmt.Errorf("execution reverted: %v", reason)
+	}
+	return &revertError{
+		error:  err,
+		reason: hexutil.Encode(result.Revert()),
+	}
+}
+
+// revertError is an API error that encompassas an EVM revertal with JSON error
+// code and a binary data blob.
+type revertError struct {
+	error
+	reason string // revert reason hex encoded
+}
+
+// ErrorCode returns the JSON error code for a revertal.
+// See: https://github.com/ethereum/wiki/wiki/JSON-RPC-Error-Codes-Improvement-Proposal
+func (e *revertError) ErrorCode() int {
+	return 3
+}
+
+// ErrorData returns the hex encoded revert reason.
+func (e *revertError) ErrorData() interface{} {
+	return e.reason
 }

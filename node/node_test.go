@@ -23,7 +23,10 @@ func TestNewNode(t *testing.T) {
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   &leader,
+		BLSKey: priKey,
+	})
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -36,7 +39,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, nil, false)
+	node := New(host, consensus, testDBFactory, nil, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -193,7 +196,10 @@ func TestAddBeaconPeer(t *testing.T) {
 	pubKey := blsKey.GetPublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8982", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
-	host, err := p2p.NewHost(&leader, priKey)
+	host, err := p2p.NewHost(p2p.HostConfig{
+		Self:   &leader,
+		BLSKey: priKey,
+	})
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
@@ -207,7 +213,10 @@ func TestAddBeaconPeer(t *testing.T) {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
 
-	node := New(host, consensus, testDBFactory, nil, false)
+	archiveMode := make(map[uint32]bool)
+	archiveMode[0] = true
+	archiveMode[1] = false
+	node := New(host, consensus, testDBFactory, nil, archiveMode)
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
 		if ret {

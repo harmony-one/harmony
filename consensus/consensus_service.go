@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/params"
-
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -102,7 +101,10 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	consensus.UpdateBitmaps()
 	consensus.ResetState()
 
-	consensus.ResetViewChangeState()
+	// do not reset view change state if it is in view changing mode
+	if !consensus.IsViewChangingMode() {
+		consensus.ResetViewChangeState()
+	}
 	return consensus.Decider.ParticipantsCount()
 }
 
@@ -165,11 +167,6 @@ func (consensus *Consensus) ResetState() {
 	consensus.aggregatedCommitSig = nil
 }
 
-// ToggleConsensusCheck flip the flag of whether ignore viewID check during consensus process
-func (consensus *Consensus) ToggleConsensusCheck() {
-	consensus.IgnoreViewIDCheck.Toggle()
-}
-
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
@@ -177,6 +174,9 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
+	consensus.getLogger().Debug().
+		Str("Mode", m.String()).
+		Msg("[SetMode]")
 	consensus.current.SetMode(m)
 }
 
@@ -209,9 +209,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
-		consensus.getLogger().Debug().
+		consensus.getLogger().Info().
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
-			Msg("Start consensus timer")
+			Msg("[checkViewID] Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
@@ -304,6 +304,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	if curHeader.IsLastBlockInEpoch() {
 		nextShardState, err := curHeader.GetShardState()
 		if err != nil {
+			consensus.getLogger().Error().
+				Err(err).
+				Uint32("shard", consensus.ShardID).
+				Msg("[UpdateConsensusInformation] Error retrieving current shard state in the first block")
 			return Syncing
 		}
 		if nextShardState.Epoch != nil {
@@ -313,9 +317,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	consensus.BlockPeriod = 5 * time.Second
 
-	// Disable aggregate sig at epoch TBD for mainnet (for other net, it's default to true)
-	if consensus.Blockchain.Config().ChainID == params.MainnetChainID && curEpoch.Cmp(big.NewInt(1000)) >= 0 {
-		consensus.AggregateSig = true
+	// Enable 2s block time at the twoSecondsEpoch
+	if consensus.Blockchain.Config().IsTwoSeconds(nextEpoch) {
+		consensus.BlockPeriod = 2 * time.Second
 	}
 
 	isFirstTimeStaking := consensus.Blockchain.Config().IsStaking(nextEpoch) &&
@@ -412,12 +416,6 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		return Syncing
 	}
 
-	consensus.getLogger().Info().
-		Uint64("block-number", curHeader.Number().Uint64()).
-		Uint64("curEpoch", curHeader.Epoch().Uint64()).
-		Uint32("shard-id", consensus.ShardID).
-		Msg("[UpdateConsensusInformation] changing committee")
-
 	// take care of possible leader change during the epoch
 	// TODO: in a very rare case, when a M1 view change happened, the block contains coinbase for last leader
 	// but the new leader is actually recognized by most of the nodes. At this time, if a node sync to this
@@ -445,6 +443,10 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 		myPubKeys := consensus.GetPublicKeys()
 		if myPubKeys.Contains(key.Object) {
 			if hasError {
+				consensus.getLogger().Error().
+					Str("myKey", myPubKeys.SerializeToHexStr()).
+					Msg("[UpdateConsensusInformation] hasError")
+
 				return Syncing
 			}
 
@@ -461,6 +463,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			return Normal
 		}
 	}
+	consensus.getLogger().Info().
+		Msg("[UpdateConsensusInformation] not in committee, Listening")
+
 	// not in committee
 	return Listening
 }
@@ -511,6 +516,7 @@ func (consensus *Consensus) StartFinalityCount() {
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
 	consensus.finality = (d - consensus.finalityCounter) / 1000000
+	consensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
 // GetFinality returns the finality time in milliseconds of previous consensus
@@ -553,11 +559,6 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errReadBitmapPayload
 	}
 
-	// update consensus structure when succeeded
-	// protect consensus data update logic
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	// Have to keep the block hash so the leader can finish the commit phase of prepared block
 	consensus.ResetState()
 
@@ -593,6 +594,27 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		}
 	}
 	return nil
+}
+
+// NumSignaturesIncludedInBlock returns the number of signatures included in the block
+func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uint32 {
+	count := uint32(0)
+	members := consensus.Decider.Participants()
+	// TODO(audit): do not reconstruct the Mask
+	mask, err := bls.NewMask(members, nil)
+	if err != nil {
+		return count
+	}
+	err = mask.SetMask(block.Header().LastCommitBitmap())
+	if err != nil {
+		return count
+	}
+	for _, key := range consensus.GetPublicKeys() {
+		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
+			count++
+		}
+	}
+	return count
 }
 
 // getLogger returns logger for consensus contexts added

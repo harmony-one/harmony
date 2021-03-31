@@ -70,7 +70,7 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transact
 		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
 	}
 	gasFee := big.NewInt(0)
-	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
+	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
 	to := ""
 	if msg.To() != nil {
 		if to, err = common2.AddressToBech32(*msg.To()); err != nil {
@@ -81,8 +81,9 @@ func GetTransaction(tx *types.Transaction, addressBlock *types.Block) (*Transact
 	if from, err = common2.AddressToBech32(msg.From()); err != nil {
 		return nil, err
 	}
+
 	return &Transaction{
-		ID:        tx.Hash().Hex(),
+		ID:        tx.HashByType().Hex(),
 		Timestamp: strconv.Itoa(int(addressBlock.Time().Int64() * 1000)),
 		From:      from,
 		To:        to,
@@ -110,7 +111,7 @@ func GetStakingTransaction(tx *staking.StakingTransaction, addressBlock *types.B
 	}
 
 	gasFee := big.NewInt(0)
-	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.Gas()))
+	gasFee = gasFee.Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
 
 	var toAddress *common.Address
 	// Populate to address of delegate and undelegate staking txns

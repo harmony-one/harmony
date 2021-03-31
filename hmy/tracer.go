@@ -162,10 +162,15 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 
 			// Fetch and execute the next block trace tasks
 			for task := range tasks {
-				signer := types.MakeSigner(hmy.BlockChain.Config(), task.block.Number())
+				hmySigner := types.MakeSigner(hmy.BlockChain.Config(), task.block.Number())
+				ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
+					signer := hmySigner
+					if tx.IsEthCompatible() {
+						signer = ethSigner
+					}
 					msg, _ := tx.AsMessage(signer)
 					vmCtx := core.NewEVMContext(msg, task.block.Header(), hmy.BlockChain, nil)
 
@@ -359,10 +364,10 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 	}
 	// Execute all the transaction contained within the block concurrently
 	var (
-		signer = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-
-		txs     = block.Transactions()
-		results = make([]*TxTraceResult, len(txs))
+		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		txs       = block.Transactions()
+		results   = make([]*TxTraceResult, len(txs))
 
 		pend = new(sync.WaitGroup)
 		jobs = make(chan *txTraceTask, len(txs))
@@ -378,6 +383,11 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 
 			// Fetch and execute the next transaction trace tasks
 			for task := range jobs {
+				signer := hmySigner
+				if txs[task.index].IsEthCompatible() {
+					signer = ethSigner
+				}
+
 				msg, _ := txs[task.index].AsMessage(signer)
 				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
 
@@ -396,6 +406,10 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		// Send the trace task over for execution
 		jobs <- &txTraceTask{statedb: statedb.Copy(), index: i}
 
+		signer := hmySigner
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
 		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
@@ -459,10 +473,15 @@ func (hmy *Harmony) standardTraceBlockToFile(ctx context.Context, block *types.B
 
 	// Execute transaction, either tracing all or just the requested one
 	var (
-		signer = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
-		dumps  []string
+		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		dumps     []string
 	)
 	for i, tx := range block.Transactions() {
+		signer := hmySigner
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
 		// Prepare the transaction for un-traced execution
 		var (
 			msg, _ = tx.AsMessage(signer)
@@ -685,9 +704,15 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 	}
 
 	// Recompute transactions up to the target index.
-	signer := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+	hmySigner := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
 
 	for idx, tx := range block.Transactions() {
+		signer := hmySigner
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
+
 		// Assemble the transaction call message and return if the requested offset
 		msg, _ := tx.AsMessage(signer)
 		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
@@ -696,7 +721,7 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 		}
 		// Not yet the searched for transaction, execute on top of the current state
 		vmenv := vm.NewEVM(context, statedb, hmy.BlockChain.Config(), vm.Config{})
-		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {
+		if _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.GasLimit())); err != nil {
 			return nil, vm.Context{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
 		// Ensure any modifications are committed to the state
@@ -719,15 +744,17 @@ type ExecutionResult struct {
 // StructLogRes stores a structured log emitted by the EVM while replaying a
 // transaction in debug mode
 type StructLogRes struct {
-	Pc      uint64             `json:"pc"`
-	Op      string             `json:"op"`
-	Gas     uint64             `json:"gas"`
-	GasCost uint64             `json:"gasCost"`
-	Depth   int                `json:"depth"`
-	Error   error              `json:"error,omitempty"`
-	Stack   *[]string          `json:"stack,omitempty"`
-	Memory  *[]string          `jsogun:"memory,omitempty"`
-	Storage *map[string]string `json:"storage,omitempty"`
+	Pc              uint64            `json:"pc"`
+	Op              string            `json:"op"`
+	CallerAddress   common.Address    `json:"callerAddress"`
+	ContractAddress common.Address    `json:"contractAddress"`
+	Gas             uint64            `json:"gas"`
+	GasCost         uint64            `json:"gasCost"`
+	Depth           int               `json:"depth"`
+	Error           error             `json:"error,omitempty"`
+	Stack           []string          `json:"stack,omitempty"`
+	Memory          []string          `json:"memory,omitempty"`
+	Storage         map[string]string `json:"storage,omitempty"`
 }
 
 // FormatLogs formats EVM returned structured logs for json output
@@ -735,33 +762,35 @@ func FormatLogs(logs []vm.StructLog) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
 		formatted[index] = StructLogRes{
-			Pc:      trace.Pc,
-			Op:      trace.Op.String(),
-			Gas:     trace.Gas,
-			GasCost: trace.GasCost,
-			Depth:   trace.Depth,
-			Error:   trace.Err,
+			Pc:              trace.Pc,
+			Op:              trace.Op.String(),
+			CallerAddress:   trace.CallerAddress,
+			ContractAddress: trace.ContractAddress,
+			Gas:             trace.Gas,
+			GasCost:         trace.GasCost,
+			Depth:           trace.Depth,
+			Error:           trace.Err,
 		}
 		if trace.Stack != nil {
 			stack := make([]string, len(trace.Stack))
 			for i, stackValue := range trace.Stack {
 				stack[i] = fmt.Sprintf("%x", math.PaddedBigBytes(stackValue, 32))
 			}
-			formatted[index].Stack = &stack
+			formatted[index].Stack = stack
 		}
 		if trace.Memory != nil {
 			memory := make([]string, 0, (len(trace.Memory)+31)/32)
 			for i := 0; i+32 <= len(trace.Memory); i += 32 {
 				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
 			}
-			formatted[index].Memory = &memory
+			formatted[index].Memory = memory
 		}
 		if trace.Storage != nil {
 			storage := make(map[string]string)
 			for i, storageValue := range trace.Storage {
 				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
 			}
-			formatted[index].Storage = &storage
+			formatted[index].Storage = storage
 		}
 	}
 	return formatted

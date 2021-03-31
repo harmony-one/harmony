@@ -11,7 +11,9 @@ BUCKET=unique-bucket-bin
 PUBBUCKET=pub.harmony.one
 REL=
 GOOS=linux
-GOARCH=amd64
+GOARCH=$(uname -m)
+GOARCH=${GOARCH/x86_64/amd64}
+GOARCH=${GOARCH/aarch64/arm64}
 FOLDER=${WHOAMI:-$USER}
 RACE=
 TRACEPTR=
@@ -259,7 +261,7 @@ while getopts "hp:a:o:b:f:rtvsdS" option; do
       p) PROFILE=$OPTARG ;;
       a) GOARCH=$OPTARG ;;
       o) GOOS=$OPTARG ;;
-      b) BUCKET=$OPTARG/ ;;
+      b) BUCKET=$OPTARG ;;
       f) FOLDER=$OPTARG ;;
       r) RACE=-race ;;
       t) TRACEPTR='-gcflags=all=-d=checkptr' ;;

@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"sort"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -179,6 +181,15 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
 	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
+
+	// Testnet incident recovery
+	// Make harmony nodes having 70% voting power for epoch 73314
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
+		epoch.Cmp(big.NewInt(73490)) <= 0 {
+		harmonyPercent = numeric.MustNewDecFromStr("0.70")
+		externalPercent = numeric.MustNewDecFromStr("0.40") // Make sure consensus is always good.
+	}
+
 	for i := range staked {
 		member := AccommodateHarmonyVote{
 			PureStakedVote: PureStakedVote{
@@ -213,19 +224,23 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		}
 	}
 
-	// NOTE Enforce voting power sums to one,
-	// give diff (expect tiny amt) to last staked voter
-	if diff := numeric.OneDec().Sub(
-		ourPercentage.Add(theirPercentage),
-	); !diff.IsZero() && lastStakedVoter != nil {
-		lastStakedVoter.OverallPercent =
-			lastStakedVoter.OverallPercent.Add(diff)
-		theirPercentage = theirPercentage.Add(diff)
-	}
+	if !(nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
+		epoch.Cmp(big.NewInt(73490)) <= 0) {
 
-	if lastStakedVoter != nil &&
-		!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
-		return nil, ErrVotingPowerNotEqualOne
+		// NOTE Enforce voting power sums to one,
+		// give diff (expect tiny amt) to last staked voter
+		if diff := numeric.OneDec().Sub(
+			ourPercentage.Add(theirPercentage),
+		); !diff.IsZero() && lastStakedVoter != nil {
+			lastStakedVoter.OverallPercent =
+				lastStakedVoter.OverallPercent.Add(diff)
+			theirPercentage = theirPercentage.Add(diff)
+		}
+
+		if lastStakedVoter != nil &&
+			!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
+			return nil, ErrVotingPowerNotEqualOne
+		}
 	}
 
 	roster.OurVotingPowerTotalPercentage = ourPercentage
@@ -245,4 +260,21 @@ func NewRoster(shardID uint32) *Roster {
 		},
 		ShardID: shardID,
 	}
+}
+
+// VotePowerByMask return the vote power with the given BLS mask. The result is a number between 0 and 1.
+func (r *Roster) VotePowerByMask(mask *bls.Mask) numeric.Dec {
+	res := numeric.ZeroDec()
+
+	for key, index := range mask.PublicsIndex {
+		if enabled, err := mask.IndexEnabled(index); err != nil || !enabled {
+			continue
+		}
+		voter, ok := r.Voters[key]
+		if !ok {
+			continue
+		}
+		res = res.Add(voter.OverallPercent)
+	}
+	return res
 }
