@@ -269,7 +269,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	}
 	sigBytes, bitmap, err := chain.ParseCommitSigAndBitmap(recvMsg.Payload)
 	if err != nil {
-		consensus.getLogger().Info().Err(err).
+		consensus.getLogger().Error().Err(err).
 			Uint64("blockNum", recvMsg.BlockNum).
 			Uint64("viewID", recvMsg.ViewID).
 			Str("blockHash", recvMsg.BlockHash.Hex()).
@@ -289,10 +289,6 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	aggSig, mask, err := chain.DecodeSigBitmap(sigBytes, bitmap, consensus.Decider.Participants())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
-		return
-	}
-	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().Hex("sigBytes bitmap", recvMsg.Payload).Msgf("[OnCommitted] Quorum Not achieved.")
 		return
 	}
 	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
