@@ -273,6 +273,14 @@ func (cr *fakeChainReader) ReadValidatorInformation(
 ) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
+func (cr *fakeChainReader) ReadValidatorInformationAtState(
+	addr common.Address, state *state.DB,
+) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *fakeChainReader) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
+}
 func (cr *fakeChainReader) ReadValidatorSnapshot(
 	addr common.Address,
 ) (*staking.ValidatorSnapshot, error) {

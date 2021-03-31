@@ -245,6 +245,8 @@ func payoutUndelegations(
 		return errors.New(msg)
 	}
 	// Payout undelegated/unlocked tokens
+	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
+	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator)
 		if err != nil {
@@ -252,14 +254,14 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
-		lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
-		noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
 				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
 			)
-			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			if totalWithdraw.Sign() != 0 {
+				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			}
 		}
 		countTrack[validator] = len(wrapper.Delegations)
 	}
