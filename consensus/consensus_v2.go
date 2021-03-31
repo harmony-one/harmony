@@ -711,7 +711,7 @@ func (consensus *Consensus) tryCatchup() error {
 			return err
 		}
 		select {
-		// TODO(jacky): check if this is still needed.
+		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
 		default:
 			consensus.getLogger().Info().
