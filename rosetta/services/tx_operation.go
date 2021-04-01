@@ -18,6 +18,12 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+const (
+	SubAccountMetadataKey = "type"
+	Delegation            = "delegation"
+	UnDelegation          = "undelegation"
+)
+
 // GetNativeOperationsFromTransaction for one of the following transactions:
 // contract creation, cross-shard sender, same-shard transfer with and without code execution.
 // Native operations only include operations that affect the native currency balance of an account.
@@ -141,7 +147,7 @@ func GetNativeOperationsFromStakingTransaction(
 		operations[1].Account.SubAccount = &types.SubAccountIdentifier{
 			Address: validatorAddress.(string),
 			Metadata: map[string]interface{}{
-				"type": "delegation",
+				SubAccountMetadataKey: Delegation,
 			},
 		}
 
@@ -156,7 +162,7 @@ func GetNativeOperationsFromStakingTransaction(
 				SubAccount: &types.SubAccountIdentifier{
 					Address: validatorAddress.(string),
 					Metadata: map[string]interface{}{
-						"type": "undelegation",
+						SubAccountMetadataKey: UnDelegation,
 					},
 				},
 				Metadata: operations[1].Account.Metadata,
@@ -192,7 +198,7 @@ func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, dele
 			SubAccount: &types.SubAccountIdentifier{
 				Address: validatorAddress.(string),
 				Metadata: map[string]interface{}{
-					"type": "delegation",
+					SubAccountMetadataKey: Delegation,
 				},
 			},
 			Metadata: delegateOperation.Account.Metadata,
