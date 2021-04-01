@@ -95,7 +95,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCKWITHSIG}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK, GetBlocksWithSig: true}
 	request.Hashes = make([][]byte, len(hashes))
 	for i := range hashes {
 		request.Hashes[i] = make([]byte, len(hashes[i]))
