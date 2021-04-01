@@ -108,7 +108,7 @@ func main() {
 	database := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	engine := chain.NewEngine(0)
+	engine := chain.NewEngine()
 	bc, _ := core.NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 	statedb, _ := state.New(common2.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
 	msg := createValidator()
