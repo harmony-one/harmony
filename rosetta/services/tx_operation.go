@@ -220,7 +220,7 @@ func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, dele
 func GetSideEffectOperationsFromUndelegationPayouts(
 	payouts hmy.UndelegationPayouts, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	return getSideEffectOperationsFromValueMap(
+	return getSideEffectOperationsFromUndelegateMap(
 		payouts, common.UndelegationPayoutOperation, startingOperationIndex,
 	)
 }
@@ -447,6 +447,75 @@ func getCrossShardSenderTransferNativeOperations(
 			Metadata: metadata,
 		},
 	}, nil
+}
+
+// delegator address => validator address => amount
+func getSideEffectOperationsFromUndelegateMap(
+	valueMap map[ethcommon.Address]map[ethcommon.Address]*big.Int, opType string, startingOperationIndex *int64,
+) ([]*types.Operation, *types.Error) {
+	var opIndex int64
+	operations := []*types.Operation{}
+	if startingOperationIndex != nil {
+		opIndex = *startingOperationIndex
+	} else {
+		opIndex = 0
+	}
+
+	for delegator, undelegationMap := range valueMap {
+
+		totalAmount := new(big.Int).SetUint64(0)
+		accID, rosettaError := newAccountIdentifier(delegator)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+
+		receiverOp := &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: opIndex,
+			},
+			Type:    opType,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: accID,
+		}
+		opIndex++
+
+		operations = append(operations, receiverOp)
+		receiverIndex := len(operations) - 1
+		for validator, amount := range undelegationMap {
+			totalAmount = new(big.Int).Add(totalAmount, amount)
+			subAccId, rosettaError := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
+				SubAccountMetadataKey: UnDelegation,
+			})
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+			payoutOp := &types.Operation{
+				OperationIdentifier: &types.OperationIdentifier{
+					Index: opIndex,
+				},
+				RelatedOperations: []*types.OperationIdentifier{
+					receiverOp.OperationIdentifier,
+				},
+				Type:    opType,
+				Status:  common.SuccessOperationStatus.Status,
+				Account: subAccId,
+				Amount: &types.Amount{
+					Value:    negativeBigValue(amount),
+					Currency: &common.NativeCurrency,
+				},
+			}
+			operations = append(operations, payoutOp)
+			opIndex++
+		}
+
+		operations[receiverIndex].Amount = &types.Amount{
+			Value:    totalAmount.String(),
+			Currency: &common.NativeCurrency,
+		}
+
+	}
+
+	return operations, nil
 }
 
 // getSideEffectOperationsFromValueMap is a helper for side effect operation construction from a address to value map.
