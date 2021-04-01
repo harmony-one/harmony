@@ -49,7 +49,7 @@ var (
 		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
 		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
-		NoEarlyUnlockEpoch:         EpochTBD,
+		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
