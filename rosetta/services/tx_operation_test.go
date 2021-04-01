@@ -191,6 +191,12 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 
+	senderAccIDWithSubAccount, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr,
+		map[string]interface{}{SubAccountMetadataKey: Delegation})
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+
 	gasUsed := uint64(1e5)
 	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
@@ -205,6 +211,22 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
+			Currency: &common.NativeCurrency,
+		},
+		Metadata: metadata,
+	})
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 2},
+		RelatedOperations: []*types.OperationIdentifier{
+			{
+				Index: 1,
+			},
+		},
+		Type:    tx.StakingType().String(),
+		Status:  common.SuccessOperationStatus.Status,
+		Account: senderAccIDWithSubAccount,
+		Amount: &types.Amount{
+			Value:    tenOnes.String(),
 			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
@@ -247,7 +269,16 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	senderAccID, rosettaError := newAccountIdentifier(senderAddr)
+	senderAccID, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr, map[string]interface{}{
+		SubAccountMetadataKey: Delegation,
+	})
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+
+	receiverAccId, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr, map[string]interface{}{
+		SubAccountMetadataKey: UnDelegation,
+	})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -264,6 +295,17 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Type:                tx.StakingType().String(),
 		Status:              common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("0"),
+			Currency: &common.NativeCurrency,
+		},
+		Metadata: metadata,
+	})
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 2},
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             receiverAccId,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
 			Currency: &common.NativeCurrency,

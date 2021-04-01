@@ -139,6 +139,39 @@ func newAccountIdentifier(
 	}, nil
 }
 
+// newSubAccountIdentifier ..
+func newSubAccountIdentifier(
+	address ethCommon.Address, metadata map[string]interface{},
+) (*types.SubAccountIdentifier, *types.Error) {
+	b32Address, err := internalCommon.AddressToBech32(address)
+	if err != nil {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	return &types.SubAccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}, nil
+}
+
+func newAccountIdentifierWithSubAccount(
+	address, subAddress ethCommon.Address, metadata map[string]interface{},
+) (*types.AccountIdentifier, *types.Error) {
+	accountIdentifier, err := newAccountIdentifier(address)
+	if err != nil {
+		return nil, err
+	}
+
+	subAccountIdentifier, err := newSubAccountIdentifier(subAddress, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	accountIdentifier.SubAccount = subAccountIdentifier
+	return accountIdentifier, nil
+}
+
 // getAddress ..
 func getAddress(
 	identifier *types.AccountIdentifier,
