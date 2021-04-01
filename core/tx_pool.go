@@ -1301,7 +1301,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
-			logger.Info().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
+			logger.Debug().Str("hash", hash.Hex()).Msg("Removed old queued transaction")
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas)
@@ -1474,7 +1474,7 @@ func (pool *TxPool) demoteUnexecutables() {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
-			logger.Info().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
+			logger.Debug().Str("hash", hash.Hex()).Msg("Removed old pending transaction")
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
