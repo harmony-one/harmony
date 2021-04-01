@@ -519,7 +519,9 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 }
 
 // UndelegationPayouts ..
-type UndelegationPayouts map[common.Address]*big.Int
+// delegator address => validator address => amount
+type UndelegationPayouts map[common.Address]map[common.Address]*big.Int
+
 
 // GetUndelegationPayouts returns the undelegation payouts for each delegator
 //
@@ -556,10 +558,13 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		for _, delegation := range wrapper.Delegations {
 			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock)
 			if withdraw.Cmp(bigZero) == 1 {
-				if totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]; ok {
-					undelegationPayouts[delegation.DelegatorAddress] = new(big.Int).Add(totalPayout, withdraw)
+				if undelegationPayouts[delegation.DelegatorAddress] == nil {
+					undelegationPayouts[delegation.DelegatorAddress] = make(map[common.Address]*big.Int)
+				}
+				if totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress][validator]; ok {
+					undelegationPayouts[delegation.DelegatorAddress][validator] = new(big.Int).Add(totalPayout, withdraw)
 				} else {
-					undelegationPayouts[delegation.DelegatorAddress] = withdraw
+					undelegationPayouts[delegation.DelegatorAddress][validator] = withdraw
 				}
 			}
 		}
