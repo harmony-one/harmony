@@ -628,8 +628,9 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 	}
 
 	for i, blockBytes := range payload {
-		var bws BlockWithSig
-		if err := rlp.DecodeBytes(blockBytes, &bws); err != nil {
+		// For forward compatibility at server side, it can be types.block or BlockWithSig
+		blockObj, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
+		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Int("taskIndex", tasks[i].index).
@@ -638,8 +639,6 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			failedTasks = append(failedTasks, tasks[i])
 			continue
 		}
-		blockObj := bws.Block
-		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
 		gotHash := blockObj.Hash()
 		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
 			utils.Logger().Warn().
@@ -654,6 +653,24 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 		ss.syncMux.Unlock()
 	}
 	return failedTasks
+}
+
+// RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
+// Return the block with commitSig if set.
+func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
+	var block *types.Block
+	if err := rlp.DecodeBytes(payload, &block); err == nil {
+		// received payload as *types.Block
+		return block, nil
+	}
+
+	var bws BlockWithSig
+	if err := rlp.DecodeBytes(payload, &bws); err == nil {
+		block := bws.Block
+		block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+		return block, nil
+	}
+	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
 }
 
 // downloadTaskQueue is wrapper around Queue with item to be SyncBlockTask
@@ -802,12 +819,13 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig, haveCurrentSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
 
+	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
@@ -883,7 +901,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		}
 		// Enforce sig check for the last block in a batch
 		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck, true)
+		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
 		if err != nil {
 			break
 		}
@@ -900,7 +918,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, true, true)
+		err = ss.UpdateBlockAndStatus(block, bc, true)
 		if err != nil {
 			break
 		}
@@ -921,7 +939,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, false, false)
+		err = ss.UpdateBlockAndStatus(block, bc, false)
 		if err != nil {
 			break
 		}

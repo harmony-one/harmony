@@ -18,7 +18,6 @@ message DownloaderRequest {
     REGISTERTIMEOUT = 5;
     UNKNOWN = 6;
     BLOCKHEADER = 7;
-    BLOCKWITHSIG = 8;
   }
 
   // Request type.
@@ -32,6 +31,7 @@ message DownloaderRequest {
   string port = 6;
   uint32 size = 7;
   bool registerWithSig = 8; // Expect to have NEWBLOCK response of block along with current signature
+  bool getBlocksWithSig = 9; // Have block along with signature for BLOCK request.
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.

@@ -99,6 +99,14 @@ func (bc *testBlockChain) ReadCommitSig(blockNum uint64) ([]byte, error)        
 func (bc *testBlockChain) ReadBlockRewardAccumulator(uint64) (*big.Int, error)      { return nil, nil }
 func (bc *testBlockChain) ValidatorCandidates() []common.Address                    { return nil }
 func (bc *testBlockChain) Engine() engine.Engine                                    { return &dummyEngine{} }
+func (cr *testBlockChain) ReadValidatorInformationAtState(
+	addr common.Address, state *state.DB,
+) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *testBlockChain) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
+}
 func (bc *testBlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }

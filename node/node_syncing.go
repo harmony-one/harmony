@@ -200,7 +200,7 @@ func (node *Node) doBeaconSyncing() {
 			for beaconBlock := range node.BeaconBlockChannel {
 				if node.beaconSync != nil {
 					err := node.beaconSync.UpdateBlockAndStatus(
-						beaconBlock, node.Beaconchain(), true, false,
+						beaconBlock, node.Beaconchain(), true,
 					)
 					if err != nil {
 						node.beaconSync.AddLastMileBlock(beaconBlock)
@@ -449,25 +449,23 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	case downloader_pb.DownloaderRequest_BLOCK:
 		var hash common.Hash
+
+		withSig := request.GetBlocksWithSig
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
-			encodedBlock, err := node.getEncodedBlockByHash(hash)
+			var (
+				encoded []byte
+				err     error
+			)
+			if withSig {
+				encoded, err = node.getEncodedBlockWithSigByHash(hash)
+			} else {
+				encoded, err = node.getEncodedBlockByHash(hash)
+			}
 
 			if err == nil {
-				response.Payload = append(response.Payload, encodedBlock)
+				response.Payload = append(response.Payload, encoded)
 			}
-		}
-
-	case downloader_pb.DownloaderRequest_BLOCKWITHSIG:
-		var hash common.Hash
-		for _, bytes := range request.Hashes {
-			hash.SetBytes(bytes)
-			encoded, err := node.getEncodedBlockWithSigByHash(hash)
-			if err != nil {
-				utils.Logger().Info().Err(err).Str("hash", hash.String()).Msg("failed to get block with sig")
-				continue
-			}
-			response.Payload = append(response.Payload, encoded)
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
@@ -479,15 +477,12 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
-		var bws legacysync.BlockWithSig
-		err := rlp.DecodeBytes(request.BlockHash, &bws)
+		block, err := legacysync.RlpDecodeBlockOrBlockWithSig(request.BlockHash)
 		if err != nil {
-			utils.Logger().Warn().Msg("[SYNC] unable to decode received new block")
+			utils.Logger().Warn().Err(err).Msg("[SYNC] unable to decode received new block")
 			return response, err
 		}
-		blockObj := bws.Block
-		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
-		node.stateSync.AddNewBlock(request.PeerHash, blockObj)
+		node.stateSync.AddNewBlock(request.PeerHash, block)
 
 	case downloader_pb.DownloaderRequest_REGISTER:
 		peerID := string(request.PeerHash[:])
