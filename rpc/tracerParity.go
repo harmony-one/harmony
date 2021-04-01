@@ -24,7 +24,7 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	if err != nil {
 		return results, err
 	}
-	var resultArray []interface{}
+	var resultArray = make([]interface{}, 0)
 	for _, result := range results {
 		raw, ok := result.Result.(json.RawMessage)
 		if !ok {
