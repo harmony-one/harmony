@@ -56,12 +56,12 @@ func (s *AccountAPI) AccountBalance(
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
 	balance := new(big.Int)
 
-	// delegated balance
 	if request.AccountIdentifier.SubAccount != nil {
 		subAccount := request.AccountIdentifier.SubAccount
 		ty, exist := subAccount.Metadata["type"]
 
-		if exist && ty.(string) == "delegation" {
+		// delegated balance
+		if exist && ty.(string) == Delegation {
 			validatorAddr := subAccount.Address
 			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
 			for index, validator := range validators {
@@ -70,7 +70,7 @@ func (s *AccountAPI) AccountBalance(
 				}
 			}
 			// pending undelegated balance
-		} else if exist && ty.(string) == "undelegation" {
+		} else if exist && ty.(string) == UnDelegation {
 			validatorAddr := subAccount.Address
 			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
 			for index, validator := range validators {
