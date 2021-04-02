@@ -286,7 +286,7 @@
 			type: sortType,
 			action: action,
 			result: call.error ? undefined : result,
-			error: call.error ? "revert" : undefined
+			error: call.error ? "Reverted" : undefined
 		};
 		for (var key in sorted) {
 			if (sorted[key] === undefined) {

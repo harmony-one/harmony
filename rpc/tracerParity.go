@@ -17,7 +17,7 @@ type PublicParityTracerService struct {
 func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockNumber) (interface{}, error) {
 	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
 	if block == nil {
-		return block, errors.New("block not exist")
+		return nil, nil
 	}
 	traceJs := "blockTracer"
 	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &traceJs})
