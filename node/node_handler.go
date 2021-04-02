@@ -208,7 +208,7 @@ func (node *Node) BroadcastCrossLink() {
 		headers = append(headers, curBlock.Header())
 	} else {
 		latestBlockNum = lastLink.BlockNum()
-		if latestSentCrosslinkNum > latestBlockNum && latestSentCrosslinkNum < latestBlockNum+crossLinkBatchSize*6 {
+		if latestSentCrosslinkNum > latestBlockNum && latestSentCrosslinkNum <= latestBlockNum+crossLinkBatchSize*6 {
 			latestBlockNum = latestSentCrosslinkNum
 		}
 
