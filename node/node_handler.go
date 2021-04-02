@@ -47,8 +47,9 @@ func (node *Node) processSkippedMsgTypeByteValue(
 }
 
 var (
-	errInvalidPayloadSize = errors.New("invalid payload size")
-	errWrongBlockMsgSize  = errors.New("invalid block message size")
+	errInvalidPayloadSize         = errors.New("invalid payload size")
+	errWrongBlockMsgSize          = errors.New("invalid block message size")
+	latestSentCrosslinkNum uint64 = 0
 )
 
 // HandleNodeMessage parses the message and dispatch the actions.
@@ -207,6 +208,9 @@ func (node *Node) BroadcastCrossLink() {
 		headers = append(headers, curBlock.Header())
 	} else {
 		latestBlockNum = lastLink.BlockNum()
+		if latestSentCrosslinkNum > latestBlockNum && latestSentCrosslinkNum <= latestBlockNum+crossLinkBatchSize*6 {
+			latestBlockNum = latestSentCrosslinkNum
+		}
 
 		batchSize := crossLinkBatchSize
 		diff := curBlock.Number().Uint64() - latestBlockNum
@@ -231,11 +235,14 @@ func (node *Node) BroadcastCrossLink() {
 	}
 
 	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
-	for _, header := range headers {
+	for i, header := range headers {
 		utils.Logger().Debug().Msgf(
 			"[BroadcastCrossLink] Broadcasting %d",
 			header.Number().Uint64(),
 		)
+		if i == len(headers)-1 {
+			latestSentCrosslinkNum = header.Number().Uint64()
+		}
 	}
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
