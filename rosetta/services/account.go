@@ -59,33 +59,38 @@ func (s *AccountAPI) AccountBalance(
 	if request.AccountIdentifier.SubAccount != nil {
 		subAccount := request.AccountIdentifier.SubAccount
 		ty, exist := subAccount.Metadata["type"]
-
-		// delegated balance
-		if exist && ty.(string) == Delegation {
-			validatorAddr := subAccount.Address
-			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
-			for index, validator := range validators {
-				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
-					balance = new(big.Int).Add(balance, delegations[index].Amount)
-				}
-			}
-			// pending undelegated balance
-		} else if exist && ty.(string) == UnDelegation {
-			validatorAddr := subAccount.Address
-			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
-			for index, validator := range validators {
-				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
-					undelegations := delegations[index].Undelegations
-					for _, undelegate := range undelegations {
-						balance = new(big.Int).Add(balance, undelegate.Amount)
+		if exist {
+			switch ty.(string) {
+			case Delegation:
+				validatorAddr := subAccount.Address
+				validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+				for index, validator := range validators {
+					if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+						balance = new(big.Int).Add(balance, delegations[index].Amount)
 					}
 				}
+			case UnDelegation:
+				validatorAddr := subAccount.Address
+				validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+				for index, validator := range validators {
+					if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+						undelegations := delegations[index].Undelegations
+						for _, undelegate := range undelegations {
+							balance = new(big.Int).Add(balance, undelegate.Amount)
+						}
+					}
+				}
+			default:
+				return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+					"message": "invalid sub account type",
+				})
 			}
-		} else {
-			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-				"message": "invalid sub account or type",
-			})
 		}
+
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": "invalid sub account",
+		})
+
 	} else {
 		balance, err = s.hmy.GetBalance(ctx, addr, blockNum)
 		if err != nil {
