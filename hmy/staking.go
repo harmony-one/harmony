@@ -519,7 +519,6 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 }
 
 // UndelegationPayouts ..
-// delegator address => validator address => amount
 type UndelegationPayouts map[common.Address]map[common.Address]*big.Int
 
 
