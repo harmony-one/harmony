@@ -243,6 +243,81 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	}
 }
 
+func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
+	startingOperationIndex := int64(0)
+	undelegationPayouts := hmy.UndelegationPayouts{}
+	delegator := ethcommon.HexToAddress("0xB5f440B5c6215eEDc1b2E12b4b964fa31f7afa7d")
+	validator1 := ethcommon.HexToAddress("0x3b8DE43c8F30D3C387840681FED67783f93f1F94")
+	validator2 := ethcommon.HexToAddress("0xB5f440B5c6215eEDc1b2E12b4b964fa31f7afa7d")
+	undelegationPayouts[delegator] = make(map[ethcommon.Address]*big.Int)
+	undelegationPayouts[delegator][validator1] = new(big.Int).SetInt64(4000)
+	undelegationPayouts[delegator][validator2] = new(big.Int).SetInt64(5000)
+	operations, err := GetSideEffectOperationsFromUndelegationPayouts(undelegationPayouts, &startingOperationIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiverAccId, err := newAccountIdentifier(delegator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reveiverSubAccId1, err := newAccountIdentifierWithSubAccount(delegator, validator1, map[string]interface{}{
+		SubAccountMetadataKey: UnDelegation,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reveiverSubAccId2, err := newAccountIdentifierWithSubAccount(delegator, validator2, map[string]interface{}{
+		SubAccountMetadataKey: UnDelegation,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refOperations := []*types.Operation{}
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 0},
+		Type:                UndelegationPayout,
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             receiverAccId,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("9000"),
+			Currency: &common.NativeCurrency,
+		},
+	}, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 1},
+		RelatedOperations: []*types.OperationIdentifier{
+			&types.OperationIdentifier{
+				Index: 0,
+			},
+		},
+		Type:    UndelegationPayout,
+		Status:  common.SuccessOperationStatus.Status,
+		Account: reveiverSubAccId1,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("-4000"),
+			Currency: &common.NativeCurrency,
+		},
+	}, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 2},
+		RelatedOperations: []*types.OperationIdentifier{
+			&types.OperationIdentifier{
+				Index: 0,
+			},
+		},
+		Type:    UndelegationPayout,
+		Status:  common.SuccessOperationStatus.Status,
+		Account: reveiverSubAccId2,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("-5000"),
+			Currency: &common.NativeCurrency,
+		},
+	})
+	if !reflect.DeepEqual(refOperations, operations) {
+		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+	}
+
+}
+
 func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	gasLimit := uint64(1e18)
 	senderKey, err := crypto.GenerateKey()

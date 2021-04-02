@@ -22,6 +22,7 @@ const (
 	SubAccountMetadataKey = "type"
 	Delegation            = "delegation"
 	UnDelegation          = "undelegation"
+	UndelegationPayout    = "UndelegationPayout"
 )
 
 // GetNativeOperationsFromTransaction for one of the following transactions:
