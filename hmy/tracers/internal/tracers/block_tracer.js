@@ -260,6 +260,8 @@
 			output: call.output,
 			gasUsed: call.gasUsed
 		};
+		if (result.gasUsed == undefined)
+			result.gasUsed = "0x0";
 		if (sortType == 'create') {
 			action.init = action.input
 			delete action['input']
