@@ -221,5 +221,5 @@ var (
 	mainnetV2_1 = MustNewInstance(4, 250, 130, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
 	mainnetV2_2 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
 	mainnetV3   = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV3_1 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_1 = MustNewInstance(4, 250, 50, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )

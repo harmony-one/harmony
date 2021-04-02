@@ -933,7 +933,7 @@ func New(
 	chainConfig := networkType.ChainConfig()
 	node.chainConfig = chainConfig
 
-	engine := chain.NewEngine(consensusObj.ShardID)
+	engine := chain.NewEngine()
 
 	collection := shardchain.NewCollection(
 		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
