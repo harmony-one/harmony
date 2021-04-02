@@ -18,7 +18,7 @@ import (
 
 const (
 	maxPendingCrossLinkSize = 1000
-	crossLinkBatchSize      = 3
+	crossLinkBatchSize      = 2
 )
 
 var (
