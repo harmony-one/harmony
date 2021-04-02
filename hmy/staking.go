@@ -521,7 +521,6 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 // UndelegationPayouts ..
 type UndelegationPayouts map[common.Address]map[common.Address]*big.Int
 
-
 // GetUndelegationPayouts returns the undelegation payouts for each delegator
 //
 // Due to in-memory caching, it is possible to get undelegation payouts for a state / epoch
