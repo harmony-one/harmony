@@ -5,12 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
 
+var (
+	parityTraceJS = "blockTracer"
+)
+
 type PublicParityTracerService struct {
 	*PublicTracerService
+}
+
+func (s *PublicParityTracerService) Transaction(ctx context.Context, hash common.Hash) (interface{}, error) {
+	return s.TraceTransaction(ctx, hash, &hmy.TraceConfig{Tracer: &parityTraceJS})
 }
 
 // trace_block RPC
@@ -19,8 +28,7 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	if block == nil {
 		return nil, nil
 	}
-	traceJs := "blockTracer"
-	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &traceJs})
+	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceJS})
 	if err != nil {
 		return results, err
 	}
