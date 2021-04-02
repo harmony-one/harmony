@@ -464,7 +464,6 @@ func getSideEffectOperationsFromUndelegateMap(
 
 	for delegator, undelegationMap := range valueMap {
 
-		totalAmount := new(big.Int).SetUint64(0)
 		accID, rosettaError := newAccountIdentifier(delegator)
 		if rosettaError != nil {
 			return nil, rosettaError
@@ -478,45 +477,63 @@ func getSideEffectOperationsFromUndelegateMap(
 			Status:  common.SuccessOperationStatus.Status,
 			Account: accID,
 		}
-		opIndex++
 
+		opIndex++
 		operations = append(operations, receiverOp)
 		receiverIndex := len(operations) - 1
-		for validator, amount := range undelegationMap {
-			totalAmount = new(big.Int).Add(totalAmount, amount)
-			subAccId, rosettaError := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
-				SubAccountMetadataKey: UnDelegation,
-			})
-			if rosettaError != nil {
-				return nil, rosettaError
-			}
-			payoutOp := &types.Operation{
-				OperationIdentifier: &types.OperationIdentifier{
-					Index: opIndex,
-				},
-				RelatedOperations: []*types.OperationIdentifier{
-					receiverOp.OperationIdentifier,
-				},
-				Type:    opType,
-				Status:  common.SuccessOperationStatus.Status,
-				Account: subAccId,
-				Amount: &types.Amount{
-					Value:    negativeBigValue(amount),
-					Currency: &common.NativeCurrency,
-				},
-			}
-			operations = append(operations, payoutOp)
-			opIndex++
+
+		totalAmount, ops, err := getOperationAndTotalAmountFromUndelegationMap(delegator, &opIndex,
+			receiverOp.OperationIdentifier, opType, undelegationMap)
+		if err != nil {
+			return nil, err
 		}
+		operations = append(operations, ops...)
 
 		operations[receiverIndex].Amount = &types.Amount{
 			Value:    totalAmount.String(),
 			Currency: &common.NativeCurrency,
 		}
-
 	}
 
 	return operations, nil
+}
+
+// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegateMap which actually
+// has some side effect(opIndex will be increased by this function) so be careful while using for other purpose
+func getOperationAndTotalAmountFromUndelegationMap(
+	delegator ethcommon.Address, opIndex *int64, relatedOpIdentifier *types.OperationIdentifier, opType string,
+	undelegationMap map[ethcommon.Address]*big.Int,
+) (*big.Int, []*types.Operation, *types.Error) {
+	totalAmount := new(big.Int).SetUint64(0)
+	var operations []*types.Operation
+	for validator, amount := range undelegationMap {
+		totalAmount = new(big.Int).Add(totalAmount, amount)
+		subAccId, rosettaError := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
+			SubAccountMetadataKey: UnDelegation,
+		})
+		if rosettaError != nil {
+			return nil, nil, rosettaError
+		}
+		payoutOp := &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: *opIndex,
+			},
+			RelatedOperations: []*types.OperationIdentifier{
+				relatedOpIdentifier,
+			},
+			Type:    opType,
+			Status:  common.SuccessOperationStatus.Status,
+			Account: subAccId,
+			Amount: &types.Amount{
+				Value:    negativeBigValue(amount),
+				Currency: &common.NativeCurrency,
+			},
+		}
+		operations = append(operations, payoutOp)
+		*opIndex++
+	}
+	return totalAmount, operations, nil
+
 }
 
 // getSideEffectOperationsFromValueMap is a helper for side effect operation construction from a address to value map.
