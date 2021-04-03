@@ -2332,7 +2332,12 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 	if cached, ok := bc.validatorSnapshotCache.Get(key); ok {
 		return cached.(*staking.ValidatorSnapshot), nil
 	}
-	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
+	vs, err := rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
+	if err != nil {
+		return nil, err
+	}
+	bc.validatorSnapshotCache.Add(key, vs)
+	return vs, nil
 }
 
 // WriteValidatorSnapshot writes the snapshot of provided validator
