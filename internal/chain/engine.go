@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	verifiedSigCache = 20
+	verifiedSigCache = 50
 	epochCtxCache    = 20
 )
 
@@ -152,10 +152,13 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return errors.New("[VerifySeal] no parent header found")
 	}
 
-	sig := header.LastCommitSignature()
-	bitmap := header.LastCommitBitmap()
+	pas := payloadArgsFromHeader(parentHeader)
+	sas := sigArgs{
+		sig:    header.LastCommitSignature(),
+		bitmap: header.LastCommitBitmap(),
+	}
 
-	if err := e.verifyHeaderSignatureCached(chain, parentHeader, sig, bitmap); err != nil {
+	if err := e.verifySignatureCached(chain, pas, sas); err != nil {
 		return errors.Wrapf(err, "verify signature for parent %s", parentHash.String())
 	}
 	return nil
@@ -403,60 +406,84 @@ func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *blo
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
-	return e.verifyHeaderSignatureCached(chain, header, commitSig, commitBitmap)
-}
+	pas := payloadArgsFromHeader(header)
+	sas := sigArgs{commitSig, commitBitmap}
 
-func (e *engineImpl) verifyHeaderSignatureCached(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
-	key := newVerifiedSigKey(header.Hash(), commitSig, commitBitmap)
-	if _, ok := e.verifiedSigCache.Get(key); ok {
-		return nil
-	}
-	if err := e.verifyHeaderSignature(chain, header, commitSig, commitBitmap); err != nil {
+	err := e.verifySignatureCached(chain, pas, sas)
+	if err != nil {
 		return err
 	}
-	e.verifiedSigCache.Add(key, struct{}{})
 	return nil
 }
 
-func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
-	ec, ok := e.getCachedEpochCtx(header)
-	if !ok {
-		// Epoch context not in cache, read from chain
-		var err error
-		ec, err = readEpochCtxFromChain(chain, header.Epoch(), header.ShardID())
-		if err != nil {
-			return err
-		}
+// VerifyCrossLink verifies the signature of the given CrossLink.
+func (e *engineImpl) VerifyCrossLink(chain engine.ChainReader, cl types.CrossLink) error {
+	if cl.BlockNum() <= 1 {
+		return errors.New("crossLink BlockNumber should greater than 1")
+	}
+	if !chain.Config().IsCrossLink(cl.Epoch()) {
+		return errors.Errorf("not cross-link epoch: %v", cl.Epoch())
 	}
 
+	pas := payloadArgsFromCrossLink(cl)
+	sas := sigArgs{cl.Signature(), cl.Bitmap()}
+
+	return e.verifySignatureCached(chain, pas, sas)
+}
+
+func (e *engineImpl) verifySignatureCached(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
+	verifiedKey := newVerifiedSigKey(pas.blockHash, sas.sig, sas.bitmap)
+	if _, ok := e.verifiedSigCache.Get(verifiedKey); ok {
+		return nil
+	}
+	// Not in cache, do verify.
+	if err := e.verifySignature(chain, pas, sas); err != nil {
+		return err
+	}
+	e.verifiedSigCache.Add(verifiedKey, struct{}{})
+	return nil
+}
+
+func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
+	ec, err := e.getEpochCtxCached(chain, pas.shardID, pas.epoch.Uint64())
+	if err != nil {
+		return err
+	}
 	var (
-		pubKeys    = ec.pubKeys
-		qrVerifier = ec.qrVerifier
+		pubKeys      = ec.pubKeys
+		qrVerifier   = ec.qrVerifier
+		commitSig    = sas.sig
+		commitBitmap = sas.bitmap
 	)
 	aggSig, mask, err := DecodeSigBitmap(commitSig, commitBitmap, pubKeys)
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	// Verify signature, mask against quorum.Verifier and publicKeys
 	if !qrVerifier.IsQuorumAchievedByMask(mask) {
 		return errors.New("not enough signature collected")
 	}
-	commitPayload := signature.ConstructCommitPayload(chain,
-		header.Epoch(), header.Hash(), header.Number().Uint64(), header.ViewID().Uint64())
-
+	commitPayload := pas.constructPayload(chain)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errors.New("Unable to verify aggregated signature for block")
 	}
 	return nil
 }
 
-func (e *engineImpl) getCachedEpochCtx(header *block.Header) (*epochCtx, bool) {
-	ecKey := newEpochCtxKeyFromHeader(header)
-	ec, ok := e.epochCtxCache.Get(ecKey)
-	if !ok || ec == nil {
-		return nil, false
+func (e *engineImpl) getEpochCtxCached(chain engine.ChainReader, shardID uint32, epoch uint64) (epochCtx, error) {
+	ecKey := epochCtxKey{
+		shardID: shardID,
+		epoch:   epoch,
 	}
-	return ec.(*epochCtx), true
+	cached, ok := e.epochCtxCache.Get(ecKey)
+	if ok && cached != nil {
+		return cached.(epochCtx), nil
+	}
+	ec, err := readEpochCtxFromChain(chain, ecKey)
+	if err != nil {
+		return epochCtx{}, nil
+	}
+	e.epochCtxCache.Add(ecKey, ec)
+	return ec, nil
 }
 
 // Support 512 at most validator nodes
@@ -480,6 +507,44 @@ func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, 
 	}
 }
 
+// payloadArgs is the arguments for constructing the payload for signature verification.
+type payloadArgs struct {
+	blockHash common.Hash
+	shardID   uint32
+	epoch     *big.Int
+	number    uint64
+	viewID    uint64
+}
+
+func payloadArgsFromHeader(header *block.Header) payloadArgs {
+	return payloadArgs{
+		blockHash: header.Hash(),
+		shardID:   header.ShardID(),
+		epoch:     header.Epoch(),
+		number:    header.Number().Uint64(),
+		viewID:    header.ViewID().Uint64(),
+	}
+}
+
+func payloadArgsFromCrossLink(cl types.CrossLink) payloadArgs {
+	return payloadArgs{
+		blockHash: cl.Hash(),
+		shardID:   cl.ShardID(),
+		epoch:     cl.Epoch(),
+		number:    cl.Number().Uint64(),
+		viewID:    cl.ViewID().Uint64(),
+	}
+}
+
+func (args payloadArgs) constructPayload(chain engine.ChainReader) []byte {
+	return signature.ConstructCommitPayload(chain, args.epoch, args.blockHash, args.number, args.viewID)
+}
+
+type sigArgs struct {
+	sig    bls_cosi.SerializedSignature
+	bitmap []byte
+}
+
 type (
 	// epochCtxKey is the key for caching epochCtx
 	epochCtxKey struct {
@@ -495,39 +560,36 @@ type (
 	}
 )
 
-func newEpochCtxKeyFromHeader(header *block.Header) epochCtxKey {
-	return epochCtxKey{
-		shardID: header.ShardID(),
-		epoch:   header.Epoch().Uint64(),
-	}
-}
-
-func readEpochCtxFromChain(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*epochCtx, error) {
+func readEpochCtxFromChain(chain engine.ChainReader, key epochCtxKey) (epochCtx, error) {
+	var (
+		epoch         = new(big.Int).SetUint64(key.epoch)
+		targetShardID = key.shardID
+	)
 	ss, err := readShardState(chain, epoch, targetShardID)
 	if err != nil {
-		return nil, err
+		return epochCtx{}, err
 	}
 	shardComm, err := ss.FindCommitteeByID(targetShardID)
 	if err != nil {
-		return nil, err
+		return epochCtx{}, err
 	}
 	pubKeys, err := shardComm.BLSPublicKeys()
 	if err != nil {
-		return nil, err
+		return epochCtx{}, err
 	}
 	isStaking := chain.Config().IsStaking(epoch)
 	qrVerifier, err := quorum.NewVerifier(shardComm, epoch, isStaking)
 	if err != nil {
-		return nil, err
+		return epochCtx{}, err
 	}
-	return &epochCtx{
+	return epochCtx{
 		qrVerifier: qrVerifier,
 		pubKeys:    pubKeys,
 	}, nil
 }
 
 func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*shard.State, error) {
-	// When doing cross shard, we need recalcualte the shard state since we don't have
+	// When doing cross shard, we need recalculate the shard state since we don't have
 	// shard state of other shards
 	if needRecalculateStateShard(chain, epoch, targetShardID) {
 		shardState, err := committee.WithStakingEnabled.Compute(epoch, chain)

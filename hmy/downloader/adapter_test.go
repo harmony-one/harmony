@@ -131,6 +131,9 @@ func (e *dummyEngine) VerifyHeader(engine.ChainReader, *block.Header, bool) erro
 func (e *dummyEngine) VerifyHeaderSignature(engine.ChainReader, *block.Header, bls.SerializedSignature, []byte) error {
 	return nil
 }
+func (e *dummyEngine) VerifyCrossLink(engine.ChainReader, types.CrossLink) error {
+	return nil
+}
 func (e *dummyEngine) VerifyHeaders(engine.ChainReader, []*block.Header, []bool) (chan<- struct{}, <-chan error) {
 	return nil, nil
 }

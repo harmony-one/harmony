@@ -2,17 +2,12 @@ package node
 
 import (
 	"fmt"
-	"math/big"
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/harmony-one/harmony/staking/verify"
 	"github.com/pkg/errors"
 )
 
@@ -33,8 +28,8 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		return nil
 	}
 
-	crossLinks := &types.CrossLinks{}
-	err := rlp.DecodeBytes(cxLinksData, crossLinks)
+	crossLinks := types.CrossLinks{}
+	err := rlp.DecodeBytes(cxLinksData, &crossLinks)
 	if err != nil {
 		return errors.Wrapf(
 			err, "[CrossLinkVerification] failed to decode cross links",
@@ -45,7 +40,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		return errors.New("[CrossLinkVerification] cross links are not sorted")
 	}
 
-	for _, crossLink := range *crossLinks {
+	for _, crossLink := range crossLinks {
 		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
 			// Add slash for exist same blocknum but different crosslink
@@ -129,98 +124,11 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	if node.Blockchain().ShardID() != shard.BeaconChainShardID {
 		return errors.New("[VerifyCrossLink] Shard chains should not verify cross links")
 	}
+	engine := node.Blockchain().Engine()
 
-	if cl.BlockNum() <= 1 {
-		return errors.New("[VerifyCrossLink] CrossLink BlockNumber should greater than 1")
+	if err := engine.VerifyCrossLink(node.Blockchain(), cl); err != nil {
+		fmt.Println("verify crosslink failed", err)
+		return errors.Wrap(err, "[VerifyCrossLink]")
 	}
-
-	if !node.Blockchain().Config().IsCrossLink(cl.Epoch()) {
-		return errors.Errorf(
-			"[VerifyCrossLink] CrossLink Epoch should >= cross link starting epoch %v %v",
-			cl.Epoch(), node.Blockchain().Config().CrossLinkEpoch,
-		)
-	}
-
-	aggSig := &bls.Sign{}
-	sig := cl.Signature()
-	if err := aggSig.Deserialize(sig[:]); err != nil {
-		return errors.Wrapf(
-			err,
-			"[VerifyCrossLink] unable to deserialize multi-signature from payload",
-		)
-	}
-
-	committee, err := node.lookupCommittee(cl.Epoch(), cl.ShardID())
-	if err != nil {
-		return err
-	}
-	decider, err := node.lookupDecider(cl.Epoch(), cl.ShardID())
-	if err != nil {
-		return err
-	}
-
-	return verify.AggregateSigForCommittee(
-		node.Blockchain(), committee, decider, aggSig, cl.Hash(), cl.BlockNum(), cl.ViewID().Uint64(), cl.Epoch(), cl.Bitmap(),
-	)
-}
-
-func (node *Node) lookupDecider(
-	epoch *big.Int, shardID uint32,
-) (quorum.Decider, error) {
-
-	// Look up
-	key := fmt.Sprintf("decider-%d-%d", epoch.Uint64(), shardID)
-	if b, ok := node.deciderCache.Get(key); ok {
-		return b.(quorum.Decider), nil
-	}
-
-	// If not found, construct
-	committee, err := node.lookupCommittee(epoch, shardID)
-	if err != nil {
-		return nil, err
-	}
-
-	decider := quorum.NewDecider(
-		quorum.SuperMajorityStake, committee.ShardID,
-	)
-
-	decider.SetMyPublicKeyProvider(func() (multibls.PublicKeys, error) {
-		return nil, nil
-	})
-
-	if _, err := decider.SetVoters(committee, epoch); err != nil {
-		return nil, err
-	}
-
-	// Put in cache
-	node.deciderCache.Add(key, decider)
-
-	return decider, nil
-}
-
-func (node *Node) lookupCommittee(
-	epoch *big.Int, shardID uint32,
-) (*shard.Committee, error) {
-
-	// Look up
-	key := fmt.Sprintf("committee-%d-%d", epoch.Uint64(), shardID)
-	if b, ok := node.committeeCache.Get(key); ok {
-		return b.(*shard.Committee), nil
-	}
-
-	// If not found, construct
-	shardState, err := node.Blockchain().ReadShardState(epoch)
-	if err != nil {
-		return nil, err
-	}
-
-	committee, err := shardState.FindCommitteeByID(shardID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Put in cache
-	node.committeeCache.Add(key, committee)
-
-	return committee, nil
+	return nil
 }
