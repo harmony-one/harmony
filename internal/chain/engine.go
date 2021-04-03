@@ -409,11 +409,7 @@ func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *blo
 	pas := payloadArgsFromHeader(header)
 	sas := sigArgs{commitSig, commitBitmap}
 
-	err := e.verifySignatureCached(chain, pas, sas)
-	if err != nil {
-		return err
-	}
-	return nil
+	return e.verifySignatureCached(chain, pas, sas)
 }
 
 // VerifyCrossLink verifies the signature of the given CrossLink.

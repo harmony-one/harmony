@@ -1,8 +1,6 @@
 package node
 
 import (
-	"fmt"
-
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
@@ -127,7 +125,6 @@ func (node *Node) VerifyCrossLink(cl types.CrossLink) error {
 	engine := node.Blockchain().Engine()
 
 	if err := engine.VerifyCrossLink(node.Blockchain(), cl); err != nil {
-		fmt.Println("verify crosslink failed", err)
 		return errors.Wrap(err, "[VerifyCrossLink]")
 	}
 	return nil
