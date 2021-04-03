@@ -472,13 +472,11 @@ func (e *engineImpl) getEpochCtxCached(chain engine.ChainReader, shardID uint32,
 	}
 	cached, ok := e.epochCtxCache.Get(ecKey)
 	if ok && cached != nil {
-		if ec := cached.(epochCtx); ec.qrVerifier != nil {
-			return ec, nil
-		}
+		return cached.(epochCtx), nil
 	}
 	ec, err := readEpochCtxFromChain(chain, ecKey)
 	if err != nil {
-		return epochCtx{}, nil
+		return epochCtx{}, err
 	}
 	e.epochCtxCache.Add(ecKey, ec)
 	return ec, nil
