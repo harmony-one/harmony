@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	verifiedSigCache = 50
+	verifiedSigCache = 100
 	epochCtxCache    = 20
 )
 
