@@ -2,6 +2,7 @@ package block
 
 import (
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"io"
 	"math/big"
 	"reflect"
@@ -38,17 +39,31 @@ var (
 // MarshalJSON ..
 func (h Header) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		S uint32   `json:"shard-id"`
-		H string   `json:"block-header-hash"`
-		N *big.Int `json:"block-number"`
-		V *big.Int `json:"view-id"`
-		E *big.Int `json:"epoch"`
+		N  *big.Int `json:"number"`
+		H  string   `json:"hash"`
+		P  string   `json:"parentHash"`
+		B  string   `json:"logsBloom"`
+		T  string   `json:"transactionsRoot"`
+		S  string   `json:"stateRoot"`
+		R  string   `json:"receiptsRoot"`
+		M  string   `json:"miner"`
+		E  string   `json:"extraData"`
+		GL uint64   `json:"gasLimit"`
+		GU uint64   `json:"gasUsed"`
+		TS *big.Int `json:"timestamp"`
 	}{
-		h.Header.ShardID(),
-		h.Header.Hash().Hex(),
 		h.Header.Number(),
-		h.Header.ViewID(),
-		h.Header.Epoch(),
+		h.Header.Hash().Hex(),
+		h.Header.ParentHash().Hex(),
+		hexutil.Encode(h.Header.Bloom().Bytes()),
+		h.Header.TxHash().Hex(),
+		h.Header.Root().Hex(),
+		h.Header.ReceiptHash().Hex(),
+		h.Header.Coinbase().Hex(),
+		hexutil.Encode(h.Header.Extra()),
+		h.Header.GasLimit(),
+		h.Header.GasUsed(),
+		h.Header.Time(),
 	})
 }
 
