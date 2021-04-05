@@ -57,9 +57,10 @@ func (bh *beaconHelper) close() {
 }
 
 func (bh *beaconHelper) loop() {
+	t := time.NewTicker(10 * time.Second)
 	for {
 		select {
-		case <-time.Tick(10 * time.Second):
+		case <-t.C:
 			bh.insertAsync()
 
 		case b, ok := <-bh.blockC:
