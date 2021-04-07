@@ -1173,9 +1173,6 @@ func (node *Node) ServiceManager() *service.Manager {
 
 // ShutDown gracefully shut down the node server and dump the in-memory blockchain state into DB.
 func (node *Node) ShutDown() {
-	node.Blockchain().Stop()
-	node.Beaconchain().Stop()
-
 	if err := node.StopRPC(); err != nil {
 		utils.Logger().Error().Err(err).Msg("failed to stop RPC")
 	}
@@ -1198,6 +1195,9 @@ func (node *Node) ShutDown() {
 	if err := node.host.Close(); err != nil {
 		utils.Logger().Error().Err(err).Msg("failed to stop p2p host")
 	}
+
+	node.Blockchain().Stop()
+	node.Beaconchain().Stop()
 
 	const msg = "Successfully shut down!\n"
 	utils.Logger().Print(msg)
