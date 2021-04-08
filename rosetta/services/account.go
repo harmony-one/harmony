@@ -93,37 +93,39 @@ func (s *AccountAPI) getStakingBalance(
 ) (*big.Int, *types.Error) {
 	balance := new(big.Int)
 	ty, exist := subAccount.Metadata["type"]
-	if exist {
-		switch ty.(string) {
-		case Delegation:
-			validatorAddr := subAccount.Address
-			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
-			for index, validator := range validators {
-				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
-					balance = new(big.Int).Add(balance, delegations[index].Amount)
-				}
-			}
-		case UnDelegation:
-			validatorAddr := subAccount.Address
-			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
-			for index, validator := range validators {
-				if validatorAddr == internalCommon.MustAddressToBech32(validator) {
-					undelegations := delegations[index].Undelegations
-					for _, undelegate := range undelegations {
-						balance = new(big.Int).Add(balance, undelegate.Amount)
-					}
-				}
-			}
-		default:
-			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-				"message": "invalid sub account type",
-			})
-		}
-	} else {
+
+	if !exist {
 		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 			"message": "invalid sub account",
 		})
 	}
+
+	switch ty.(string) {
+	case Delegation:
+		validatorAddr := subAccount.Address
+		validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+		for index, validator := range validators {
+			if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+				balance = new(big.Int).Add(balance, delegations[index].Amount)
+			}
+		}
+	case UnDelegation:
+		validatorAddr := subAccount.Address
+		validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+		for index, validator := range validators {
+			if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+				undelegations := delegations[index].Undelegations
+				for _, undelegate := range undelegations {
+					balance = new(big.Int).Add(balance, undelegate.Amount)
+				}
+			}
+		}
+	default:
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": "invalid sub account type",
+		})
+	}
+
 	return balance, nil
 }
 
@@ -155,7 +157,6 @@ func newAccountIdentifier(
 	}, nil
 }
 
-// newSubAccountIdentifier ..
 func newSubAccountIdentifier(
 	address ethCommon.Address, metadata map[string]interface{},
 ) (*types.SubAccountIdentifier, *types.Error) {
