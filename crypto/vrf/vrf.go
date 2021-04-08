@@ -15,9 +15,7 @@
 // Package vrf defines the interface to a verifiable random function.
 package vrf
 
-import (
-	"crypto"
-)
+import "crypto"
 
 // A VRF is a pseudorandom function f_k from a secret key k, such that that
 // knowledge of k not only enables one to evaluate f_k at for any message m,

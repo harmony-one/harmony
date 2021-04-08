@@ -9,15 +9,15 @@ import (
 )
 
 func TestVRF1(t *testing.T) {
-	blsSk := bls.RandPrivateKey()
+	blsSk := bls.RandSecretKey()
 
-	vrfSk := NewVRFSigner(blsSk)
-	vrfPk := NewVRFVerifier(blsSk.GetPublicKey())
+	vrfSk := blsSk
+	vrfPk := blsSk.PublicKey()
 
 	m1 := []byte("data1")
 
-	vrf, proof := vrfSk.Evaluate(m1)
-	hash, err := vrfPk.ProofToHash(m1, proof)
+	vrf, proof := Evaluate(vrfSk, m1)
+	hash, err := ProofToHash(vrfPk, m1, proof)
 
 	if err != nil {
 		t.Errorf("error generating proof to hash")
@@ -29,17 +29,17 @@ func TestVRF1(t *testing.T) {
 }
 
 func TestVRF2(t *testing.T) {
-	blsSk := bls.RandPrivateKey()
+	blsSk := bls.RandSecretKey()
 
-	k := NewVRFSigner(blsSk)
-	pk := NewVRFVerifier(blsSk.GetPublicKey())
+	k := blsSk
+	pk := blsSk.PublicKey()
 
 	m1 := []byte("data1")
 	m2 := []byte("data2")
 	m3 := []byte("data2")
-	index1, proof1 := k.Evaluate(m1)
-	index2, proof2 := k.Evaluate(m2)
-	index3, proof3 := k.Evaluate(m3)
+	index1, proof1 := Evaluate(k, m1)
+	index2, proof2 := Evaluate(k, m2)
+	index3, proof3 := Evaluate(k, m3)
 	for _, tc := range []struct {
 		m     []byte
 		index [32]byte
@@ -52,7 +52,7 @@ func TestVRF2(t *testing.T) {
 		{m3, index3, proof2, nil},
 		{m3, index3, proof1, ErrInvalidVRF},
 	} {
-		index, err := pk.ProofToHash(tc.m, tc.proof)
+		index, err := ProofToHash(pk, tc.m, tc.proof)
 		if got, want := err, tc.err; got != want {
 			t.Errorf("ProofToHash(%s, %x): %v, want %v", tc.m, tc.proof, got, want)
 		}
@@ -66,53 +66,53 @@ func TestVRF2(t *testing.T) {
 }
 
 func TestRightTruncateProof(t *testing.T) {
-	blsSk := bls.RandPrivateKey()
+	blsSk := bls.RandSecretKey()
 
-	k := NewVRFSigner(blsSk)
-	pk := NewVRFVerifier(blsSk.GetPublicKey())
+	k := blsSk
+	pk := blsSk.PublicKey()
 
 	data := []byte("data")
-	_, proof := k.Evaluate(data)
+	_, proof := Evaluate(k, data)
 	proofLen := len(proof)
 	for i := 0; i < proofLen; i++ {
 		proof = proof[:len(proof)-1]
 		if i < 47 {
 			continue
 		}
-		if _, err := pk.ProofToHash(data, proof); err == nil {
+		if _, err := ProofToHash(pk, data, proof); err == nil {
 			t.Errorf("Verify unexpectedly succeeded after truncating %v bytes from the end of proof", i)
 		}
 	}
 }
 
 func TestLeftTruncateProof(t *testing.T) {
-	blsSk := bls.RandPrivateKey()
+	blsSk := bls.RandSecretKey()
 
-	k := NewVRFSigner(blsSk)
-	pk := NewVRFVerifier(blsSk.GetPublicKey())
+	k := blsSk
+	pk := blsSk.PublicKey()
 
 	data := []byte("data")
-	_, proof := k.Evaluate(data)
+	_, proof := Evaluate(k, data)
 	proofLen := len(proof)
 	for i := 0; i < proofLen; i++ {
 		proof = proof[1:]
-		if _, err := pk.ProofToHash(data, proof); err == nil {
+		if _, err := ProofToHash(pk, data, proof); err == nil {
 			t.Errorf("Verify unexpectedly succeeded after truncating %v bytes from the beginning of proof", i)
 		}
 	}
 }
 
 func TestBitFlip(t *testing.T) {
-	blsSk := bls.RandPrivateKey()
+	blsSk := bls.RandSecretKey()
 
-	k := NewVRFSigner(blsSk)
-	pk := NewVRFVerifier(blsSk.GetPublicKey())
+	k := blsSk
+	pk := blsSk.PublicKey()
 
 	data := []byte("data")
-	_, proof := k.Evaluate(data)
+	_, proof := Evaluate(k, data)
 	for i := 0; i < len(proof)*8; i++ {
 		// Flip bit in position i.
-		if _, err := pk.ProofToHash(data, flipBit(proof, i)); err == nil {
+		if _, err := ProofToHash(pk, data, flipBit(proof, i)); err == nil {
 			t.Errorf("Verify unexpectedly succeeded after flipping bit %v of vrf", i)
 		}
 	}

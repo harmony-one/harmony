@@ -12,7 +12,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -53,7 +52,7 @@ func (b Ballot) MarshalJSON() ([]byte, error) {
 
 // Round is a round of voting in any FBFT phase
 type Round struct {
-	AggregatedVote *bls_core.Sign
+	AggregatedVote bls.Signature
 	BallotBox      map[bls.SerializedPublicKey]*Ballot
 }
 
@@ -65,7 +64,7 @@ func (b Ballot) String() string {
 // NewRound ..
 func NewRound() *Round {
 	return &Round{
-		AggregatedVote: &bls_core.Sign{},
+		AggregatedVote: nil,
 		BallotBox:      map[bls.SerializedPublicKey]*Ballot{},
 	}
 }
@@ -220,7 +219,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 		if _, ok := roster.Voters[staked[i].BLSPublicKey]; !ok {
 			roster.Voters[staked[i].BLSPublicKey] = &member
 		} else {
-			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.Hex()).Msg("Duplicate BLS key found")
+			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.ToHex()).Msg("Duplicate BLS key found")
 		}
 	}
 

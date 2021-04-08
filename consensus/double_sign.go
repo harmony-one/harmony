@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -18,10 +17,10 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 		addrSet := map[common.Address]struct{}{}
 		for _, pubKey2 := range recvMsg.SenderPubkeys {
 			if alreadyCastBallot := consensus.Decider.ReadBallot(
-				quorum.Commit, pubKey2.Bytes,
+				quorum.Commit, pubKey2.Serialized(),
 			); alreadyCastBallot != nil {
 				for _, pubKey1 := range alreadyCastBallot.SignerPubKeys {
-					if bytes.Compare(pubKey2.Bytes[:], pubKey1[:]) == 0 {
+					if bytes.Compare(pubKey2.ToBytes(), pubKey1[:]) == 0 {
 						for _, blk := range consensus.FBFTLog.GetBlocksByNumber(recvMsg.BlockNum) {
 							firstSignedHeader := blk.Header()
 							areHeightsEqual := firstSignedHeader.Number().Uint64() == recvMsg.BlockNum
@@ -33,8 +32,8 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 							// hash, and if block hash is different, then that is a clear
 							// case of double signing
 							if areHeightsEqual && areViewIDsEqual && !areHeadersEqual {
-								var doubleSign bls_core.Sign
-								if err := doubleSign.Deserialize(recvMsg.Payload); err != nil {
+								doubleSign, err := bls.SignatureFromBytes(recvMsg.Payload)
+								if err != nil {
 									consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 										Msg("could not deserialize potential double signer")
 									return true
@@ -60,7 +59,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 									return true
 								}
 
-								addr, err := subComm.AddressForBLSKey(pubKey2.Bytes)
+								addr, err := subComm.AddressForBLSKey(pubKey2.Serialized())
 								if err != nil {
 									consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 										Msg("could not find address for bls key")
@@ -71,7 +70,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 									break
 								}
 
-								leaderAddr, err := subComm.AddressForBLSKey(consensus.LeaderPubKey.Bytes)
+								leaderAddr, err := subComm.AddressForBLSKey(consensus.LeaderPubKey.Serialized())
 								if err != nil {
 									consensus.getLogger().Err(err).Str("msg", recvMsg.String()).
 										Msg("could not find address for leader bls key")
@@ -81,7 +80,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 								go func(reporter common.Address) {
 									secondKeys := make([]bls.SerializedPublicKey, len(recvMsg.SenderPubkeys))
 									for i, pubKey := range recvMsg.SenderPubkeys {
-										secondKeys[i] = pubKey.Bytes
+										secondKeys[i] = pubKey.Serialized()
 									}
 									evid := slash.Evidence{
 										ConflictingVotes: slash.ConflictingVotes{
@@ -93,7 +92,7 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 											SecondVote: slash.Vote{
 												secondKeys,
 												recvMsg.BlockHash,
-												common.Hex2Bytes(doubleSign.SerializeToHexStr()),
+												doubleSign.ToBytes(),
 											}},
 										Moment: slash.Moment{
 											Epoch:   curHeader.Epoch(),

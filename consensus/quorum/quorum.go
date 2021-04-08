@@ -7,9 +7,9 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/consensus/votepower"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/numeric"
@@ -73,10 +73,10 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
-	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
-	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
-	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
+	NthNext(bls.PublicKey, int) (bool, bls.PublicKey)
+	NthNextHmy(shardingconfig.Instance, bls.PublicKey, int) (bool, bls.PublicKey)
+	FirstParticipant(shardingconfig.Instance) bls.PublicKey
+	UpdateParticipants(pubKeys []bls.PublicKey)
 }
 
 // SignatoryTracker ..
@@ -85,7 +85,7 @@ type SignatoryTracker interface {
 	// This func shouldn't be called directly from outside of quorum. Use AddNewVote instead.
 	submitVote(
 		p Phase, pubkeys []bls.SerializedPublicKey,
-		sig *bls_core.Sign, headerHash common.Hash,
+		sig bls.Signature, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	// Caller assumes concurrency protection
@@ -100,7 +100,7 @@ type SignatureReader interface {
 	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
-	AggregateVotes(p Phase) *bls_core.Sign
+	AggregateVotes(p Phase) bls.Signature
 }
 
 // DependencyInjectionWriter ..
@@ -121,12 +121,12 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
-		sig *bls_core.Sign, headerHash common.Hash,
+		p Phase, pubkeys []bls.PublicKey,
+		sig bls.Signature, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
-	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
+	IsQuorumAchievedByMask(mask *bls.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
@@ -157,7 +157,7 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys  []bls.PublicKeyWrapper
+	publicKeys  []bls.PublicKey
 	keyIndexMap map[bls.SerializedPublicKey]int
 	prepare     *votepower.Round
 	commit      *votepower.Round
@@ -170,12 +170,11 @@ type depInject struct {
 	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
-func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
+func (s *cIdentities) AggregateVotes(p Phase) bls.Signature {
 	ballots := s.ReadAllBallots(p)
-	sigs := make([]*bls_core.Sign, 0, len(ballots))
-	collectedKeys := map[bls_cosi.SerializedPublicKey]struct{}{}
+	sigs := make([]bls.Signature, 0, len(ballots))
+	collectedKeys := map[bls.SerializedPublicKey]struct{}{}
 	for _, ballot := range ballots {
-		sig := &bls_core.Sign{}
 		// NOTE invariant that shouldn't happen by now
 		// but pointers are pointers
 
@@ -197,11 +196,11 @@ func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
 		}
 
 		if ballot != nil {
-			sig.DeserializeHexStr(common.Bytes2Hex(ballot.Signature))
+			sig, _ := bls.SignatureFromBytes(ballot.Signature)
 			sigs = append(sigs, sig)
 		}
 	}
-	return bls_cosi.AggregateSig(sigs)
+	return bls.AggreagateSignatures(sigs)
 }
 
 func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
@@ -212,10 +211,10 @@ func (s *cIdentities) IndexOf(pubKey bls.SerializedPublicKey) int {
 }
 
 // NthNext return the Nth next pubkey, next can be negative number
-func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+func (s *cIdentities) NthNext(pubKey bls.PublicKey, next int) (bool, bls.PublicKey) {
 	found := false
 
-	idx := s.IndexOf(pubKey.Bytes)
+	idx := s.IndexOf(pubKey.Serialized())
 	if idx != -1 {
 		found = true
 	}
@@ -225,14 +224,14 @@ func (s *cIdentities) NthNext(pubKey *bls.PublicKeyWrapper, next int) (bool, *bl
 		numNodes = len(s.publicKeys)
 	}
 	idx = (idx + next) % numNodes
-	return found, &s.publicKeys[idx]
+	return found, s.publicKeys[idx]
 }
 
 // NthNextHmy return the Nth next pubkey of Harmony nodes, next can be negative number
-func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey bls.PublicKey, next int) (bool, bls.PublicKey) {
 	found := false
 
-	idx := s.IndexOf(pubKey.Bytes)
+	idx := s.IndexOf(pubKey.Serialized())
 	if idx != -1 {
 		found = true
 	}
@@ -242,22 +241,22 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 		numNodes = len(s.publicKeys)
 	}
 	idx = (idx + next) % numNodes
-	return found, &s.publicKeys[idx]
+	return found, s.publicKeys[idx]
 }
 
 // FirstParticipant returns the first participant of the shard
-func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
-	return &s.publicKeys[0]
+func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) bls.PublicKey {
+	return s.publicKeys[0]
 }
 
 func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) UpdateParticipants(pubKeys []bls.PublicKeyWrapper) {
+func (s *cIdentities) UpdateParticipants(pubKeys []bls.PublicKey) {
 	keyIndexMap := map[bls.SerializedPublicKey]int{}
 	for i := range pubKeys {
-		keyIndexMap[pubKeys[i].Bytes] = i
+		keyIndexMap[pubKeys[i].Serialized()] = i
 	}
 	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
@@ -283,7 +282,7 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 
 func (s *cIdentities) submitVote(
 	p Phase, pubkeys []bls.SerializedPublicKey,
-	sig *bls_core.Sign, headerHash common.Hash,
+	sig bls.Signature, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
 	seenKeys := map[bls.SerializedPublicKey]struct{}{}
@@ -301,7 +300,7 @@ func (s *cIdentities) submitVote(
 	ballot := &votepower.Ballot{
 		SignerPubKeys:   pubkeys,
 		BlockHeaderHash: headerHash,
-		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
+		Signature:       common.Hex2Bytes(sig.ToHex()),
 		Height:          height,
 		ViewID:          viewID,
 	}
@@ -378,7 +377,7 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 
 func newBallotsBackedSignatureReader() *cIdentities {
 	return &cIdentities{
-		publicKeys:  []bls.PublicKeyWrapper{},
+		publicKeys:  []bls.PublicKey{},
 		keyIndexMap: map[bls.SerializedPublicKey]int{},
 		prepare:     votepower.NewRound(),
 		commit:      votepower.NewRound(),

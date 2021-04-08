@@ -18,6 +18,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -33,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core/state"
@@ -49,8 +49,8 @@ import (
 var (
 	// testTxPoolConfig is a transaction pool configuration without stateful disk sideeffects used during testing.
 	testTxPoolConfig TxPoolConfig
-	testBLSPubKey    = "30b2c38b1316da91e068ac3bd8751c0901ef6c02a1d58bc712104918302c6ed03d5894671d0c816dad2b4d303320f202"
-	testBLSPrvKey    = "c6d7603520311f7a4e6aac0b26701fc433b75b38df504cd416ef2b900cd66205"
+	testBLSPubKey    = "a8c1e0a9f4c6db2166c873addd8a925f6541f70e6baca6f61a470040320573ea29d906aa2fd329d6c75a6ebaaf2d3cac"
+	testBLSPrvKey    = "2a899297ecd72b60aa70ce22d83b2fcb8e564ddb54f8e97695ee69a8b826e9b0"
 
 	gasPrice       = big.NewInt(1e9)
 	gasLimit       = big.NewInt(int64(params.TxGasValidatorCreation))
@@ -90,17 +90,14 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 // TODO: more staking tests in tx pool & testing lib
 func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingTransaction, error) {
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
-		p := &bls_core.PublicKey{}
-		p.DeserializeHexStr(testBLSPubKey)
-		pub := bls.SerializedPublicKey{}
-		pub.FromLibBLSPublicKey(p)
+		pubBytes, _ := hex.DecodeString(testBLSPubKey)
+		pub, _ := bls.PublicKeyFromBytes(pubBytes)
+		privBytes, _ := hex.DecodeString(testBLSPrvKey)
+		privateKey, _ := bls.SecretKeyFromBytes(privBytes)
 		messageBytes := []byte(staking.BLSVerificationStr)
-		privateKey := &bls_core.SecretKey{}
-		privateKey.DeserializeHexStr(testBLSPrvKey)
+
 		msgHash := hash.Keccak256(messageBytes)
-		signature := privateKey.SignHash(msgHash[:])
-		var sig bls.SerializedSignature
-		copy(sig[:], signature.Serialize())
+		signature := privateKey.Sign(msgHash[:])
 
 		ra, _ := numeric.NewDecFromStr("0.7")
 		maxRate, _ := numeric.NewDecFromStr("1")
@@ -121,8 +118,8 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 			MinSelfDelegation:  tenKOnes,
 			MaxTotalDelegation: twelveKOnes,
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []bls.SerializedPublicKey{pub},
-			SlotKeySigs:        []bls.SerializedSignature{sig},
+			SlotPubKeys:        []bls.SerializedPublicKey{pub.Serialized()},
+			SlotKeySigs:        []bls.SerializedSignature{signature.Serialized()},
 			Amount:             tenKOnes,
 		}
 	}

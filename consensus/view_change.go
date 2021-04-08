@@ -153,13 +153,13 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 // It reads the current leader's pubkey based on the blockchain data and returns
 // the next leader based on the gap of the viewID of the view change and the last
 // know view id of the block.
-func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrapper {
+func (consensus *Consensus) getNextLeaderKey(viewID uint64) bls.PublicKey {
 	gap := 1
 
 	if viewID > consensus.GetCurBlockViewID() {
 		gap = int(viewID - consensus.GetCurBlockViewID())
 	}
-	var lastLeaderPubKey *bls.PublicKeyWrapper
+	var lastLeaderPubKey bls.PublicKey
 	var err error
 	epoch := big.NewInt(0)
 	if consensus.Blockchain == nil {
@@ -194,8 +194,8 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		}
 	}
 	consensus.getLogger().Info().
-		Str("lastLeaderPubKey", lastLeaderPubKey.Bytes.Hex()).
-		Str("leaderPubKey", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("lastLeaderPubKey", lastLeaderPubKey.ToHex()).
+		Str("leaderPubKey", consensus.LeaderPubKey.ToHex()).
 		Int("gap", gap).
 		Uint64("newViewID", viewID).
 		Uint64("myCurBlockViewID", consensus.GetCurBlockViewID()).
@@ -208,11 +208,11 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		gap)
 	if !wasFound {
 		consensus.getLogger().Warn().
-			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
+			Str("key", consensus.LeaderPubKey.ToHex()).
 			Msg("[getNextLeaderKey] currentLeaderKey not found")
 	}
 	consensus.getLogger().Info().
-		Str("nextLeader", next.Bytes.Hex()).
+		Str("nextLeader", next.ToHex()).
 		Msg("[getNextLeaderKey] next Leader")
 	return next
 }
@@ -250,7 +250,7 @@ func (consensus *Consensus) startViewChange() {
 		Uint64("nextViewID", nextViewID).
 		Uint64("viewChangingID", consensus.GetViewChangingID()).
 		Dur("timeoutDuration", duration).
-		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("NextLeader", consensus.LeaderPubKey.ToHex()).
 		Msg("[startViewChange]")
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "started"}).Inc()
 
@@ -274,10 +274,10 @@ func (consensus *Consensus) startViewChange() {
 	// for view change, send separate view change per public key
 	// do not do multi-sign of view change message
 	for _, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+		if !consensus.IsValidatorInCommittee(key.PublicKey().Serialized()) {
 			continue
 		}
-		msgToSend := consensus.constructViewChangeMessage(&key)
+		msgToSend := consensus.constructViewChangeMessage(key)
 		if err := consensus.msgSender.SendWithRetry(
 			consensus.blockNum,
 			msg_pb.MessageType_VIEWCHANGE,
@@ -292,7 +292,7 @@ func (consensus *Consensus) startViewChange() {
 }
 
 // startNewView stops the current view change
-func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper, reset bool) error {
+func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey bls.SecretKey, reset bool) error {
 	if !consensus.IsViewChangingMode() {
 		return errors.New("not in view changing mode anymore")
 	}
@@ -314,7 +314,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 		return errors.New("failed to send out the NewView message")
 	}
 	consensus.getLogger().Info().
-		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
+		Str("myKey", newLeaderPriKey.PublicKey().ToHex()).
 		Hex("M1Payload", consensus.vc.GetM1Payload()).
 		Msg("[startNewView] Sent NewView Messge")
 
@@ -328,14 +328,14 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 	consensus.getLogger().Info().
 		Uint64("viewID", viewID).
-		Str("myKey", newLeaderPriKey.Pub.Bytes.Hex()).
+		Str("myKey", newLeaderPriKey.PublicKey().ToHex()).
 		Msg("[startNewView] viewChange stopped. I am the New Leader")
 
 	// TODO: consider make ResetState unified and only called in one place like finalizeCommit()
 	if reset {
 		consensus.ResetState()
 	}
-	consensus.LeaderPubKey = newLeaderPriKey.Pub
+	consensus.LeaderPubKey = newLeaderPriKey.PublicKey()
 
 	return nil
 }
@@ -353,12 +353,12 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 
 	// if not leader, noop
 	newLeaderKey := recvMsg.LeaderPubkey
-	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey.Object)
+	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey)
 	if err != nil {
 		consensus.getLogger().Info().
 			Err(err).
 			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
-			Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
+			Str("NextLeader", recvMsg.LeaderPubkey.ToHex()).
 			Str("myBLSPubKey", consensus.priKey.GetPublicKeys().SerializeToHexStr()).
 			Msg("[onViewChange] I am not the Leader")
 		return
@@ -369,7 +369,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).
 			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
-			Str("newLeaderKey", newLeaderKey.Bytes.Hex()).
+			Str("newLeaderKey", newLeaderKey.ToHex()).
 			Msg("[onViewChange] Received Enough View Change Messages")
 		return
 	}
@@ -400,7 +400,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		consensus.getLogger().Error().Err(err).
 			Uint64("viewID", recvMsg.ViewID).
 			Uint64("blockNum", recvMsg.BlockNum).
-			Str("msgSender", senderKey.Bytes.Hex()).
+			Str("msgSender", senderKey.ToHex()).
 			Msg("[onViewChange] process View Change message error")
 		return
 	}
@@ -494,7 +494,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 				Msg("[onNewView] ReadSignatureBitmapPayload Failed")
 			return
 		}
-		if !aggSig.VerifyHash(mask.AggregatePublic, blockHash) {
+		if !aggSig.Verify(mask.AggregatePublic(), blockHash) {
 			consensus.getLogger().Warn().
 				Msg("[onNewView] Failed to Verify Signature for M1 (prepare) message")
 			return
@@ -514,7 +514,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		preparedMsg.Payload = make([]byte, len(recvMsg.Payload)-32)
 		copy(preparedMsg.Payload[:], recvMsg.Payload[32:])
 
-		preparedMsg.SenderPubkeys = []*bls.PublicKeyWrapper{senderKey}
+		preparedMsg.SenderPubkeys = []bls.PublicKey{senderKey}
 		consensus.FBFTLog.AddVerifiedMessage(&preparedMsg)
 
 		if preparedBlock != nil {
@@ -545,7 +545,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		consensus.getLogger().Info().Msg("onNewView === announce")
 	}
 	consensus.getLogger().Info().
-		Str("newLeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+		Str("newLeaderKey", consensus.LeaderPubKey.ToHex()).
 		Msg("new leader changed")
 	consensus.consensusTimeout[timeoutConsensus].Start()
 	consensusVCCounterVec.With(prometheus.Labels{"viewchange": "finished"}).Inc()

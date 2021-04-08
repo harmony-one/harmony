@@ -231,7 +231,7 @@ func (s *PublicStakingService) GetValidatorKeys(
 	// Response output is the same for all versions
 	validators := make([]string, len(cmt.Slots))
 	for i, v := range cmt.Slots {
-		validators[i] = v.BLSPublicKey.Hex()
+		validators[i] = v.BLSPublicKey.ToHex()
 	}
 	return validators, nil
 }

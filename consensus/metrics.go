@@ -109,7 +109,7 @@ func (consensus *Consensus) AddPubkeyMetrics() {
 	keys := consensus.GetPublicKeys()
 	for i, key := range keys {
 		index := fmt.Sprintf("%d", i)
-		consensusPubkeyVec.With(prometheus.Labels{"index": index, "pubkey": key.Bytes.Hex()}).Set(float64(i))
+		consensusPubkeyVec.With(prometheus.Labels{"index": index, "pubkey": key.ToHex()}).Set(float64(i))
 	}
 }
 

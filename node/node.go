@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	lru "github.com/hashicorp/golang-lru"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -524,7 +523,7 @@ func (node *Node) validateShardBoundMessage(
 
 	serializedKey := bls.SerializedPublicKey{}
 	if len(senderKey) > 0 {
-		if len(senderKey) != bls.PublicKeySizeInBytes {
+		if len(senderKey) != bls.PublicKeySize {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_key_size"}).Inc()
 			return nil, nil, true, errors.WithStack(errNotRightKeySize)
 		}
@@ -1107,7 +1106,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 	}
 
 	for _, key := range pubKeys {
-		if node.Consensus.GetPublicKeys().Contains(key.Object) {
+		if node.Consensus.GetPublicKeys().Contains(key) {
 			utils.Logger().Info().
 				Uint64("blockNum", blockNum).
 				Int("numPubKeys", len(pubKeys)).
@@ -1230,17 +1229,9 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 	}
 
 	for _, blskey := range node.Consensus.GetPublicKeys() {
-		blsStr := blskey.Bytes.Hex()
-		shardkey := bls.FromLibBLSPublicKeyUnsafe(blskey.Object)
-		if shardkey == nil {
-			utils.Logger().Error().
-				Int64("epoch", epoch.Int64()).
-				Uint32("shard-id", shardID).
-				Str("blskey", blsStr).
-				Msg("[PopulateSelfAddresses] failed to get shard key from bls key")
-			return
-		}
-		addr, err := committee.AddressForBLSKey(*shardkey)
+		blsStr := blskey.ToHex()
+		shardkey := blskey.Serialized()
+		addr, err := committee.AddressForBLSKey(shardkey)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Int64("epoch", epoch.Int64()).
@@ -1260,14 +1251,14 @@ func (node *Node) populateSelfAddresses(epoch *big.Int) {
 }
 
 // GetAddressForBLSKey retrieves the ECDSA address associated with bls key for epoch
-func (node *Node) GetAddressForBLSKey(blskey *bls_core.PublicKey, epoch *big.Int) common.Address {
+func (node *Node) GetAddressForBLSKey(blskey bls.PublicKey, epoch *big.Int) common.Address {
 	// populate if first time setting or new epoch
 	node.keysToAddrsMutex.Lock()
 	defer node.keysToAddrsMutex.Unlock()
 	if node.keysToAddrsEpoch == nil || epoch.Cmp(node.keysToAddrsEpoch) != 0 {
 		node.populateSelfAddresses(epoch)
 	}
-	blsStr := blskey.SerializeToHexStr()
+	blsStr := blskey.ToHex()
 	addr, ok := node.KeysToAddrs[blsStr]
 	if !ok {
 		return common.Address{}

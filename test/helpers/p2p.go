@@ -1,8 +1,7 @@
 package helpers
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
-	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-crypto"
@@ -45,7 +44,7 @@ func init() {
 }
 
 // GenerateHost - test helper to generate a new host
-func GenerateHost(address string, port string) (p2p.Host, *bls.PublicKey, error) {
+func GenerateHost(address string, port string) (p2p.Host, bls.PublicKey, error) {
 	nodePrivateKey, _, err := GeneratePrivateKey()
 	if err != nil {
 		return nil, nil, errors.New("failed to generate private key for node")
@@ -70,8 +69,8 @@ func GenerateHost(address string, port string) (p2p.Host, *bls.PublicKey, error)
 
 // GeneratePeer - test helper to generate a new peer
 func GeneratePeer(address string, port string) (p2p.Peer, error) {
-	peerPrivateKey := harmony_bls.RandPrivateKey()
-	peerPublicKey := peerPrivateKey.GetPublicKey()
+	peerPrivateKey := bls.RandSecretKey()
+	peerPublicKey := peerPrivateKey.PublicKey()
 	if peerPrivateKey == nil || peerPublicKey == nil {
 		return p2p.Peer{}, errors.New("failed to generate bls key for peer")
 	}

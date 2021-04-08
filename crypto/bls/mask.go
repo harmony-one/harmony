@@ -1,95 +1,56 @@
 package bls
 
 import (
-	"github.com/harmony-one/bls/ffi/go/bls"
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 )
-
-const (
-	blsPubKeyCacheSize = 1024
-)
-
-var (
-	// BLSPubKeyCache is the Cache of the Deserialized BLS PubKey
-	BLSPubKeyCache, _ = lru.New(blsPubKeyCacheSize)
-)
-
-func init() {
-	bls.Init(bls.BLS12_381)
-}
-
-// RandPrivateKey returns a random private key.
-func RandPrivateKey() *bls.SecretKey {
-	sec := bls.SecretKey{}
-	sec.SetByCSPRNG()
-	return &sec
-}
-
-var (
-	errEmptyInput = errors.New("BytesToBLSPublicKey: empty input")
-	errPubKeyCast = errors.New("BytesToBLSPublicKey: cast error")
-)
-
-// BytesToBLSPublicKey converts bytes into bls.PublicKey pointer.
-func BytesToBLSPublicKey(bytes []byte) (*bls.PublicKey, error) {
-	if len(bytes) == 0 {
-		return nil, errEmptyInput
-	}
-	kkey := string(bytes)
-	if k, ok := BLSPubKeyCache.Get(kkey); ok {
-		if pk, ok := k.(bls.PublicKey); ok {
-			return &pk, nil
-		}
-		return nil, errPubKeyCast
-	}
-	pubKey := &bls.PublicKey{}
-	err := pubKey.Deserialize(bytes)
-
-	if err == nil {
-		BLSPubKeyCache.Add(kkey, *pubKey)
-		return pubKey, nil
-	}
-
-	return nil, err
-}
-
-// AggregateSig aggregates all the BLS signature into a single multi-signature.
-func AggregateSig(sigs []*bls.Sign) *bls.Sign {
-	var aggregatedSig bls.Sign
-	for _, sig := range sigs {
-		aggregatedSig.Add(sig)
-	}
-	return &aggregatedSig
-}
 
 // Mask represents a cosigning participation bitmask.
 type Mask struct {
 	Bitmap          []byte
-	Publics         []*PublicKeyWrapper
+	Publics         []PublicKey
 	PublicsIndex    map[SerializedPublicKey]int
-	AggregatePublic *bls.PublicKey
+	aggregatePublic publicKeyAggregator
+}
+
+func (m *Mask) AggregatePublic() PublicKey {
+	return m.aggregatePublic.affine()
+}
+
+// SeparateSigAndMask parse the commig signature data into signature and bitmap.
+func SeparateSigAndMask(commitSigs []byte) ([]byte, []byte, error) {
+	if len(commitSigs) < SignatureSize {
+		return nil, nil, errors.Errorf("no mask data found in commit sigs: %x", commitSigs)
+	}
+	//#### Read payload data from committed msg
+	aggSig := make([]byte, SignatureSize)
+	bitmap := make([]byte, len(commitSigs)-SignatureSize)
+	offset := 0
+	copy(aggSig[:], commitSigs[offset:offset+SignatureSize])
+	offset += SignatureSize
+	copy(bitmap[:], commitSigs[offset:])
+	//#### END Read payload data from committed msg
+	return aggSig, bitmap, nil
 }
 
 // NewMask returns a new participation bitmask for cosigning where all
 // cosigners are disabled by default. If a public key is given it verifies that
 // it is present in the list of keys and sets the corresponding index in the
 // bitmask to 1 (enabled).
-func NewMask(publics []PublicKeyWrapper, myKey *PublicKeyWrapper) (*Mask, error) {
+func NewMask(publics []PublicKey, myKey PublicKey) (*Mask, error) {
 	index := map[SerializedPublicKey]int{}
-	publicKeys := make([]*PublicKeyWrapper, len(publics))
+	publicKeys := make([]PublicKey, len(publics))
 	for i, key := range publics {
-		publicKeys[i] = &publics[i]
-		index[key.Bytes] = i
+		publicKeys[i] = publics[i]
+		index[key.Serialized()] = i
 	}
 	m := &Mask{
 		Publics:      publicKeys,
 		PublicsIndex: index,
 	}
 	m.Bitmap = make([]byte, m.Len())
-	m.AggregatePublic = &bls.PublicKey{}
+	m.aggregatePublic = newPublicKeyAggregator()
 	if myKey != nil {
-		i, found := m.PublicsIndex[myKey.Bytes]
+		i, found := m.PublicsIndex[myKey.Serialized()]
 		if found {
 			m.SetBit(i, true)
 			found = true
@@ -104,7 +65,7 @@ func NewMask(publics []PublicKeyWrapper, myKey *PublicKeyWrapper) (*Mask, error)
 // Clear clears the existing bits and aggregate public keys.
 func (m *Mask) Clear() {
 	m.Bitmap = make([]byte, m.Len())
-	m.AggregatePublic = &bls.PublicKey{}
+	m.aggregatePublic = newPublicKeyAggregator()
 }
 
 // Mask returns a copy of the participation bitmask.
@@ -135,11 +96,11 @@ func (m *Mask) SetMask(mask []byte) error {
 		msk := byte(1) << uint(i&7)
 		if ((m.Bitmap[byt] & msk) == 0) && ((mask[byt] & msk) != 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-			m.AggregatePublic.Add(m.Publics[i].Object)
+			m.aggregatePublic.add(m.Publics[i])
 		}
 		if ((m.Bitmap[byt] & msk) != 0) && ((mask[byt] & msk) == 0) {
 			m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-			m.AggregatePublic.Sub(m.Publics[i].Object)
+			m.aggregatePublic.sub(m.Publics[i])
 		}
 	}
 	return nil
@@ -155,29 +116,29 @@ func (m *Mask) SetBit(i int, enable bool) error {
 	msk := byte(1) << uint(i&7)
 	if ((m.Bitmap[byt] & msk) == 0) && enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 0 to 1
-		m.AggregatePublic.Add(m.Publics[i].Object)
+		m.aggregatePublic.add(m.Publics[i])
 	}
 	if ((m.Bitmap[byt] & msk) != 0) && !enable {
 		m.Bitmap[byt] ^= msk // flip bit in Bitmap from 1 to 0
-		m.AggregatePublic.Sub(m.Publics[i].Object)
+		m.aggregatePublic.sub(m.Publics[i])
 	}
 	return nil
 }
 
 // GetPubKeyFromMask will return pubkeys which masked either zero or one depending on the flag
 // it is used to show which signers are signed or not in the cosign message
-func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
-	pubKeys := []*bls.PublicKey{}
+func (m *Mask) GetPubKeyFromMask(flag bool) []PublicKey {
+	pubKeys := []PublicKey{}
 	for i := range m.Publics {
 		byt := i >> 3
 		msk := byte(1) << uint(i&7)
 		if flag {
 			if (m.Bitmap[byt] & msk) != 0 {
-				pubKeys = append(pubKeys, m.Publics[i].Object)
+				pubKeys = append(pubKeys, m.Publics[i])
 			}
 		} else {
 			if (m.Bitmap[byt] & msk) == 0 {
-				pubKeys = append(pubKeys, m.Publics[i].Object)
+				pubKeys = append(pubKeys, m.Publics[i])
 			}
 		}
 	}
@@ -185,7 +146,7 @@ func (m *Mask) GetPubKeyFromMask(flag bool) []*bls.PublicKey {
 }
 
 // GetSignedPubKeysFromBitmap will return pubkeys that are signed based on the specified bitmap.
-func (m *Mask) GetSignedPubKeysFromBitmap(bitmap []byte) ([]*PublicKeyWrapper, error) {
+func (m *Mask) GetSignedPubKeysFromBitmap(bitmap []byte) ([]PublicKey, error) {
 	if m.Len() != len(bitmap) {
 		return nil, errors.Errorf(
 			"mismatching bitmap lengths expectedBitmapLength %d providedBitmapLength %d",
@@ -193,7 +154,7 @@ func (m *Mask) GetSignedPubKeysFromBitmap(bitmap []byte) ([]*PublicKeyWrapper, e
 			len(bitmap),
 		)
 	}
-	pubKeys := []*PublicKeyWrapper{}
+	pubKeys := []PublicKey{}
 	// For details about who bitmap is structured, refer to func SetMask
 	for i := range m.Publics {
 		byt := i >> 3
@@ -235,10 +196,10 @@ func (m *Mask) SetKey(public SerializedPublicKey, enable bool) error {
 }
 
 // SetKeysAtomic set the bit in the Bitmap for the given cosigners only when all the cosigners are present in the map.
-func (m *Mask) SetKeysAtomic(publics []*PublicKeyWrapper, enable bool) error {
+func (m *Mask) SetKeysAtomic(publics []PublicKey, enable bool) error {
 	indexes := make([]int, len(publics))
 	for i, key := range publics {
-		index, found := m.PublicsIndex[key.Bytes]
+		index, found := m.PublicsIndex[key.Serialized()]
 		if !found {
 			return errors.New("key not found")
 		}

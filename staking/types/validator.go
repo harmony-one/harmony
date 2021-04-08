@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -468,6 +467,7 @@ func VerifyBLSKeys(pubKeys []bls.SerializedPublicKey, pubKeySigs []bls.Serialize
 	}
 
 	for i := 0; i < len(pubKeys); i++ {
+
 		if err := VerifyBLSKey(&pubKeys[i], &pubKeySigs[i]); err != nil {
 			return err
 		}
@@ -482,19 +482,20 @@ func VerifyBLSKey(pubKey *bls.SerializedPublicKey, pubKeySig *bls.SerializedSign
 		return errBLSKeysNotMatchSigs
 	}
 
-	blsPubKey, err := bls.BytesToBLSPublicKey(pubKey[:])
+	blsPubKey, err := bls.PublicKeyFromBytes(pubKey[:])
 	if err != nil {
 		return errBLSKeysNotMatchSigs
 	}
 
-	msgSig := bls_core.Sign{}
-	if err := msgSig.Deserialize(pubKeySig[:]); err != nil {
+	msgSig, err := bls.SignatureFromBytes(pubKeySig[:])
+	if err != nil {
 		return err
 	}
 
 	messageBytes := []byte(BLSVerificationStr)
 	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(blsPubKey, msgHash[:]) {
+
+	if !msgSig.Verify(blsPubKey, msgHash) {
 		return errBLSKeysNotMatchSigs
 	}
 
@@ -534,7 +535,7 @@ func matchesHarmonyBLSKey(
 			}
 		}
 
-		hex := blsKey.Hex()
+		hex := blsKey.ToHex()
 		if _, exists := cache[key][hex]; exists {
 			return errors.Wrapf(
 				errDuplicateSlotKeys,

@@ -181,7 +181,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 	blsKeys := []string{}
 	if cfg.ConsensusPriKey != nil {
 		for _, key := range cfg.ConsensusPriKey {
-			blsKeys = append(blsKeys, key.Pub.Bytes.Hex())
+			blsKeys = append(blsKeys, key.PublicKey().ToHex())
 		}
 	}
 	c := commonRPC.C{}

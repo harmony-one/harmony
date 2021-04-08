@@ -5,19 +5,17 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 )
 
 func TestConstructAnnounceMessage(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -29,29 +27,26 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	blsPriKey := bls.RandPrivateKey()
+	blsPriKey := bls.RandSecretKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey}, decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
 	consensus.blockHash = [32]byte{}
-	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
-	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
-	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper}); err != nil {
+	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []bls.SecretKey{blsPriKey}); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
 }
 
 func TestConstructPreparedMessage(test *testing.T) {
-	leaderPriKey := bls.RandPrivateKey()
-	leaderPubKey := leaderPriKey.GetPublicKey()
+	leaderPriKey := bls.RandSecretKey()
+	leaderPubKey := leaderPriKey.PublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: leaderPubKey}
 
-	validatorPriKey := bls.RandPrivateKey()
-	validatorPubKey := leaderPriKey.GetPublicKey()
+	validatorPriKey := bls.RandSecretKey()
+	validatorPubKey := leaderPriKey.PublicKey()
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -63,9 +58,9 @@ func TestConstructPreparedMessage(test *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	blsPriKey := bls.RandPrivateKey()
+	blsPriKey := bls.RandSecretKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey}, decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot craeate consensus: %v", err)
@@ -74,16 +69,10 @@ func TestConstructPreparedMessage(test *testing.T) {
 	consensus.UpdateBitmaps()
 	consensus.blockHash = [32]byte{}
 
-	message := "test string"
-	leaderKey := bls.SerializedPublicKey{}
-	leaderKey.FromLibBLSPublicKey(leaderPubKey)
-	leaderKeyWrapper := bls.PublicKeyWrapper{Object: leaderPubKey, Bytes: leaderKey}
-	validatorKey := bls.SerializedPublicKey{}
-	validatorKey.FromLibBLSPublicKey(validatorPubKey)
-	validatorKeyWrapper := bls.PublicKeyWrapper{Object: validatorPubKey, Bytes: validatorKey}
+	message := []byte("test string")
 	consensus.Decider.AddNewVote(
 		quorum.Prepare,
-		[]*bls.PublicKeyWrapper{&leaderKeyWrapper},
+		[]bls.PublicKey{leaderPubKey},
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
@@ -91,7 +80,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 	)
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Prepare,
-		[]*bls.PublicKeyWrapper{&validatorKeyWrapper},
+		[]bls.PublicKey{validatorPubKey},
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
 		consensus.blockNum,
@@ -101,17 +90,14 @@ func TestConstructPreparedMessage(test *testing.T) {
 	}
 
 	// According to RJ these failures are benign.
-	if err := consensus.prepareBitmap.SetKey(leaderKey, true); err != nil {
+	if err := consensus.prepareBitmap.SetKey(leaderPubKey.Serialized(), true); err != nil {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
-	if err := consensus.prepareBitmap.SetKey(validatorKey, true); err != nil {
+	if err := consensus.prepareBitmap.SetKey(validatorPubKey.Serialized(), true); err != nil {
 		test.Log(errors.New("prepareBitmap.SetKey"))
 	}
 
-	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
-	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
-	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper})
+	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, []bls.SecretKey{blsPriKey})
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
 	}
@@ -121,7 +107,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 }
 
 func TestConstructPrepareMessage(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -131,35 +117,31 @@ func TestConstructPrepareMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 
-	blsPriKey1 := bls.RandPrivateKey()
-	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
-	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	blsPriKey1 := bls.RandSecretKey()
+	pubKeyWrapper1 := blsPriKey1.PublicKey()
 
-	blsPriKey2 := bls.RandPrivateKey()
-	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
-	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	blsPriKey2 := bls.RandSecretKey()
+	pubKeyWrapper2 := blsPriKey2.PublicKey()
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey1}, decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKey{pubKeyWrapper1, pubKeyWrapper2})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
 	copy(consensus.blockHash[:], []byte("random"))
 	consensus.blockNum = 1000
 
-	sig := priKeyWrapper1.Pri.SignHash(consensus.blockHash[:])
-	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper1})
+	sig := blsPriKey1.Sign(consensus.blockHash[:])
+	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []bls.SecretKey{blsPriKey1})
 
 	if err != nil {
 		test.Fatalf("could not construct announce: %v", err)
@@ -173,20 +155,23 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if network.FBFTMsg.ViewID != consensus.GetCurBlockViewID() {
 		test.Errorf("ViewID is not populated correctly")
 	}
-	if len(network.FBFTMsg.SenderPubkeys) != 1 && network.FBFTMsg.SenderPubkeys[0].Bytes != pubKeyWrapper1.Bytes {
+	if len(network.FBFTMsg.SenderPubkeys) != 1 && network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Compare(network.FBFTMsg.Payload, sig.Serialize()) != 0 {
+	if bytes.Compare(network.FBFTMsg.Payload, sig.ToBytes()) != 0 {
 		test.Errorf("Payload is not populated correctly")
 	}
 
-	keys := []*bls.PrivateKeyWrapper{&priKeyWrapper1, &priKeyWrapper2}
-	aggSig := bls_core.Sign{}
+	keys := []bls.SecretKey{blsPriKey1, blsPriKey2}
+
+	signatures := []bls.Signature{}
 	for _, priKey := range keys {
-		if s := priKey.Pri.SignHash(consensus.blockHash[:]); s != nil {
-			aggSig.Add(s)
+		if s := priKey.Sign(consensus.blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
+
 	network, err = consensus.construct(msg_pb.MessageType_PREPARE, nil, keys)
 
 	if err != nil {
@@ -201,10 +186,10 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if network.FBFTMsg.ViewID != consensus.GetCurBlockViewID() {
 		test.Errorf("ViewID is not populated correctly")
 	}
-	if len(network.FBFTMsg.SenderPubkeys) != 2 && (network.FBFTMsg.SenderPubkeys[0].Bytes != pubKeyWrapper1.Bytes || network.FBFTMsg.SenderPubkeys[1].Bytes != pubKeyWrapper2.Bytes) {
+	if len(network.FBFTMsg.SenderPubkeys) != 2 && (network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() || network.FBFTMsg.SenderPubkeys[1].Serialized() != pubKeyWrapper2.Serialized()) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Compare(network.FBFTMsg.Payload, aggSig.Serialize()) != 0 {
+	if bytes.Compare(network.FBFTMsg.Payload, aggSig.ToBytes()) != 0 {
 		test.Errorf("Payload is not populated correctly")
 	}
 	if bytes.Compare(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) != 0 {
@@ -213,7 +198,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 }
 
 func TestConstructCommitMessage(test *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "19999", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -223,27 +208,23 @@ func TestConstructCommitMessage(test *testing.T) {
 		test.Fatalf("newhost failure: %v", err)
 	}
 
-	blsPriKey1 := bls.RandPrivateKey()
-	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
-	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	blsPriKey1 := bls.RandSecretKey()
+	pubKeyWrapper1 := blsPriKey1.PublicKey()
 
-	blsPriKey2 := bls.RandPrivateKey()
-	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
-	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	blsPriKey2 := bls.RandSecretKey()
+	pubKeyWrapper2 := blsPriKey2.PublicKey()
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey1), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey1}, decider,
 	)
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKey{pubKeyWrapper1, pubKeyWrapper2})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
@@ -252,8 +233,8 @@ func TestConstructCommitMessage(test *testing.T) {
 
 	sigPayload := []byte("payload")
 
-	sig := priKeyWrapper1.Pri.SignHash(sigPayload)
-	network, err := consensus.construct(msg_pb.MessageType_COMMIT, sigPayload, []*bls.PrivateKeyWrapper{&priKeyWrapper1})
+	sig := blsPriKey1.Sign(sigPayload)
+	network, err := consensus.construct(msg_pb.MessageType_COMMIT, sigPayload, []bls.SecretKey{blsPriKey1})
 
 	if err != nil {
 		test.Fatalf("could not construct announce: %v", err)
@@ -267,20 +248,23 @@ func TestConstructCommitMessage(test *testing.T) {
 	if network.FBFTMsg.ViewID != consensus.GetCurBlockViewID() {
 		test.Errorf("ViewID is not populated correctly")
 	}
-	if len(network.FBFTMsg.SenderPubkeys) != 1 && network.FBFTMsg.SenderPubkeys[0].Bytes != pubKeyWrapper1.Bytes {
+	if len(network.FBFTMsg.SenderPubkeys) != 1 && network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Compare(network.FBFTMsg.Payload, sig.Serialize()) != 0 {
+	if bytes.Equal(network.FBFTMsg.Payload, sig.ToBytes()) {
 		test.Errorf("Payload is not populated correctly")
 	}
 
-	keys := []*bls.PrivateKeyWrapper{&priKeyWrapper1, &priKeyWrapper2}
-	aggSig := bls_core.Sign{}
+	keys := []bls.SecretKey{blsPriKey1, blsPriKey2}
+
+	signatures := []bls.Signature{}
 	for _, priKey := range keys {
-		if s := priKey.Pri.SignHash(sigPayload); s != nil {
-			aggSig.Add(s)
+		if s := priKey.Sign(sigPayload); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
+
 	network, err = consensus.construct(msg_pb.MessageType_COMMIT, sigPayload, keys)
 
 	if err != nil {
@@ -295,19 +279,19 @@ func TestConstructCommitMessage(test *testing.T) {
 	if network.FBFTMsg.ViewID != consensus.GetCurBlockViewID() {
 		test.Errorf("ViewID is not populated correctly")
 	}
-	if len(network.FBFTMsg.SenderPubkeys) != 2 && (network.FBFTMsg.SenderPubkeys[0].Bytes != pubKeyWrapper1.Bytes || network.FBFTMsg.SenderPubkeys[1].Bytes != pubKeyWrapper2.Bytes) {
+	if len(network.FBFTMsg.SenderPubkeys) != 2 && (network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() || network.FBFTMsg.SenderPubkeys[1].Serialized() != pubKeyWrapper2.Serialized()) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Compare(network.FBFTMsg.Payload, aggSig.Serialize()) != 0 {
+	if bytes.Equal(network.FBFTMsg.Payload, aggSig.ToBytes()) {
 		test.Errorf("Payload is not populated correctly")
 	}
-	if bytes.Compare(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) != 0 {
+	if bytes.Equal(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) {
 		test.Errorf("SenderPubkeyBitmap is not populated correctly")
 	}
 }
 
 func TestPopulateMessageFields(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -316,12 +300,12 @@ func TestPopulateMessageFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newhost failure: %v", err)
 	}
-	blsPriKey := bls.RandPrivateKey()
+	blsPriKey := bls.RandSecretKey()
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey}, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -336,10 +320,8 @@ func TestPopulateMessageFields(t *testing.T) {
 		},
 	}
 
-	keyBytes := bls.SerializedPublicKey{}
-	keyBytes.FromLibBLSPublicKey(blsPriKey.GetPublicKey())
 	consensusMsg := consensus.populateMessageFieldsAndSender(msg.GetConsensus(), consensus.blockHash[:],
-		keyBytes)
+		blsPriKey.PublicKey().Serialized())
 
 	if consensusMsg.ViewId != 2 {
 		t.Errorf("Consensus ID is not populated correctly")
@@ -347,7 +329,7 @@ func TestPopulateMessageFields(t *testing.T) {
 	if !bytes.Equal(consensusMsg.BlockHash[:], blockHash[:]) {
 		t.Errorf("Block hash is not populated correctly")
 	}
-	if !bytes.Equal(consensusMsg.SenderPubkey, blsPriKey.GetPublicKey().Serialize()) {
+	if !bytes.Equal(consensusMsg.SenderPubkey, blsPriKey.PublicKey().ToBytes()) {
 		t.Errorf("Sender ID is not populated correctly")
 	}
 	if len(consensusMsg.SenderPubkeyBitmap) > 0 {

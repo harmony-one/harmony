@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -17,7 +18,6 @@ import (
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/vm"
@@ -33,28 +33,20 @@ import (
 var (
 	validatorAddress = common2.Address(common.MustBech32ToAddress("one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy"))
 
-	testBLSPubKey    = "30b2c38b1316da91e068ac3bd8751c0901ef6c02a1d58bc712104918302c6ed03d5894671d0c816dad2b4d303320f202"
-	testBLSPrvKey    = "c6d7603520311f7a4e6aac0b26701fc433b75b38df504cd416ef2b900cd66205"
+	testBLSPubKey    = "a8c1e0a9f4c6db2166c873addd8a925f6541f70e6baca6f61a470040320573ea29d906aa2fd329d6c75a6ebaaf2d3cac"
+	testBLSPrvKey    = "2a899297ecd72b60aa70ce22d83b2fcb8e564ddb54f8e97695ee69a8b826e9b0"
 	postStakingEpoch = big.NewInt(200)
 )
 
-func init() {
-	bls_core.Init(bls_core.BLS12_381)
-}
-
 func generateBLSKeySigPair() (bls.SerializedPublicKey, bls.SerializedSignature) {
-	p := &bls_core.PublicKey{}
-	p.DeserializeHexStr(testBLSPubKey)
-	pub := bls.SerializedPublicKey{}
-	pub.FromLibBLSPublicKey(p)
+	pubBytes, _ := hex.DecodeString(testBLSPubKey)
+	pub, _ := bls.PublicKeyFromBytes(pubBytes)
 	messageBytes := []byte(staking.BLSVerificationStr)
-	privateKey := &bls_core.SecretKey{}
-	privateKey.DeserializeHexStr(testBLSPrvKey)
+	privBytes, _ := hex.DecodeString(testBLSPrvKey)
+	privateKey, _ := bls.SecretKeyFromBytes(privBytes)
 	msgHash := hash.Keccak256(messageBytes)
-	signature := privateKey.SignHash(msgHash[:])
-	var sig bls.SerializedSignature
-	copy(sig[:], signature.Serialize())
-	return pub, sig
+	signature := privateKey.Sign(msgHash[:])
+	return pub.Serialized(), signature.Serialized()
 }
 
 func createValidator() *staking.CreateValidator {
@@ -153,9 +145,8 @@ func main() {
 		},
 	}
 
-	blsPriKey := bls.RandPrivateKey()
-	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
-	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
+	blsPriKey := bls.RandSecretKey()
+	pubKeyWrapper := blsPriKey.PublicKey()
 
 	request := message.GetConsensus()
 	request.ViewId = 5
@@ -164,7 +155,7 @@ func main() {
 	// 32 byte block hash
 	request.BlockHash = []byte("stasdlkfjsadlkjfkdsljflksadjf")
 	// sender address
-	request.SenderPubkey = pubKeyWrapper.Bytes[:]
+	request.SenderPubkey = pubKeyWrapper.ToBytes()
 
 	message.Signature = nil
 	// TODO: use custom serialization method rather than protobuf
@@ -174,13 +165,13 @@ func main() {
 
 	startTime = time.Now()
 	for i := 0; i < 1000; i++ {
-		blsPriKey.SignHash(hash1[:])
+		blsPriKey.Sign(hash1[:])
 	}
 	endTime = time.Now()
 	fmt.Printf("Time required to sign: %f seconds\n", endTime.Sub(startTime).Seconds())
 
-	sig := blsPriKey.SignHash(hash1[:])
-	message.Signature = sig.Serialize()
+	sig := blsPriKey.Sign(hash1[:])
+	message.Signature = sig.ToBytes()
 	marshaledMessage2, _ := protobuf.Marshal(message)
 
 	message = &msg_pb.Message{}
@@ -207,18 +198,21 @@ func main() {
 	endTime = time.Now()
 	fmt.Printf("Time required to marshal: %f seconds\n", endTime.Sub(startTime).Seconds())
 	messageBytes, err := protobuf.Marshal(message)
-	msgSig := bls_core.Sign{}
-	err = msgSig.Deserialize(signature)
+
+	msgSig, err := bls.SignatureFromBytes(signature)
+	if err != nil {
+		return
+	}
 
 	startTime = time.Now()
 	for i := 0; i < 1000; i++ {
-		msgSig.Deserialize(signature)
+		msgSig.FromBytes(signature)
 	}
 	endTime = time.Now()
 	fmt.Printf("Time required to deserialize sig: %f seconds\n", endTime.Sub(startTime).Seconds())
 
 	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(pubKeyWrapper.Object, msgHash[:]) {
+	if !msgSig.Verify(pubKeyWrapper, msgHash[:]) {
 		return
 	}
 
@@ -231,7 +225,7 @@ func main() {
 
 	startTime = time.Now()
 	for i := 0; i < 1000; i++ {
-		msgSig.VerifyHash(pubKeyWrapper.Object, msgHash[:])
+		msgSig.Verify(pubKeyWrapper, msgHash[:])
 	}
 	endTime = time.Now()
 	fmt.Printf("Time required to verify sig: %f seconds\n", endTime.Sub(startTime).Seconds())

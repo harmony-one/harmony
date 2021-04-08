@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 const (
@@ -51,6 +50,20 @@ func TestNewMultiKeyLoader(t *testing.T) {
 	}
 }
 
+func genBLSKeyWithPassPhrase(dir string, passphrase string) (bls.SecretKey, string, error) {
+	privateKey := bls.RandSecretKey()
+	publickKey := privateKey.PublicKey()
+	fileName := filepath.Join(dir, publickKey.ToHex()+".key")
+	// Encrypt with passphrase
+	encryptedPrivateKeyStr, err := encrypt(privateKey.ToBytes(), passphrase)
+	if err != nil {
+		return nil, "", err
+	}
+	// Write to file.
+	err = writeFile(fileName, encryptedPrivateKeyStr)
+	return privateKey, fileName, err
+}
+
 func TestMultiKeyLoader_loadKeys(t *testing.T) {
 	setTestConsole(newTestConsole())
 
@@ -58,18 +71,23 @@ func TestMultiKeyLoader_loadKeys(t *testing.T) {
 	os.Remove(unitTestDir)
 	os.MkdirAll(unitTestDir, 0700)
 
-	keyFile1 := filepath.Join(unitTestDir, testKeys[0].publicKey+basicKeyExt)
-	if err := writeFile(keyFile1, testKeys[0].keyFileData); err != nil {
+	key1, keyFile1, err := genBLSKeyWithPassPhrase(unitTestDir, "pass 1")
+	if err != nil {
 		t.Fatal(err)
 	}
-	keyFile2 := filepath.Join(unitTestDir, testKeys[1].publicKey+testExt)
-	if err := writeFile(keyFile2, testKeys[1].keyFileData); err != nil {
+	passFile1 := filepath.Join(unitTestDir, key1.PublicKey().ToHex()+passExt)
+	if err := writeFile(passFile1, "pass 1"); err != nil {
 		t.Fatal(err)
 	}
-	passFile1 := filepath.Join(unitTestDir, testKeys[0].publicKey+passExt)
-	if err := writeFile(passFile1, testKeys[0].passphrase); err != nil {
+	key2, keyFile2, err := genBLSKeyWithPassPhrase(unitTestDir, "pass 2")
+	if err != nil {
 		t.Fatal(err)
 	}
+	passFile2 := filepath.Join(unitTestDir, key2.PublicKey().ToHex()+passExt)
+	if err := writeFile(passFile2, "pass 2"); err != nil {
+		t.Fatal(err)
+	}
+
 	decrypters := map[string]keyDecrypter{
 		basicKeyExt: &passDecrypter{pps: []passProvider{&dynamicPassProvider{}}},
 		testExt:     newTestPassDecrypter(),
@@ -78,7 +96,7 @@ func TestMultiKeyLoader_loadKeys(t *testing.T) {
 	loader := &multiKeyLoader{
 		keyFiles:      []string{keyFile1, keyFile2},
 		decrypters:    decrypters,
-		loadedSecrets: make([]*bls_core.SecretKey, 0, 2),
+		loadedSecrets: make([]bls.SecretKey, 0, 2),
 	}
 	keys, err := loader.loadKeys()
 	if err != nil {
@@ -88,12 +106,12 @@ func TestMultiKeyLoader_loadKeys(t *testing.T) {
 		t.Fatalf("unexpected number of keys: %v / 2", len(keys))
 	}
 	gotPubs := [][]byte{
-		keys[0].Pub.Bytes[:],
-		keys[1].Pub.Bytes[:],
+		keys[0].PublicKey().ToBytes(),
+		keys[1].PublicKey().ToBytes(),
 	}
 	expPubs := [][]byte{
-		common.Hex2Bytes(testKeys[0].publicKey),
-		common.Hex2Bytes(testKeys[1].publicKey),
+		key1.PublicKey().ToBytes(),
+		key2.PublicKey().ToBytes(),
 	}
 	for i := range gotPubs {
 		got, exp := gotPubs[i], expPubs[i]
@@ -110,18 +128,23 @@ func TestBlsDirLoader(t *testing.T) {
 	os.Remove(unitTestDir)
 	os.MkdirAll(unitTestDir, 0700)
 
-	keyFile1 := filepath.Join(unitTestDir, testKeys[0].publicKey+basicKeyExt)
-	if err := writeFile(keyFile1, testKeys[0].keyFileData); err != nil {
+	key1, _, err := genBLSKeyWithPassPhrase(unitTestDir, "pass 1")
+	if err != nil {
 		t.Fatal(err)
 	}
-	keyFile2 := filepath.Join(unitTestDir, testKeys[1].publicKey+testExt)
-	if err := writeFile(keyFile2, testKeys[1].keyFileData); err != nil {
+	passFile1 := filepath.Join(unitTestDir, key1.PublicKey().ToHex()+passExt)
+	if err := writeFile(passFile1, "pass 1"); err != nil {
 		t.Fatal(err)
 	}
-	passFile1 := filepath.Join(unitTestDir, testKeys[0].publicKey+passExt)
-	if err := writeFile(passFile1, testKeys[0].passphrase); err != nil {
+	key2, _, err := genBLSKeyWithPassPhrase(unitTestDir, "pass 2")
+	if err != nil {
 		t.Fatal(err)
 	}
+	passFile2 := filepath.Join(unitTestDir, key2.PublicKey().ToHex()+passExt)
+	if err := writeFile(passFile2, "pass 2"); err != nil {
+		t.Fatal(err)
+	}
+
 	// write a file without the given extension
 	if err := writeFile(filepath.Join(unitTestDir, "unknown.ext"), "random string"); err != nil {
 		t.Fatal(err)
@@ -144,12 +167,12 @@ func TestBlsDirLoader(t *testing.T) {
 		t.Fatalf("unexpected number of keys: %v / 2", len(keys))
 	}
 	gotPubs := [][]byte{
-		keys[0].Pub.Bytes[:],
-		keys[1].Pub.Bytes[:],
+		key1.PublicKey().ToBytes(),
+		key2.PublicKey().ToBytes(),
 	}
 	expPubs := [][]byte{
-		common.Hex2Bytes(testKeys[0].publicKey),
-		common.Hex2Bytes(testKeys[1].publicKey),
+		key1.PublicKey().ToBytes(),
+		key2.PublicKey().ToBytes(),
 	}
 	for i := range gotPubs {
 		got, exp := gotPubs[i], expPubs[i]
@@ -179,6 +202,6 @@ func (decrypter *testPassDecrypter) extension() string {
 	return testExt
 }
 
-func (decrypter *testPassDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
+func (decrypter *testPassDecrypter) decryptFile(keyFile string) (bls.SecretKey, error) {
 	return decrypter.pd.decryptFile(keyFile)
 }

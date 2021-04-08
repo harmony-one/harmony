@@ -1698,16 +1698,16 @@ type blsPubSigPair struct {
 }
 
 func makeBLSKeyPair() blsPubSigPair {
-	blsPriv := bls.RandPrivateKey()
-	blsPub := blsPriv.GetPublicKey()
+	blsPriv := bls.RandSecretKey()
+	blsPub := blsPriv.PublicKey()
 	msgHash := hash.Keccak256([]byte(staking.BLSVerificationStr))
-	sig := blsPriv.SignHash(msgHash)
+	sig := blsPriv.Sign(msgHash)
 
 	var shardPub bls.SerializedPublicKey
-	copy(shardPub[:], blsPub.Serialize())
+	copy(shardPub[:], blsPub.ToBytes())
 
 	var shardSig bls.SerializedSignature
-	copy(shardSig[:], sig.Serialize())
+	copy(shardSig[:], sig.ToBytes())
 
 	return blsPubSigPair{shardPub, shardSig}
 }

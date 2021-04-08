@@ -1,6 +1,7 @@
 package committee
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -140,15 +140,16 @@ func prepareOrders(
 	// Avoid duplicate BLS keys as harmony nodes
 	instance := shard.Schedule.InstanceForEpoch(stakedReader.CurrentBlock().Epoch())
 	for _, account := range instance.HmyAccounts() {
-		pub := &bls_core.PublicKey{}
-		if err := pub.DeserializeHexStr(account.BLSPublicKey); err != nil {
+		pubkeyBytes, err := hex.DecodeString(account.BLSPublicKey)
+		if err != nil {
 			continue
 		}
-		pubKey := bls.SerializedPublicKey{}
-		if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
+
+		pub, err := bls.PublicKeyFromBytes(pubkeyBytes)
+		if err != nil {
 			continue
 		}
-		blsKeys[pubKey] = struct{}{}
+		blsKeys[pub.Serialized()] = struct{}{}
 	}
 
 	state, err := stakedReader.StateAt(stakedReader.CurrentBlock().Root())
@@ -281,10 +282,15 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 		com := shard.Committee{ShardID: uint32(i)}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardNum // The initial account to use for genesis nodes
-			pub := &bls_core.PublicKey{}
-			pub.DeserializeHexStr(hmyAccounts[index].BLSPublicKey)
-			pubKey := bls.SerializedPublicKey{}
-			pubKey.FromLibBLSPublicKey(pub)
+
+			pubkeyBytes, err := hex.DecodeString(hmyAccounts[index].BLSPublicKey)
+			if err != nil {
+				return nil, err
+			}
+			pubKey, err := bls.PublicKeyFromBytes(pubkeyBytes)
+			if err != nil {
+				return nil, err
+			}
 			// TODO: directly read address for bls too
 			addr, err := common2.ParseAddr(hmyAccounts[index].Address)
 			if err != nil {
@@ -292,7 +298,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 			}
 			curNodeID := shard.Slot{
 				addr,
-				pubKey,
+				pubKey.Serialized(),
 				nil,
 			}
 			com.Slots = append(com.Slots, curNodeID)
@@ -300,10 +306,16 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 		// add FN runner's key
 		for j := shardHarmonyNodes; j < shardSize; j++ {
 			index := i + (j-shardHarmonyNodes)*shardNum
-			pub := &bls_core.PublicKey{}
-			pub.DeserializeHexStr(fnAccounts[index].BLSPublicKey)
-			pubKey := bls.SerializedPublicKey{}
-			pubKey.FromLibBLSPublicKey(pub)
+
+			pubkeyBytes, err := hex.DecodeString(fnAccounts[index].BLSPublicKey)
+			if err != nil {
+				return nil, err
+			}
+			pubKey, err := bls.PublicKeyFromBytes(pubkeyBytes)
+			if err != nil {
+				return nil, err
+			}
+
 			// TODO: directly read address for bls too
 			addr, err := common2.ParseAddr(fnAccounts[index].Address)
 			if err != nil {
@@ -311,7 +323,7 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 			}
 			curNodeID := shard.Slot{
 				addr,
-				pubKey,
+				pubKey.Serialized(),
 				nil,
 			}
 			com.Slots = append(com.Slots, curNodeID)
@@ -334,12 +346,13 @@ func eposStakedCommittee(
 		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
-			pub := &bls_core.PublicKey{}
-			if err := pub.DeserializeHexStr(hAccounts[index].BLSPublicKey); err != nil {
+
+			pubkeyBytes, err := hex.DecodeString(hAccounts[index].BLSPublicKey)
+			if err != nil {
 				return nil, err
 			}
-			pubKey := bls.SerializedPublicKey{}
-			if err := pubKey.FromLibBLSPublicKey(pub); err != nil {
+			pubKey, err := bls.PublicKeyFromBytes(pubkeyBytes)
+			if err != nil {
 				return nil, err
 			}
 
@@ -349,7 +362,7 @@ func eposStakedCommittee(
 			}
 			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
 				addr,
-				pubKey,
+				pubKey.Serialized(),
 				nil,
 			})
 		}
@@ -365,7 +378,7 @@ func eposStakedCommittee(
 	shardBig := big.NewInt(int64(shardCount))
 	for i := range completedEPoSRound.AuctionWinners {
 		purchasedSlot := completedEPoSRound.AuctionWinners[i]
-		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
+		shardID := int(new(big.Int).Mod(new(big.Int).SetBytes(purchasedSlot.Key[:]), shardBig).Int64())
 		shardState.Shards[shardID].Slots = append(
 			shardState.Shards[shardID].Slots, shard.Slot{
 				purchasedSlot.Addr,
@@ -394,6 +407,7 @@ func (def partialStakingEnabled) ReadFromDB(
 func (def partialStakingEnabled) Compute(
 	epoch *big.Int, stakerReader DataProvider,
 ) (newSuperComm *shard.State, err error) {
+
 	preStaking := true
 	if stakerReader != nil {
 		config := stakerReader.Config()

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	multiBLSPriKey multibls.PrivateKeys
+	multiBLSPriKey multibls.SecretKeys
 	onceLoadBLSKey sync.Once
 )
 
@@ -30,7 +30,7 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 	return multiBLSPriKey.GetPublicKeys()
 }
 
-func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
+func loadBLSKeys(raw blsConfig) (multibls.SecretKeys, error) {
 	config, err := parseBLSLoadingConfig(raw)
 	if err != nil {
 		return nil, err

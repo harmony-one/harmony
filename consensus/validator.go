@@ -132,7 +132,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		consensus.getLogger().Warn().Msgf("[OnPrepared] Quorum Not achieved.")
 		return
 	}
-	if !aggSig.VerifyHash(mask.AggregatePublic, blockHash[:]) {
+	if !aggSig.Verify(mask.AggregatePublic(), blockHash[:]) {
 		myBlockHash := common.Hash{}
 		myBlockHash.SetBytes(consensus.blockHash[:])
 		consensus.getLogger().Warn().
@@ -304,7 +304,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	blk := consensus.Blockchain.GetBlockByHash(blockObj.Hash())
 	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) && blk != nil {
 		new := mask.CountEnabled()
-		mask.SetMask(commitSigBitmap[bls.BLSSignatureSizeInBytes:])
+		mask.SetMask(commitSigBitmap[bls.SignatureSize:])
 		cur := mask.CountEnabled()
 		if new > cur {
 			consensus.getLogger().Info().Hex("old", commitSigBitmap).Hex("new", recvMsg.Payload).Msg("[OnCommitted] Overriding commit signatures!!")
@@ -343,18 +343,18 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 
 // Collect private keys that are part of the current committee.
 // TODO: cache valid private keys and only update when keys change.
-func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
-	priKeys := []*bls.PrivateKeyWrapper{}
+func (consensus *Consensus) getPriKeysInCommittee() []bls.SecretKey {
+	priKeys := []bls.SecretKey{}
 	for i, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+		if !consensus.IsValidatorInCommittee(key.PublicKey().Serialized()) {
 			continue
 		}
-		priKeys = append(priKeys, &consensus.priKey[i])
+		priKeys = append(priKeys, consensus.priKey[i])
 	}
 	return priKeys
 }
 
-func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper) []*NetworkMessage {
+func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, payloadForSign []byte, priKeys []bls.SecretKey) []*NetworkMessage {
 	p2pMsgs := []*NetworkMessage{}
 	if consensus.AggregateSig {
 		networkMessage, err := consensus.construct(msgType, payloadForSign, priKeys)
@@ -362,7 +362,7 @@ func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, pay
 			logger := consensus.getLogger().Err(err).
 				Str("message-type", msgType.String())
 			for _, key := range priKeys {
-				logger.Str("key", key.Pri.SerializeToHexStr())
+				logger.Str("key", string(key.ToBytes()))
 			}
 			logger.Msg("could not construct message")
 		} else {
@@ -371,11 +371,11 @@ func (consensus *Consensus) constructP2pMessages(msgType msg_pb.MessageType, pay
 
 	} else {
 		for _, key := range priKeys {
-			networkMessage, err := consensus.construct(msgType, payloadForSign, []*bls.PrivateKeyWrapper{key})
+			networkMessage, err := consensus.construct(msgType, payloadForSign, []bls.SecretKey{key})
 			if err != nil {
 				consensus.getLogger().Err(err).
 					Str("message-type", msgType.String()).
-					Str("key", key.Pri.SerializeToHexStr()).
+					Str("key", string(key.ToBytes())).
 					Msg("could not construct message")
 				continue
 			}

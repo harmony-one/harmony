@@ -8,7 +8,6 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
@@ -22,7 +21,7 @@ type NetworkMessage struct {
 	MessageType                msg_pb.MessageType
 	Bytes                      []byte
 	FBFTMsg                    *FBFTMessage
-	OptionalAggregateSignature *bls_core.Sign
+	OptionalAggregateSignature bls.Signature
 }
 
 // Populates the common basic fields for all consensus message.
@@ -59,7 +58,7 @@ func (consensus *Consensus) populateMessageFieldsAndSender(
 
 // construct is the single creation point of messages intended for the wire.
 func (consensus *Consensus) construct(
-	p msg_pb.MessageType, payloadForSign []byte, priKeys []*bls.PrivateKeyWrapper,
+	p msg_pb.MessageType, payloadForSign []byte, priKeys []bls.SecretKey,
 ) (*NetworkMessage, error) {
 	if len(priKeys) == 0 {
 		return nil, errors.New("no elected bls keys provided")
@@ -73,12 +72,12 @@ func (consensus *Consensus) construct(
 	}
 	var (
 		consensusMsg *msg_pb.ConsensusRequest
-		aggSig       *bls_core.Sign
+		aggSig       bls.Signature
 	)
 
 	if len(priKeys) == 1 {
 		consensusMsg = consensus.populateMessageFieldsAndSender(
-			message.GetConsensus(), consensus.blockHash[:], priKeys[0].Pub.Bytes,
+			message.GetConsensus(), consensus.blockHash[:], priKeys[0].PublicKey().Serialized(),
 		)
 	} else {
 		// TODO: use a persistent bitmap to report bitmap
@@ -88,7 +87,7 @@ func (consensus *Consensus) construct(
 			return nil, err
 		}
 		for _, key := range priKeys {
-			mask.SetKey(key.Pub.Bytes, true)
+			mask.SetKey(key.PublicKey().Serialized(), true)
 		}
 		consensusMsg = consensus.populateMessageFieldsAndSendersBitmap(
 			message.GetConsensus(), consensus.blockHash[:], mask.Bitmap,
@@ -102,22 +101,24 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.blockHash[:]
 	case msg_pb.MessageType_PREPARE:
 		needMsgSig = false
-		sig := bls_core.Sign{}
+		signatures := []bls.Signature{}
 		for _, priKey := range priKeys {
-			if s := priKey.Pri.SignHash(consensusMsg.BlockHash); s != nil {
-				sig.Add(s)
+			if s := priKey.Sign(consensusMsg.BlockHash); s != nil {
+				signatures = append(signatures, s)
 			}
 		}
-		consensusMsg.Payload = sig.Serialize()
+		agg := bls.AggreagateSignatures(signatures)
+		consensusMsg.Payload = agg.ToBytes()
 	case msg_pb.MessageType_COMMIT:
 		needMsgSig = false
-		sig := bls_core.Sign{}
+		signatures := []bls.Signature{}
 		for _, priKey := range priKeys {
-			if s := priKey.Pri.SignHash(payloadForSign); s != nil {
-				sig.Add(s)
+			if s := priKey.Sign(payloadForSign); s != nil {
+				signatures = append(signatures, s)
 			}
 		}
-		consensusMsg.Payload = sig.Serialize()
+		agg := bls.AggreagateSignatures(signatures)
+		consensusMsg.Payload = agg.ToBytes()
 	case msg_pb.MessageType_PREPARED:
 		consensusMsg.Block = consensus.block
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Prepare)
@@ -129,7 +130,7 @@ func (consensus *Consensus) construct(
 	var err error
 	if needMsgSig {
 		// The message that needs signing only needs to be signed with a single key
-		marshaledMessage, err = consensus.signAndMarshalConsensusMessage(message, priKeys[0].Pri)
+		marshaledMessage, err = consensus.signAndMarshalConsensusMessage(message, priKeys[0])
 	} else {
 		// Skip message (potentially multi-sig) signing for validator consensus messages (prepare and commit)
 		// as signature is already signed on the block data.
@@ -165,7 +166,7 @@ func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
 	buffer := bytes.Buffer{}
 	// 96 bytes aggregated signature
 	aggSig := consensus.Decider.AggregateVotes(p)
-	buffer.Write(aggSig.Serialize())
+	buffer.Write(aggSig.ToBytes())
 	// Bitmap
 	if p == quorum.Prepare {
 		buffer.Write(consensus.prepareBitmap.Bitmap)

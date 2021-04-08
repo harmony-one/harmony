@@ -5,14 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 func TestPhaseStrings(t *testing.T) {
@@ -54,13 +51,11 @@ func TestAddingQuoromParticipants(t *testing.T) {
 
 	assert.Equal(t, int64(0), decider.ParticipantsCount())
 
-	blsKeys := []harmony_bls.PublicKeyWrapper{}
+	blsKeys := []bls.PublicKey{}
 	keyCount := int64(5)
 	for i := int64(0); i < keyCount; i++ {
-		blsKey := harmony_bls.RandPrivateKey()
-		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
-		blsKeys = append(blsKeys, wrapper)
+		secretKey := bls.RandSecretKey()
+		blsKeys = append(blsKeys, secretKey.PublicKey())
 	}
 
 	decider.UpdateParticipants(blsKeys)
@@ -77,20 +72,18 @@ func TestSubmitVote(test *testing.T) {
 		SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
-	message := "test string"
-	blsPriKey1 := bls.RandPrivateKey()
-	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
-	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
+	message := []byte("test string")
+	blsPriKey1 := bls.RandSecretKey()
+	pubKeyWrapper1 := blsPriKey1.PublicKey()
 
-	blsPriKey2 := bls.RandPrivateKey()
-	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
-	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
+	blsPriKey2 := bls.RandSecretKey()
+	pubKeyWrapper2 := blsPriKey2.PublicKey()
 
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	decider.UpdateParticipants([]bls.PublicKey{pubKeyWrapper1, pubKeyWrapper2})
 
 	if _, err := decider.submitVote(
 		Prepare,
-		[]bls.SerializedPublicKey{pubKeyWrapper1.Bytes},
+		[]bls.SerializedPublicKey{pubKeyWrapper1.Serialized()},
 		blsPriKey1.Sign(message),
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -101,7 +94,7 @@ func TestSubmitVote(test *testing.T) {
 
 	if _, err := decider.submitVote(
 		Prepare,
-		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes},
+		[]bls.SerializedPublicKey{pubKeyWrapper2.Serialized()},
 		blsPriKey2.Sign(message),
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -113,10 +106,12 @@ func TestSubmitVote(test *testing.T) {
 		test.Fatal("submitVote failed")
 	}
 
-	aggSig := &bls_core.Sign{}
-	aggSig.Add(blsPriKey1.Sign(message))
-	aggSig.Add(blsPriKey2.Sign(message))
-	if decider.AggregateVotes(Prepare).SerializeToHexStr() != aggSig.SerializeToHexStr() {
+	aggSig := bls.AggreagateSignatures(
+		[]bls.Signature{
+			blsPriKey1.Sign(message),
+			blsPriKey2.Sign(message)},
+	)
+	if decider.AggregateVotes(Prepare).ToHex() != aggSig.ToHex() {
 		test.Fatal("AggregateVotes failed")
 	}
 }
@@ -131,38 +126,33 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 		SuperMajorityStake, shard.BeaconChainShardID,
 	)
 
-	blsPriKey1 := bls.RandPrivateKey()
-	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
-	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-
-	blsPriKey2 := bls.RandPrivateKey()
-	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
-	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-
-	blsPriKey3 := bls.RandPrivateKey()
-	pubKeyWrapper3 := bls.PublicKeyWrapper{Object: blsPriKey3.GetPublicKey()}
-	pubKeyWrapper3.Bytes.FromLibBLSPublicKey(pubKeyWrapper3.Object)
-
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	blsPriKey1 := bls.RandSecretKey()
+	pubKeyWrapper1 := blsPriKey1.PublicKey()
+	blsPriKey2 := bls.RandSecretKey()
+	pubKeyWrapper2 := blsPriKey2.PublicKey()
+	blsPriKey3 := bls.RandSecretKey()
+	pubKeyWrapper3 := blsPriKey3.PublicKey()
+	decider.UpdateParticipants([]bls.PublicKey{pubKeyWrapper1, pubKeyWrapper2})
 
 	decider.submitVote(
 		Prepare,
-		[]bls.SerializedPublicKey{pubKeyWrapper1.Bytes},
-		blsPriKey1.SignHash(blockHash[:]),
+		[]bls.SerializedPublicKey{pubKeyWrapper1.Serialized()},
+		blsPriKey1.Sign(blockHash[:]),
 		common.BytesToHash(blockHash[:]),
 		blockNum,
 		viewID,
 	)
 
-	aggSig := &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{blsPriKey2, blsPriKey3} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures := []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{blsPriKey2, blsPriKey3} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
 	if _, err := decider.submitVote(
 		Prepare,
-		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes, pubKeyWrapper3.Bytes},
+		[]bls.SerializedPublicKey{pubKeyWrapper2.Serialized(), pubKeyWrapper3.Serialized()},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -175,14 +165,15 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 		test.Fatal("submitVote failed")
 	}
 
-	aggSig.Add(blsPriKey1.SignHash(blockHash[:]))
-	if decider.AggregateVotes(Prepare).SerializeToHexStr() != aggSig.SerializeToHexStr() {
+	signatures = append(signatures, blsPriKey1.Sign(blockHash[:]))
+	aggSig = bls.AggreagateSignatures(signatures)
+	if decider.AggregateVotes(Prepare).ToHex() != aggSig.ToHex() {
 		test.Fatal("AggregateVotes failed")
 	}
 
 	if _, err := decider.submitVote(
 		Prepare,
-		[]bls.SerializedPublicKey{pubKeyWrapper2.Bytes},
+		[]bls.SerializedPublicKey{pubKeyWrapper2.Serialized()},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -204,8 +195,8 @@ func TestAddNewVote(test *testing.T) {
 	)
 
 	slotList := shard.SlotList{}
-	sKeys := []bls_core.SecretKey{}
-	pubKeys := []bls.PublicKeyWrapper{}
+	sKeys := []bls.SecretKey{}
+	pubKeys := []bls.PublicKey{}
 
 	quorumNodes := 10
 
@@ -216,8 +207,7 @@ func TestAddNewVote(test *testing.T) {
 		}
 		sKeys = append(sKeys, sKey)
 		slotList = append(slotList, newSlot)
-		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		wrapper := sKey.PublicKey()
 		pubKeys = append(pubKeys, wrapper)
 	}
 
@@ -226,16 +216,17 @@ func TestAddNewVote(test *testing.T) {
 		shard.BeaconChainShardID, slotList,
 	}, big.NewInt(3))
 
-	aggSig := &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures := []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[0], sKeys[1], sKeys[2]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
 
 	// aggregate sig from all of 3 harmony nodes
 	decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[0], &pubKeys[1], &pubKeys[2]},
+		[]bls.PublicKey{pubKeys[0], pubKeys[1], pubKeys[2]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -251,14 +242,17 @@ func TestAddNewVote(test *testing.T) {
 	decider.ResetPrepareAndCommitVotes()
 
 	// aggregate sig from 3 external nodes, expect error
-	aggSig = &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[3], &sKeys[4], &sKeys[5]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures = []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[3], sKeys[4], sKeys[5]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
+
 		}
 	}
+	aggSig = bls.AggreagateSignatures(signatures)
+
 	_, err := decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[3], &pubKeys[4], &pubKeys[5]},
+		[]bls.PublicKey{pubKeys[3], pubKeys[4], pubKeys[5]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -278,8 +272,8 @@ func TestAddNewVote(test *testing.T) {
 
 	// one sig from external node
 	_, err = decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[3]},
-		sKeys[3].SignHash(blockHash[:]),
+		[]bls.PublicKey{pubKeys[3]},
+		sKeys[3].Sign(blockHash[:]),
 		common.BytesToHash(blockHash[:]),
 		blockNum,
 		viewID)
@@ -306,8 +300,8 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	)
 
 	slotList := shard.SlotList{}
-	sKeys := []bls_core.SecretKey{}
-	pubKeys := []bls.PublicKeyWrapper{}
+	sKeys := []bls.SecretKey{}
+	pubKeys := []bls.PublicKey{}
 
 	quorumNodes := 5
 
@@ -318,8 +312,7 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 		}
 		sKeys = append(sKeys, sKey)
 		slotList = append(slotList, newSlot)
-		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		wrapper := sKey.PublicKey()
 		pubKeys = append(pubKeys, wrapper)
 	}
 
@@ -331,16 +324,17 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 		shard.BeaconChainShardID, slotList,
 	}, big.NewInt(3))
 
-	aggSig := &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures := []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[0], sKeys[1]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
 
 	// aggregate sig from all of 2 harmony nodes
 	decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[0], &pubKeys[1]},
+		[]bls.PublicKey{pubKeys[0], pubKeys[1]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -354,14 +348,16 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	}
 	// aggregate sig from all of 2 external nodes
 
-	aggSig = &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[3], &sKeys[4]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures = []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[3], sKeys[4]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig = bls.AggreagateSignatures(signatures)
+
 	decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[3], &pubKeys[4]},
+		[]bls.PublicKey{pubKeys[3], pubKeys[4]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -387,8 +383,8 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	)
 
 	slotList := shard.SlotList{}
-	sKeys := []bls_core.SecretKey{}
-	pubKeys := []bls.PublicKeyWrapper{}
+	sKeys := []bls.SecretKey{}
+	pubKeys := []bls.PublicKey{}
 
 	quorumNodes := 8
 
@@ -399,8 +395,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 		}
 		sKeys = append(sKeys, sKey)
 		slotList = append(slotList, newSlot)
-		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		wrapper := sKey.PublicKey()
 		pubKeys = append(pubKeys, wrapper)
 	}
 
@@ -415,16 +410,17 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 		shard.BeaconChainShardID, slotList,
 	}, big.NewInt(3))
 
-	aggSig := &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures := []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[0], sKeys[1]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
 
 	// aggregate sig from all of 2 harmony nodes
 	decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[0], &pubKeys[1]},
+		[]bls.PublicKey{pubKeys[0], pubKeys[1]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -437,15 +433,17 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 		test.Errorf("signers are incorrect for harmony nodes signing with aggregate sig: have %d, expect %d", decider.SignersCount(Prepare), 2)
 	}
 
-	aggSig = &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[3], &sKeys[4]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures = []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[3], sKeys[4]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig = bls.AggreagateSignatures(signatures)
+
 	// aggregate sig from all of 2 external nodes
 	_, err := decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[3], &pubKeys[4]},
+		[]bls.PublicKey{pubKeys[3], pubKeys[4]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -460,16 +458,14 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 
 	// Aggregate Vote should only contain sig from 0, 1, 3, 4
 	fourSigs := decider.AggregateVotes(Prepare)
-	aggPubKey := &bls_core.PublicKey{}
-	for _, priKey := range []*bls_core.PublicKey{pubKeys[0].Object, pubKeys[1].Object, pubKeys[3].Object, pubKeys[4].Object} {
-		aggPubKey.Add(priKey)
-	}
-	if !fourSigs.VerifyHash(aggPubKey, blockHash[:]) {
+	aggPubKey := bls.AggreagatePublicKeys([]bls.PublicKey{pubKeys[0], pubKeys[1], pubKeys[3], pubKeys[4]})
+
+	if !fourSigs.Verify(aggPubKey, blockHash[:]) {
 		test.Error("Failed to aggregate votes for 4 keys from 2 aggregate sigs")
 	}
 
 	_, err = decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[3], &pubKeys[7]},
+		[]bls.PublicKey{pubKeys[3], pubKeys[7]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -483,7 +479,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	}
 
 	_, err = decider.AddNewVote(Prepare,
-		[]*bls.PublicKeyWrapper{&pubKeys[6], &pubKeys[5], &pubKeys[6]},
+		[]bls.PublicKey{pubKeys[6], pubKeys[5], pubKeys[6]},
 		aggSig,
 		common.BytesToHash(blockHash[:]),
 		blockNum,
@@ -503,8 +499,8 @@ func TestInvalidAggregateSig(test *testing.T) {
 	copy(blockHash[:], []byte("random"))
 
 	slotList := shard.SlotList{}
-	sKeys := []bls_core.SecretKey{}
-	pubKeys := []bls.PublicKeyWrapper{}
+	sKeys := []bls.SecretKey{}
+	pubKeys := []bls.PublicKey{}
 
 	quorumNodes := 8
 
@@ -515,35 +511,32 @@ func TestInvalidAggregateSig(test *testing.T) {
 		}
 		sKeys = append(sKeys, sKey)
 		slotList = append(slotList, newSlot)
-		wrapper := bls.PublicKeyWrapper{Object: sKey.GetPublicKey()}
-		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		wrapper := sKey.PublicKey()
 		pubKeys = append(pubKeys, wrapper)
 	}
 
-	aggSig := &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2], &sKeys[2]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures := []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[0], sKeys[1], sKeys[2], sKeys[2]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
+	aggSig := bls.AggreagateSignatures(signatures)
 
-	aggPubKey := &bls_core.PublicKey{}
+	aggPubKey := bls.AggreagatePublicKeys([]bls.PublicKey{pubKeys[0], pubKeys[1], pubKeys[2]})
 
-	for _, priKey := range []*bls_core.PublicKey{pubKeys[0].Object, pubKeys[1].Object, pubKeys[2].Object} {
-		aggPubKey.Add(priKey)
-	}
-
-	if aggSig.VerifyHash(aggPubKey, blockHash[:]) {
+	if aggSig.Verify(aggPubKey, blockHash[:]) {
 		test.Error("Expect aggregate signature verification to fail due to duplicate signing from one key")
 	}
 
-	aggSig = &bls_core.Sign{}
-	for _, priKey := range []*bls_core.SecretKey{&sKeys[0], &sKeys[1], &sKeys[2]} {
-		if s := priKey.SignHash(blockHash[:]); s != nil {
-			aggSig.Add(s)
+	signatures = []bls.Signature{}
+	for _, priKey := range []bls.SecretKey{sKeys[0], sKeys[1], sKeys[2]} {
+		if s := priKey.Sign(blockHash[:]); s != nil {
+			signatures = append(signatures, s)
 		}
 	}
-	if !aggSig.VerifyHash(aggPubKey, blockHash[:]) {
+	aggSig = bls.AggreagateSignatures(signatures)
+	if !aggSig.Verify(aggPubKey, blockHash[:]) {
 		test.Error("Expect aggregate signature verification to succeed with correctly matched keys and sigs")
 	}
 }

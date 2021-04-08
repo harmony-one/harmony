@@ -9,7 +9,6 @@ import (
 	"sort"
 	"testing"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -55,15 +54,19 @@ func init() {
 
 func generateRandomSlots(num int) []SlotPurchase {
 	randomSlots := []SlotPurchase{}
+
 	for i := 0; i < num; i++ {
 		addr := common.Address{}
 		addr.SetBytes(big.NewInt(int64(accountGen.Int63n(maxAccountGen))).Bytes())
-		secretKey := bls_core.SecretKey{}
-		secretKey.Deserialize(big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes())
-		key := bls.SerializedPublicKey{}
-		key.FromLibBLSPublicKey(secretKey.GetPublicKey())
+		secretKeyRaw := big.NewInt(int64(keyGen.Int63n(maxKeyGen))).Bytes()
+		secretKeyBytes := make([]byte, 32)
+		copy(secretKeyBytes[32-len(secretKeyRaw):], secretKeyRaw[:])
+		secretKey, err := bls.SecretKeyFromBytes(secretKeyBytes)
+		if err != nil {
+			panic(err)
+		}
 		stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
-		randomSlots = append(randomSlots, SlotPurchase{addr, key, stake, stake})
+		randomSlots = append(randomSlots, SlotPurchase{addr, secretKey.PublicKey().Serialized(), stake, stake})
 	}
 	return randomSlots
 }

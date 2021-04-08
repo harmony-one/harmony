@@ -358,7 +358,7 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 	signers := []string{}
 	for _, validator := range slots {
 		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
-			signers = append(signers, validator.BLSPublicKey.Hex())
+			signers = append(signers, validator.BLSPublicKey.ToHex())
 		}
 	}
 	return signers, nil

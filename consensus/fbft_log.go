@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -23,15 +22,15 @@ type FBFTMessage struct {
 	BlockNum           uint64
 	BlockHash          common.Hash
 	Block              []byte
-	SenderPubkeys      []*bls.PublicKeyWrapper
+	SenderPubkeys      []bls.PublicKey
 	SenderPubkeyBitmap []byte
-	LeaderPubkey       *bls.PublicKeyWrapper
+	LeaderPubkey       bls.PublicKey
 	Payload            []byte
-	ViewchangeSig      *bls_core.Sign
-	ViewidSig          *bls_core.Sign
-	M2AggSig           *bls_core.Sign
+	ViewchangeSig      bls.Signature
+	ViewidSig          bls.Signature
+	M2AggSig           bls.Signature
 	M2Bitmap           *bls_cosi.Mask
-	M3AggSig           *bls_core.Sign
+	M3AggSig           bls.Signature
 	M3Bitmap           *bls_cosi.Mask
 	Verified           bool
 }
@@ -41,14 +40,14 @@ func (m *FBFTMessage) String() string {
 	sender := ""
 	for _, key := range m.SenderPubkeys {
 		if sender == "" {
-			sender = key.Bytes.Hex()
+			sender = key.ToHex()
 		} else {
-			sender = sender + ";" + key.Bytes.Hex()
+			sender = sender + ";" + key.ToHex()
 		}
 	}
 	leader := ""
 	if m.LeaderPubkey != nil {
-		leader = m.LeaderPubkey.Bytes.Hex()
+		leader = m.LeaderPubkey.ToHex()
 	}
 	return fmt.Sprintf(
 		"[Type:%s ViewID:%d Num:%d BlockHash:%s Sender:%s Leader:%s]",
@@ -70,7 +69,7 @@ const (
 	idTypeBytes   = 4
 	idViewIDBytes = 8
 	idHashBytes   = common.HashLength
-	idSenderBytes = bls.PublicKeySizeInBytes
+	idSenderBytes = bls.PublicKeySize
 
 	idBytes = idTypeBytes + idViewIDBytes + idHashBytes + idSenderBytes
 )
@@ -89,7 +88,7 @@ func (m *FBFTMessage) id() fbftMsgID {
 	copy(id[idTypeBytes+idViewIDBytes:], m.BlockHash[:])
 
 	if m.HasSingleSender() {
-		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].Bytes[:])
+		copy(id[idTypeBytes+idViewIDBytes+idHashBytes:], m.SenderPubkeys[0].ToBytes())
 	} else {
 		// Currently this case is not reachable as only validator will use id() func
 		// and validator won't receive message with multiple senders
@@ -352,12 +351,11 @@ func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 
 	if len(consensusMsg.SenderPubkey) != 0 {
 		// If SenderPubKey is populated, treat it as a single key message
-		pubKey, err := bls_cosi.BytesToBLSPublicKey(consensusMsg.SenderPubkey)
+		pubKey, err := bls.PublicKeyFromBytes(consensusMsg.SenderPubkey)
 		if err != nil {
 			return nil, err
 		}
-		pbftMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
-		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
+		pbftMsg.SenderPubkeys = []bls.PublicKey{pubKey}
 	} else {
 		// else, it should be a multi-key message where the bitmap is populated
 		consensus.multiSigMutex.RLock()

@@ -12,19 +12,17 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/service/kms"
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/pkg/errors"
 )
 
 // GenBLSKeyWithPassPhrase generates bls key with passphrase and write into disk.
-func GenBLSKeyWithPassPhrase(passphrase string) (*ffi_bls.SecretKey, string, error) {
-	privateKey := bls.RandPrivateKey()
-	publickKey := privateKey.GetPublicKey()
-	fileName := publickKey.SerializeToHexStr() + ".key"
-	privateKeyHex := privateKey.SerializeToHexStr()
+func GenBLSKeyWithPassPhrase(passphrase string) (bls.SecretKey, string, error) {
+	privateKey := bls.RandSecretKey()
+	publickKey := privateKey.PublicKey()
+	fileName := publickKey.ToHex() + ".key"
 	// Encrypt with passphrase
-	encryptedPrivateKeyStr, err := encrypt([]byte(privateKeyHex), passphrase)
+	encryptedPrivateKeyStr, err := encrypt(privateKey.ToBytes(), passphrase)
 	if err != nil {
 		return nil, "", err
 	}
@@ -49,7 +47,7 @@ func WriteToFile(filename string, data string) error {
 }
 
 // LoadBLSKeyWithPassPhrase loads bls key with passphrase.
-func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, error) {
+func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "attempted to load from %s", fileName)
@@ -60,9 +58,8 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 	if err != nil {
 		return nil, err
 	}
-
-	priKey := &ffi_bls.SecretKey{}
-	if err := priKey.DeserializeHexStr(string(decryptedBytes)); err != nil {
+	priKey, err := bls.SecretKeyFromBytes(decryptedBytes)
+	if err != nil {
 		return nil, errors.Wrapf(
 			err, "could not deserialize byte content of %s as BLS secret key", fileName,
 		)
@@ -71,7 +68,7 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (*ffi_bls.SecretKey, 
 }
 
 // LoadAwsCMKEncryptedBLSKey loads aws encrypted bls key.
-func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.SecretKey, error) {
+func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (bls.SecretKey, error) {
 	encryptedPrivateKeyBytes, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "fail read at: %s", fileName)
@@ -90,8 +87,8 @@ func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (*ffi_bls.Se
 		return nil, err
 	}
 
-	priKey := &ffi_bls.SecretKey{}
-	if err = priKey.DeserializeHexStr(hex.EncodeToString(clearKey.Plaintext)); err != nil {
+	priKey, err := bls.SecretKeyFromBytes(clearKey.Plaintext)
+	if err != nil {
 		return nil, errors.Wrapf(err, "failed to deserialize the decrypted bls private key")
 	}
 

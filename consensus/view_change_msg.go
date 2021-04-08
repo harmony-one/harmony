@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/proto"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
@@ -17,7 +16,7 @@ import (
 )
 
 // construct the view change message
-func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWrapper) []byte {
+func (consensus *Consensus) constructViewChangeMessage(priKey bls.SecretKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_VIEWCHANGE,
@@ -26,8 +25,8 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 				ViewId:       consensus.GetViewChangingID(),
 				BlockNum:     consensus.blockNum,
 				ShardId:      consensus.ShardID,
-				SenderPubkey: priKey.Pub.Bytes[:],
-				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
+				SenderPubkey: priKey.PublicKey().ToBytes(),
+				LeaderPubkey: consensus.LeaderPubKey.ToBytes(),
 			},
 		},
 	}
@@ -71,27 +70,27 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 
 	consensus.getLogger().Info().
 		Hex("m1Payload", vcMsg.Payload).
-		Str("NextLeader", consensus.LeaderPubKey.Bytes.Hex()).
-		Str("SenderPubKey", priKey.Pub.Bytes.Hex()).
+		Str("NextLeader", consensus.LeaderPubKey.ToHex()).
+		Str("SenderPubKey", priKey.PublicKey().ToHex()).
 		Msg("[constructViewChangeMessage]")
 
-	sign := priKey.Pri.SignHash(msgToSign)
+	sign := priKey.Sign(msgToSign)
 	if sign != nil {
-		vcMsg.ViewchangeSig = sign.Serialize()
+		vcMsg.ViewchangeSig = sign.ToBytes()
 	} else {
 		consensus.getLogger().Error().Msg("unable to serialize m1/m2 view change message signature")
 	}
 
 	viewIDBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDBytes, consensus.GetViewChangingID())
-	sign1 := priKey.Pri.SignHash(viewIDBytes)
+	sign1 := priKey.Sign(viewIDBytes)
 	if sign1 != nil {
-		vcMsg.ViewidSig = sign1.Serialize()
+		vcMsg.ViewidSig = sign1.ToBytes()
 	} else {
 		consensus.getLogger().Error().Msg("unable to serialize viewID signature")
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Msg("[constructViewChangeMessage] failed to sign and marshal the viewchange message")
@@ -100,7 +99,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 }
 
 // new leader construct newview message
-func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.PrivateKeyWrapper) []byte {
+func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey bls.SecretKey) []byte {
 	message := &msg_pb.Message{
 		ServiceType: msg_pb.ServiceType_CONSENSUS,
 		Type:        msg_pb.MessageType_NEWVIEW,
@@ -109,7 +108,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 				ViewId:       viewID,
 				BlockNum:     consensus.blockNum,
 				ShardId:      consensus.ShardID,
-				SenderPubkey: priKey.Pub.Bytes[:],
+				SenderPubkey: priKey.PublicKey().ToBytes(),
 			},
 		},
 	}
@@ -122,7 +121,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		return nil
 	}
 
-	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey.Pri)
+	marshaledMessage, err := consensus.signAndMarshalConsensusMessage(message, priKey)
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Msg("[constructNewViewMessage] failed to sign and marshal the new view message")
@@ -156,34 +155,29 @@ func ParseViewChangeMessage(msg *msg_pb.Message) (*FBFTMessage, error) {
 	copy(FBFTMsg.Block[:], vcMsg.PreparedBlock[:])
 	copy(FBFTMsg.Payload[:], vcMsg.Payload[:])
 
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
+	pubKey, err := bls.PublicKeyFromBytes(vcMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
-	leaderKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.LeaderPubkey)
+	leaderKey, err := bls.PublicKeyFromBytes(vcMsg.LeaderPubkey)
 	if err != nil {
 		return nil, err
 	}
 
-	vcSig := bls_core.Sign{}
-	err = vcSig.Deserialize(vcMsg.ViewchangeSig)
+	vcSig, err := bls.SignatureFromBytes(vcMsg.ViewchangeSig)
 	if err != nil {
 		return nil, err
 	}
-	FBFTMsg.ViewchangeSig = &vcSig
+	FBFTMsg.ViewchangeSig = vcSig
 
-	vcSig1 := bls_core.Sign{}
-	err = vcSig1.Deserialize(vcMsg.ViewidSig)
+	vcSig1, err := bls.SignatureFromBytes(vcMsg.ViewidSig)
 	if err != nil {
 		return nil, err
 	}
-	FBFTMsg.ViewidSig = &vcSig1
+	FBFTMsg.ViewidSig = vcSig1
 
-	FBFTMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
-	copy(FBFTMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
-	FBFTMsg.LeaderPubkey = &bls.PublicKeyWrapper{Object: leaderKey}
-	copy(FBFTMsg.LeaderPubkey.Bytes[:], vcMsg.LeaderPubkey[:])
-
+	FBFTMsg.SenderPubkeys = []bls.PublicKey{pubKey}
+	FBFTMsg.LeaderPubkey = leaderKey
 	return &FBFTMsg, nil
 }
 
@@ -208,17 +202,17 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 	copy(FBFTMsg.Payload[:], vcMsg.Payload[:])
 	copy(FBFTMsg.Block[:], vcMsg.PreparedBlock[:])
 
-	pubKey, err := bls_cosi.BytesToBLSPublicKey(vcMsg.SenderPubkey)
+	pubKey, err := bls.PublicKeyFromBytes(vcMsg.SenderPubkey)
 	if err != nil {
 		return nil, err
 	}
 
-	FBFTMsg.SenderPubkeys = []*bls.PublicKeyWrapper{{Object: pubKey}}
-	copy(FBFTMsg.SenderPubkeys[0].Bytes[:], vcMsg.SenderPubkey[:])
+	FBFTMsg.SenderPubkeys = []bls.PublicKey{pubKey}
+	copy(FBFTMsg.SenderPubkeys[0].ToBytes(), vcMsg.SenderPubkey[:])
 
 	if len(vcMsg.M3Aggsigs) > 0 {
-		m3Sig := bls_core.Sign{}
-		err = m3Sig.Deserialize(vcMsg.M3Aggsigs)
+
+		m3Sig, err := bls.SignatureFromBytes(vcMsg.ViewchangeSig)
 		if err != nil {
 			return nil, err
 		}
@@ -227,13 +221,12 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 			return nil, err
 		}
 		m3mask.SetMask(vcMsg.M3Bitmap)
-		FBFTMsg.M3AggSig = &m3Sig
+		FBFTMsg.M3AggSig = m3Sig
 		FBFTMsg.M3Bitmap = m3mask
 	}
 
 	if len(vcMsg.M2Aggsigs) > 0 {
-		m2Sig := bls_core.Sign{}
-		err = m2Sig.Deserialize(vcMsg.M2Aggsigs)
+		m2Sig, err := bls.SignatureFromBytes(vcMsg.M2Aggsigs)
 		if err != nil {
 			return nil, err
 		}
@@ -242,7 +235,7 @@ func ParseNewViewMessage(msg *msg_pb.Message, members multibls.PublicKeys) (*FBF
 			return nil, err
 		}
 		m2mask.SetMask(vcMsg.M2Bitmap)
-		FBFTMsg.M2AggSig = &m2Sig
+		FBFTMsg.M2AggSig = m2Sig
 		FBFTMsg.M2Bitmap = m2mask
 	}
 

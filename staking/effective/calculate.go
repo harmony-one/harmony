@@ -44,7 +44,7 @@ func (p SlotPurchase) MarshalJSON() ([]byte, error) {
 		EPoSStake numeric.Dec `json:"eposed-stake"`
 	}{
 		common2.MustAddressToBech32(p.Addr),
-		p.Key.Hex(),
+		p.Key.ToHex(),
 		p.RawStake,
 		p.EPoSStake,
 	})

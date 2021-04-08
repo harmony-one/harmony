@@ -10,13 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
-	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -61,7 +59,7 @@ var (
 
 // Signs the consensus message and returns the marshaled message.
 func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Message,
-	priKey *bls_core.SecretKey) ([]byte, error) {
+	priKey bls.SecretKey) ([]byte, error) {
 	if err := consensus.signConsensusMessage(message, priKey); err != nil {
 		return empty, err
 	}
@@ -74,7 +72,7 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper) int64 {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls.PublicKey) int64 {
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys)
@@ -82,15 +80,15 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper
 	for i := range pubKeys {
 		consensus.getLogger().Info().
 			Int("index", i).
-			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
+			Str("BLSPubKey", pubKeys[i].ToHex()).
 			Msg("Member")
 	}
 
 	allKeys := consensus.Decider.Participants()
 	if len(allKeys) != 0 {
-		consensus.LeaderPubKey = &allKeys[0]
+		consensus.LeaderPubKey = allKeys[0]
 		consensus.getLogger().Info().
-			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+			Str("info", consensus.LeaderPubKey.ToHex()).Msg("My Leader")
 	} else {
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
@@ -114,15 +112,15 @@ func NewFaker() *Consensus {
 }
 
 // Sign on the hash of the message
-func (consensus *Consensus) signMessage(message []byte, priKey *bls_core.SecretKey) []byte {
+func (consensus *Consensus) signMessage(message []byte, priKey bls.SecretKey) []byte {
 	hash := hash.Keccak256(message)
-	signature := priKey.SignHash(hash[:])
-	return signature.Serialize()
+	signature := priKey.Sign(hash[:])
+	return signature.ToBytes()
 }
 
 // Sign on the consensus message signature field.
 func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
-	priKey *bls_core.SecretKey) error {
+	priKey bls.SecretKey) error {
 	message.Signature = nil
 	marshaledMessage, err := protobuf.Marshal(message)
 	if err != nil {
@@ -140,9 +138,9 @@ func (consensus *Consensus) UpdateBitmaps() {
 		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
 	members := consensus.Decider.Participants()
-	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
-	commitBitmap, _ := bls_cosi.NewMask(members, nil)
-	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
+	prepareBitmap, _ := bls.NewMask(members, nil)
+	commitBitmap, _ := bls.NewMask(members, nil)
+	multiSigBitmap, _ := bls.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
 	consensus.multiSigMutex.Lock()
@@ -210,7 +208,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensus.getLogger().Info().
-			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+			Str("leaderKey", consensus.LeaderPubKey.ToHex()).
 			Msg("[checkViewID] Start consensus timer")
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
@@ -229,8 +227,8 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
 func (consensus *Consensus) ReadSignatureBitmapPayload(
 	recvPayload []byte, offset int,
-) (*bls_core.Sign, *bls_cosi.Mask, error) {
-	if offset+bls.BLSSignatureSizeInBytes > len(recvPayload) {
+) (bls.Signature, *bls.Mask, error) {
+	if offset+bls.SignatureSize > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
@@ -245,7 +243,7 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 // retrieve corresponding blsPublicKey from Coinbase Address
 func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 	header *block.Header,
-) (*bls.PublicKeyWrapper, error) {
+) (bls.PublicKey, error) {
 	shardState, err := consensus.Blockchain.ReadShardState(header.Epoch())
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
@@ -259,23 +257,25 @@ func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
 		return nil, err
 	}
 
-	committerKey := new(bls_core.PublicKey)
 	isStaking := consensus.Blockchain.Config().IsStaking(header.Epoch())
 	for _, member := range committee.Slots {
 		if isStaking {
 			// After staking the coinbase address will be the address of bls public key
 			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == header.Coinbase() {
-				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+				committerKey, err := bls.PublicKeyFromBytes(member.BLSPublicKey[:])
+				if err != nil {
 					return nil, err
 				}
-				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+				return committerKey, nil
 			}
 		} else {
 			if member.EcdsaAddress == header.Coinbase() {
-				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+				committerKey, err := bls.PublicKeyFromBytes(member.BLSPublicKey[:])
+				if err != nil {
 					return nil, err
 				}
-				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+				return committerKey, nil
+
 			}
 		}
 	}
@@ -432,7 +432,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			hasError = true
 		} else {
 			consensus.getLogger().Info().
-				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
+				Str("leaderPubKey", leaderPubKey.ToHex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.LeaderPubKey = leaderPubKey
 		}
@@ -441,7 +441,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	for _, key := range pubKeys {
 		// in committee
 		myPubKeys := consensus.GetPublicKeys()
-		if myPubKeys.Contains(key.Object) {
+		if myPubKeys.Contains(key) {
 			if hasError {
 				consensus.getLogger().Error().
 					Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -452,7 +452,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 			// If the leader changed and I myself become the leader
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
-				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
+				!consensus.LeaderPubKey.Equal(oldLeader)) && consensus.IsLeader() {
 				go func() {
 					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -474,7 +474,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
 	for _, key := range consensus.priKey {
-		if key.Pub.Object.IsEqual(consensus.LeaderPubKey.Object) {
+		if key.PublicKey().Equal(consensus.LeaderPubKey) {
 			return true
 		}
 	}
@@ -569,19 +569,19 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		block.Epoch(), block.Hash(), block.NumberU64(), block.Header().ViewID().Uint64())
 	for i, key := range consensus.priKey {
-		if err := consensus.commitBitmap.SetKey(key.Pub.Bytes, true); err != nil {
+		if err := consensus.commitBitmap.SetKey(key.PublicKey().Serialized(), true); err != nil {
 			consensus.getLogger().Error().
 				Err(err).
 				Int("Index", i).
-				Str("Key", key.Pub.Bytes.Hex()).
+				Str("Key", key.PublicKey().ToHex()).
 				Msg("[selfCommit] New Leader commit bitmap set failed")
 			continue
 		}
 
 		if _, err := consensus.Decider.AddNewVote(
 			quorum.Commit,
-			[]*bls_cosi.PublicKeyWrapper{key.Pub},
-			key.Pri.SignHash(commitPayload),
+			[]bls.PublicKey{key.PublicKey()},
+			key.Sign(commitPayload),
 			common.BytesToHash(consensus.blockHash[:]),
 			block.NumberU64(),
 			block.Header().ViewID().Uint64(),
@@ -589,7 +589,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 			consensus.getLogger().Warn().
 				Err(err).
 				Int("Index", i).
-				Str("Key", key.Pub.Bytes.Hex()).
+				Str("Key", key.PublicKey().ToHex()).
 				Msg("[selfCommit] submit vote on viewchange commit failed")
 		}
 	}
@@ -610,7 +610,7 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 		return count
 	}
 	for _, key := range consensus.GetPublicKeys() {
-		if ok, err := mask.KeyEnabled(key.Bytes); err == nil && ok {
+		if ok, err := mask.KeyEnabled(key.Serialized()); err == nil && ok {
 			count++
 		}
 	}

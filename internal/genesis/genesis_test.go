@@ -1,13 +1,14 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/btcsuite/btcutil/bech32"
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 )
 
@@ -43,8 +44,20 @@ func testAccounts(test *testing.T, accounts []DeployAccount) {
 			test.Error("Account address", account.Address, "is not valid:", err)
 		}
 
-		pubKey := bls.PublicKey{}
-		err = pubKey.DeserializeHexStr(account.BLSPublicKey)
+		pubBytesOld, err := hex.DecodeString(account.BLSPublicKey)
+		if err != nil {
+			test.Error(err)
+		}
+
+		// reverse bytes order
+		pubBytes := make([]byte, 48)
+		for i := 0; i < 48; i++ {
+			pubBytes[i] = pubBytesOld[48-i-1]
+		}
+		// add compression tag
+		pubBytes[0] = pubBytes[0] | (1 << 7)
+
+		_, err = bls.PublicKeyFromBytes(pubBytes)
 		if err != nil {
 			test.Error("Account bls public key", account.BLSPublicKey, "is not valid:", err)
 		}
@@ -65,12 +78,18 @@ func testDeployAccounts(t *testing.T, accounts []DeployAccount) {
 		} else {
 			indicesByAddress[address] = append(indicesByAddress[address], index)
 		}
-		pubKey := bls.PublicKey{}
-		if err := pubKey.DeserializeHexStr(account.BLSPublicKey); err != nil {
+
+		pubBytes, err := hex.DecodeString(account.BLSPublicKey)
+		if err != nil {
+			t.Error(err)
+		}
+
+		pubKey, err := bls.PublicKeyFromBytes(pubBytes)
+		if err != nil {
 			t.Errorf("account %+v at index %v has invalid public key (%s)",
 				account, index, err)
 		} else {
-			pubKeyStr := pubKey.SerializeToHexStr()
+			pubKeyStr := pubKey.ToHex()
 			indicesByKey[pubKeyStr] = append(indicesByKey[pubKeyStr], index)
 		}
 	}

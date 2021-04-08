@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
@@ -84,7 +83,7 @@ type ConfigType struct {
 	NtpServer       string
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey multibls.PrivateKeys
+	ConsensusPriKey multibls.SecretKeys
 	// Database directory
 	DBDir            string
 	networkType      NetworkType
@@ -280,23 +279,18 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 }
 
 // ShardIDFromKey returns the shard ID statically determined from the input key
-func (conf *ConfigType) ShardIDFromKey(key *bls_core.PublicKey) (uint32, error) {
-	var pubKey bls.SerializedPublicKey
-	if err := pubKey.FromLibBLSPublicKey(key); err != nil {
-		return 0, errors.Wrapf(err,
-			"cannot convert libbls public key %s to internal form",
-			key.SerializeToHexStr())
-	}
+func (conf *ConfigType) ShardIDFromKey(key bls.PublicKey) (uint32, error) {
+	pubKeyBig := new(big.Int).SetBytes(key.ToBytes())
 	epoch := conf.networkType.ChainConfig().StakingEpoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
-	shardID := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(numShards)))
+	shardID := new(big.Int).Mod(pubKeyBig, big.NewInt(int64(numShards)))
 	return uint32(shardID.Uint64()), nil
 }
 
 // ShardIDFromConsensusKey returns the shard ID statically determined from the
 // consensus key.
 func (conf *ConfigType) ShardIDFromConsensusKey() (uint32, error) {
-	return conf.ShardIDFromKey(conf.ConsensusPriKey[0].Pub.Object)
+	return conf.ShardIDFromKey(conf.ConsensusPriKey[0].PublicKey())
 }
 
 // ValidateConsensusKeysForSameShard checks if all consensus public keys belong to the same shard
@@ -304,7 +298,7 @@ func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys multibls.Publi
 	keyShardStrs := []string{}
 	isSameShard := true
 	for _, key := range pubkeys {
-		shardID, err := conf.ShardIDFromKey(key.Object)
+		shardID, err := conf.ShardIDFromKey(key)
 		if err != nil {
 			return err
 		}
@@ -313,7 +307,7 @@ func (conf *ConfigType) ValidateConsensusKeysForSameShard(pubkeys multibls.Publi
 		}
 		keyShardStrs = append(
 			keyShardStrs,
-			fmt.Sprintf("key: %s, shard id: %d", key.Bytes.Hex(), shardID),
+			fmt.Sprintf("key: %s, shard id: %d", key.ToHex(), shardID),
 		)
 	}
 	if !isSameShard {

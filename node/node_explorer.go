@@ -66,7 +66,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 
 		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
 			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
-		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		if !aggSig.Verify(mask.AggregatePublic(), commitPayload) {
 			utils.Logger().
 				Error().Err(err).
 				Uint64("msgBlock", recvMsg.BlockNum).

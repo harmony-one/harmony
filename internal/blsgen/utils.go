@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
-func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (*bls_core.SecretKey, error) {
+func loadBasicKeyWithProvider(blsKeyFile string, pp passProvider) (bls.SecretKey, error) {
 	pass, err := pp.getPassphrase(blsKeyFile)
 	if err != nil {
 		return nil, err

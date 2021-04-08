@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -220,7 +219,7 @@ func TestVerify(t *testing.T) {
 			sdb:   defaultTestStateDB(),
 			chain: defaultFakeBlockChain(),
 
-			expErr: errors.New("Empty buf"),
+			expErr: errors.New("invalid public key size"),
 		},
 		{
 			// false signature
@@ -945,8 +944,8 @@ func (maker *shardSlotMaker) makeSlot() shard.Slot {
 }
 
 type blsKeyPair struct {
-	pri *bls_core.SecretKey
-	pub *bls_core.PublicKey
+	pri bls.SecretKey
+	pub bls.PublicKey
 }
 
 func genKeyPairs(size int) []blsKeyPair {
@@ -958,8 +957,8 @@ func genKeyPairs(size int) []blsKeyPair {
 }
 
 func genKeyPair() blsKeyPair {
-	pri := bls.RandPrivateKey()
-	pub := pri.GetPublicKey()
+	pri := bls.RandSecretKey()
+	pub := pri.PublicKey()
 	return blsKeyPair{
 		pri: pri,
 		pub: pub,
@@ -967,9 +966,7 @@ func genKeyPair() blsKeyPair {
 }
 
 func (kp blsKeyPair) Pub() bls.SerializedPublicKey {
-	var pub bls.SerializedPublicKey
-	copy(pub[:], kp.pub.Serialize())
-	return pub
+	return kp.pub.Serialized()
 }
 
 func (kp blsKeyPair) Sign(block *types.Block) []byte {
@@ -977,9 +974,9 @@ func (kp blsKeyPair) Sign(block *types.Block) []byte {
 	msg := consensus_sig.ConstructCommitPayload(chain, block.Epoch(), block.Hash(),
 		block.Number().Uint64(), block.Header().ViewID().Uint64())
 
-	sig := kp.pri.SignHash(msg)
+	sig := kp.pri.Sign(msg)
 
-	return sig.Serialize()
+	return sig.ToBytes()
 }
 
 func defaultTestStateDB() *state.DB {

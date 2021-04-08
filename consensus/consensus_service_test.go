@@ -8,13 +8,12 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 )
 
 func TestSignAndMarshalConsensusMessage(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -24,9 +23,9 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 		t.Fatalf("newhost failure: %v", err)
 	}
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, shard.BeaconChainShardID)
-	blsPriKey := bls.RandPrivateKey()
+	blsPriKey := bls.RandSecretKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey}, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -46,7 +45,7 @@ func TestSignAndMarshalConsensusMessage(t *testing.T) {
 }
 
 func TestSetViewID(t *testing.T) {
-	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902"}
+	leader := p2p.Peer{IP: "127.0.0.1", Port: "9902", ConsensusPubKey: bls.RandSecretKey().PublicKey()}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
 		Self:   &leader,
@@ -58,9 +57,9 @@ func TestSetViewID(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	blsPriKey := bls.RandPrivateKey()
+	blsPriKey := bls.RandSecretKey()
 	consensus, err := New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsPriKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsPriKey}, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

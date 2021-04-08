@@ -8,7 +8,6 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/harmony-one/abool"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -51,8 +50,8 @@ type Consensus struct {
 	// 2 types of timeouts: normal and viewchange
 	consensusTimeout map[TimeoutType]*utils.Timeout
 	// Commits collected from validators.
-	aggregatedPrepareSig *bls_core.Sign
-	aggregatedCommitSig  *bls_core.Sign
+	aggregatedPrepareSig bls.Signature
+	aggregatedCommitSig  bls.Signature
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
 
@@ -66,9 +65,9 @@ type Consensus struct {
 	MinPeers   int
 	pubKeyLock sync.Mutex
 	// private/public keys of current node
-	priKey multibls.PrivateKeys
+	priKey multibls.SecretKeys
 	// the publickey of leader
-	LeaderPubKey *bls.PublicKeyWrapper
+	LeaderPubKey bls.PublicKey
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
@@ -165,18 +164,18 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
+func (consensus *Consensus) GetLeaderPrivateKey(leaderKey bls.PublicKey) (bls.SecretKey, error) {
 	for i, key := range consensus.priKey {
-		if key.Pub.Object.IsEqual(leaderKey) {
-			return &consensus.priKey[i], nil
+		if key.PublicKey().Equal(leaderKey) {
+			return consensus.priKey[i], nil
 		}
 	}
-	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
+	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.ToHex())
 }
 
 // GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
+func (consensus *Consensus) GetConsensusLeaderPrivateKey() (bls.SecretKey, error) {
+	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey)
 }
 
 // SetBlockVerifier sets the block verifier
@@ -187,7 +186,7 @@ func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.SecretKeys,
 	Decider quorum.Decider,
 ) (*Consensus, error) {
 	consensus := Consensus{}

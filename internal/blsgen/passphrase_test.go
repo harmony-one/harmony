@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 func TestNewPassDecrypter(t *testing.T) {
@@ -173,9 +172,9 @@ func TestPassDecrypter_decryptFile(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		gotPub := bls.FromLibBLSPublicKeyUnsafe(secret.GetPublicKey())[:]
-		if expPub := common.Hex2Bytes(test.expPublicKey); !bytes.Equal(gotPub, expPub) {
-			t.Errorf("Test %v: unexpected public key %v / %v", i, gotPub, expPub)
+		gotPub := secret.PublicKey()
+		if expPub := common.Hex2Bytes(test.expPublicKey); !bytes.Equal(gotPub.ToBytes(), expPub) {
+			t.Errorf("Test %v: unexpected public key %v / %v", i, gotPub.ToBytes(), expPub)
 		}
 	}
 }

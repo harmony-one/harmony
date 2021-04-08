@@ -23,11 +23,11 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/abool v1.0.1
-	github.com/harmony-one/bls v0.0.6
 	github.com/harmony-one/taggedrlp v0.1.4
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/herumi/bls-eth-go-binary v0.0.0-20210325004959-a24496ac0743
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0
@@ -50,6 +50,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.6.1
+	github.com/supranational/blst v0.3.4
 	github.com/syndtr/goleveldb v1.0.1-0.20200815110645-5c35d600f0ca
 	go.uber.org/ratelimit v0.1.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a

@@ -10,15 +10,14 @@ import (
 	"github.com/harmony-one/harmony/crypto/bls"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 func TestAddNewBlock(t *testing.T) {
-	blsKey := bls.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
+	blsKey := bls.RandSecretKey()
+	pubKey := blsKey.PublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "9882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
@@ -32,7 +31,7 @@ func TestAddNewBlock(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsKey}, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
@@ -64,8 +63,8 @@ func TestAddNewBlock(t *testing.T) {
 }
 
 func TestVerifyNewBlock(t *testing.T) {
-	blsKey := bls.RandPrivateKey()
-	pubKey := blsKey.GetPublicKey()
+	blsKey := bls.RandSecretKey()
+	pubKey := blsKey.PublicKey()
 	leader := p2p.Peer{IP: "127.0.0.1", Port: "8882", ConsensusPubKey: pubKey}
 	priKey, _, _ := utils.GenKeyP2P("127.0.0.1", "9902")
 	host, err := p2p.NewHost(p2p.HostConfig{
@@ -79,7 +78,7 @@ func TestVerifyNewBlock(t *testing.T) {
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
 	consensus, err := consensus.New(
-		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
+		host, shard.BeaconChainShardID, leader, []bls.SecretKey{blsKey}, decider,
 	)
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)

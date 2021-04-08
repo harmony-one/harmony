@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/api/service/synchronize"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/hmy/downloader"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/prometheus"
@@ -456,7 +456,7 @@ func nodeconfigSetShardSchedule(config harmonyConfig) {
 
 func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.PublicKeys) {
 	for _, key := range pubKeys {
-		keyStr := key.Bytes.Hex()
+		keyStr := key.ToHex()
 		_, account := config.FindAccount(keyStr)
 		if account != nil {
 			initialAccounts = append(initialAccounts, account)
@@ -510,7 +510,7 @@ func setupStakingNodeAccount(hc harmonyConfig) error {
 	for _, blsKey := range pubKeys {
 		initialAccount := &genesis.DeployAccount{}
 		initialAccount.ShardID = shardID
-		initialAccount.BLSPublicKey = blsKey.Bytes.Hex()
+		initialAccount.BLSPublicKey = blsKey.ToHex()
 		initialAccount.Address = ""
 		initialAccounts = append(initialAccounts, initialAccount)
 	}
@@ -529,7 +529,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 		setupConsensusKeys(hc, nodeConfig)
 	} else {
 		// set dummy bls key for consensus object
-		nodeConfig.ConsensusPriKey = multibls.GetPrivateKeys(&bls.SecretKey{})
+		nodeConfig.ConsensusPriKey = []bls.SecretKey{}
 	}
 
 	// Set network type
@@ -550,7 +550,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	selfPeer := p2p.Peer{
 		IP:              hc.P2P.IP,
 		Port:            strconv.Itoa(hc.P2P.Port),
-		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
+		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].PublicKey(),
 	}
 
 	myHost, err = p2p.NewHost(p2p.HostConfig{

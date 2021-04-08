@@ -7,9 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	bls2 "github.com/harmony-one/bls/ffi/go/bls"
-	"github.com/harmony-one/harmony/consensus/signature"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -18,6 +15,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/consensus/quorum"
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	vrf_bls "github.com/harmony-one/harmony/crypto/vrf/bls"
@@ -63,7 +61,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	// Do easier check before signature check
 	if msg.Type == msg_pb.MessageType_ANNOUNCE || msg.Type == msg_pb.MessageType_PREPARED || msg.Type == msg_pb.MessageType_COMMITTED {
 		// Only validator needs to check whether the message is from the correct leader
-		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.Bytes[:]) &&
+		if !bytes.Equal(senderKey[:], consensus.LeaderPubKey.ToBytes()) &&
 			consensus.current.Mode() == Normal && !consensus.IgnoreViewIDCheck.IsSet() {
 			return errSenderPubKeyNotLeader
 		}
@@ -136,7 +134,7 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []bls.SecretKey{leaderPriKey})
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[finalCommit] Unable to construct Committed message")
@@ -261,7 +259,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 	}
 	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
 	if err != nil ||
-		len(lastCommits) < bls.BLSSignatureSizeInBytes {
+		len(lastCommits) < bls.SignatureSize {
 		msgs := consensus.FBFTLog.GetMessagesByTypeSeq(
 			msg_pb.MessageType_COMMITTED, blockNum,
 		)
@@ -605,7 +603,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	}
 
 	// Construct committed message
-	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []*bls.PrivateKeyWrapper{leaderPriKey})
+	network, err := consensus.construct(msg_pb.MessageType_COMMITTED, nil, []bls.SecretKey{leaderPriKey})
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).
 			Msg("[preCommitAndPropose] Unable to construct Committed message")
@@ -658,24 +656,20 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 }
 
 func (consensus *Consensus) verifyLastCommitSig(lastCommitSig []byte, blk *types.Block) error {
-	if len(lastCommitSig) < bls.BLSSignatureSizeInBytes {
+	if len(lastCommitSig) < bls.SignatureSize {
 		return errors.New("lastCommitSig not have enough length")
 	}
-
-	aggSigBytes := lastCommitSig[0:bls.BLSSignatureSizeInBytes]
-
-	aggSig := bls2.Sign{}
-	err := aggSig.Deserialize(aggSigBytes)
-
+	aggSigBytes := lastCommitSig[0:bls.SignatureSize]
+	sig, err := bls.SignatureFromBytes(aggSigBytes)
 	if err != nil {
 		return errors.New("unable to deserialize multi-signature from payload")
 	}
-	aggPubKey := consensus.commitBitmap.AggregatePublic
+	aggPubKey := consensus.commitBitmap.AggregatePublic()
 
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blk.Epoch(), blk.Hash(), blk.NumberU64(), blk.Header().ViewID().Uint64())
 
-	if !aggSig.VerifyHash(aggPubKey, commitPayload) {
+	if !sig.Verify(aggPubKey, commitPayload) {
 		return errors.New("Failed to verify the multi signature for last commit sig")
 	}
 	return nil
@@ -782,7 +776,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 			Msg("[GenerateVrfAndProof] VRF generation error")
 		return vrfBlockNumbers
 	}
-	sk := vrf_bls.NewVRFSigner(key.Pri)
+	sk := key
 	blockHash := [32]byte{}
 	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		newBlock.NumberU64() - 1,
@@ -793,7 +787,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 	previousHash := previousHeader.Hash()
 	copy(blockHash[:], previousHash[:])
 
-	vrf, proof := sk.Evaluate(blockHash[:])
+	vrf, proof := vrf_bls.Evaluate(sk, blockHash[:])
 	newBlock.AddVrf(append(vrf[:], proof...))
 
 	consensus.getLogger().Info().
@@ -807,7 +801,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newBlock *types.Block, vrfBlockN
 
 // ValidateVrfAndProof validates a VRF/Proof from hash of previous block
 func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
-	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey.Object)
+	vrfPk := consensus.LeaderPubKey
 	var blockHash [32]byte
 	previousHeader := consensus.Blockchain.GetHeaderByNumber(
 		headerObj.Number().Uint64() - 1,
@@ -820,7 +814,7 @@ func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
 	copy(blockHash[:], previousHash[:])
 	vrfProof := [96]byte{}
 	copy(vrfProof[:], headerObj.Vrf()[32:])
-	hash, err := vrfPk.ProofToHash(blockHash[:], vrfProof[:])
+	hash, err := vrf_bls.ProofToHash(vrfPk, blockHash[:], vrfProof[:])
 
 	if err != nil {
 		consensus.getLogger().Warn().

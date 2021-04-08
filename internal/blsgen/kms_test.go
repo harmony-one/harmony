@@ -14,7 +14,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/ethereum/go-ethereum/common"
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 )
 
@@ -260,12 +259,13 @@ func TestKMSEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	priKey := &ffi_bls.SecretKey{}
-	if err = priKey.DeserializeHexStr(hex.EncodeToString(decryted.Plaintext)); err != nil {
+
+	priKey, err := bls.SecretKeyFromBytes(decryted.Plaintext)
+	if err != nil {
 		t.Fatal(err)
 	}
-	pubKey := bls.FromLibBLSPublicKeyUnsafe(priKey.GetPublicKey())
-	if hex.EncodeToString(pubKey[:]) != testKeys[0].publicKey {
+	pubKey := priKey.PublicKey()
+	if hex.EncodeToString(pubKey.ToBytes()) != testKeys[0].publicKey {
 		t.Errorf("unexpected public key")
 	}
 }

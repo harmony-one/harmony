@@ -3,14 +3,12 @@ package chain
 import (
 	"errors"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // ReadSignatureBitmapByPublicKeys read the payload of signature and bitmap based on public keys
-func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
+func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.PublicKey) (bls.Signature, *bls.Mask, error) {
 	sig, bitmap, err := ParseCommitSigAndBitmap(recvPayload)
 	if err != nil {
 		return nil, nil, err
@@ -20,23 +18,22 @@ func ReadSignatureBitmapByPublicKeys(recvPayload []byte, publicKeys []bls.Public
 
 // ParseCommitSigAndBitmap parse the commitSigAndBitmap to signature + bitmap
 func ParseCommitSigAndBitmap(payload []byte) (bls.SerializedSignature, []byte, error) {
-	if len(payload) < bls.BLSSignatureSizeInBytes {
+	if len(payload) < bls.SignatureSize {
 		return bls.SerializedSignature{}, nil, errors.New("payload not have enough length")
 	}
 	var (
 		sig    bls.SerializedSignature
-		bitmap = make([]byte, len(payload)-bls.BLSSignatureSizeInBytes)
+		bitmap = make([]byte, len(payload)-bls.SignatureSize)
 	)
-	copy(sig[:], payload[:bls.BLSSignatureSizeInBytes])
-	copy(bitmap, payload[bls.BLSSignatureSizeInBytes:])
+	copy(sig[:], payload[:bls.SignatureSize])
+	copy(bitmap, payload[bls.SignatureSize:])
 
 	return sig, bitmap, nil
 }
 
 // DecodeSigBitmap decode and parse the signature, bitmap with the given public keys
-func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []bls.PublicKeyWrapper) (*bls_core.Sign, *bls.Mask, error) {
-	aggSig := bls_core.Sign{}
-	err := aggSig.Deserialize(sigBytes[:])
+func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []bls.PublicKey) (bls.Signature, *bls.Mask, error) {
+	aggSig, err := bls.SignatureFromBytes(sigBytes[:])
 	if err != nil {
 		return nil, nil, errors.New("unable to deserialize multi-signature from payload")
 	}
@@ -48,5 +45,5 @@ func DecodeSigBitmap(sigBytes bls.SerializedSignature, bitmap []byte, pubKeys []
 	if err := mask.SetMask(bitmap); err != nil {
 		utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
 	}
-	return &aggSig, mask, nil
+	return aggSig, mask, nil
 }

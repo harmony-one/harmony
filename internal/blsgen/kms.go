@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/pkg/errors"
 )
 
@@ -75,7 +75,7 @@ func (kd *kmsDecrypter) extension() string {
 }
 
 // decryptFile decrypt a kms key file to a secret key
-func (kd *kmsDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
+func (kd *kmsDecrypter) decryptFile(keyFile string) (bls.SecretKey, error) {
 	kms, err := kd.getKMSClient()
 	if err != nil {
 		return nil, err

@@ -10,14 +10,13 @@ import (
 )
 
 func TestFBFTLog_id(t *testing.T) {
+	senderPublicKey1 := bls.RandSecretKey().PublicKey()
 	tests := []FBFTMessage{
 		{
-			MessageType: msg_pb.MessageType_ANNOUNCE,
-			ViewID:      4,
-			BlockHash:   [32]byte{01, 02},
-			SenderPubkeys: []*bls.PublicKeyWrapper{&bls.PublicKeyWrapper{
-				Bytes: bls.SerializedPublicKey{0x01, 0x02},
-			}},
+			MessageType:        msg_pb.MessageType_ANNOUNCE,
+			ViewID:             4,
+			BlockHash:          [32]byte{01, 02},
+			SenderPubkeys:      []bls.PublicKey{senderPublicKey1},
 			SenderPubkeyBitmap: []byte{05, 07},
 		},
 		{
@@ -44,7 +43,7 @@ func TestFBFTLog_id(t *testing.T) {
 				t.Errorf("sender key expected to be the bitmap when key list is not size 1")
 			}
 		} else {
-			if !bytes.Equal(id[idTypeBytes+idViewIDBytes+idHashBytes:], msg.SenderPubkeys[0].Bytes[:]) {
+			if !bytes.Equal(id[idTypeBytes+idViewIDBytes+idHashBytes:], msg.SenderPubkeys[0].ToBytes()) {
 				t.Errorf("sender key not expected")
 			}
 		}

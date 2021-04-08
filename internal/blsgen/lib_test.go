@@ -1,6 +1,8 @@
 package blsgen
 
 import (
+	"bytes"
+	"encoding/hex"
 	"os"
 	"testing"
 )
@@ -17,11 +19,11 @@ func TestUpdateStakingList(t *testing.T) {
 		t.Error(err)
 	}
 
-	if !privateKey.IsEqual(anotherPriKey) {
+	if !bytes.Equal(privateKey.ToBytes(), anotherPriKey.ToBytes()) {
 		t.Errorf("Error when generating bls key \n%s\n%s\n%s",
 			fileName,
-			privateKey.SerializeToHexStr(),
-			anotherPriKey.SerializeToHexStr(),
+			hex.EncodeToString(privateKey.ToBytes()),
+			hex.EncodeToString(anotherPriKey.ToBytes()),
 		)
 	}
 

@@ -80,7 +80,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							}
 						case commitSigs := <-commitSigsChan:
 							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
-							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
+							if len(commitSigs) > bls.SignatureSize {
 								newCommitSigsChan <- commitSigs
 							}
 						}
@@ -137,14 +137,14 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	// state data in preparation to propose/process new transactions
 	leaderKey := node.Consensus.LeaderPubKey
 	var (
-		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
+		coinbase    = node.GetAddressForBLSKey(leaderKey, header.Epoch())
 		beneficiary = coinbase
 		err         error
 	)
 
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
-		blsPubKeyBytes := leaderKey.Object.GetAddress()
+		blsPubKeyBytes := leaderKey.Address()
 		coinbase.SetBytes(blsPubKeyBytes[:])
 	}
 

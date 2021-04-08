@@ -50,7 +50,7 @@ type Committee struct {
 func (l SlotList) String() string {
 	blsKeys := make([]string, len(l))
 	for i, k := range l {
-		blsKeys[i] = k.BLSPublicKey.Hex()
+		blsKeys[i] = k.BLSPublicKey.ToHex()
 	}
 	s, _ := json.Marshal(blsKeys)
 	return string(s)
@@ -327,19 +327,18 @@ func (c *Committee) Hash() common.Hash {
 }
 
 // BLSPublicKeys ..
-func (c *Committee) BLSPublicKeys() ([]bls.PublicKeyWrapper, error) {
+func (c *Committee) BLSPublicKeys() ([]bls.PublicKey, error) {
 	if c == nil {
 		return nil, ErrSubCommitteeNil
 	}
 
-	slice := make([]bls.PublicKeyWrapper, len(c.Slots))
+	slice := make([]bls.PublicKey, len(c.Slots))
 	for j := range c.Slots {
-		pubKey, err := bls.BytesToBLSPublicKey(c.Slots[j].BLSPublicKey[:])
+		pubKey, err := bls.PublicKeyFromBytes(c.Slots[j].BLSPublicKey[:])
 		if err != nil {
 			return nil, err
 		}
-
-		slice[j] = bls.PublicKeyWrapper{c.Slots[j].BLSPublicKey, pubKey}
+		slice[j] = pubKey
 	}
 
 	return slice, nil

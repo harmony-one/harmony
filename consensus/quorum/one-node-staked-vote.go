@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/consensus/votepower"
@@ -58,16 +57,16 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *stakedVoteWeight) AddNewVote(
-	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
-	sig *bls_core.Sign, headerHash common.Hash,
+	p Phase, pubKeys []bls.PublicKey,
+	sig bls.Signature, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
 	signerAddr := common.Address{}
 	for i, pubKey := range pubKeys {
-		voter, ok := v.roster.Voters[pubKey.Bytes]
+		voter, ok := v.roster.Voters[pubKey.Serialized()]
 		if !ok {
-			return nil, errors.Errorf("Signer not in committee: %x", pubKey.Bytes)
+			return nil, errors.Errorf("Signer not in committee: %x", pubKey.Serialized())
 		}
 		if i == 0 {
 			signerAddr = voter.EarningAccount
@@ -79,7 +78,7 @@ func (v *stakedVoteWeight) AddNewVote(
 				return nil, errors.Errorf("Multiple signer accounts used in multi-sig: %x, %x", signerAddr.Bytes(), voter.EarningAccount)
 			}
 		}
-		pubKeysBytes[i] = pubKey.Bytes
+		pubKeysBytes[i] = pubKey.Serialized()
 	}
 
 	ballet, err := v.submitVote(p, pubKeysBytes, sig, headerHash, height, viewID)
@@ -94,7 +93,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	for _, pubKeyBytes := range pubKeysBytes {
 		votingPower := v.roster.Voters[pubKeyBytes].OverallPercent
 		utils.Logger().Debug().
-			Str("signer", pubKeyBytes.Hex()).
+			Str("signer", pubKeyBytes.ToHex()).
 			Str("votingPower", votingPower.String()).
 			Msg("Signer vote counted")
 		additionalVotePower = additionalVotePower.Add(votingPower)
@@ -271,7 +270,7 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		member := u{
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
-			identity.Hex(),
+			identity.ToHex(),
 			voter.GroupPercent.String(),
 			voter.OverallPercent.String(),
 			"",
@@ -306,7 +305,7 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 	}
 	identity, _ := pubKeyFunc()
 	for _, key := range identity {
-		_, ok := v.roster.Voters[key.Bytes]
+		_, ok := v.roster.Voters[key.Serialized()]
 		if ok {
 			return true
 		}

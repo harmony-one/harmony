@@ -4,10 +4,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -23,7 +23,7 @@ func AggregateSigForCommittee(
 	chain *core.BlockChain,
 	committee *shard.Committee,
 	decider quorum.Decider,
-	aggSignature *bls.Sign,
+	aggSignature bls.Signature,
 	hash common.Hash,
 	blockNum, viewID uint64,
 	epoch *big.Int,
@@ -46,7 +46,7 @@ func AggregateSigForCommittee(
 	}
 
 	commitPayload := signature.ConstructCommitPayload(chain, epoch, hash, blockNum, viewID)
-	if !aggSignature.VerifyHash(mask.AggregatePublic, commitPayload) {
+	if !aggSignature.Verify(mask.AggregatePublic(), commitPayload) {
 		return errAggregateSigFail
 	}
 

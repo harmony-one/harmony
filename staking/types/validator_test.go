@@ -446,10 +446,9 @@ func TestVerifyBLSKeys(t *testing.T) {
 	for i, test := range tests {
 		pubs := getPubsFromPairs(pairs, test.pubIndexes)
 		sigs := getSigsFromPairs(pairs, test.sigIndexes)
-
 		err := VerifyBLSKeys(pubs, sigs)
 		if assErr := assertError(err, test.expErr); assErr != nil {
-			t.Errorf("Test %v: %v", i, assErr)
+			t.Fatalf("Test %v: %v", i, assErr)
 		}
 	}
 }
@@ -486,7 +485,7 @@ func makeDeployAccountsFromBLSPubs(pubs []bls.SerializedPublicKey) []genesis.Dep
 	for i, pub := range pubs {
 		das = append(das, genesis.DeployAccount{
 			Address:      common.BigToAddress(big.NewInt(int64(i))).Hex(),
-			BLSPublicKey: pub.Hex(),
+			BLSPublicKey: pub.ToHex(),
 		})
 	}
 	return das
@@ -704,18 +703,12 @@ func makeBLSPubSigPairs(size int) []blsPubSigPair {
 }
 
 func makeBLSPubSigPair() blsPubSigPair {
-	blsPriv := bls.RandPrivateKey()
-	blsPub := blsPriv.GetPublicKey()
+	blsPriv := bls.RandSecretKey()
+	blsPub := blsPriv.PublicKey()
 	msgHash := hash.Keccak256([]byte(BLSVerificationStr))
-	sig := blsPriv.SignHash(msgHash)
+	sig := blsPriv.Sign(msgHash)
 
-	var shardPub bls.SerializedPublicKey
-	copy(shardPub[:], blsPub.Serialize())
-
-	var shardSig bls.SerializedSignature
-	copy(shardSig[:], sig.Serialize())
-
-	return blsPubSigPair{shardPub, shardSig}
+	return blsPubSigPair{blsPub.Serialized(), sig.Serialized()}
 }
 
 func getPubsFromPairs(pairs []blsPubSigPair, indexes []int) []bls.SerializedPublicKey {
@@ -800,7 +793,7 @@ func assertValidatorEqual(v1, v2 Validator) error {
 	for i := range v1.SlotPubKeys {
 		pk1, pk2 := v1.SlotPubKeys[i], v2.SlotPubKeys[i]
 		if pk1 != pk2 {
-			return fmt.Errorf("SlotPubKeys[%v] not equal: %s / %s", i, pk1.Hex(), pk2.Hex())
+			return fmt.Errorf("SlotPubKeys[%v] not equal: %s / %s", i, pk1.ToHex(), pk2.ToHex())
 		}
 	}
 	if v1.LastEpochInCommittee.Cmp(v2.LastEpochInCommittee) != 0 {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/harmony-one/harmony/crypto/bls"
 )
 
 // PassSrcType is the type of passphrase provider source.
@@ -67,7 +67,7 @@ func (pd *passDecrypter) extension() string {
 	return basicKeyExt
 }
 
-func (pd *passDecrypter) decryptFile(keyFile string) (*bls_core.SecretKey, error) {
+func (pd *passDecrypter) decryptFile(keyFile string) (bls.SecretKey, error) {
 	for _, pp := range pd.pps {
 		secretKey, err := loadBasicKeyWithProvider(keyFile, pp)
 		if err != nil {

@@ -675,9 +675,7 @@ func makeTestCommittee(n int, shardID uint32) *shard.Committee {
 
 func makeHmySlot(seed int, shardID uint32) shard.Slot {
 	addr := common.BigToAddress(new(big.Int).SetInt64(int64(seed) + int64(shardID*1000000)))
-	var blsKey bls.SerializedPublicKey
-	copy(blsKey[:], bls.RandPrivateKey().GetPublicKey().Serialize())
-
+	blsKey := bls.RandSecretKey().PublicKey().Serialized()
 	return shard.Slot{
 		EcdsaAddress: addr,
 		BLSPublicKey: blsKey,

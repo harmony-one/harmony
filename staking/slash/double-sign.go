@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
@@ -173,7 +172,7 @@ func Verify(
 		candidate.Evidence.SecondVote
 
 	for _, pubKey := range append(first.SignerPubKeys, second.SignerPubKeys...) {
-		if len(pubKey) != bls.PublicKeySizeInBytes {
+		if len(pubKey) != bls.PublicKeySize {
 			return errors.Wrapf(
 				errSignerKeyNotRightSize, "double-signed key %x", pubKey,
 			)
@@ -262,21 +261,20 @@ func Verify(
 		candidate.Evidence.SecondVote,
 	} {
 		// now the only real assurance, cryptography
-		signature := &bls_core.Sign{}
-		publicKey := &bls_core.PublicKey{}
-
-		if err := signature.Deserialize(ballot.Signature); err != nil {
+		signature, err := bls.SignatureFromBytes(ballot.Signature)
+		if err != nil {
 			return err
 		}
 
+		publicKeys := []bls.PublicKey{}
 		for _, pubKey := range ballot.SignerPubKeys {
-			publicKeyObj, err := bls.BytesToBLSPublicKey(pubKey[:])
-
+			publicKey, err := bls.PublicKeyFromBytes(pubKey[:])
 			if err != nil {
 				return err
 			}
-			publicKey.Add(publicKeyObj)
+			publicKeys = append(publicKeys, publicKey)
 		}
+		publicKey := bls.AggreagatePublicKeys(publicKeys)
 		// slash verification only happens in staking era, therefore want commit payload for staking epoch
 		commitPayload := consensus_sig.ConstructCommitPayload(chain,
 			candidate.Evidence.Epoch, ballot.BlockHeaderHash, candidate.Evidence.Height, candidate.Evidence.ViewID)
@@ -286,7 +284,7 @@ func Verify(
 			Uint64("view-id", candidate.Evidence.ViewID).
 			Msgf("[COMMIT-PAYLOAD] doubleSignVerify %v", hex.EncodeToString(commitPayload))
 
-		if !signature.VerifyHash(publicKey, commitPayload) {
+		if !signature.Verify(publicKey, commitPayload) {
 			return errFailVerifySlash
 		}
 	}

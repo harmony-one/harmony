@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 
 	protobuf "github.com/golang/protobuf/proto"
-	libbls "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -17,7 +16,7 @@ import (
 const MaxBlockNumDiff = 100
 
 // verifyMessageSig verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) error {
+func verifyMessageSig(signerPubKey bls.PublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
@@ -25,13 +24,12 @@ func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) e
 		return err
 	}
 
-	msgSig := libbls.Sign{}
-	err = msgSig.Deserialize(signature)
+	msgSig, err := bls.SignatureFromBytes(signature)
 	if err != nil {
 		return err
 	}
 	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+	if !msgSig.Verify(signerPubKey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
 	message.Signature = signature
@@ -39,7 +37,7 @@ func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) e
 }
 
 func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) bool {
-	pubkey, err := bls.BytesToBLSPublicKey(senderKey[:])
+	pubkey, err := bls.PublicKeyFromBytes(senderKey[:])
 	if err != nil {
 		return false
 	}
@@ -80,12 +78,12 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 			return false
 		}
 		if logMsgs[0].BlockHash != recvMsg.BlockHash &&
-			bytes.Equal(logMsgs[0].SenderPubkeys[0].Bytes[:], recvMsg.SenderPubkeys[0].Bytes[:]) {
+			bytes.Equal(logMsgs[0].SenderPubkeys[0].ToBytes(), recvMsg.SenderPubkeys[0].ToBytes()) {
 			consensus.getLogger().Debug().
-				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys[0].Bytes.Hex()).
+				Str("logMsgSenderKey", logMsgs[0].SenderPubkeys[0].ToHex()).
 				Str("logMsgBlockHash", logMsgs[0].BlockHash.Hex()).
 				Str("recvMsg", recvMsg.String()).
-				Str("LeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+				Str("LeaderKey", consensus.LeaderPubKey.ToHex()).
 				Msg("[OnAnnounce] Leader is malicious")
 			if consensus.IsViewChangingMode() {
 				consensus.getLogger().Debug().Msg(
@@ -96,7 +94,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 			}
 		}
 		consensus.getLogger().Debug().
-			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
+			Str("leaderKey", consensus.LeaderPubKey.ToHex()).
 			Msg("[OnAnnounce] Announce message received again")
 	}
 	return consensus.isRightBlockNumCheck(recvMsg)
@@ -183,7 +181,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 
 	viewIDHash := make([]byte, 8)
 	binary.LittleEndian.PutUint64(viewIDHash, recvMsg.ViewID)
-	if !recvMsg.ViewidSig.VerifyHash(senderKey.Object, viewIDHash) {
+	if !recvMsg.ViewidSig.Verify(senderKey, viewIDHash) {
 		consensus.getLogger().Warn().
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[onViewChangeSanityCheck] Failed to Verify viewID Signature")

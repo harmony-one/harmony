@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
@@ -39,7 +38,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []*bls.PrivateKeyWrapper{key})
+	networkMessage, err := consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []bls.SecretKey{key})
 	if err != nil {
 		consensus.getLogger().Err(err).
 			Str("message-type", msg_pb.MessageType_ANNOUNCE.String()).
@@ -58,7 +57,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 	// Leader sign the block hash itself
 	for i, key := range consensus.priKey {
-		if err := consensus.prepareBitmap.SetKey(key.Pub.Bytes, true); err != nil {
+		if err := consensus.prepareBitmap.SetKey(key.PublicKey().Serialized(), true); err != nil {
 			consensus.getLogger().Warn().Err(err).Msgf(
 				"[Announce] Leader prepareBitmap SetKey failed for key at index %d", i,
 			)
@@ -67,8 +66,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 
 		if _, err := consensus.Decider.AddNewVote(
 			quorum.Prepare,
-			[]*bls.PublicKeyWrapper{key.Pub},
-			key.Pri.SignHash(consensus.blockHash[:]),
+			[]bls.PublicKey{key.PublicKey()},
+			key.Sign(consensus.blockHash[:]),
 			block.Hash(),
 			block.NumberU64(),
 			block.Header().ViewID().Uint64(),
@@ -119,10 +118,10 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	prepareBitmap := consensus.prepareBitmap
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
-		signed := consensus.Decider.ReadBallot(quorum.Prepare, signer.Bytes)
+		signed := consensus.Decider.ReadBallot(quorum.Prepare, signer.Serialized())
 		if signed != nil {
 			consensus.getLogger().Debug().
-				Str("validatorPubKey", signer.Bytes.Hex()).
+				Str("validatorPubKey", signer.ToHex()).
 				Msg("[OnPrepare] Already Received prepare message from the validator")
 			return
 		}
@@ -140,22 +139,19 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 
 	// Check BLS signature for the multi-sig
 	prepareSig := recvMsg.Payload
-	var sign bls_core.Sign
-	err := sign.Deserialize(prepareSig)
+	sign, err := bls.SignatureFromBytes(prepareSig)
 	if err != nil {
 		consensus.getLogger().Error().Err(err).
 			Msg("[OnPrepare] Failed to deserialize bls signature")
 		return
 	}
-	signerPubKey := &bls_core.PublicKey{}
+	var signerPubKey bls.PublicKey
 	if recvMsg.HasSingleSender() {
-		signerPubKey = recvMsg.SenderPubkeys[0].Object
+		signerPubKey = recvMsg.SenderPubkeys[0]
 	} else {
-		for _, pubKey := range recvMsg.SenderPubkeys {
-			signerPubKey.Add(pubKey.Object)
-		}
+		signerPubKey = bls.AggreagatePublicKeys(recvMsg.SenderPubkeys)
 	}
-	if !sign.VerifyHash(signerPubKey, blockHash) {
+	if !sign.Verify(signerPubKey, blockHash) {
 		consensus.getLogger().Error().Msg("[OnPrepare] Received invalid BLS signature")
 		return
 	}
@@ -168,7 +164,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	//// Write - Start
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Prepare, recvMsg.SenderPubkeys,
-		&sign, recvMsg.BlockHash,
+		sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("submit vote prepare failed")
@@ -201,10 +197,10 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	}
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
-		signed := consensus.Decider.ReadBallot(quorum.Commit, signer.Bytes)
+		signed := consensus.Decider.ReadBallot(quorum.Commit, signer.Serialized())
 		if signed != nil {
 			consensus.getLogger().Debug().
-				Str("validatorPubKey", signer.Bytes.Hex()).
+				Str("validatorPubKey", signer.ToHex()).
 				Msg("[OnCommit] Already Received commit message from the validator")
 			return
 		}
@@ -224,8 +220,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		Int64("numReceivedSoFar", signerCount).Logger()
 
 	logger.Debug().Msg("[OnCommit] Received new commit message")
-	var sign bls_core.Sign
-	if err := sign.Deserialize(recvMsg.Payload); err != nil {
+	sign, err := bls.SignatureFromBytes(recvMsg.Payload)
+	if err != nil {
 		logger.Debug().Msg("[OnCommit] Failed to deserialize bls signature")
 		return
 	}
@@ -247,15 +243,13 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Logger()
 
-	signerPubKey := &bls_core.PublicKey{}
+	var signerPubKey bls.PublicKey
 	if recvMsg.HasSingleSender() {
-		signerPubKey = recvMsg.SenderPubkeys[0].Object
+		signerPubKey = recvMsg.SenderPubkeys[0]
 	} else {
-		for _, pubKey := range recvMsg.SenderPubkeys {
-			signerPubKey.Add(pubKey.Object)
-		}
+		signerPubKey = bls.AggreagatePublicKeys(recvMsg.SenderPubkeys)
 	}
-	if !sign.VerifyHash(signerPubKey, commitPayload) {
+	if !sign.Verify(signerPubKey, commitPayload) {
 		logger.Error().Msg("[OnCommit] Cannot verify commit message")
 		return
 	}
@@ -267,7 +261,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	}
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkeys,
-		&sign, recvMsg.BlockHash,
+		sign, recvMsg.BlockHash,
 		recvMsg.BlockNum, recvMsg.ViewID,
 	); err != nil {
 		return

@@ -17,6 +17,7 @@
 package rawdb
 
 import (
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/hash"
@@ -36,8 +36,8 @@ import (
 )
 
 var (
-	testBLSPubKey = "30b2c38b1316da91e068ac3bd8751c0901ef6c02a1d58bc712104918302c6ed03d5894671d0c816dad2b4d303320f202"
-	testBLSPrvKey = "c6d7603520311f7a4e6aac0b26701fc433b75b38df504cd416ef2b900cd66205"
+	testBLSPubKey = "a8c1e0a9f4c6db2166c873addd8a925f6541f70e6baca6f61a470040320573ea29d906aa2fd329d6c75a6ebaaf2d3cac"
+	testBLSPrvKey = "2a899297ecd72b60aa70ce22d83b2fcb8e564ddb54f8e97695ee69a8b826e9b0"
 )
 
 // Tests that positional lookup metadata can be stored and retrieved.
@@ -153,17 +153,14 @@ func TestMixedLookupStorage(t *testing.T) {
 func sampleCreateValidatorStakingTxn() *staking.StakingTransaction {
 	key, _ := crypto.GenerateKey()
 	stakePayloadMaker := func() (staking.Directive, interface{}) {
-		p := &bls_core.PublicKey{}
-		p.DeserializeHexStr(testBLSPubKey)
-		pub := bls.SerializedPublicKey{}
-		pub.FromLibBLSPublicKey(p)
+		pubBytes, _ := hex.DecodeString(testBLSPubKey)
+		pub, _ := bls.PublicKeyFromBytes(pubBytes)
+
 		messageBytes := []byte(staking.BLSVerificationStr)
-		privateKey := &bls_core.SecretKey{}
-		privateKey.DeserializeHexStr(testBLSPrvKey)
+		privBytes, _ := hex.DecodeString(testBLSPrvKey)
+		privateKey, _ := bls.SecretKeyFromBytes(privBytes)
 		msgHash := hash.Keccak256(messageBytes)
-		signature := privateKey.SignHash(msgHash[:])
-		var sig bls.SerializedSignature
-		copy(sig[:], signature.Serialize())
+		signature := privateKey.Sign(msgHash[:])
 
 		ra, _ := numeric.NewDecFromStr("0.7")
 		maxRate, _ := numeric.NewDecFromStr("1")
@@ -184,8 +181,8 @@ func sampleCreateValidatorStakingTxn() *staking.StakingTransaction {
 			MinSelfDelegation:  big.NewInt(1e18),
 			MaxTotalDelegation: big.NewInt(3e18),
 			ValidatorAddress:   crypto.PubkeyToAddress(key.PublicKey),
-			SlotPubKeys:        []bls.SerializedPublicKey{pub},
-			SlotKeySigs:        []bls.SerializedSignature{sig},
+			SlotPubKeys:        []bls.SerializedPublicKey{pub.Serialized()},
+			SlotKeySigs:        []bls.SerializedSignature{signature.Serialized()},
 			Amount:             big.NewInt(1e18),
 		}
 	}
