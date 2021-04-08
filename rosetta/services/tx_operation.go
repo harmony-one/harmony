@@ -138,40 +138,12 @@ func GetNativeOperationsFromStakingTransaction(
 
 	// expose delegated balance
 	if tx.StakingType() == stakingTypes.DirectiveDelegate {
-		op2 := GetDelegateOperationForSubAccount(tx, operations[1])
+		op2 := getDelegateOperationForSubAccount(tx, operations[1])
 		return append(operations, op2), nil
 	}
 
 	if tx.StakingType() == stakingTypes.DirectiveUndelegate {
-		// set sub account
-		validatorAddress := operations[1].Metadata["validatorAddress"]
-		operations[1].Account.SubAccount = &types.SubAccountIdentifier{
-			Address: validatorAddress.(string),
-			Metadata: map[string]interface{}{
-				SubAccountMetadataKey: Delegation,
-			},
-		}
-
-		op2 := &types.Operation{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: operations[1].OperationIdentifier.Index + 1,
-			},
-			Type:   tx.StakingType().String(),
-			Status: GetTransactionStatus(tx, receipt),
-			Account: &types.AccountIdentifier{
-				Address: operations[1].Account.Address,
-				SubAccount: &types.SubAccountIdentifier{
-					Address: validatorAddress.(string),
-					Metadata: map[string]interface{}{
-						SubAccountMetadataKey: UnDelegation,
-					},
-				},
-				Metadata: operations[1].Account.Metadata,
-			},
-			Amount:   operations[1].Amount,
-			Metadata: operations[1].Metadata,
-		}
-
+		op2 := getUndelegateOperationForSubAccount(tx, operations[1], receipt)
 		return append(operations, op2), nil
 	}
 
@@ -179,7 +151,44 @@ func GetNativeOperationsFromStakingTransaction(
 
 }
 
-func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, delegateOperation *types.Operation) *types.Operation {
+func getUndelegateOperationForSubAccount(
+	tx *stakingTypes.StakingTransaction, delegateOperation *types.Operation, receipt *hmytypes.Receipt,
+) *types.Operation {
+	// set sub account
+	validatorAddress := delegateOperation.Metadata["validatorAddress"]
+	delegateOperation.Account.SubAccount = &types.SubAccountIdentifier{
+		Address: validatorAddress.(string),
+		Metadata: map[string]interface{}{
+			SubAccountMetadataKey: Delegation,
+		},
+	}
+
+	undelegateion := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: delegateOperation.OperationIdentifier.Index + 1,
+		},
+		Type:   tx.StakingType().String(),
+		Status: GetTransactionStatus(tx, receipt),
+		Account: &types.AccountIdentifier{
+			Address: delegateOperation.Account.Address,
+			SubAccount: &types.SubAccountIdentifier{
+				Address: validatorAddress.(string),
+				Metadata: map[string]interface{}{
+					SubAccountMetadataKey: UnDelegation,
+				},
+			},
+			Metadata: delegateOperation.Account.Metadata,
+		},
+		Amount:   delegateOperation.Amount,
+		Metadata: delegateOperation.Metadata,
+	}
+
+	return undelegateion
+}
+
+func getDelegateOperationForSubAccount(
+	tx *stakingTypes.StakingTransaction, delegateOperation *types.Operation,
+) *types.Operation {
 	amt, _ := new(big.Int).SetString(delegateOperation.Amount.Value, 10)
 	delegateAmt := new(big.Int).Sub(new(big.Int).SetUint64(0), amt)
 	validatorAddress := delegateOperation.Metadata["validatorAddress"]
@@ -216,12 +225,12 @@ func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, dele
 
 }
 
-// GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
+// getSideEffectOperationsFromUndelegationPayouts from the given payouts.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
-func GetSideEffectOperationsFromUndelegationPayouts(
+func getSideEffectOperationsFromUndelegationPayouts(
 	payouts *hmy.UndelegationPayouts, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	return getSideEffectOperationsFromUndelegationPayouts(
+	return getSideEffectOperationsFromUndelegationPayoutsMap(
 		payouts, common.UndelegationPayoutOperation, startingOperationIndex,
 	)
 }
@@ -429,8 +438,6 @@ func getCrossShardSenderTransferNativeOperations(
 	var opIndex int64
 	if startingOperationIndex != nil {
 		opIndex = *startingOperationIndex
-	} else {
-		opIndex = 0
 	}
 
 	return []*types.Operation{
@@ -451,7 +458,7 @@ func getCrossShardSenderTransferNativeOperations(
 }
 
 // delegator address => validator address => amount
-func getSideEffectOperationsFromUndelegationPayouts(
+func getSideEffectOperationsFromUndelegationPayoutsMap(
 	undelegationPayouts *hmy.UndelegationPayouts, opType string, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	var opIndex int64
@@ -498,7 +505,7 @@ func getSideEffectOperationsFromUndelegationPayouts(
 	return operations, nil
 }
 
-// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegationPayouts which actually
+// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegationPayoutsMap which actually
 // has some side effect(opIndex will be increased by this function) so be careful while using for other purpose
 func getOperationAndTotalAmountFromUndelegationMap(
 	delegator ethcommon.Address, opIndex *int64, relatedOpIdentifier *types.OperationIdentifier, opType string,
