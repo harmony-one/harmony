@@ -465,8 +465,6 @@ func getSideEffectOperationsFromUndelegationPayoutsMap(
 	operations := []*types.Operation{}
 	if startingOperationIndex != nil {
 		opIndex = *startingOperationIndex
-	} else {
-		opIndex = 0
 	}
 
 	for delegator, undelegationMap := range undelegationPayouts.Data {
