@@ -219,9 +219,9 @@ func GetDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, dele
 // GetSideEffectOperationsFromUndelegationPayouts from the given payouts.
 // If the startingOperationIndex is provided, all operations will be indexed starting from the given operation index.
 func GetSideEffectOperationsFromUndelegationPayouts(
-	payouts hmy.UndelegationPayouts, startingOperationIndex *int64,
+	payouts *hmy.UndelegationPayouts, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
-	return getSideEffectOperationsFromUndelegateMap(
+	return getSideEffectOperationsFromUndelegationPayouts(
 		payouts, common.UndelegationPayoutOperation, startingOperationIndex,
 	)
 }
@@ -451,8 +451,8 @@ func getCrossShardSenderTransferNativeOperations(
 }
 
 // delegator address => validator address => amount
-func getSideEffectOperationsFromUndelegateMap(
-	valueMap map[ethcommon.Address]map[ethcommon.Address]*big.Int, opType string, startingOperationIndex *int64,
+func getSideEffectOperationsFromUndelegationPayouts(
+	undelegationPayouts *hmy.UndelegationPayouts, opType string, startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	var opIndex int64
 	operations := []*types.Operation{}
@@ -462,7 +462,7 @@ func getSideEffectOperationsFromUndelegateMap(
 		opIndex = 0
 	}
 
-	for delegator, undelegationMap := range valueMap {
+	for delegator, undelegationMap := range undelegationPayouts.Data {
 
 		accID, rosettaError := newAccountIdentifier(delegator)
 		if rosettaError != nil {
@@ -498,7 +498,7 @@ func getSideEffectOperationsFromUndelegateMap(
 	return operations, nil
 }
 
-// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegateMap which actually
+// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegationPayouts which actually
 // has some side effect(opIndex will be increased by this function) so be careful while using for other purpose
 func getOperationAndTotalAmountFromUndelegationMap(
 	delegator ethcommon.Address, opIndex *int64, relatedOpIdentifier *types.OperationIdentifier, opType string,

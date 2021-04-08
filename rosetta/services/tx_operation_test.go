@@ -245,11 +245,10 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 
 func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
 	startingOperationIndex := int64(0)
-	undelegationPayouts := hmy.UndelegationPayouts{}
+	undelegationPayouts := hmy.NewUndelegationPayouts()
 	delegator := ethcommon.HexToAddress("0xB5f440B5c6215eEDc1b2E12b4b964fa31f7afa7d")
 	validator := ethcommon.HexToAddress("0x3b8DE43c8F30D3C387840681FED67783f93f1F94")
-	undelegationPayouts[delegator] = make(map[ethcommon.Address]*big.Int)
-	undelegationPayouts[delegator][validator] = new(big.Int).SetInt64(4000)
+	undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(delegator, validator, new(big.Int).SetInt64(4000))
 	operations, err := GetSideEffectOperationsFromUndelegationPayouts(undelegationPayouts, &startingOperationIndex)
 	if err != nil {
 		t.Fatal(err)
