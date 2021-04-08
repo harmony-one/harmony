@@ -244,6 +244,9 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				}
 
 				crossLinksToPropose = append(crossLinksToPropose, pending)
+				if len(crossLinksToPropose) > 15 {
+					break
+				}
 			}
 			utils.Logger().Info().
 				Msgf("[ProposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",
