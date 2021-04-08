@@ -557,8 +557,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 
 	payouts, ok := hmy.undelegationPayoutsCache.Get(epoch.Uint64())
 	if ok {
-		result := payouts.(UndelegationPayouts)
-		return &result, nil
+		return payouts.(*UndelegationPayouts), nil
 	}
 	undelegationPayouts := NewUndelegationPayouts()
 	// require second to last block as saved undelegations are AFTER undelegations are payed out
