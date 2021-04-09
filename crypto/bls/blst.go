@@ -45,8 +45,27 @@ func randBLSTSecretKey() SecretKey {
 }
 
 func blstSecretKeyFromBytes(in []byte) (SecretKey, error) {
+	if len(in) != SecretKeySize {
+		return nil, errSecretKeySize
+	}
 	secretKey := new(blst.SecretKey)
 	secretKey = secretKey.Deserialize(in)
+	if secretKey == nil {
+		return nil, errInvalidSecretKey
+	}
+	return &BLSTSecretKey{secretKey}, nil
+}
+
+func blstSecretKeyFromBigEndianBytes(in []byte) (SecretKey, error) {
+	if len(in) != SecretKeySize {
+		return nil, errSecretKeySize
+	}
+	fixed := make([]byte, SecretKeySize)
+	for i := 0; i < SecretKeySize; i++ {
+		fixed[i] = in[SecretKeySize-i-1]
+	}
+	secretKey := new(blst.SecretKey)
+	secretKey = secretKey.Deserialize(fixed)
 	if secretKey == nil {
 		return nil, errInvalidSecretKey
 	}
@@ -70,6 +89,15 @@ func (secretKey *BLSTSecretKey) ToBytes() []byte {
 	return secretKey.s.Serialize()
 }
 
+func (secretKey *BLSTSecretKey) ToBigEndianBytes() []byte {
+	le := secretKey.ToBytes()
+	be := make([]byte, SecretKeySize)
+	for i := 0; i < SecretKeySize; i++ {
+		be[i] = le[SecretKeySize-i-1]
+	}
+	return be
+}
+
 func (publicKey *BLSTPublicKey) FromBytes(serialized []byte) (PublicKey, error) {
 
 	if len(serialized) != PublicKeySize {
@@ -88,6 +116,15 @@ func (publicKey *BLSTPublicKey) FromBytes(serialized []byte) (PublicKey, error) 
 
 func (publicKey *BLSTPublicKey) ToBytes() []byte {
 	return publicKey.p.Compress()
+}
+
+func (publicKey *BLSTPublicKey) ToBigEndianBytes() []byte {
+	le := publicKey.ToBytes()
+	be := make([]byte, PublicKeySize)
+	for i := 0; i < PublicKeySize; i++ {
+		be[i] = le[PublicKeySize-i-1]
+	}
+	return be
 }
 
 func (publicKey *BLSTPublicKey) ToHex() string {

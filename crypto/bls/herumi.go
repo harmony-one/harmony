@@ -47,8 +47,27 @@ func randHerumiSecretKey() SecretKey {
 }
 
 func herumiSecretKeyFromBytes(in []byte) (SecretKey, error) {
+	if len(in) != SecretKeySize {
+		return nil, errSecretKeySize
+	}
 	secretKey := new(herumi.SecretKey)
 	err := secretKey.Deserialize(in)
+	if err != nil {
+		return nil, errInvalidSecretKey
+	}
+	return &HerumiSecretKey{secretKey}, nil
+}
+
+func herumiSecretKeyFromBigEndianBytes(in []byte) (SecretKey, error) {
+	if len(in) != SecretKeySize {
+		return nil, errSecretKeySize
+	}
+	fixed := make([]byte, SecretKeySize)
+	for i := 0; i < SecretKeySize; i++ {
+		fixed[i] = in[SecretKeySize-i-1]
+	}
+	secretKey := new(herumi.SecretKey)
+	err := secretKey.Deserialize(fixed)
 	if err != nil {
 		return nil, errInvalidSecretKey
 	}
@@ -72,9 +91,27 @@ func (secretKey *HerumiSecretKey) ToBytes() []byte {
 	return secretKey.s.Serialize()
 }
 
+func (secretKey *HerumiSecretKey) ToBigEndianBytes() []byte {
+	le := secretKey.ToBytes()
+	be := make([]byte, SecretKeySize)
+	for i := 0; i < SecretKeySize; i++ {
+		be[i] = le[SecretKeySize-i-1]
+	}
+	return be
+}
+
+func (publicKey *HerumiPublicKey) ToBigEndianBytes() []byte {
+	le := publicKey.ToBytes()
+	be := make([]byte, PublicKeySize)
+	for i := 0; i < PublicKeySize; i++ {
+		be[i] = le[PublicKeySize-i-1]
+	}
+	return be
+}
+
 func (publicKey *HerumiPublicKey) FromBytes(serialized []byte) (PublicKey, error) {
 	if len(serialized) != PublicKeySize {
-		return nil, errors.New("invalid public key size")
+		return nil, errPublicKeySize
 	}
 	herumiPublicKey := new(herumiPublicKey)
 	if err := herumiPublicKey.Deserialize(serialized); err != nil {
@@ -84,7 +121,7 @@ func (publicKey *HerumiPublicKey) FromBytes(serialized []byte) (PublicKey, error
 		return nil, errors.New("invalid public key order")
 	}
 	if herumiPublicKey.IsZero() {
-		return nil, errors.New("public key is zero")
+		return nil, errZeroPublicKey
 	}
 	publicKey.p = herumiPublicKey
 	return publicKey, nil
@@ -121,7 +158,7 @@ func (publicKey *HerumiPublicKey) Equal(other PublicKey) bool {
 
 func (signature *HerumiSignature) FromBytes(serialized []byte) (Signature, error) {
 	if len(serialized) != SignatureSize {
-		return nil, errors.New("invalid public key size")
+		return nil, errSignatureSize
 	}
 	herumiSignature := new(herumiSignature)
 	if err := herumiSignature.Deserialize(serialized); err != nil {
@@ -131,7 +168,7 @@ func (signature *HerumiSignature) FromBytes(serialized []byte) (Signature, error
 		return nil, errors.New("invalid signature order")
 	}
 	if herumiSignature.IsZero() {
-		return nil, errors.New("signature is zero")
+		return nil, errZeroSignature
 	}
 	signature.p = herumiSignature
 	return signature, nil

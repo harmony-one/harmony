@@ -280,7 +280,7 @@ func SetShardingSchedule(schedule shardingconfig.Schedule) {
 
 // ShardIDFromKey returns the shard ID statically determined from the input key
 func (conf *ConfigType) ShardIDFromKey(key bls.PublicKey) (uint32, error) {
-	pubKeyBig := new(big.Int).SetBytes(key.ToBytes())
+	pubKeyBig := new(big.Int).SetBytes(key.ToBigEndianBytes())
 	epoch := conf.networkType.ChainConfig().StakingEpoch
 	numShards := conf.shardingSchedule.InstanceForEpoch(epoch).NumShards()
 	shardID := new(big.Int).Mod(pubKeyBig, big.NewInt(int64(numShards)))

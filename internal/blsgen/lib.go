@@ -22,7 +22,8 @@ func GenBLSKeyWithPassPhrase(passphrase string) (bls.SecretKey, string, error) {
 	publickKey := privateKey.PublicKey()
 	fileName := publickKey.ToHex() + ".key"
 	// Encrypt with passphrase
-	encryptedPrivateKeyStr, err := encrypt(privateKey.ToBytes(), passphrase)
+	data := hex.EncodeToString(privateKey.ToBigEndianBytes())
+	encryptedPrivateKeyStr, err := encrypt([]byte(data), passphrase)
 	if err != nil {
 		return nil, "", err
 	}
@@ -58,7 +59,8 @@ func LoadBLSKeyWithPassPhrase(fileName, passphrase string) (bls.SecretKey, error
 	if err != nil {
 		return nil, err
 	}
-	priKey, err := bls.SecretKeyFromBytes(decryptedBytes)
+	// TODO:
+	priKey, err := bls.SecretKeyFromBigEndianBytes(decryptedBytes)
 	if err != nil {
 		return nil, errors.Wrapf(
 			err, "could not deserialize byte content of %s as BLS secret key", fileName,
@@ -87,7 +89,7 @@ func LoadAwsCMKEncryptedBLSKey(fileName string, kmsClient *kms.KMS) (bls.SecretK
 		return nil, err
 	}
 
-	priKey, err := bls.SecretKeyFromBytes(clearKey.Plaintext)
+	priKey, err := bls.SecretKeyFromBigEndianBytes(clearKey.Plaintext)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to deserialize the decrypted bls private key")
 	}
@@ -119,7 +121,11 @@ func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) 
 	unhexed := make([]byte, hex.DecodedLen(len(encrypted)))
 	if _, err = hex.Decode(unhexed, encrypted); err == nil {
 		if decrypted, err = decryptRaw(unhexed, passphrase); err == nil {
-			return decrypted, nil
+			_decrypted, err := hex.DecodeString(string(decrypted))
+			if err != nil {
+				return nil, err
+			}
+			return _decrypted, nil
 		}
 	}
 	// At this point err != nil, either from hex decode or from decryptRaw.
@@ -129,7 +135,11 @@ func decrypt(encrypted []byte, passphrase string) (decrypted []byte, err error) 
 		// because our canonical form is hex and not binary.
 		return nil, err
 	}
-	return decrypted, nil
+	_decrypted, err := hex.DecodeString(string(decrypted))
+	if err != nil {
+		return nil, err
+	}
+	return _decrypted, nil
 }
 
 func decryptRaw(data []byte, passphrase string) ([]byte, error) {

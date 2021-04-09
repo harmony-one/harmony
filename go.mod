@@ -27,7 +27,7 @@ require (
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/herumi/bls-eth-go-binary v0.0.0-20210325004959-a24496ac0743
+	github.com/herumi/bls-eth-go-binary v0.0.0-20210407105559-9588dcfc7de7
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0

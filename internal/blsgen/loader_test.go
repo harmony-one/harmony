@@ -33,8 +33,8 @@ func ExampleLoadKeys() {
 	// Output:
 	//
 	// loaded 2 keys
-	//   key 0: a60cec91fda57196dce57ebe9bc52c6253dc4d9ac7ba6bdaa98b58bf44e4243fe1933e7b36d0d133d7dcd9696508dcf7
-	//   key 1: b4bf083468ec18ba39533df66c7f5107e910e90a04cc3e4d1d113009a2ea4da2092a6b3bfaaaaddb862da4d56a1779f6
+	//   key 0: 0e969f8b302cf7648bc39652ca7a279a8562b72933a3f7cddac2252583280c7c3495c9ae854f00f6dd19c32fc5a17500
+	//   key 1: 152beed46d7a0002ef0f960946008887eedd4775bdf2ed238809aa74e20d31fdca267443615cc6f4ede49d58911ee083
 }
 
 func prepareDataForExample() (string, error) {

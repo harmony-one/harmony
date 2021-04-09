@@ -334,7 +334,7 @@ func (c *Committee) BLSPublicKeys() ([]bls.PublicKey, error) {
 
 	slice := make([]bls.PublicKey, len(c.Slots))
 	for j := range c.Slots {
-		pubKey, err := bls.PublicKeyFromBytes(c.Slots[j].BLSPublicKey[:])
+		pubKey, err := c.Slots[j].BLSPublicKey.PublicKey()
 		if err != nil {
 			return nil, err
 		}

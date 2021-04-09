@@ -101,12 +101,14 @@ type SecretKey interface {
 	Sign(message []byte) Signature
 	PublicKey() PublicKey
 	ToBytes() []byte
+	ToBigEndianBytes() []byte
 	equal(SecretKey) bool
 }
 
 type PublicKey interface {
 	FromBytes(serialized []byte) (PublicKey, error)
 	ToBytes() []byte
+	ToBigEndianBytes() []byte
 	Serialized() SerializedPublicKey
 	ToHex() string
 	Address() [20]byte
@@ -166,6 +168,27 @@ func SecretKeyFromBytes(_secretKey []byte) (SecretKey, error) {
 	return secretKey, nil
 }
 
+func SecretKeyFromBigEndianBytes(_secretKey []byte) (SecretKey, error) {
+	if len(_secretKey) != SecretKeySize {
+		return nil, errSecretKeySize
+	}
+	if bytes.Equal(zeroSecretKey, _secretKey) {
+		return nil, errZeroSecretKey
+	}
+	var secretKey SecretKey
+	var err error
+	switch BLSLibrary {
+	case libraryHerumi:
+		secretKey, err = herumiSecretKeyFromBigEndianBytes(_secretKey)
+	case libraryBLST:
+		secretKey, err = blstSecretKeyFromBigEndianBytes(_secretKey)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return secretKey, nil
+}
+
 func PublicKeyFromBytes(serialized []byte) (PublicKey, error) {
 	if len(serialized) != PublicKeySize {
 		return nil, errPublicKeySize
@@ -176,7 +199,7 @@ func PublicKeyFromBytes(serialized []byte) (PublicKey, error) {
 	if bytes.Equal(infinitePublicKey, serialized) {
 		return nil, errInfinitePublicKey
 	}
-	key := string(serialized)
+	key := BLSLibrary + string(serialized)
 	if k, ok := BLSPubKeyCache.Get(key); ok {
 		if pk, ok := k.(PublicKey); ok {
 			return pk, nil
@@ -295,6 +318,10 @@ func (serializedPublicKey SerializedPublicKey) ToHex() string {
 	return hex.EncodeToString(serializedPublicKey[:])
 }
 
+func (serializedPublicKey SerializedPublicKey) PublicKey() (PublicKey, error) {
+	return PublicKeyFromBytes(serializedPublicKey[:])
+}
+
 func (serizlizedPublicKey SerializedPublicKey) MarshalText() (text []byte, err error) {
 	text = make([]byte, SignatureSize)
 	hex.Encode(text, serizlizedPublicKey[:])
@@ -327,23 +354,23 @@ func negatePublicKey(publicKey PublicKey) PublicKey {
 	uncompressed := publicKey.uncompressed()
 	y := new(big.Int).Set(fieldOrder)
 	// y = p - y
-	y.Sub(new(big.Int).SetBytes(uncompressed[48:]), y)
+	y.Sub(new(big.Int).SetBytes(uncompressed[PublicKeySize:]), y)
 	// pad back to 48 bytes
 	yBytes := y.Bytes()
-	off := 48 - len(yBytes)
+	off := PublicKeySize - len(yBytes)
 	if off != 0 {
 		yBytes = append(make([]byte, off), yBytes...)
 	}
-	copy(uncompressed[48:], yBytes[:])
+	copy(uncompressed[PublicKeySize:], yBytes[:])
 	ret, _ := publicKeyFromUncompresesd(uncompressed)
 	return ret
 }
 
 func fixSerializedPublicKey(old []byte) []byte {
 	// reverse bytes order
-	fixed := make([]byte, 48)
-	for i := 0; i < 48; i++ {
-		fixed[i] = old[48-i-1]
+	fixed := make([]byte, PublicKeySize)
+	for i := 0; i < PublicKeySize; i++ {
+		fixed[i] = old[PublicKeySize-i-1]
 	}
 	// add compression tag
 	fixed[0] = fixed[0] | (1 << 7)

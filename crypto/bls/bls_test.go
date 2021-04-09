@@ -8,10 +8,6 @@ import (
 	"crypto/rand"
 )
 
-// test cases
-// * empty
-// * equality
-
 const n = 100
 
 func randPublicKey() PublicKey {

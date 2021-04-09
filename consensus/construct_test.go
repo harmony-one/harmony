@@ -251,7 +251,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	if len(network.FBFTMsg.SenderPubkeys) != 1 && network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Equal(network.FBFTMsg.Payload, sig.ToBytes()) {
+	if bytes.Compare(network.FBFTMsg.Payload, sig.ToBytes()) != 0 {
 		test.Errorf("Payload is not populated correctly")
 	}
 
@@ -282,10 +282,10 @@ func TestConstructCommitMessage(test *testing.T) {
 	if len(network.FBFTMsg.SenderPubkeys) != 2 && (network.FBFTMsg.SenderPubkeys[0].Serialized() != pubKeyWrapper1.Serialized() || network.FBFTMsg.SenderPubkeys[1].Serialized() != pubKeyWrapper2.Serialized()) {
 		test.Errorf("SenderPubkeys is not populated correctly")
 	}
-	if bytes.Equal(network.FBFTMsg.Payload, aggSig.ToBytes()) {
+	if bytes.Compare(network.FBFTMsg.Payload, aggSig.ToBytes()) != 0 {
 		test.Errorf("Payload is not populated correctly")
 	}
-	if bytes.Equal(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) {
+	if bytes.Compare(network.FBFTMsg.SenderPubkeyBitmap, []byte{0x03}) != 0 {
 		test.Errorf("SenderPubkeyBitmap is not populated correctly")
 	}
 }

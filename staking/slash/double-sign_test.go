@@ -219,7 +219,7 @@ func TestVerify(t *testing.T) {
 			sdb:   defaultTestStateDB(),
 			chain: defaultFakeBlockChain(),
 
-			expErr: errors.New("invalid public key size"),
+			expErr: errors.New("invalid signature size"),
 		},
 		{
 			// false signature
