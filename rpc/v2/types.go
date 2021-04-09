@@ -621,7 +621,7 @@ func NewBlockWithTxHash(
 
 	for _, tx := range b.Transactions() {
 		blk.Transactions = append(blk.Transactions, tx.Hash())
-		blk.EthTransactions = append(blk.Transactions, tx.ConvertToEth().Hash())
+		blk.EthTransactions = append(blk.EthTransactions, tx.ConvertToEth().Hash())
 	}
 
 	if blockArgs.InclStaking {
