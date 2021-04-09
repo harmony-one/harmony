@@ -267,7 +267,7 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 // GetNodeSync returns status code 500 if node is not in sync
 func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	sync := !s.stateSync.IsOutOfSync(s.blockchain, false)
+	sync, _ := s.stateSync.SyncStatus(s.blockchain)
 	if !sync {
 		w.WriteHeader(http.StatusTeapot)
 	}
