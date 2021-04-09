@@ -846,7 +846,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 		// We need to deduct gas price and verify balance since txn.Cost() is not accurate for delegate
 		// staking transaction because of re-delegation.
-		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit())))
+		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit()))
 		totalAmt := new(big.Int).Add(delegateAmt, gasAmt)
 		if bal := pool.currentState.GetBalance(from); bal.Cmp(totalAmt) < 0 {
 			return fmt.Errorf("not enough balance for delegation: %v < %v", bal, delegateAmt)
