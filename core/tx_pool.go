@@ -839,9 +839,19 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return err
 		}
 		pendingEpoch := pool.pendingEpoch()
-		_, _, _, err = VerifyAndDelegateFromMsg(
+		_, delegateAmt, _, err := VerifyAndDelegateFromMsg(
 			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig.IsRedelegation(pendingEpoch))
-		return err
+		if err != nil {
+			return err
+		}
+		// We need to deduct gas price and verify balance since txn.Cost() is not accurate for delegate
+		// staking transaction because of re-delegation.
+		gasAmt := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.GasLimit())))
+		totalAmt := new(big.Int).Add(delegateAmt, gasAmt)
+		if bal := pool.currentState.GetBalance(from); bal.Cmp(totalAmt) < 0 {
+			return fmt.Errorf("not enough balance for delegation: %v < %v", bal, delegateAmt)
+		}
+		return nil
 	case staking.DirectiveUndelegate:
 		msg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
