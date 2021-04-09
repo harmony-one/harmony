@@ -77,7 +77,13 @@ func NewTransaction(
 	tx *types.EthTransaction, blockHash common.Hash,
 	blockNumber uint64, timestamp uint64, index uint64,
 ) (*Transaction, error) {
-	from, err := tx.SenderAddress()
+	from := common.Address{}
+	var err error
+	if tx.IsEthCompatible() {
+		from, err = tx.SenderAddress()
+	} else {
+		from, err = tx.ConvertToHmy().SenderAddress()
+	}
 	if err != nil {
 		return nil, err
 	}

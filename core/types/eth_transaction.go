@@ -21,6 +21,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -333,7 +335,7 @@ func (tx *EthTransaction) SenderAddress() (common.Address, error) {
 
 // IsEthCompatible returns whether the txn is ethereum compatible
 func (tx *EthTransaction) IsEthCompatible() bool {
-	return true
+	return params.IsEthCompatible(tx.ChainID())
 }
 
 // AsMessage returns the transaction as a core.Message.
