@@ -38,7 +38,7 @@ type BlockWithTxHash struct {
 	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
 	Uncles           []common.Hash  `json:"uncles"`
 	Transactions     []common.Hash  `json:"transactions"`
-	EthTransactions  []common.Hash  `json:"EthTransactions"`
+	EthTransactions  []common.Hash  `json:"transactionsInEthHash"`
 	StakingTxs       []common.Hash  `json:"stakingTransactions"`
 	Signers          []string       `json:"signers,omitempty"`
 }
