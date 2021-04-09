@@ -55,12 +55,16 @@ type PublicTracerService struct {
 	version Version
 }
 
-// NewPublicTracerAPI creates a new API for the RPC interface
-func NewPublicTracerAPI(hmy *hmy.Harmony, version Version) rpc.API {
+// NewPublicTraceAPI creates a new API for the RPC interface
+func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
+	var service interface{} = &PublicTracerService{hmy, version}
+	if version == Trace {
+		service = &PublicParityTracerService{service.(*PublicTracerService)}
+	}
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicTracerService{hmy, version},
+		Service:   service,
 		Public:    true,
 	}
 }

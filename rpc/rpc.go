@@ -21,6 +21,7 @@ const (
 	V2
 	Eth
 	Debug
+	Trace
 )
 
 const (
@@ -43,9 +44,9 @@ const (
 
 var (
 	// HTTPModules ..
-	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer"}
+	HTTPModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "explorer"}
 	// WSModules ..
-	WSModules = []string{"hmy", "hmyv2", "eth", "debug", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
+	WSModules = []string{"hmy", "hmyv2", "eth", "debug", "trace", netNamespace, netV1Namespace, netV2Namespace, web3Namespace, "web3"}
 
 	httpListener     net.Listener
 	httpHandler      *rpc.Server
@@ -140,7 +141,8 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
 		NewPublicPoolAPI(hmy, Eth),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
-		NewPublicTracerAPI(hmy, Debug),
+		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
+		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
 		eth.NewPublicEthService(hmy, "eth"),
