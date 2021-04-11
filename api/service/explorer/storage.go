@@ -6,6 +6,8 @@ import (
 	"path"
 	"sync"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -18,9 +20,10 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix    = "ad"
-	CheckpointPrefix = "dc"
-	PrefixLen        = 3
+	AddressPrefix      = "ad"
+	CheckpointPrefix   = "dc"
+	PrefixLen          = 3
+	addrIndexCacheSize = 1000
 )
 
 // GetAddressKey ...
@@ -38,8 +41,9 @@ var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db   *leveldb.DB
-	lock sync.Mutex
+	db             *leveldb.DB
+	lock           sync.Mutex
+	addrIndexCache *lru.Cache
 }
 
 // GetStorageInstance returns attack model by using singleton pattern.
@@ -68,6 +72,7 @@ func (storage *Storage) Init(ip, port string) {
 	if storage.db, err = leveldb.OpenFile(dbFileName, options); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create new database")
 	}
+	storage.addrIndexCache, _ = lru.New(addrIndexCacheSize)
 }
 
 // GetDB returns the LDBDatabase of the storage.
@@ -106,10 +111,15 @@ func (storage *Storage) Dump(block *types.Block, height uint64) {
 func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords TxRecords, isStaking bool) {
 	var address Address
 	key := GetAddressKey(addr)
-	if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
-		if err = rlp.DecodeBytes(data, &address); err != nil {
-			utils.Logger().Error().
-				Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
+
+	if cached, ok := storage.addrIndexCache.Get(key); ok {
+		address = cached.(Address)
+	} else {
+		if data, err := storage.GetDB().Get([]byte(key), nil); err == nil {
+			if err = rlp.DecodeBytes(data, &address); err != nil {
+				utils.Logger().Error().
+					Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
+			}
 		}
 	}
 
@@ -122,6 +132,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr string, txRecords TxRecords,
 	encoded, err := rlp.EncodeToBytes(address)
 	if err == nil {
 		storage.GetDB().Put([]byte(key), encoded, nil)
+		storage.addrIndexCache.Add(key, address)
 	} else {
 		utils.Logger().Error().
 			Bool("isStaking", isStaking).Err(err).Msg("cannot encode address")
