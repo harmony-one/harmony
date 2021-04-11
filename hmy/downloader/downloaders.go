@@ -10,6 +10,8 @@ import (
 type Downloaders struct {
 	ds     map[uint32]*Downloader
 	active *abool.AtomicBool
+
+	config Config
 }
 
 // NewDownloaders creates Downloaders for sync of multiple blockchains
@@ -25,11 +27,19 @@ func NewDownloaders(host p2p.Host, bcs []*core.BlockChain, config Config) *Downl
 		}
 		ds[bc.ShardID()] = NewDownloader(host, bc, config)
 	}
-	return &Downloaders{ds, abool.New()}
+	return &Downloaders{
+		ds:     ds,
+		active: abool.New(),
+		config: config,
+	}
 }
 
 // Start start the downloaders
 func (ds *Downloaders) Start() {
+	if ds.config.ServerOnly {
+		// Run in server only mode. Do not start downloaders.
+		return
+	}
 	ds.active.Set()
 	for _, d := range ds.ds {
 		d.Start()
@@ -38,6 +48,10 @@ func (ds *Downloaders) Start() {
 
 // Close close the downloaders
 func (ds *Downloaders) Close() {
+	if ds.config.ServerOnly {
+		// Run in server only mode. Downloaders not started.
+		return
+	}
 	ds.active.UnSet()
 	for _, d := range ds.ds {
 		d.Close()
