@@ -48,6 +48,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		TxHash      common.Hash      `json:"transactionsRoot"`
 		ReceiptHash common.Hash      `json:"receiptsRoot"`
 		Bloom       types.Bloom      `json:"logsBloom"`
+		Difficulty  *hexutil.Big     `json:"difficulty"`
 		Number      *hexutil.Big     `json:"number"`
 		GasLimit    hexutil.Uint64   `json:"gasLimit"`
 		GasUsed     hexutil.Uint64   `json:"gasUsed"`
@@ -68,6 +69,7 @@ func (h Header) MarshalJSON() ([]byte, error) {
 		h.TxHash(),
 		h.ReceiptHash(),
 		h.Bloom(),
+		(*hexutil.Big)(big.NewInt(0)),
 		(*hexutil.Big)(h.Number()),
 		hexutil.Uint64(h.GasLimit()),
 		hexutil.Uint64(h.GasUsed()),
