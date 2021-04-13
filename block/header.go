@@ -40,25 +40,29 @@ var (
 // MarshalJSON ..
 func (h Header) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-		Coinbase    common.Address `json:"miner"            gencodec:"required"`
-		Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
-		TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
-		ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-		Bloom       types.Bloom    `json:"logsBloom"        gencodec:"required"`
-		Number      *hexutil.Big   `json:"number"           gencodec:"required"`
-		GasLimit    hexutil.Uint64 `json:"gasLimit"         gencodec:"required"`
-		GasUsed     hexutil.Uint64 `json:"gasUsed"          gencodec:"required"`
-		Time        *hexutil.Big   `json:"timestamp"        gencodec:"required"`
-		Extra       hexutil.Bytes  `json:"extraData"        gencodec:"required"`
-		MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
-		Hash        common.Hash    `json:"hash"`
+		ParentHash  common.Hash      `json:"parentHash"`
+		UncleHash   common.Hash      `json:"sha3Uncles"`
+		Nonce       types.BlockNonce `json:"nonce"`
+		Coinbase    common.Address   `json:"miner"`
+		Root        common.Hash      `json:"stateRoot"`
+		TxHash      common.Hash      `json:"transactionsRoot"`
+		ReceiptHash common.Hash      `json:"receiptsRoot"`
+		Bloom       types.Bloom      `json:"logsBloom"`
+		Number      *hexutil.Big     `json:"number"`
+		GasLimit    hexutil.Uint64   `json:"gasLimit"`
+		GasUsed     hexutil.Uint64   `json:"gasUsed"`
+		Time        *hexutil.Big     `json:"timestamp"`
+		Extra       hexutil.Bytes    `json:"extraData"`
+		MixDigest   common.Hash      `json:"mixHash"`
+		Hash        common.Hash      `json:"hash"`
 		// Additional Fields
-		ViewID  *big.Int `json:"viewID"           gencodec:"required"`
-		Epoch   *big.Int `json:"epoch"            gencodec:"required"`
-		ShardID uint32   `json:"shardID"          gencodec:"required"`
+		ViewID  *big.Int `json:"viewID"`
+		Epoch   *big.Int `json:"epoch"`
+		ShardID uint32   `json:"shardID"`
 	}{
 		h.ParentHash(),
+		common.Hash{},
+		types.BlockNonce{},
 		h.Coinbase(),
 		h.Root(),
 		h.TxHash(),
