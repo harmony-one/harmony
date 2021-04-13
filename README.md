@@ -27,7 +27,7 @@ sudo ln -sf /usr/local/opt/openssl@1.1 /usr/local/opt/openssl
 ```
 On Linux (Ubuntu)
 ```bash
-sudo apt install glibc-static gmp-devel gmp-static openssl-libs openssl-static gcc-c++
+sudo apt install libgmp-dev  libssl-dev  build-essential
 ```
 On Linux (Cent OS / Amazon Linux 2)
 ```bash
