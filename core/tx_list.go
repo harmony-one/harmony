@@ -18,9 +18,12 @@ package core
 
 import (
 	"container/heap"
+	"errors"
 	"math"
 	"math/big"
 	"sort"
+
+	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
@@ -245,6 +248,8 @@ func (m *txSortedMap) Flatten() types.PoolTransactions {
 	return txs
 }
 
+const stakingTxCheckThreshold = 10 // check staking transaction validation every 10 blocks
+
 // txList is a "list" of transactions belonging to an account, sorted by account
 // nonce. The same type can be used both for storing contiguous transactions for
 // the executable/pending queue; and for storing gapped transactions for the non-
@@ -253,8 +258,9 @@ type txList struct {
 	strict bool         // Whether nonces are strictly continuous or not
 	txs    *txSortedMap // Heap indexed sorted hash map of the transactions
 
-	costcap *big.Int // Price of the highest costing transaction (reset only if exceeds balance)
-	gascap  uint64   // Gas limit of the highest spending transaction (reset only if exceeds block limit)
+	lastStkCheck uint64   // Check all staking transaction validation every 10 blocks
+	costcap      *big.Int // Price of the highest costing transaction (reset only if exceeds balance)
+	gascap       uint64   // Gas limit of the highest spending transaction (reset only if exceeds block limit)
 }
 
 // newTxList create a new transaction list for maintaining nonce-indexable fast,
@@ -312,40 +318,24 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 	return l.txs.Forward(threshold)
 }
 
-// FilterPrice returns all regular transactions from the list with a cost or gas limit higher
-// than the provided thresholds and all staking transactions that can not be validated.
-func (l *txList) FilterPrice(
-	txPool *TxPool, address common.Address,
-) (types.PoolTransactions, types.PoolTransactions) {
-	costLimit := txPool.currentState.GetBalance(address)
-	gasLimit := txPool.currentMaxGas
-	// If all transactions are below the threshold, short circuit
-	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
-		return nil, nil
-	}
-	l.costcap = new(big.Int).Set(costLimit) // Lower the caps to the thresholds
-	l.gascap = gasLimit
-
-	return l.Filter(func(tx types.PoolTransaction) bool {
-		cost, err := tx.Cost()
-		if err != nil {
-			return true // failure should lead to removal of the tx
-		}
-		return cost.Cmp(costLimit) == 1 || tx.GasLimit() > gasLimit
-	})
-}
-
-// Filter iterates over the list of transactions and removes all of them for which
-// the specified function evaluates to true. Moreover, it returns all transactions
-// that were invalidated from the filter
-func (l *txList) Filter(
-	filter func(types.PoolTransaction) bool,
-) (types.PoolTransactions, types.PoolTransactions) {
-	// If the list was strict, filter anything above the lowest nonce
+// Filter out all invalid transactions from the txList. Return removed transactions, errors
+// why the removed transactions are failed, and trailing transactions that are enqueued due
+// to high nonce because removing the invalid transaction.
+// Invalid transaction check as follows:
+// 1. Not enough balance transactions.
+// 2. Checked every 10 blocks for staking transaction validation.
+func (l *txList) FilterValid(txPool *TxPool, address common.Address, bn uint64) (types.PoolTransactions, []error, types.PoolTransactions) {
 	var invalids types.PoolTransactions
 
-	// Filter out all the transactions above the account's funds
-	removed := l.txs.Filter(filter)
+	removed, errs := l.filterPrice(txPool, address)
+	if bn > l.lastStkCheck+stakingTxCheckThreshold {
+		l.lastStkCheck = bn
+
+		stkRemoved, errRemoved := l.filterStaking(txPool)
+		removed = append(removed, stkRemoved...)
+		errs = append(errs, errRemoved...)
+	}
+
 	if l.strict && len(removed) > 0 {
 		lowest := uint64(math.MaxUint64)
 		for _, tx := range removed {
@@ -355,7 +345,53 @@ func (l *txList) Filter(
 		}
 		invalids = l.txs.Filter(func(tx types.PoolTransaction) bool { return tx.Nonce() > lowest })
 	}
-	return removed, invalids
+	return removed, errs, invalids
+}
+
+// filterPrice returns all regular transactions from the list with a cost or gas limit higher
+// than the provided thresholds.
+func (l *txList) filterPrice(txPool *TxPool, address common.Address) (types.PoolTransactions, []error) {
+	costLimit := txPool.currentState.GetBalance(address)
+	gasLimit := txPool.currentMaxGas
+	// If all transactions are below the threshold, short circuit
+	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
+		return nil, nil
+	}
+	l.costcap = new(big.Int).Set(costLimit) // Lower the caps to the thresholds
+	l.gascap = gasLimit
+
+	return l.filterWithError(func(tx types.PoolTransaction) error {
+		cost, err := tx.Cost()
+		if err != nil {
+			return err // failure should lead to removal of the tx
+		}
+		if cost.Cmp(costLimit) > 0 {
+			return errors.New("not enough balance")
+		}
+		if tx.GasLimit() > gasLimit {
+			return errors.New("exceed max transaction gas limit")
+		}
+		return nil
+	})
+}
+
+// filterStaking validates and return invalid staking transaction with error, and trending
+// invalid transactions for high nonce.
+func (l *txList) filterStaking(txPool *TxPool) (types.PoolTransactions, []error) {
+	return l.filterWithError(func(tx types.PoolTransaction) error {
+		stkTxn, ok := tx.(*staking.StakingTransaction)
+		if !ok {
+			return nil
+		}
+		return txPool.validateStakingTx(stkTxn)
+	})
+}
+
+// Filter iterates over the list of transactions and removes all of them for which
+// the specified function invalidates the tx. Moreover, it returns all transactions
+// that were invalidated from the filter.
+func (l *txList) filterWithError(filter func(types.PoolTransaction) error) (types.PoolTransactions, []error) {
+	return l.txs.FilterWithError(filter)
 }
 
 // Cap places a hard limit on the number of items, returning all transactions
