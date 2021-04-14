@@ -22,12 +22,9 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for
@@ -315,38 +312,26 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 	return l.txs.Forward(threshold)
 }
 
-// FilterValid returns all regular transactions from the list with a cost or gas limit higher
+// FilterPrice returns all regular transactions from the list with a cost or gas limit higher
 // than the provided thresholds and all staking transactions that can not be validated.
-func (l *txList) FilterValid(
+func (l *txList) FilterPrice(
 	txPool *TxPool, address common.Address,
-) (types.PoolTransactions, types.PoolTransactions, []error) {
+) (types.PoolTransactions, types.PoolTransactions) {
 	costLimit := txPool.currentState.GetBalance(address)
 	gasLimit := txPool.currentMaxGas
 	// If all transactions are below the threshold, short circuit
 	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
-		return nil, nil, nil
+		return nil, nil
 	}
 	l.costcap = new(big.Int).Set(costLimit) // Lower the caps to the thresholds
 	l.gascap = gasLimit
 
-	return l.Filter(func(tx types.PoolTransaction) error {
+	return l.Filter(func(tx types.PoolTransaction) bool {
 		cost, err := tx.Cost()
 		if err != nil {
-			return err // failure should lead to removal of the tx
+			return true // failure should lead to removal of the tx
 		}
-		if cost.Cmp(costLimit) > 0 {
-			return errors.New("not enough balance")
-		}
-		if tx.GasLimit() > gasLimit {
-			return errors.New("transaction gas limit exceeding block limit")
-		}
-		if _, ok := tx.(*staking.StakingTransaction); ok {
-			err := txPool.validateTx(tx, false)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		return cost.Cmp(costLimit) == 1 || tx.GasLimit() > gasLimit
 	})
 }
 
@@ -354,13 +339,13 @@ func (l *txList) FilterValid(
 // the specified function evaluates to true. Moreover, it returns all transactions
 // that were invalidated from the filter
 func (l *txList) Filter(
-	filter func(types.PoolTransaction) error,
-) (types.PoolTransactions, types.PoolTransactions, []error) {
+	filter func(types.PoolTransaction) bool,
+) (types.PoolTransactions, types.PoolTransactions) {
 	// If the list was strict, filter anything above the lowest nonce
 	var invalids types.PoolTransactions
 
 	// Filter out all the transactions above the account's funds
-	removed, errs := l.txs.FilterWithError(filter)
+	removed := l.txs.Filter(filter)
 	if l.strict && len(removed) > 0 {
 		lowest := uint64(math.MaxUint64)
 		for _, tx := range removed {
@@ -370,7 +355,7 @@ func (l *txList) Filter(
 		}
 		invalids = l.txs.Filter(func(tx types.PoolTransaction) bool { return tx.Nonce() > lowest })
 	}
-	return removed, invalids, errs
+	return removed, invalids
 }
 
 // Cap places a hard limit on the number of items, returning all transactions
