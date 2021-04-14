@@ -328,7 +328,7 @@ func (l *txList) FilterValid(txPool *TxPool, address common.Address, bn uint64) 
 	var invalids types.PoolTransactions
 
 	removed, errs := l.filterPrice(txPool, address)
-	if bn > l.lastStkCheck+stakingTxCheckThreshold {
+	if bn >= l.lastStkCheck+stakingTxCheckThreshold {
 		l.lastStkCheck = bn
 
 		stkRemoved, errRemoved := l.filterStaking(txPool)
