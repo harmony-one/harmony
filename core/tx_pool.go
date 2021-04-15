@@ -511,7 +511,7 @@ func (pool *TxPool) reset(oldHead, newHead *block.Header) {
 	// any transactions that have been included in the block or
 	// have been invalidated because of another transaction (e.g.
 	// higher gas price)
-	pool.demoteUnexecutables()
+	pool.demoteUnexecutables(newHead.Number().Uint64())
 
 	// Update all accounts to the latest known pending nonce
 	for addr, list := range pool.pending {
@@ -1315,14 +1315,15 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas)
-		drops, _ := list.FilterValid(pool, addr)
-		for _, tx := range drops {
+		drops, errs, _ := list.FilterValid(pool, addr, 0)
+		for i, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			queuedNofundsCounter.Inc(1)
-			pool.txErrorSink.Add(tx, fmt.Errorf("removed unpayable queued transaction"))
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unpayable queued transaction")
+			pool.txErrorSink.Add(tx, errs[i])
+			logger.Warn().Str("hash", hash.Hex()).Err(errs[i]).
+				Msg("Removed unpayable queued transaction")
 		}
 		// Gather all executable transactions and promote them
 		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
@@ -1472,7 +1473,7 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 // demoteUnexecutables removes invalid and processed transactions from the pools
 // executable/pending queue and any subsequent transactions that become unexecutable
 // are moved back into the future queue.
-func (pool *TxPool) demoteUnexecutables() {
+func (pool *TxPool) demoteUnexecutables(bn uint64) {
 	// Iterate over all accounts and demote any non-executable transactions
 	logger := utils.Logger().With().Stack().Logger()
 
@@ -1488,14 +1489,15 @@ func (pool *TxPool) demoteUnexecutables() {
 			// Do not report to error sink as old txs are on chain or meaningful error caught elsewhere.
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
-		drops, invalids := list.FilterValid(pool, addr)
-		for _, tx := range drops {
+		drops, errs, invalids := list.FilterValid(pool, addr, bn)
+		for i, tx := range drops {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
 			pendingNofundsCounter.Inc(1)
-			pool.txErrorSink.Add(tx, fmt.Errorf("removed unexecutable pending transaction"))
-			logger.Warn().Str("hash", hash.Hex()).Msg("Removed unexecutable pending transaction")
+			pool.txErrorSink.Add(tx, errs[i])
+			logger.Warn().Str("hash", hash.Hex()).Err(errs[i]).
+				Msg("Removed unexecutable pending transaction")
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
