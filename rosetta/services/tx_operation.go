@@ -74,7 +74,7 @@ func GetNativeOperationsFromTransaction(
 // GetNativeOperationsFromStakingTransaction for all staking directives
 // Note that only native token operations can come from staking transactions.
 func GetNativeOperationsFromStakingTransaction(
-	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
+	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt, signed bool,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
@@ -85,12 +85,16 @@ func GetNativeOperationsFromStakingTransaction(
 		return nil, rosettaError
 	}
 
-	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
+	var operations []*types.Operation
+
+	if signed {
+		// All operations excepts for cross-shard tx payout expend gas
+		gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
+		operations = newNativeOperationsWithGas(gasExpended, accountID)
+	}
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
-	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
+	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0, signed)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -125,26 +129,42 @@ func GetNativeOperationsFromStakingTransaction(
 		}
 	}
 
-	operations := append(gasOperations, &types.Operation{
-		OperationIdentifier: &types.OperationIdentifier{
-			Index: gasOperations[0].OperationIdentifier.Index + 1,
-		},
-		Type:     tx.StakingType().String(),
-		Status:   GetTransactionStatus(tx, receipt),
-		Account:  accountID,
-		Amount:   amount,
-		Metadata: metadata,
-	})
-
-	// expose delegated balance
-	if tx.StakingType() == stakingTypes.DirectiveDelegate {
-		op2 := getDelegateOperationForSubAccount(tx, operations[1])
-		return append(operations, op2), nil
+	if len(operations) > 0 {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: operations[0].OperationIdentifier.Index + 1,
+			},
+			Type:     tx.StakingType().String(),
+			Status:   GetTransactionStatus(tx, receipt),
+			Account:  accountID,
+			Amount:   amount,
+			Metadata: metadata,
+		})
+	} else {
+		operations = []*types.Operation{{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: 0,
+			},
+			Type:     tx.StakingType().String(),
+			Status:   GetTransactionStatus(tx, receipt),
+			Account:  accountID,
+			Amount:   amount,
+			Metadata: metadata,
+		}}
 	}
 
-	if tx.StakingType() == stakingTypes.DirectiveUndelegate {
-		op2 := getUndelegateOperationForSubAccount(tx, operations[1], receipt)
-		return append(operations, op2), nil
+	if signed {
+
+		// expose delegated balance
+		if tx.StakingType() == stakingTypes.DirectiveDelegate {
+			op2 := getDelegateOperationForSubAccount(tx, operations[1])
+			return append(operations, op2), nil
+		}
+
+		if tx.StakingType() == stakingTypes.DirectiveUndelegate {
+			op2 := getUndelegateOperationForSubAccount(tx, operations[1], receipt)
+			return append(operations, op2), nil
+		}
 	}
 
 	return operations, nil
@@ -634,11 +654,6 @@ func getAmountFromCollectRewards(
 			}
 			break
 		}
-	}
-	if amount == nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress.String()),
-		})
 	}
 	return amount, nil
 }

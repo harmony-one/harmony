@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/coinbase/rosetta-sdk-go/parser"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -38,7 +40,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.GasLimit(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{})
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{}, false)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -79,7 +81,32 @@ func TestParseUnsignedTransaction(t *testing.T) {
 }
 
 func TestParseUnsignedTransactionStaking(t *testing.T) {
-	// TODO (dm): implement staking test
+	bytes := "{\"rlp_bytes\":\"+DkC65TrzRbowdj0k7oE6ZpWR0Ei2BqcWJTrzRbowdj0k7oE6ZpWR0Ei2BqcWAqAhHc1lACCUgiAgIA=\",\"is_staking\":true,\"contract_code\":\"0x\",\"from\":{\"address\":\"one1a0x3d6xpmr6f8wsyaxd9v36pytvp48zckswvv9\",\"metadata\":{\"hex_address\":\"0xeBCD16e8c1D8f493bA04E99a56474122D81A9c58\"}}}"
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(bytes, false)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	_, err := parseUnsignedTransaction(context.Background(), wrappedTransaction, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bytes = "{\"rlp_bytes\":\"+HgC65TrzRbowdj0k7oE6ZpWR0Ei2BqcWJTrzRbowdj0k7oE6ZpWR0Ei2BqcWAoBhDuaygCCpBAon6JAUrdiS7lD8XyHhos2yj8gAff6d+If7EVYGijoRVOgKnIb+8ecrVX0wO/R1C0AX/FUL5AJ6jyOh1CtJ3kfV/c=\",\"is_staking\":true,\"contract_code\":\"0x\",\"from\":{\"address\":\"one1snm53h0yk5xrqcxrna0n3g3a4um7peqctwrt30\",\"metadata\":{\"hex_address\":\"0x84f748DDE4B50C3060c39f5f38a23dAF37E0e418\"}}}"
+	wrappedTransaction, tx, rosettaError = unpackWrappedTransactionFromString(bytes, true)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	addr, err2 := tx.SenderAddress()
+	if err2 != nil {
+		t.Fatal(err2)
+	}
+	if hexutil.Encode(addr[:]) != "0x84f748dde4b50c3060c39f5f38a23daf37e0e418" {
+		t.Fatal("sender addr error")
+	}
+	_, err = parseSignedTransaction(context.Background(), wrappedTransaction, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestParseSignedTransaction(t *testing.T) {
@@ -101,7 +128,7 @@ func TestParseSignedTransaction(t *testing.T) {
 	refTestReceipt := &hmytypes.Receipt{
 		GasUsed: testTx.GasLimit(),
 	}
-	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{})
+	refFormattedTx, rosettaError := FormatTransaction(testTx, refTestReceipt, &ContractInfo{}, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

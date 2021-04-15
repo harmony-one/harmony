@@ -79,6 +79,13 @@ var (
 		Message:   "invalid transaction construction",
 		Retriable: false,
 	}
+
+	// InvalidStakingConstructionError ..
+	InvalidStakingConstructionError = types.Error{
+		Code:      10,
+		Message:   "invalid staking transaction construction",
+		Retriable: false,
+	}
 )
 
 // NewError create a new error with a given detail structure

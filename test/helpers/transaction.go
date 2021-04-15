@@ -34,7 +34,7 @@ func CreateTestStakingTransaction(
 
 // GetMessageFromStakingTx gets the staking message, as seen by the rpc layer
 func GetMessageFromStakingTx(tx *stakingTypes.StakingTransaction) (map[string]interface{}, error) {
-	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
+	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0, true)
 	if err != nil {
 		return nil, err
 	}

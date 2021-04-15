@@ -143,6 +143,10 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
+func (tx *StakingTransaction) SetRawSignature(v, r, s *big.Int) {
+	tx.data.R, tx.data.S, tx.data.V = r, s, v
+}
+
 // GasLimit returns gas of StakingTransaction.
 func (tx *StakingTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit

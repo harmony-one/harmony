@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
+	common2 "github.com/harmony-one/harmony/internal/common"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -38,7 +40,6 @@ func (s *OperationComponents) IsStaking() bool {
 // Providing a gas expenditure operation is INVALID.
 // All staking & cross-shard operations require metadata matching the operation type to be a valid.
 // All other operations do not require metadata.
-// TODO (dm): implement staking transaction construction
 func GetOperationComponents(
 	operations []*types.Operation,
 ) (*OperationComponents, *types.Error) {
@@ -61,6 +62,16 @@ func GetOperationComponents(
 		return getCrossShardOperationComponents(operations[0])
 	case common.ContractCreationOperation:
 		return getContractCreationOperationComponents(operations[0])
+	case common.CreateValidatorOperation:
+		return getCreateValidatorOperationComponents(operations[0])
+	case common.EditValidatorOperation:
+		return getEditValidatorOperationComponents(operations[0])
+	case common.DelegateOperation:
+		return getDelegateOperationComponents(operations[0])
+	case common.UndelegateOperation:
+		return getUndelegateOperationComponents(operations[0])
+	case common.CollectRewardsOperation:
+		return getCollectRewardsOperationComponents(operations[0])
 	default:
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": fmt.Sprintf("%v is unsupported or invalid operation type", operations[0].Type),
@@ -231,5 +242,209 @@ func getContractCreationOperationComponents(
 			"message": "operation must have account sender/from identifier for contract creation",
 		})
 	}
+	return components, nil
+}
+
+func getCreateValidatorOperationComponents(
+	operation *types.Operation,
+) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
+	metadata := common.CreateValidatorOperationMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+	if metadata.ValidatorAddress == "" || !common2.IsBech32Address(metadata.ValidatorAddress) {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "validator address must not be empty or wrong format",
+		})
+	}
+	if metadata.CommissionRate == nil || metadata.MaxCommissionRate == nil || metadata.MaxChangeRate == nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "commission rate & max commission rate & max change rate must not be nil",
+		})
+	}
+	if metadata.MinSelfDelegation == nil || metadata.MaxTotalDelegation == nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "min self delegation & max total delegation much not be nil",
+		})
+	}
+	if metadata.Amount == nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "amount must not be nil",
+		})
+	}
+	if metadata.Name == "" || metadata.Website == "" || metadata.Identity == "" ||
+		metadata.SecurityContact == "" || metadata.Details == "" {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "name & website & identity & security contract & details must no be empty",
+		})
+	}
+
+	// slot public key would be add into
+	// https://github.com/harmony-one/harmony/blob/3a8125666817149eaf9cea7870735e26cfe49c87/rosetta/services/tx_construction.go#L16
+	// see https://github.com/harmony-one/harmony/issues/3431
+
+	components := &OperationComponents{
+		Type:           operation.Type,
+		From:           operation.Account,
+		StakingMessage: metadata,
+	}
+
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for creating validator",
+		})
+	}
+
+	return components, nil
+
+}
+
+func getEditValidatorOperationComponents(
+	operation *types.Operation,
+) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
+	metadata := common.EditValidatorOperationMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+	if metadata.ValidatorAddress == "" || !common2.IsBech32Address(metadata.ValidatorAddress) {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "validator address must not be empty or wrong format",
+		})
+	}
+	if metadata.CommissionRate == nil || metadata.MinSelfDelegation == nil || metadata.MaxTotalDelegation == nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "commission rate & max commission rate & max change rate must not be nil",
+		})
+	}
+	if metadata.Name == "" || metadata.Website == "" || metadata.Identity == "" ||
+		metadata.SecurityContact == "" || metadata.Details == "" {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": "name & website & identity & security contract & details must no be empty",
+		})
+	}
+
+	components := &OperationComponents{
+		Type:           operation.Type,
+		From:           operation.Account,
+		StakingMessage: metadata,
+	}
+
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for editing validator",
+		})
+	}
+
+	return components, nil
+
+}
+
+func getDelegateOperationComponents(
+	operation *types.Operation,
+) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
+	metadata := common.DelegateOperationMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+
+	// validator and delegator and amount already got checked inside UnmarshalFromInterface
+	components := &OperationComponents{
+		Type:           operation.Type,
+		From:           operation.Account,
+		StakingMessage: metadata,
+	}
+
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for delegating",
+		})
+	}
+
+	return components, nil
+
+}
+
+func getUndelegateOperationComponents(
+	operation *types.Operation,
+) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
+	metadata := common.UndelegateOperationMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+
+	// validator and delegator and amount already got checked inside UnmarshalFromInterface
+	components := &OperationComponents{
+		Type:           operation.Type,
+		From:           operation.Account,
+		StakingMessage: metadata,
+	}
+
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for undelegating",
+		})
+	}
+
+	return components, nil
+
+}
+
+func getCollectRewardsOperationComponents(
+	operation *types.Operation,
+) (*OperationComponents, *types.Error) {
+	if operation == nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "nil operation",
+		})
+	}
+	metadata := common.CollectRewardsMetadata{}
+	if err := metadata.UnmarshalFromInterface(operation.Metadata); err != nil {
+		return nil, common.NewError(common.InvalidStakingConstructionError, map[string]interface{}{
+			"message": errors.WithMessage(err, "invalid metadata").Error(),
+		})
+	}
+
+	//delegator already got checked inside UnmarshalFromInterface
+
+	components := &OperationComponents{
+		Type:           operation.Type,
+		From:           operation.Account,
+		StakingMessage: metadata,
+	}
+
+	if components.From == nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "operation must have account sender/from identifier for collecting rewards",
+		})
+	}
+
 	return components, nil
 }
