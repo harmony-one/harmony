@@ -183,7 +183,7 @@ func (s *BlockAPI) BlockTransaction(
 				return nil, rosettaError
 			}
 		}
-		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractInfo)
+		transaction, rosettaError = FormatTransaction(txInfo.tx, txInfo.receipt, contractInfo, true)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
