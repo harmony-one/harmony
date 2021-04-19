@@ -1,7 +1,7 @@
 TOP:=$(realpath ..)
-export CGO_CFLAGS:=-I$(TOP)/bls/include -I$(TOP)/mcl/include -I/usr/local/opt/openssl/include
-export CGO_LDFLAGS:=-L$(TOP)/bls/lib -L/usr/local/opt/openssl/lib
-export LD_LIBRARY_PATH:=$(TOP)/bls/lib:$(TOP)/mcl/lib:/usr/local/opt/openssl/lib
+export CGO_CFLAGS:=-I/usr/local/opt/openssl/include
+export CGO_LDFLAGS:=-L/usr/local/opt/openssl/lib
+export LD_LIBRARY_PATH:=/usr/local/opt/openssl/lib
 export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export GO111MODULE:=on
@@ -14,12 +14,11 @@ SHELL := bash
 
 .PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean
 
-all: libs
+all:
 	bash ./scripts/go_executable_build.sh -S
 
 help:
 	@echo "all - build the harmony binary & bootnode along with the MCL & BLS libs (if necessary)"
-	@echo "libs - build only the MCL & BLS libs (if necessary) "
 	@echo "exe - build the harmony binary & bootnode"
 	@echo "race - build the harmony binary & bootnode with race condition checks"
 	@echo "trace-pointer - build the harmony binary & bootnode with pointer analysis"
@@ -40,10 +39,6 @@ help:
 	@echo "deb - build a harmony Debian pacakge"
 	@echo "debpub_dev - publish harmony Debian package to development repo"
 	@echo "debpub_prod - publish harmony Debian package to production repo"
-
-libs:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls BLS_SWAP_G=1 -j8
 
 exe:
 	bash ./scripts/go_executable_build.sh -S
@@ -70,11 +65,8 @@ clean:
 	rm -f coverage.txt
 
 distclean: clean
-	make -C $(TOP)/mcl clean
-	make -C $(TOP)/bls clean
 
 go-get:
-	source ./scripts/setup_bls_build_flags.sh
 	go get -v ./...
 
 test:
@@ -96,8 +88,6 @@ test-rosetta-attach:
 	bash ./test/rosetta.sh attach
 
 linux_static:
-	make -C $(TOP)/mcl -j8
-	make -C $(TOP)/bls minimised_static BLS_SWAP_G=1 -j8
 	bash ./scripts/go_executable_build.sh -s
 
 deb_init:

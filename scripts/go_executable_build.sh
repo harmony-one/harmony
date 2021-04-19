@@ -28,22 +28,16 @@ case "${0}" in
 *) progdir=.;;
 esac
 
-. "${progdir}/setup_bls_build_flags.sh"
-
 declare -A LIB
 
 if [ "$(uname -s)" == "Darwin" ]; then
    MD5='md5 -r'
    GOOS=darwin
-   LIB[libbls384_256.dylib]=${BLS_DIR}/lib/libbls384_256.dylib
-   LIB[libmcl.dylib]=${MCL_DIR}/lib/libmcl.dylib
    LIB[libgmp.10.dylib]=/usr/local/opt/gmp/lib/libgmp.10.dylib
    LIB[libgmpxx.4.dylib]=/usr/local/opt/gmp/lib/libgmpxx.4.dylib
    LIB[libcrypto.1.1.dylib]=/usr/local/opt/openssl/lib/libcrypto.1.1.dylib
 else
    MD5=md5sum
-   LIB[libbls384_256.so]=${BLS_DIR}/lib/libbls384_256.so
-   LIB[libmcl.so]=${MCL_DIR}/lib/libmcl.so
 fi
 
 function usage

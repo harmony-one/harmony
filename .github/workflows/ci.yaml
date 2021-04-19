@@ -55,18 +55,6 @@ jobs:
         with:
           go-version: 1.14.14
 
-      - name: Checkout dependence repo
-        uses: actions/checkout@v2
-        with:
-          repository: harmony-one/mcl
-          path: mcl
-
-      - name: Checkout dependence repo
-        uses: actions/checkout@v2
-        with:
-          repository: harmony-one/bls
-          path: bls
-
       - name: Checkout harmony core code
         uses: actions/checkout@v2
         with:

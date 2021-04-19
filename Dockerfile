@@ -8,11 +8,6 @@ ENV GOPATH=/root/go
 ENV GO111MODULE=on
 ENV HMY_PATH=${GOPATH}/src/github.com/harmony-one
 ENV OPENSSL_DIR=/usr/lib/ssl
-ENV MCL_DIR=${HMY_PATH}/mcl
-ENV BLS_DIR=${HMY_PATH}/bls
-ENV CGO_CFLAGS="-I${BLS_DIR}/include -I${MCL_DIR}/include"
-ENV CGO_LDFLAGS="-L${BLS_DIR}/lib"
-ENV LD_LIBRARY_PATH=${BLS_DIR}/lib:${MCL_DIR}/lib
 ENV GIMME_GO_VERSION="1.14.1"
 ENV PATH="/root/bin:${PATH}"
 
@@ -33,13 +28,7 @@ RUN mkdir /root/workspace
 
 RUN git clone https://github.com/harmony-one/harmony.git ${HMY_PATH}/harmony
 
-RUN git clone https://github.com/harmony-one/bls.git ${HMY_PATH}/bls
-
-RUN git clone https://github.com/harmony-one/mcl.git ${HMY_PATH}/mcl
-
 RUN git clone https://github.com/harmony-one/go-sdk.git ${HMY_PATH}/go-sdk
-
-RUN cd ${HMY_PATH}/bls && make -j8 BLS_SWAP_G=1
 
 RUN touch /root/.bash_profile
 

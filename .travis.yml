@@ -16,10 +16,6 @@ install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
-  - git clone https://github.com/harmony-one/mcl.git $HOME/gopath/src/github.com/harmony-one/mcl
-  - git clone https://github.com/harmony-one/bls.git $HOME/gopath/src/github.com/harmony-one/bls
-  - (cd $HOME/gopath/src/github.com/harmony-one/mcl; make -j4)
-  - (cd $HOME/gopath/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
   - make go-get
   - scripts/install_build_tools.sh
 script:
