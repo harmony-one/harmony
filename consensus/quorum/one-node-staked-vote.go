@@ -130,7 +130,6 @@ func (v *stakedVoteWeight) AddNewVote(
 		Int64("signer-count", v.SignersCount(p)).
 		Str("new-power-added", additionalVotePower.String()).
 		Str("total-power-of-signers", tallyQuorum.tally.String()).
-		Str("ballot", ballet.String()).
 		Msg(msg)
 	return ballet, nil
 }

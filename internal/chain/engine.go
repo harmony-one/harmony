@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -26,23 +27,25 @@ import (
 )
 
 const (
-	verifiedSigCache = 20
+	verifiedSigCache = 100
+	epochCtxCache    = 20
 )
 
 type engineImpl struct {
-	beacon  engine.ChainReader
-	shardID uint32
+	beacon engine.ChainReader
 
 	// Caching field
+	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
 	verifiedSigCache *lru.Cache // verifiedSigKey -> struct{}{}
 }
 
 // NewEngine creates Engine with some cache
-func NewEngine(shardID uint32) *engineImpl {
+func NewEngine() *engineImpl {
 	sigCache, _ := lru.New(verifiedSigCache)
+	epochCtxCache, _ := lru.New(epochCtxCache)
 	return &engineImpl{
 		beacon:           nil,
-		shardID:          shardID,
+		epochCtxCache:    epochCtxCache,
 		verifiedSigCache: sigCache,
 	}
 }
@@ -149,10 +152,13 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return errors.New("[VerifySeal] no parent header found")
 	}
 
-	sig := header.LastCommitSignature()
-	bitmap := header.LastCommitBitmap()
+	pas := payloadArgsFromHeader(parentHeader)
+	sas := sigArgs{
+		sig:    header.LastCommitSignature(),
+		bitmap: header.LastCommitBitmap(),
+	}
 
-	if err := e.verifyHeaderSignatureCached(chain, parentHeader, sig, bitmap); err != nil {
+	if err := e.verifySignatureCached(chain, pas, sas); err != nil {
 		return errors.Wrapf(err, "verify signature for parent %s", parentHash.String())
 	}
 	return nil
@@ -245,6 +251,8 @@ func payoutUndelegations(
 		return errors.New(msg)
 	}
 	// Payout undelegated/unlocked tokens
+	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
+	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator)
 		if err != nil {
@@ -252,14 +260,14 @@ func payoutUndelegations(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
-		lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
-		noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
 			totalWithdraw := delegation.RemoveUnlockedUndelegations(
 				header.Epoch(), wrapper.LastEpochInCommittee, lockPeriod, noEarlyUnlock,
 			)
-			state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			if totalWithdraw.Sign() != 0 {
+				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
+			}
 		}
 		countTrack[validator] = len(wrapper.Delegations)
 	}
@@ -398,83 +406,80 @@ func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *blo
 	if chain.CurrentHeader().Number().Uint64() <= uint64(1) {
 		return nil
 	}
-	return e.verifyHeaderSignatureCached(chain, header, commitSig, commitBitmap)
+	pas := payloadArgsFromHeader(header)
+	sas := sigArgs{commitSig, commitBitmap}
+
+	return e.verifySignatureCached(chain, pas, sas)
 }
 
-func (e *engineImpl) verifyHeaderSignatureCached(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
-	key := newVerifiedSigKey(header.Hash(), commitSig, commitBitmap)
-	if _, ok := e.verifiedSigCache.Get(key); ok {
+// VerifyCrossLink verifies the signature of the given CrossLink.
+func (e *engineImpl) VerifyCrossLink(chain engine.ChainReader, cl types.CrossLink) error {
+	if cl.BlockNum() <= 1 {
+		return errors.New("crossLink BlockNumber should greater than 1")
+	}
+	if !chain.Config().IsCrossLink(cl.Epoch()) {
+		return errors.Errorf("not cross-link epoch: %v", cl.Epoch())
+	}
+
+	pas := payloadArgsFromCrossLink(cl)
+	sas := sigArgs{cl.Signature(), cl.Bitmap()}
+
+	return e.verifySignatureCached(chain, pas, sas)
+}
+
+func (e *engineImpl) verifySignatureCached(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
+	verifiedKey := newVerifiedSigKey(pas.blockHash, sas.sig, sas.bitmap)
+	if _, ok := e.verifiedSigCache.Get(verifiedKey); ok {
 		return nil
 	}
-	if err := e.verifyHeaderSignature(chain, header, commitSig, commitBitmap); err != nil {
+	// Not in cache, do verify.
+	if err := e.verifySignature(chain, pas, sas); err != nil {
 		return err
 	}
-	e.verifiedSigCache.Add(key, struct{}{})
+	e.verifiedSigCache.Add(verifiedKey, struct{}{})
 	return nil
 }
 
-func (e *engineImpl) verifyHeaderSignature(chain engine.ChainReader, header *block.Header, commitSig bls_cosi.SerializedSignature, commitBitmap []byte) error {
-	ss, err := e.getShardState(chain, header.Epoch(), header.ShardID())
+func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
+	ec, err := e.getEpochCtxCached(chain, pas.shardID, pas.epoch.Uint64())
 	if err != nil {
 		return err
 	}
-	shardComm, err := ss.FindCommitteeByID(header.ShardID())
-	if err != nil {
-		return err
-	}
-	pubKeys, err := shardComm.BLSPublicKeys()
-	if err != nil {
-		return err
-	}
-	aggSig, mask, err := decodeSigBitmap(commitSig, commitBitmap, pubKeys)
+	var (
+		pubKeys      = ec.pubKeys
+		qrVerifier   = ec.qrVerifier
+		commitSig    = sas.sig
+		commitBitmap = sas.bitmap
+	)
+	aggSig, mask, err := DecodeSigBitmap(commitSig, commitBitmap, pubKeys)
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	isStaking := chain.Config().IsStaking(header.Epoch())
-	qrVerifier, err := quorum.NewVerifier(shardComm, header.Epoch(), isStaking)
-	if err != nil {
-		return err
-	}
-
-	// Verify signature, mask against quorum.Verifier and publicKeys
 	if !qrVerifier.IsQuorumAchievedByMask(mask) {
 		return errors.New("not enough signature collected")
 	}
-	commitPayload := signature.ConstructCommitPayload(chain,
-		header.Epoch(), header.Hash(), header.Number().Uint64(), header.ViewID().Uint64())
-
+	commitPayload := pas.constructPayload(chain)
 	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
 		return errors.New("Unable to verify aggregated signature for block")
 	}
 	return nil
 }
 
-func (e *engineImpl) getShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*shard.State, error) {
-	// (TODO) For now, when doing cross shard, we need recalcualte the shard state since we don't have
-	//    hard state of other shards
-	if e.needRecalculateStateShard(chain, epoch, targetShardID) {
-		shardState, err := committee.WithStakingEnabled.Compute(epoch, chain)
-		if err != nil {
-			return nil, errors.Wrapf(err, "compute shard state for epoch %v", epoch)
-		}
-		return shardState, nil
-
-	} else {
-		shardState, err := chain.ReadShardState(epoch)
-		if err != nil {
-			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
-		}
-		return shardState, nil
+func (e *engineImpl) getEpochCtxCached(chain engine.ChainReader, shardID uint32, epoch uint64) (epochCtx, error) {
+	ecKey := epochCtxKey{
+		shardID: shardID,
+		epoch:   epoch,
 	}
-}
-
-// only recalculate for non-staking epoch and targetShardID is not the same
-// as engine
-func (e *engineImpl) needRecalculateStateShard(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) bool {
-	if chain.Config().IsStaking(epoch) {
-		return false
+	cached, ok := e.epochCtxCache.Get(ecKey)
+	if ok && cached != nil {
+		return cached.(epochCtx), nil
 	}
-	return targetShardID != e.shardID
+	ec, err := readEpochCtxFromChain(chain, ecKey)
+	if err != nil {
+		return epochCtx{}, err
+	}
+	e.epochCtxCache.Add(ecKey, ec)
+	return ec, nil
 }
 
 // Support 512 at most validator nodes
@@ -496,6 +501,115 @@ func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, 
 		signature: sig,
 		bitmap:    keyBM,
 	}
+}
+
+// payloadArgs is the arguments for constructing the payload for signature verification.
+type payloadArgs struct {
+	blockHash common.Hash
+	shardID   uint32
+	epoch     *big.Int
+	number    uint64
+	viewID    uint64
+}
+
+func payloadArgsFromHeader(header *block.Header) payloadArgs {
+	return payloadArgs{
+		blockHash: header.Hash(),
+		shardID:   header.ShardID(),
+		epoch:     header.Epoch(),
+		number:    header.Number().Uint64(),
+		viewID:    header.ViewID().Uint64(),
+	}
+}
+
+func payloadArgsFromCrossLink(cl types.CrossLink) payloadArgs {
+	return payloadArgs{
+		blockHash: cl.Hash(),
+		shardID:   cl.ShardID(),
+		epoch:     cl.Epoch(),
+		number:    cl.Number().Uint64(),
+		viewID:    cl.ViewID().Uint64(),
+	}
+}
+
+func (args payloadArgs) constructPayload(chain engine.ChainReader) []byte {
+	return signature.ConstructCommitPayload(chain, args.epoch, args.blockHash, args.number, args.viewID)
+}
+
+type sigArgs struct {
+	sig    bls_cosi.SerializedSignature
+	bitmap []byte
+}
+
+type (
+	// epochCtxKey is the key for caching epochCtx
+	epochCtxKey struct {
+		shardID uint32
+		epoch   uint64
+	}
+
+	// epochCtx is the epoch's context used for signature verification.
+	// The value is fixed for each epoch and is cached in engineImpl.
+	epochCtx struct {
+		qrVerifier quorum.Verifier
+		pubKeys    []bls.PublicKeyWrapper
+	}
+)
+
+func readEpochCtxFromChain(chain engine.ChainReader, key epochCtxKey) (epochCtx, error) {
+	var (
+		epoch         = new(big.Int).SetUint64(key.epoch)
+		targetShardID = key.shardID
+	)
+	ss, err := readShardState(chain, epoch, targetShardID)
+	if err != nil {
+		return epochCtx{}, err
+	}
+	shardComm, err := ss.FindCommitteeByID(targetShardID)
+	if err != nil {
+		return epochCtx{}, err
+	}
+	pubKeys, err := shardComm.BLSPublicKeys()
+	if err != nil {
+		return epochCtx{}, err
+	}
+	isStaking := chain.Config().IsStaking(epoch)
+	qrVerifier, err := quorum.NewVerifier(shardComm, epoch, isStaking)
+	if err != nil {
+		return epochCtx{}, err
+	}
+	return epochCtx{
+		qrVerifier: qrVerifier,
+		pubKeys:    pubKeys,
+	}, nil
+}
+
+func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) (*shard.State, error) {
+	// When doing cross shard, we need recalculate the shard state since we don't have
+	// shard state of other shards
+	if needRecalculateStateShard(chain, epoch, targetShardID) {
+		shardState, err := committee.WithStakingEnabled.Compute(epoch, chain)
+		if err != nil {
+			return nil, errors.Wrapf(err, "compute shard state for epoch %v", epoch)
+		}
+		return shardState, nil
+
+	} else {
+		shardState, err := chain.ReadShardState(epoch)
+		if err != nil {
+			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
+		}
+		return shardState, nil
+	}
+}
+
+// only recalculate for non-staking epoch and targetShardID is not the same
+// as engine
+func needRecalculateStateShard(chain engine.ChainReader, epoch *big.Int, targetShardID uint32) bool {
+	if chain.Config().IsStaking(epoch) {
+		return false
+	}
+	return targetShardID != chain.ShardID()
 }
 
 // GetLockPeriodInEpoch returns the delegation lock period for the given chain

@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -53,11 +54,21 @@ func (s *AccountAPI) AccountBalance(
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
-	if err != nil {
-		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
-			"message": "invalid address",
-		})
+	balance := new(big.Int)
+
+	if request.AccountIdentifier.SubAccount != nil {
+		// indicate it may be a request for delegated balance
+		balance, rosettaError = s.getStakingBalance(request.AccountIdentifier.SubAccount, addr, block)
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
+	} else {
+		balance, err = s.hmy.GetBalance(ctx, addr, blockNum)
+		if err != nil {
+			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+				"message": "invalid address",
+			})
+		}
 	}
 
 	amount := types.Amount{
@@ -74,6 +85,48 @@ func (s *AccountAPI) AccountBalance(
 		BlockIdentifier: &respBlock,
 		Balances:        []*types.Amount{&amount},
 	}, nil
+}
+
+// getStakingBalance used for get delegated balance with sub account identifier
+func (s *AccountAPI) getStakingBalance(
+	subAccount *types.SubAccountIdentifier, addr ethCommon.Address, block *hmyTypes.Block,
+) (*big.Int, *types.Error) {
+	balance := new(big.Int)
+	ty, exist := subAccount.Metadata["type"]
+
+	if !exist {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": "invalid sub account",
+		})
+	}
+
+	switch ty.(string) {
+	case Delegation:
+		validatorAddr := subAccount.Address
+		validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+		for index, validator := range validators {
+			if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+				balance = new(big.Int).Add(balance, delegations[index].Amount)
+			}
+		}
+	case UnDelegation:
+		validatorAddr := subAccount.Address
+		validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(addr, block)
+		for index, validator := range validators {
+			if validatorAddr == internalCommon.MustAddressToBech32(validator) {
+				undelegations := delegations[index].Undelegations
+				for _, undelegate := range undelegations {
+					balance = new(big.Int).Add(balance, undelegate.Amount)
+				}
+			}
+		}
+	default:
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": "invalid sub account type",
+		})
+	}
+
+	return balance, nil
 }
 
 // AccountMetadata used for account identifiers
@@ -102,6 +155,38 @@ func newAccountIdentifier(
 		Address:  b32Address,
 		Metadata: metadata,
 	}, nil
+}
+
+func newSubAccountIdentifier(
+	address ethCommon.Address, metadata map[string]interface{},
+) (*types.SubAccountIdentifier, *types.Error) {
+	b32Address, err := internalCommon.AddressToBech32(address)
+	if err != nil {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	return &types.SubAccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}, nil
+}
+
+func newAccountIdentifierWithSubAccount(
+	address, subAddress ethCommon.Address, metadata map[string]interface{},
+) (*types.AccountIdentifier, *types.Error) {
+	accountIdentifier, err := newAccountIdentifier(address)
+	if err != nil {
+		return nil, err
+	}
+
+	subAccountIdentifier, err := newSubAccountIdentifier(subAddress, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	accountIdentifier.SubAccount = subAccountIdentifier
+	return accountIdentifier, nil
 }
 
 // getAddress ..

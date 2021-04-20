@@ -168,15 +168,10 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		}
 		total.Add(total, stkMsg.Amount)
 	case DirectiveDelegate:
-		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
-		if err != nil {
-			return nil, err
-		}
-		stkMsg, ok := msg.(*Delegate)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		total.Add(total, stkMsg.Amount)
+		// Temporary hack: Cost function is not accurate for delegate transaction.
+		// Thus the cost validation is done in `txPool.validateTx`.
+		// TODO: refactor this hack.
+	default:
 	}
 	return total, nil
 }

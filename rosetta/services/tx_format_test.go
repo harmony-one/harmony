@@ -83,8 +83,8 @@ func testFormatStakingTransaction(
 		t.Fatal(rosettaError)
 	}
 
-	if len(rosettaTx.Operations) != 2 {
-		t.Error("Expected 2 operations")
+	if len(rosettaTx.Operations) != 3 {
+		t.Error("Expected 3 operations")
 	}
 	if err := assertNativeOperationTypeUniquenessInvariant(rosettaTx.Operations); err != nil {
 		t.Error(err)

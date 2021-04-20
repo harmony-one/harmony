@@ -38,6 +38,7 @@ type BlockWithTxHash struct {
 	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
 	Uncles           []common.Hash  `json:"uncles"`
 	Transactions     []common.Hash  `json:"transactions"`
+	EthTransactions  []common.Hash  `json:"transactionsInEthHash"`
 	StakingTxs       []common.Hash  `json:"stakingTransactions"`
 	Signers          []string       `json:"signers,omitempty"`
 }
@@ -78,6 +79,7 @@ type Transaction struct {
 	Gas              uint64        `json:"gas"`
 	GasPrice         *big.Int      `json:"gasPrice"`
 	Hash             common.Hash   `json:"hash"`
+	EthHash          common.Hash   `json:"ethHash"`
 	Input            hexutil.Bytes `json:"input"`
 	Nonce            uint64        `json:"nonce"`
 	To               string        `json:"to"`
@@ -258,6 +260,7 @@ func NewTransaction(
 		Gas:       tx.GasLimit(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
+		EthHash:   tx.ConvertToEth().Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     tx.Nonce(),
 		Value:     tx.Value(),
@@ -612,11 +615,13 @@ func NewBlockWithTxHash(
 		ReceiptsRoot:     head.ReceiptHash(),
 		Uncles:           []common.Hash{},
 		Transactions:     []common.Hash{},
+		EthTransactions:  []common.Hash{},
 		StakingTxs:       []common.Hash{},
 	}
 
 	for _, tx := range b.Transactions() {
 		blk.Transactions = append(blk.Transactions, tx.Hash())
+		blk.EthTransactions = append(blk.EthTransactions, tx.ConvertToEth().Hash())
 	}
 
 	if blockArgs.InclStaking {
