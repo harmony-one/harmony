@@ -235,7 +235,7 @@ func (m *txSortedMap) Len() int {
 // it's requested again before any modifications are made to the contents.
 func (m *txSortedMap) Flatten() types.PoolTransactions {
 	// If the sorting was not cached yet, create and cache it
-	if m.cache != nil {
+	if m.cache == nil {
 		m.cache = m.sortedTxs()
 	}
 	// Copy the cache to prevent accidental modifications
@@ -246,7 +246,7 @@ func (m *txSortedMap) Flatten() types.PoolTransactions {
 
 // Peek return the transaction with the lowest nonce.
 func (m *txSortedMap) Peek() types.PoolTransaction {
-	if m.cache != nil {
+	if m.cache == nil {
 		m.cache = m.sortedTxs()
 	}
 	if len(m.cache) == 0 {
