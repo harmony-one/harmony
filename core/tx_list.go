@@ -235,17 +235,33 @@ func (m *txSortedMap) Len() int {
 // it's requested again before any modifications are made to the contents.
 func (m *txSortedMap) Flatten() types.PoolTransactions {
 	// If the sorting was not cached yet, create and cache it
-	if m.cache == nil {
-		m.cache = make(types.PoolTransactions, 0, len(m.items))
-		for _, tx := range m.items {
-			m.cache = append(m.cache, tx)
-		}
-		sort.Sort(types.PoolTxByNonce(m.cache))
+	if m.cache != nil {
+		m.cache = m.sortedTxs()
 	}
 	// Copy the cache to prevent accidental modifications
 	txs := make(types.PoolTransactions, len(m.cache))
 	copy(txs, m.cache)
 	return txs
+}
+
+// Peek return the transaction with the lowest nonce.
+func (m *txSortedMap) Peek() types.PoolTransaction {
+	if m.cache != nil {
+		m.cache = m.sortedTxs()
+	}
+	if len(m.cache) == 0 {
+		return nil
+	}
+	return m.cache[0]
+}
+
+func (m *txSortedMap) sortedTxs() types.PoolTransactions {
+	cache := make(types.PoolTransactions, 0, len(m.items))
+	for _, tx := range m.items {
+		cache = append(m.cache, tx)
+	}
+	sort.Sort(types.PoolTxByNonce(cache))
+	return cache
 }
 
 const stakingTxCheckThreshold = 10 // check staking transaction validation every 10 blocks
@@ -442,6 +458,11 @@ func (l *txList) Empty() bool {
 // it's requested again before any modifications are made to the contents.
 func (l *txList) Flatten() types.PoolTransactions {
 	return l.txs.Flatten()
+}
+
+// Peek return a transaction with the lowest nonce.
+func (l *txList) Peek() types.PoolTransaction {
+	return l.txs.Peek()
 }
 
 // priceHeap is a heap.Interface implementation over transactions for retrieving

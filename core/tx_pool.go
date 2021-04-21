@@ -28,13 +28,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/harmony-one/harmony/internal/params"
+	"github.com/fwojciec/clock"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -105,6 +106,26 @@ var (
 	statsReportInterval = 8 * time.Second // Time interval to report transaction pool stats
 )
 
+const (
+	// Check and broadcast "stuck" executable transactions.
+	// A transaction is defined as stuck:
+	//   1. Transaction is executable (exist in txPool.pending)
+	//   2. exist in pending for at least txStuckThreshold
+	// Broadcast check is executed with an interval randomly chosen from
+	// broadcastMaxInterval and broadcastMinInterval. This is to prevent
+	// several nodes broadcast the same transaction at the same time in
+	// pub-sub.
+	// TODO: A better way to prevent broadcasting the same transaction
+	//  multiple times is to broadcast the pending `txHash` periodically,
+	//  and the leader is responsible for collecting the transaction data
+	//  in a p2p stream. This will cut the cost of broadcasting transactions,
+	//  but shall be extremely careful about the security from leader's
+	//  perspective.
+	broadcastMaxInterval = 5 * time.Minute
+	broadcastMinInterval = 1 * time.Minute
+	txStuckThreshold     = 1 * time.Minute
+)
+
 var (
 	// Metrics for the pending pool
 	pendingDiscardCounter   = metrics.NewRegisteredCounter("txpool/pending/discard", nil)
@@ -159,7 +180,8 @@ type TxPoolConfig struct {
 	AccountQueue uint64 // Maximum number of non-executable transaction slots permitted per account
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
-	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+	broadcast func(types.PoolTransactions) // broadcast invalid transaction
+	Lifetime  time.Duration                // Maximum amount of time non-executable transaction are queued
 
 	Blacklist map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
 }
@@ -212,6 +234,9 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
 		conf.Blacklist = DefaultTxPoolConfig.Blacklist
 	}
+	if conf.broadcast == nil {
+		utils.Logger().Warn().Msg("broadcast function is nil, unable to broadcast stuck transaction")
+	}
 
 	return conf
 }
@@ -237,6 +262,8 @@ type TxPool struct {
 	currentState  *state.DB           // Current state in the blockchain head
 	pendingState  *state.ManagedState // Pending state tracking virtual nonces
 	currentMaxGas uint64              // Current gas limit for transaction caps
+
+	broadcast func(tx types.PoolTransactions) // broadcast timed out executable transactions
 
 	locals  *accountSet // Set of local transaction to exempt from eviction rules
 	journal *txJournal  // Journal of local transaction to back up to disk
@@ -275,6 +302,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig,
 		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
 		txErrorSink: txErrorSink,
+		broadcast:   config.broadcast,
 	}
 	pool.locals = newAccountSet(chainconfig.ChainID)
 	for _, addr := range config.Locals {
@@ -322,6 +350,9 @@ func (pool *TxPool) loop() {
 
 	journal := time.NewTicker(pool.config.Rejournal)
 	defer journal.Stop()
+
+	broadcast := clock.NewRandomTicker(broadcastMinInterval, broadcastMaxInterval)
+	defer broadcast.Stop()
 
 	// Track the previous head headers for transaction reorgs
 	head := pool.chain.CurrentBlock()
@@ -393,6 +424,23 @@ func (pool *TxPool) loop() {
 					utils.Logger().Warn().Err(err).Msg("Failed to rotate local tx journal")
 				}
 				pool.mu.Unlock()
+			}
+
+		// broadcast stuck transactions from pendings
+		case <-broadcast.C:
+			pool.mu.Lock()
+			stuckTxs := pool.stuckExecutables()
+			for _, tx := range stuckTxs {
+				addr, _ := tx.SenderAddress()
+				pool.beats[addr] = time.Now()
+			}
+			pool.mu.Unlock()
+
+			utils.Logger().Info().Int("Count", len(stuckTxs)).
+				Msg("Broadcasting stuck transaction")
+
+			if pool.broadcast != nil {
+				go pool.broadcast(stuckTxs)
 			}
 		}
 	}
@@ -919,9 +967,11 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	if pool.txErrorSink.Contains(tx.Hash().String()) {
 		pool.txErrorSink.Remove(tx)
 	}
-	// If the transaction is already known, discard it
+	// If the transaction is already known, refresh the beats timestamp, and
+	// discard it.
 	hash := tx.Hash()
-	if pool.all.Get(hash) != nil {
+	if cachedTx := pool.all.Get(hash); cachedTx != nil {
+		pool.handleKnownTx(cachedTx)
 		logger.Info().Str("hash", hash.Hex()).Msg("Discarding already known transaction")
 		return false, errors.WithMessagef(ErrKnownTransaction, "transaction hash %x", hash)
 	}
@@ -1117,6 +1167,24 @@ func (pool *TxPool) promoteTx(addr common.Address, tx types.PoolTransaction) boo
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
 	return true
+}
+
+// handleKnownTx update the beats of the sender if the transaction is at the head of the
+// pending address's txList.
+func (pool *TxPool) handleKnownTx(tx types.PoolTransaction) {
+	sender, _ := tx.SenderAddress()
+	txList, ok := pool.pending[sender]
+	if !ok || txList == nil {
+		return
+	}
+	// only update sender's beat when tx is at the head
+	if headTx := txList.Peek(); headTx.Hash() == tx.Hash() {
+		utils.Logger().Info().Str("txHash", tx.Hash().String()).
+			Str("address", sender.String()).
+			Msg("updated beats at txPool")
+		pool.beats[sender] = time.Now()
+	}
+	return
 }
 
 // AddLocal enqueues a single transaction into the pool if it is valid, marking
@@ -1522,6 +1590,30 @@ func (pool *TxPool) demoteUnexecutables(bn uint64) {
 			delete(pool.beats, addr)
 		}
 	}
+}
+
+// stuckExecutables get the stuck executable transactions.
+// A stuck transaction is defined as a transactions that have
+// exist in TxPool.pending for duration of txStuckThreshold.
+// Only the first transaction of each account is returned
+func (pool *TxPool) stuckExecutables() types.PoolTransactions {
+	var stuckTxs types.PoolTransactions
+
+	for addr, list := range pool.pending {
+		head := list.Peek()
+		if head == nil {
+			continue
+		}
+		if beat, ok := pool.beats[addr]; ok && time.Since(beat) > txStuckThreshold {
+			// transaction is likely to be stuck, validate and
+			// add to stuckTxs
+			if err := pool.validateTx(head, false); err != nil {
+				continue
+			}
+			stuckTxs = append(stuckTxs, head)
+		}
+	}
+	return stuckTxs
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
