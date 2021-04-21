@@ -16,7 +16,7 @@ require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.9.23
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
-	github.com/fwojciec/clock v0.0.0-20201211142135-a6f233dec376 // indirect
+	github.com/fwojciec/clock v0.0.0-20201211142135-a6f233dec376
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.4.0
 	github.com/golang/protobuf v1.4.3

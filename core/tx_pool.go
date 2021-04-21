@@ -180,7 +180,7 @@ type TxPoolConfig struct {
 	AccountQueue uint64 // Maximum number of non-executable transaction slots permitted per account
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
-	broadcast func(types.PoolTransactions) // broadcast invalid transaction
+	Broadcast func(types.PoolTransactions) // broadcast invalid transaction
 	Lifetime  time.Duration                // Maximum amount of time non-executable transaction are queued
 
 	Blacklist map[common.Address]struct{} // Set of accounts that cannot be a part of any transaction
@@ -234,7 +234,7 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
 		conf.Blacklist = DefaultTxPoolConfig.Blacklist
 	}
-	if conf.broadcast == nil {
+	if conf.Broadcast == nil {
 		utils.Logger().Warn().Msg("broadcast function is nil, unable to broadcast stuck transaction")
 	}
 
@@ -302,7 +302,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig,
 		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
 		txErrorSink: txErrorSink,
-		broadcast:   config.broadcast,
+		broadcast:   config.Broadcast,
 	}
 	pool.locals = newAccountSet(chainconfig.ChainID)
 	for _, addr := range config.Locals {

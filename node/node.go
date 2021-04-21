@@ -154,38 +154,50 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
-// TODO: make this batch more transactions
-func (node *Node) tryBroadcast(tx *types.Transaction) {
-	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
+// TODO: Use batch broadcast
+func (node *Node) broadcastTransactions(txs types.PoolTransactions) {
+	for _, tx := range txs {
+		switch t := tx.(type) {
+		case *types.Transaction:
+			node.broadcastTx(t)
 
-	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcast")
+		case *staking.StakingTransaction:
+			node.broadcastStakingTx(t)
 
-	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast tx")
-		} else {
-			break
+		default:
+			utils.Logger().Warn().Str("type", fmt.Sprintf("%t", tx)).
+				Msg("Unknown PoolTransaction type to broadcast")
 		}
 	}
 }
 
-func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
+// TODO: make this batch more transactions
+func (node *Node) broadcastTx(tx *types.Transaction) {
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
+	groups := []nodeconfig.GroupID{shardGroupID}
+
+	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
+	finalMsg := p2p.ConstructMessage(msg)
+
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("broadcastTx")
+
+	if err := node.host.SendMessageToGroups(groups, finalMsg); err != nil {
+		utils.Logger().Error().Err(err).Msg("Error when trying to broadcast tx")
+	}
+}
+
+func (node *Node) broadcastStakingTx(stakingTx *staking.StakingTransaction) {
+	// broadcast staking transaction to beacon chain
+	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shard.BeaconChainShardID))
+	groups := []nodeconfig.GroupID{shardGroupID}
+
 	msg := proto_node.ConstructStakingTransactionListMessageAccount(staking.StakingTransactions{stakingTx})
+	finalMsg := p2p.ConstructMessage(msg)
 
-	shardGroupID := nodeconfig.NewGroupIDByShardID(
-		nodeconfig.ShardID(shard.BeaconChainShardID),
-	) // broadcast to beacon chain
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("tryBroadcastStaking")
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("broadcastStakingTx")
 
-	for attempt := 0; attempt < NumTryBroadCast; attempt++ {
-		if err := node.host.SendMessageToGroups([]nodeconfig.GroupID{shardGroupID},
-			p2p.ConstructMessage(msg)); err != nil && attempt < NumTryBroadCast {
-			utils.Logger().Error().Int("attempt", attempt).Msg("Error when trying to broadcast staking tx")
-		} else {
-			break
-		}
+	if err := node.host.SendMessageToGroups(groups, finalMsg); err != nil {
+		utils.Logger().Error().Err(err).Msg("Error when trying to broadcast staking tx")
 	}
 }
 
@@ -263,7 +275,7 @@ func (node *Node) AddPendingStakingTransaction(
 			utils.Logger().Info().
 				Str("Hash", newStakingTx.Hash().Hex()).
 				Msg("Broadcasting Staking Tx")
-			node.tryBroadcastStaking(newStakingTx)
+			node.broadcastStakingTx(newStakingTx)
 		}
 		return err
 	}
@@ -285,7 +297,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		}
 		if err == nil || node.BroadcastInvalidTx {
 			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Str("HashByType", newTx.HashByType().Hex()).Msg("Broadcasting Tx")
-			node.tryBroadcast(newTx)
+			node.broadcastTx(newTx)
 		}
 		return err
 	}
@@ -972,6 +984,7 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 		txPoolConfig.Blacklist = blacklist
+		txPoolConfig.Broadcast = node.broadcastTransactions
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
