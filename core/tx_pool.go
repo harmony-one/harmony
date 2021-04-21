@@ -436,10 +436,9 @@ func (pool *TxPool) loop() {
 			}
 			pool.mu.Unlock()
 
-			utils.Logger().Info().Int("Count", len(stuckTxs)).
-				Msg("Broadcasting stuck transaction")
-
-			if pool.broadcast != nil {
+			if pool.broadcast != nil && len(stuckTxs) != 0 {
+				utils.Logger().Info().Int("Count", len(stuckTxs)).
+					Msg("Broadcasting stuck transaction")
 				go pool.broadcast(stuckTxs)
 			}
 		}

@@ -159,7 +159,7 @@ func (node *Node) broadcastTransactions(txs types.PoolTransactions) {
 	for _, tx := range txs {
 		switch t := tx.(type) {
 		case *types.Transaction:
-			node.broadcastTx(t)
+			node.broadcastPlainTx(t)
 
 		case *staking.StakingTransaction:
 			node.broadcastStakingTx(t)
@@ -172,14 +172,14 @@ func (node *Node) broadcastTransactions(txs types.PoolTransactions) {
 }
 
 // TODO: make this batch more transactions
-func (node *Node) broadcastTx(tx *types.Transaction) {
+func (node *Node) broadcastPlainTx(tx *types.Transaction) {
 	shardGroupID := nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(tx.ShardID()))
 	groups := []nodeconfig.GroupID{shardGroupID}
 
 	msg := proto_node.ConstructTransactionListMessageAccount(types.Transactions{tx})
 	finalMsg := p2p.ConstructMessage(msg)
 
-	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("broadcastTx")
+	utils.Logger().Info().Str("shardGroupID", string(shardGroupID)).Msg("broadcastPlainTx")
 
 	if err := node.host.SendMessageToGroups(groups, finalMsg); err != nil {
 		utils.Logger().Error().Err(err).Msg("Error when trying to broadcast tx")
@@ -297,7 +297,7 @@ func (node *Node) AddPendingTransaction(newTx *types.Transaction) error {
 		}
 		if err == nil || node.BroadcastInvalidTx {
 			utils.Logger().Info().Str("Hash", newTx.Hash().Hex()).Str("HashByType", newTx.HashByType().Hex()).Msg("Broadcasting Tx")
-			node.broadcastTx(newTx)
+			node.broadcastPlainTx(newTx)
 		}
 		return err
 	}
