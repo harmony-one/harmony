@@ -258,7 +258,7 @@ func (m *txSortedMap) Peek() types.PoolTransaction {
 func (m *txSortedMap) sortedTxs() types.PoolTransactions {
 	cache := make(types.PoolTransactions, 0, len(m.items))
 	for _, tx := range m.items {
-		cache = append(m.cache, tx)
+		cache = append(cache, tx)
 	}
 	sort.Sort(types.PoolTxByNonce(cache))
 	return cache
