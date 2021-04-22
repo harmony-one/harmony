@@ -261,8 +261,8 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     []string{"1", "2", "3", "4"},
 				LegacySyncing: false,
 				DNSZone:       "8.8.8.8",
-				DNSSyncPort:   nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
-				LegacyDNSPort: intPtr(9001),
+				DNSSyncPort:   6001,
+				LegacyDNSPort: nil,
 			},
 		},
 		{
