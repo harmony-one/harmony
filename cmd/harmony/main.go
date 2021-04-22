@@ -124,6 +124,7 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
+		fmt.Println()
 		cmd.Help()
 		os.Exit(128)
 	}
