@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
@@ -43,7 +44,10 @@ type networkConfig struct {
 
 	LegacySyncing bool // if true, use LegacySyncingPeerProvider
 	DNSZone       string
-	DNSPort       int
+	DNSSyncPort   int
+
+	// Legacy field
+	LegacyDNSPort *int `toml:"DNSPort,omitempty"`
 }
 
 type p2pConfig struct {
@@ -155,16 +159,33 @@ type prometheusConfig struct {
 
 type syncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Downloader     bool // start the sync downloader client
-	LegacyServer   bool // provide the gRPC sync protocol server
-	LegacyClient   bool // aside from stream sync protocol, also run gRPC client to get blocks
-	Concurrency    int  // concurrency used for stream sync protocol
-	MinPeers       int  // minimum streams to start a sync task.
-	InitStreams    int  // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int  // upper limit of streams in one sync protocol
-	DiscBatch      int  // size of each discovery
+	Downloader       bool // start the sync downloader client
+	LegacyServer     bool // provide the gRPC sync protocol server
+	LegacyServerPort int  // sync server port
+	LegacyClient     bool // aside from stream sync protocol, also run gRPC client to get blocks
+
+	Concurrency    int // concurrency used for stream sync protocol
+	MinPeers       int // minimum streams to start a sync task.
+	InitStreams    int // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int // upper limit of streams in one sync protocol
+	DiscBatch      int // size of each discovery
+}
+
+func sanityFixHarmonyConfig(config *harmonyConfig) {
+	// Using not-updated harmony config will have network.DNSPort = 0, update it to default
+	if syncPort := config.Network.DNSSyncPort; syncPort == 0 {
+		config.Network.DNSSyncPort = nodeconfig.DefaultDNSPort
+	}
+	// Using not-updated harmony config will have sync.LegacyServerPort = 0, update it to default
+	if serverPort := config.Sync.LegacyServerPort; serverPort == 0 {
+		config.Sync.LegacyServerPort = nodeconfig.DefaultDNSPort
+	}
+	// legSyncPort is set in harmony.conf and not equal to default, update network.SyncPort
+	if legSyncPort := config.Network.LegacyDNSPort; legSyncPort != nil && *legSyncPort != nodeconfig.DefaultLegacyDNSPort {
+		config.Network.DNSSyncPort = *legSyncPort - legacysync.SyncingPortDifference
+	}
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.
@@ -230,7 +251,7 @@ func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 		BootNodes:     bn,
 		LegacySyncing: false,
 		DNSZone:       zone,
-		DNSPort:       port,
+		DNSSyncPort:   port,
 	}
 }
 

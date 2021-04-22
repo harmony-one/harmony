@@ -180,6 +180,8 @@ var (
 		syncDownloaderFlag,
 		syncLegacyClientFlag,
 		syncLegacyServerFlag,
+		syncLegacyServerPortFlag,
+
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -348,7 +350,7 @@ var (
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
-		Usage:    "port of customized dns node",
+		Usage:    "port of DNS service of the remote DNS service provider",
 	}
 	legacyDNSZoneFlag = cli.StringFlag{
 		Name:       "dns_zone",
@@ -403,9 +405,10 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 	}
 
 	if cli.IsFlagChanged(cmd, dnsPortFlag) {
-		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
+		cfg.Network.DNSSyncPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSPortFlag) {
-		cfg.Network.DNSPort = cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
+		val := cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
+		cfg.Network.LegacyDNSPort = &val
 	}
 }
 
@@ -1298,6 +1301,12 @@ var (
 		Hidden:   true,
 		DefValue: true,
 	}
+	syncLegacyServerPortFlag = cli.IntFlag{
+		Name:     "sync.legacy.server.port",
+		Usage:    "port used for gRPC sync server",
+		Hidden:   true,
+		DefValue: defaultMainnetSyncConfig.LegacyServerPort,
+	}
 	syncLegacyClientFlag = cli.BoolFlag{
 		Name:     "sync.legacy.client",
 		Usage:    "Enable the legacy centralized sync service for block synchronization",
@@ -1354,6 +1363,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {
 		config.Sync.LegacyServer = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyServerPortFlag) {
+		config.Sync.LegacyServerPort = cli.GetIntFlagValue(cmd, syncLegacyServerPortFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncLegacyClientFlag) {
