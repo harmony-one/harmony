@@ -1043,8 +1043,8 @@ func New(
 
 	node.serviceManager = service.NewManager()
 
-	node.stateSync = node.getStateSync()
-	node.beaconSync = node.getStateSync()
+	node.stateSync = node.createStateSync()
+	node.beaconSync = node.createStateSync()
 
 	return &node
 }
