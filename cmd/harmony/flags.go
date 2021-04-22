@@ -410,8 +410,11 @@ func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, dnsPortFlag) {
 		cfg.Network.DNSSyncPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSPortFlag) {
-		val := cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
-		cfg.Network.LegacyDNSPort = &val
+		// Still using node.sh to launch the node. Flag --dns_port should have
+		// port arithmetic of actual port being val - 3000.
+		rawPort := cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
+		mutatedPort, _ := strconv.Atoi(legacysync.GetSyncingPort(strconv.Itoa(rawPort)))
+		cfg.Network.DNSSyncPort = mutatedPort
 	}
 }
 
