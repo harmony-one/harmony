@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	"github.com/harmony-one/harmony/api/service/legacysync"
 
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -1185,6 +1188,11 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
+
+		legPortStr := strconv.Itoa(legacyPort)
+		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))
+		config.Network.DNSSyncPort = syncPort
+		config.Sync.LegacyServerPort = syncPort
 	}
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
@@ -1293,25 +1301,25 @@ var (
 		Name:     "sync.downloader",
 		Usage:    "Enable the downloader module to sync through stream sync protocol",
 		Hidden:   true,
-		DefValue: false,
+		DefValue: defaultConfig.Sync.Downloader,
 	}
 	syncLegacyServerFlag = cli.BoolFlag{
 		Name:     "sync.legacy.server",
 		Usage:    "Enable the gRPC sync server for backward compatibility",
 		Hidden:   true,
-		DefValue: true,
+		DefValue: defaultConfig.Sync.LegacyServer,
 	}
 	syncLegacyServerPortFlag = cli.IntFlag{
 		Name:     "sync.legacy.server.port",
 		Usage:    "port used for gRPC sync server",
 		Hidden:   true,
-		DefValue: defaultMainnetSyncConfig.LegacyServerPort,
+		DefValue: defaultConfig.Sync.LegacyServerPort,
 	}
 	syncLegacyClientFlag = cli.BoolFlag{
 		Name:     "sync.legacy.client",
 		Usage:    "Enable the legacy centralized sync service for block synchronization",
 		Hidden:   true,
-		DefValue: false,
+		DefValue: defaultConfig.Sync.LegacyClient,
 	}
 	syncConcurrencyFlag = cli.IntFlag{
 		Name:   "sync.concurrency",
@@ -1352,11 +1360,6 @@ var (
 
 // applySyncFlags apply the sync flags.
 func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
-	if config.Sync == (syncConfig{}) {
-		nt := nodeconfig.NetworkType(config.Network.NetworkType)
-		config.Sync = getDefaultSyncConfig(nt)
-	}
-
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}

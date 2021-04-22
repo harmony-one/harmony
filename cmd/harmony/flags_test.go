@@ -46,8 +46,8 @@ func TestHarmonyFlags(t *testing.T) {
 						"/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX",
 						"/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj",
 					},
-					DNSZone: "t.hmny.io",
-					DNSPort: 9000,
+					DNSZone:     "t.hmny.io",
+					DNSSyncPort: 6000,
 				},
 				P2P: p2pConfig{
 					Port:    9000,
@@ -229,7 +229,7 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     nodeconfig.GetDefaultBootNodes(defNetworkType),
 				LegacySyncing: false,
 				DNSZone:       nodeconfig.GetDefaultDNSZone(defNetworkType),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(defNetworkType),
+				DNSSyncPort:   nodeconfig.GetDefaultDNSPort(defNetworkType),
 			},
 		},
 		{
@@ -239,7 +239,7 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     nodeconfig.GetDefaultBootNodes(nodeconfig.Stressnet),
 				LegacySyncing: false,
 				DNSZone:       nodeconfig.GetDefaultDNSZone(nodeconfig.Stressnet),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
+				DNSSyncPort:   nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
 			},
 		},
 		{
@@ -250,7 +250,7 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     []string{"1", "2", "3", "4"},
 				LegacySyncing: false,
 				DNSZone:       "8.8.8.8",
-				DNSPort:       9001,
+				DNSSyncPort:   9001,
 			},
 		},
 		{
@@ -261,7 +261,8 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     []string{"1", "2", "3", "4"},
 				LegacySyncing: false,
 				DNSZone:       "8.8.8.8",
-				DNSPort:       9001,
+				DNSSyncPort:   nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
+				LegacyDNSPort: intPtr(9001),
 			},
 		},
 		{
@@ -271,7 +272,7 @@ func TestNetworkFlags(t *testing.T) {
 				BootNodes:     nodeconfig.GetDefaultBootNodes(defNetworkType),
 				LegacySyncing: true,
 				DNSZone:       nodeconfig.GetDefaultDNSZone(defNetworkType),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(defNetworkType),
+				DNSSyncPort:   nodeconfig.GetDefaultDNSPort(defNetworkType),
 			},
 		},
 	}
@@ -961,22 +962,14 @@ func TestSyncFlags(t *testing.T) {
 			expConfig: defaultMainnetSyncConfig,
 		},
 		{
-			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
+			args: []string{"--sync.legacy.server", "--sync.legacy.client",
+				"--sync.legacy.server.port", "6001"},
 			network: "mainnet",
 			expConfig: func() syncConfig {
 				cfg := defaultMainnetSyncConfig
 				cfg.LegacyClient = true
 				cfg.LegacyServer = true
-				return cfg
-			}(),
-		},
-		{
-			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
-			network: "testnet",
-			expConfig: func() syncConfig {
-				cfg := defaultTestNetSyncConfig
-				cfg.LegacyClient = true
-				cfg.LegacyServer = true
+				cfg.LegacyServerPort = 6001
 				return cfg
 			}(),
 		},
@@ -1003,7 +996,6 @@ func TestSyncFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *harmonyConfig) {
-			config.Network.NetworkType = test.network
 			applySyncFlags(command, config)
 		})
 		hc, err := ts.run(test.args)
@@ -1031,7 +1023,7 @@ type flagTestSuite struct {
 func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *harmonyConfig)) *flagTestSuite {
 	cli.SetParseErrorHandle(func(err error) { t.Fatal(err) })
 
-	ts := &flagTestSuite{hc: defaultConfig}
+	ts := &flagTestSuite{hc: getDefaultHmyConfigCopy(defNetworkType)}
 	ts.cmd = makeTestCommand(func(cmd *cobra.Command, args []string) {
 		applyFlags(cmd, &ts.hc)
 	})
@@ -1070,4 +1062,8 @@ func assertError(gotErr, expErr error) error {
 		return fmt.Errorf("error unexpected [%v] / [%v]", gotErr, expErr)
 	}
 	return nil
+}
+
+func intPtr(i int) *int {
+	return &i
 }
