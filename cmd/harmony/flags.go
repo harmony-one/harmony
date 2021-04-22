@@ -353,7 +353,7 @@ var (
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
-		Usage:    "port of DNS service of the remote DNS service provider",
+		Usage:    "data port of the remote DNS service provider",
 	}
 	legacyDNSZoneFlag = cli.StringFlag{
 		Name:       "dns_zone",
@@ -362,7 +362,7 @@ var (
 	}
 	legacyDNSPortFlag = cli.IntFlag{
 		Name:       "dns_port",
-		Usage:      "port of dns node",
+		Usage:      "data port of the remote DNS service provider",
 		Deprecated: "use --dns.zone",
 	}
 	legacyDNSFlag = cli.BoolFlag{
