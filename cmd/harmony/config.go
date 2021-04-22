@@ -173,19 +173,31 @@ type syncConfig struct {
 	DiscBatch      int // size of each discovery
 }
 
-func sanityFixHarmonyConfig(config *harmonyConfig) {
-	// Using not-updated harmony config will have network.DNSPort = 0, update it to default
+// sanityFixHarmonyConfig correct values for old config version load
+func correctLegacyHarmonyConfig(config *harmonyConfig) {
+	if config.Sync == (syncConfig{}) {
+		nt := nodeconfig.NetworkType(config.Network.NetworkType)
+		config.Sync = getDefaultSyncConfig(nt)
+	}
+	if config.HTTP.RosettaPort == 0 {
+		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
+	}
+	if config.P2P.IP == "" {
+		config.P2P.IP = defaultConfig.P2P.IP
+	}
+	if config.Prometheus == nil {
+		config.Prometheus = defaultConfig.Prometheus
+	}
 	if syncPort := config.Network.DNSSyncPort; syncPort == 0 {
 		config.Network.DNSSyncPort = nodeconfig.DefaultDNSPort
 	}
-	// Using not-updated harmony config will have sync.LegacyServerPort = 0, update it to default
 	if serverPort := config.Sync.LegacyServerPort; serverPort == 0 {
 		config.Sync.LegacyServerPort = nodeconfig.DefaultDNSPort
 	}
-	// legSyncPort is set in harmony.conf and not equal to default, update network.SyncPort
 	if legSyncPort := config.Network.LegacyDNSPort; legSyncPort != nil && *legSyncPort != nodeconfig.DefaultLegacyDNSPort {
 		config.Network.DNSSyncPort = *legSyncPort - legacysync.SyncingPortDifference
 	}
+	config.Network.LegacyDNSPort = nil // Change to nil after applied legacy value
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.
@@ -320,16 +332,7 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 		return harmonyConfig{}, err
 	}
 
-	// Correct for old config version load (port 0 is invalid anyways)
-	if config.HTTP.RosettaPort == 0 {
-		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
-	}
-	if config.P2P.IP == "" {
-		config.P2P.IP = defaultConfig.P2P.IP
-	}
-	if config.Prometheus == nil {
-		config.Prometheus = defaultConfig.Prometheus
-	}
+	correctLegacyHarmonyConfig(&config)
 	return config, nil
 }
 

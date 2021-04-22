@@ -179,7 +179,6 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 
 	applyRootFlags(cmd, &config)
 
-	sanityFixHarmonyConfig(&config)
 	if err := validateHarmonyConfig(config); err != nil {
 		return harmonyConfig{}, err
 	}
