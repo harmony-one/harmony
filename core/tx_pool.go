@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
@@ -99,6 +101,9 @@ var (
 
 	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
 	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
+
+	// ErrStaking is returned if a staking transaction fails validation
+	ErrStaking = errors.New("staking transaction validation failed")
 )
 
 var (
@@ -126,6 +131,7 @@ const (
 	txStuckThreshold     = 1 * time.Minute
 )
 
+// TODO: fully replace these counters
 var (
 	// Metrics for the pending pool
 	pendingDiscardCounter   = metrics.NewRegisteredCounter("txpool/pending/discard", nil)
@@ -372,6 +378,11 @@ func (pool *TxPool) loop() {
 				}
 				pool.reset(head.Header(), ev.Block.Header())
 				head = ev.Block
+
+				pendings, queued := pool.stats()
+				pendingTxGauge.Set(float64(pendings))
+				queuedTxGauge.Set(float64(queued))
+
 				pool.mu.Unlock()
 			}
 		// Be unsubscribed due to system stopped
@@ -439,6 +450,7 @@ func (pool *TxPool) loop() {
 			if pool.broadcast != nil && len(stuckTxs) != 0 {
 				utils.Logger().Info().Int("Count", len(stuckTxs)).
 					Msg("Broadcasting stuck transaction")
+				stuckTxsCounter.Add(float64(len(stuckTxs)))
 				go pool.broadcast(stuckTxs)
 			}
 		}
@@ -803,7 +815,10 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	// Do more checks if it is a staking transaction
 	if isStakingTx {
-		return pool.validateStakingTx(stakingTx)
+		if err := pool.validateStakingTx(stakingTx); err != nil {
+			return errors.WithMessagef(ErrStaking, "staking validation failed: %v", err)
+		}
+		return nil
 	}
 	return nil
 }
@@ -962,6 +977,8 @@ func (pool *TxPool) pendingEpoch() *big.Int {
 // the pool due to pricing constraints.
 func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	logger := utils.Logger().With().Stack().Logger()
+
+	receivedTxsCounter.Inc()
 	// If the transaction is in the error sink, remove it as it may succeed
 	if pool.txErrorSink.Contains(tx.Hash().String()) {
 		pool.txErrorSink.Remove(tx)
@@ -970,6 +987,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	// discard it.
 	hash := tx.Hash()
 	if cachedTx := pool.all.Get(hash); cachedTx != nil {
+		knownTxsCounter.Inc()
 		pool.handleKnownTx(cachedTx)
 		logger.Info().Str("hash", hash.Hex()).Msg("Discarding already known transaction")
 		return false, errors.WithMessagef(ErrKnownTransaction, "transaction hash %x", hash)
@@ -977,6 +995,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
 		logger.Warn().Err(err).Str("hash", hash.Hex()).Msg("Discarding invalid transaction")
+		invalidTxsCounterVec.With(prometheus.Labels{"err": errors.Cause(err).Error()}).Inc()
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
@@ -1374,7 +1393,9 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		}
 		// Drop all transactions that are deemed too old (low nonce)
 		nonce := pool.currentState.GetNonce(addr)
-		for _, tx := range list.Forward(nonce) {
+		forwards := list.Forward(nonce)
+		lowNonceTxCounter.Add(float64(len(forwards)))
+		for _, tx := range forwards {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
@@ -1548,7 +1569,9 @@ func (pool *TxPool) demoteUnexecutables(bn uint64) {
 		nonce := pool.currentState.GetNonce(addr)
 
 		// Drop all transactions that are deemed too old (low nonce)
-		for _, tx := range list.Forward(nonce) {
+		forwards := list.Forward(nonce)
+		lowNonceTxCounter.Add(float64(len(forwards)))
+		for _, tx := range forwards {
 			hash := tx.Hash()
 			pool.all.Remove(hash)
 			pool.priced.Removed()
@@ -1613,6 +1636,17 @@ func (pool *TxPool) stuckExecutables() types.PoolTransactions {
 		}
 	}
 	return stuckTxs
+}
+
+// lockedStats return the statistics for prometheus metrics.
+func (pool *TxPool) stats() (pending, queued int) {
+	for _, txList := range pool.pending {
+		pending += txList.Len()
+	}
+	for _, txList := range pool.queue {
+		queued += txList.Len()
+	}
+	return
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
