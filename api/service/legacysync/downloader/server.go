@@ -2,7 +2,6 @@ package downloader
 
 import (
 	"context"
-	"log"
 	"net"
 	"strconv"
 
@@ -47,7 +46,8 @@ func (s *Server) Start() (*grpc.Server, error) {
 	addr := net.JoinHostPort("", strconv.Itoa(s.Port))
 	lis, err := net.Listen("tcp4", addr)
 	if err != nil {
-		log.Fatalf("[SYNC] failed to listen: %v", err)
+		utils.Logger().Error().Err(err).Msg("[SYNC] failed to start sync server")
+		return nil, err
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
