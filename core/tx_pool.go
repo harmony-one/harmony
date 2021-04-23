@@ -1638,17 +1638,6 @@ func (pool *TxPool) stuckExecutables() types.PoolTransactions {
 	return stuckTxs
 }
 
-// lockedStats return the statistics for prometheus metrics.
-func (pool *TxPool) stats() (pending, queued int) {
-	for _, txList := range pool.pending {
-		pending += txList.Len()
-	}
-	for _, txList := range pool.queue {
-		queued += txList.Len()
-	}
-	return
-}
-
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
 type addressByHeartbeat struct {
 	address   common.Address
