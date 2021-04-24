@@ -1,20 +1,24 @@
-package main
+package config
 
 import (
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/stretchr/testify/assert"
 )
 
-type testCfgOpt func(config *harmonyConfig)
+var (
+	trueBool = true
+)
 
-func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) harmonyConfig {
-	cfg := getDefaultHmyConfigCopy(nt)
+type testCfgOpt func(config *HarmonyConfig)
+
+func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) HarmonyConfig {
+	cfg := GetDefaultHmyConfigCopy(nt)
 	if opt != nil {
 		opt(&cfg)
 	}
@@ -104,11 +108,11 @@ func TestV1_0_0Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := loadHarmonyConfig(file)
+	config, err := LoadHarmonyConfig(file)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defConf := getDefaultHmyConfigCopy(nodeconfig.Mainnet)
+	defConf := GetDefaultHmyConfigCopy(nodeconfig.Mainnet)
 	if config.HTTP.RosettaEnabled {
 		t.Errorf("Expected rosetta http server to be disabled when loading old config")
 	}
@@ -122,9 +126,7 @@ func TestV1_0_0Config(t *testing.T) {
 		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
 	config.Version = defConf.Version // Shortcut for testing, value checked above
-	if !reflect.DeepEqual(config, defConf) {
-		t.Errorf("Unexpected config \n\t%+v \n\t%+v", config, defaultConfig)
-	}
+	assert.Equal(t, defConf, config)
 }
 
 func TestPersistConfig(t *testing.T) {
@@ -133,7 +135,7 @@ func TestPersistConfig(t *testing.T) {
 	os.MkdirAll(testDir, 0777)
 
 	tests := []struct {
-		config harmonyConfig
+		config HarmonyConfig
 	}{
 		{
 			config: makeTestConfig("mainnet", nil),
@@ -142,23 +144,23 @@ func TestPersistConfig(t *testing.T) {
 			config: makeTestConfig("devnet", nil),
 		},
 		{
-			config: makeTestConfig("mainnet", func(cfg *harmonyConfig) {
-				consensus := getDefaultConsensusConfigCopy()
+			config: makeTestConfig("mainnet", func(cfg *HarmonyConfig) {
+				consensus := GetDefaultConsensusConfigCopy()
 				cfg.Consensus = &consensus
 
-				devnet := getDefaultDevnetConfigCopy()
+				devnet := GetDefaultDevnetConfigCopy()
 				cfg.Devnet = &devnet
 
-				revert := getDefaultRevertConfigCopy()
+				revert := GetDefaultRevertConfigCopy()
 				cfg.Revert = &revert
 
 				webHook := "web hook"
-				cfg.Legacy = &legacyConfig{
+				cfg.Legacy = &LegacyConfig{
 					WebHookConfig:         &webHook,
 					TPBroadcastInvalidTxn: &trueBool,
 				}
 
-				logCtx := getDefaultLogContextCopy()
+				logCtx := GetDefaultLogContextCopy()
 				cfg.Log.Context = &logCtx
 			}),
 		},
@@ -166,15 +168,13 @@ func TestPersistConfig(t *testing.T) {
 	for i, test := range tests {
 		file := filepath.Join(testDir, fmt.Sprintf("%d.conf", i))
 
-		if err := writeHarmonyConfigToFile(test.config, file); err != nil {
+		if err := WriteHarmonyConfigToFile(test.config, file); err != nil {
 			t.Fatal(err)
 		}
-		config, err := loadHarmonyConfig(file)
+		config, err := LoadHarmonyConfig(file)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(config, test.config) {
-			t.Errorf("Test %v: unexpected config \n\t%+v \n\t%+v", i, config, test.config)
-		}
+		assert.Equal(t, test.config, config, "test %d: configs should match", i)
 	}
 }

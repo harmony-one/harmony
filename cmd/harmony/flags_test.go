@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 func TestHarmonyFlags(t *testing.T) {
 	tests := []struct {
 		argStr    string
-		expConfig harmonyConfig
+		expConfig config.HarmonyConfig
 	}{
 		{
 			// running staking command from legacy node.sh
@@ -29,16 +30,16 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json",
-			expConfig: harmonyConfig{
-				Version: tomlConfigVersion,
-				General: generalConfig{
+			expConfig: config.HarmonyConfig{
+				Version: config.TOMLConfigVersion,
+				General: config.GeneralConfig{
 					NodeType:   "validator",
 					NoStaking:  false,
 					ShardID:    -1,
 					IsArchival: false,
 					DataDir:    "./",
 				},
-				Network: networkConfig{
+				Network: config.NetworkConfig{
 					NetworkType: "mainnet",
 					BootNodes: []string{
 						"/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
@@ -46,31 +47,29 @@ func TestHarmonyFlags(t *testing.T) {
 						"/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX",
 						"/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj",
 					},
-					DNSZone: "t.hmny.io",
-					DNSPort: 9000,
 				},
-				P2P: p2pConfig{
+				P2P: config.P2PConfig{
 					Port:    9000,
-					IP:      defaultConfig.P2P.IP,
-					KeyFile: defaultConfig.P2P.KeyFile,
+					IP:      config.DefaultConfig.P2P.IP,
+					KeyFile: config.DefaultConfig.P2P.KeyFile,
 				},
-				HTTP: httpConfig{
+				HTTP: config.HTTPConfig{
 					Enabled:        true,
 					IP:             "127.0.0.1",
 					Port:           9500,
 					RosettaEnabled: false,
 					RosettaPort:    9700,
 				},
-				WS: wsConfig{
+				WS: config.WSConfig{
 					Enabled: true,
 					IP:      "127.0.0.1",
 					Port:    9800,
 				},
-				Consensus: &consensusConfig{
+				Consensus: &config.ConsensusConfig{
 					MinPeers:     6,
 					AggregateSig: true,
 				},
-				BLSKeys: blsConfig{
+				BLSKeys: config.BLSConfig{
 					KeyDir:           "./.hmy/blskeys",
 					KeyFiles:         []string{},
 					MaxKeys:          10,
@@ -82,37 +81,43 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigSrcType: "file",
 					KMSConfigFile:    "config.json",
 				},
-				TxPool: txPoolConfig{
+				TxPool: config.TxPoolConfig{
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
-				Pprof: pprofConfig{
+				Pprof: config.PprofConfig{
 					Enabled:    false,
 					ListenAddr: "127.0.0.1:6060",
 				},
-				Log: logConfig{
+				Log: config.LogConfig{
 					Folder:     "./latest",
 					FileName:   "validator-8.8.8.8-9000.log",
 					RotateSize: 100,
 					Verbosity:  3,
-					Context: &logContext{
+					Context: &config.LogContext{
 						IP:   "8.8.8.8",
 						Port: 9000,
 					},
 				},
-				Sys: &sysConfig{
-					NtpServer: defaultSysConfig.NtpServer,
+				Sys: &config.SysConfig{
+					NtpServer: config.DefaultSysConfig.NtpServer,
 				},
-				Legacy: &legacyConfig{
+				Legacy: &config.LegacyConfig{
 					TPBroadcastInvalidTxn: &trueBool,
 				},
-				Prometheus: &prometheusConfig{
+				Prometheus: &config.PrometheusConfig{
 					Enabled:    true,
 					IP:         "0.0.0.0",
 					Port:       9900,
 					EnablePush: true,
 					Gateway:    "https://gateway.harmony.one",
 				},
-				Sync: defaultMainnetSyncConfig,
+				Sync: config.DefaultMainnetSyncConfig,
+				DNSSync: config.DNSSyncConfig{
+					DNSZone:      "t.hmny.io",
+					DNSPort:      9000,
+					LegacyServer: true,
+					LegacyClient: true,
+				},
 			},
 		},
 	}
@@ -122,9 +127,7 @@ func TestHarmonyFlags(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Test %v: %v", i, err)
 		}
-		if !reflect.DeepEqual(hc, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, hc, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -132,12 +135,12 @@ func TestHarmonyFlags(t *testing.T) {
 func TestGeneralFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig generalConfig
+		expConfig config.GeneralConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "validator",
 				NoStaking:  false,
 				ShardID:    -1,
@@ -148,7 +151,7 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{"--run", "explorer", "--run.legacy", "--run.shard=0",
 				"--run.archive=true", "--datadir=./.hmy"},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  true,
 				ShardID:    0,
@@ -159,7 +162,7 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{"--node_type", "explorer", "--staking", "--shard_id", "0",
 				"--is_archival", "--db_dir", "./"},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -169,7 +172,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--staking=false", "--is_archival=false"},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "validator",
 				NoStaking:  true,
 				ShardID:    -1,
@@ -179,7 +182,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0"},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -189,7 +192,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0", "--run.archive=false"},
-			expConfig: generalConfig{
+			expConfig: config.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -209,9 +212,7 @@ func TestGeneralFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(got.General, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.General, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, got.General, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -219,68 +220,44 @@ func TestGeneralFlags(t *testing.T) {
 func TestNetworkFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig networkConfig
+		expConfig config.NetworkConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: networkConfig{
-				NetworkType:   defNetworkType,
-				BootNodes:     nodeconfig.GetDefaultBootNodes(defNetworkType),
-				LegacySyncing: false,
-				DNSZone:       nodeconfig.GetDefaultDNSZone(defNetworkType),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(defNetworkType),
+			expConfig: config.NetworkConfig{
+				NetworkType: config.DefNetworkType,
+				BootNodes:   nodeconfig.GetDefaultBootNodes(config.DefNetworkType),
 			},
 		},
 		{
 			args: []string{"-n", "stn"},
-			expConfig: networkConfig{
-				NetworkType:   nodeconfig.Stressnet,
-				BootNodes:     nodeconfig.GetDefaultBootNodes(nodeconfig.Stressnet),
-				LegacySyncing: false,
-				DNSZone:       nodeconfig.GetDefaultDNSZone(nodeconfig.Stressnet),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
+			expConfig: config.NetworkConfig{
+				NetworkType: nodeconfig.Stressnet,
+				BootNodes:   nodeconfig.GetDefaultBootNodes(nodeconfig.Stressnet),
 			},
 		},
 		{
-			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
-				"--dns.port", "9001"},
-			expConfig: networkConfig{
-				NetworkType:   "pangaea",
-				BootNodes:     []string{"1", "2", "3", "4"},
-				LegacySyncing: false,
-				DNSZone:       "8.8.8.8",
-				DNSPort:       9001,
+			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4"},
+			expConfig: config.NetworkConfig{
+				NetworkType: "pangaea",
+				BootNodes:   []string{"1", "2", "3", "4"},
 			},
 		},
 		{
-			args: []string{"--network_type", "stk", "--bootnodes", "1,2,3,4", "--dns_zone", "8.8.8.8",
-				"--dns_port", "9001"},
-			expConfig: networkConfig{
-				NetworkType:   "pangaea",
-				BootNodes:     []string{"1", "2", "3", "4"},
-				LegacySyncing: false,
-				DNSZone:       "8.8.8.8",
-				DNSPort:       9001,
-			},
-		},
-		{
-			args: []string{"--dns=false"},
-			expConfig: networkConfig{
-				NetworkType:   defNetworkType,
-				BootNodes:     nodeconfig.GetDefaultBootNodes(defNetworkType),
-				LegacySyncing: true,
-				DNSZone:       nodeconfig.GetDefaultDNSZone(defNetworkType),
-				DNSPort:       nodeconfig.GetDefaultDNSPort(defNetworkType),
+			args: []string{"--network_type", "stk", "--bootnodes", "1,2,3,4"},
+			expConfig: config.NetworkConfig{
+				NetworkType: "pangaea",
+				BootNodes:   []string{"1", "2", "3", "4"},
 			},
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, networkFlags, func(cmd *cobra.Command, config *harmonyConfig) {
+		ts := newFlagTestSuite(t, networkFlags, func(cmd *cobra.Command, cfg *config.HarmonyConfig) {
 			// This is the network related logic in function getHarmonyConfig
 			nt := getNetworkType(cmd)
-			config.Network = getDefaultNetworkConfig(nt)
-			applyNetworkFlags(cmd, config)
+			cfg.Network = config.GetDefaultNetworkConfig(nt)
+			applyNetworkFlags(cmd, cfg)
 		})
 
 		got, err := ts.run(test.args)
@@ -291,9 +268,7 @@ func TestNetworkFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(got.Network, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, got.Network, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -303,17 +278,17 @@ var defDataStore = ".dht-127.0.0.1"
 func TestP2PFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig p2pConfig
+		expConfig config.P2PConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.P2P,
+			expConfig: config.DefaultConfig.P2P,
 		},
 		{
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
-			expConfig: p2pConfig{
+			expConfig: config.P2PConfig{
 				Port:         9001,
 				IP:           nodeconfig.DefaultPublicListenIP,
 				KeyFile:      "./key.file",
@@ -322,7 +297,7 @@ func TestP2PFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
-			expConfig: p2pConfig{
+			expConfig: config.P2PConfig{
 				Port:    9001,
 				IP:      nodeconfig.DefaultPublicListenIP,
 				KeyFile: "./key.file",
@@ -331,7 +306,7 @@ func TestP2PFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *config.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyP2PFlags(cmd, config)
 			},
@@ -345,9 +320,7 @@ func TestP2PFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(got.P2P, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, got.P2P, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -355,36 +328,36 @@ func TestP2PFlags(t *testing.T) {
 func TestRPCFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig httpConfig
+		expConfig config.HTTPConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.HTTP,
+			expConfig: config.DefaultConfig.HTTP,
 		},
 		{
 			args: []string{"--http=false"},
-			expConfig: httpConfig{
+			expConfig: config.HTTPConfig{
 				Enabled:        false,
 				RosettaEnabled: false,
-				IP:             defaultConfig.HTTP.IP,
-				Port:           defaultConfig.HTTP.Port,
-				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				IP:             config.DefaultConfig.HTTP.IP,
+				Port:           config.DefaultConfig.HTTP.Port,
+				RosettaPort:    config.DefaultConfig.HTTP.RosettaPort,
 			},
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001"},
-			expConfig: httpConfig{
+			expConfig: config.HTTPConfig{
 				Enabled:        true,
 				RosettaEnabled: false,
 				IP:             "8.8.8.8",
 				Port:           9001,
-				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+				RosettaPort:    config.DefaultConfig.HTTP.RosettaPort,
 			},
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001", "--http.rosetta.port", "10001"},
-			expConfig: httpConfig{
+			expConfig: config.HTTPConfig{
 				Enabled:        true,
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
@@ -394,17 +367,17 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.rosetta.port", "10001"},
-			expConfig: httpConfig{
+			expConfig: config.HTTPConfig{
 				Enabled:        true,
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
-				Port:           defaultConfig.HTTP.Port,
+				Port:           config.DefaultConfig.HTTP.Port,
 				RosettaPort:    10001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
-			expConfig: httpConfig{
+			expConfig: config.HTTPConfig{
 				Enabled:        true,
 				RosettaEnabled: false,
 				IP:             nodeconfig.DefaultPublicListenIP,
@@ -415,7 +388,7 @@ func TestRPCFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(httpFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *config.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyHTTPFlags(cmd, config)
 			},
@@ -430,9 +403,7 @@ func TestRPCFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.HTTP, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, hc.HTTP, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.HTTP, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -440,24 +411,24 @@ func TestRPCFlags(t *testing.T) {
 func TestWSFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig wsConfig
+		expConfig config.WSConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.WS,
+			expConfig: config.DefaultConfig.WS,
 		},
 		{
 			args: []string{"--ws=false"},
-			expConfig: wsConfig{
+			expConfig: config.WSConfig{
 				Enabled: false,
-				IP:      defaultConfig.WS.IP,
-				Port:    defaultConfig.WS.Port,
+				IP:      config.DefaultConfig.WS.IP,
+				Port:    config.DefaultConfig.WS.Port,
 			},
 		},
 		{
 			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.port", "9001"},
-			expConfig: wsConfig{
+			expConfig: config.WSConfig{
 				Enabled: true,
 				IP:      "8.8.8.8",
 				Port:    9001,
@@ -465,7 +436,7 @@ func TestWSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
-			expConfig: wsConfig{
+			expConfig: config.WSConfig{
 				Enabled: true,
 				IP:      nodeconfig.DefaultPublicListenIP,
 				Port:    9801,
@@ -474,7 +445,7 @@ func TestWSFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(wsFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *config.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyWSFlags(cmd, config)
 			},
@@ -489,9 +460,7 @@ func TestWSFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.WS, test.expConfig) {
-			t.Errorf("Test %v: \n\t%+v\n\t%+v", i, hc.WS, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.WS, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -499,11 +468,11 @@ func TestWSFlags(t *testing.T) {
 func TestRPCOptFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig rpcOptConfig
+		expConfig config.RPCOptConfig
 	}{
 		{
 			args: []string{"--rpc.debug"},
-			expConfig: rpcOptConfig{
+			expConfig: config.RPCOptConfig{
 				DebugEnabled: true,
 			},
 		},
@@ -513,10 +482,7 @@ func TestRPCOptFlags(t *testing.T) {
 
 		hc, _ := ts.run(test.args)
 
-		if !reflect.DeepEqual(hc.RPCOpt, test.expConfig) {
-			t.Errorf("Test %v: \n\t%+v\n\t%+v", i, hc.RPCOpt, test.expConfig)
-		}
-
+		assert.Equal(t, test.expConfig, hc.RPCOpt, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -524,19 +490,19 @@ func TestRPCOptFlags(t *testing.T) {
 func TestBLSFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig blsConfig
+		expConfig config.BLSConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.BLSKeys,
+			expConfig: config.DefaultConfig.BLSKeys,
 		},
 		{
 			args: []string{"--bls.dir", "./blskeys", "--bls.keys", "key1,key2",
 				"--bls.maxkeys", "8", "--bls.pass", "--bls.pass.src", "auto", "--bls.pass.save",
 				"--bls.kms", "--bls.kms.src", "shared",
 			},
-			expConfig: blsConfig{
+			expConfig: config.BLSConfig{
 				KeyDir:           "./blskeys",
 				KeyFiles:         []string{"key1", "key2"},
 				MaxKeys:          8,
@@ -551,10 +517,10 @@ func TestBLSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--bls.pass.file", "xxx.pass", "--bls.kms.config", "config.json"},
-			expConfig: blsConfig{
-				KeyDir:           defaultConfig.BLSKeys.KeyDir,
-				KeyFiles:         defaultConfig.BLSKeys.KeyFiles,
-				MaxKeys:          defaultConfig.BLSKeys.MaxKeys,
+			expConfig: config.BLSConfig{
+				KeyDir:           config.DefaultConfig.BLSKeys.KeyDir,
+				KeyFiles:         config.DefaultConfig.BLSKeys.KeyFiles,
+				MaxKeys:          config.DefaultConfig.BLSKeys.MaxKeys,
 				PassEnabled:      true,
 				PassSrcType:      "file",
 				PassFile:         "xxx.pass",
@@ -569,7 +535,7 @@ func TestBLSFlags(t *testing.T) {
 				"--max_bls_keys_per_node", "5", "--blspass", "file:xxx.pass", "--save-passphrase",
 				"--aws-config-source", "file:config.json",
 			},
-			expConfig: blsConfig{
+			expConfig: config.BLSConfig{
 				KeyDir:           "./hmykeys",
 				KeyFiles:         []string{"key1", "key2"},
 				MaxKeys:          5,
@@ -594,10 +560,7 @@ func TestBLSFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(hc.BLSKeys, test.expConfig) {
-			t.Errorf("Test %v: \n\t%+v\n\t%+v", i, hc.BLSKeys, test.expConfig)
-		}
-
+		assert.Equal(t, test.expConfig, hc.BLSKeys, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -605,7 +568,7 @@ func TestBLSFlags(t *testing.T) {
 func TestConsensusFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *consensusConfig
+		expConfig *config.ConsensusConfig
 		expErr    error
 	}{
 		{
@@ -614,7 +577,7 @@ func TestConsensusFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--consensus.min-peers", "10", "--consensus.aggregate-sig=false"},
-			expConfig: &consensusConfig{
+			expConfig: &config.ConsensusConfig{
 				MinPeers:     10,
 				AggregateSig: false,
 			},
@@ -622,7 +585,7 @@ func TestConsensusFlags(t *testing.T) {
 		{
 			args: []string{"--delay_commit", "10ms", "--block_period", "5", "--min_peers", "10",
 				"--consensus.aggregate-sig=true"},
-			expConfig: &consensusConfig{
+			expConfig: &config.ConsensusConfig{
 				MinPeers:     10,
 				AggregateSig: true,
 			},
@@ -639,10 +602,7 @@ func TestConsensusFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(hc.Consensus, test.expConfig) {
-			t.Errorf("Test %v: unexpected config \n\t%+v\n\t%+v", i, hc.Consensus, test.expConfig)
-		}
-
+		assert.Equal(t, test.expConfig, hc.Consensus, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -650,24 +610,24 @@ func TestConsensusFlags(t *testing.T) {
 func TestTxPoolFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig txPoolConfig
+		expConfig config.TxPoolConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: txPoolConfig{
-				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
+			expConfig: config.TxPoolConfig{
+				BlacklistFile: config.DefaultConfig.TxPool.BlacklistFile,
 			},
 		},
 		{
 			args: []string{"--txpool.blacklist", "blacklist.file"},
-			expConfig: txPoolConfig{
+			expConfig: config.TxPoolConfig{
 				BlacklistFile: "blacklist.file",
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file"},
-			expConfig: txPoolConfig{
+			expConfig: config.TxPoolConfig{
 				BlacklistFile: "blacklist.file",
 			},
 		},
@@ -683,9 +643,7 @@ func TestTxPoolFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.TxPool, test.expConfig) {
-			t.Errorf("Test %v: unexpected config\n\t%+v\n\t%+v", i, hc.TxPool, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.TxPool, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -693,30 +651,30 @@ func TestTxPoolFlags(t *testing.T) {
 func TestPprofFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig pprofConfig
+		expConfig config.PprofConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.Pprof,
+			expConfig: config.DefaultConfig.Pprof,
 		},
 		{
 			args: []string{"--pprof"},
-			expConfig: pprofConfig{
+			expConfig: config.PprofConfig{
 				Enabled:    true,
-				ListenAddr: defaultConfig.Pprof.ListenAddr,
+				ListenAddr: config.DefaultConfig.Pprof.ListenAddr,
 			},
 		},
 		{
 			args: []string{"--pprof.addr", "8.8.8.8:9001"},
-			expConfig: pprofConfig{
+			expConfig: config.PprofConfig{
 				Enabled:    true,
 				ListenAddr: "8.8.8.8:9001",
 			},
 		},
 		{
 			args: []string{"--pprof=false", "--pprof.addr", "8.8.8.8:9001"},
-			expConfig: pprofConfig{
+			expConfig: config.PprofConfig{
 				Enabled:    false,
 				ListenAddr: "8.8.8.8:9001",
 			},
@@ -732,9 +690,7 @@ func TestPprofFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(hc.Pprof, test.expConfig) {
-			t.Errorf("Test %v: unexpected config\n\t%+v\n\t%+v", i, hc.Pprof, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Pprof, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -742,17 +698,17 @@ func TestPprofFlags(t *testing.T) {
 func TestLogFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig logConfig
+		expConfig config.LogConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
-			expConfig: defaultConfig.Log,
+			expConfig: config.DefaultConfig.Log,
 		},
 		{
 			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.name", "harmony.log",
 				"--log.verb", "5"},
-			expConfig: logConfig{
+			expConfig: config.LogConfig{
 				Folder:     "latest_log",
 				FileName:   "harmony.log",
 				RotateSize: 10,
@@ -762,12 +718,12 @@ func TestLogFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--log.ctx.ip", "8.8.8.8", "--log.ctx.port", "9001"},
-			expConfig: logConfig{
-				Folder:     defaultConfig.Log.Folder,
-				FileName:   defaultConfig.Log.FileName,
-				RotateSize: defaultConfig.Log.RotateSize,
-				Verbosity:  defaultConfig.Log.Verbosity,
-				Context: &logContext{
+			expConfig: config.LogConfig{
+				Folder:     config.DefaultConfig.Log.Folder,
+				FileName:   config.DefaultConfig.Log.FileName,
+				RotateSize: config.DefaultConfig.Log.RotateSize,
+				Verbosity:  config.DefaultConfig.Log.Verbosity,
+				Context: &config.LogContext{
 					IP:   "8.8.8.8",
 					Port: 9001,
 				},
@@ -776,12 +732,12 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--log_folder", "latest_log", "--log_max_size", "10", "--verbosity",
 				"5", "--ip", "8.8.8.8", "--port", "9001"},
-			expConfig: logConfig{
+			expConfig: config.LogConfig{
 				Folder:     "latest_log",
 				FileName:   "validator-8.8.8.8-9001.log",
 				RotateSize: 10,
 				Verbosity:  5,
-				Context: &logContext{
+				Context: &config.LogContext{
 					IP:   "8.8.8.8",
 					Port: 9001,
 				},
@@ -790,7 +746,7 @@ func TestLogFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(logFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *config.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyLogFlags(cmd, config)
 			},
@@ -804,9 +760,7 @@ func TestLogFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.Log, test.expConfig) {
-			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Log, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Log, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -814,18 +768,18 @@ func TestLogFlags(t *testing.T) {
 func TestSysFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *sysConfig
+		expConfig *config.SysConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: &sysConfig{
-				NtpServer: defaultSysConfig.NtpServer,
+			expConfig: &config.SysConfig{
+				NtpServer: config.DefaultSysConfig.NtpServer,
 			},
 		},
 		{
 			args: []string{"--sys.ntp", "0.pool.ntp.org"},
-			expConfig: &sysConfig{
+			expConfig: &config.SysConfig{
 				NtpServer: "0.pool.ntp.org",
 			},
 		},
@@ -842,9 +796,7 @@ func TestSysFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.Sys, test.expConfig) {
-			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sys, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Sys, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -852,7 +804,7 @@ func TestSysFlags(t *testing.T) {
 func TestDevnetFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *devnetConfig
+		expConfig *config.DevnetConfig
 		expErr    error
 	}{
 		{
@@ -862,7 +814,7 @@ func TestDevnetFlags(t *testing.T) {
 		{
 			args: []string{"--devnet.num-shard", "3", "--devnet.shard-size", "100",
 				"--devnet.hmy-node-size", "60"},
-			expConfig: &devnetConfig{
+			expConfig: &config.DevnetConfig{
 				NumShards:   3,
 				ShardSize:   100,
 				HmyNodeSize: 60,
@@ -871,7 +823,7 @@ func TestDevnetFlags(t *testing.T) {
 		{
 			args: []string{"--dn_num_shards", "3", "--dn_shard_size", "100", "--dn_hmy_size",
 				"60"},
-			expConfig: &devnetConfig{
+			expConfig: &config.DevnetConfig{
 				NumShards:   3,
 				ShardSize:   100,
 				HmyNodeSize: 60,
@@ -889,9 +841,7 @@ func TestDevnetFlags(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(hc.Devnet, test.expConfig) {
-			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Devnet, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Devnet, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -899,7 +849,7 @@ func TestDevnetFlags(t *testing.T) {
 func TestRevertFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *revertConfig
+		expConfig *config.RevertConfig
 		expErr    error
 	}{
 		{
@@ -908,15 +858,15 @@ func TestRevertFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--revert.beacon"},
-			expConfig: &revertConfig{
+			expConfig: &config.RevertConfig{
 				RevertBeacon: true,
-				RevertTo:     defaultRevertConfig.RevertTo,
-				RevertBefore: defaultRevertConfig.RevertBefore,
+				RevertTo:     config.DefaultRevertConfig.RevertTo,
+				RevertBefore: config.DefaultRevertConfig.RevertBefore,
 			},
 		},
 		{
 			args: []string{"--revert.beacon", "--revert.to", "100", "--revert.do-before", "10000"},
-			expConfig: &revertConfig{
+			expConfig: &config.RevertConfig{
 				RevertBeacon: true,
 				RevertTo:     100,
 				RevertBefore: 10000,
@@ -924,7 +874,7 @@ func TestRevertFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--revert_beacon", "--do_revert_before", "10000", "--revert_to", "100"},
-			expConfig: &revertConfig{
+			expConfig: &config.RevertConfig{
 				RevertBeacon: true,
 				RevertTo:     100,
 				RevertBefore: 10000,
@@ -941,9 +891,7 @@ func TestRevertFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(hc.Revert, test.expConfig) {
-			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Revert, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Revert, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -952,33 +900,13 @@ func TestSyncFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
 		network   string
-		expConfig syncConfig
+		expConfig config.SyncConfig
 		expErr    error
 	}{
 		{
 			args:      []string{},
 			network:   "mainnet",
-			expConfig: defaultMainnetSyncConfig,
-		},
-		{
-			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
-			network: "mainnet",
-			expConfig: func() syncConfig {
-				cfg := defaultMainnetSyncConfig
-				cfg.LegacyClient = true
-				cfg.LegacyServer = true
-				return cfg
-			}(),
-		},
-		{
-			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
-			network: "testnet",
-			expConfig: func() syncConfig {
-				cfg := defaultTestNetSyncConfig
-				cfg.LegacyClient = true
-				cfg.LegacyServer = true
-				return cfg
-			}(),
+			expConfig: config.DefaultMainnetSyncConfig,
 		},
 		{
 			args: []string{"--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
@@ -987,8 +915,8 @@ func TestSyncFlags(t *testing.T) {
 				"--sync.disc.batch", "10",
 			},
 			network: "mainnet",
-			expConfig: func() syncConfig {
-				cfg := defaultMainnetSyncConfig
+			expConfig: func() config.SyncConfig {
+				cfg := config.DefaultMainnetSyncConfig
 				cfg.Downloader = true
 				cfg.Concurrency = 10
 				cfg.MinPeers = 10
@@ -1002,7 +930,7 @@ func TestSyncFlags(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *harmonyConfig) {
+		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *config.HarmonyConfig) {
 			config.Network.NetworkType = test.network
 			applySyncFlags(command, config)
 		})
@@ -1014,9 +942,7 @@ func TestSyncFlags(t *testing.T) {
 		if err != nil || test.expErr != nil {
 			continue
 		}
-		if !reflect.DeepEqual(hc.Sync, test.expConfig) {
-			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sync, test.expConfig)
-		}
+		assert.Equal(t, test.expConfig, hc.Sync, "test %d: configs should be equal", i)
 		ts.tearDown()
 	}
 }
@@ -1025,13 +951,105 @@ type flagTestSuite struct {
 	t *testing.T
 
 	cmd *cobra.Command
-	hc  harmonyConfig
+	hc  config.HarmonyConfig
 }
 
-func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *harmonyConfig)) *flagTestSuite {
+func TestDNSSyncFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		network   string
+		expConfig config.DNSSyncConfig
+		expErr    error
+	}{
+		{
+			args:    []string{},
+			network: "mainnet",
+			expConfig: config.DNSSyncConfig{
+				LegacySyncing: false,
+				DNSZone:       nodeconfig.GetDefaultDNSZone(config.DefNetworkType),
+				DNSPort:       nodeconfig.GetDefaultDNSPort(config.DefNetworkType),
+				LegacyClient:  true,
+				LegacyServer:  true,
+			},
+		},
+		{
+			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
+			network: "mainnet",
+			expConfig: func() config.DNSSyncConfig {
+				cfg := config.GetDefaultDNSSyncConfig(nodeconfig.Mainnet)
+				cfg.LegacyClient = true
+				cfg.LegacyServer = true
+				return cfg
+			}(),
+		},
+		{
+			args:    []string{},
+			network: "stn",
+			expConfig: config.DNSSyncConfig{
+				LegacySyncing: false,
+				DNSZone:       nodeconfig.GetDefaultDNSZone(nodeconfig.Stressnet),
+				DNSPort:       nodeconfig.GetDefaultDNSPort(nodeconfig.Stressnet),
+				LegacyClient:  false,
+				LegacyServer:  true,
+			},
+		},
+		{
+			args:    []string{"--dns.zone", "8.8.8.8", "--dns.port", "9001"},
+			network: "testnet",
+			expConfig: config.DNSSyncConfig{
+				LegacySyncing: false,
+				DNSZone:       "8.8.8.8",
+				DNSPort:       9001,
+				LegacyClient:  true,
+				LegacyServer:  true,
+			},
+		},
+		{
+			args:    []string{"--dns_zone", "8.8.8.8", "--dns_port", "9001"},
+			network: "stk",
+			expConfig: config.DNSSyncConfig{
+				LegacySyncing: false,
+				DNSZone:       "8.8.8.8",
+				DNSPort:       9001,
+				LegacyClient:  false,
+				LegacyServer:  true,
+			},
+		},
+		{
+			args:    []string{"--dns=false"},
+			network: "mainnet",
+			expConfig: config.DNSSyncConfig{
+				LegacySyncing: true,
+				DNSZone:       nodeconfig.GetDefaultDNSZone(config.DefNetworkType),
+				DNSPort:       nodeconfig.GetDefaultDNSPort(config.DefNetworkType),
+				LegacyClient:  true,
+				LegacyServer:  true,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, getRootFlags(), func(cmd *cobra.Command, cfg *config.HarmonyConfig) {
+			cfg.DNSSync = config.GetDefaultDNSSyncConfig(config.ParseNetworkType(test.network))
+			applyDNSSyncFlags(cmd, cfg)
+		})
+
+		got, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		assert.Equal(t, test.expConfig, got.DNSSync, "test %d: configs should be equal", i)
+		ts.tearDown()
+	}
+}
+
+func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *config.HarmonyConfig)) *flagTestSuite {
 	cli.SetParseErrorHandle(func(err error) { t.Fatal(err) })
 
-	ts := &flagTestSuite{hc: defaultConfig}
+	ts := &flagTestSuite{hc: config.DefaultConfig}
 	ts.cmd = makeTestCommand(func(cmd *cobra.Command, args []string) {
 		applyFlags(cmd, &ts.hc)
 	})
@@ -1042,7 +1060,7 @@ func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Com
 	return ts
 }
 
-func (ts *flagTestSuite) run(args []string) (harmonyConfig, error) {
+func (ts *flagTestSuite) run(args []string) (config.HarmonyConfig, error) {
 	ts.cmd.SetArgs(args)
 	err := ts.cmd.Execute()
 	return ts.hc, err

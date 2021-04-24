@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ var (
 	onceLoadBLSKey sync.Once
 )
 
-// setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
-func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibls.PublicKeys {
+// SetupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
+func SetupConsensusKeys(hc HarmonyConfig, config *nodeconfig.ConfigType) multibls.PublicKeys {
 	onceLoadBLSKey.Do(func() {
 		var err error
 		multiBLSPriKey, err = loadBLSKeys(hc.BLSKeys)
@@ -30,7 +30,7 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 	return multiBLSPriKey.GetPublicKeys()
 }
 
-func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
+func loadBLSKeys(raw BLSConfig) (multibls.PrivateKeys, error) {
 	config, err := parseBLSLoadingConfig(raw)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
 	return keys.Dedup(), err
 }
 
-func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {
+func parseBLSLoadingConfig(raw BLSConfig) (blsgen.Config, error) {
 	var (
 		config blsgen.Config
 		err    error
@@ -69,7 +69,7 @@ func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {
 	return config, nil
 }
 
-func parseBLSPassConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+func parseBLSPassConfig(cfg blsgen.Config, raw BLSConfig) (blsgen.Config, error) {
 	if !raw.PassEnabled {
 		cfg.PassSrcType = blsgen.PassSrcNil
 		return blsgen.Config{}, nil
@@ -90,7 +90,7 @@ func parseBLSPassConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error)
 	return cfg, nil
 }
 
-func parseBLSKmsConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+func parseBLSKmsConfig(cfg blsgen.Config, raw BLSConfig) (blsgen.Config, error) {
 	if !raw.KMSEnabled {
 		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcNil
 		return cfg, nil
