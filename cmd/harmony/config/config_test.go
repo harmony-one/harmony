@@ -265,3 +265,38 @@ func TestPersistConfig(t *testing.T) {
 		assert.Equal(t, test.config, config, "test %d: configs should match", i)
 	}
 }
+
+func TestBackupAndUpgradeConfigToTheLatestVersion(t *testing.T) {
+	testDir := filepath.Join(testBaseDir, t.Name())
+	os.RemoveAll(testDir)
+	os.MkdirAll(testDir, 0777)
+
+	fileName := filepath.Join(testDir, "config.toml")
+	testConfig := `Version = "1.0.4"`
+	err := ioutil.WriteFile(fileName, []byte(testConfig), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := LoadHarmonyConfig(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "1.0.4", config.Version)
+	// when there is no fileName.old
+	oldFileName, err := BackupAndUpgradeConfigToTheLatestVersion(config, fileName)
+	assert.Nil(t, err)
+	assert.Equal(t, fileName+".old", oldFileName)
+	assert.FileExists(t, oldFileName)
+	oldTestConfig, err := ioutil.ReadFile(oldFileName)
+	assert.Nil(t, err)
+	assert.Equal(t, []byte(testConfig), oldTestConfig)
+	newConfig, err := LoadHarmonyConfig(fileName)
+	assert.Nil(t, err)
+	assert.Equal(t, TOMLConfigVersion, newConfig.Version)
+
+	// when there exists fileName.old
+	oldFileName, err = BackupAndUpgradeConfigToTheLatestVersion(config, fileName)
+	assert.Nil(t, err)
+	assert.Equal(t, fileName+".old.old", oldFileName)
+	assert.FileExists(t, oldFileName)
+}

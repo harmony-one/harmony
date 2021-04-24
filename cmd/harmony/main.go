@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"github.com/harmony-one/harmony/hmy/downloader"
+	"golang.org/x/crypto/ssh/terminal"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -107,6 +108,17 @@ func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
 }
 
+var upgradeConfigCmd = &cobra.Command{
+	Use:   "upgradeconfig -c [config_file]",
+	Short: "upgrade the config file to the latest format",
+	Long:  "upgrade the config file for harmony binary configurations to the latest format",
+	Run:   runUpgradeConfig,
+}
+
+func registerUpgradeConfigFlags() error {
+	return cli.RegisterFlags(upgradeConfigCmd, []cli.Flag{configFlag})
+}
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 	cli.SetParseErrorHandle(func(err error) {
@@ -114,11 +126,15 @@ func init() {
 	})
 	rootCmd.AddCommand(dumpConfigCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(upgradeConfigCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
 	}
 	if err := registerDumpConfigFlags(); err != nil {
+		os.Exit(2)
+	}
+	if err := registerUpgradeConfigFlags(); err != nil {
 		os.Exit(2)
 	}
 }
@@ -178,6 +194,50 @@ func raiseFdLimits() error {
 	return nil
 }
 
+func promptForConfigUpgrade() bool {
+	if !terminal.IsTerminal(syscall.Stdin) {
+		return false
+	}
+	for {
+		fmt.Fprint(os.Stderr, "Would you like to upgrade your config to the latest version? (y/n): ")
+		var input string
+		fmt.Scanln(&input)
+		switch strings.ToLower(input) {
+		case "y":
+			return true
+		case "n":
+			return false
+		default:
+			fmt.Fprint(os.Stderr, "Incorrect input. ")
+		}
+	}
+}
+
+func runUpgradeConfig(cmd *cobra.Command, args []string) {
+	var (
+		cfg        config.HarmonyConfig
+		configFile string
+		err        error
+	)
+	if cli.IsFlagChanged(cmd, configFlag) {
+		configFile = cli.GetStringFlagValue(cmd, configFlag)
+		cfg, err = config.LoadHarmonyConfig(configFile)
+	} else {
+		fmt.Println("config file should be specified")
+		os.Exit(128)
+	}
+	if cfg.Version == config.TOMLConfigVersion {
+		// nothing to do
+		return
+	}
+	oldFileName, err := config.BackupAndUpgradeConfigToTheLatestVersion(cfg, configFile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(128)
+	}
+	fmt.Printf("previous config was stored at %s\n", oldFileName)
+}
+
 func getHarmonyConfig(cmd *cobra.Command) (config.HarmonyConfig, error) {
 	var (
 		cfg config.HarmonyConfig
@@ -196,7 +256,11 @@ func getHarmonyConfig(cmd *cobra.Command) (config.HarmonyConfig, error) {
 	if cfg.Version != config.DefaultConfig.Version {
 		fmt.Printf("Loaded config version %s which is not latest (%s).\n",
 			cfg.Version, config.DefaultConfig.Version)
-		fmt.Println("Update saved config with `./harmony dumpconfig [config_file]`")
+		if promptForConfigUpgrade() {
+			runUpgradeConfig(cmd, nil)
+		} else {
+			fmt.Println("Upgrade saved config with `./harmony upgradeconfig -c [config_file]`")
+		}
 	}
 
 	applyRootFlags(cmd, &cfg)

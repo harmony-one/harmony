@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -326,4 +327,30 @@ func WriteHarmonyConfigToFile(config HarmonyConfig, file string) error {
 		return err
 	}
 	return ioutil.WriteFile(file, b, 0644)
+}
+
+// BackupAndUpgradeConfigToTheLatestVersion backups previous version of config file and persists on the disk the latest format.
+// It returns file name of the backup.
+func BackupAndUpgradeConfigToTheLatestVersion(cfg HarmonyConfig, fileName string) (string, error) {
+	oldFileName := fileName + ".old"
+	for {
+		_, err := os.Stat(oldFileName)
+		if os.IsNotExist(err) {
+			break
+		}
+		oldFileName = oldFileName + ".old"
+	}
+	if err := os.Rename(fileName, oldFileName); err != nil {
+		return "", fmt.Errorf("renaming %s to %s: %w", fileName, oldFileName, err)
+	}
+	cfg.Version = TOMLConfigVersion
+	if err := WriteHarmonyConfigToFile(cfg, fileName); err != nil {
+		// try to undo the rename
+		rErr := os.Rename(oldFileName, fileName)
+		if rErr != nil {
+			return "", fmt.Errorf("renaming %s to %s: %s, original error: %w", oldFileName, fileName, rErr.Error(), err)
+		}
+		return "", err
+	}
+	return oldFileName, nil
 }
