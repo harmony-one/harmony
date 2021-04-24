@@ -290,9 +290,20 @@ func LoadHarmonyConfig(file string) (HarmonyConfig, error) {
 	if err != nil {
 		return HarmonyConfig{}, err
 	}
-
+	var header struct {
+		Version string
+	}
+	if err := toml.Unmarshal(b, &header); err != nil {
+		return HarmonyConfig{}, fmt.Errorf("reading config version: %w", err)
+	}
 	var config HarmonyConfig
-	if err := toml.Unmarshal(b, &config); err != nil {
+	// lexicographicaly compare
+	if header.Version <= v1TOMLConfigVersion {
+		config, err = loadHarmonyConfigV1(b)
+	} else {
+		err = toml.Unmarshal(b, &config)
+	}
+	if err != nil {
 		return HarmonyConfig{}, err
 	}
 
