@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
@@ -36,18 +36,21 @@ type harmonyConfig struct {
 	Revert     *revertConfig     `toml:",omitempty"`
 	Legacy     *legacyConfig     `toml:",omitempty"`
 	Prometheus *prometheusConfig `toml:",omitempty"`
+	DNSSync    dnsSync
+}
+
+type dnsSync struct {
+	Port          int    // replaces: Network.DNSSyncPort
+	Zone          string // replaces: Network.DNSZone
+	LegacySyncing bool   // replaces: Network.LegacySyncing
+	Client        bool   // replaces: Sync.LegacyClient
+	Server        bool   // replaces Sync.LegacyServer
+	ServerPort    int
 }
 
 type networkConfig struct {
 	NetworkType string
 	BootNodes   []string
-
-	LegacySyncing bool // if true, use LegacySyncingPeerProvider
-	DNSZone       string
-	DNSSyncPort   int
-
-	// Legacy field
-	LegacyDNSPort *int `toml:"DNSPort,omitempty"`
 }
 
 type p2pConfig struct {
@@ -159,21 +162,17 @@ type prometheusConfig struct {
 
 type syncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Downloader       bool // start the sync downloader client
-	LegacyServer     bool // provide the gRPC sync protocol server
-	LegacyServerPort int  // sync server port
-	LegacyClient     bool // aside from stream sync protocol, also run gRPC client to get blocks
-
-	Concurrency    int // concurrency used for stream sync protocol
-	MinPeers       int // minimum streams to start a sync task.
-	InitStreams    int // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int // upper limit of streams in one sync protocol
-	DiscBatch      int // size of each discovery
+	Downloader     bool // start the sync downloader client
+	Concurrency    int  // concurrency used for stream sync protocol
+	MinPeers       int  // minimum streams to start a sync task.
+	InitStreams    int  // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int  // upper limit of streams in one sync protocol
+	DiscBatch      int  // size of each discovery
 }
 
-// sanityFixHarmonyConfig correct values for old config version load
+// correctLegacyHarmonyConfig correct values for old config version load
 func correctLegacyHarmonyConfig(config *harmonyConfig) {
 	if config.Sync == (syncConfig{}) {
 		nt := nodeconfig.NetworkType(config.Network.NetworkType)
@@ -188,16 +187,12 @@ func correctLegacyHarmonyConfig(config *harmonyConfig) {
 	if config.Prometheus == nil {
 		config.Prometheus = defaultConfig.Prometheus
 	}
-	if syncPort := config.Network.DNSSyncPort; syncPort == 0 {
-		config.Network.DNSSyncPort = nodeconfig.DefaultDNSPort
+	if syncPort := config.DNSSync.Port; syncPort == 0 {
+		config.DNSSync.Port = nodeconfig.DefaultDNSPort
 	}
-	if serverPort := config.Sync.LegacyServerPort; serverPort == 0 {
-		config.Sync.LegacyServerPort = nodeconfig.DefaultDNSPort
+	if serverPort := config.DNSSync.ServerPort; serverPort == 0 {
+		config.DNSSync.ServerPort = nodeconfig.DefaultDNSPort
 	}
-	if legSyncPort := config.Network.LegacyDNSPort; legSyncPort != nil && *legSyncPort != nodeconfig.DefaultLegacyDNSPort {
-		config.Network.DNSSyncPort = *legSyncPort - legacysync.SyncingPortDifference
-	}
-	config.Network.LegacyDNSPort = nil // Change to nil after applied legacy value
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.
@@ -236,7 +231,7 @@ func validateHarmonyConfig(config harmonyConfig) error {
 		return fmt.Errorf("flag --run.offline must have p2p IP be %v", nodeconfig.DefaultLocalListenIP)
 	}
 
-	if !config.Sync.Downloader && !config.Sync.LegacyClient {
+	if !config.Sync.Downloader && !config.DNSSync.Client {
 		// There is no module up for sync
 		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
 	}
@@ -254,16 +249,36 @@ func checkStringAccepted(flag string, val string, accepts []string) error {
 	return fmt.Errorf("unknown arg for %s: %s (%v)", flag, val, acceptsStr)
 }
 
-func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
-	bn := nodeconfig.GetDefaultBootNodes(nt)
+func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) dnsSync {
 	zone := nodeconfig.GetDefaultDNSZone(nt)
 	port := nodeconfig.GetDefaultDNSPort(nt)
-	return networkConfig{
-		NetworkType:   string(nt),
-		BootNodes:     bn,
+	dnsSync := dnsSync{
+		Port:          port,
+		Zone:          zone,
 		LegacySyncing: false,
-		DNSZone:       zone,
-		DNSSyncPort:   port,
+	}
+	switch nt {
+	case nodeconfig.Mainnet:
+		dnsSync.Server = true
+		dnsSync.Client = true
+	case nodeconfig.Testnet:
+		dnsSync.Server = true
+		dnsSync.Client = true
+	case nodeconfig.Localnet:
+		dnsSync.Server = true
+		dnsSync.Client = true
+	default:
+		dnsSync.Server = true
+		dnsSync.Client = false
+	}
+	return dnsSync
+}
+
+func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
+	bn := nodeconfig.GetDefaultBootNodes(nt)
+	return networkConfig{
+		NetworkType: string(nt),
+		BootNodes:   bn,
 	}
 }
 
@@ -301,10 +316,30 @@ func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
 	}
 }
 
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "dump or update config",
+	Long:  "",
+}
+
+var updateConfigCmd = &cobra.Command{
+	Use:   "update [config_file]",
+	Short: "update config to latest version",
+	Long:  "updates config file to latest version, preserving values",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		err := updateConfigFile(args[0])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(128)
+		}
+	},
+}
+
 var dumpConfigCmd = &cobra.Command{
-	Use:   "dumpconfig [config_file]",
-	Short: "dump the config file for harmony binary configurations",
-	Long:  "dump the config file for harmony binary configurations",
+	Use:   "dump [config_file]",
+	Short: "dump default file for harmony binary configurations",
+	Long:  "dump default config file for harmony binary configurations",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		nt := getNetworkType(cmd)
@@ -321,19 +356,76 @@ func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
 }
 
-func loadHarmonyConfig(file string) (harmonyConfig, error) {
+func promptConfigUpdate() bool {
+	var readStr string
+	fmt.Println("Do you want to update config to the latest version: [Y/n]")
+	timeoutTimer := time.NewTimer(time.Second * 15)
+	read := make(chan string)
+	go func() {
+		fmt.Scanf("%s", &readStr)
+		read <- readStr
+	}()
+	select {
+	case <-timeoutTimer.C:
+		fmt.Println("Timed out - update manually with ./harmony config update [config_file]")
+		return false
+	case <-read:
+		readStr = strings.TrimSpace(readStr)
+		if len(readStr) > 1 {
+			readStr = readStr[0:1]
+		}
+		readStr = strings.ToLower(readStr)
+		return readStr == "y" || readStr == ""
+	}
+}
+
+func loadHarmonyConfig(file string) (harmonyConfig, string, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return harmonyConfig{}, err
+		return harmonyConfig{}, "", err
 	}
-
-	var config harmonyConfig
-	if err := toml.Unmarshal(b, &config); err != nil {
-		return harmonyConfig{}, err
+	config, migratedVer, err := migrateConf(b)
+	if err != nil {
+		return harmonyConfig{}, "", err
 	}
+	// Correct for old config version load (port 0 is invalid anyways)
+	if config.HTTP.RosettaPort == 0 {
+		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
+	}
+	backup := fmt.Sprintf("%s.backup", file)
+	if err := ioutil.WriteFile(backup, configBytes, 0664); err != nil {
+		return err
+	}
+	fmt.Printf("Original config backed up to %s\n", fmt.Sprintf("%s.backup", file))
+	config, migratedFromVer, err := migrateConf(configBytes)
+	if err != nil {
+		return err
+	}
+	if err := writeHarmonyConfigToFile(config, file); err != nil {
+		return err
+	}
+	return config, migratedVer, nil
+}
 
-	correctLegacyHarmonyConfig(&config)
-	return config, nil
+func updateConfigFile(file string) error {
+	configBytes, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	backup := fmt.Sprintf("%s.backup", file)
+	if err := ioutil.WriteFile(backup, configBytes, 0664); err != nil {
+		return err
+	}
+	fmt.Printf("Original config backed up to %s\n", fmt.Sprintf("%s.backup", file))
+	config, migratedFromVer, err := migrateConf(configBytes)
+	if err != nil {
+		return err
+	}
+	if err := writeHarmonyConfigToFile(config, file); err != nil {
+		return err
+	}
+	fmt.Printf("Successfully migrated %s from %s to %s \n", file, migratedFromVer, config.Version)
+	return nil
 }
 
 func writeHarmonyConfigToFile(config harmonyConfig, file string) error {
