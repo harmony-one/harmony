@@ -55,7 +55,7 @@ type NodeMetadata struct {
 	ChainConfig     params.ChainConfig `json:"chain-config"`
 	IsLeader        bool               `json:"is-leader"`
 	ShardID         uint32             `json:"shard-id"`
-	CurrentBlockNum uint64             `json:"current-number"`
+	CurrentBlockNum uint64             `json:"current-block-number"`
 	CurrentEpoch    uint64             `json:"current-epoch"`
 	BlocksPerEpoch  *uint64            `json:"blocks-per-epoch,omitempty"`
 	Role            string             `json:"role"`
