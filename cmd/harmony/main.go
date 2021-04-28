@@ -195,9 +195,6 @@ func raiseFdLimits() error {
 }
 
 func promptForConfigUpgrade() bool {
-	if !terminal.IsTerminal(syscall.Stdin) {
-		return false
-	}
 	for {
 		fmt.Fprint(os.Stderr, "Would you like to upgrade your config to the latest version? (y/n): ")
 		var input string
@@ -253,10 +250,10 @@ func getHarmonyConfig(cmd *cobra.Command) (config.HarmonyConfig, error) {
 	if err != nil {
 		return config.HarmonyConfig{}, err
 	}
-	if cfg.Version != config.DefaultConfig.Version {
+	if !cfg.IsLatestVersion() {
 		fmt.Printf("Loaded config version %s which is not latest (%s).\n",
 			cfg.Version, config.DefaultConfig.Version)
-		if promptForConfigUpgrade() {
+		if terminal.IsTerminal(syscall.Stdin) && promptForConfigUpgrade() {
 			runUpgradeConfig(cmd, nil)
 		} else {
 			fmt.Println("Upgrade saved config with `./harmony upgradeconfig -c [config_file]`")

@@ -36,6 +36,12 @@ type HarmonyConfig struct {
 	Prometheus *PrometheusConfig `toml:",omitempty"`
 }
 
+// IsLatestVersion returns whether this config was loaded from the latest version format.
+func (c HarmonyConfig) IsLatestVersion() bool {
+	return c.Version == TOMLConfigVersion
+}
+
+// NetworkConfig contains network related config options.
 type NetworkConfig struct {
 	NetworkType string
 	BootNodes   []string
@@ -160,6 +166,7 @@ type SyncConfig struct {
 	DiscBatch      int  // size of each discovery
 }
 
+// IsEmpty returns whether this structure is zero value.
 func (c SyncConfig) IsEmpty() bool {
 	return c == SyncConfig{}
 }
@@ -286,6 +293,7 @@ func GetDefaultDNSSyncConfig(nt nodeconfig.NetworkType) DNSSyncConfig {
 	return config
 }
 
+// LoadHarmonyConfig loads toml configuration for the binary node from the specified file on disk.
 func LoadHarmonyConfig(file string) (HarmonyConfig, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -333,12 +341,17 @@ func WriteHarmonyConfigToFile(config HarmonyConfig, file string) error {
 // It returns file name of the backup.
 func BackupAndUpgradeConfigToTheLatestVersion(cfg HarmonyConfig, fileName string) (string, error) {
 	oldFileName := fileName + ".old"
-	for {
+	success := false
+	for tries := 0; tries < 5; tries++ {
 		_, err := os.Stat(oldFileName)
 		if os.IsNotExist(err) {
+			success = true
 			break
 		}
 		oldFileName = oldFileName + ".old"
+	}
+	if !success {
+		return "", fmt.Errorf("unable to locate appropriate non-existing file name for backing up the old config: %s", oldFileName)
 	}
 	if err := os.Rename(fileName, oldFileName); err != nil {
 		return "", fmt.Errorf("renaming %s to %s: %w", fileName, oldFileName, err)

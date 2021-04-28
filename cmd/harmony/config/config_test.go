@@ -34,77 +34,15 @@ func init() {
 }
 
 func TestV1_0_0Config(t *testing.T) {
-	testConfig := `Version = "1.0.4"
-
-[BLSKeys]
-  KMSConfigFile = ""
-  KMSConfigSrcType = "shared"
-  KMSEnabled = false
-  KeyDir = "./.hmy/blskeys"
-  KeyFiles = []
-  MaxKeys = 10
-  PassEnabled = true
-  PassFile = ""
-  PassSrcType = "auto"
-  SavePassphrase = false
-
-[General]
-  DataDir = "./"
-  IsArchival = false
-  NoStaking = false
-  NodeType = "validator"
-  ShardID = -1
-
-[HTTP]
-  Enabled = true
-  IP = "127.0.0.1"
-  Port = 9500
-
-[Log]
-  FileName = "harmony.log"
-  Folder = "./latest"
-  RotateSize = 100
-  Verbosity = 3
-
-[Network]
-  BootNodes = ["/dnsaddr/bootstrap.t.hmny.io"]
-  DNSPort = 9000
-  DNSZone = "t.hmny.io"
-  LegacySyncing = false
-  NetworkType = "mainnet"
-
-[P2P]
-  KeyFile = "./.hmykey"
-  Port = 9000
-
-[Pprof]
-  Enabled = false
-  ListenAddr = "127.0.0.1:6060"
-
-[TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
-
-[Sync]
-  Downloader = false
-  Concurrency = 6
-  DiscBatch = 8
-  DiscHardLowCap = 6
-  DiscHighCap = 128
-  DiscSoftLowCap = 8
-  InitStreams = 8
-  LegacyClient = true
-  LegacyServer = true
-  MinPeers = 6
-
-[WS]
-  Enabled = true
-  IP = "127.0.0.1"
-  Port = 9800`
+	testConfigFileName, err := filepath.Abs(filepath.Join("testdata", "config_v1.toml"))
+	assert.Nil(t, err)
+	testConfig, err := ioutil.ReadFile(testConfigFileName)
+	assert.Nil(t, err)
 	testDir := filepath.Join(testBaseDir, t.Name())
 	os.RemoveAll(testDir)
 	os.MkdirAll(testDir, 0777)
 	file := filepath.Join(testDir, "test.config")
-	err := ioutil.WriteFile(file, []byte(testConfig), 0644)
+	err = ioutil.WriteFile(file, []byte(testConfig), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,6 +50,7 @@ func TestV1_0_0Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assert.False(t, config.IsLatestVersion())
 	defConf := GetDefaultHmyConfigCopy(nodeconfig.Mainnet)
 	if config.HTTP.RosettaEnabled {
 		t.Errorf("Expected rosetta http server to be disabled when loading old config")
@@ -130,79 +69,15 @@ func TestV1_0_0Config(t *testing.T) {
 }
 
 func TestV2_0_0Config(t *testing.T) {
-	testConfig := `Version = "2.0.0"
-
-[BLSKeys]
-  KMSConfigFile = ""
-  KMSConfigSrcType = "shared"
-  KMSEnabled = false
-  KeyDir = "./.hmy/blskeys"
-  KeyFiles = []
-  MaxKeys = 10
-  PassEnabled = true
-  PassFile = ""
-  PassSrcType = "auto"
-  SavePassphrase = false
-
-[General]
-  DataDir = "./"
-  IsArchival = false
-  NoStaking = false
-  NodeType = "validator"
-  ShardID = -1
-
-[HTTP]
-  Enabled = true
-  IP = "127.0.0.1"
-  Port = 9500
-
-[Log]
-  FileName = "harmony.log"
-  Folder = "./latest"
-  RotateSize = 100
-  Verbosity = 3
-
-[Network]
-  BootNodes = ["/dnsaddr/bootstrap.t.hmny.io"]
-  NetworkType = "mainnet"
-
-[P2P]
-  KeyFile = "./.hmykey"
-  Port = 9000
-
-[Pprof]
-  Enabled = false
-  ListenAddr = "127.0.0.1:6060"
-
-[TxPool]
-  BlacklistFile = "./.hmy/blacklist.txt"
-
-[Sync]
-  Downloader = false
-  Concurrency = 6
-  DiscBatch = 8
-  DiscHardLowCap = 6
-  DiscHighCap = 128
-  DiscSoftLowCap = 8
-  InitStreams = 8
-  MinPeers = 6
-
-[WS]
-  Enabled = true
-  IP = "127.0.0.1"
-  Port = 9800
-
-[DNSSync]
-  DNSPort = 9002
-  DNSZone = "8.8.8.8"
-  LegacySyncing = false
-  LegacyClient = true
-LegacyServer = true`
+	testConfigFileName, err := filepath.Abs(filepath.Join("testdata", "config_v2.toml"))
+	assert.Nil(t, err)
+	testConfig, err := ioutil.ReadFile(testConfigFileName)
+	assert.Nil(t, err)
 	testDir := filepath.Join(testBaseDir, t.Name())
 	os.RemoveAll(testDir)
 	os.MkdirAll(testDir, 0777)
 	file := filepath.Join(testDir, "test.config")
-	err := ioutil.WriteFile(file, []byte(testConfig), 0644)
+	err = ioutil.WriteFile(file, []byte(testConfig), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,6 +85,7 @@ LegacyServer = true`
 	if err != nil {
 		t.Fatal(err)
 	}
+	assert.True(t, config.IsLatestVersion())
 	defConf := GetDefaultHmyConfigCopy(nodeconfig.Mainnet)
 	defConf.DNSSync.DNSPort = 9002
 	defConf.DNSSync.DNSZone = "8.8.8.8"
