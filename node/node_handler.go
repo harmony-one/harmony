@@ -277,6 +277,18 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 		return err
 	}
 
+	if err := node.Blockchain().Engine().VerifyVRF(
+		node.Blockchain(), newBlock.Header(),
+	); err != nil {
+		utils.Logger().Error().
+			Str("blockHash", newBlock.Hash().Hex()).
+			Err(err).
+			Msg("[VerifyNewBlock] Cannot verify vrf for the new block")
+		return errors.New(
+			"[VerifyNewBlock] Cannot verify vrf for the new block",
+		)
+	}
+
 	if err := node.Blockchain().Engine().VerifyShardState(
 		node.Blockchain(), node.Beaconchain(), newBlock.Header(),
 	); err != nil {

@@ -726,49 +726,6 @@ func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
 	return nil
 }
 
-// ValidateVrfAndProof validates a VRF/Proof from hash of previous block
-func (consensus *Consensus) ValidateVrfAndProof(headerObj *block.Header) bool {
-	vrfPk := vrf_bls.NewVRFVerifier(consensus.LeaderPubKey.Object)
-	var blockHash [32]byte
-	previousHeader := consensus.Blockchain.GetHeaderByNumber(
-		headerObj.Number().Uint64() - 1,
-	)
-	if previousHeader == nil {
-		return false
-	}
-
-	previousHash := previousHeader.Hash()
-	copy(blockHash[:], previousHash[:])
-	vrfProof := [96]byte{}
-	copy(vrfProof[:], headerObj.Vrf()[32:])
-	hash, err := vrfPk.ProofToHash(blockHash[:], vrfProof[:])
-
-	if err != nil {
-		consensus.getLogger().Warn().
-			Err(err).
-			Str("MsgBlockNum", headerObj.Number().String()).
-			Msg("[OnAnnounce] VRF verification error")
-		return false
-	}
-
-	if !bytes.Equal(hash[:], headerObj.Vrf()[:32]) {
-		consensus.getLogger().Warn().
-			Str("MsgBlockNum", headerObj.Number().String()).
-			Msg("[OnAnnounce] VRF proof is not valid")
-		return false
-	}
-
-	vrfBlockNumbers, _ := consensus.Blockchain.ReadEpochVrfBlockNums(
-		headerObj.Epoch(),
-	)
-	consensus.getLogger().Info().
-		Str("MsgBlockNum", headerObj.Number().String()).
-		Int("Number of VRF", len(vrfBlockNumbers)).
-		Msg("[OnAnnounce] validated a new VRF")
-
-	return true
-}
-
 // GenerateVdfAndProof generates new VDF/Proof from VRFs in the current epoch
 func (consensus *Consensus) GenerateVdfAndProof(newBlock *types.Block, vrfBlockNumbers []uint64) {
 	//derive VDF seed from VRFs generated in the current epoch
