@@ -24,8 +24,6 @@ const (
 	localnetBlocksPerEpochV2 = 10
 
 	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
-
-	localnetRandomnessStartingEpoch = 0
 )
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -114,12 +112,6 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 
 func (ls localnetSchedule) VdfDifficulty() int {
 	return localnetVdfDifficulty
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ls localnetSchedule) RandomnessStartingEpoch() uint64 {
-	return localnetRandomnessStartingEpoch
 }
 
 func (ls localnetSchedule) GetNetworkID() NetworkID {

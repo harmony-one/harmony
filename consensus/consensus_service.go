@@ -481,15 +481,6 @@ func (consensus *Consensus) IsLeader() bool {
 	return false
 }
 
-// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
-func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
-		return true
-	}
-
-	return false
-}
-
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {

@@ -59,12 +59,6 @@ func (ss stressnetSchedule) VdfDifficulty() int {
 	return stressnetVdfDifficulty
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ss stressnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ss stressnetSchedule) GetNetworkID() NetworkID {
 	return StressNet
 }

@@ -57,12 +57,6 @@ func (ps partnerSchedule) VdfDifficulty() int {
 	return partnerVdfDifficulty
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ps partnerSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ps partnerSchedule) GetNetworkID() NetworkID {
 	return Partner
 }

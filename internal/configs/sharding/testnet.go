@@ -94,12 +94,6 @@ func (ts testnetSchedule) VdfDifficulty() int {
 	return testnetVdfDifficulty
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ts testnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ts testnetSchedule) GetNetworkID() NetworkID {
 	return TestNet
 }
