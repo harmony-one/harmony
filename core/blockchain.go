@@ -2890,6 +2890,7 @@ func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Dele
 }
 
 // GetECDSAFromCoinbase retrieve corresponding ecdsa address from Coinbase Address
+// TODO: optimize this func by adding cache etc.
 func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address, error) {
 	// backward compatibility: before isStaking epoch, coinbase address is the ecdsa address
 	coinbase := header.Coinbase()

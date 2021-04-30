@@ -1,6 +1,7 @@
 package node
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -98,10 +99,26 @@ func TestVerifyNewBlock(t *testing.T) {
 	go func() {
 		commitSigs <- []byte{}
 	}()
-	block, _ := node.Worker.FinalizeNewBlock(
-		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
-	)
 
+	ecdsaAddr := pubKey.GetAddress()
+
+	shardState := &shard.State{}
+	com := shard.Committee{ShardID: uint32(0)}
+
+	spKey := bls.SerializedPublicKey{}
+	spKey.FromLibBLSPublicKey(pubKey)
+	curNodeID := shard.Slot{
+		ecdsaAddr,
+		spKey,
+		nil,
+	}
+	com.Slots = append(com.Slots, curNodeID)
+	shardState.Epoch = big.NewInt(0)
+	shardState.Shards = append(shardState.Shards, com)
+
+	block, _ := node.Worker.FinalizeNewBlock(
+		commitSigs, func() uint64 { return 0 }, ecdsaAddr, nil, shardState,
+	)
 	if err := node.VerifyNewBlock(block); err != nil {
 		t.Error("New block is not verified successfully:", err)
 	}

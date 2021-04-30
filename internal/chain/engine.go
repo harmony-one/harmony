@@ -156,6 +156,10 @@ func (e *engineImpl) VerifyVRF(
 
 	leaderPubKey, err := GetLeaderPubKeyFromCoinbase(bc, header)
 
+	if leaderPubKey == nil || err != nil {
+		return err
+	}
+
 	vrfPk := blsvrf.NewVRFVerifier(leaderPubKey.Object)
 
 	previousHeader := bc.GetHeaderByNumber(
