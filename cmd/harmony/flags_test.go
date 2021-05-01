@@ -48,10 +48,11 @@ func TestHarmonyFlags(t *testing.T) {
 					},
 				},
 				DNSSync: dnsSync{
-					Port:   9000,
-					Zone:   "t.hmny.io",
-					Server: true,
-					Client: true,
+					Port:       6000,
+					Zone:       "t.hmny.io",
+					Server:     true,
+					Client:     true,
+					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: p2pConfig{
 					Port:    9000,
@@ -258,6 +259,7 @@ func TestNetworkFlags(t *testing.T) {
 					Zone:          "8.8.8.8",
 					LegacySyncing: false,
 					Server:        true,
+					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
 				},
 			},
 		},
@@ -274,6 +276,7 @@ func TestNetworkFlags(t *testing.T) {
 					Zone:          "8.8.8.8",
 					LegacySyncing: false,
 					Server:        true,
+					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
 				},
 			},
 		},
@@ -290,6 +293,7 @@ func TestNetworkFlags(t *testing.T) {
 					LegacySyncing: true,
 					Client:        true,
 					Server:        true,
+					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
 				},
 			},
 		},
@@ -316,10 +320,10 @@ func TestNetworkFlags(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(got.Network, test.expConfig.Network) {
-			t.Errorf("Test %v: unexpected network config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
+			t.Errorf("Test %v: unexpected network config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig.Network)
 		}
 		if !reflect.DeepEqual(got.DNSSync, test.expConfig.DNSSync) {
-			t.Errorf("Test %v: unexpected dnssync config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
+			t.Errorf("Test %v: unexpected dnssync config: \n\t%+v\n\t%+v", i, got.DNSSync, test.expConfig.DNSSync)
 		}
 		ts.tearDown()
 	}

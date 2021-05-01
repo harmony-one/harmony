@@ -256,6 +256,7 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) dnsSync {
 		Port:          port,
 		Zone:          zone,
 		LegacySyncing: false,
+		ServerPort:    nodeconfig.DefaultDNSPort,
 	}
 	switch nt {
 	case nodeconfig.Mainnet:
@@ -358,7 +359,7 @@ func registerDumpConfigFlags() error {
 
 func promptConfigUpdate() bool {
 	var readStr string
-	fmt.Println("Do you want to update config to the latest version: [Y/n]")
+	fmt.Println("Do you want to update config to the latest version: [y/N]")
 	timeoutTimer := time.NewTimer(time.Second * 15)
 	read := make(chan string)
 	go func() {
@@ -375,7 +376,7 @@ func promptConfigUpdate() bool {
 			readStr = readStr[0:1]
 		}
 		readStr = strings.ToLower(readStr)
-		return readStr == "y" || readStr == ""
+		return readStr == "y"
 	}
 }
 
@@ -388,22 +389,8 @@ func loadHarmonyConfig(file string) (harmonyConfig, string, error) {
 	if err != nil {
 		return harmonyConfig{}, "", err
 	}
-	// Correct for old config version load (port 0 is invalid anyways)
-	if config.HTTP.RosettaPort == 0 {
-		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
-	}
-	backup := fmt.Sprintf("%s.backup", file)
-	if err := ioutil.WriteFile(backup, configBytes, 0664); err != nil {
-		return err
-	}
-	fmt.Printf("Original config backed up to %s\n", fmt.Sprintf("%s.backup", file))
-	config, migratedFromVer, err := migrateConf(configBytes)
-	if err != nil {
-		return err
-	}
-	if err := writeHarmonyConfigToFile(config, file); err != nil {
-		return err
-	}
+
+	correctLegacyHarmonyConfig(&config)
 	return config, migratedVer, nil
 }
 

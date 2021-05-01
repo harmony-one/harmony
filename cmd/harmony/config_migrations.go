@@ -4,11 +4,39 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/harmony-one/harmony/api/service/legacysync"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
 )
 
 const legacyConfigVersion = "1.0.4"
+
+func doMigrations(confVersion string, confTree *toml.Tree) error {
+	Ver, err := goversion.NewVersion(confVersion)
+	if err != nil {
+		return fmt.Errorf("invalid or missing config file version - '%s'", confVersion)
+	}
+	legacyVer, _ := goversion.NewVersion(legacyConfigVersion)
+	migrationKey := confVersion
+	if Ver.LessThan(legacyVer) {
+		migrationKey = legacyConfigVersion
+	}
+
+	migration, found := migrations[migrationKey]
+
+	// Version does not match any of the migration criteria
+	if !found {
+		return fmt.Errorf("unrecognized config version - %s", confVersion)
+	}
+
+	for confVersion != tomlConfigVersion {
+		confTree = migration(confTree)
+		confVersion = confTree.Get("Version").(string)
+		migration = migrations[confVersion]
+	}
+	return nil
+}
 
 func migrateConf(confBytes []byte) (harmonyConfig, string, error) {
 	var (
@@ -24,27 +52,9 @@ func migrateConf(confBytes []byte) (harmonyConfig, string, error) {
 	}
 	migratedFrom = confVersion
 	if confVersion != tomlConfigVersion {
-		Ver, err := goversion.NewVersion(confVersion)
+		err = doMigrations(confVersion, confTree)
 		if err != nil {
-			return harmonyConfig{}, "", fmt.Errorf("invalid or missing config file version - '%s'", confVersion)
-		}
-		legacyVer, _ := goversion.NewVersion(legacyConfigVersion)
-		migrationKey := confVersion
-		if Ver.LessThan(legacyVer) {
-			migrationKey = legacyConfigVersion
-		}
-
-		migration, found := migrations[migrationKey]
-
-		// Version does not match any of the migration criteria
-		if !found {
-			return harmonyConfig{}, "", fmt.Errorf("unrecognized config version - %s", confVersion)
-		}
-
-		for confVersion != tomlConfigVersion {
-			confTree = migration(confTree)
-			confVersion = confTree.Get("Version").(string)
-			migration = migrations[confVersion]
+			return harmonyConfig{}, "", err
 		}
 	}
 
@@ -75,8 +85,12 @@ func init() {
 			confTree.Set("DNSSync.Zone", zone)
 		}
 
+		var port = int64(nodeconfig.DefaultDNSPort)
 		portField := confTree.Get("Network.DNSPort")
-		if port, ok := portField.(int64); ok {
+		if p, ok := portField.(int64); ok {
+			if p != nodeconfig.DefaultDNSPort {
+				port = p - legacysync.SyncingPortDifference
+			}
 			confTree.Set("DNSSync.Port", port)
 		}
 
@@ -105,6 +119,11 @@ func init() {
 			serverPort = int(port)
 		}
 		confTree.Set("DNSSync.ServerPort", serverPort)
+
+		rosettaPort := confTree.Get("HTTP.RosettaPort")
+		if rosettaPort == nil {
+			confTree.Set("HTTP.RosettaPort", defaultConfig.HTTP.RosettaPort)
+		}
 
 		confTree.Set("Version", "2.0.0")
 		return confTree
