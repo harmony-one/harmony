@@ -28,28 +28,28 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 )
 
-type action struct{
-	op vm.OpCode
-	from common.Address
-	to common.Address
-	input []byte
-	output []byte
-	gasIn uint64
-	gasCost uint64
-	gas uint64
-	gasUsed uint64
-	outOff int64
-	outLen int64
-	value *big.Int
-	err error
+type action struct {
+	op       vm.OpCode
+	from     common.Address
+	to       common.Address
+	input    []byte
+	output   []byte
+	gasIn    uint64
+	gasCost  uint64
+	gas      uint64
+	gasUsed  uint64
+	outOff   int64
+	outLen   int64
+	value    *big.Int
+	err      error
 	subCalls []*action
 }
 
-func(c *action) push(ac *action){
+func (c *action) push(ac *action) {
 	c.subCalls = append(c.subCalls, ac)
 }
 
-func(c action) toJsonStr() (string, *string, *string){
+func (c action) toJsonStr() (string, *string, *string) {
 	callType := strings.ToLower(c.op.String())
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		action := fmt.Sprintf(
@@ -60,7 +60,7 @@ func(c action) toJsonStr() (string, *string, *string){
 			`{"code":"0x%x","gasUsed":"0x%x"}`,
 			c.output, c.gasUsed,
 		)
-		return "create",&action,&output
+		return "create", &action, &output
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
 		var action string
@@ -75,12 +75,12 @@ func(c action) toJsonStr() (string, *string, *string){
 				callType, c.to, c.gas, c.from, c.input,
 			)
 		}
-		
+
 		output := fmt.Sprintf(
 			`{"output":"0x%x","gasUsed":"0x%x"}`,
 			c.output, c.gasUsed,
 		)
-		return "call",&action,&output
+		return "call", &action, &output
 	}
 	if c.op == vm.SELFDESTRUCT {
 		action := fmt.Sprintf(
@@ -89,31 +89,29 @@ func(c action) toJsonStr() (string, *string, *string){
 		)
 		return "suicide", &action, nil
 	}
-	return "unkonw",nil,nil
+	return "unkonw", nil, nil
 }
 
 type ParityBlockTracer struct {
-	blockNumber	uint64
-	blockHash common.Hash
+	blockNumber         uint64
+	blockHash           common.Hash
 	transactionPosition uint64
-	transactionHash common.Hash
-	descended bool
-	calls []*action
+	transactionHash     common.Hash
+	descended           bool
+	calls               []*action
 	action
 }
 
-func(jst *ParityBlockTracer) push(ac *action){
+func (jst *ParityBlockTracer) push(ac *action) {
 	jst.calls = append(jst.calls, ac)
 }
 
-
-func(jst *ParityBlockTracer) pop() *action{
-	popIndex := len(jst.calls)-1
+func (jst *ParityBlockTracer) pop() *action {
+	popIndex := len(jst.calls) - 1
 	ac := jst.calls[popIndex]
 	jst.calls = jst.calls[:popIndex]
 	return ac
 }
-
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
 func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
@@ -141,14 +139,14 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	//	return nil
 	//}
 	var retErr error
-	stackPeek := func(n int)*big.Int{
-		if(n >= len(stack.Data())) {
+	stackPeek := func(n int) *big.Int {
+		if n >= len(stack.Data()) {
 			retErr = errors.New("tracer bug:stack overflow")
 			return big.NewInt(0)
 		}
 		return stack.Back(n)
 	}
-	memoryCopy := func(off, size int64)[]byte{
+	memoryCopy := func(off, size int64) []byte {
 		if off+size >= int64(memory.Len()) {
 			retErr = errors.New("tracer bug:memory leak")
 			return nil
@@ -160,12 +158,12 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		inOff := stackPeek(1).Int64()
 		inSize := stackPeek(2).Int64()
 		jst.push(&action{
-			op:op,
-			from: contract.Address(),
-			input: memoryCopy(inOff, inSize),
-			gasIn: gas,
+			op:      op,
+			from:    contract.Address(),
+			input:   memoryCopy(inOff, inSize),
+			gasIn:   gas,
 			gasCost: cost,
-			value: (&big.Int{}).Set(stackPeek(0)),
+			value:   (&big.Int{}).Set(stackPeek(0)),
 		})
 		jst.descended = true
 		return retErr
@@ -173,12 +171,12 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	if op == vm.SELFDESTRUCT {
 		ac := jst.calls[len(jst.calls)-1]
 		ac.push(&action{
-			op:op,
-			from: contract.Address(),
-			to: common.BigToAddress(stackPeek(0)),
-			gasIn: gas,
+			op:      op,
+			from:    contract.Address(),
+			to:      common.BigToAddress(stackPeek(0)),
+			gasIn:   gas,
 			gasCost: cost,
-			value: (&big.Int{}).Set(stackPeek(0)),
+			value:   (&big.Int{}).Set(stackPeek(0)),
 		})
 		return retErr
 	}
@@ -192,17 +190,17 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		if op == vm.DELEGATECALL || op == vm.STATICCALL {
 			off = 0
 		}
-		inOff := stackPeek(2+off).Int64()
-		inSize := stackPeek(3+off).Int64()
+		inOff := stackPeek(2 + off).Int64()
+		inSize := stackPeek(3 + off).Int64()
 		callObj := &action{
-			op:op,
-			from: contract.Address(),
-			to: to,
-			input: memoryCopy(inOff, inSize),
-			gasIn: gas,
+			op:      op,
+			from:    contract.Address(),
+			to:      to,
+			input:   memoryCopy(inOff, inSize),
+			gasIn:   gas,
 			gasCost: cost,
-			outOff: stackPeek(4+off).Int64(),
-			outLen: stackPeek(5+off).Int64(),
+			outOff:  stackPeek(4 + off).Int64(),
+			outLen:  stackPeek(5 + off).Int64(),
 		}
 		if op != vm.DELEGATECALL && op != vm.STATICCALL {
 			callObj.value = (&big.Int{}).Set(stackPeek(2))
@@ -230,11 +228,11 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			if ret.Sign() != 0 {
 				call.to = common.BigToAddress(ret)
 				call.output = env.StateDB.GetCode(call.to)
-			} else if (call.err == nil) {
+			} else if call.err == nil {
 				call.err = errors.New("internal failure")
 			}
 		} else {
-			if (call.gas != 0){
+			if call.gas != 0 {
 				call.gasUsed = call.gasIn - call.gasCost + call.gas - gas
 			}
 			ret := stackPeek(0)
@@ -267,15 +265,14 @@ func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.D
 	return nil
 }
 
-
 // GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
 func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 	root := &jst.action
-	headPiece:=fmt.Sprintf(
+	headPiece := fmt.Sprintf(
 		`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d,`,
 		jst.blockNumber, jst.blockHash.Hex(), jst.transactionHash.Hex(), jst.transactionPosition,
 	)
-	
+
 	var results []json.RawMessage
 	var err error
 	var finalize func(ac *action, traceAddress []int)
@@ -285,24 +282,24 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 			err = errors.New("tracer internal failure")
 			return
 		}
-		traceStr,_ := json.Marshal(traceAddress)
-		bodyPiece:=fmt.Sprintf(
+		traceStr, _ := json.Marshal(traceAddress)
+		bodyPiece := fmt.Sprintf(
 			`"subtraces":%d,"traceAddress":%s,"type":"%s","action":%s,`,
 			len(ac.subCalls), string(traceStr), typStr, *acStr,
 		)
 		var resultPiece string
 		if jst.err != nil {
 			resultPiece = `"error": "Reverted"`
-		}else if outStr != nil{
+		} else if outStr != nil {
 			resultPiece = fmt.Sprintf(`"result":%s`, *outStr)
 		}
 
-		jstr := "{"+headPiece + bodyPiece + resultPiece+"}"
+		jstr := "{" + headPiece + bodyPiece + resultPiece + "}"
 		results = append(results, json.RawMessage(jstr))
 		for i, subAc := range ac.subCalls {
 			finalize(subAc, append(traceAddress[:], i))
 		}
 	}
 	finalize(root, make([]int, 0))
-	return results,err
+	return results, err
 }
