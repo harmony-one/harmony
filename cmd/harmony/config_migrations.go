@@ -105,13 +105,14 @@ func init() {
 			confTree.Set("DNSSync.Zone", zone)
 		}
 
-		var port = int64(nodeconfig.DefaultDNSPort)
 		portField := confTree.Get("Network.DNSPort")
 		if p, ok := portField.(int64); ok {
 			if p != nodeconfig.DefaultDNSPort {
-				port = p - legacysync.SyncingPortDifference
+				p = p - legacysync.SyncingPortDifference
 			}
-			confTree.Set("DNSSync.Port", port)
+			confTree.Set("DNSSync.Port", p)
+		} else {
+			confTree.Set("DNSSync.Port", nodeconfig.DefaultDNSPort)
 		}
 
 		syncingField := confTree.Get("Network.LegacySyncing")
