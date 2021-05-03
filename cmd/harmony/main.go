@@ -162,10 +162,11 @@ func raiseFdLimits() error {
 
 func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	var (
-		config       harmonyConfig
-		err          error
-		migratedFrom string
-		configFile   string
+		config         harmonyConfig
+		err            error
+		migratedFrom   string
+		configFile     string
+		isUsingDefault bool
 	)
 	if cli.IsFlagChanged(cmd, configFlag) {
 		configFile = cli.GetStringFlagValue(cmd, configFlag)
@@ -173,11 +174,12 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	} else {
 		nt := getNetworkType(cmd)
 		config = getDefaultHmyConfigCopy(nt)
+		isUsingDefault = true
 	}
 	if err != nil {
 		return harmonyConfig{}, err
 	}
-	if migratedFrom != defaultConfig.Version {
+	if migratedFrom != defaultConfig.Version && !isUsingDefault {
 		fmt.Printf("Old config version detected %s\n",
 			migratedFrom)
 		stat, _ := os.Stdin.Stat()
