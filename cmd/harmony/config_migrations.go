@@ -79,6 +79,26 @@ func init() {
 		nt := parseNetworkType(ntStr)
 
 		defDNSSyncConf := getDefaultDNSSyncConfig(nt)
+		defSyncConfig := getDefaultSyncConfig(nt)
+
+		// Legacy conf missing fields
+		if confTree.Get("Sync") == nil {
+			confTree.Set("Sync", defSyncConfig)
+		}
+
+		if confTree.Get("HTTP.RosettaPort") == nil {
+			confTree.Set("HTTP.RosettaPort", defaultConfig.HTTP.RosettaPort)
+		}
+
+		if confTree.Get("P2P.IP") == nil {
+			confTree.Set("P2P.IP", defaultConfig.P2P.IP)
+		}
+
+		if confTree.Get("Prometheus") == nil {
+			if defaultConfig.Prometheus != nil {
+				confTree.Set("Prometheus", *defaultConfig.Prometheus)
+			}
+		}
 
 		zoneField := confTree.Get("Network.DNSZone")
 		if zone, ok := zoneField.(string); ok {
@@ -119,11 +139,6 @@ func init() {
 			serverPort = int(port)
 		}
 		confTree.Set("DNSSync.ServerPort", serverPort)
-
-		rosettaPort := confTree.Get("HTTP.RosettaPort")
-		if rosettaPort == nil {
-			confTree.Set("HTTP.RosettaPort", defaultConfig.HTTP.RosettaPort)
-		}
 
 		confTree.Set("Version", "2.0.0")
 		return confTree

@@ -172,29 +172,6 @@ type syncConfig struct {
 	DiscBatch      int  // size of each discovery
 }
 
-// correctLegacyHarmonyConfig correct values for old config version load
-func correctLegacyHarmonyConfig(config *harmonyConfig) {
-	if config.Sync == (syncConfig{}) {
-		nt := nodeconfig.NetworkType(config.Network.NetworkType)
-		config.Sync = getDefaultSyncConfig(nt)
-	}
-	if config.HTTP.RosettaPort == 0 {
-		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
-	}
-	if config.P2P.IP == "" {
-		config.P2P.IP = defaultConfig.P2P.IP
-	}
-	if config.Prometheus == nil {
-		config.Prometheus = defaultConfig.Prometheus
-	}
-	if syncPort := config.DNSSync.Port; syncPort == 0 {
-		config.DNSSync.Port = nodeconfig.DefaultDNSPort
-	}
-	if serverPort := config.DNSSync.ServerPort; serverPort == 0 {
-		config.DNSSync.ServerPort = nodeconfig.DefaultDNSPort
-	}
-}
-
 // TODO: use specific type wise validation instead of general string types assertion.
 func validateHarmonyConfig(config harmonyConfig) error {
 	var accepts []string
@@ -390,7 +367,6 @@ func loadHarmonyConfig(file string) (harmonyConfig, string, error) {
 		return harmonyConfig{}, "", err
 	}
 
-	correctLegacyHarmonyConfig(&config)
 	return config, migratedVer, nil
 }
 
