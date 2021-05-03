@@ -284,7 +284,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot verify vrf for the new block")
-		return errors.New(
+		return errors.Wrap(err,
 			"[VerifyNewBlock] Cannot verify vrf for the new block",
 		)
 	}
@@ -296,7 +296,7 @@ func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 			Str("blockHash", newBlock.Hash().Hex()).
 			Err(err).
 			Msg("[VerifyNewBlock] Cannot verify shard state for the new block")
-		return errors.New(
+		return errors.Wrap(err,
 			"[VerifyNewBlock] Cannot verify shard state for the new block",
 		)
 	}

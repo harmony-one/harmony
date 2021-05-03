@@ -153,6 +153,14 @@ func (e *engineImpl) VerifyVRF(
 			"[VerifyVRF] invalid vrf data format or no vrf proposed %x", header.Vrf(),
 		)
 	}
+	if !bc.Config().IsVRF(header.Epoch()) {
+		if len(header.Vrf()) != 0 {
+			errors.Errorf(
+				"[VerifyVRF] vrf data present in pre-vrf epoch %x", header.Vrf(),
+			)
+		}
+		return nil
+	}
 
 	leaderPubKey, err := GetLeaderPubKeyFromCoinbase(bc, header)
 
