@@ -142,3 +142,19 @@ func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
 		ConsensusTime: node.Consensus.GetFinality(),
 	}
 }
+
+// IsBackup returns the node is in backup mode
+func (node *Node) IsBackup() bool {
+	return node.Consensus.IsBackup()
+}
+
+// SetNodeBackupMode change node backup mode
+func (node *Node) SetNodeBackupMode(isBackup bool) bool {
+	if node.Consensus.IsBackup() == isBackup {
+		return false
+	}
+
+	node.Consensus.SetIsBackup(isBackup)
+	node.Consensus.ResetViewChangeState()
+	return true
+}

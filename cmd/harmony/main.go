@@ -661,6 +661,10 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	case nodeTypeValidator:
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
+
+		if hc.General.IsBackup {
+			currentConsensus.SetIsBackup(true)
+		}
 	}
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))

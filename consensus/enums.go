@@ -14,6 +14,8 @@ const (
 	Syncing
 	// Listening ..
 	Listening
+	// NormalBackup Backup Node ..
+	NormalBackup
 )
 
 // FBFTPhase : different phases of consensus
