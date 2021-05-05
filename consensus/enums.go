@@ -34,6 +34,7 @@ var (
 		ViewChanging: "ViewChanging",
 		Syncing:      "Syncing",
 		Listening:    "Listening",
+		NormalBackup: "NormalBackup",
 	}
 	phaseNames = map[FBFTPhase]string{
 		FBFTAnnounce: "Announce",
