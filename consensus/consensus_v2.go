@@ -715,6 +715,10 @@ func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
 
 	previousHash := previousHeader.Hash()
 	vrf, proof := sk.Evaluate(previousHash[:])
+	if proof == nil {
+		return errors.New("[GenerateVrfAndProof] failed to generate vrf")
+	}
+
 	newHeader.SetVrf(append(vrf[:], proof...))
 
 	consensus.getLogger().Info().

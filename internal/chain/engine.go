@@ -32,6 +32,8 @@ import (
 const (
 	verifiedSigCache = 100
 	epochCtxCache    = 20
+	vrfBeta          = 32 // 32 bytes randomness
+	vrfProof         = 96 // 96 bytes proof (bls sig)
 )
 
 type engineImpl struct {
@@ -148,14 +150,14 @@ func (e *engineImpl) VerifyVRF(
 		)
 	}
 
-	if bc.Config().IsVRF(header.Epoch()) && len(header.Vrf()) != 128 {
+	if bc.Config().IsVRF(header.Epoch()) && len(header.Vrf()) != vrfBeta+vrfProof {
 		return errors.Errorf(
 			"[VerifyVRF] invalid vrf data format or no vrf proposed %x", header.Vrf(),
 		)
 	}
 	if !bc.Config().IsVRF(header.Epoch()) {
 		if len(header.Vrf()) != 0 {
-			errors.Errorf(
+			return errors.Errorf(
 				"[VerifyVRF] vrf data present in pre-vrf epoch %x", header.Vrf(),
 			)
 		}
@@ -178,15 +180,15 @@ func (e *engineImpl) VerifyVRF(
 	}
 
 	previousHash := previousHeader.Hash()
-	vrfProof := [96]byte{}
-	copy(vrfProof[:], header.Vrf()[32:])
+	vrfProof := [vrfProof]byte{}
+	copy(vrfProof[:], header.Vrf()[vrfBeta:])
 	hash, err := vrfPk.ProofToHash(previousHash[:], vrfProof[:])
 
 	if err != nil {
 		return errors.New("[VerifyVRF] Failed VRF verification")
 	}
 
-	if !bytes.Equal(hash[:], header.Vrf()[:32]) {
+	if !bytes.Equal(hash[:], header.Vrf()[:vrfBeta]) {
 		return errors.New("[VerifyVRF] VRF proof is not valid")
 	}
 
