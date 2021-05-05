@@ -172,6 +172,7 @@ func TestVerifyVRF(t *testing.T) {
 	// Write shard state for the new epoch
 	node.Blockchain().WriteShardStateBytes(node.Blockchain().ChainDb(), big.NewInt(1), node.Worker.GetCurrentHeader().ShardState())
 
+	node.Blockchain().Config().VRFEpoch = big.NewInt(0)
 	if err := node.Blockchain().Engine().VerifyVRF(
 		node.Blockchain(), block.Header(),
 	); err != nil {
