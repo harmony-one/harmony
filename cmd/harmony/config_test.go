@@ -29,7 +29,7 @@ func init() {
 	}
 }
 
-func TestV1_0_0Config(t *testing.T) {
+func TestV1_0_4Config(t *testing.T) {
 	testConfig := `Version = "1.0.4"
 
 [BLSKeys]
