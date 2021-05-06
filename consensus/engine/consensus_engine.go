@@ -105,6 +105,9 @@ type Engine interface {
 	// VerifyShardState verifies the shard state during epoch transition is valid
 	VerifyShardState(chain ChainReader, beacon ChainReader, header *block.Header) error
 
+	// VerifyVRF verifies the vrf of the block
+	VerifyVRF(chain ChainReader, header *block.Header) error
+
 	// Beaconchain provides the handle for Beaconchain
 	Beaconchain() ChainReader
 

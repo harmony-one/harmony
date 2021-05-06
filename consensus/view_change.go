@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -174,7 +176,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
-			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, curHeader)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
