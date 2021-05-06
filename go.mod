@@ -1,6 +1,6 @@
 module github.com/harmony-one/harmony
 
-go 1.14
+go 1.16
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
