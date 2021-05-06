@@ -653,19 +653,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	)
 
 	nodeconfig.GetDefaultConfig().DBDir = nodeConfig.DBDir
-	switch hc.General.NodeType {
-	case nodeTypeExplorer:
-		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-
-	case nodeTypeValidator:
-		nodeconfig.SetDefaultRole(nodeconfig.Validator)
-		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-
-		if hc.General.IsBackup {
-			currentConsensus.SetIsBackup(true)
-		}
-	}
+	processNodeType(hc, currentNode, currentConsensus)
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
@@ -692,6 +680,22 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
+}
+
+func processNodeType(hc harmonyConfig, currentNode *node.Node, currentConsensus *consensus.Consensus) {
+	switch hc.General.NodeType {
+	case nodeTypeExplorer:
+		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
+		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+
+	case nodeTypeValidator:
+		nodeconfig.SetDefaultRole(nodeconfig.Validator)
+		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
+
+		if hc.General.IsBackup {
+			currentConsensus.SetIsBackup(true)
+		}
+	}
 }
 
 func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {

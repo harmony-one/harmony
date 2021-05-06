@@ -45,7 +45,7 @@ const (
 
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
-	return consensus.current.Mode() == ViewChanging
+	return consensus.current.Mode() == ViewChanging || (consensus.current.Mode() == Normal && consensus.IsBackup())
 }
 
 // HandleMessageUpdate will update the consensus state according to received message
