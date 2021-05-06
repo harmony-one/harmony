@@ -16,7 +16,7 @@ http://api.hmny.io/
 
 ## Requirements
 
-### **Go 1.14.7**
+### **Go 1.16.3**
 ### **GMP and OpenSSL**
 
 On macOS:
