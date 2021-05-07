@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/harmony-one/harmony/api/service/legacysync"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
@@ -107,9 +106,6 @@ func init() {
 
 		portField := confTree.Get("Network.DNSPort")
 		if p, ok := portField.(int64); ok {
-			if p != nodeconfig.DefaultDNSPort {
-				p = p - legacysync.SyncingPortDifference
-			}
 			confTree.Set("DNSSync.Port", p)
 		} else {
 			confTree.Set("DNSSync.Port", nodeconfig.DefaultDNSPort)
