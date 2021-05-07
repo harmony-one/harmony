@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+	"golang.org/x/time/rate"
 
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -28,16 +30,31 @@ import (
 type PublicBlockchainService struct {
 	hmy     *hmy.Harmony
 	version Version
+	limiter *rate.Limiter
 }
 
+var (
+	DefaultRateLimiterWaitTimeout = 5 * time.Second
+)
+
 // NewPublicBlockchainAPI creates a new API for the RPC interface
-func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
-	return rpc.API{
-		Namespace: version.Namespace(),
-		Version:   APIVersion,
-		Service:   &PublicBlockchainService{hmy, version},
-		Public:    true,
+func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	if limiterEnable {
+		return rpc.API{
+			Namespace: version.Namespace(),
+			Version:   APIVersion,
+			Service:   &PublicBlockchainService{hmy, version, rate.NewLimiter(rate.Limit(limit), 1)},
+			Public:    true,
+		}
+	} else {
+		return rpc.API{
+			Namespace: version.Namespace(),
+			Version:   APIVersion,
+			Service:   &PublicBlockchainService{hmy, version, nil},
+			Public:    true,
+		}
 	}
+
 }
 
 // ChainId returns the chain id of the chain - required by MetaMask
@@ -122,12 +139,27 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 	}
 }
 
+func (s *PublicBlockchainService) wait(ctx context.Context) error {
+	if s.limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		return s.limiter.Wait(deadlineCtx)
+	}
+	return nil
+}
+
 // GetBlockByNumber returns the requested block. When blockNum is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 // When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
+
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	var blockArgs *rpc_common.BlockArgs
@@ -198,6 +230,12 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 func (s *PublicBlockchainService) GetBlockByHash(
 	ctx context.Context, blockHash common.Hash, opts interface{},
 ) (response StructuredResponse, err error) {
+
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -260,6 +298,12 @@ func (s *PublicBlockchainService) GetBlocks(
 	ctx context.Context, blockNumberStart BlockNumber,
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
 
@@ -469,6 +513,11 @@ func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error)
 func (s *PublicBlockchainService) GetShardingStructure(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Get header and number of shards.
 	epoch := s.hmy.CurrentBlock().Epoch()
 	numShard := shard.Schedule.InstanceForEpoch(epoch).NumShards()
@@ -487,6 +536,12 @@ func (s *PublicBlockchainService) GetShardID(ctx context.Context) (int, error) {
 func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (interface{}, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -512,6 +567,12 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 
 // LatestHeader returns the latest header information
 func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
@@ -535,6 +596,12 @@ func (s *PublicBlockchainService) GetLatestChainHeaders(
 func (s *PublicBlockchainService) GetLastCrossLinks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -561,6 +628,11 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 func (s *PublicBlockchainService) GetHeaderByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -583,6 +655,11 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -601,6 +678,11 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 func (s *PublicBlockchainService) GetSuperCommittees(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -619,6 +701,12 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Fetch bad blocks and format
 	badBlocks := []StructuredResponse{}
 	for _, blk := range s.hmy.GetCurrentBadBlocks() {
@@ -651,6 +739,12 @@ func (s *PublicBlockchainService) GetCirculatingSupply(
 func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}

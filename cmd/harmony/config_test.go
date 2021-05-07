@@ -30,8 +30,8 @@ func init() {
 }
 
 func TestV1_0_4Config(t *testing.T) {
-	testConfig := `Version = "1.0.4"
-
+	testConfig := `
+Version = "1.0.4"
 [BLSKeys]
   KMSConfigFile = ""
   KMSConfigSrcType = "shared"
@@ -104,7 +104,7 @@ func TestV1_0_4Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := loadHarmonyConfig(file)
+	config, migratedFrom, err := loadHarmonyConfig(file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestV1_0_4Config(t *testing.T) {
 	if config.P2P.IP != defConf.P2P.IP {
 		t.Errorf("Expect default p2p IP if old config is provided")
 	}
-	if config.Version != "1.0.4" {
+	if migratedFrom != "1.0.4" {
 		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
 	config.Version = defConf.Version // Shortcut for testing, value checked above
@@ -169,7 +169,7 @@ func TestPersistConfig(t *testing.T) {
 		if err := writeHarmonyConfigToFile(test.config, file); err != nil {
 			t.Fatal(err)
 		}
-		config, err := loadHarmonyConfig(file)
+		config, _, err := loadHarmonyConfig(file)
 		if err != nil {
 			t.Fatal(err)
 		}
