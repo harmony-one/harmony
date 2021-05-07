@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
@@ -662,7 +661,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	} else if hc.DNSSync.LegacySyncing {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, legacysync.GetSyncingPort(strconv.Itoa(hc.DNSSync.Port)))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port))
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
