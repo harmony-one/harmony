@@ -18,7 +18,7 @@ const (
 	GetBlocksByHashesAmountCap = 10
 
 	// minAdvertiseInterval is the minimum advertise interval
-	minAdvertiseInterval = 1 * time.Minute
+	minAdvertiseInterval = 10 * time.Minute
 
 	// rateLimiterGlobalRequestPerSecond is the request per second limit for all streams in the sync protocol.
 	// This constant helps prevent the node resource from exhausting for being the stream sync host.
