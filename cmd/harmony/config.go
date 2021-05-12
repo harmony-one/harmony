@@ -314,24 +314,35 @@ var updateConfigCmd = &cobra.Command{
 	},
 }
 
+func dumpConfig(cmd *cobra.Command, args []string) {
+	nt := getNetworkType(cmd)
+	config := getDefaultHmyConfigCopy(nt)
+
+	if err := writeHarmonyConfigToFile(config, args[0]); err != nil {
+		fmt.Println(err)
+		os.Exit(128)
+	}
+}
+
 var dumpConfigCmd = &cobra.Command{
 	Use:   "dump [config_file]",
-	Short: "dump default file for harmony binary configurations",
+	Short: "dump default config file for harmony binary configurations",
 	Long:  "dump default config file for harmony binary configurations",
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		nt := getNetworkType(cmd)
-		config := getDefaultHmyConfigCopy(nt)
+	Run:   dumpConfig,
+}
 
-		if err := writeHarmonyConfigToFile(config, args[0]); err != nil {
-			fmt.Println(err)
-			os.Exit(128)
-		}
-	},
+var dumpConfigLegacyCmd = &cobra.Command{
+	Use:   "dumpconfig [config_file]",
+	Short: "depricated - use config dump instead",
+	Long:  "depricated - use config dump instead",
+	Args:  cobra.MinimumNArgs(1),
+	Run:   dumpConfig,
 }
 
 func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
+	return cli.RegisterFlags(dumpConfigLegacyCmd, []cli.Flag{networkTypeFlag})
 }
 
 func promptConfigUpdate() bool {

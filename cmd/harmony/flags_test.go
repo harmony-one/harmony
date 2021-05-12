@@ -248,7 +248,7 @@ func TestNetworkFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
-				"--dns.port", "9001"},
+				"--dns.port", "9001", "--dns.server-port", "9002"},
 			expConfig: harmonyConfig{
 				Network: networkConfig{
 					NetworkType: "pangaea",
@@ -259,7 +259,7 @@ func TestNetworkFlags(t *testing.T) {
 					Zone:          "8.8.8.8",
 					LegacySyncing: false,
 					Server:        true,
-					ServerPort:    nodeconfig.GetDefaultDNSPort(nodeconfig.Pangaea),
+					ServerPort:    9002,
 				},
 			},
 		},

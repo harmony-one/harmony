@@ -32,6 +32,7 @@ var (
 	dnsSyncFlags = []cli.Flag{
 		dnsZoneFlag,
 		dnsPortFlag,
+		dnsServerPortFlag,
 		dnsClientFlag,
 		dnsServerFlag,
 
@@ -382,7 +383,12 @@ var (
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
-		Usage:    "port of customized dns node",
+		Usage:    "dns sync remote server port",
+	}
+	dnsServerPortFlag = cli.IntFlag{
+		Name:     "dns.server-port",
+		DefValue: nodeconfig.DefaultDNSPort,
+		Usage:    "dns sync local server port",
 	}
 	syncLegacyClientFlag = cli.BoolFlag{
 		Name:       "sync.legacy.client",
@@ -453,6 +459,10 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 		cfg.DNSSync.Client = cli.GetBoolFlagValue(cmd, syncLegacyClientFlag)
 	} else if cli.IsFlagChanged(cmd, dnsClientFlag) {
 		cfg.DNSSync.Client = cli.GetBoolFlagValue(cmd, dnsClientFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, dnsServerPortFlag) {
+		cfg.DNSSync.ServerPort = cli.GetIntFlagValue(cmd, dnsServerPortFlag)
 	}
 
 }
