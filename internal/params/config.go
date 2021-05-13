@@ -468,9 +468,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                               *big.Int
-	EthChainID                                            *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
+	ChainID                                                      *big.Int
+	EthChainID                                                   *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -491,5 +491,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsS3:         c.IsS3(epoch),
 		IsReceiptLog: c.IsReceiptLog(epoch),
 		IsIstanbul:   c.IsIstanbul(epoch),
+		IsVRF:        c.IsVRF(epoch),
 	}
 }
