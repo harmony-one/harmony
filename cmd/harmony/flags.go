@@ -368,11 +368,12 @@ var (
 	legacyDNSPortFlag = cli.IntFlag{
 		Name:       "dns_port",
 		Usage:      "port of dns node",
-		Deprecated: "use --dns.zone",
+		Deprecated: "use --dns.port",
 	}
 	legacyDNSFlag = cli.BoolFlag{
 		Name:       "dns",
 		DefValue:   true,
+		Hidden:     true,
 		Usage:      "use dns for syncing",
 		Deprecated: "only set to false to use self discovered peers for syncing",
 	}
