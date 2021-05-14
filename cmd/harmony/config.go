@@ -44,7 +44,7 @@ type dnsSync struct {
 	Zone          string // replaces: Network.DNSZone
 	LegacySyncing bool   // replaces: Network.LegacySyncing
 	Client        bool   // replaces: Sync.LegacyClient
-	Server        bool   // replaces Sync.LegacyServer
+	Server        bool   // replaces: Sync.LegacyServer
 	ServerPort    int
 }
 
