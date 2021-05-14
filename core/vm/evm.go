@@ -54,7 +54,14 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if evm.chainRules.IsIstanbul {
 			precompiles = PrecompiledContractsIstanbul
 		}
+		if evm.chainRules.IsVRF {
+			precompiles = PrecompiledContractsVRF
+		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
+			if _, ok := p.(*vrf); ok {
+				// Override the input with vrf data of the current block so it can be returned to the contract program.
+				input = evm.Context.VRF.Bytes()
+			}
 			return RunPrecompiledContract(p, input, contract)
 		}
 	}
@@ -69,6 +76,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 				evm.interpreter = interpreter
 			}
 			return interpreter.Run(contract, input, readOnly)
+
 		}
 	}
 	return nil, ErrNoCompatibleInterpreter
@@ -99,6 +107,7 @@ type Context struct {
 	BlockNumber *big.Int       // Provides information for NUMBER
 	EpochNumber *big.Int       // Provides information for EPOCH
 	Time        *big.Int       // Provides information for TIME
+	VRF         common.Hash    // Provides information for VRF
 
 	TxType types.TransactionType
 }
@@ -225,6 +234,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		if evm.chainRules.IsIstanbul {
 			precompiles = PrecompiledContractsIstanbul
 		}
+		if evm.chainRules.IsVRF {
+			precompiles = PrecompiledContractsVRF
+		}
+
 		if precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {

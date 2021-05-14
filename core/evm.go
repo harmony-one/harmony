@@ -55,6 +55,11 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 	} else {
 		beneficiary = *author
 	}
+	vrf := common.Hash{}
+	if len(header.Vrf()) >= 32 {
+		vrfAndProof := header.Vrf()
+		copy(vrf[:], vrfAndProof[:32])
+	}
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -64,6 +69,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Coinbase:    beneficiary,
 		BlockNumber: header.Number(),
 		EpochNumber: header.Epoch(),
+		VRF:         vrf,
 		Time:        header.Time(),
 		GasLimit:    header.GasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),

@@ -724,7 +724,7 @@ func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
 	consensus.getLogger().Info().
 		Uint64("BlockNum", newHeader.Number().Uint64()).
 		Uint64("Epoch", newHeader.Epoch().Uint64()).
-		Bytes("VRF+Proof", newHeader.Vrf()).
+		Hex("VRF+Proof", newHeader.Vrf()).
 		Msg("[GenerateVrfAndProof] Leader generated a VRF")
 
 	return nil
