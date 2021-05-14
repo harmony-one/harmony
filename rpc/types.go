@@ -19,6 +19,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+	jsoniter "github.com/json-iterator/go"
 )
 
 // CallArgs represents the arguments for a call.
@@ -101,11 +102,12 @@ type StructuredResponse = map[string]interface{}
 // NewStructuredResponse creates a structured response from the given input
 func NewStructuredResponse(input interface{}) (StructuredResponse, error) {
 	var objMap StructuredResponse
-	dat, err := json.Marshal(input)
+	var jsonIter = jsoniter.ConfigCompatibleWithStandardLibrary
+	dat, err := jsonIter.Marshal(input)
 	if err != nil {
 		return nil, err
 	}
-	d := json.NewDecoder(bytes.NewReader(dat))
+	d := jsonIter.NewDecoder(bytes.NewReader(dat))
 	d.UseNumber()
 	err = d.Decode(&objMap)
 	if err != nil {

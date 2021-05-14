@@ -29,6 +29,7 @@ require (
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-ds-badger v0.2.4
+	github.com/json-iterator/go v1.1.10
 	github.com/libp2p/go-libp2p v0.14.0
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-crypto v0.1.0
