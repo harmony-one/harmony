@@ -233,3 +233,4 @@ See [`CONTRIBUTING`](CONTRIBUTING.md) for details.
 - Integration with WASM
 - Fast state synchronization
 - Auditable privacy asset using ZK proof
+
