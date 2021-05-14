@@ -40,11 +40,11 @@ jobs:
     if: needs.check.outputs.tag_annotated == 'true'
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-10.15, [self-hosted, Linux, ARM64]]
+        os: [ubuntu-18.04, macos-10.15, [self-hosted, linux, ARM64]]
 
     steps:
       - name: Import GPG key
-        if: join(matrix.os, '-') != 'self-hosted-Linux-ARM64'
+        if: join(matrix.os, '-') != 'self-hosted-linux-ARM64'
         uses: crazy-max/ghaction-import-gpg@v3
         with:
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -95,7 +95,7 @@ jobs:
         working-directory: harmony
 
       - name: Build harmony binary and packages for Linux
-        if: join(matrix.os, '-') == 'self-hosted-Linux-ARM64'
+        if: join(matrix.os, '-') == 'self-hosted-linux-ARM64'
         run: |
           make linux_static
           mv ./bin/harmony ./bin/harmony-arm64
