@@ -37,7 +37,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 	serverAsserter, err := asserter.NewServer(
 		append(common.PlainOperationTypes, common.StakingOperationTypes...),
 		nodeconfig.GetShardConfig(hmy.ShardID).Role() == nodeconfig.ExplorerNode,
-		[]*types.NetworkIdentifier{network},
+		[]*types.NetworkIdentifier{network}, services.CallMethod, false,
 	)
 	if err != nil {
 		return err
@@ -84,6 +84,7 @@ func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
 		server.NewMempoolAPIController(services.NewMempoolAPI(hmy), asserter),
 		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
 		server.NewConstructionAPIController(services.NewConstructionAPI(hmy), asserter),
+		server.NewCallAPIController(services.NewCallAPIService(hmy), asserter),
 	)
 }
 
