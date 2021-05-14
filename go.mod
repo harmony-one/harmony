@@ -14,7 +14,7 @@ require (
 	github.com/ethereum/go-ethereum v1.9.25
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/golang/mock v1.5.0
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.4.3
 	github.com/golangci/golangci-lint v1.40.0
 	github.com/gorilla/mux v1.8.0
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
@@ -52,7 +52,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/tools v0.1.1
 	google.golang.org/grpc v1.37.1
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20210326210528-650f7c854440
