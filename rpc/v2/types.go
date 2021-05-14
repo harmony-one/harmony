@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -38,6 +40,7 @@ type BlockWithTxHash struct {
 	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
 	Uncles           []common.Hash  `json:"uncles"`
 	Transactions     []common.Hash  `json:"transactions"`
+	EthTransactions  []common.Hash  `json:"transactionsInEthHash"`
 	StakingTxs       []common.Hash  `json:"stakingTransactions"`
 	Signers          []string       `json:"signers,omitempty"`
 }
@@ -78,6 +81,7 @@ type Transaction struct {
 	Gas              uint64        `json:"gas"`
 	GasPrice         *big.Int      `json:"gasPrice"`
 	Hash             common.Hash   `json:"hash"`
+	EthHash          common.Hash   `json:"ethHash"`
 	Input            hexutil.Bytes `json:"input"`
 	Nonce            uint64        `json:"nonce"`
 	To               string        `json:"to"`
@@ -124,6 +128,7 @@ type CreateValidatorMsg struct {
 	SecurityContact    string                    `json:"securityContact"`
 	Details            string                    `json:"details"`
 	SlotPubKeys        []bls.SerializedPublicKey `json:"slotPubKeys"`
+	SlotKeySigs        []bls.SerializedSignature `json:"slotKeySigs"`
 }
 
 // EditValidatorMsg represents a staking transaction's edit validator directive that
@@ -140,6 +145,7 @@ type EditValidatorMsg struct {
 	Details            string                   `json:"details"`
 	SlotPubKeyToAdd    *bls.SerializedPublicKey `json:"slotPubKeyToAdd"`
 	SlotPubKeyToRemove *bls.SerializedPublicKey `json:"slotPubKeyToRemove"`
+	SlotKeyToAddSig    *bls.SerializedSignature `json:"slotKeyToAddSig"`
 }
 
 // CollectRewardsMsg represents a staking transaction's collect rewards directive that
@@ -258,6 +264,7 @@ func NewTransaction(
 		Gas:       tx.GasLimit(),
 		GasPrice:  tx.GasPrice(),
 		Hash:      tx.Hash(),
+		EthHash:   tx.ConvertToEth().Hash(),
 		Input:     hexutil.Bytes(tx.Data()),
 		Nonce:     tx.Nonce(),
 		Value:     tx.Value(),
@@ -416,12 +423,9 @@ func NewStakingTxReceipt(
 // representation, with the given location metadata set (if available).
 func NewStakingTransaction(
 	tx *staking.StakingTransaction, blockHash common.Hash,
-	blockNumber uint64, timestamp uint64, index uint64,
+	blockNumber uint64, timestamp uint64, index uint64, signed bool,
 ) (*StakingTransaction, error) {
-	from, err := tx.SenderAddress()
-	if err != nil {
-		return nil, nil
-	}
+
 	v, r, s := tx.RawSignatureValues()
 
 	var rpcMsg interface{}
@@ -429,7 +433,7 @@ func NewStakingTransaction(
 	case staking.DirectiveCreateValidator:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCreateValidator)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("RLP decode error: %s", err.Error()))
 		}
 		msg, ok := rawMsg.(*staking.CreateValidator)
 		if !ok {
@@ -437,7 +441,7 @@ func NewStakingTransaction(
 		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert validator address error: %s", err.Error()))
 		}
 		rpcMsg = &CreateValidatorMsg{
 			ValidatorAddress:   validatorAddress,
@@ -453,11 +457,12 @@ func NewStakingTransaction(
 			SecurityContact:    msg.Description.SecurityContact,
 			Details:            msg.Description.Details,
 			SlotPubKeys:        msg.SlotPubKeys,
+			SlotKeySigs:        msg.SlotKeySigs,
 		}
 	case staking.DirectiveEditValidator:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveEditValidator)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("RLP decode error: %s", err.Error()))
 		}
 		msg, ok := rawMsg.(*staking.EditValidator)
 		if !ok {
@@ -465,7 +470,7 @@ func NewStakingTransaction(
 		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert validator address error: %s", err.Error()))
 		}
 		// Edit validators txs need not have commission rates to edit
 		commissionRate := &big.Int{}
@@ -484,11 +489,12 @@ func NewStakingTransaction(
 			Details:            msg.Description.Details,
 			SlotPubKeyToAdd:    msg.SlotKeyToAdd,
 			SlotPubKeyToRemove: msg.SlotKeyToRemove,
+			SlotKeyToAddSig:    msg.SlotKeyToAddSig,
 		}
 	case staking.DirectiveCollectRewards:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveCollectRewards)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("RLP decode error: %s", err.Error()))
 		}
 		msg, ok := rawMsg.(*staking.CollectRewards)
 		if !ok {
@@ -496,13 +502,13 @@ func NewStakingTransaction(
 		}
 		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert delegator address error: %s", err.Error()))
 		}
 		rpcMsg = &CollectRewardsMsg{DelegatorAddress: delegatorAddress}
 	case staking.DirectiveDelegate:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("RLP decode error: %s", err.Error()))
 		}
 		msg, ok := rawMsg.(*staking.Delegate)
 		if !ok {
@@ -510,11 +516,11 @@ func NewStakingTransaction(
 		}
 		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert delegator address error: %s", err.Error()))
 		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert validator address error: %s", err.Error()))
 		}
 		rpcMsg = &DelegateMsg{
 			DelegatorAddress: delegatorAddress,
@@ -524,7 +530,7 @@ func NewStakingTransaction(
 	case staking.DirectiveUndelegate:
 		rawMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("RLP decode error: %s", err.Error()))
 		}
 		msg, ok := rawMsg.(*staking.Undelegate)
 		if !ok {
@@ -532,7 +538,7 @@ func NewStakingTransaction(
 		}
 		delegatorAddress, err := internal_common.AddressToBech32(msg.DelegatorAddress)
 		if err != nil {
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("convert delegator address error: %s", err.Error()))
 		}
 		validatorAddress, err := internal_common.AddressToBech32(msg.ValidatorAddress)
 		if err != nil {
@@ -563,11 +569,18 @@ func NewStakingTransaction(
 		result.TransactionIndex = index
 	}
 
-	fromAddr, err := internal_common.AddressToBech32(from)
-	if err != nil {
-		return nil, err
+	if signed {
+		from, err := tx.SenderAddress()
+		if err != nil {
+			return nil, errors.New(fmt.Sprintf("get sender address error: %s", err.Error()))
+		}
+
+		fromAddr, err := internal_common.AddressToBech32(from)
+		if err != nil {
+			return nil, err
+		}
+		result.From = fromAddr
 	}
-	result.From = fromAddr
 
 	return result, nil
 }
@@ -612,11 +625,13 @@ func NewBlockWithTxHash(
 		ReceiptsRoot:     head.ReceiptHash(),
 		Uncles:           []common.Hash{},
 		Transactions:     []common.Hash{},
+		EthTransactions:  []common.Hash{},
 		StakingTxs:       []common.Hash{},
 	}
 
 	for _, tx := range b.Transactions() {
 		blk.Transactions = append(blk.Transactions, tx.Hash())
+		blk.EthTransactions = append(blk.EthTransactions, tx.ConvertToEth().Hash())
 	}
 
 	if blockArgs.InclStaking {
@@ -727,5 +742,5 @@ func NewStakingTransactionFromBlockIndex(b *types.Block, index uint64) (*Staking
 			"tx index %v greater than or equal to number of transactions on block %v", index, b.Hash().String(),
 		)
 	}
-	return NewStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+	return NewStakingTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index, true)
 }

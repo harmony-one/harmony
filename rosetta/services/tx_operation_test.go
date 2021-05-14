@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -74,12 +75,14 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
 	if !reflect.DeepEqual(operations, refOperations) {
-		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+		operationsRaw, _ := json.Marshal(operations)
+		refOperationsRaw, _ := json.Marshal(refOperations)
+		t.Errorf("Expected operations to be:\n %v\n not\n %v", string(operationsRaw), string(refOperationsRaw))
 	}
 	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
@@ -191,6 +194,12 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 
+	senderAccIDWithSubAccount, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr,
+		map[string]interface{}{SubAccountMetadataKey: Delegation})
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+
 	gasUsed := uint64(1e5)
 	gasFee := new(big.Int).Mul(gasPrice, big.NewInt(int64(gasUsed)))
 	receipt := &hmytypes.Receipt{
@@ -209,7 +218,23 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 2},
+		RelatedOperations: []*types.OperationIdentifier{
+			{
+				Index: 1,
+			},
+		},
+		Type:    tx.StakingType().String(),
+		Status:  common.SuccessOperationStatus.Status,
+		Account: senderAccIDWithSubAccount,
+		Amount: &types.Amount{
+			Value:    tenOnes.String(),
+			Currency: &common.NativeCurrency,
+		},
+		Metadata: metadata,
+	})
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -219,6 +244,59 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
+	startingOperationIndex := int64(0)
+	undelegationPayouts := hmy.NewUndelegationPayouts()
+	delegator := ethcommon.HexToAddress("0xB5f440B5c6215eEDc1b2E12b4b964fa31f7afa7d")
+	validator := ethcommon.HexToAddress("0x3b8DE43c8F30D3C387840681FED67783f93f1F94")
+	undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(delegator, validator, new(big.Int).SetInt64(4000))
+	operations, err := getSideEffectOperationsFromUndelegationPayouts(undelegationPayouts, &startingOperationIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiverAccId, err := newAccountIdentifier(delegator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reveiverSubAccId1, err := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
+		SubAccountMetadataKey: UnDelegation,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refOperations := []*types.Operation{}
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 0},
+		Type:                UndelegationPayout,
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             receiverAccId,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("9000"),
+			Currency: &common.NativeCurrency,
+		},
+	}, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 1},
+		RelatedOperations: []*types.OperationIdentifier{
+			&types.OperationIdentifier{
+				Index: 0,
+			},
+		},
+		Type:    UndelegationPayout,
+		Status:  common.SuccessOperationStatus.Status,
+		Account: reveiverSubAccId1,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("-9000"),
+			Currency: &common.NativeCurrency,
+		},
+	})
+
+	if len(refOperations) != len(operations) {
+		t.Errorf("Expected operation to be %d not %d", len(refOperations), len(operations))
+	}
+
 }
 
 func TestGetStakingOperationsFromUndelegate(t *testing.T) {
@@ -247,7 +325,16 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	senderAccID, rosettaError := newAccountIdentifier(senderAddr)
+	senderAccID, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr, map[string]interface{}{
+		SubAccountMetadataKey: Delegation,
+	})
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+
+	receiverAccId, rosettaError := newAccountIdentifierWithSubAccount(senderAddr, validatorAddr, map[string]interface{}{
+		SubAccountMetadataKey: UnDelegation,
+	})
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -270,7 +357,18 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
+	refOperations = append(refOperations, &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{Index: 2},
+		Type:                tx.StakingType().String(),
+		Status:              common.SuccessOperationStatus.Status,
+		Account:             receiverAccId,
+		Amount: &types.Amount{
+			Value:    fmt.Sprintf("0"),
+			Currency: &common.NativeCurrency,
+		},
+		Metadata: metadata,
+	})
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -331,7 +429,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -385,7 +483,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 		},
 		Metadata: metadata,
 	})
-	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt)
+	operations, rosettaError := GetNativeOperationsFromStakingTransaction(tx, receipt, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}

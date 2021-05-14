@@ -164,6 +164,14 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		return nil, err
 	}
 
+	// Add VRF
+	if node.Blockchain().Config().IsVRF(header.Epoch()) {
+		//generate a new VRF for the current block
+		if err := node.Consensus.GenerateVrfAndProof(header); err != nil {
+			return nil, err
+		}
+	}
+
 	// Prepare normal and staking transactions retrieved from transaction pool
 	utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
@@ -244,6 +252,9 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				}
 
 				crossLinksToPropose = append(crossLinksToPropose, pending)
+				if len(crossLinksToPropose) > 15 {
+					break
+				}
 			}
 			utils.Logger().Info().
 				Msgf("[ProposeNewBlock] Proposed %d crosslinks from %d pending crosslinks",

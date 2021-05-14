@@ -56,12 +56,6 @@ func (ps pangaeaSchedule) VdfDifficulty() int {
 	return pangaeaVdfDifficulty
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ps pangaeaSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ps pangaeaSchedule) GetNetworkID() NetworkID {
 	return Pangaea
 }

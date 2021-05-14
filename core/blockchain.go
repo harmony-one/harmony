@@ -2280,18 +2280,29 @@ func (bc *BlockChain) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, 
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorInformationAt reads staking
+// ReadValidatorInformationAtRoot reads staking
 // information of given validatorWrapper at a specific state root
-func (bc *BlockChain) ReadValidatorInformationAt(
+func (bc *BlockChain) ReadValidatorInformationAtRoot(
 	addr common.Address, root common.Hash,
 ) (*staking.ValidatorWrapper, error) {
 	state, err := bc.StateAt(root)
 	if err != nil || state == nil {
 		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
 	}
+	return bc.ReadValidatorInformationAtState(addr, state)
+}
+
+// ReadValidatorInformationAtState reads staking
+// information of given validatorWrapper at a specific state root
+func (bc *BlockChain) ReadValidatorInformationAtState(
+	addr common.Address, state *state.DB,
+) (*staking.ValidatorWrapper, error) {
+	if state == nil {
+		return nil, errors.New("empty state")
+	}
 	wrapper, err := state.ValidatorWrapper(addr)
 	if err != nil {
-		return nil, errors.Wrapf(err, "at root: %s", root.Hex())
+		return nil, err
 	}
 	return wrapper, nil
 }
@@ -2300,7 +2311,7 @@ func (bc *BlockChain) ReadValidatorInformationAt(
 func (bc *BlockChain) ReadValidatorInformation(
 	addr common.Address,
 ) (*staking.ValidatorWrapper, error) {
-	return bc.ReadValidatorInformationAt(addr, bc.CurrentBlock().Root())
+	return bc.ReadValidatorInformationAtRoot(addr, bc.CurrentBlock().Root())
 }
 
 // ReadValidatorSnapshotAtEpoch reads the snapshot
@@ -2321,7 +2332,12 @@ func (bc *BlockChain) ReadValidatorSnapshot(
 	if cached, ok := bc.validatorSnapshotCache.Get(key); ok {
 		return cached.(*staking.ValidatorSnapshot), nil
 	}
-	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
+	vs, err := rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
+	if err != nil {
+		return nil, err
+	}
+	bc.validatorSnapshotCache.Add(key, vs)
+	return vs, nil
 }
 
 // WriteValidatorSnapshot writes the snapshot of provided validator
@@ -2874,6 +2890,7 @@ func (bc *BlockChain) DelegatorsInformation(addr common.Address) []*staking.Dele
 }
 
 // GetECDSAFromCoinbase retrieve corresponding ecdsa address from Coinbase Address
+// TODO: optimize this func by adding cache etc.
 func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address, error) {
 	// backward compatibility: before isStaking epoch, coinbase address is the ecdsa address
 	coinbase := header.Coinbase()

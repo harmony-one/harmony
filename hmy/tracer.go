@@ -376,6 +376,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 	if threads > len(txs) {
 		threads = len(txs)
 	}
+	blockHash := block.Hash()
 	for th := 0; th < threads; th++ {
 		pend.Add(1)
 		go func() {
@@ -390,7 +391,8 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 
 				msg, _ := txs[task.index].AsMessage(signer)
 				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
-
+				ethTx := txs[task.index].ConvertToEth()
+				task.statedb.Prepare(ethTx.Hash(), blockHash, task.index)
 				res, err := hmy.TraceTx(ctx, msg, vmctx, task.statedb, config)
 				if err != nil {
 					results[task.index] = &TxTraceResult{Error: err.Error()}
@@ -412,6 +414,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		}
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
+		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
 
 		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{})

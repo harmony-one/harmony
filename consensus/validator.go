@@ -3,14 +3,15 @@ package consensus
 import (
 	"encoding/hex"
 
-	"github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -256,16 +257,6 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	// Optimistically add committedMessage in case of receiving committed before prepared
 	consensus.FBFTLog.AddNotVerifiedMessage(recvMsg)
 
-	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
-	if err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
-		return
-	}
-	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
-		consensus.getLogger().Warn().Hex("sigbitmap", recvMsg.Payload).Msgf("[OnCommitted] Quorum Not achieved.")
-		return
-	}
-
 	// Must have the corresponding block to verify committed message.
 	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 	if blockObj == nil {
@@ -276,17 +267,30 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 			Msg("[OnCommitted] Failed finding a matching block for committed message")
 		return
 	}
-	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
-		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
-
-	// TODO(jacky): cache the result of signature verification to reuse in next block's last-sig verification
-	if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+	sigBytes, bitmap, err := chain.ParseCommitSigAndBitmap(recvMsg.Payload)
+	if err != nil {
+		consensus.getLogger().Error().Err(err).
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnCommitted] Failed to parse commit sigBytes and bitmap")
+		return
+	}
+	if err := consensus.Blockchain.Engine().VerifyHeaderSignature(consensus.Blockchain, blockObj.Header(),
+		sigBytes, bitmap); err != nil {
 		consensus.getLogger().Error().
-			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
 			Msg("[OnCommitted] Failed to verify the multi signature for commit phase")
 		return
 	}
 
+	aggSig, mask, err := chain.DecodeSigBitmap(sigBytes, bitmap, consensus.Decider.Participants())
+	if err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[OnCommitted] readSignatureBitmapPayload failed")
+		return
+	}
 	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
 	consensus.aggregatedCommitSig = aggSig
 	consensus.commitBitmap = mask
@@ -296,7 +300,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	// Otherwise, simply write the commit signature in db.
 	commitSigBitmap, err := consensus.Blockchain.ReadCommitSig(blockObj.NumberU64())
 	// Need to check whether this block actually was committed, because it could be another block
-	// with the same number that's committed and overriding its commit sig is wrong.
+	// with the same number that's committed and overriding its commit sigBytes is wrong.
 	blk := consensus.Blockchain.GetBlockByHash(blockObj.Hash())
 	if err == nil && len(commitSigBitmap) == len(recvMsg.Payload) && blk != nil {
 		new := mask.CountEnabled()

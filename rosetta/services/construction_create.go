@@ -6,6 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/harmony-one/harmony/crypto/bls"
+	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/numeric"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -32,7 +36,7 @@ type WrappedTransaction struct {
 
 // unpackWrappedTransactionFromString ..
 func unpackWrappedTransactionFromString(
-	str string,
+	str string, signed bool,
 ) (*WrappedTransaction, hmyTypes.PoolTransaction, *types.Error) {
 	wrappedTransaction := &WrappedTransaction{}
 	if err := json.Unmarshal([]byte(str), wrappedTransaction); err != nil {
@@ -54,13 +58,196 @@ func unpackWrappedTransactionFromString(
 	var tx hmyTypes.PoolTransaction
 	stream := rlp.NewStream(bytes.NewBuffer(wrappedTransaction.RLPBytes), 0)
 	if wrappedTransaction.IsStaking {
+		index := 0
+		if signed {
+			index = 1
+		}
 		stakingTx := &stakingTypes.StakingTransaction{}
 		if err := stakingTx.DecodeRLP(stream); err != nil {
 			return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 				"message": errors.WithMessage(err, "rlp encoding error for staking transaction").Error(),
 			})
 		}
-		tx = stakingTx
+		intendedReceipt := &hmyTypes.Receipt{
+			GasUsed: stakingTx.GasLimit(),
+		}
+		formattedTx, rosettaError := FormatTransaction(
+			stakingTx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode}, signed,
+		)
+		if rosettaError != nil {
+			return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": rosettaError,
+			})
+		}
+
+		var stakingTransaction *stakingTypes.StakingTransaction
+		switch stakingTx.StakingType() {
+		case stakingTypes.DirectiveCreateValidator:
+			var createValidatorMsg common.CreateValidatorOperationMetadata
+			// to solve deserialization error
+			slotPubKeys := formattedTx.Operations[index].Metadata["slotPubKeys"]
+			delete(formattedTx.Operations[index].Metadata, "slotPubKeys")
+			slotKeySigs := formattedTx.Operations[index].Metadata["slotKeySigs"]
+			delete(formattedTx.Operations[index].Metadata, "slotKeySigs")
+
+			err := createValidatorMsg.UnmarshalFromInterface(formattedTx.Operations[index].Metadata)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			validatorAddr, err := common2.Bech32ToAddress(createValidatorMsg.ValidatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			stakePayloadMaker := func() (stakingTypes.Directive, interface{}) {
+				return stakingTypes.DirectiveCreateValidator, stakingTypes.CreateValidator{
+					Description: stakingTypes.Description{
+						Name:            createValidatorMsg.Name,
+						Identity:        createValidatorMsg.Identity,
+						Website:         createValidatorMsg.Website,
+						SecurityContact: createValidatorMsg.SecurityContact,
+						Details:         createValidatorMsg.Details,
+					},
+					CommissionRates: stakingTypes.CommissionRates{
+						Rate:          numeric.Dec{createValidatorMsg.CommissionRate},
+						MaxRate:       numeric.Dec{createValidatorMsg.MaxCommissionRate},
+						MaxChangeRate: numeric.Dec{createValidatorMsg.MaxChangeRate},
+					},
+					MinSelfDelegation:  createValidatorMsg.MinSelfDelegation,
+					MaxTotalDelegation: createValidatorMsg.MaxTotalDelegation,
+					ValidatorAddress:   validatorAddr,
+					Amount:             createValidatorMsg.Amount,
+					SlotPubKeys:        slotPubKeys.([]bls.SerializedPublicKey),
+					SlotKeySigs:        slotKeySigs.([]bls.SerializedSignature),
+				}
+			}
+			stakingTransaction, _ = stakingTypes.NewStakingTransaction(stakingTx.Nonce(), stakingTx.GasLimit(), stakingTx.GasPrice(), stakePayloadMaker)
+		case stakingTypes.DirectiveEditValidator:
+			var editValidatorMsg common.EditValidatorOperationMetadata
+			// to solve deserialization error
+			slotKeyToRemove := formattedTx.Operations[index].Metadata["slotPubKeyToRemove"]
+			delete(formattedTx.Operations[index].Metadata, "slotPubKeyToRemove")
+			slotKeyToAdd := formattedTx.Operations[index].Metadata["slotPubKeyToAdd"]
+			delete(formattedTx.Operations[index].Metadata, "slotPubKeyToAdd")
+			slotKeySigs := formattedTx.Operations[index].Metadata["slotKeyToAddSig"]
+			delete(formattedTx.Operations[index].Metadata, "slotKeyToAddSig")
+			err := editValidatorMsg.UnmarshalFromInterface(formattedTx.Operations[index].Metadata)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			validatorAddr, err := common2.Bech32ToAddress(editValidatorMsg.ValidatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			stakePayloadMaker := func() (stakingTypes.Directive, interface{}) {
+				return stakingTypes.DirectiveEditValidator, stakingTypes.EditValidator{
+					ValidatorAddress: validatorAddr,
+					Description: stakingTypes.Description{
+						Name:            editValidatorMsg.Name,
+						Identity:        editValidatorMsg.Identity,
+						Website:         editValidatorMsg.Website,
+						SecurityContact: editValidatorMsg.SecurityContact,
+						Details:         editValidatorMsg.Details,
+					},
+					CommissionRate:     &numeric.Dec{editValidatorMsg.CommissionRate},
+					MinSelfDelegation:  editValidatorMsg.MinSelfDelegation,
+					MaxTotalDelegation: editValidatorMsg.MaxTotalDelegation,
+					SlotKeyToAdd:       slotKeyToAdd.(*bls.SerializedPublicKey),
+					SlotKeyToRemove:    slotKeyToRemove.(*bls.SerializedPublicKey),
+					SlotKeyToAddSig:    slotKeySigs.(*bls.SerializedSignature),
+				}
+			}
+			stakingTransaction, _ = stakingTypes.NewStakingTransaction(stakingTx.Nonce(), stakingTx.GasLimit(), stakingTx.GasPrice(), stakePayloadMaker)
+		case stakingTypes.DirectiveDelegate:
+			var delegateMsg common.DelegateOperationMetadata
+			err := delegateMsg.UnmarshalFromInterface(formattedTx.Operations[index].Metadata)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			validatorAddr, err := common2.Bech32ToAddress(delegateMsg.ValidatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			delegatorAddr, err := common2.Bech32ToAddress(delegateMsg.DelegatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			stakePayloadMaker := func() (stakingTypes.Directive, interface{}) {
+				return stakingTypes.DirectiveDelegate, stakingTypes.Delegate{
+					ValidatorAddress: validatorAddr,
+					DelegatorAddress: delegatorAddr,
+					Amount:           delegateMsg.Amount,
+				}
+			}
+			stakingTransaction, _ = stakingTypes.NewStakingTransaction(stakingTx.Nonce(), stakingTx.GasLimit(), stakingTx.GasPrice(), stakePayloadMaker)
+		case stakingTypes.DirectiveUndelegate:
+			var undelegateMsg common.UndelegateOperationMetadata
+			err := undelegateMsg.UnmarshalFromInterface(formattedTx.Operations[index].Metadata)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			validatorAddr, err := common2.Bech32ToAddress(undelegateMsg.ValidatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			delegatorAddr, err := common2.Bech32ToAddress(undelegateMsg.DelegatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			stakePayloadMaker := func() (stakingTypes.Directive, interface{}) {
+				return stakingTypes.DirectiveUndelegate, stakingTypes.Undelegate{
+					ValidatorAddress: validatorAddr,
+					DelegatorAddress: delegatorAddr,
+					Amount:           undelegateMsg.Amount,
+				}
+			}
+			stakingTransaction, _ = stakingTypes.NewStakingTransaction(stakingTx.Nonce(), stakingTx.GasLimit(), stakingTx.GasPrice(), stakePayloadMaker)
+		case stakingTypes.DirectiveCollectRewards:
+			var collectRewardsMsg common.CollectRewardsMetadata
+			err := collectRewardsMsg.UnmarshalFromInterface(formattedTx.Operations[index].Metadata)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			delegatorAddr, err := common2.Bech32ToAddress(collectRewardsMsg.DelegatorAddress)
+			if err != nil {
+				return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+					"message": err,
+				})
+			}
+			stakePayloadMaker := func() (stakingTypes.Directive, interface{}) {
+				return stakingTypes.DirectiveCollectRewards, stakingTypes.CollectRewards{
+					DelegatorAddress: delegatorAddr,
+				}
+			}
+			stakingTransaction, _ = stakingTypes.NewStakingTransaction(stakingTx.Nonce(), stakingTx.GasLimit(), stakingTx.GasPrice(), stakePayloadMaker)
+		default:
+			return nil, nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+				"message": "staking type error",
+			})
+		}
+		stakingTransaction.SetRawSignature(stakingTx.RawSignatureValues())
+		tx = stakingTransaction
 	} else {
 		plainTx := &hmyTypes.Transaction{}
 		if err := plainTx.DecodeRLP(stream); err != nil {
@@ -185,7 +372,7 @@ func (s *ConstructAPI) ConstructionCombine(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.UnsignedTransaction)
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.UnsignedTransaction, false)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}

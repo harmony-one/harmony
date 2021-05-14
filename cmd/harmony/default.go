@@ -2,7 +2,7 @@ package main
 
 import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
-const tomlConfigVersion = "1.0.4"
+const tomlConfigVersion = "1.0.5"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -56,6 +56,7 @@ var defaultConfig = harmonyConfig{
 	TxPool: txPoolConfig{
 		BlacklistFile: "./.hmy/blacklist.txt",
 	},
+	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: pprofConfig{
 		Enabled:    false,
 		ListenAddr: "127.0.0.1:6060",
@@ -104,42 +105,59 @@ var defaultPrometheusConfig = prometheusConfig{
 
 var (
 	defaultMainnetSyncConfig = syncConfig{
-		Downloader:     false,
-		LegacyServer:   true,
-		LegacyClient:   true,
-		Concurrency:    6,
-		MinPeers:       6,
-		InitStreams:    8,
-		DiscSoftLowCap: 8,
-		DiscHardLowCap: 6,
-		DiscHighCap:    128,
-		DiscBatch:      8,
+		Downloader:       false,
+		LegacyServer:     true,
+		LegacyServerPort: nodeconfig.DefaultDNSPort,
+		LegacyClient:     true,
+		Concurrency:      6,
+		MinPeers:         6,
+		InitStreams:      8,
+		DiscSoftLowCap:   8,
+		DiscHardLowCap:   6,
+		DiscHighCap:      128,
+		DiscBatch:        8,
 	}
 
 	defaultTestNetSyncConfig = syncConfig{
-		Downloader:     false,
-		LegacyServer:   true,
-		LegacyClient:   true,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
-		DiscHighCap:    1024,
-		DiscBatch:      8,
+		Downloader:       false,
+		LegacyServer:     true,
+		LegacyServerPort: nodeconfig.DefaultDNSPort,
+		LegacyClient:     true,
+		Concurrency:      4,
+		MinPeers:         4,
+		InitStreams:      4,
+		DiscSoftLowCap:   4,
+		DiscHardLowCap:   4,
+		DiscHighCap:      1024,
+		DiscBatch:        8,
+	}
+
+	defaultLocalNetSyncConfig = syncConfig{
+		Downloader:       false,
+		LegacyServer:     true,
+		LegacyServerPort: nodeconfig.DefaultDNSPort,
+		LegacyClient:     true,
+		Concurrency:      4,
+		MinPeers:         4,
+		InitStreams:      4,
+		DiscSoftLowCap:   4,
+		DiscHardLowCap:   4,
+		DiscHighCap:      1024,
+		DiscBatch:        8,
 	}
 
 	defaultElseSyncConfig = syncConfig{
-		Downloader:     true,
-		LegacyServer:   true,
-		LegacyClient:   false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
-		DiscHighCap:    1024,
-		DiscBatch:      8,
+		Downloader:       true,
+		LegacyServer:     true,
+		LegacyServerPort: nodeconfig.DefaultDNSPort,
+		LegacyClient:     false,
+		Concurrency:      4,
+		MinPeers:         4,
+		InitStreams:      4,
+		DiscSoftLowCap:   4,
+		DiscHardLowCap:   4,
+		DiscHighCap:      1024,
+		DiscBatch:        8,
 	}
 )
 

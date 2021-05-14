@@ -99,6 +99,14 @@ func (bc *testBlockChain) ReadCommitSig(blockNum uint64) ([]byte, error)        
 func (bc *testBlockChain) ReadBlockRewardAccumulator(uint64) (*big.Int, error)      { return nil, nil }
 func (bc *testBlockChain) ValidatorCandidates() []common.Address                    { return nil }
 func (bc *testBlockChain) Engine() engine.Engine                                    { return &dummyEngine{} }
+func (cr *testBlockChain) ReadValidatorInformationAtState(
+	addr common.Address, state *state.DB,
+) (*staking.ValidatorWrapper, error) {
+	return nil, nil
+}
+func (cr *testBlockChain) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
+}
 func (bc *testBlockChain) ReadValidatorInformation(addr common.Address) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
@@ -121,6 +129,12 @@ func (e *dummyEngine) VerifyHeader(engine.ChainReader, *block.Header, bool) erro
 	return nil
 }
 func (e *dummyEngine) VerifyHeaderSignature(engine.ChainReader, *block.Header, bls.SerializedSignature, []byte) error {
+	return nil
+}
+func (e *dummyEngine) VerifyCrossLink(engine.ChainReader, types.CrossLink) error {
+	return nil
+}
+func (e *dummyEngine) VerifyVRF(chain engine.ChainReader, header *block.Header) error {
 	return nil
 }
 func (e *dummyEngine) VerifyHeaders(engine.ChainReader, []*block.Header, []bool) (chan<- struct{}, <-chan error) {

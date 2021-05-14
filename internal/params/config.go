@@ -47,9 +47,10 @@ var (
 		QuickUnlockEpoch:           big.NewInt(191),
 		FiveSecondsEpoch:           big.NewInt(230),
 		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
-		SixtyPercentEpoch:          EpochTBD,
+		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
-		NoEarlyUnlockEpoch:         EpochTBD,
+		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		VRFEpoch:                   EpochTBD,
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
@@ -72,6 +73,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
+		VRFEpoch:                   EpochTBD,
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(43800),
@@ -95,6 +97,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -118,6 +121,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -141,6 +145,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -163,6 +168,7 @@ var (
 		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -187,6 +193,7 @@ var (
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
+		big.NewInt(0),                      // VRFEpoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
 		big.NewInt(0),                      // IstanbulEpoch
@@ -211,6 +218,7 @@ var (
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
+		big.NewInt(0),        // VRFEpoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
 		big.NewInt(0),        // IstanbulEpoch
@@ -287,6 +295,9 @@ type ChainConfig struct {
 	// NoEarlyUnlockEpoch is the epoch when the early unlock of undelegated token from validators who were elected for
 	// more than 7 epochs is disabled
 	NoEarlyUnlockEpoch *big.Int `json:"no-early-unlock-epoch,omitempty"`
+
+	// VRFEpoch is the epoch when VRF randomness is enabled
+	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -372,6 +383,11 @@ func (c *ChainConfig) IsRedelegation(epoch *big.Int) bool {
 // IsNoEarlyUnlock determines whether it is the epoch to stop early unlock
 func (c *ChainConfig) IsNoEarlyUnlock(epoch *big.Int) bool {
 	return isForked(c.NoEarlyUnlockEpoch, epoch)
+}
+
+// IsVRF determines whether it is the epoch to enable vrf
+func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
+	return isForked(c.VRFEpoch, epoch)
 }
 
 // IsPreStaking determines whether staking transactions are allowed

@@ -16,20 +16,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/harmony-one/harmony/api/service/synchronize"
-	"github.com/harmony-one/harmony/hmy/downloader"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/api/service"
-	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/prometheus"
+	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
 	"github.com/harmony-one/harmony/common/ntp"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/internal/cli"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -44,8 +45,6 @@ import (
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/webhooks"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 // Host
@@ -125,6 +124,7 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
+		fmt.Println()
 		cmd.Help()
 		os.Exit(128)
 	}
@@ -372,7 +372,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	if hc.Sync.LegacyServer && !hc.General.IsOffline {
 		utils.Logger().Info().Msg("support gRPC sync server")
-		currentNode.SupportGRPCSyncServer()
+		currentNode.SupportGRPCSyncServer(hc.Sync.LegacyServerPort)
 	}
 	if hc.Sync.LegacyClient && !hc.General.IsOffline {
 		utils.Logger().Info().Msg("go with gRPC sync client")
@@ -641,7 +641,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	} else if hc.Network.LegacySyncing {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, legacysync.GetSyncingPort(strconv.Itoa(hc.Network.DNSPort)))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, strconv.Itoa(hc.Network.DNSSyncPort))
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/core"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -73,6 +75,22 @@ func (s *ConstructAPI) ConstructionPreprocess(
 	if components.From == nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
 			"message": "sender address is not found for given operations",
+		})
+	}
+	if request.Operations[0].Type == common.CreateValidatorOperation && len(txMetadata.SlotPubKeys) == 0 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid slot public keys",
+		})
+	}
+	if request.Operations[0].Type == common.CreateValidatorOperation && len(txMetadata.SlotKeySigs) == 0 {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "invalid slot key signatures",
+		})
+	}
+	if request.Operations[0].Type == common.EditValidatorOperation && (txMetadata.SlotPubKeyToAdd == "" ||
+		txMetadata.SlotPubKeyToRemove == "" || txMetadata.SlotKeyToAddSig == "") {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": "slot pub key to add/remove or sig to add error",
 		})
 	}
 	if txMetadata.ToShardID != nil && txMetadata.FromShardID != nil &&
@@ -222,9 +240,10 @@ func (s *ConstructAPI) ConstructionMetadata(
 			)
 		}
 	} else {
-		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
-			"message": "staking operations are not supported",
-		})
+		estGasUsed, err = core.IntrinsicGas(data, false, false,
+			false, options.OperationType == common.CreateValidatorOperation)
+		estGasUsed *= 2
+
 	}
 	if err != nil {
 		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{

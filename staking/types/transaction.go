@@ -143,6 +143,10 @@ func (tx *StakingTransaction) WithSignature(signer Signer, sig []byte) (*Staking
 	return cpy, nil
 }
 
+func (tx *StakingTransaction) SetRawSignature(v, r, s *big.Int) {
+	tx.data.R, tx.data.S, tx.data.V = r, s, v
+}
+
 // GasLimit returns gas of StakingTransaction.
 func (tx *StakingTransaction) GasLimit() uint64 {
 	return tx.data.GasLimit
@@ -168,15 +172,10 @@ func (tx *StakingTransaction) Cost() (*big.Int, error) {
 		}
 		total.Add(total, stkMsg.Amount)
 	case DirectiveDelegate:
-		msg, err := RLPDecodeStakeMsg(tx.Data(), DirectiveDelegate)
-		if err != nil {
-			return nil, err
-		}
-		stkMsg, ok := msg.(*Delegate)
-		if !ok {
-			return nil, errStakingTransactionTypeCastErr
-		}
-		total.Add(total, stkMsg.Amount)
+		// Temporary hack: Cost function is not accurate for delegate transaction.
+		// Thus the cost validation is done in `txPool.validateTx`.
+		// TODO: refactor this hack.
+	default:
 	}
 	return total, nil
 }

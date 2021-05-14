@@ -157,7 +157,7 @@ func createBlockChain() *BlockChain {
 	database := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	engine := chain2.NewEngine(0)
+	engine := chain2.NewEngine()
 	blockchain, _ := NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
 	return blockchain
 }
@@ -1532,7 +1532,7 @@ func benchmarkPendingDemotion(b *testing.B, size int) {
 	// Benchmark the speed of pool validation
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pool.demoteUnexecutables()
+		pool.demoteUnexecutables(0)
 	}
 }
 

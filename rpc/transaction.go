@@ -241,7 +241,7 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v2.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index, true)
 		if err != nil {
 			return nil, err
 		}

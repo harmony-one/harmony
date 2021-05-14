@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
@@ -43,7 +44,10 @@ type networkConfig struct {
 
 	LegacySyncing bool // if true, use LegacySyncingPeerProvider
 	DNSZone       string
-	DNSPort       int
+	DNSSyncPort   int
+
+	// Legacy field
+	LegacyDNSPort *int `toml:"DNSPort,omitempty"`
 }
 
 type p2pConfig struct {
@@ -155,16 +159,45 @@ type prometheusConfig struct {
 
 type syncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
-	Downloader     bool // start the sync downloader client
-	LegacyServer   bool // provide the gRPC sync protocol server
-	LegacyClient   bool // aside from stream sync protocol, also run gRPC client to get blocks
-	Concurrency    int  // concurrency used for stream sync protocol
-	MinPeers       int  // minimum streams to start a sync task.
-	InitStreams    int  // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int  // upper limit of streams in one sync protocol
-	DiscBatch      int  // size of each discovery
+	Downloader       bool // start the sync downloader client
+	LegacyServer     bool // provide the gRPC sync protocol server
+	LegacyServerPort int  // sync server port
+	LegacyClient     bool // aside from stream sync protocol, also run gRPC client to get blocks
+
+	Concurrency    int // concurrency used for stream sync protocol
+	MinPeers       int // minimum streams to start a sync task.
+	InitStreams    int // minimum streams in bootstrap to start sync loop.
+	DiscSoftLowCap int // when number of streams is below this value, spin discover during check
+	DiscHardLowCap int // when removing stream, num is below this value, spin discovery immediately
+	DiscHighCap    int // upper limit of streams in one sync protocol
+	DiscBatch      int // size of each discovery
+}
+
+// sanityFixHarmonyConfig correct values for old config version load
+func correctLegacyHarmonyConfig(config *harmonyConfig) {
+	if config.Sync == (syncConfig{}) {
+		nt := nodeconfig.NetworkType(config.Network.NetworkType)
+		config.Sync = getDefaultSyncConfig(nt)
+	}
+	if config.HTTP.RosettaPort == 0 {
+		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
+	}
+	if config.P2P.IP == "" {
+		config.P2P.IP = defaultConfig.P2P.IP
+	}
+	if config.Prometheus == nil {
+		config.Prometheus = defaultConfig.Prometheus
+	}
+	if syncPort := config.Network.DNSSyncPort; syncPort == 0 {
+		config.Network.DNSSyncPort = nodeconfig.DefaultDNSPort
+	}
+	if serverPort := config.Sync.LegacyServerPort; serverPort == 0 {
+		config.Sync.LegacyServerPort = nodeconfig.DefaultDNSPort
+	}
+	if legSyncPort := config.Network.LegacyDNSPort; legSyncPort != nil && *legSyncPort != nodeconfig.DefaultLegacyDNSPort {
+		config.Network.DNSSyncPort = *legSyncPort - legacysync.SyncingPortDifference
+	}
+	config.Network.LegacyDNSPort = nil // Change to nil after applied legacy value
 }
 
 // TODO: use specific type wise validation instead of general string types assertion.
@@ -230,7 +263,7 @@ func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
 		BootNodes:     bn,
 		LegacySyncing: false,
 		DNSZone:       zone,
-		DNSPort:       port,
+		DNSSyncPort:   port,
 	}
 }
 
@@ -261,6 +294,8 @@ func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
 		return defaultMainnetSyncConfig
 	case nodeconfig.Testnet:
 		return defaultTestNetSyncConfig
+	case nodeconfig.Localnet:
+		return defaultLocalNetSyncConfig
 	default:
 		return defaultElseSyncConfig
 	}
@@ -297,16 +332,7 @@ func loadHarmonyConfig(file string) (harmonyConfig, error) {
 		return harmonyConfig{}, err
 	}
 
-	// Correct for old config version load (port 0 is invalid anyways)
-	if config.HTTP.RosettaPort == 0 {
-		config.HTTP.RosettaPort = defaultConfig.HTTP.RosettaPort
-	}
-	if config.P2P.IP == "" {
-		config.P2P.IP = defaultConfig.P2P.IP
-	}
-	if config.Prometheus == nil {
-		config.Prometheus = defaultConfig.Prometheus
-	}
+	correctLegacyHarmonyConfig(&config)
 	return config, nil
 }
 

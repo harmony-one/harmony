@@ -38,7 +38,7 @@ func TestNewWorker(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 10,
 		}
-		engine = chain2.NewEngine(10)
+		engine = chain2.NewEngine()
 	)
 
 	genesis := gspec.MustCommit(database)
@@ -66,7 +66,7 @@ func TestCommitTransactions(t *testing.T) {
 			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
 			ShardID: 0,
 		}
-		engine = chain2.NewEngine(0)
+		engine = chain2.NewEngine()
 	)
 
 	gspec.MustCommit(database)

@@ -282,7 +282,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	addr common.Address, block *types.Block,
 ) (*staking.ValidatorRPCEnhanced, error) {
 	bc := hmy.BlockChain
-	wrapper, err := bc.ReadValidatorInformationAt(addr, block.Root())
+	wrapper, err := bc.ReadValidatorInformationAtRoot(addr, block.Root())
 	if err != nil {
 		s, _ := internalCommon.AddressToBech32(addr)
 		return nil, errors.Wrapf(err, "not found address in current state %s", s)
@@ -469,7 +469,7 @@ func (hmy *Harmony) GetDelegationsByValidator(validator common.Address) []*staki
 func (hmy *Harmony) GetDelegationsByValidatorAtBlock(
 	validator common.Address, block *types.Block,
 ) []*staking.Delegation {
-	wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, block.Root())
+	wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, block.Root())
 	if err != nil || wrapper == nil {
 		return nil
 	}
@@ -501,7 +501,7 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 	}
 
 	for i := range delegationIndexes {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(
 			delegationIndexes[i].ValidatorAddress, block.Root(),
 		)
 		if err != nil || wrapper == nil {
@@ -519,7 +519,29 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 }
 
 // UndelegationPayouts ..
-type UndelegationPayouts map[common.Address]*big.Int
+type UndelegationPayouts struct {
+	Data map[common.Address]map[common.Address]*big.Int
+}
+
+func NewUndelegationPayouts() *UndelegationPayouts {
+	return &UndelegationPayouts{
+		Data: make(map[common.Address]map[common.Address]*big.Int),
+	}
+}
+
+func (u *UndelegationPayouts) SetPayoutByDelegatorAddrAndValidatorAddr(
+	delegator, validator common.Address, amount *big.Int,
+) {
+	if u.Data[delegator] == nil {
+		u.Data[delegator] = make(map[common.Address]*big.Int)
+	}
+
+	if totalPayout, ok := u.Data[delegator][validator]; ok {
+		u.Data[delegator][validator] = new(big.Int).Add(totalPayout, amount)
+	} else {
+		u.Data[delegator][validator] = amount
+	}
+}
 
 // GetUndelegationPayouts returns the undelegation payouts for each delegator
 //
@@ -528,16 +550,16 @@ type UndelegationPayouts map[common.Address]*big.Int
 // This not a problem if a full (archival) DB is used.
 func (hmy *Harmony) GetUndelegationPayouts(
 	ctx context.Context, epoch *big.Int,
-) (UndelegationPayouts, error) {
+) (*UndelegationPayouts, error) {
 	if !hmy.IsPreStakingEpoch(epoch) {
 		return nil, fmt.Errorf("not pre-staking epoch or later")
 	}
 
 	payouts, ok := hmy.undelegationPayoutsCache.Get(epoch.Uint64())
 	if ok {
-		return payouts.(UndelegationPayouts), nil
+		return payouts.(*UndelegationPayouts), nil
 	}
-	undelegationPayouts := UndelegationPayouts{}
+	undelegationPayouts := NewUndelegationPayouts()
 	// require second to last block as saved undelegations are AFTER undelegations are payed out
 	blockNumber := shard.Schedule.EpochLastBlock(epoch.Uint64()) - 1
 	undelegationPayoutBlock, err := hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNumber))
@@ -548,7 +570,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 
 	lockingPeriod := hmy.GetDelegationLockingPeriodInEpoch(undelegationPayoutBlock.Epoch())
 	for _, validator := range hmy.GetAllValidatorAddresses() {
-		wrapper, err := hmy.BlockChain.ReadValidatorInformationAt(validator, undelegationPayoutBlock.Root())
+		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validator, undelegationPayoutBlock.Root())
 		if err != nil || wrapper == nil {
 			continue // Not a validator at this epoch or unable to fetch validator info because of pruned state.
 		}
@@ -556,11 +578,7 @@ func (hmy *Harmony) GetUndelegationPayouts(
 		for _, delegation := range wrapper.Delegations {
 			withdraw := delegation.RemoveUnlockedUndelegations(epoch, wrapper.LastEpochInCommittee, lockingPeriod, noEarlyUnlock)
 			if withdraw.Cmp(bigZero) == 1 {
-				if totalPayout, ok := undelegationPayouts[delegation.DelegatorAddress]; ok {
-					undelegationPayouts[delegation.DelegatorAddress] = new(big.Int).Add(totalPayout, withdraw)
-				} else {
-					undelegationPayouts[delegation.DelegatorAddress] = withdraw
-				}
+				undelegationPayouts.SetPayoutByDelegatorAddrAndValidatorAddr(validator, delegation.DelegatorAddress, withdraw)
 			}
 		}
 	}

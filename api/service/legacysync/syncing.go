@@ -628,8 +628,9 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 	}
 
 	for i, blockBytes := range payload {
-		var bws BlockWithSig
-		if err := rlp.DecodeBytes(blockBytes, &bws); err != nil {
+		// For forward compatibility at server side, it can be types.block or BlockWithSig
+		blockObj, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
+		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Int("taskIndex", tasks[i].index).
@@ -638,8 +639,6 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			failedTasks = append(failedTasks, tasks[i])
 			continue
 		}
-		blockObj := bws.Block
-		blockObj.SetCurrentCommitSig(bws.CommitSigAndBitmap)
 		gotHash := blockObj.Hash()
 		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
 			utils.Logger().Warn().
@@ -654,6 +653,24 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 		ss.syncMux.Unlock()
 	}
 	return failedTasks
+}
+
+// RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
+// Return the block with commitSig if set.
+func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
+	var block *types.Block
+	if err := rlp.DecodeBytes(payload, &block); err == nil {
+		// received payload as *types.Block
+		return block, nil
+	}
+
+	var bws BlockWithSig
+	if err := rlp.DecodeBytes(payload, &bws); err == nil {
+		block := bws.Block
+		block.SetCurrentCommitSig(bws.CommitSigAndBitmap)
+		return block, nil
+	}
+	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
 }
 
 // downloadTaskQueue is wrapper around Queue with item to be SyncBlockTask
@@ -802,17 +819,18 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig, haveCurrentSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Info().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
 
+	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
 		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
-		verifyCurrentSig := verifyAllSig && verifySeal
+		verifyCurrentSig := verifyAllSig && haveCurrentSig
 		if verifyCurrentSig {
 			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 			if err != nil {
@@ -883,7 +901,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		}
 		// Enforce sig check for the last block in a batch
 		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck, true)
+		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
 		if err != nil {
 			break
 		}
@@ -900,7 +918,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, true, true)
+		err = ss.UpdateBlockAndStatus(block, bc, true)
 		if err != nil {
 			break
 		}
@@ -921,7 +939,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 		if block == nil {
 			break
 		}
-		err = ss.UpdateBlockAndStatus(block, bc, false, false)
+		err = ss.UpdateBlockAndStatus(block, bc, false)
 		if err != nil {
 			break
 		}
@@ -1036,10 +1054,16 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 	return ss.getMaxPeerHeight(false)
 }
 
+// SyncStatus returns inSync and remote height
+func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64) {
+	outOfSync, remoteNum := ss.IsOutOfSync(bc, false)
+	return !outOfSync, remoteNum
+}
+
 // IsOutOfSync checks whether the node is out of sync from other peers
-func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) bool {
+func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64) {
 	if ss.syncConfig == nil {
-		return true // If syncConfig is not instantiated, return not in sync
+		return true, 0 // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := ss.getMaxPeerHeight(false)
 	lastHeight := bc.CurrentBlock().NumberU64()
@@ -1050,7 +1074,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) bool {
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
-		return wasOutOfSync
+		return wasOutOfSync, otherHeight1
 	}
 	time.Sleep(1 * time.Second)
 	// double check the sync status after 1 second to confirm (avoid false alarm)
@@ -1066,7 +1090,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) bool {
 		Uint64("currentHeight", currentHeight).
 		Msg("[SYNC] Checking sync status")
 	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
-	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight
+	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight, otherHeight2
 }
 
 // SyncLoop will keep syncing with peers until catches up

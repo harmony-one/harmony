@@ -262,7 +262,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 					continue // Legacy behavior is to not return error here
 				}
 			case V2:
-				tx, err = v2.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0)
+				tx, err = v2.NewStakingTransaction(stakingTx, common.Hash{}, 0, 0, 0, true)
 				if err != nil {
 					utils.Logger().Debug().
 						Err(err).

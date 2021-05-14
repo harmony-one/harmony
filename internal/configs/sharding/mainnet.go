@@ -17,9 +17,6 @@ const (
 
 	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
 
-	// TODO: remove it after randomness feature turned on mainnet
-	mainnetRandomnessStartingEpoch = 100000
-
 	mainnetV0_1Epoch = 1
 	mainnetV0_2Epoch = 5
 	mainnetV0_3Epoch = 8
@@ -176,12 +173,6 @@ func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
-}
-
 func (ms mainnetSchedule) GetNetworkID() NetworkID {
 	return MainNet
 }
@@ -221,5 +212,5 @@ var (
 	mainnetV2_1 = MustNewInstance(4, 250, 130, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
 	mainnetV2_2 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
 	mainnetV3   = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV3_1 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_1 = MustNewInstance(4, 250, 50, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )

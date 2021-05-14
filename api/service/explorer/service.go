@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -45,13 +45,18 @@ type Service struct {
 	Storage     *Storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
-	stateSync   *legacysync.StateSync
 	blockchain  *core.BlockChain
+	backend     hmy.NodeAPI
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, ss *legacysync.StateSync, bc *core.BlockChain) *Service {
-	return &Service{IP: selfPeer.IP, Port: selfPeer.Port, stateSync: ss, blockchain: bc}
+func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+	return &Service{
+		IP:         selfPeer.IP,
+		Port:       selfPeer.Port,
+		blockchain: bc,
+		backend:    backend,
+	}
 }
 
 // Start starts explorer service.
@@ -267,7 +272,7 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 // GetNodeSync returns status code 500 if node is not in sync
 func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	sync := !s.stateSync.IsOutOfSync(s.blockchain, false)
+	sync, _ := s.backend.SyncStatus(s.blockchain.ShardID())
 	if !sync {
 		w.WriteHeader(http.StatusTeapot)
 	}
