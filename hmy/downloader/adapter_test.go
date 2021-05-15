@@ -134,6 +134,9 @@ func (e *dummyEngine) VerifyHeaderSignature(engine.ChainReader, *block.Header, b
 func (e *dummyEngine) VerifyCrossLink(engine.ChainReader, types.CrossLink) error {
 	return nil
 }
+func (e *dummyEngine) VerifyVRF(chain engine.ChainReader, header *block.Header) error {
+	return nil
+}
 func (e *dummyEngine) VerifyHeaders(engine.ChainReader, []*block.Header, []bool) (chan<- struct{}, <-chan error) {
 	return nil, nil
 }

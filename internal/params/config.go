@@ -50,6 +50,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		VRFEpoch:                   EpochTBD,
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
@@ -72,6 +73,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
+		VRFEpoch:                   EpochTBD,
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(43800),
@@ -95,6 +97,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -118,6 +121,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -141,6 +145,7 @@ var (
 		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -163,6 +168,7 @@ var (
 		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -187,6 +193,7 @@ var (
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
+		big.NewInt(0),                      // VRFEpoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
 		big.NewInt(0),                      // IstanbulEpoch
@@ -211,6 +218,7 @@ var (
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
+		big.NewInt(0),        // VRFEpoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
 		big.NewInt(0),        // IstanbulEpoch
@@ -287,6 +295,9 @@ type ChainConfig struct {
 	// NoEarlyUnlockEpoch is the epoch when the early unlock of undelegated token from validators who were elected for
 	// more than 7 epochs is disabled
 	NoEarlyUnlockEpoch *big.Int `json:"no-early-unlock-epoch,omitempty"`
+
+	// VRFEpoch is the epoch when VRF randomness is enabled
+	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -374,6 +385,11 @@ func (c *ChainConfig) IsNoEarlyUnlock(epoch *big.Int) bool {
 	return isForked(c.NoEarlyUnlockEpoch, epoch)
 }
 
+// IsVRF determines whether it is the epoch to enable vrf
+func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
+	return isForked(c.VRFEpoch, epoch)
+}
+
 // IsPreStaking determines whether staking transactions are allowed
 func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
 	return isForked(c.PreStakingEpoch, epoch)
@@ -452,9 +468,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                               *big.Int
-	EthChainID                                            *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
+	ChainID                                                      *big.Int
+	EthChainID                                                   *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -475,5 +491,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsS3:         c.IsS3(epoch),
 		IsReceiptLog: c.IsReceiptLog(epoch),
 		IsIstanbul:   c.IsIstanbul(epoch),
+		IsVRF:        c.IsVRF(epoch),
 	}
 }

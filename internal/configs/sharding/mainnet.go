@@ -17,9 +17,6 @@ const (
 
 	mainnetVdfDifficulty = 50000 // This takes about 100s to finish the vdf
 
-	// TODO: remove it after randomness feature turned on mainnet
-	mainnetRandomnessStartingEpoch = 100000
-
 	mainnetV0_1Epoch = 1
 	mainnetV0_2Epoch = 5
 	mainnetV0_3Epoch = 8
@@ -174,12 +171,6 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 
 func (ms mainnetSchedule) VdfDifficulty() int {
 	return mainnetVdfDifficulty
-}
-
-// TODO: remove it after randomness feature turned on mainnet
-//RandonnessStartingEpoch returns starting epoch of randonness generation
-func (ms mainnetSchedule) RandomnessStartingEpoch() uint64 {
-	return mainnetRandomnessStartingEpoch
 }
 
 func (ms mainnetSchedule) GetNetworkID() NetworkID {

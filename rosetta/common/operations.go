@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/harmony-one/harmony/internal/common"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 
 	rpcV2 "github.com/harmony-one/harmony/rpc/v2"
@@ -22,6 +24,21 @@ const (
 
 	// NativeCrossShardTransferOperation is an operation that only affects the native currency.
 	NativeCrossShardTransferOperation = "NativeCrossShardTransfer"
+
+	// CreateValidatorOperation is an operation that only affects the native currency.
+	CreateValidatorOperation = "CreateValidator"
+
+	// EditValidatorOperation is an operation that only affects the native currency.
+	EditValidatorOperation = "EditValidator"
+
+	// DelegateOperation is an operation that only affects the native currency.
+	DelegateOperation = "Delegate"
+
+	// UndelegateOperation is an operation that only affects the native currency.
+	UndelegateOperation = "Undelegate"
+
+	// CollectRewardsOperation is an operation that only affects the native currency.
+	CollectRewardsOperation = "CollectRewards"
 
 	// GenesisFundsOperation is a side effect operation for genesis block only.
 	// Note that no transaction can be constructed with this operation.
@@ -118,6 +135,94 @@ func (s *CrossShardTransactionOperationMetadata) UnmarshalFromInterface(data int
 	}
 	if T.To == nil || T.From == nil {
 		return fmt.Errorf("expected to & from to be present for CrossShardTransactionOperationMetadata")
+	}
+	*s = T
+	return nil
+}
+
+func (s *CreateValidatorOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T CreateValidatorOperationMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+	*s = T
+	return nil
+}
+
+func (s *EditValidatorOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T EditValidatorOperationMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+	*s = T
+	return nil
+}
+
+func (s *DelegateOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T DelegateOperationMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+	if T.Amount == nil || T.ValidatorAddress == "" || T.DelegatorAddress == "" {
+		return fmt.Errorf("expected validator address & delegator address & amount be present for DelegateOperationMetadata")
+	}
+
+	if !common.IsBech32Address(T.ValidatorAddress) || !common.IsBech32Address(T.DelegatorAddress) {
+		return fmt.Errorf("expected validator address & delegator address to be bech32 format for DelegateOperationMetadata")
+	}
+
+	*s = T
+	return nil
+}
+
+func (s *UndelegateOperationMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T UndelegateOperationMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+
+	if T.Amount == nil || T.ValidatorAddress == "" || T.DelegatorAddress == "" {
+		return fmt.Errorf("expected validator address & delegator address & amount be present for UndelegateOperationMetadata")
+	}
+
+	if !common.IsBech32Address(T.ValidatorAddress) || !common.IsBech32Address(T.DelegatorAddress) {
+		return fmt.Errorf("expected validator address & delegator address to be bech32 format for UndelegateOperationMetadata")
+	}
+
+	*s = T
+	return nil
+}
+
+func (s *CollectRewardsMetadata) UnmarshalFromInterface(data interface{}) error {
+	var T CollectRewardsMetadata
+	dat, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(dat, &T); err != nil {
+		return err
+	}
+	if T.DelegatorAddress == "" {
+		return fmt.Errorf("expected delegator address be present for CollectRewardsMetadata")
+	}
+	if !common.IsBech32Address(T.DelegatorAddress) {
+		return fmt.Errorf("expected delegator address to be bech32 format for CollectRewardsMetadata")
 	}
 	*s = T
 	return nil
