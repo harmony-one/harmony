@@ -182,7 +182,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	}
 	if op == vm.CALL || op == vm.CALLCODE || op == vm.DELEGATECALL || op == vm.STATICCALL {
 		to := common.BigToAddress(stackPeek(1))
-		precompiles := vm.PrecompiledContractsIstanbul
+		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
 			return nil
 		}
