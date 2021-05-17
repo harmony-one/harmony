@@ -1027,6 +1027,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(100),
 			redelegate: false,
+			expAmt:     new(big.Int).Mul(big.NewInt(500), oneBig),
 		},
 	}
 	for i, test := range tests {
