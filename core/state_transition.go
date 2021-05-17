@@ -456,7 +456,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 		return err
 	}
 	updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
-		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig().IsRedelegation(st.evm.EpochNumber))
+		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig())
 	if err != nil {
 		return err
 	}
