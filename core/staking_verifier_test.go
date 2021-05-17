@@ -1007,7 +1007,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			sdb: makeStateDBForStake(t),
 			msg: func() staking.Delegate {
 				msg := defaultMsgDelegate()
-				msg.Amount = big.NewInt(90)
+				msg.Amount = new(big.Int).Mul(big.NewInt(90), oneBig)
 				return msg
 			}(),
 			ds:         makeMsgCollectRewards(),
@@ -1021,7 +1021,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			sdb: makeStateDBForStake(t),
 			msg: func() staking.Delegate {
 				msg := defaultMsgDelegate()
-				msg.Amount = big.NewInt(500)
+				msg.Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
 				return msg
 			}(),
 			ds:         makeMsgCollectRewards(),
