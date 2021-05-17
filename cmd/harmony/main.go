@@ -90,8 +90,11 @@ func init() {
 	cli.SetParseErrorHandle(func(err error) {
 		os.Exit(128) // 128 - invalid command line arguments
 	})
-	rootCmd.AddCommand(dumpConfigCmd)
+	configCmd.AddCommand(dumpConfigCmd)
+	configCmd.AddCommand(updateConfigCmd)
+	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(dumpConfigLegacyCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
@@ -159,23 +162,40 @@ func raiseFdLimits() error {
 
 func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	var (
-		config harmonyConfig
-		err    error
+		config         harmonyConfig
+		err            error
+		migratedFrom   string
+		configFile     string
+		isUsingDefault bool
 	)
 	if cli.IsFlagChanged(cmd, configFlag) {
-		configFile := cli.GetStringFlagValue(cmd, configFlag)
-		config, err = loadHarmonyConfig(configFile)
+		configFile = cli.GetStringFlagValue(cmd, configFlag)
+		config, migratedFrom, err = loadHarmonyConfig(configFile)
 	} else {
 		nt := getNetworkType(cmd)
 		config = getDefaultHmyConfigCopy(nt)
+		isUsingDefault = true
 	}
 	if err != nil {
 		return harmonyConfig{}, err
 	}
-	if config.Version != defaultConfig.Version {
-		fmt.Printf("Loaded config version %s which is not latest (%s).\n",
-			config.Version, defaultConfig.Version)
-		fmt.Println("Update saved config with `./harmony dumpconfig [config_file]`")
+	if migratedFrom != defaultConfig.Version && !isUsingDefault {
+		fmt.Printf("Old config version detected %s\n",
+			migratedFrom)
+		stat, _ := os.Stdin.Stat()
+		// Ask to update if only using terminal
+		if stat.Mode()&os.ModeCharDevice != 0 {
+			if promptConfigUpdate() {
+				err := updateConfigFile(configFile)
+				if err != nil {
+					fmt.Printf("Could not update config - %s", err.Error())
+					fmt.Println("Update config manually with `./harmony config update [config_file]`")
+				}
+			}
+
+		} else {
+			fmt.Println("Update saved config with `./harmony config update [config_file]`")
+		}
 	}
 
 	applyRootFlags(cmd, &config)
@@ -193,6 +213,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applyLegacyMiscFlags(cmd, config)
 	applyGeneralFlags(cmd, config)
 	applyNetworkFlags(cmd, config)
+	applyDNSSyncFlags(cmd, config)
 	applyP2PFlags(cmd, config)
 	applyHTTPFlags(cmd, config)
 	applyWSFlags(cmd, config)
@@ -370,11 +391,11 @@ func setupNodeAndRun(hc harmonyConfig) {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
 	}
 
-	if hc.Sync.LegacyServer && !hc.General.IsOffline {
+	if hc.DNSSync.Server && !hc.General.IsOffline {
 		utils.Logger().Info().Msg("support gRPC sync server")
-		currentNode.SupportGRPCSyncServer(hc.Sync.LegacyServerPort)
+		currentNode.SupportGRPCSyncServer(hc.DNSSync.ServerPort)
 	}
-	if hc.Sync.LegacyClient && !hc.General.IsOffline {
+	if hc.DNSSync.Client && !hc.General.IsOffline {
 		utils.Logger().Info().Msg("go with gRPC sync client")
 		currentNode.StartGRPCSyncClient()
 	}
@@ -638,15 +659,15 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		selfPort := hc.P2P.Port
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
-	} else if hc.Network.LegacySyncing {
+	} else if hc.DNSSync.LegacySyncing {
 		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
-		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.Network.DNSZone, strconv.Itoa(hc.Network.DNSSyncPort))
+		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port))
 	}
 
 	// TODO: refactor the creation of blockchain out of node.New()
 	currentConsensus.Blockchain = currentNode.Blockchain()
-	currentNode.NodeConfig.DNSZone = hc.Network.DNSZone
+	currentNode.NodeConfig.DNSZone = hc.DNSSync.Zone
 
 	currentNode.NodeConfig.SetBeaconGroupID(
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
