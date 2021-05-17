@@ -1016,6 +1016,18 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 			expErr: errDelegationTooSmallV2,
 		},
+		{
+			// 18: valid amount v2
+			sdb: makeStateDBForStake(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = big.NewInt(500)
+				return msg
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(100),
+			redelegate: false,
+		},
 	}
 	for i, test := range tests {
 		config := &params.ChainConfig{}
