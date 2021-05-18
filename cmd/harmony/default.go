@@ -38,7 +38,9 @@ var defaultConfig = harmonyConfig{
 		Port:    nodeconfig.DefaultWSPort,
 	},
 	RPCOpt: rpcOptConfig{
-		DebugEnabled: false,
+		DebugEnabled:      false,
+		RateLimterEnabled: true,
+		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
 	},
 	BLSKeys: blsConfig{
 		KeyDir:   "./.hmy/blskeys",

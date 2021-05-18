@@ -131,7 +131,9 @@ type wsConfig struct {
 }
 
 type rpcOptConfig struct {
-	DebugEnabled bool // Enables PrivateDebugService APIs, including the EVM tracer
+	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
+	RateLimterEnabled bool // Enable Rate limiter for RPC
+	RequestsPerSecond int  // for RPC rate limiter
 }
 
 type devnetConfig struct {

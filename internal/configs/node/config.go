@@ -107,6 +107,9 @@ type RPCServerConfig struct {
 	WSPort    int
 
 	DebugEnabled bool
+
+	RateLimiterEnabled bool
+	RequestsPerSecond  int
 }
 
 // RosettaServerConfig is the config for the rosetta server

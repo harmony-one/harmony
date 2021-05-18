@@ -62,6 +62,8 @@ Version = "1.0.2"
 
 [RPCOpt]
   DebugEnabled = false
+  RateLimterEnabled = true
+  RequestsPerSecond = 300
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -127,6 +129,8 @@ Version = "1.0.3"
 
 [RPCOpt]
   DebugEnabled = false
+  RateLimterEnabled = true
+  RequestsPerSecond = 300
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -135,7 +139,6 @@ Version = "1.0.3"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
-
 `)
 
 	V1_0_4ConfigDefault = []byte(`
@@ -193,6 +196,8 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
+  RateLimterEnabled = true
+  RequestsPerSecond = 300
 
 [Sync]
   Concurrency = 6
