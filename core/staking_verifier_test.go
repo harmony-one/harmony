@@ -1027,7 +1027,13 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(100),
 			redelegate: false,
-			expAmt:     new(big.Int).Mul(big.NewInt(500), oneBig),
+
+			expVWrappers: func() []staking.ValidatorWrapper {
+				wrapper := defaultExpVWrapperDelegate()
+				wrapper.Delegations[0].Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				return []staking.ValidatorWrapper{wrapper}
+			}(),
+			expAmt: new(big.Int).Mul(big.NewInt(500), oneBig),
 		},
 	}
 	for i, test := range tests {
