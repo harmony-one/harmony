@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -187,11 +189,14 @@ func VerifyAndEditValidatorFromMsg(
 }
 
 const oneThousand = 1000
+const oneHundred = 100
 
 var (
-	oneAsBigInt           = big.NewInt(denominations.One)
-	minimumDelegation     = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneThousand))
-	errDelegationTooSmall = errors.New("minimum delegation amount for a delegator has to be greater than or equal to 1000 ONE")
+	oneAsBigInt             = big.NewInt(denominations.One)
+	minimumDelegation       = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneThousand))
+	minimumDelegationV2     = new(big.Int).Mul(oneAsBigInt, big.NewInt(oneHundred))
+	errDelegationTooSmall   = errors.New("minimum delegation amount for a delegator has to be greater than or equal to 1000 ONE")
+	errDelegationTooSmallV2 = errors.New("minimum delegation amount for a delegator has to be greater than or equal to 100 ONE")
 )
 
 // VerifyAndDelegateFromMsg verifies the delegate message using the stateDB
@@ -200,7 +205,7 @@ var (
 //
 // Note that this function never updates the stateDB, it only reads from stateDB.
 func VerifyAndDelegateFromMsg(
-	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, redelegation bool,
+	stateDB vm.StateDB, epoch *big.Int, msg *staking.Delegate, delegations []staking.DelegationIndex, chainConfig *params.ChainConfig,
 ) ([]*staking.ValidatorWrapper, *big.Int, map[common.Address]*big.Int, error) {
 	if stateDB == nil {
 		return nil, nil, nil, errStateDBIsMissing
@@ -212,7 +217,13 @@ func VerifyAndDelegateFromMsg(
 		return nil, nil, nil, errNegativeAmount
 	}
 	if msg.Amount.Cmp(minimumDelegation) < 0 {
-		return nil, nil, nil, errDelegationTooSmall
+		if chainConfig.IsMinDelegation100(epoch) {
+			if msg.Amount.Cmp(minimumDelegationV2) < 0 {
+				return nil, nil, nil, errDelegationTooSmallV2
+			}
+		} else {
+			return nil, nil, nil, errDelegationTooSmall
+		}
 	}
 
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
@@ -220,7 +231,7 @@ func VerifyAndDelegateFromMsg(
 	fromLockedTokens := map[common.Address]*big.Int{}
 
 	var delegateeWrapper *staking.ValidatorWrapper
-	if redelegation {
+	if chainConfig.IsRedelegation(epoch) {
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
 			delegationIndex := &delegations[i]

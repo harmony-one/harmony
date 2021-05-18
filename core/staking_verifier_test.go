@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -1000,9 +1002,49 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			}(),
 			expAmt: tenKOnes,
 		},
+		{
+			// 17: small amount v2
+			sdb: makeStateDBForStake(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = new(big.Int).Mul(big.NewInt(90), oneBig)
+				return msg
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(100),
+			redelegate: false,
+
+			expErr: errDelegationTooSmallV2,
+		},
+		{
+			// 18: valid amount v2
+			sdb: makeStateDBForStake(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				return msg
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(100),
+			redelegate: false,
+
+			expVWrappers: func() []staking.ValidatorWrapper {
+				wrapper := defaultExpVWrapperDelegate()
+				wrapper.Delegations[1].Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				return []staking.ValidatorWrapper{wrapper}
+			}(),
+			expAmt: new(big.Int).Mul(big.NewInt(500), oneBig),
+		},
 	}
 	for i, test := range tests {
-		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
+		config := &params.ChainConfig{}
+		config.MinDelegation100Epoch = big.NewInt(100)
+		if test.redelegate {
+			config.RedelegationEpoch = test.epoch
+		} else {
+			config.RedelegationEpoch = big.NewInt(test.epoch.Int64() + 1)
+		}
+		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, config)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)

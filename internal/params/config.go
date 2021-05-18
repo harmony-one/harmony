@@ -51,6 +51,7 @@ var (
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   EpochTBD,
+		MinDelegation100Epoch:      EpochTBD,
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
@@ -74,6 +75,7 @@ var (
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   EpochTBD,
+		MinDelegation100Epoch:      EpochTBD,
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(43800),
@@ -98,6 +100,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -122,6 +125,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -146,6 +150,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -169,6 +174,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -194,6 +200,7 @@ var (
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // VRFEpoch
+		big.NewInt(0),                      // MinDelegation100Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
 		big.NewInt(0),                      // IstanbulEpoch
@@ -219,6 +226,7 @@ var (
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // VRFEpoch
+		big.NewInt(0),        // MinDelegation100Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
 		big.NewInt(0),        // IstanbulEpoch
@@ -298,6 +306,9 @@ type ChainConfig struct {
 
 	// VRFEpoch is the epoch when VRF randomness is enabled
 	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
+
+	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
+	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -388,6 +399,11 @@ func (c *ChainConfig) IsNoEarlyUnlock(epoch *big.Int) bool {
 // IsVRF determines whether it is the epoch to enable vrf
 func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
 	return isForked(c.VRFEpoch, epoch)
+}
+
+// IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
+func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
+	return isForked(c.MinDelegation100Epoch, epoch)
 }
 
 // IsPreStaking determines whether staking transactions are allowed

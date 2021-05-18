@@ -840,7 +840,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 		}
 		pendingEpoch := pool.pendingEpoch()
 		_, delegateAmt, _, err := VerifyAndDelegateFromMsg(
-			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig.IsRedelegation(pendingEpoch))
+			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig)
 		if err != nil {
 			return err
 		}
