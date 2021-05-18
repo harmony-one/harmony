@@ -87,17 +87,3 @@ func TestMedian(t *testing.T) {
 		t.Errorf("Expected: %s, Got: %s", expectedMedian.String(), med.String())
 	}
 }
-
-func TestEffectiveStake(t *testing.T) {
-	for _, val := range testingPurchases {
-		expectedStake := numeric.MaxDec(
-			numeric.MinDec(numeric.OneDec().Add(c).Mul(expectedMedian), val.RawStake),
-			numeric.OneDec().Sub(c).Mul(expectedMedian))
-		calculatedStake := effectiveStake(expectedMedian, val.RawStake)
-		if !expectedStake.Equal(calculatedStake) {
-			t.Errorf(
-				"Expected: %s, Got: %s", expectedStake.String(), calculatedStake.String(),
-			)
-		}
-	}
-}
