@@ -62,8 +62,6 @@ Version = "1.0.2"
 
 [RPCOpt]
   DebugEnabled = false
-  RateLimterEnabled = true
-  RequestsPerSecond = 300
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -129,8 +127,6 @@ Version = "1.0.3"
 
 [RPCOpt]
   DebugEnabled = false
-  RateLimterEnabled = true
-  RequestsPerSecond = 300
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -196,8 +192,6 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
-  RateLimterEnabled = true
-  RequestsPerSecond = 300
 
 [Sync]
   Concurrency = 6
