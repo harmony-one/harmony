@@ -96,7 +96,7 @@ Version = "1.0.4"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
- 
+  
 [RPCOpt]
   RateLimterEnabled = true
   RequestsPerSecond = 300`

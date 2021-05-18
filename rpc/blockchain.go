@@ -23,34 +23,39 @@ import (
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockchainService struct {
-	hmy     *hmy.Harmony
-	version Version
-	limiter *rate.Limiter
+	hmy        *hmy.Harmony
+	version    Version
+	limiter    *rate.Limiter
+	blockCache *lru.Cache
 }
 
-var (
+const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
+	blockCacheLimit               = 256
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	blockCache, _ := lru.New(blockCacheLimit)
 	if limiterEnable {
 		return rpc.API{
 			Namespace: version.Namespace(),
 			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, rate.NewLimiter(rate.Limit(limit), 1)},
+			Service:   &PublicBlockchainService{hmy, version, rate.NewLimiter(rate.Limit(limit), 1), blockCache},
 			Public:    true,
 		}
 	} else {
 		return rpc.API{
 			Namespace: version.Namespace(),
 			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, nil},
+			Service:   &PublicBlockchainService{hmy, version, nil, blockCache},
 			Public:    true,
 		}
 	}
@@ -155,13 +160,17 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
 
+	blockNum := blockNumber.EthBlockNumber()
+	if block, ok := s.blockCache.Get(uint64(blockNum)); ok {
+		return block.(StructuredResponse), nil
+	}
+
 	err = s.wait(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Process arguments based on version
-	blockNum := blockNumber.EthBlockNumber()
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
 	if !ok {
@@ -218,6 +227,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			}
 		}
 
+		s.blockCache.Add(uint64(blockNum), response)
 		return response, err
 	}
 
