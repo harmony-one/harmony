@@ -17,7 +17,7 @@ import (
 var (
 	two         = numeric.NewDecFromBigInt(big.NewInt(2))
 	c, _        = numeric.NewDecFromStr("0.15")
-	cV2, _      = numeric.NewDecFromStr("0.15")
+	cV2, _      = numeric.NewDecFromStr("0.35")
 	onePlusC    = numeric.OneDec().Add(c)
 	oneMinusC   = numeric.OneDec().Sub(c)
 	onePlusCV2  = numeric.OneDec().Add(cV2)
