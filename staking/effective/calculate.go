@@ -156,9 +156,13 @@ func Apply(shortHand map[common.Address]*SlotOrder, pull int, isExtendedBound bo
 		min = oneMinusCV2.Mul(median)
 	}
 	for i := range picks {
-		newMax := numeric.MinDec(max, picks[i].RawStake)
-		picks[i].EPoSStake = numeric.MaxDec(newMax, min)
+		picks[i].EPoSStake = effectiveStake(min, max, picks[i].RawStake)
 	}
 
 	return median, picks
+}
+
+func effectiveStake(min, max, actual numeric.Dec) numeric.Dec {
+	newMax := numeric.MinDec(max, actual)
+	return numeric.MaxDec(newMax, min)
 }
