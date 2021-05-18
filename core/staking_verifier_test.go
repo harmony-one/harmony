@@ -1030,7 +1030,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 
 			expVWrappers: func() []staking.ValidatorWrapper {
 				wrapper := defaultExpVWrapperDelegate()
-				wrapper.Delegations[0].Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				wrapper.Delegations[1].Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
 				return []staking.ValidatorWrapper{wrapper}
 			}(),
 			expAmt: new(big.Int).Mul(big.NewInt(500), oneBig),
