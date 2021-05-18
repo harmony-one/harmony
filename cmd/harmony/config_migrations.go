@@ -90,6 +90,14 @@ func init() {
 			confTree.Set("HTTP.RosettaPort", defaultConfig.HTTP.RosettaPort)
 		}
 
+		if confTree.Get("RPCOpt.RateLimterEnabled") == nil {
+			confTree.Set("RPCOpt.RateLimterEnabled", defaultConfig.RPCOpt.RateLimterEnabled)
+		}
+
+		if confTree.Get("RPCOpt.RequestsPerSecond") == nil {
+			confTree.Set("RPCOpt.RequestsPerSecond", defaultConfig.RPCOpt.RequestsPerSecond)
+		}
+
 		if confTree.Get("P2P.IP") == nil {
 			confTree.Set("P2P.IP", defaultConfig.P2P.IP)
 		}
