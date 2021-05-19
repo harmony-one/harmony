@@ -19,6 +19,8 @@ package core
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -44,6 +46,9 @@ type ChainContext interface {
 
 	// ReadValidatorList returns the list of all validators
 	ReadValidatorList() ([]common.Address, error)
+
+	// Config returns chain config
+	Config() *params.ChainConfig
 }
 
 // NewEVMContext creates a new context for use in the EVM.

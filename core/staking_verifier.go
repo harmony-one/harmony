@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"math/big"
 
+	"github.com/harmony-one/harmony/staking/availability"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -164,6 +167,17 @@ func VerifyAndEditValidatorFromMsg(
 	newRate := wrapper.Validator.Rate
 	if newRate.GT(wrapper.Validator.MaxRate) {
 		return nil, errCommissionRateChangeTooHigh
+	}
+
+	if chainContext.Config().IsMinCommissionRate(epoch) && newRate.LT(availability.MinCommissionRate) {
+		firstEpoch := stateDB.GetValidatorFirstElectionEpoch(msg.ValidatorAddress)
+		promoPeriod := 100
+		if nodeconfig.GetDefaultConfig().GetNetworkType() != nodeconfig.Mainnet {
+			promoPeriod = 10
+		}
+		if firstEpoch.Uint64() != 0 && firstEpoch.Sub(epoch, firstEpoch).Int64() >= int64(promoPeriod) {
+			return nil, errCommissionRateChangeTooLow
+		}
 	}
 
 	snapshotValidator, err := chainContext.ReadValidatorSnapshot(wrapper.Address)

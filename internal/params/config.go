@@ -52,6 +52,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   EpochTBD,
 		MinDelegation100Epoch:      EpochTBD,
+		MinCommissionRateEpoch:     EpochTBD,
 		EPoSBound35Epoch:           EpochTBD,
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
@@ -77,6 +78,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   EpochTBD,
 		MinDelegation100Epoch:      EpochTBD,
+		MinCommissionRateEpoch:     EpochTBD,
 		EPoSBound35Epoch:           EpochTBD,
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
@@ -103,6 +105,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
@@ -129,6 +132,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
@@ -155,6 +159,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
@@ -180,6 +185,7 @@ var (
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
@@ -207,6 +213,7 @@ var (
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // VRFEpoch
 		big.NewInt(0),                      // MinDelegation100Epoch
+		big.NewInt(0),                      // MinCommissionRateEpoch
 		big.NewInt(0),                      // EPoSBound35Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
@@ -234,6 +241,7 @@ var (
 		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // VRFEpoch
 		big.NewInt(0),        // MinDelegation100Epoch
+		big.NewInt(0),        // MinCommissionRateEpoch
 		big.NewInt(0),        // EPoSBound35Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
@@ -317,6 +325,9 @@ type ChainConfig struct {
 
 	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
 	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
+
+	// MinCommissionRateEpoch is the epoch when policy for minimum comission rate of 5% is started
+	MinCommissionRateEpoch *big.Int `json:"min-commission-rate-epoch,omitempty"`
 
 	// EPoSBound35Epoch is the epoch when the EPoS bound parameter c is changed from 15% to 35%
 	EPoSBound35Epoch *big.Int `json:"epos-bound-35-epoch,omitempty"`
@@ -415,6 +426,11 @@ func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
 // IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
 func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
 	return isForked(c.MinDelegation100Epoch, epoch)
+}
+
+// IsMinCommissionRate determines whether it is the epoch to start the policy of 5% min commission
+func (c *ChainConfig) IsMinCommissionRate(epoch *big.Int) bool {
+	return isForked(c.MinCommissionRateEpoch, epoch)
 }
 
 // IsEPoSBound35 determines whether it is the epoch to extend the EPoS bound to 35%

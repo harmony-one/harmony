@@ -1675,6 +1675,12 @@ func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 	return nil
 }
 
+func (chain *fakeChainContext) Config() *params.ChainConfig {
+	config := &params.ChainConfig{}
+	config.MinCommissionRateEpoch = big.NewInt(10)
+	return config
+}
+
 func (chain *fakeChainContext) GetHeader(common.Hash, uint64) *block.Header {
 	return nil
 }
@@ -1707,6 +1713,12 @@ func (chain *fakeErrChainContext) Engine() consensus_engine.Engine {
 
 func (chain *fakeErrChainContext) GetHeader(common.Hash, uint64) *block.Header {
 	return nil
+}
+
+func (chain *fakeErrChainContext) Config() *params.ChainConfig {
+	config := &params.ChainConfig{}
+	config.MinCommissionRateEpoch = big.NewInt(10)
+	return config
 }
 
 func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
