@@ -14,9 +14,9 @@ const (
 
 // keys used to retrieve staking related informatio
 var (
-	IsValidatorKey      = crypto.Keccak256Hash([]byte(isValidatorKeyStr))
-	IsValidator         = crypto.Keccak256Hash([]byte(isValidatorStr))
-	CollectRewardsTopic = crypto.Keccak256Hash([]byte(collectRewardsStr))
-	DelegateTopic       = crypto.Keccak256Hash([]byte(delegateStr))
-	FirstElectionEpoch  = crypto.Keccak256Hash([]byte(firstElectionEpochStr))
+	IsValidatorKey        = crypto.Keccak256Hash([]byte(isValidatorKeyStr))
+	IsValidator           = crypto.Keccak256Hash([]byte(isValidatorStr))
+	CollectRewardsTopic   = crypto.Keccak256Hash([]byte(collectRewardsStr))
+	DelegateTopic         = crypto.Keccak256Hash([]byte(delegateStr))
+	FirstElectionEpochKey = crypto.Keccak256Hash([]byte(firstElectionEpochStr))
 )

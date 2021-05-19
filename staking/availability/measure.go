@@ -243,7 +243,7 @@ func UpdateMinimumCommissionFee(
 	if nodeconfig.GetDefaultConfig().GetNetworkType() != nodeconfig.Mainnet {
 		promoPeriod = 10
 	}
-	if firstElectionEpoch.Uint64() != 0 && firstElectionEpoch.Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
+	if firstElectionEpoch.Uint64() != 0 && big.NewInt(0).Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
 		if wrapper.Rate.LT(MinCommissionRate) {
 			utils.Logger().Info().
 				Str("addr", addr.Hex()).

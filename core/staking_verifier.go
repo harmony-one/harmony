@@ -175,7 +175,7 @@ func VerifyAndEditValidatorFromMsg(
 		if nodeconfig.GetDefaultConfig().GetNetworkType() != nodeconfig.Mainnet {
 			promoPeriod = 10
 		}
-		if firstEpoch.Uint64() != 0 && firstEpoch.Sub(epoch, firstEpoch).Int64() >= int64(promoPeriod) {
+		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= int64(promoPeriod) {
 			return nil, errCommissionRateChangeTooLow
 		}
 	}

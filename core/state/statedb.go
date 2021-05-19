@@ -865,14 +865,14 @@ func (db *DB) SetValidatorFirstElectionEpoch(addr common.Address, epoch *big.Int
 	if firstEpoch.Uint64() == 0 {
 		// Set only when it's not set (or it's 0)
 		bytes := common.BigToHash(epoch)
-		db.SetState(addr, staking.FirstElectionEpoch, bytes)
+		db.SetState(addr, staking.FirstElectionEpochKey, bytes)
 	}
 }
 
 // GetValidatorFirstElectionEpoch gets the epoch when the validator was first elected
 func (db *DB) GetValidatorFirstElectionEpoch(addr common.Address) *big.Int {
 	so := db.getStateObject(addr)
-	value := so.GetState(db.db, staking.IsValidatorKey)
+	value := so.GetState(db.db, staking.FirstElectionEpochKey)
 	return value.Big()
 }
 

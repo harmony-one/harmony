@@ -55,6 +55,7 @@ var (
 	hundredKOnes    = new(big.Int).Mul(big.NewInt(100000), oneBig)
 
 	negRate           = numeric.NewDecWithPrec(-1, 10)
+	pointZeroOneDec   = numeric.NewDecWithPrec(1, 2)
 	pointOneDec       = numeric.NewDecWithPrec(1, 1)
 	pointTwoDec       = numeric.NewDecWithPrec(2, 1)
 	pointFiveDec      = numeric.NewDecWithPrec(5, 1)
@@ -654,6 +655,44 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			msg:      defaultMsgEditValidator(),
 
 			expErr: errors.New("banned status"),
+		},
+		{
+			// 14: Rate is lower than min rate of 5%
+			sdb: makeStateDBForStake(t),
+			bc: func() *fakeChainContext {
+				chain := makeFakeChainContextForStake()
+				vw := chain.vWrappers[validatorAddr]
+				vw.Rate = pointSevenDec
+				chain.vWrappers[validatorAddr] = vw
+				return chain
+			}(),
+			epoch:    big.NewInt(20),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.EditValidator {
+				msg := defaultMsgEditValidator()
+				msg.CommissionRate = &pointZeroOneDec
+				return msg
+			}(),
+
+			expErr: errCommissionRateChangeTooLow,
+		},
+		{
+			// 15: Rate is ok within the promo period
+			sdb: makeStateDBForStake(t),
+			bc: func() *fakeChainContext {
+				chain := makeFakeChainContextForStake()
+				vw := chain.vWrappers[validatorAddr]
+				vw.Rate = pointSevenDec
+				chain.vWrappers[validatorAddr] = vw
+				return chain
+			}(),
+			epoch:    big.NewInt(15),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.EditValidator {
+				msg := defaultMsgEditValidator()
+				msg.CommissionRate = &pointZeroOneDec
+				return msg
+			}(),
 		},
 	}
 	for i, test := range tests {
@@ -1588,6 +1627,7 @@ func updateStateValidators(sdb *state.DB, ws []*staking.ValidatorWrapper) error 
 	for i, w := range ws {
 		sdb.SetValidatorFlag(w.Address)
 		sdb.AddBalance(w.Address, hundredKOnes)
+		sdb.SetValidatorFirstElectionEpoch(w.Address, big.NewInt(10))
 		if err := sdb.UpdateValidatorWrapper(w.Address, w); err != nil {
 			return fmt.Errorf("update %v vw error: %v", i, err)
 		}
@@ -1677,7 +1717,7 @@ func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 
 func (chain *fakeChainContext) Config() *params.ChainConfig {
 	config := &params.ChainConfig{}
-	config.MinCommissionRateEpoch = big.NewInt(10)
+	config.MinCommissionRateEpoch = big.NewInt(0)
 	return config
 }
 
