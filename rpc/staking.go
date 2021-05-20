@@ -6,15 +6,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	staking "github.com/harmony-one/harmony/staking/types"
-
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -601,6 +599,11 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
+
+		// Skip delegations with zero amount and empty undelegation
+		if delegation.Amount.Cmp(common.Big0) == 0 || len(undelegations) == 0 {
+			continue
+		}
 
 		// Response output is the same for all versions
 		del, err := NewStructuredResponse(Delegation{
