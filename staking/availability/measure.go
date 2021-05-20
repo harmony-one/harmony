@@ -3,8 +3,6 @@ package availability
 import (
 	"math/big"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/harmony-one/harmony/core/state"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -229,6 +227,7 @@ func UpdateMinimumCommissionFee(
 	electionEpoch *big.Int,
 	state *state.DB,
 	addr common.Address,
+	promoPeriod int64,
 ) error {
 	utils.Logger().Info().Msg("begin update min commission fee")
 
@@ -239,10 +238,6 @@ func UpdateMinimumCommissionFee(
 
 	firstElectionEpoch := state.GetValidatorFirstElectionEpoch(addr)
 
-	promoPeriod := 100
-	if nodeconfig.GetDefaultConfig().GetNetworkType() != nodeconfig.Mainnet {
-		promoPeriod = 10
-	}
 	if firstElectionEpoch.Uint64() != 0 && big.NewInt(0).Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
 		if wrapper.Rate.LT(MinCommissionRate) {
 			utils.Logger().Info().

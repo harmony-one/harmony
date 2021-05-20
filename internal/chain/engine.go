@@ -416,7 +416,7 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 
 			// Update minimum commission fee
 			if err := availability.UpdateMinimumCommissionFee(
-				newShardState.Epoch, state, addr,
+				newShardState.Epoch, state, addr, config.MinCommissionPromoPeriod.Int64(),
 			); err != nil {
 				return err
 			}

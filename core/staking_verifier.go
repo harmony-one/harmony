@@ -6,7 +6,6 @@ import (
 
 	"github.com/harmony-one/harmony/staking/availability"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -171,11 +170,8 @@ func VerifyAndEditValidatorFromMsg(
 
 	if chainContext.Config().IsMinCommissionRate(epoch) && newRate.LT(availability.MinCommissionRate) {
 		firstEpoch := stateDB.GetValidatorFirstElectionEpoch(msg.ValidatorAddress)
-		promoPeriod := 100
-		if nodeconfig.GetDefaultConfig().GetNetworkType() != nodeconfig.Mainnet {
-			promoPeriod = 10
-		}
-		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= int64(promoPeriod) {
+		promoPeriod := chainContext.Config().MinCommissionPromoPeriod.Int64()
+		if firstEpoch.Uint64() != 0 && big.NewInt(0).Sub(epoch, firstEpoch).Int64() >= promoPeriod {
 			return nil, errCommissionRateChangeTooLow
 		}
 	}
