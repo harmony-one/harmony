@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
 
@@ -290,7 +292,7 @@ func (e *engineImpl) Finalize(
 
 		// Needs to be after payoutUndelegations because payoutUndelegations
 		// depends on the old LastEpochInCommittee
-		if err := setLastEpochInCommittee(header, state); err != nil {
+		if err := setElectionEpochAndMinFee(header, state, chain.Config()); err != nil {
 			return nil, nil, err
 		}
 
@@ -392,7 +394,7 @@ func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) b
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
+func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *params.ChainConfig) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
@@ -405,7 +407,20 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
+		// Set last epoch in committee
 		wrapper.LastEpochInCommittee = newShardState.Epoch
+
+		if config.IsMinCommissionRate(newShardState.Epoch) {
+			// Set first election epoch
+			state.SetValidatorFirstElectionEpoch(addr, newShardState.Epoch)
+
+			// Update minimum commission fee
+			if err := availability.UpdateMinimumCommissionFee(
+				newShardState.Epoch, state, addr, config.MinCommissionPromoPeriod.Int64(),
+			); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

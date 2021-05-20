@@ -3,6 +3,8 @@ package availability
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/state"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -15,6 +17,8 @@ import (
 
 var (
 	measure = numeric.NewDec(2).Quo(numeric.NewDec(3))
+
+	MinCommissionRate = numeric.MustNewDecFromStr("0.05")
 	// ErrDivByZero ..
 	ErrDivByZero = errors.New("toSign of availability cannot be 0, mistake in protocol")
 )
@@ -213,5 +217,36 @@ func ComputeAndMutateEPOSStatus(
 		// to leave the committee can actually leave.
 	}
 
+	return nil
+}
+
+// UpdateMinimumCommissionFee update the validator commission fee to the minimum 5%
+// if the validator has a lower commission rate and 100 epochs have passed after
+// the validator was first elected.
+func UpdateMinimumCommissionFee(
+	electionEpoch *big.Int,
+	state *state.DB,
+	addr common.Address,
+	promoPeriod int64,
+) error {
+	utils.Logger().Info().Msg("begin update min commission fee")
+
+	wrapper, err := state.ValidatorWrapper(addr)
+	if err != nil {
+		return err
+	}
+
+	firstElectionEpoch := state.GetValidatorFirstElectionEpoch(addr)
+
+	if firstElectionEpoch.Uint64() != 0 && big.NewInt(0).Sub(electionEpoch, firstElectionEpoch).Int64() >= int64(promoPeriod) {
+		if wrapper.Rate.LT(MinCommissionRate) {
+			utils.Logger().Info().
+				Str("addr", addr.Hex()).
+				Str("old rate", wrapper.Rate.String()).
+				Str("firstElectionEpoch", firstElectionEpoch.String()).
+				Msg("updating min commission rate")
+			wrapper.Rate.SetBytes(MinCommissionRate.Bytes())
+		}
+	}
 	return nil
 }

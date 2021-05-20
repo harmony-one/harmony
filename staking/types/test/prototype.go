@@ -59,9 +59,9 @@ var (
 	}
 
 	commissionRates = staking.CommissionRates{
-		Rate:          numeric.NewDecWithPrec(5, 1),
+		Rate:          numeric.NewDecWithPrec(4, 1),
 		MaxRate:       numeric.NewDecWithPrec(9, 1),
-		MaxChangeRate: numeric.NewDecWithPrec(3, 1),
+		MaxChangeRate: numeric.NewDecWithPrec(4, 1),
 	}
 
 	commission = staking.Commission{
