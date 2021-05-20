@@ -1726,6 +1726,7 @@ func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 func (chain *fakeChainContext) Config() *params.ChainConfig {
 	config := &params.ChainConfig{}
 	config.MinCommissionRateEpoch = big.NewInt(0)
+	config.MinCommissionPromoPeriod = big.NewInt(10)
 	return config
 }
 
