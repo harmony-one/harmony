@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
 	"time"
+
+	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -245,4 +249,46 @@ func NewHeaderInformation(header *block.Header, leader string) *HeaderInformatio
 	}
 
 	return result
+}
+
+// AddressOrList represents an address or a list of addresses
+type AddressOrList struct {
+	Address     *common.Address
+	AddressList []common.Address
+}
+
+// UnmarshalJSON defines the input parsing of AddressOrList
+func (aol *AddressOrList) UnmarshalJSON(data []byte) (err error) {
+	var itf interface{}
+	if err := json.Unmarshal(data, &itf); err != nil {
+		return err
+	}
+	switch d := itf.(type) {
+	case string: // Single address
+		addr, err := internal_common.ParseAddr(d)
+		if err != nil {
+			return err
+		}
+		aol.Address = &addr
+		return nil
+
+	case []interface{}: // Address array
+		var addrs []common.Address
+		for _, addrItf := range d {
+			addrStr, ok := addrItf.(string)
+			if !ok {
+				return errors.New("not invalid address array")
+			}
+			addr, err := internal_common.ParseAddr(addrStr)
+			if err != nil {
+				return fmt.Errorf("invalid address: %v", addrStr)
+			}
+			addrs = append(addrs, addr)
+		}
+		aol.AddressList = addrs
+		return nil
+
+	default:
+		return errors.New("must provide one address or address list")
+	}
 }
