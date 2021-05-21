@@ -218,7 +218,7 @@ func validateHarmonyConfig(config harmonyConfig) error {
 
 	if config.Sync.Downloader && !config.Sync.Enabled {
 		// Node must run sync protocol to enable downloader
-		return errors.New("--sync must be set to true to support stream sync downloader")
+		return errors.New("--sync must be set to true to support --sync.downloader")
 	}
 
 	return nil
@@ -341,11 +341,12 @@ var dumpConfigCmd = &cobra.Command{
 }
 
 var dumpConfigLegacyCmd = &cobra.Command{
-	Use:   "dumpconfig [config_file]",
-	Short: "depricated - use config dump instead",
-	Long:  "depricated - use config dump instead",
-	Args:  cobra.MinimumNArgs(1),
-	Run:   dumpConfig,
+	Use:    "dumpconfig [config_file]",
+	Short:  "depricated - use config dump instead",
+	Long:   "depricated - use config dump instead",
+	Args:   cobra.MinimumNArgs(1),
+	Hidden: true,
+	Run:    dumpConfig,
 }
 
 func registerDumpConfigFlags() error {
