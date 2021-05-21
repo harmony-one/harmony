@@ -18,6 +18,8 @@ RUN git clone https://github.com/harmony-one/harmony.git && \
 
 WORKDIR $HMY_PATH/harmony
 
+RUN go mod download
+
 RUN make linux_static && \
     cp ./bin/harmony /root/harmony && \
     cp ./rosetta/infra/run.sh /root/run.sh
