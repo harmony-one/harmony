@@ -70,7 +70,7 @@ func (n Version) Namespace() string {
 
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
-	apis = append(apis, getAPIs(hmy, config.DebugEnabled)...)
+	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
@@ -121,15 +121,15 @@ func StopServers() error {
 }
 
 // getAPIs returns all the API methods for the RPC interface
-func getAPIs(hmy *hmy.Harmony, debugEnable bool) []rpc.API {
+func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
 	publicAPIs := []rpc.API{
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
 		NewPublicHarmonyAPI(hmy, Eth),
-		NewPublicBlockchainAPI(hmy, V1),
-		NewPublicBlockchainAPI(hmy, V2),
-		NewPublicBlockchainAPI(hmy, Eth),
+		NewPublicBlockchainAPI(hmy, V1, rateLimiterEnable, ratelimit),
+		NewPublicBlockchainAPI(hmy, V2, rateLimiterEnable, ratelimit),
+		NewPublicBlockchainAPI(hmy, Eth, rateLimiterEnable, ratelimit),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
 		NewPublicContractAPI(hmy, Eth),

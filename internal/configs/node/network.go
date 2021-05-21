@@ -57,6 +57,11 @@ const (
 )
 
 const (
+	// DefaultRateLimit for RPC, the number of requests per second
+	DefaultRPCRateLimit = 300
+)
+
+const (
 	// rpcHTTPPortOffset is the port offset for RPC HTTP requests
 	rpcHTTPPortOffset = 500
 

@@ -74,6 +74,8 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcRateLimiterEnabledFlag,
+		rpcRateLimitFlag,
 	}
 
 	blsFlags = append(newBLSFlags, legacyBLSFlags...)
@@ -628,12 +630,31 @@ var (
 		DefValue: defaultConfig.RPCOpt.DebugEnabled,
 		Hidden:   true,
 	}
+
+	rpcRateLimiterEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.ratelimiter",
+		Usage:    "enable rate limiter for RPCs",
+		DefValue: defaultConfig.RPCOpt.RateLimterEnabled,
+	}
+
+	rpcRateLimitFlag = cli.IntFlag{
+		Name:     "rpc.ratelimit",
+		Usage:    "the number of requests per second for RPCs",
+		DefValue: defaultConfig.RPCOpt.RequestsPerSecond,
+	}
 )
 
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
 	}
+	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
+		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcRateLimitFlag) {
+		config.RPCOpt.RequestsPerSecond = cli.GetIntFlagValue(cmd, rpcRateLimitFlag)
+	}
+
 }
 
 // bls flags

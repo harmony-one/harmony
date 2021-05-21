@@ -66,6 +66,11 @@ func TestHarmonyFlags(t *testing.T) {
 					RosettaEnabled: false,
 					RosettaPort:    9700,
 				},
+				RPCOpt: rpcOptConfig{
+					DebugEnabled:      false,
+					RateLimterEnabled: true,
+					RequestsPerSecond: 300,
+				},
 				WS: wsConfig{
 					Enabled: true,
 					IP:      "127.0.0.1",
@@ -535,7 +540,36 @@ func TestRPCOptFlags(t *testing.T) {
 		{
 			args: []string{"--rpc.debug"},
 			expConfig: rpcOptConfig{
-				DebugEnabled: true,
+				DebugEnabled:      true,
+				RateLimterEnabled: true,
+				RequestsPerSecond: 300,
+			},
+		},
+
+		{
+			args: []string{},
+			expConfig: rpcOptConfig{
+				DebugEnabled:      false,
+				RateLimterEnabled: true,
+				RequestsPerSecond: 300,
+			},
+		},
+
+		{
+			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "1000"},
+			expConfig: rpcOptConfig{
+				DebugEnabled:      false,
+				RateLimterEnabled: true,
+				RequestsPerSecond: 1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "1000"},
+			expConfig: rpcOptConfig{
+				DebugEnabled:      false,
+				RateLimterEnabled: false,
+				RequestsPerSecond: 1000,
 			},
 		},
 	}

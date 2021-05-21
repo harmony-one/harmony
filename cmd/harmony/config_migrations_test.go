@@ -135,7 +135,6 @@ Version = "1.0.3"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
-
 `)
 
 	V1_0_4ConfigDefault = []byte(`
