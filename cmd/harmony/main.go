@@ -201,7 +201,7 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	if err := validateHarmonyConfig(config); err != nil {
 		return harmonyConfig{}, err
 	}
-
+	sanityFixHarmonyConfig(&config)
 	return config, nil
 }
 

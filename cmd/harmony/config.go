@@ -216,12 +216,15 @@ func validateHarmonyConfig(config harmonyConfig) error {
 		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
 	}
 
-	if config.Sync.Downloader && !config.Sync.Enabled {
-		// Node must run sync protocol to enable downloader
-		return errors.New("--sync must be set to true to support --sync.downloader")
-	}
-
 	return nil
+}
+
+func sanityFixHarmonyConfig(hc *harmonyConfig) {
+	// When running sync downloader, set sync.Enabled to true
+	if hc.Sync.Downloader && !hc.Sync.Enabled {
+		fmt.Println("Set Sync.Enabled to true when running stream downloader")
+		hc.Sync.Enabled = true
+	}
 }
 
 func checkStringAccepted(flag string, val string, accepts []string) error {
