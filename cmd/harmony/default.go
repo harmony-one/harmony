@@ -108,6 +108,7 @@ var defaultPrometheusConfig = prometheusConfig{
 
 var (
 	defaultMainnetSyncConfig = syncConfig{
+		Enabled:        false,
 		Downloader:     false,
 		Concurrency:    6,
 		MinPeers:       6,
@@ -119,6 +120,7 @@ var (
 	}
 
 	defaultTestNetSyncConfig = syncConfig{
+		Enabled:        true,
 		Downloader:     false,
 		Concurrency:    4,
 		MinPeers:       4,
@@ -130,6 +132,7 @@ var (
 	}
 
 	defaultLocalNetSyncConfig = syncConfig{
+		Enabled:        true,
 		Downloader:     false,
 		Concurrency:    4,
 		MinPeers:       4,
@@ -141,6 +144,7 @@ var (
 	}
 
 	defaultElseSyncConfig = syncConfig{
+		Enabled:        true,
 		Downloader:     true,
 		Concurrency:    4,
 		MinPeers:       4,

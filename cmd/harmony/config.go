@@ -164,6 +164,7 @@ type prometheusConfig struct {
 
 type syncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
+	Enabled        bool // enable the stream sync protocol
 	Downloader     bool // start the sync downloader client
 	Concurrency    int  // concurrency used for stream sync protocol
 	MinPeers       int  // minimum streams to start a sync task.
@@ -213,6 +214,11 @@ func validateHarmonyConfig(config harmonyConfig) error {
 	if !config.Sync.Downloader && !config.DNSSync.Client {
 		// There is no module up for sync
 		return errors.New("either --sync.downloader or --sync.legacy.client shall be enabled")
+	}
+
+	if config.Sync.Downloader && !config.Sync.Enabled {
+		// Node must run sync protocol to enable downloader
+		return errors.New("--sync must be set to true to support stream sync downloader")
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
-
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/spf13/cobra"
@@ -190,6 +189,7 @@ var (
 	}
 
 	syncFlags = []cli.Flag{
+		syncStreamEnabledFlag,
 		syncDownloaderFlag,
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
@@ -1376,6 +1376,11 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 }
 
 var (
+	syncStreamEnabledFlag = cli.BoolFlag{
+		Name:     "sync",
+		Usage:    "Enable the stream sync protocol (experimental feature)",
+		DefValue: false,
+	}
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
 		Name:     "sync.downloader",
@@ -1422,6 +1427,10 @@ var (
 
 // applySyncFlags apply the sync flags.
 func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
+	if cli.IsFlagChanged(cmd, syncStreamEnabledFlag) {
+		config.Sync.Enabled = cli.GetBoolFlagValue(cmd, syncStreamEnabledFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}

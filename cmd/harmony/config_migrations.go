@@ -147,6 +147,12 @@ func init() {
 		}
 		confTree.Set("DNSSync.ServerPort", serverPort)
 
+		downloaderEnabledField := confTree.Get("Sync.Downloader")
+		if downloaderEnabled, ok := downloaderEnabledField.(bool); ok && downloaderEnabled {
+			// If we enabled downloader previously, run stream sync protocol.
+			confTree.Set("Sync.Enabled", true)
+		}
+
 		confTree.Set("Version", "2.0.0")
 		return confTree
 	}

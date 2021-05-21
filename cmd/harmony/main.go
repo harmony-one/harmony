@@ -382,8 +382,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 	nodeconfig.SetPeerID(myHost.GetID())
 
 	// Setup services
-	setupSyncService(currentNode, myHost, hc)
-
+	if hc.Sync.Enabled {
+		setupSyncService(currentNode, myHost, hc)
+	}
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
