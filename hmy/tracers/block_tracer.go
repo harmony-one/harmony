@@ -42,6 +42,7 @@ type action struct {
 	outLen   int64
 	value    *big.Int
 	err      error
+	revert   []byte
 	subCalls []*action
 }
 
@@ -53,28 +54,24 @@ func (c action) toJsonStr() (string, *string, *string) {
 	callType := strings.ToLower(c.op.String())
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
 		action := fmt.Sprintf(
-			`{"callType":"%s","value":"0x%s","address":"0x%x","gas":"0x%x","from":"0x%x","init":"0x%x"}`,
-			callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
+			`{"from":"0x%x","gas":"0x%x","init":"0x%x","value":"0x%s"}`,
+			c.from, c.gas, c.input, c.value.Text(16),
 		)
 		output := fmt.Sprintf(
-			`{"code":"0x%x","gasUsed":"0x%x"}`,
-			c.output, c.gasUsed,
+			`{"address":"0x%x","code":"0x%x","gasUsed":"0x%x"}`,
+			c.to, c.output, c.gasUsed,
 		)
 		return "create", &action, &output
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
-		var action string
-		if c.value != nil {
-			action = fmt.Sprintf(
-				`{"callType":"%s","value":"0x%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
-				callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
-			)
-		} else {
-			action = fmt.Sprintf(
-				`{"callType":"%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
-				callType, c.to, c.gas, c.from, c.input,
-			)
+		if c.value == nil {
+			c.value = big.NewInt(0)
 		}
+
+		action := fmt.Sprintf(
+			`{"callType":"%s","value":"0x%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
+			callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
+		)
 
 		output := fmt.Sprintf(
 			`{"output":"0x%x","gasUsed":"0x%x"}`,
@@ -111,6 +108,14 @@ func (jst *ParityBlockTracer) pop() *action {
 	ac := jst.calls[popIndex]
 	jst.calls = jst.calls[:popIndex]
 	return ac
+}
+
+func (jst *ParityBlockTracer) last() *action {
+	return jst.calls[len(jst.calls)-1]
+}
+
+func (jst *ParityBlockTracer) len() int {
+	return len(jst.calls)
 }
 
 // CaptureStart implements the ParityBlockTracer interface to initialize the tracing operation.
@@ -169,7 +174,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return retErr
 	}
 	if op == vm.SELFDESTRUCT {
-		ac := jst.calls[len(jst.calls)-1]
+		ac := jst.last()
 		ac.push(&action{
 			op:      op,
 			from:    contract.Address(),
@@ -211,15 +216,19 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	}
 	if jst.descended {
 		jst.descended = false
-		if depth >= len(jst.calls) { // >= to >
-			jst.calls[len(jst.calls)-1].gas = gas
+		if depth >= jst.len() { // >= to >
+			jst.last().gas = gas
 		}
 	}
 	if op == vm.REVERT {
-		jst.calls[len(jst.calls)-1].err = errors.New("execution reverted")
+		last := jst.last()
+		last.err = errors.New("execution reverted")
+		revertOff := stackPeek(0).Int64()
+		revertLen := stackPeek(1).Int64()
+		last.revert = memoryCopy(revertOff, revertLen)
 		return retErr
 	}
-	if depth == len(jst.calls)-1 { // depth == len - 1
+	if depth == jst.len()-1 { // depth == len - 1
 		call := jst.pop()
 		if call.op == vm.CREATE || call.op == vm.CREATE2 {
 			call.gasUsed = call.gasIn - call.gasCost - gas
@@ -242,8 +251,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 				call.err = errors.New("internal failure")
 			}
 		}
-		size := len(jst.calls)
-		jst.calls[size-1].push(call)
+		jst.last().push(call)
 	}
 	return retErr
 }
@@ -251,7 +259,23 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
 func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
-	jst.err = err
+	if op == vm.REVERT {
+		return nil
+	}
+	call := jst.pop()
+	if call.err == nil {
+		// Consume all available gas and clean any leftovers
+		if call.gas != 0 {
+			call.gasUsed = call.gas
+		}
+
+		// Flatten the failed call into its parent
+		if jst.len() > 0 {
+			jst.last().push(call)
+			return nil
+		}
+	}
+	jst.push(call)
 	return nil
 }
 
@@ -288,8 +312,9 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 			len(ac.subCalls), string(traceStr), typStr, *acStr,
 		)
 		var resultPiece string
-		if jst.err != nil {
-			resultPiece = `"error": "Reverted"`
+		if ac.err != nil {
+			resultPiece = fmt.Sprintf(`"error":"Reverted","revert":"0x%x"`, ac.revert)
+
 		} else if outStr != nil {
 			resultPiece = fmt.Sprintf(`"result":%s`, *outStr)
 		}
