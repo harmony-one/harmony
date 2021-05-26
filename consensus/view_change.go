@@ -236,7 +236,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange {
+	if consensus.disableViewChange || consensus.IsBackup() {
 		return
 	}
 	consensus.mutex.Lock()
