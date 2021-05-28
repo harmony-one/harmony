@@ -1075,7 +1075,7 @@ func TestSyncFlags(t *testing.T) {
 		expErr    error
 	}{
 		{
-			args: []string{"--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
+			args: []string{"--sync", "--sync.downloader", "--sync.concurrency", "10", "--sync.min-peers", "10",
 				"--sync.init-peers", "10", "--sync.disc.soft-low-cap", "10",
 				"--sync.disc.hard-low-cap", "10", "--sync.disc.hi-cap", "10",
 				"--sync.disc.batch", "10",
@@ -1083,6 +1083,7 @@ func TestSyncFlags(t *testing.T) {
 			network: "mainnet",
 			expConfig: func() syncConfig {
 				cfgSync := defaultMainnetSyncConfig
+				cfgSync.Enabled = true
 				cfgSync.Downloader = true
 				cfgSync.Concurrency = 10
 				cfgSync.MinPeers = 10

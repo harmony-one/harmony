@@ -213,6 +213,83 @@ Version = "1.0.4"
   IP = "127.0.0.1"
   Port = 9800
 `)
+
+	V1_0_4ConfigDownloaderOn = []byte(`
+Version = "1.0.4"
+
+[BLSKeys]
+  KMSConfigFile = ""
+  KMSConfigSrcType = "shared"
+  KMSEnabled = false
+  KeyDir = "./.hmy/blskeys"
+  KeyFiles = []
+  MaxKeys = 10
+  PassEnabled = true
+  PassFile = ""
+  PassSrcType = "auto"
+  SavePassphrase = false
+
+[General]
+  DataDir = "./"
+  IsArchival = false
+  IsBeaconArchival = false
+  IsOffline = false
+  NoStaking = false
+  NodeType = "validator"
+  ShardID = -1
+
+[HTTP]
+  Enabled = true
+  IP = "127.0.0.1"
+  Port = 9500
+  RosettaEnabled = false
+  RosettaPort = 9700
+
+[Log]
+  FileName = "harmony.log"
+  Folder = "./latest"
+  RotateSize = 100
+  Verbosity = 3
+
+[Network]
+  BootNodes = ["/dnsaddr/bootstrap.t.hmny.io"]
+  DNSPort = 9000
+  DNSZone = "t.hmny.io"
+  LegacySyncing = false
+  NetworkType = "mainnet"
+
+[P2P]
+  IP = "0.0.0.0"
+  KeyFile = "./.hmykey"
+  Port = 9000
+
+[Pprof]
+  Enabled = false
+  ListenAddr = "127.0.0.1:6060"
+
+[RPCOpt]
+  DebugEnabled = false
+
+[Sync]
+  Concurrency = 6
+  DiscBatch = 8
+  DiscHardLowCap = 6
+  DiscHighCap = 128
+  DiscSoftLowCap = 8
+  Downloader = true
+  InitStreams = 8
+  LegacyClient = true
+  LegacyServer = true
+  MinPeers = 6
+
+[TxPool]
+  BlacklistFile = "./.hmy/blacklist.txt"
+
+[WS]
+  Enabled = true
+  IP = "127.0.0.1"
+  Port = 9800
+`)
 )
 
 func Test_migrateConf(t *testing.T) {
@@ -258,8 +335,24 @@ func Test_migrateConf(t *testing.T) {
 			want:    defConf,
 			wantErr: false,
 		},
+		{
+			name: "1.0.4 with sync downloaders on",
+			args: args{
+				confBytes: V1_0_4ConfigDownloaderOn,
+			},
+			want: func() harmonyConfig {
+				hc := defConf
+				hc.Sync.Downloader = true
+				hc.Sync.Enabled = true
+				return hc
+			}(),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
+		if tt.name != "1.0.4 with sync downloaders on" {
+			continue
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			got, _, err := migrateConf(tt.args.confBytes)
 			if (err != nil) != tt.wantErr {
@@ -267,7 +360,7 @@ func Test_migrateConf(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("migrateConf() = %v, want %v", got, tt.want)
+				t.Errorf("migrateConf() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}

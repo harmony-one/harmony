@@ -127,8 +127,6 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	cfg, err := getHarmonyConfig(cmd)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
-		fmt.Println()
-		cmd.Help()
 		os.Exit(128)
 	}
 
@@ -203,7 +201,7 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	if err := validateHarmonyConfig(config); err != nil {
 		return harmonyConfig{}, err
 	}
-
+	sanityFixHarmonyConfig(&config)
 	return config, nil
 }
 
@@ -382,8 +380,9 @@ func setupNodeAndRun(hc harmonyConfig) {
 	nodeconfig.SetPeerID(myHost.GetID())
 
 	// Setup services
-	setupSyncService(currentNode, myHost, hc)
-
+	if hc.Sync.Enabled {
+		setupSyncService(currentNode, myHost, hc)
+	}
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {

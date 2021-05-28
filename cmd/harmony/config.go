@@ -164,6 +164,7 @@ type prometheusConfig struct {
 
 type syncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
+	Enabled        bool // enable the stream sync protocol
 	Downloader     bool // start the sync downloader client
 	Concurrency    int  // concurrency used for stream sync protocol
 	MinPeers       int  // minimum streams to start a sync task.
@@ -216,6 +217,14 @@ func validateHarmonyConfig(config harmonyConfig) error {
 	}
 
 	return nil
+}
+
+func sanityFixHarmonyConfig(hc *harmonyConfig) {
+	// When running sync downloader, set sync.Enabled to true
+	if hc.Sync.Downloader && !hc.Sync.Enabled {
+		fmt.Println("Set Sync.Enabled to true when running stream downloader")
+		hc.Sync.Enabled = true
+	}
 }
 
 func checkStringAccepted(flag string, val string, accepts []string) error {
@@ -335,11 +344,12 @@ var dumpConfigCmd = &cobra.Command{
 }
 
 var dumpConfigLegacyCmd = &cobra.Command{
-	Use:   "dumpconfig [config_file]",
-	Short: "depricated - use config dump instead",
-	Long:  "depricated - use config dump instead",
-	Args:  cobra.MinimumNArgs(1),
-	Run:   dumpConfig,
+	Use:    "dumpconfig [config_file]",
+	Short:  "depricated - use config dump instead",
+	Long:   "depricated - use config dump instead",
+	Args:   cobra.MinimumNArgs(1),
+	Hidden: true,
+	Run:    dumpConfig,
 }
 
 func registerDumpConfigFlags() error {
