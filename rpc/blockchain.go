@@ -165,6 +165,11 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		return block.(StructuredResponse), nil
 	}
 
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -288,10 +293,6 @@ func (s *PublicBlockchainService) GetBlockByHash(
 func (s *PublicBlockchainService) GetBlockByNumberNew(
 	ctx context.Context, blockNum BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) (StructuredResponse, error) {
-	err := s.wait(ctx)
-	if err != nil {
-		return nil, err
-	}
 	return s.GetBlockByNumber(ctx, blockNum, blockArgs)
 }
 
