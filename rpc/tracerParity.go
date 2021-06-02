@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	parityTraceJS = "blockTracer"
+	parityTraceGO = "ParityBlockTracer"
 )
 
 type PublicParityTracerService struct {
@@ -19,7 +19,7 @@ type PublicParityTracerService struct {
 }
 
 func (s *PublicParityTracerService) Transaction(ctx context.Context, hash common.Hash) (interface{}, error) {
-	return s.TraceTransaction(ctx, hash, &hmy.TraceConfig{Tracer: &parityTraceJS})
+	return s.TraceTransaction(ctx, hash, &hmy.TraceConfig{Tracer: &parityTraceGO})
 }
 
 // trace_block RPC
@@ -28,19 +28,17 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	if block == nil {
 		return nil, nil
 	}
-	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceJS})
+	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceGO})
 	if err != nil {
 		return results, err
 	}
-	var resultArray = make([]interface{}, 0)
+	var resultArray = make([]json.RawMessage, 0)
 	for _, result := range results {
-		raw, ok := result.Result.(json.RawMessage)
+		raw, ok := result.Result.([]json.RawMessage)
 		if !ok {
-			return results, errors.New("expected json.RawMessage")
+			return results, errors.New("tracer bug:expected []json.RawMessage")
 		}
-		var subArray []interface{}
-		json.Unmarshal(raw, &subArray)
-		resultArray = append(resultArray, subArray...)
+		resultArray = append(resultArray, raw...)
 	}
 	return resultArray, nil
 }
