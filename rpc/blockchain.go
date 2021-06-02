@@ -309,11 +309,6 @@ func (s *PublicBlockchainService) GetBlocks(
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) ([]StructuredResponse, error) {
 
-	err := s.wait(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
 
