@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -148,6 +150,12 @@ func (s *PublicBlockchainService) wait(ctx context.Context) error {
 	if s.limiter != nil {
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
+		if !s.limiter.Allow() {
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"trigger_info": "rpcOverRateLimit",
+			}).Inc()
+		}
+
 		return s.limiter.Wait(deadlineCtx)
 	}
 	return nil
