@@ -14,8 +14,8 @@ func init() {
 var (
 	rpcRateLimitCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "rpc",
-			Subsystem: "",
+			Namespace: "hmy",
+			Subsystem: "rpc",
 			Name:      "rpc_over_ratelimit_trigger",
 			Help:      "number of times triggered rpc rate limit",
 		},
