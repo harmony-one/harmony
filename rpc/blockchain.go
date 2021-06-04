@@ -151,8 +151,9 @@ func (s *PublicBlockchainService) wait(ctx context.Context) error {
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
 		if !s.limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(s.limiter.Limit()))
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				"trigger_info": "rpcOverRateLimit",
+				"rate_limit": strLimit,
 			}).Inc()
 		}
 

@@ -19,5 +19,5 @@ var (
 			Name:      "rpc_over_ratelimit_trigger",
 			Help:      "number of times triggered rpc rate limit",
 		},
-		[]string{"trigger_info"})
+		[]string{"rate_limit"})
 )
