@@ -134,6 +134,7 @@ func (rm *requestManager) loop() {
 		throttleC = make(chan struct{}, 1) // throttle the waiting requests periodically
 		ticker    = time.NewTicker(throttleInterval)
 	)
+	defer ticker.Stop()
 	throttle := func() {
 		select {
 		case throttleC <- struct{}{}:

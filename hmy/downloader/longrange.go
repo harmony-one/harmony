@@ -165,6 +165,7 @@ func (lsi *lrSyncIter) insertChainLoop(targetBN uint64) {
 		t       = time.NewTicker(100 * time.Millisecond)
 		resultC = make(chan struct{}, 1)
 	)
+	defer t.Stop()
 
 	trigger := func() {
 		select {

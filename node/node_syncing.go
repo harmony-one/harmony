@@ -261,6 +261,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 	}
 
 	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
+	defer ticker.Stop()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		select {
