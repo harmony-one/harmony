@@ -72,6 +72,7 @@ cd harmony
 make
 ```
 > Run `bash scripts/install_build_tools.sh` to ensure build tools are of correct versions.
+> If you get 'missing go.sum entry for module providing package <package_name>', run `go mod tidy`.
 
 ## Dev Docker Image
 
