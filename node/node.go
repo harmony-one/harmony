@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/configs/harmony"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -106,7 +106,7 @@ type Node struct {
 	ContractAddresses            []common.Address
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
-	HarmonyConfig  harmony.HarmonyConfig
+	HarmonyConfig  *harmonyconfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
@@ -940,6 +940,7 @@ func New(
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
 	isArchival map[uint32]bool,
+	harmonyconfig *harmonyconfig.HarmonyConfig,
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
@@ -950,6 +951,7 @@ func New(
 	} else {
 		node.NodeConfig = nodeconfig.GetDefaultConfig()
 	}
+	node.HarmonyConfig = harmonyconfig
 
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {

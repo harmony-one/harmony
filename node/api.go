@@ -145,7 +145,7 @@ func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
 
 func (node *Node) GetConfig() rpc_common.Config {
 	return rpc_common.Config{
-		HarmonyConfig: node.HarmonyConfig,
+		HarmonyConfig: *node.HarmonyConfig,
 		NodeConfig:    *node.NodeConfig,
 		ChainConfig:   node.chainConfig,
 	}

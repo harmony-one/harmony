@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/spf13/cobra"
@@ -18,7 +20,7 @@ var (
 func TestHarmonyFlags(t *testing.T) {
 	tests := []struct {
 		argStr    string
-		expConfig HarmonyConfig
+		expConfig harmonyconfig.HarmonyConfig
 	}{
 		{
 			// running staking command from legacy node.sh
@@ -29,16 +31,16 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json",
-			expConfig: HarmonyConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
-				General: generalConfig{
+				General: harmonyconfig.GeneralConfig{
 					NodeType:   "validator",
 					NoStaking:  false,
 					ShardID:    -1,
 					IsArchival: false,
 					DataDir:    "./",
 				},
-				Network: networkConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: "mainnet",
 					BootNodes: []string{
 						"/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv",
@@ -47,40 +49,40 @@ func TestHarmonyFlags(t *testing.T) {
 						"/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj",
 					},
 				},
-				DNSSync: dnsSync{
+				DNSSync: harmonyconfig.DnsSync{
 					Port:       6000,
 					Zone:       "t.hmny.io",
 					Server:     true,
 					Client:     true,
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
-				P2P: p2pConfig{
+				P2P: harmonyconfig.P2pConfig{
 					Port:    9000,
 					IP:      defaultConfig.P2P.IP,
 					KeyFile: defaultConfig.P2P.KeyFile,
 				},
-				HTTP: httpConfig{
+				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
 					IP:             "127.0.0.1",
 					Port:           9500,
 					RosettaEnabled: false,
 					RosettaPort:    9700,
 				},
-				RPCOpt: rpcOptConfig{
+				RPCOpt: harmonyconfig.RpcOptConfig{
 					DebugEnabled:      false,
 					RateLimterEnabled: true,
 					RequestsPerSecond: 1000,
 				},
-				WS: wsConfig{
+				WS: harmonyconfig.WsConfig{
 					Enabled: true,
 					IP:      "127.0.0.1",
 					Port:    9800,
 				},
-				Consensus: &consensusConfig{
+				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
 					AggregateSig: true,
 				},
-				BLSKeys: blsConfig{
+				BLSKeys: harmonyconfig.BlsConfig{
 					KeyDir:           "./.hmy/blskeys",
 					KeyFiles:         []string{},
 					MaxKeys:          10,
@@ -92,30 +94,30 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigSrcType: "file",
 					KMSConfigFile:    "config.json",
 				},
-				TxPool: txPoolConfig{
+				TxPool: harmonyconfig.TxPoolConfig{
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
-				Pprof: pprofConfig{
+				Pprof: harmonyconfig.PprofConfig{
 					Enabled:    false,
 					ListenAddr: "127.0.0.1:6060",
 				},
-				Log: logConfig{
+				Log: harmonyconfig.LogConfig{
 					Folder:     "./latest",
 					FileName:   "validator-8.8.8.8-9000.log",
 					RotateSize: 100,
 					Verbosity:  3,
-					Context: &logContext{
+					Context: &harmonyconfig.LogContext{
 						IP:   "8.8.8.8",
 						Port: 9000,
 					},
 				},
-				Sys: &sysConfig{
+				Sys: &harmonyconfig.SysConfig{
 					NtpServer: defaultSysConfig.NtpServer,
 				},
-				Legacy: &legacyConfig{
+				Legacy: &harmonyconfig.LegacyConfig{
 					TPBroadcastInvalidTxn: &trueBool,
 				},
-				Prometheus: &prometheusConfig{
+				Prometheus: &harmonyconfig.PrometheusConfig{
 					Enabled:    true,
 					IP:         "0.0.0.0",
 					Port:       9900,
@@ -142,12 +144,12 @@ func TestHarmonyFlags(t *testing.T) {
 func TestGeneralFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig generalConfig
+		expConfig harmonyconfig.GeneralConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "validator",
 				NoStaking:  false,
 				ShardID:    -1,
@@ -158,7 +160,7 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{"--run", "explorer", "--run.legacy", "--run.shard=0",
 				"--run.archive=true", "--datadir=./.hmy"},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  true,
 				ShardID:    0,
@@ -169,7 +171,7 @@ func TestGeneralFlags(t *testing.T) {
 		{
 			args: []string{"--node_type", "explorer", "--staking", "--shard_id", "0",
 				"--is_archival", "--db_dir", "./"},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -179,7 +181,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--staking=false", "--is_archival=false"},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "validator",
 				NoStaking:  true,
 				ShardID:    -1,
@@ -189,7 +191,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0"},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -199,7 +201,7 @@ func TestGeneralFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--run", "explorer", "--run.shard", "0", "--run.archive=false"},
-			expConfig: generalConfig{
+			expConfig: harmonyconfig.GeneralConfig{
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
@@ -229,13 +231,13 @@ func TestGeneralFlags(t *testing.T) {
 func TestNetworkFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig HarmonyConfig
+		expConfig harmonyconfig.HarmonyConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: HarmonyConfig{
-				Network: networkConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: defNetworkType,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(defNetworkType),
 				},
@@ -243,8 +245,8 @@ func TestNetworkFlags(t *testing.T) {
 		},
 		{
 			args: []string{"-n", "stn"},
-			expConfig: HarmonyConfig{
-				Network: networkConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: nodeconfig.Stressnet,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(nodeconfig.Stressnet),
 				},
@@ -254,12 +256,12 @@ func TestNetworkFlags(t *testing.T) {
 		{
 			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
 				"--dns.port", "9001", "--dns.server-port", "9002"},
-			expConfig: HarmonyConfig{
-				Network: networkConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: "pangaea",
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
-				DNSSync: dnsSync{
+				DNSSync: harmonyconfig.DnsSync{
 					Port:          9001,
 					Zone:          "8.8.8.8",
 					LegacySyncing: false,
@@ -271,12 +273,12 @@ func TestNetworkFlags(t *testing.T) {
 		{
 			args: []string{"--network_type", "stk", "--bootnodes", "1,2,3,4", "--dns_zone", "8.8.8.8",
 				"--dns_port", "9001"},
-			expConfig: HarmonyConfig{
-				Network: networkConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: "pangaea",
 					BootNodes:   []string{"1", "2", "3", "4"},
 				},
-				DNSSync: dnsSync{
+				DNSSync: harmonyconfig.DnsSync{
 					Port:          9001,
 					Zone:          "8.8.8.8",
 					LegacySyncing: false,
@@ -287,12 +289,12 @@ func TestNetworkFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--dns=false"},
-			expConfig: HarmonyConfig{
-				Network: networkConfig{
+			expConfig: harmonyconfig.HarmonyConfig{
+				Network: harmonyconfig.NetworkConfig{
 					NetworkType: defNetworkType,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(defNetworkType),
 				},
-				DNSSync: dnsSync{
+				DNSSync: harmonyconfig.DnsSync{
 					Port:          nodeconfig.GetDefaultDNSPort(defNetworkType),
 					Zone:          nodeconfig.GetDefaultDNSZone(defNetworkType),
 					LegacySyncing: true,
@@ -307,8 +309,8 @@ func TestNetworkFlags(t *testing.T) {
 		neededFlags := make([]cli.Flag, 0)
 		neededFlags = append(neededFlags, networkFlags...)
 		neededFlags = append(neededFlags, dnsSyncFlags...)
-		ts := newFlagTestSuite(t, neededFlags, func(cmd *cobra.Command, config *HarmonyConfig) {
-			// This is the network related logic in function getHarmonyConfig
+		ts := newFlagTestSuite(t, neededFlags, func(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+			// This is the network related logic in function getharmonyconfig.HarmonyConfig
 			nt := getNetworkType(cmd)
 			config.Network = getDefaultNetworkConfig(nt)
 			config.DNSSync = getDefaultDNSSyncConfig(nt)
@@ -339,7 +341,7 @@ var defDataStore = ".dht-127.0.0.1"
 func TestP2PFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig p2pConfig
+		expConfig harmonyconfig.P2pConfig
 		expErr    error
 	}{
 		{
@@ -349,7 +351,7 @@ func TestP2PFlags(t *testing.T) {
 		{
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
-			expConfig: p2pConfig{
+			expConfig: harmonyconfig.P2pConfig{
 				Port:         9001,
 				IP:           nodeconfig.DefaultPublicListenIP,
 				KeyFile:      "./key.file",
@@ -358,7 +360,7 @@ func TestP2PFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
-			expConfig: p2pConfig{
+			expConfig: harmonyconfig.P2pConfig{
 				Port:    9001,
 				IP:      nodeconfig.DefaultPublicListenIP,
 				KeyFile: "./key.file",
@@ -367,7 +369,7 @@ func TestP2PFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *HarmonyConfig) {
+			func(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyP2PFlags(cmd, config)
 			},
@@ -391,7 +393,7 @@ func TestP2PFlags(t *testing.T) {
 func TestRPCFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig httpConfig
+		expConfig harmonyconfig.HttpConfig
 		expErr    error
 	}{
 		{
@@ -400,7 +402,7 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--http=false"},
-			expConfig: httpConfig{
+			expConfig: harmonyconfig.HttpConfig{
 				Enabled:        false,
 				RosettaEnabled: false,
 				IP:             defaultConfig.HTTP.IP,
@@ -410,7 +412,7 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001"},
-			expConfig: httpConfig{
+			expConfig: harmonyconfig.HttpConfig{
 				Enabled:        true,
 				RosettaEnabled: false,
 				IP:             "8.8.8.8",
@@ -420,7 +422,7 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.port", "9001", "--http.rosetta.port", "10001"},
-			expConfig: httpConfig{
+			expConfig: harmonyconfig.HttpConfig{
 				Enabled:        true,
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
@@ -430,7 +432,7 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--http.ip", "8.8.8.8", "--http.rosetta.port", "10001"},
-			expConfig: httpConfig{
+			expConfig: harmonyconfig.HttpConfig{
 				Enabled:        true,
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
@@ -440,7 +442,7 @@ func TestRPCFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
-			expConfig: httpConfig{
+			expConfig: harmonyconfig.HttpConfig{
 				Enabled:        true,
 				RosettaEnabled: false,
 				IP:             nodeconfig.DefaultPublicListenIP,
@@ -451,7 +453,7 @@ func TestRPCFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(httpFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *HarmonyConfig) {
+			func(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyHTTPFlags(cmd, config)
 			},
@@ -476,7 +478,7 @@ func TestRPCFlags(t *testing.T) {
 func TestWSFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig wsConfig
+		expConfig harmonyconfig.WsConfig
 		expErr    error
 	}{
 		{
@@ -485,7 +487,7 @@ func TestWSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--ws=false"},
-			expConfig: wsConfig{
+			expConfig: harmonyconfig.WsConfig{
 				Enabled: false,
 				IP:      defaultConfig.WS.IP,
 				Port:    defaultConfig.WS.Port,
@@ -493,7 +495,7 @@ func TestWSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.port", "9001"},
-			expConfig: wsConfig{
+			expConfig: harmonyconfig.WsConfig{
 				Enabled: true,
 				IP:      "8.8.8.8",
 				Port:    9001,
@@ -501,7 +503,7 @@ func TestWSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
-			expConfig: wsConfig{
+			expConfig: harmonyconfig.WsConfig{
 				Enabled: true,
 				IP:      nodeconfig.DefaultPublicListenIP,
 				Port:    9801,
@@ -510,7 +512,7 @@ func TestWSFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(wsFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *HarmonyConfig) {
+			func(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyWSFlags(cmd, config)
 			},
@@ -535,11 +537,11 @@ func TestWSFlags(t *testing.T) {
 func TestRPCOptFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig rpcOptConfig
+		expConfig harmonyconfig.RpcOptConfig
 	}{
 		{
 			args: []string{"--rpc.debug"},
-			expConfig: rpcOptConfig{
+			expConfig: harmonyconfig.RpcOptConfig{
 				DebugEnabled:      true,
 				RateLimterEnabled: true,
 				RequestsPerSecond: 1000,
@@ -548,7 +550,7 @@ func TestRPCOptFlags(t *testing.T) {
 
 		{
 			args: []string{},
-			expConfig: rpcOptConfig{
+			expConfig: harmonyconfig.RpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: true,
 				RequestsPerSecond: 1000,
@@ -557,7 +559,7 @@ func TestRPCOptFlags(t *testing.T) {
 
 		{
 			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "2000"},
-			expConfig: rpcOptConfig{
+			expConfig: harmonyconfig.RpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: true,
 				RequestsPerSecond: 2000,
@@ -566,7 +568,7 @@ func TestRPCOptFlags(t *testing.T) {
 
 		{
 			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "2000"},
-			expConfig: rpcOptConfig{
+			expConfig: harmonyconfig.RpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: false,
 				RequestsPerSecond: 2000,
@@ -589,7 +591,7 @@ func TestRPCOptFlags(t *testing.T) {
 func TestBLSFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig blsConfig
+		expConfig harmonyconfig.BlsConfig
 		expErr    error
 	}{
 		{
@@ -601,7 +603,7 @@ func TestBLSFlags(t *testing.T) {
 				"--bls.maxkeys", "8", "--bls.pass", "--bls.pass.src", "auto", "--bls.pass.save",
 				"--bls.kms", "--bls.kms.src", "shared",
 			},
-			expConfig: blsConfig{
+			expConfig: harmonyconfig.BlsConfig{
 				KeyDir:           "./blskeys",
 				KeyFiles:         []string{"key1", "key2"},
 				MaxKeys:          8,
@@ -616,7 +618,7 @@ func TestBLSFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--bls.pass.file", "xxx.pass", "--bls.kms.config", "config.json"},
-			expConfig: blsConfig{
+			expConfig: harmonyconfig.BlsConfig{
 				KeyDir:           defaultConfig.BLSKeys.KeyDir,
 				KeyFiles:         defaultConfig.BLSKeys.KeyFiles,
 				MaxKeys:          defaultConfig.BLSKeys.MaxKeys,
@@ -634,7 +636,7 @@ func TestBLSFlags(t *testing.T) {
 				"--max_bls_keys_per_node", "5", "--blspass", "file:xxx.pass", "--save-passphrase",
 				"--aws-config-source", "file:config.json",
 			},
-			expConfig: blsConfig{
+			expConfig: harmonyconfig.BlsConfig{
 				KeyDir:           "./hmykeys",
 				KeyFiles:         []string{"key1", "key2"},
 				MaxKeys:          5,
@@ -670,7 +672,7 @@ func TestBLSFlags(t *testing.T) {
 func TestConsensusFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *consensusConfig
+		expConfig *harmonyconfig.ConsensusConfig
 		expErr    error
 	}{
 		{
@@ -679,7 +681,7 @@ func TestConsensusFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--consensus.min-peers", "10", "--consensus.aggregate-sig=false"},
-			expConfig: &consensusConfig{
+			expConfig: &harmonyconfig.ConsensusConfig{
 				MinPeers:     10,
 				AggregateSig: false,
 			},
@@ -687,7 +689,7 @@ func TestConsensusFlags(t *testing.T) {
 		{
 			args: []string{"--delay_commit", "10ms", "--block_period", "5", "--min_peers", "10",
 				"--consensus.aggregate-sig=true"},
-			expConfig: &consensusConfig{
+			expConfig: &harmonyconfig.ConsensusConfig{
 				MinPeers:     10,
 				AggregateSig: true,
 			},
@@ -715,24 +717,24 @@ func TestConsensusFlags(t *testing.T) {
 func TestTxPoolFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig txPoolConfig
+		expConfig harmonyconfig.TxPoolConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: txPoolConfig{
+			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
 			},
 		},
 		{
 			args: []string{"--txpool.blacklist", "blacklist.file"},
-			expConfig: txPoolConfig{
+			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile: "blacklist.file",
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file"},
-			expConfig: txPoolConfig{
+			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile: "blacklist.file",
 			},
 		},
@@ -758,7 +760,7 @@ func TestTxPoolFlags(t *testing.T) {
 func TestPprofFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig pprofConfig
+		expConfig harmonyconfig.PprofConfig
 		expErr    error
 	}{
 		{
@@ -767,21 +769,21 @@ func TestPprofFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--pprof"},
-			expConfig: pprofConfig{
+			expConfig: harmonyconfig.PprofConfig{
 				Enabled:    true,
 				ListenAddr: defaultConfig.Pprof.ListenAddr,
 			},
 		},
 		{
 			args: []string{"--pprof.addr", "8.8.8.8:9001"},
-			expConfig: pprofConfig{
+			expConfig: harmonyconfig.PprofConfig{
 				Enabled:    true,
 				ListenAddr: "8.8.8.8:9001",
 			},
 		},
 		{
 			args: []string{"--pprof=false", "--pprof.addr", "8.8.8.8:9001"},
-			expConfig: pprofConfig{
+			expConfig: harmonyconfig.PprofConfig{
 				Enabled:    false,
 				ListenAddr: "8.8.8.8:9001",
 			},
@@ -807,7 +809,7 @@ func TestPprofFlags(t *testing.T) {
 func TestLogFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig logConfig
+		expConfig harmonyconfig.LogConfig
 		expErr    error
 	}{
 		{
@@ -817,7 +819,7 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.name", "harmony.log",
 				"--log.verb", "5"},
-			expConfig: logConfig{
+			expConfig: harmonyconfig.LogConfig{
 				Folder:     "latest_log",
 				FileName:   "harmony.log",
 				RotateSize: 10,
@@ -827,12 +829,12 @@ func TestLogFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--log.ctx.ip", "8.8.8.8", "--log.ctx.port", "9001"},
-			expConfig: logConfig{
+			expConfig: harmonyconfig.LogConfig{
 				Folder:     defaultConfig.Log.Folder,
 				FileName:   defaultConfig.Log.FileName,
 				RotateSize: defaultConfig.Log.RotateSize,
 				Verbosity:  defaultConfig.Log.Verbosity,
-				Context: &logContext{
+				Context: &harmonyconfig.LogContext{
 					IP:   "8.8.8.8",
 					Port: 9001,
 				},
@@ -841,12 +843,12 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--log_folder", "latest_log", "--log_max_size", "10", "--verbosity",
 				"5", "--ip", "8.8.8.8", "--port", "9001"},
-			expConfig: logConfig{
+			expConfig: harmonyconfig.LogConfig{
 				Folder:     "latest_log",
 				FileName:   "validator-8.8.8.8-9001.log",
 				RotateSize: 10,
 				Verbosity:  5,
-				Context: &logContext{
+				Context: &harmonyconfig.LogContext{
 					IP:   "8.8.8.8",
 					Port: 9001,
 				},
@@ -854,19 +856,19 @@ func TestLogFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--verbose-prints", "config"},
-			expConfig: logConfig{
+			expConfig: harmonyconfig.LogConfig{
 				Folder:        defaultConfig.Log.Folder,
 				FileName:      defaultConfig.Log.FileName,
 				RotateSize:    defaultConfig.Log.RotateSize,
 				Verbosity:     defaultConfig.Log.Verbosity,
-				VerbosePrints: []string{"config"},
+				VerbosePrints: map[string]bool{"config": true},
 				Context:       nil,
 			},
 		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(logFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *HarmonyConfig) {
+			func(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyLogFlags(cmd, config)
 			},
@@ -890,18 +892,18 @@ func TestLogFlags(t *testing.T) {
 func TestSysFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *sysConfig
+		expConfig *harmonyconfig.SysConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: &sysConfig{
+			expConfig: &harmonyconfig.SysConfig{
 				NtpServer: defaultSysConfig.NtpServer,
 			},
 		},
 		{
 			args: []string{"--sys.ntp", "0.pool.ntp.org"},
-			expConfig: &sysConfig{
+			expConfig: &harmonyconfig.SysConfig{
 				NtpServer: "0.pool.ntp.org",
 			},
 		},
@@ -928,7 +930,7 @@ func TestSysFlags(t *testing.T) {
 func TestDevnetFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *devnetConfig
+		expConfig *harmonyconfig.DevnetConfig
 		expErr    error
 	}{
 		{
@@ -938,7 +940,7 @@ func TestDevnetFlags(t *testing.T) {
 		{
 			args: []string{"--devnet.num-shard", "3", "--devnet.shard-size", "100",
 				"--devnet.hmy-node-size", "60"},
-			expConfig: &devnetConfig{
+			expConfig: &harmonyconfig.DevnetConfig{
 				NumShards:   3,
 				ShardSize:   100,
 				HmyNodeSize: 60,
@@ -947,7 +949,7 @@ func TestDevnetFlags(t *testing.T) {
 		{
 			args: []string{"--dn_num_shards", "3", "--dn_shard_size", "100", "--dn_hmy_size",
 				"60"},
-			expConfig: &devnetConfig{
+			expConfig: &harmonyconfig.DevnetConfig{
 				NumShards:   3,
 				ShardSize:   100,
 				HmyNodeSize: 60,
@@ -975,7 +977,7 @@ func TestDevnetFlags(t *testing.T) {
 func TestRevertFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig *revertConfig
+		expConfig *harmonyconfig.RevertConfig
 		expErr    error
 	}{
 		{
@@ -984,7 +986,7 @@ func TestRevertFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--revert.beacon"},
-			expConfig: &revertConfig{
+			expConfig: &harmonyconfig.RevertConfig{
 				RevertBeacon: true,
 				RevertTo:     defaultRevertConfig.RevertTo,
 				RevertBefore: defaultRevertConfig.RevertBefore,
@@ -992,7 +994,7 @@ func TestRevertFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--revert.beacon", "--revert.to", "100", "--revert.do-before", "10000"},
-			expConfig: &revertConfig{
+			expConfig: &harmonyconfig.RevertConfig{
 				RevertBeacon: true,
 				RevertTo:     100,
 				RevertBefore: 10000,
@@ -1000,7 +1002,7 @@ func TestRevertFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--revert_beacon", "--do_revert_before", "10000", "--revert_to", "100"},
-			expConfig: &revertConfig{
+			expConfig: &harmonyconfig.RevertConfig{
 				RevertBeacon: true,
 				RevertTo:     100,
 				RevertBefore: 10000,
@@ -1028,7 +1030,7 @@ func TestDNSSyncFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
 		network   string
-		expConfig dnsSync
+		expConfig harmonyconfig.DnsSync
 		expErr    error
 	}{
 		{
@@ -1044,7 +1046,7 @@ func TestDNSSyncFlags(t *testing.T) {
 		{
 			args:    []string{"--sync.legacy.server", "--sync.legacy.client"},
 			network: "testnet",
-			expConfig: func() dnsSync {
+			expConfig: func() harmonyconfig.DnsSync {
 				cfg := getDefaultDNSSyncConfig(nodeconfig.Mainnet)
 				cfg.Client = true
 				cfg.Server = true
@@ -1059,7 +1061,7 @@ func TestDNSSyncFlags(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, dnsSyncFlags, func(command *cobra.Command, config *HarmonyConfig) {
+		ts := newFlagTestSuite(t, dnsSyncFlags, func(command *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 			config.Network.NetworkType = test.network
 			applyDNSSyncFlags(command, config)
 		})
@@ -1082,7 +1084,7 @@ func TestSyncFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
 		network   string
-		expConfig syncConfig
+		expConfig harmonyconfig.SyncConfig
 		expErr    error
 	}{
 		{
@@ -1092,7 +1094,7 @@ func TestSyncFlags(t *testing.T) {
 				"--sync.disc.batch", "10",
 			},
 			network: "mainnet",
-			expConfig: func() syncConfig {
+			expConfig: func() harmonyconfig.SyncConfig {
 				cfgSync := defaultMainnetSyncConfig
 				cfgSync.Enabled = true
 				cfgSync.Downloader = true
@@ -1108,7 +1110,7 @@ func TestSyncFlags(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *HarmonyConfig) {
+		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 			applySyncFlags(command, config)
 		})
 		hc, err := ts.run(test.args)
@@ -1131,10 +1133,10 @@ type flagTestSuite struct {
 	t *testing.T
 
 	cmd *cobra.Command
-	hc  HarmonyConfig
+	hc  harmonyconfig.HarmonyConfig
 }
 
-func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *HarmonyConfig)) *flagTestSuite {
+func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *harmonyconfig.HarmonyConfig)) *flagTestSuite {
 	cli.SetParseErrorHandle(func(err error) { t.Fatal(err) })
 
 	ts := &flagTestSuite{hc: getDefaultHmyConfigCopy(defNetworkType)}
@@ -1148,7 +1150,7 @@ func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Com
 	return ts
 }
 
-func (ts *flagTestSuite) run(args []string) (HarmonyConfig, error) {
+func (ts *flagTestSuite) run(args []string) (harmonyconfig.HarmonyConfig, error) {
 	ts.cmd.SetArgs(args)
 	err := ts.cmd.Execute()
 	return ts.hc, err
