@@ -83,8 +83,8 @@ type ConfigType struct {
 	Downloader      bool // Whether stream downloader is running; TODO: remove this after sync up
 	NtpServer       string
 	StringRole      string
-	P2PPriKey       p2p_crypto.PrivKey
-	ConsensusPriKey multibls.PrivateKeys
+	P2PPriKey       p2p_crypto.PrivKey   `json:"-"`
+	ConsensusPriKey multibls.PrivateKeys `json:"-"`
 	// Database directory
 	DBDir            string
 	networkType      NetworkType

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"strconv"
 	"strings"
 
@@ -133,6 +134,7 @@ var (
 		logContextIPFlag,
 		logContextPortFlag,
 		logVerbosityFlag,
+		verbosePrintsFlag,
 		legacyVerbosityFlag,
 
 		legacyLogFolderFlag,
@@ -297,7 +299,7 @@ func getRootFlags() []cli.Flag {
 	return flags
 }
 
-func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, nodeTypeFlag) {
 		config.General.NodeType = cli.GetStringFlagValue(cmd, nodeTypeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyNodeTypeFlag) {
@@ -434,7 +436,7 @@ func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
 	return parseNetworkType(raw)
 }
 
-func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyConfig) {
+func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, dnsZoneFlag) {
 		cfg.DNSSync.Zone = cli.GetStringFlagValue(cmd, dnsZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSZoneFlag) {
@@ -470,7 +472,7 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyConfig) {
 
 }
 
-func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
+func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, bootNodeFlag) {
 		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
 	}
@@ -507,7 +509,7 @@ var (
 	}
 )
 
-func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
@@ -559,7 +561,7 @@ var (
 	}
 )
 
-func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyHTTPFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var isRPCSpecified, isRosettaSpecified bool
 
 	if cli.IsFlagChanged(cmd, httpIPFlag) {
@@ -610,7 +612,7 @@ var (
 	}
 )
 
-func applyWSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, wsEnabledFlag) {
 		config.WS.Enabled = cli.GetBoolFlagValue(cmd, wsEnabledFlag)
 	}
@@ -644,7 +646,7 @@ var (
 	}
 )
 
-func applyRPCOptFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
 	}
@@ -749,7 +751,7 @@ var (
 	}
 )
 
-func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyBLSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, blsDirFlag) {
 		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, blsDirFlag)
 	} else if cli.IsFlagChanged(cmd, legacyBLSFolderFlag) {
@@ -777,7 +779,7 @@ func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyBLSPassFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var passFileSpecified bool
 
 	if cli.IsFlagChanged(cmd, passEnabledFlag) {
@@ -797,7 +799,7 @@ func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyKMSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var fileSpecified bool
 
 	if cli.IsFlagChanged(cmd, kmsEnabledFlag) {
@@ -814,7 +816,7 @@ func applyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyBLSPassFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyBLSPassFlag)
 		legacyApplyBLSPassVal(val, config)
@@ -824,14 +826,14 @@ func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyLegacyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyKMSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyKMSConfigSourceFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyKMSConfigSourceFlag)
 		legacyApplyKMSSourceVal(val, config)
 	}
 }
 
-func legacyApplyBLSPassVal(src string, config *harmonyConfig) {
+func legacyApplyBLSPassVal(src string, config *harmonyconfig.HarmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -852,7 +854,7 @@ func legacyApplyBLSPassVal(src string, config *harmonyConfig) {
 	}
 }
 
-func legacyApplyKMSSourceVal(src string, config *harmonyConfig) {
+func legacyApplyKMSSourceVal(src string, config *harmonyconfig.HarmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -903,7 +905,7 @@ var (
 	}
 )
 
-func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if config.Consensus == nil && cli.HasFlagsChanged(cmd, consensusValidFlags) {
 		cfg := getDefaultConsensusConfigCopy()
 		config.Consensus = &cfg
@@ -935,7 +937,7 @@ var (
 	}
 )
 
-func applyTxPoolFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
@@ -957,7 +959,7 @@ var (
 	}
 )
 
-func applyPprofFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyPprofFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
@@ -993,6 +995,10 @@ var (
 		Usage:     "logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail",
 		DefValue:  defaultConfig.Log.Verbosity,
 	}
+	verbosePrintsFlag = cli.StringSliceFlag{
+		Name:	   "verbose-prints",
+		Usage:     "verbose prints, available options: config",
+	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{
 		Name:     "log.ctx.ip",
@@ -1026,7 +1032,7 @@ var (
 	}
 )
 
-func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, logFolderFlag) {
 		config.Log.Folder = cli.GetStringFlagValue(cmd, logFolderFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogFolderFlag) {
@@ -1047,6 +1053,15 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
 	} else if cli.IsFlagChanged(cmd, legacyVerbosityFlag) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, legacyVerbosityFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, verbosePrintsFlag) {
+		verbosePrintsSlice := cli.GetStringSliceFlagValue(cmd, verbosePrintsFlag)
+		verbosePrintsMap := make(map[string]bool, 0)
+		for _, verbosePrint := range verbosePrintsSlice {
+			verbosePrintsMap[verbosePrint] = true
+		}
+		config.Log.VerbosePrints = verbosePrintsMap
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {
@@ -1071,7 +1086,7 @@ var (
 	}
 )
 
-func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applySysFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, sysFlags) || config.Sys == nil {
 		cfg := getDefaultSysConfigCopy()
 		config.Sys = &cfg
@@ -1121,7 +1136,7 @@ var (
 	}
 )
 
-func applyDevnetFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyDevnetFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet == nil {
 		cfg := getDefaultDevnetConfigCopy()
 		config.Devnet = &cfg
@@ -1196,7 +1211,7 @@ var (
 	}
 )
 
-func applyRevertFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, revertFlags) {
 		cfg := getDefaultRevertConfigCopy()
 		config.Revert = &cfg
@@ -1261,7 +1276,7 @@ var (
 )
 
 // Note: this function need to be called before parse other flags
-func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
@@ -1296,7 +1311,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		logPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.Log.FileName = fmt.Sprintf("validator-%v-%v.log", logIP, logPort)
 
-		logCtx := &logContext{
+		logCtx := &harmonyconfig.LogContext{
 			IP:   logIP,
 			Port: logPort,
 		}
@@ -1304,7 +1319,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{legacyWebHookConfigFlag, legacyTPBroadcastInvalidTxFlag}) {
-		config.Legacy = &legacyConfig{}
+		config.Legacy = &harmonyconfig.LegacyConfig{}
 		if cli.IsFlagChanged(cmd, legacyWebHookConfigFlag) {
 			val := cli.GetStringFlagValue(cmd, legacyWebHookConfigFlag)
 			config.Legacy.WebHookConfig = &val
@@ -1345,7 +1360,7 @@ var (
 	}
 )
 
-func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyPrometheusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if config.Prometheus == nil {
 		cfg := getDefaultPrometheusConfigCopy()
 		config.Prometheus = &cfg
@@ -1426,7 +1441,7 @@ var (
 )
 
 // applySyncFlags apply the sync flags.
-func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, syncStreamEnabledFlag) {
 		config.Sync.Enabled = cli.GetBoolFlagValue(cmd, syncStreamEnabledFlag)
 	}

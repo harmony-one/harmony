@@ -18,7 +18,7 @@ var (
 func TestHarmonyFlags(t *testing.T) {
 	tests := []struct {
 		argStr    string
-		expConfig harmonyConfig
+		expConfig HarmonyConfig
 	}{
 		{
 			// running staking command from legacy node.sh
@@ -29,7 +29,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
 				"-aws-config-source file:config.json",
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: generalConfig{
 					NodeType:   "validator",
@@ -229,12 +229,12 @@ func TestGeneralFlags(t *testing.T) {
 func TestNetworkFlags(t *testing.T) {
 	tests := []struct {
 		args      []string
-		expConfig harmonyConfig
+		expConfig HarmonyConfig
 		expErr    error
 	}{
 		{
 			args: []string{},
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Network: networkConfig{
 					NetworkType: defNetworkType,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(defNetworkType),
@@ -243,7 +243,7 @@ func TestNetworkFlags(t *testing.T) {
 		},
 		{
 			args: []string{"-n", "stn"},
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Network: networkConfig{
 					NetworkType: nodeconfig.Stressnet,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(nodeconfig.Stressnet),
@@ -254,7 +254,7 @@ func TestNetworkFlags(t *testing.T) {
 		{
 			args: []string{"--network", "stk", "--bootnodes", "1,2,3,4", "--dns.zone", "8.8.8.8",
 				"--dns.port", "9001", "--dns.server-port", "9002"},
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Network: networkConfig{
 					NetworkType: "pangaea",
 					BootNodes:   []string{"1", "2", "3", "4"},
@@ -271,7 +271,7 @@ func TestNetworkFlags(t *testing.T) {
 		{
 			args: []string{"--network_type", "stk", "--bootnodes", "1,2,3,4", "--dns_zone", "8.8.8.8",
 				"--dns_port", "9001"},
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Network: networkConfig{
 					NetworkType: "pangaea",
 					BootNodes:   []string{"1", "2", "3", "4"},
@@ -287,7 +287,7 @@ func TestNetworkFlags(t *testing.T) {
 		},
 		{
 			args: []string{"--dns=false"},
-			expConfig: harmonyConfig{
+			expConfig: HarmonyConfig{
 				Network: networkConfig{
 					NetworkType: defNetworkType,
 					BootNodes:   nodeconfig.GetDefaultBootNodes(defNetworkType),
@@ -307,7 +307,7 @@ func TestNetworkFlags(t *testing.T) {
 		neededFlags := make([]cli.Flag, 0)
 		neededFlags = append(neededFlags, networkFlags...)
 		neededFlags = append(neededFlags, dnsSyncFlags...)
-		ts := newFlagTestSuite(t, neededFlags, func(cmd *cobra.Command, config *harmonyConfig) {
+		ts := newFlagTestSuite(t, neededFlags, func(cmd *cobra.Command, config *HarmonyConfig) {
 			// This is the network related logic in function getHarmonyConfig
 			nt := getNetworkType(cmd)
 			config.Network = getDefaultNetworkConfig(nt)
@@ -367,7 +367,7 @@ func TestP2PFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyP2PFlags(cmd, config)
 			},
@@ -451,7 +451,7 @@ func TestRPCFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(httpFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyHTTPFlags(cmd, config)
 			},
@@ -510,7 +510,7 @@ func TestWSFlags(t *testing.T) {
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(wsFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyWSFlags(cmd, config)
 			},
@@ -852,10 +852,21 @@ func TestLogFlags(t *testing.T) {
 				},
 			},
 		},
+		{
+			args: []string{"--verbose-prints", "config"},
+			expConfig: logConfig{
+				Folder:     defaultConfig.Log.Folder,
+				FileName:   defaultConfig.Log.FileName,
+				RotateSize: defaultConfig.Log.RotateSize,
+				Verbosity:  defaultConfig.Log.Verbosity,
+				VerbosePrints: []string{"config"},
+				Context: nil,
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(logFlags, legacyMiscFlags...),
-			func(cmd *cobra.Command, config *harmonyConfig) {
+			func(cmd *cobra.Command, config *HarmonyConfig) {
 				applyLegacyMiscFlags(cmd, config)
 				applyLogFlags(cmd, config)
 			},
@@ -1048,7 +1059,7 @@ func TestDNSSyncFlags(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, dnsSyncFlags, func(command *cobra.Command, config *harmonyConfig) {
+		ts := newFlagTestSuite(t, dnsSyncFlags, func(command *cobra.Command, config *HarmonyConfig) {
 			config.Network.NetworkType = test.network
 			applyDNSSyncFlags(command, config)
 		})
@@ -1097,7 +1108,7 @@ func TestSyncFlags(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *harmonyConfig) {
+		ts := newFlagTestSuite(t, syncFlags, func(command *cobra.Command, config *HarmonyConfig) {
 			applySyncFlags(command, config)
 		})
 		hc, err := ts.run(test.args)
@@ -1120,10 +1131,10 @@ type flagTestSuite struct {
 	t *testing.T
 
 	cmd *cobra.Command
-	hc  harmonyConfig
+	hc  HarmonyConfig
 }
 
-func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *harmonyConfig)) *flagTestSuite {
+func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Command, *HarmonyConfig)) *flagTestSuite {
 	cli.SetParseErrorHandle(func(err error) { t.Fatal(err) })
 
 	ts := &flagTestSuite{hc: getDefaultHmyConfigCopy(defNetworkType)}
@@ -1137,7 +1148,7 @@ func newFlagTestSuite(t *testing.T, flags []cli.Flag, applyFlags func(*cobra.Com
 	return ts
 }
 
-func (ts *flagTestSuite) run(args []string) (harmonyConfig, error) {
+func (ts *flagTestSuite) run(args []string) (HarmonyConfig, error) {
 	ts.cmd.SetArgs(args)
 	err := ts.cmd.Execute()
 	return ts.hc, err

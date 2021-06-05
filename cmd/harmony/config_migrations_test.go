@@ -308,7 +308,7 @@ func Test_migrateConf(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    harmonyConfig
+		want    HarmonyConfig
 		wantErr bool
 	}{
 		{
@@ -340,7 +340,7 @@ func Test_migrateConf(t *testing.T) {
 			args: args{
 				confBytes: V1_0_4ConfigDownloaderOn,
 			},
-			want: func() harmonyConfig {
+			want: func() HarmonyConfig {
 				hc := defConf
 				hc.Sync.Downloader = true
 				hc.Sync.Enabled = true
