@@ -90,8 +90,8 @@ type LogConfig struct {
 	FileName      string
 	RotateSize    int
 	Verbosity     int
-	VerbosePrints map[string]bool
-	Context       *LogContext `toml:",omitempty"`
+	VerbosePrints map[string]bool `toml:",omitempty"`
+	Context       *LogContext     `toml:",omitempty"`
 }
 
 type LogContext struct {
