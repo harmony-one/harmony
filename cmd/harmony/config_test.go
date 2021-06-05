@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,9 +12,9 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-type testCfgOpt func(config *harmonyConfig)
+type testCfgOpt func(config *conf.HarmonyConfig)
 
-func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) harmonyConfig {
+func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) conf.HarmonyConfig {
 	cfg := getDefaultHmyConfigCopy(nt)
 	if opt != nil {
 		opt(&cfg)
@@ -133,7 +134,7 @@ func TestPersistConfig(t *testing.T) {
 	os.MkdirAll(testDir, 0777)
 
 	tests := []struct {
-		config harmonyConfig
+		config conf.HarmonyConfig
 	}{
 		{
 			config: makeTestConfig("mainnet", nil),
@@ -142,7 +143,7 @@ func TestPersistConfig(t *testing.T) {
 			config: makeTestConfig("devnet", nil),
 		},
 		{
-			config: makeTestConfig("mainnet", func(cfg *harmonyConfig) {
+			config: makeTestConfig("mainnet", func(cfg *conf.HarmonyConfig) {
 				consensus := getDefaultConsensusConfigCopy()
 				cfg.Consensus = &consensus
 
@@ -153,7 +154,7 @@ func TestPersistConfig(t *testing.T) {
 				cfg.Revert = &revert
 
 				webHook := "web hook"
-				cfg.Legacy = &legacyConfig{
+				cfg.Legacy = &conf.LegacyConfig{
 					WebHookConfig:         &webHook,
 					TPBroadcastInvalidTxn: &trueBool,
 				}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"reflect"
 	"testing"
 
@@ -308,7 +309,7 @@ func Test_migrateConf(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    harmonyConfig
+		want    conf.HarmonyConfig
 		wantErr bool
 	}{
 		{
@@ -340,7 +341,7 @@ func Test_migrateConf(t *testing.T) {
 			args: args{
 				confBytes: V1_0_4ConfigDownloaderOn,
 			},
-			want: func() harmonyConfig {
+			want: func() conf.HarmonyConfig {
 				hc := defConf
 				hc.Sync.Downloader = true
 				hc.Sync.Enabled = true

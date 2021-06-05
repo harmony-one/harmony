@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -38,31 +39,31 @@ func doMigrations(confVersion string, confTree *toml.Tree) error {
 	return nil
 }
 
-func migrateConf(confBytes []byte) (harmonyConfig, string, error) {
+func migrateConf(confBytes []byte) (conf.HarmonyConfig, string, error) {
 	var (
 		migratedFrom string
 	)
 	confTree, err := toml.LoadBytes(confBytes)
 	if err != nil {
-		return harmonyConfig{}, "", fmt.Errorf("config file parse error - %s", err.Error())
+		return conf.HarmonyConfig{}, "", fmt.Errorf("config file parse error - %s", err.Error())
 	}
 	confVersion, found := confTree.Get("Version").(string)
 	if !found {
-		return harmonyConfig{}, "", errors.New("config file invalid - no version entry found")
+		return conf.HarmonyConfig{}, "", errors.New("config file invalid - no version entry found")
 	}
 	migratedFrom = confVersion
 	if confVersion != tomlConfigVersion {
 		err = doMigrations(confVersion, confTree)
 		if err != nil {
-			return harmonyConfig{}, "", err
+			return conf.HarmonyConfig{}, "", err
 		}
 	}
 
 	// At this point we must be at current config version so
 	// we can safely unmarshal it
-	var config harmonyConfig
+	var config conf.HarmonyConfig
 	if err := confTree.Unmarshal(&config); err != nil {
-		return harmonyConfig{}, "", err
+		return conf.HarmonyConfig{}, "", err
 	}
 	return config, migratedFrom, nil
 }

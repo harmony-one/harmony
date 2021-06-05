@@ -1,6 +1,9 @@
 package main
 
-import nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+import (
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+)
 
 const tomlConfigVersion = "2.0.0"
 
@@ -8,9 +11,9 @@ const (
 	defNetworkType = nodeconfig.Mainnet
 )
 
-var defaultConfig = harmonyConfig{
+var defaultConfig = conf.HarmonyConfig{
 	Version: tomlConfigVersion,
-	General: generalConfig{
+	General: conf.GeneralConfig{
 		NodeType:         "validator",
 		NoStaking:        false,
 		ShardID:          -1,
@@ -20,29 +23,29 @@ var defaultConfig = harmonyConfig{
 		DataDir:          "./",
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
-	P2P: p2pConfig{
+	P2P: conf.P2pConfig{
 		Port:    nodeconfig.DefaultP2PPort,
 		IP:      nodeconfig.DefaultPublicListenIP,
 		KeyFile: "./.hmykey",
 	},
-	HTTP: httpConfig{
+	HTTP: conf.HttpConfig{
 		Enabled:        true,
 		RosettaEnabled: false,
 		IP:             "127.0.0.1",
 		Port:           nodeconfig.DefaultRPCPort,
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
-	WS: wsConfig{
+	WS: conf.WsConfig{
 		Enabled: true,
 		IP:      "127.0.0.1",
 		Port:    nodeconfig.DefaultWSPort,
 	},
-	RPCOpt: rpcOptConfig{
+	RPCOpt: conf.RpcOptConfig{
 		DebugEnabled:      false,
 		RateLimterEnabled: true,
 		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
 	},
-	BLSKeys: blsConfig{
+	BLSKeys: conf.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
 		KeyFiles: []string{},
 		MaxKeys:  10,
@@ -55,15 +58,15 @@ var defaultConfig = harmonyConfig{
 		KMSConfigSrcType: kmsConfigTypeShared,
 		KMSConfigFile:    "",
 	},
-	TxPool: txPoolConfig{
+	TxPool: conf.TxPoolConfig{
 		BlacklistFile: "./.hmy/blacklist.txt",
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
-	Pprof: pprofConfig{
+	Pprof: conf.PprofConfig{
 		Enabled:    false,
 		ListenAddr: "127.0.0.1:6060",
 	},
-	Log: logConfig{
+	Log: conf.LogConfig{
 		Folder:     "./latest",
 		FileName:   "harmony.log",
 		RotateSize: 100,
@@ -72,33 +75,33 @@ var defaultConfig = harmonyConfig{
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
 }
 
-var defaultSysConfig = sysConfig{
+var defaultSysConfig = conf.SysConfig{
 	NtpServer: "1.pool.ntp.org",
 }
 
-var defaultDevnetConfig = devnetConfig{
+var defaultDevnetConfig = conf.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
 }
 
-var defaultRevertConfig = revertConfig{
+var defaultRevertConfig = conf.RevertConfig{
 	RevertBeacon: false,
 	RevertBefore: 0,
 	RevertTo:     0,
 }
 
-var defaultLogContext = logContext{
+var defaultLogContext = conf.LogContext{
 	IP:   "127.0.0.1",
 	Port: 9000,
 }
 
-var defaultConsensusConfig = consensusConfig{
+var defaultConsensusConfig = conf.ConsensusConfig{
 	MinPeers:     6,
 	AggregateSig: true,
 }
 
-var defaultPrometheusConfig = prometheusConfig{
+var defaultPrometheusConfig = conf.PrometheusConfig{
 	Enabled:    true,
 	IP:         "0.0.0.0",
 	Port:       9900,
@@ -107,7 +110,7 @@ var defaultPrometheusConfig = prometheusConfig{
 }
 
 var (
-	defaultMainnetSyncConfig = syncConfig{
+	defaultMainnetSyncConfig = conf.SyncConfig{
 		Enabled:        false,
 		Downloader:     false,
 		Concurrency:    6,
@@ -119,7 +122,7 @@ var (
 		DiscBatch:      8,
 	}
 
-	defaultTestNetSyncConfig = syncConfig{
+	defaultTestNetSyncConfig = conf.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
 		Concurrency:    4,
@@ -131,7 +134,7 @@ var (
 		DiscBatch:      8,
 	}
 
-	defaultLocalNetSyncConfig = syncConfig{
+	defaultLocalNetSyncConfig = conf.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
 		Concurrency:    4,
@@ -143,7 +146,7 @@ var (
 		DiscBatch:      8,
 	}
 
-	defaultElseSyncConfig = syncConfig{
+	defaultElseSyncConfig = conf.SyncConfig{
 		Enabled:        true,
 		Downloader:     true,
 		Concurrency:    4,
@@ -160,7 +163,7 @@ const (
 	defaultBroadcastInvalidTx = true
 )
 
-func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
+func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) conf.HarmonyConfig {
 	config := defaultConfig
 
 	config.Network = getDefaultNetworkConfig(nt)
@@ -174,32 +177,32 @@ func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
 	return config
 }
 
-func getDefaultSysConfigCopy() sysConfig {
+func getDefaultSysConfigCopy() conf.SysConfig {
 	config := defaultSysConfig
 	return config
 }
 
-func getDefaultDevnetConfigCopy() devnetConfig {
+func getDefaultDevnetConfigCopy() conf.DevnetConfig {
 	config := defaultDevnetConfig
 	return config
 }
 
-func getDefaultRevertConfigCopy() revertConfig {
+func getDefaultRevertConfigCopy() conf.RevertConfig {
 	config := defaultRevertConfig
 	return config
 }
 
-func getDefaultLogContextCopy() logContext {
+func getDefaultLogContextCopy() conf.LogContext {
 	config := defaultLogContext
 	return config
 }
 
-func getDefaultConsensusConfigCopy() consensusConfig {
+func getDefaultConsensusConfigCopy() conf.ConsensusConfig {
 	config := defaultConsensusConfig
 	return config
 }
 
-func getDefaultPrometheusConfigCopy() prometheusConfig {
+func getDefaultPrometheusConfigCopy() conf.PrometheusConfig {
 	config := defaultPrometheusConfig
 	return config
 }
