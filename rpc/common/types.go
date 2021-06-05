@@ -86,4 +86,5 @@ type NodePeerInfo struct {
 type Config struct {
 	HarmonyConfig harmonyconfig.HarmonyConfig
 	NodeConfig nodeconfig.ConfigType
+	ChainConfig params.ChainConfig
 }

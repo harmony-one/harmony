@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	commonRPC "github.com/harmony-one/harmony/rpc/common"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -63,4 +64,11 @@ func (s *PrivateDebugService) GetConsensusPhase(
 	ctx context.Context,
 ) string {
 	return s.hmy.NodeAPI.GetConsensusPhase()
+}
+
+// GetConfig get harmony config
+func (s *PrivateDebugService) GetConfig(
+	ctx context.Context,
+) commonRPC.Config {
+	return s.hmy.NodeAPI.GetConfig()
 }

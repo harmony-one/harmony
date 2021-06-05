@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
 	"math/big"
 	"os"
 	"strings"
@@ -105,6 +106,7 @@ type Node struct {
 	ContractAddresses            []common.Address
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
+	HarmonyConfig harmony.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.

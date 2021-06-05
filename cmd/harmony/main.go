@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
@@ -297,17 +296,6 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		os.Exit(1)
 	}
 
-	if hc.Log.VerbosePrints["config"] {
-		if cfgJson, err := json.MarshalIndent(rpc_common.Config{
-			HarmonyConfig: hc,
-			NodeConfig:    *nodeConfig,
-		}, "", " "); err != nil {
-			panic(err)
-		} else {
-			println(string(cfgJson))
-		}
-	}
-
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
 
@@ -392,6 +380,14 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		Msg(startMsg)
 
 	nodeconfig.SetPeerID(myHost.GetID())
+
+	if hc.Log.VerbosePrints["config"] {
+		utils.Logger().Info().Interface("config", rpc_common.Config{
+			HarmonyConfig: hc,
+			NodeConfig:    *nodeConfig,
+			ChainConfig:   *currentNode.Blockchain().Config(),
+		}).Msg("verbose prints config")
+	}
 
 	// Setup services
 	if hc.Sync.Enabled {

@@ -142,3 +142,11 @@ func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
 		ConsensusTime: node.Consensus.GetFinality(),
 	}
 }
+
+func (node *Node) GetConfig() rpc_common.Config {
+	return rpc_common.Config{
+		HarmonyConfig: node.HarmonyConfig,
+		NodeConfig: *node.NodeConfig,
+		ChainConfig: node.chainConfig,
+	}
+}
