@@ -161,8 +161,10 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 ) (response StructuredResponse, err error) {
 
 	blockNum := blockNumber.EthBlockNumber()
-	if block, ok := s.blockCache.Get(uint64(blockNum)); ok {
-		return block.(StructuredResponse), nil
+	if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
+		if block, ok := s.blockCache.Get(blockNum.Int64()); ok {
+			return block.(StructuredResponse), nil
+		}
 	}
 
 	err = s.wait(ctx)
@@ -227,7 +229,9 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			}
 		}
 
-		s.blockCache.Add(uint64(blockNum), response)
+		if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
+			s.blockCache.Add(blockNum.Int64(), response)
+		}
 		return response, err
 	}
 
