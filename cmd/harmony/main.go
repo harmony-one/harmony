@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pelletier/go-toml"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -85,6 +86,12 @@ var configFlag = cli.StringFlag{
 	DefValue:  "",
 }
 
+var enableConfigLoggingFlag = cli.BoolFlag{
+	Name:     "enable-config-logging",
+	Usage:    "log config values",
+	DefValue: false,
+}
+
 func init() {
 	rand.Seed(time.Now().UnixNano())
 	cli.SetParseErrorHandle(func(err error) {
@@ -160,11 +167,12 @@ func raiseFdLimits() error {
 
 func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	var (
-		config         harmonyConfig
-		err            error
-		migratedFrom   string
-		configFile     string
-		isUsingDefault bool
+		config              harmonyConfig
+		enableConfigLogging bool
+		err                 error
+		migratedFrom        string
+		configFile          string
+		isUsingDefault      bool
 	)
 	if cli.IsFlagChanged(cmd, configFlag) {
 		configFile = cli.GetStringFlagValue(cmd, configFlag)
@@ -193,6 +201,18 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 
 		} else {
 			fmt.Println("Update saved config with `./harmony config update [config_file]`")
+		}
+	}
+
+	if cli.IsFlagChanged(cmd, enableConfigLoggingFlag) {
+		enableConfigLogging = cli.GetBoolFlagValue(cmd, enableConfigLoggingFlag)
+	}
+	if enableConfigLogging {
+		b, err := toml.Marshal(config)
+		if err != nil {
+			fmt.Printf("Could not log config - %s", err.Error())
+		} else {
+			fmt.Printf("Node Configuration:\n%s", b)
 		}
 	}
 

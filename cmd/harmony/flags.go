@@ -275,6 +275,7 @@ func getRootFlags() []cli.Flag {
 
 	flags = append(flags, versionFlag)
 	flags = append(flags, configFlag)
+	flags = append(flags, enableConfigLoggingFlag)
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
 	flags = append(flags, dnsSyncFlags...)
