@@ -162,7 +162,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
-		if block, ok := s.blockCache.Get(blockNum.Int64()); ok {
+		if block, ok := s.blockCache.Get(uint64(blockNum)); ok {
 			return block.(StructuredResponse), nil
 		}
 	}
@@ -230,7 +230,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		}
 
 		if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
-			s.blockCache.Add(blockNum.Int64(), response)
+			s.blockCache.Add(uint64(blockNum), response)
 		}
 		return response, err
 	}
