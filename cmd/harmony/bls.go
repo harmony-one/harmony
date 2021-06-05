@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"os"
 	"sync"
+
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"

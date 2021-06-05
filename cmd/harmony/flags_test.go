@@ -855,12 +855,12 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--verbose-prints", "config"},
 			expConfig: logConfig{
-				Folder:     defaultConfig.Log.Folder,
-				FileName:   defaultConfig.Log.FileName,
-				RotateSize: defaultConfig.Log.RotateSize,
-				Verbosity:  defaultConfig.Log.Verbosity,
+				Folder:        defaultConfig.Log.Folder,
+				FileName:      defaultConfig.Log.FileName,
+				RotateSize:    defaultConfig.Log.RotateSize,
+				Verbosity:     defaultConfig.Log.Verbosity,
 				VerbosePrints: []string{"config"},
-				Context: nil,
+				Context:       nil,
 			},
 		},
 	}

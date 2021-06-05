@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -207,7 +208,7 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyconfig.HarmonyConfig, error) {
 	return config, nil
 }
 
-func applyRootFlags(cmd *cobra.Command, config * harmonyconfig.HarmonyConfig) {
+func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	// Misc flags shall be applied first since legacy ip / port is overwritten
 	// by new ip / port flags
 	applyLegacyMiscFlags(cmd, config)

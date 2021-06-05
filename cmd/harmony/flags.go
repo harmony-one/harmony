@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"strconv"
 	"strings"
+
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
@@ -996,8 +997,8 @@ var (
 		DefValue:  defaultConfig.Log.Verbosity,
 	}
 	verbosePrintsFlag = cli.StringSliceFlag{
-		Name:	   "verbose-prints",
-		Usage:     "verbose prints, available options: config",
+		Name:  "verbose-prints",
+		Usage: "verbose prints, available options: config",
 	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 
 	"github.com/ethereum/go-ethereum/log"

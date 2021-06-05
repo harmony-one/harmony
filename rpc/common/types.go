@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
@@ -85,6 +86,6 @@ type NodePeerInfo struct {
 
 type Config struct {
 	HarmonyConfig harmonyconfig.HarmonyConfig
-	NodeConfig nodeconfig.ConfigType
-	ChainConfig params.ChainConfig
+	NodeConfig    nodeconfig.ConfigType
+	ChainConfig   params.ChainConfig
 }
