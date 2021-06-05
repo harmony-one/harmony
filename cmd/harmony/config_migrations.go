@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+
 	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"

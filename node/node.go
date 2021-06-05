@@ -3,12 +3,13 @@ package node
 import (
 	"context"
 	"fmt"
-	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"math/big"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"reflect"
 	"strings"
 	"testing"
+
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"

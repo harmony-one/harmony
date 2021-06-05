@@ -2,8 +2,9 @@ package hmy
 
 import (
 	"context"
-	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"math/big"
+
+	"github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"

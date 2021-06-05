@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"strconv"
 	"strings"
+
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"

@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	conf "github.com/harmony-one/harmony/cmd/harmony/config"
-	"github.com/pelletier/go-toml"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
+	"github.com/pelletier/go-toml"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"

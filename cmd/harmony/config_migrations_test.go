@@ -1,9 +1,10 @@
 package main
 
 import (
-	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"reflect"
 	"testing"
+
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )

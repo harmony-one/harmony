@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	conf "github.com/harmony-one/harmony/cmd/harmony/config"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
