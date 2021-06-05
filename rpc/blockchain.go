@@ -229,8 +229,8 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			}
 		}
 
-		if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
-			s.blockCache.Add(uint64(blockNum), response)
+		if blockNum != rpc.PendingBlockNumber {
+			s.blockCache.Add(blk.NumberU64(), response)
 		}
 		return response, err
 	}
