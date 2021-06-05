@@ -86,3 +86,11 @@ func (s *PublicHarmonyService) GetPeerInfo(
 	// Response output is the same for all versions
 	return NewStructuredResponse(s.hmy.GetPeerInfo())
 }
+
+// GetNodeHarmonyConfiguration produces the HarmonyConfiguration values that the node is using
+func (s *PublicHarmonyService) GetNodeHarmonyConfiguration(
+	ctx context.Context,
+) (StructuredResponse, error) {
+	// Response output is the same for all versions
+	return NewStructuredResponse(s.hmy.GetNodeHarmonyConfiguration())
+}

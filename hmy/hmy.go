@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -100,6 +101,7 @@ type NodeAPI interface {
 	ListBlockedPeer() []peer.ID
 
 	GetConsensusInternal() commonRPC.ConsensusInternal
+	GetHarmonyConfiguration() *config.HarmonyConfig
 
 	// debug API
 	GetConsensusMode() string
@@ -233,4 +235,9 @@ func (hmy *Harmony) EventMux() *event.TypeMux {
 func (hmy *Harmony) BloomStatus() (uint64, uint64) {
 	sections, _, _ := hmy.BloomIndexer.Sections()
 	return BloomBitsBlocks, sections
+}
+
+// GetNodeHarmonyConfiguration ...
+func (hmy *Harmony) GetNodeHarmonyConfiguration() *config.HarmonyConfig {
+	return hmy.NodeAPI.GetHarmonyConfiguration()
 }

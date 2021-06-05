@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"github.com/harmony-one/harmony/cmd/harmony/config"
 	"math/big"
 	"os"
 	"strings"
@@ -130,6 +131,8 @@ type Node struct {
 	// context control for pub-sub handling
 	psCtx    context.Context
 	psCancel func()
+
+	NodeHarmonyConfig *config.HarmonyConfig
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -912,8 +915,11 @@ func New(
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
 	isArchival map[uint32]bool,
+	hc *config.HarmonyConfig,
 ) *Node {
 	node := Node{}
+	// Save starting harmony configuration
+	node.NodeHarmonyConfig = hc
 	node.unixTimeAtNodeStart = time.Now().Unix()
 	node.TransactionErrorSink = types.NewTransactionErrorSink()
 	// Get the node config that's created in the harmony.go program.
@@ -1290,4 +1296,8 @@ func (node *Node) GetAddresses(epoch *big.Int) map[string]common.Address {
 // IsRunningBeaconChain returns whether the node is running on beacon chain.
 func (node *Node) IsRunningBeaconChain() bool {
 	return node.NodeConfig.ShardID == shard.BeaconChainShardID
+}
+
+func (node *Node) GetHarmonyConfiguration() *config.HarmonyConfig {
+	return node.NodeHarmonyConfig
 }

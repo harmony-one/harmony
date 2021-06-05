@@ -209,11 +209,11 @@ func getHarmonyConfig(cmd *cobra.Command) (conf.HarmonyConfig, error) {
 		enableConfigLogging = cli.GetBoolFlagValue(cmd, enableConfigLoggingFlag)
 	}
 	if enableConfigLogging {
-		b, err := toml.Marshal(config)
+		bytes, err := toml.Marshal(config)
 		if err != nil {
-			fmt.Printf("Could not log config - %s", err.Error())
+			fmt.Printf("Could not read harmony configuration - %s", err.Error())
 		} else {
-			fmt.Printf("Node Configuration:\n%s", b)
+			fmt.Printf("Harmony Node configuration:\n%s", bytes)
 		}
 	}
 
@@ -663,7 +663,7 @@ func setupConsensusAndNode(hc conf.HarmonyConfig, nodeConfig *nodeconfig.ConfigT
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes())
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
