@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -160,16 +161,6 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
 
-	blockNum := blockNumber.EthBlockNumber()
-	if block, ok := s.blockCache.Get(uint64(blockNum)); ok {
-		return block.(StructuredResponse), nil
-	}
-
-	err = s.wait(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -180,6 +171,19 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		}
 	}
 	blockArgs.InclTx = true
+
+	blockNum := blockNumber.EthBlockNumber()
+	if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
+		cacheKey := combineCacheKey(uint64(blockNum), s.version, blockArgs)
+		if block, ok := s.blockCache.Get(cacheKey); ok {
+			return block.(StructuredResponse), nil
+		}
+	}
+
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
 	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
@@ -227,7 +231,10 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			}
 		}
 
-		s.blockCache.Add(uint64(blockNum), response)
+		if blockNum != rpc.PendingBlockNumber {
+			cacheKey := combineCacheKey(blk.NumberU64(), s.version, blockArgs)
+			s.blockCache.Add(cacheKey, response)
+		}
 		return response, err
 	}
 
@@ -811,4 +818,10 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 		return false
 	}
 	return uint64(blockNum) > hmy.CurrentBlock().NumberU64()
+}
+
+func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
+	// no need format blockArgs.Signers[] as a part of cache key
+	// because it's not input from rpc caller, it's caculate with blockArgs.WithSigners
+	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.InclTx) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
 }
