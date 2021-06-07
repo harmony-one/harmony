@@ -601,7 +601,7 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
 
 		// Skip delegations with zero amount and empty undelegation
-		if delegation.Amount.Cmp(common.Big0) == 0 || len(undelegations) == 0 {
+		if delegation.Amount.Cmp(common.Big0) == 0 && len(undelegations) == 0 {
 			continue
 		}
 
