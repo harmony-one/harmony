@@ -187,8 +187,12 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	blockArgs.InclTx = true
 
 	blockNum := blockNumber.EthBlockNumber()
-	if blockNum != rpc.LatestBlockNumber && blockNum != rpc.PendingBlockNumber {
-		cacheKey := combineCacheKey(uint64(blockNum), s.version, blockArgs)
+	if blockNum != rpc.PendingBlockNumber {
+		realBlockNum := uint64(blockNum)
+		if blockNum == rpc.LatestBlockNumber {
+			realBlockNum = s.hmy.CurrentBlock().NumberU64()
+		}
+		cacheKey := combineCacheKey(realBlockNum, s.version, blockArgs)
 		if block, ok := s.blockCache.Get(cacheKey); ok {
 			return block.(StructuredResponse), nil
 		}
