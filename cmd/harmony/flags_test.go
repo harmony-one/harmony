@@ -69,7 +69,7 @@ func TestHarmonyFlags(t *testing.T) {
 				RPCOpt: rpcOptConfig{
 					DebugEnabled:      false,
 					RateLimterEnabled: true,
-					RequestsPerSecond: 300,
+					RequestsPerSecond: 1000,
 				},
 				WS: wsConfig{
 					Enabled: true,
@@ -542,7 +542,7 @@ func TestRPCOptFlags(t *testing.T) {
 			expConfig: rpcOptConfig{
 				DebugEnabled:      true,
 				RateLimterEnabled: true,
-				RequestsPerSecond: 300,
+				RequestsPerSecond: 1000,
 			},
 		},
 
@@ -551,25 +551,25 @@ func TestRPCOptFlags(t *testing.T) {
 			expConfig: rpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: true,
-				RequestsPerSecond: 300,
+				RequestsPerSecond: 1000,
 			},
 		},
 
 		{
-			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "1000"},
+			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "2000"},
 			expConfig: rpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				RequestsPerSecond: 2000,
 			},
 		},
 
 		{
-			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "1000"},
+			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "2000"},
 			expConfig: rpcOptConfig{
 				DebugEnabled:      false,
 				RateLimterEnabled: false,
-				RequestsPerSecond: 1000,
+				RequestsPerSecond: 2000,
 			},
 		},
 	}
