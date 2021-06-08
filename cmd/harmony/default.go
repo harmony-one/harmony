@@ -157,7 +157,7 @@ var (
 )
 
 const (
-	defaultBroadcastInvalidTx = true
+	defaultBroadcastInvalidTx = false
 )
 
 func getDefaultHmyConfigCopy(nt nodeconfig.NetworkType) harmonyConfig {
