@@ -16,7 +16,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "rpc",
-			Name:      "rpc_over_ratelimit_trigger",
+			Name:      "over_ratelimit",
 			Help:      "number of times triggered rpc rate limit",
 		},
 		[]string{"rate_limit"})
