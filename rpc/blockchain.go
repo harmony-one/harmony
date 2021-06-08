@@ -47,10 +47,15 @@ const (
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	blockCache, _ := lru.New(blockCacheLimit)
 	if limiterEnable {
+		limiter := rate.NewLimiter(rate.Limit(limit), 1)
+		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+		rpcRateLimitCounterVec.With(prometheus.Labels{
+			"rate_limit": strLimit,
+		}).Add(float64(0))
 		return rpc.API{
 			Namespace: version.Namespace(),
 			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, rate.NewLimiter(rate.Limit(limit), 1), blockCache},
+			Service:   &PublicBlockchainService{hmy, version, limiter, blockCache},
 			Public:    true,
 		}
 	} else {
