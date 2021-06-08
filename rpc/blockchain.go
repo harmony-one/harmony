@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -46,10 +48,15 @@ const (
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	blockCache, _ := lru.New(blockCacheLimit)
 	if limiterEnable {
+		limiter := rate.NewLimiter(rate.Limit(limit), 1)
+		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+		rpcRateLimitCounterVec.With(prometheus.Labels{
+			"rate_limit": strLimit,
+		}).Add(float64(0))
 		return rpc.API{
 			Namespace: version.Namespace(),
 			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, rate.NewLimiter(rate.Limit(limit), 1), blockCache},
+			Service:   &PublicBlockchainService{hmy, version, limiter, blockCache},
 			Public:    true,
 		}
 	} else {
@@ -149,6 +156,13 @@ func (s *PublicBlockchainService) wait(ctx context.Context) error {
 	if s.limiter != nil {
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
+		if !s.limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(s.limiter.Limit()))
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"rate_limit": strLimit,
+			}).Inc()
+		}
+
 		return s.limiter.Wait(deadlineCtx)
 	}
 	return nil
