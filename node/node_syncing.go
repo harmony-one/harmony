@@ -31,6 +31,10 @@ import (
 // Constants related to doing syncing.
 const (
 	SyncFrequency = 60
+
+	// getBlocksRequestHardCap is the hard capped message size at server side for getBlocks request.
+	// The number is 4MB (default gRPC message size) minus 2k reserved for message overhead.
+	getBlocksRequestHardCap = 4*1024*1024 - 2*1024
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -466,6 +470,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	case downloader_pb.DownloaderRequest_BLOCK:
 		var hash common.Hash
 
+		payloadSize := 0
 		withSig := request.GetBlocksWithSig
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
@@ -478,10 +483,14 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			} else {
 				encoded, err = node.getEncodedBlockByHash(hash)
 			}
-
-			if err == nil {
-				response.Payload = append(response.Payload, encoded)
+			if err != nil {
+				continue
 			}
+			payloadSize += len(encoded)
+			if payloadSize > getBlocksRequestHardCap {
+				break
+			}
+			response.Payload = append(response.Payload, encoded)
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
