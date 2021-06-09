@@ -488,6 +488,10 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			}
 			payloadSize += len(encoded)
 			if payloadSize > getBlocksRequestHardCap {
+				utils.Logger().Warn().Err(err).
+					Int("req size", len(request.Hashes)).
+					Int("cur size", len(response.Payload)).
+					Msg("[SYNC] Max blocks response size reached, ignoring the rest.")
 				break
 			}
 			response.Payload = append(response.Payload, encoded)
