@@ -997,9 +997,9 @@ var (
 		DefValue:  defaultConfig.Log.Verbosity,
 	}
 	logVerbosePrintsFlag = cli.StringSliceFlag{
-		Name:      "log.verbose-prints",
-		Usage:     "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
-		DefValue:  []string{},
+		Name:     "log.verbose-prints",
+		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
+		DefValue: []string{},
 	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{

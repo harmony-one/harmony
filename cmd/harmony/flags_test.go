@@ -827,16 +827,16 @@ func TestLogFlags(t *testing.T) {
 				VerbosePrints: harmonyconfig.LogVerbosePrints{
 					Config: true,
 				},
-				Context:    nil,
+				Context: nil,
 			},
 		},
 		{
 			args: []string{"--log.ctx.ip", "8.8.8.8", "--log.ctx.port", "9001"},
 			expConfig: harmonyconfig.LogConfig{
-				Folder:     defaultConfig.Log.Folder,
-				FileName:   defaultConfig.Log.FileName,
-				RotateSize: defaultConfig.Log.RotateSize,
-				Verbosity:  defaultConfig.Log.Verbosity,
+				Folder:        defaultConfig.Log.Folder,
+				FileName:      defaultConfig.Log.FileName,
+				RotateSize:    defaultConfig.Log.RotateSize,
+				Verbosity:     defaultConfig.Log.Verbosity,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{
 					IP:   "8.8.8.8",
@@ -848,10 +848,10 @@ func TestLogFlags(t *testing.T) {
 			args: []string{"--log_folder", "latest_log", "--log_max_size", "10", "--verbosity",
 				"5", "--ip", "8.8.8.8", "--port", "9001"},
 			expConfig: harmonyconfig.LogConfig{
-				Folder:     "latest_log",
-				FileName:   "validator-8.8.8.8-9001.log",
-				RotateSize: 10,
-				Verbosity:  5,
+				Folder:        "latest_log",
+				FileName:      "validator-8.8.8.8-9001.log",
+				RotateSize:    10,
+				Verbosity:     5,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{
 					IP:   "8.8.8.8",

@@ -96,7 +96,7 @@ type LogConfig struct {
 	RotateSize    int
 	Verbosity     int
 	VerbosePrints LogVerbosePrints
-	Context       *LogContext     `toml:",omitempty"`
+	Context       *LogContext `toml:",omitempty"`
 }
 
 type LogVerbosePrints struct {
