@@ -75,7 +75,7 @@ func ReadPendingCrossLinks(db DatabaseReader) ([]byte, error) {
 	return db.Get(pendingCrosslinkKey)
 }
 
-// CachePendingCrossLinks stores last pending crosslinks into database.
+// WritePendingCrossLinks stores last pending crosslinks into database.
 func WritePendingCrossLinks(db DatabaseWriter, bytes []byte) error {
 	return db.Put(pendingCrosslinkKey, bytes)
 }
