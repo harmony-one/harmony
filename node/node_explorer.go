@@ -35,12 +35,12 @@ var (
 
 // explorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Message) error {
-	parsedMsg, err := node.Consensus.ParseFBFTMessage(msg)
-	if err != nil {
-		return errors.New("failed to parse FBFT message")
-	}
-
 	if msg.Type == msg_pb.MessageType_COMMITTED {
+		parsedMsg, err := node.Consensus.ParseFBFTMessage(msg)
+		if err != nil {
+			return errors.New("failed to parse FBFT message")
+		}
+
 		node.Consensus.Mutex.Lock()
 		defer node.Consensus.Mutex.Unlock()
 
@@ -57,6 +57,11 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return errors.Wrap(err, "failed to catchup for explorer")
 		}
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
+		parsedMsg, err := node.Consensus.ParseFBFTMessage(msg)
+		if err != nil {
+			return errors.New("failed to parse FBFT message")
+		}
+
 		node.Consensus.Mutex.Lock()
 		defer node.Consensus.Mutex.Unlock()
 
