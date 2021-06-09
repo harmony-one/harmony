@@ -354,7 +354,7 @@ func (consensus *Consensus) Start(
 			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-				consensus.mutex.Lock()
+				consensus.Mutex.Lock()
 				if consensus.blockNum < consensus.Blockchain.CurrentHeader().Number().Uint64()+1 {
 					consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
@@ -373,7 +373,7 @@ func (consensus *Consensus) Start(
 					consensus.consensusTimeout[timeoutConsensus].Start()
 					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 				}
-				consensus.mutex.Unlock()
+				consensus.Mutex.Unlock()
 
 			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
 			case <-consensus.syncNotReadyChan:
@@ -461,13 +461,13 @@ type LastMileBlockIter struct {
 
 // GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
 func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64) (*LastMileBlockIter, error) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	if consensus.BlockVerifier == nil {
 		return nil, errors.New("consensus haven't initialized yet")
 	}
-	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
+	blocks, _, err := consensus.GetLastMileBlocksAndMsg(bnStart)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +498,8 @@ func (iter *LastMileBlockIter) Next() *types.Block {
 	return block
 }
 
-func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Block, []*FBFTMessage, error) {
+// GetLastMileBlocksAndMsg get last mile blocks and messages
+func (consensus *Consensus) GetLastMileBlocksAndMsg(bnStart uint64) ([]*types.Block, []*FBFTMessage, error) {
 	var (
 		blocks []*types.Block
 		msgs   []*FBFTMessage
@@ -616,7 +617,7 @@ func (consensus *Consensus) tryCatchup() error {
 	initBN := consensus.blockNum
 	defer consensus.postCatchup(initBN)
 
-	blks, msgs, err := consensus.getLastMileBlocksAndMsg(initBN)
+	blks, msgs, err := consensus.GetLastMileBlocksAndMsg(initBN)
 	if err != nil {
 		return errors.Wrapf(err, "[TryCatchup] Failed to get last mile blocks: %v", err)
 	}

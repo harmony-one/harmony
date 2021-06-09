@@ -122,6 +122,8 @@ type Node struct {
 	IsInSync      *abool.AtomicBool
 	proposedBlock map[uint64]*types.Block
 
+	explorerHelper *explorerHelper
+
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
 
@@ -1042,6 +1044,7 @@ func New(
 	nodeStringCounterVec.WithLabelValues("version", nodeconfig.GetVersion()).Inc()
 
 	node.serviceManager = service.NewManager()
+	node.explorerHelper = newExplorerHelper(&node)
 
 	return &node
 }

@@ -232,8 +232,8 @@ func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange {
 		return
 	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
@@ -344,8 +344,8 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
@@ -443,8 +443,8 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 // Or the validator will enter announce phase to wait for the new block proposed
 // from the new leader
 func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	consensus.Mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).

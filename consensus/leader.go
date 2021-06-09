@@ -27,10 +27,10 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 
 	//// Lock Write - Start
-	consensus.mutex.Lock()
+	consensus.Mutex.Lock()
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = encodedBlock
-	consensus.mutex.Unlock()
+	consensus.Mutex.Unlock()
 	//// Lock Write - End
 
 	key, err := consensus.GetConsensusLeaderPrivateKey()
@@ -108,8 +108,8 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	}
 
 	//// Read - Start
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
@@ -193,8 +193,8 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 	//// Read - Start
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
@@ -314,8 +314,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			time.Sleep(waitTime)
 			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
+			consensus.Mutex.Lock()
+			defer consensus.Mutex.Unlock()
 			if viewID == consensus.GetCurBlockViewID() {
 				consensus.finalCommit()
 			}

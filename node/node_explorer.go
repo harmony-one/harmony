@@ -5,12 +5,15 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
@@ -32,88 +35,36 @@ var (
 
 // explorerMessageHandler passes received message in node_handler to explorer service
 func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Message) error {
+	parsedMsg, err := node.Consensus.ParseFBFTMessage(msg)
+	if err != nil {
+		return errors.New("failed to parse FBFT message")
+	}
+
 	if msg.Type == msg_pb.MessageType_COMMITTED {
-		recvMsg, err := node.Consensus.ParseFBFTMessage(msg)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Msg("[Explorer] onCommitted unable to parse msg")
-			return err
+		node.Consensus.Mutex.Lock()
+		defer node.Consensus.Mutex.Unlock()
+
+		if err := node.explorerHelper.verifyCommittedMsg(parsedMsg); err != nil {
+			if err == errBlockNotReady {
+				utils.Logger().Info().Uint64("block number", parsedMsg.BlockNum).
+					Str("blockHash", parsedMsg.BlockHash.Hex()).
+					Msg("committed message received before prepared")
+				return nil
+			}
+			return errors.Wrap(err, "verify committed message for explorer")
 		}
-
-		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(
-			recvMsg.Payload, 0,
-		)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Msg("[Explorer] readSignatureBitmapPayload failed")
-			return err
+		if err := node.explorerHelper.tryCatchup(); err != nil {
+			return errors.Wrap(err, "failed to catchup for explorer")
 		}
-
-		if !node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
-			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
-			return nil
-		}
-
-		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
-
-		if block == nil {
-			utils.Logger().Info().
-				Uint64("msgBlock", recvMsg.BlockNum).
-				Msg("[Explorer] Haven't received the block before the committed msg")
-			node.Consensus.FBFTLog.AddVerifiedMessage(recvMsg)
-			return errBlockBeforeCommit
-		}
-
-		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
-			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
-		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
-			utils.Logger().
-				Error().Err(err).
-				Uint64("msgBlock", recvMsg.BlockNum).
-				Msg("[Explorer] Failed to verify the multi signature for commit phase")
-			return errFailVerifyMultiSign
-		}
-
-		block.SetCurrentCommitSig(recvMsg.Payload)
-		node.AddNewBlockForExplorer(block)
-		node.commitBlockForExplorer(block)
 	} else if msg.Type == msg_pb.MessageType_PREPARED {
+		node.Consensus.Mutex.Lock()
+		defer node.Consensus.Mutex.Unlock()
 
-		recvMsg, err := node.Consensus.ParseFBFTMessage(msg)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[Explorer] Unable to parse Prepared msg")
-			return err
+		if err := node.explorerHelper.verifyPreparedMsg(parsedMsg); err != nil {
+			return errors.Wrap(err, "verify prepared message for explorer")
 		}
-		block, blockObj := recvMsg.Block, &types.Block{}
-		if err := rlp.DecodeBytes(block, blockObj); err != nil {
-			utils.Logger().Error().Err(err).Msg("explorer could not rlp decode block")
-			return err
-		}
-		// Add the block into FBFT log.
-		node.Consensus.FBFTLog.AddBlock(blockObj)
-		// Try to search for MessageType_COMMITTED message from pbft log.
-		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(
-			msg_pb.MessageType_COMMITTED,
-			blockObj.NumberU64(),
-			blockObj.Hash(),
-		)
-		// If found, then add the new block into blockchain db.
-		if len(msgs) > 0 {
-			var committedMsg *consensus.FBFTMessage
-			for i := range msgs {
-				if blockObj.Hash() != msgs[i].BlockHash {
-					continue
-				}
-				committedMsg = msgs[i]
-				break
-			}
-			if committedMsg == nil {
-				utils.Logger().Error().Err(err).Msg("[Explorer] Failed finding a valid committed message.")
-				return errFailFindingValidCommit
-			}
-			blockObj.SetCurrentCommitSig(committedMsg.Payload)
-			node.AddNewBlockForExplorer(blockObj)
-			node.commitBlockForExplorer(blockObj)
+		if err := node.explorerHelper.tryCatchup(); err != nil {
+			return errors.Wrap(err, "failed to catchup for explorer")
 		}
 	}
 	return nil
@@ -272,4 +223,129 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 		}
 	}
 	return count, nil
+}
+
+var errBlockNotReady = errors.New("block not ready for committed message")
+
+type explorerHelper struct {
+	bc     *core.BlockChain
+	n      *Node
+	engine engine.Engine
+	c      *consensus.Consensus
+}
+
+func newExplorerHelper(n *Node) *explorerHelper {
+	return &explorerHelper{
+		bc:     n.Blockchain(),
+		n:      n,
+		engine: n.Blockchain().Engine(),
+		c:      n.Consensus,
+	}
+}
+
+// TODO: this is the copied code from c.OnCommitted. Refactor later.
+func (eh *explorerHelper) verifyCommittedMsg(recvMsg *consensus.FBFTMessage) error {
+	if recvMsg.BlockNum <= eh.bc.CurrentBlock().NumberU64() {
+		return errors.New("stale committed message received from pub-sub")
+	}
+	if curNumber := eh.bc.CurrentBlock().NumberU64(); recvMsg.BlockNum > curNumber+1 {
+		// TODO: also add trigger to stream downloader module
+		utils.Logger().Info().Uint64("received number", recvMsg.BlockNum).
+			Uint64("current number", curNumber).Msg("sync spin up on explorer committed")
+		select {
+		case eh.c.BlockNumLowChan <- struct{}{}:
+		default:
+		}
+	}
+	eh.c.FBFTLog.AddNotVerifiedMessage(recvMsg)
+
+	blockObj := eh.c.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		utils.Logger().Info().Uint64("blockNum", recvMsg.BlockNum).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("block not ready when handling committed message")
+		return errBlockNotReady
+	}
+	sigBytes, bitmap, err := chain.ParseCommitSigAndBitmap(recvMsg.Payload)
+	if err != nil {
+		return errors.Wrap(err, "unable to read signature bitmap payload")
+	}
+	if err := eh.c.Blockchain.Engine().VerifyHeaderSignature(eh.bc, blockObj.Header(),
+		sigBytes, bitmap); err != nil {
+		utils.Logger().Error().Uint64("blockNum", recvMsg.BlockNum).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("Failed to verify the multi signature for commit phase")
+		return err
+	}
+	eh.c.FBFTLog.AddVerifiedMessage(recvMsg)
+	return nil
+}
+
+// TODO: this is the copied code from c.OnPrepared. Refactor later.
+func (eh *explorerHelper) verifyPreparedMsg(recvMsg *consensus.FBFTMessage) error {
+	var blockObj *types.Block
+	if err := rlp.DecodeBytes(recvMsg.Block, &blockObj); err != nil {
+		return err
+	}
+	if blockObj.NumberU64() <= eh.bc.CurrentBlock().NumberU64() {
+		return errors.New("stale prepared message received from pub-sub")
+	}
+	if curNumber := eh.bc.CurrentBlock().NumberU64(); blockObj.NumberU64() > curNumber+1 {
+		// TODO: also add trigger to stream downloader module
+		utils.Logger().Info().Uint64("received number", recvMsg.BlockNum).
+			Uint64("current number", curNumber).Msg("sync spin up on explorer prepared")
+		select {
+		case eh.c.BlockNumLowChan <- struct{}{}:
+		default:
+		}
+	}
+
+	eh.c.FBFTLog.AddBlock(blockObj)
+
+	msgs := eh.c.FBFTLog.GetMessagesByTypeSeqHash(
+		msg_pb.MessageType_COMMITTED,
+		blockObj.NumberU64(),
+		blockObj.Hash(),
+	)
+	// If found, then add the new block into blockchain db.
+	if len(msgs) > 0 {
+		var committedMsg *consensus.FBFTMessage
+		for i := range msgs {
+			if blockObj.Hash() != msgs[i].BlockHash {
+				continue
+			}
+			committedMsg = msgs[i]
+			break
+		}
+		if committedMsg == nil {
+			return nil
+		}
+		if err := eh.verifyCommittedMsg(committedMsg); err != nil {
+			return errors.Wrap(err, "failed to verify committed message as paired prepared msg")
+		}
+	}
+	return nil
+}
+
+func (eh *explorerHelper) tryCatchup() error {
+	initBN := eh.bc.CurrentBlock().NumberU64() + 1
+	blks, msgs, err := eh.c.GetLastMileBlocksAndMsg(initBN)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to get last mile blocks")
+	}
+	for i := range blks {
+		blk, msg := blks[i], msgs[i]
+		if blk == nil {
+			return nil
+		}
+		if !msg.Verified {
+			if err := eh.verifyCommittedMsg(msg); err != nil {
+				return errors.New("failed to verify committed message")
+			}
+		}
+		blk.SetCurrentCommitSig(msg.Payload)
+		eh.n.AddNewBlockForExplorer(blk)
+		eh.n.commitBlockForExplorer(blk)
+	}
+	return nil
 }

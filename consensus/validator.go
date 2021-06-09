@@ -36,8 +36,8 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -98,8 +98,8 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
@@ -228,8 +228,8 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
+	consensus.Mutex.Lock()
+	defer consensus.Mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).

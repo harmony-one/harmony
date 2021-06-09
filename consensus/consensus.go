@@ -80,8 +80,8 @@ type Consensus struct {
 	ShardID uint32
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
-	// consensus mutex
-	mutex sync.Mutex
+	// consensus Mutex
+	Mutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
