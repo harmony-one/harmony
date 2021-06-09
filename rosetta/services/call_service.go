@@ -8,6 +8,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 	rpc2 "github.com/harmony-one/harmony/rpc"
 	"github.com/pkg/errors"
@@ -81,12 +82,12 @@ func (c *CallAPIService) Call(
 
 }
 
-func NewCallAPIService(hmy *hmy.Harmony) server.CallAPIServicer {
+func NewCallAPIService(hmy *hmy.Harmony, limiterEnable bool, rateLimit int) server.CallAPIServicer {
 	return &CallAPIService{
 		hmy:                 hmy,
 		publicContractAPI:   rpc2.NewPublicContractAPI(hmy, rpc2.V2),
 		publicStakingAPI:    rpc2.NewPublicStakingAPI(hmy, rpc2.V2),
-		publicBlockChainAPI: rpc2.NewPublicBlockchainAPI(hmy, rpc2.V2),
+		publicBlockChainAPI: rpc2.NewPublicBlockchainAPI(hmy, rpc2.V2, limiterEnable, rateLimit),
 	}
 }
 
@@ -286,7 +287,16 @@ func (c *CallAPIService) getDelegationsByDelegatorByBlockNumber(
 			"message": errors.WithMessage(err, "invalid parameters").Error(),
 		})
 	}
-	resp, err := stakingAPI.GetDelegationsByDelegatorByBlockNumber(ctx, args.DelegatorAddr, rpc2.BlockNumber(args.BlockNum))
+
+	addr, err := internal_common.Bech32ToAddress(args.DelegatorAddr)
+	if err != nil {
+		return nil, common.NewError(common.ErrCallParametersInvalid, map[string]interface{}{
+			"message": errors.WithMessage(err, "delegator address error").Error(),
+		})
+	}
+
+	addOrList := rpc2.AddressOrList{Address: &addr}
+	resp, err := stakingAPI.GetDelegationsByDelegatorByBlockNumber(ctx, addOrList, rpc2.BlockNumber(args.BlockNum))
 	if err != nil {
 		return nil, common.NewError(common.ErrGetStakingInfo, map[string]interface{}{
 			"message": errors.WithMessage(err, "get delegations by delegator and number error").Error(),

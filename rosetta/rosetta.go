@@ -24,7 +24,7 @@ var listener net.Listener
 
 // StartServers starts the rosetta http server
 // TODO (dm): optimize rosetta to use single flight & use extra caching type DB to avoid re-processing data
-func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error {
+func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig, limiterEnable bool, rateLimit int) error {
 	if !config.HTTPEnabled {
 		utils.Logger().Info().Msg("Rosetta http server disabled...")
 		return nil
@@ -43,7 +43,7 @@ func StartServers(hmy *hmy.Harmony, config nodeconfig.RosettaServerConfig) error
 		return err
 	}
 
-	router := recoverMiddleware(server.CorsMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy))))
+	router := recoverMiddleware(server.CorsMiddleware(loggerMiddleware(getRouter(serverAsserter, hmy, limiterEnable, rateLimit))))
 	utils.Logger().Info().
 		Int("port", config.HTTPPort).
 		Str("ip", config.HTTPIp).
@@ -77,14 +77,14 @@ func newHTTPServer(handler http.Handler) *http.Server {
 	}
 }
 
-func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony) http.Handler {
+func getRouter(asserter *asserter.Asserter, hmy *hmy.Harmony, limiterEnable bool, rateLimit int) http.Handler {
 	return server.NewRouter(
 		server.NewAccountAPIController(services.NewAccountAPI(hmy), asserter),
 		server.NewBlockAPIController(services.NewBlockAPI(hmy), asserter),
 		server.NewMempoolAPIController(services.NewMempoolAPI(hmy), asserter),
 		server.NewNetworkAPIController(services.NewNetworkAPI(hmy), asserter),
 		server.NewConstructionAPIController(services.NewConstructionAPI(hmy), asserter),
-		server.NewCallAPIController(services.NewCallAPIService(hmy), asserter),
+		server.NewCallAPIController(services.NewCallAPIService(hmy, limiterEnable, rateLimit), asserter),
 	)
 }
 
