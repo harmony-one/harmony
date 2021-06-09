@@ -624,7 +624,8 @@ func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTask
 			Err(errors.New("unexpected number of block delivered")).
 			Int("expect", len(tasks)).
 			Int("got", len(payload))
-		failedTasks = append(failedTasks, tasks[len(payload):]...)
+		// Temporarily accept less blocks in the response.
+		//failedTasks = append(failedTasks, tasks[len(payload):]...)
 	}
 
 	for i, blockBytes := range payload {
