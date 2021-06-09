@@ -135,7 +135,7 @@ var (
 		logContextIPFlag,
 		logContextPortFlag,
 		logVerbosityFlag,
-		verbosePrintsFlag,
+		logVerbosePrintsFlag,
 		legacyVerbosityFlag,
 
 		legacyLogFolderFlag,
@@ -996,9 +996,10 @@ var (
 		Usage:     "logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail",
 		DefValue:  defaultConfig.Log.Verbosity,
 	}
-	verbosePrintsFlag = cli.StringSliceFlag{
-		Name:  "verbose-prints",
-		Usage: "verbose prints, available options: config",
+	logVerbosePrintsFlag = cli.StringSliceFlag{
+		Name:      "log.verbose-prints",
+		Usage:     "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
+		DefValue:  []string{},
 	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{
@@ -1056,13 +1057,9 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, legacyVerbosityFlag)
 	}
 
-	if cli.IsFlagChanged(cmd, verbosePrintsFlag) {
-		verbosePrintsSlice := cli.GetStringSliceFlagValue(cmd, verbosePrintsFlag)
-		verbosePrintsMap := make(map[string]bool, 0)
-		for _, verbosePrint := range verbosePrintsSlice {
-			verbosePrintsMap[verbosePrint] = true
-		}
-		config.Log.VerbosePrints = verbosePrintsMap
+	if cli.IsFlagChanged(cmd, logVerbosePrintsFlag) {
+		verbosePrintsFlagSlice := cli.GetStringSliceFlagValue(cmd, logVerbosePrintsFlag)
+		config.Log.VerbosePrints = harmonyconfig.FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice)
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {

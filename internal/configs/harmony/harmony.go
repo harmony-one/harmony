@@ -1,5 +1,10 @@
 package harmony
 
+import (
+	"reflect"
+	"strings"
+)
+
 // HarmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
@@ -90,8 +95,26 @@ type LogConfig struct {
 	FileName      string
 	RotateSize    int
 	Verbosity     int
-	VerbosePrints map[string]bool `toml:",omitempty"`
+	VerbosePrints LogVerbosePrints
 	Context       *LogContext     `toml:",omitempty"`
+}
+
+type LogVerbosePrints struct {
+	Config bool
+}
+
+func FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice []string) LogVerbosePrints {
+	verbosePrints := LogVerbosePrints{}
+	verbosePrintsReflect := reflect.Indirect(reflect.ValueOf(&verbosePrints))
+	for _, verbosePrint := range verbosePrintsFlagSlice {
+		verbosePrint = strings.Title(verbosePrint)
+		field := verbosePrintsReflect.FieldByName(verbosePrint)
+		if field.IsValid() && field.CanSet() {
+			field.SetBool(true)
+		}
+	}
+
+	return verbosePrints
 }
 
 type LogContext struct {

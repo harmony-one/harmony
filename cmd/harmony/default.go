@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.0.0"
+const tomlConfigVersion = "2.1.0"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -71,6 +71,9 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		FileName:   "harmony.log",
 		RotateSize: 100,
 		Verbosity:  3,
+		VerbosePrints: harmonyconfig.LogVerbosePrints{
+			Config: false,
+		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
 }

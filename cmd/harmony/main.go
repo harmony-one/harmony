@@ -382,7 +382,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
-	if val, ok := hc.Log.VerbosePrints["config"]; ok && val {
+	if hc.Log.VerbosePrints.Config {
 		utils.Logger().Info().Interface("config", rpc_common.Config{
 			HarmonyConfig: hc,
 			NodeConfig:    *nodeConfig,

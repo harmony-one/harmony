@@ -157,4 +157,14 @@ func init() {
 		confTree.Set("Version", "2.0.0")
 		return confTree
 	}
+
+	migrations["2.0.0"] = func(confTree *toml.Tree) *toml.Tree {
+		// Legacy conf missing fields
+		if confTree.Get("Log.VerbosePrints") == nil {
+			confTree.Set("Log.VerbosePrints", defaultConfig.Log.VerbosePrints)
+		}
+
+		confTree.Set("Version", "2.1.0")
+		return confTree
+	}
 }
