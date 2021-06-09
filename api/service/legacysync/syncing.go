@@ -42,7 +42,7 @@ const (
 	NumPeersLowBound  = 3
 	numPeersHighBound = 5
 
-	downloadTaskBatch = 30
+	downloadTaskBatch = 15
 )
 
 // SyncPeerConfig is peer config to sync.
