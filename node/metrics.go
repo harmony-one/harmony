@@ -61,7 +61,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "p2p",
-			Name:      "msg_rate_limited",
+			Name:      "rate_limited_msg",
 			Help:      "number of pub-sub message rejected and dropped due to rate limit",
 		},
 		[]string{
@@ -74,7 +74,7 @@ var (
 		prometheus.CounterOpts{
 			Namespace: "hmy",
 			Subsystem: "p2p",
-			Name:      "rate_limited",
+			Name:      "rate_blacklisted",
 			Help:      "number of pub-sub message rejected and dropped since the sender is blacklisted",
 		},
 		[]string{
@@ -93,6 +93,8 @@ func initMetrics() {
 			nodeP2PMessageCounterVec,
 			nodeConsensusMessageCounterVec,
 			nodeNodeMessageCounterVec,
+			rateLimitRejectedCounterVec,
+			blacklistRejectedCounterVec,
 		)
 	})
 }
