@@ -688,6 +688,7 @@ func (node *Node) StartPubSub() error {
 				if !rateLimiter.Allow(peer) {
 					// TODO: it would be better to have a cool down and ignored before directly go to blacklist
 					rateLimitRejectedCounterVec.With(prometheus.Labels{"topic": topicNamed}).Inc()
+
 					blacklist.Add(peer)
 					return libp2p_pubsub.ValidationReject
 				}

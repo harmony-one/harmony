@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	pubSubRateLimit  = 5  // 5 messages per second
-	pubSubBurstLimit = 10 // 10 messages at burst
+	pubSubRateLimit  = 10 // 10 messages per second
+	pubSubBurstLimit = 20 // 20 messages at burst
 )
 
 // Preconfigured internal nodes
