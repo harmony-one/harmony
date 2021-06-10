@@ -375,7 +375,7 @@ var (
 	errInvalidShard      = errors.New("invalid shard")
 )
 
-const beaconBlockHeightTolerance = 1
+const beaconBlockHeightTolerance = 2
 
 // validateNodeMessage validate node message
 func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
@@ -416,7 +416,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			curBeaconHeight := node.Beaconchain().CurrentBlock().NumberU64()
 			for _, block := range blocks {
 				// Ban blocks number that is smaller than tolerance
-				if block.NumberU64()+beaconBlockHeightTolerance < curBeaconHeight {
+				if block.NumberU64()+beaconBlockHeightTolerance <= curBeaconHeight {
 					return nil, 0, errors.New("beacon block height smaller than current height. Banned")
 				} else if block.NumberU64() <= curBeaconHeight {
 					return nil, 0, errIgnoreBeaconMsg
