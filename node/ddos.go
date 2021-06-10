@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	pubSubRateLimit  = 3  // 3 messages per second
+	pubSubRateLimit  = 5  // 5 messages per second
 	pubSubBurstLimit = 10 // 10 messages at burst
 )
 

@@ -65,7 +65,6 @@ var (
 			Help:      "number of pub-sub message rejected and dropped due to rate limit",
 		},
 		[]string{
-			"peer",
 			"topic",
 		},
 	)
@@ -78,7 +77,6 @@ var (
 			Help:      "number of pub-sub message rejected and dropped since the sender is blacklisted",
 		},
 		[]string{
-			"peer",
 			"topic",
 		},
 	)
