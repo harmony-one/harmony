@@ -422,7 +422,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Info().Uint64("receivedNum", block.NumberU64()).
-						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ginored")
+						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
 					return nil, 0, errIgnoreBeaconMsg
 				}
 			}
