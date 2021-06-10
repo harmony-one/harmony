@@ -218,14 +218,18 @@ func (node *Node) doBeaconSyncing() {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
 			for beaconBlock := range node.BeaconBlockChannel {
 				if node.beaconSync != nil {
-					err := node.beaconSync.UpdateBlockAndStatus(
-						beaconBlock, node.Beaconchain(), true,
-					)
-					if err != nil {
-						node.beaconSync.AddLastMileBlock(beaconBlock)
-					} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-						// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
-						node.BroadcastCrossLink()
+					if beaconBlock.NumberU64() >= node.Beaconchain().CurrentBlock().NumberU64()+1 {
+						err := node.beaconSync.UpdateBlockAndStatus(
+							beaconBlock, node.Beaconchain(), true,
+						)
+						if err != nil {
+							node.beaconSync.AddLastMileBlock(beaconBlock)
+						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
+							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
+							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
+								node.BroadcastCrossLink()
+							}
+						}
 					}
 				}
 			}
