@@ -262,9 +262,13 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	//// Write - Start
 	// Check for potential double signing
-	if consensus.checkDoubleSign(recvMsg) {
-		return
-	}
+
+	// FIXME (leo): failed view change, will comeback later
+	/*
+		if consensus.checkDoubleSign(recvMsg) {
+			return
+		}
+	*/
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.Commit, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,
