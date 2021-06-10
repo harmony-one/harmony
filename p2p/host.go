@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/protocol"
 
@@ -45,6 +46,7 @@ type Host interface {
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	PubSub() *libp2p_pubsub.PubSub
+	Blacklist() libp2p_pubsub.Blacklist
 	C() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
 	ListPeer(topic string) []libp2p_peer.ID
@@ -70,6 +72,8 @@ const (
 	MaxMessageHandlers = SetAsideForConsensus + SetAsideOtherwise
 	// MaxMessageSize is 2Mb
 	MaxMessageSize = 1 << 21
+
+	blacklistExpiry = 5 * time.Minute // blacklist expires 5 minutes
 )
 
 // HostConfig is the config structure to create a new host
@@ -111,6 +115,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
+	blacklist, _ := libp2p_pubsub.NewTimeCachedBlacklist(blacklistExpiry)
+
 	options := []libp2p_pubsub.Option{
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
 		libp2p_pubsub.WithValidateQueueSize(512),
@@ -122,6 +128,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p_pubsub.WithValidateThrottle(MaxMessageHandlers),
 		libp2p_pubsub.WithMaxMessageSize(MaxMessageSize),
 		libp2p_pubsub.WithDiscovery(disc.GetRawDiscovery()),
+		libp2p_pubsub.WithBlacklist(blacklist),
 	}
 
 	traceFile := os.Getenv("P2P_TRACEFILE")
@@ -162,6 +169,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		priKey:    key,
 		discovery: disc,
 		logger:    &subLogger,
+		blacklist: blacklist,
 		ctx:       ctx,
 		cancel:    cancel,
 	}
@@ -185,7 +193,7 @@ type HostV2 struct {
 	lock         sync.Mutex
 	discovery    discovery.Discovery
 	logger       *zerolog.Logger
-	blocklist    libp2p_pubsub.Blacklist
+	blacklist    libp2p_pubsub.Blacklist
 	ctx          context.Context
 	cancel       func()
 }
@@ -227,6 +235,11 @@ func (host *HostV2) C() (int, int, int) {
 		}
 	}
 	return len(peers), connected, not
+}
+
+// Blacklist return the blacklist of the host
+func (host *HostV2) Blacklist() libp2p_pubsub.Blacklist {
+	return host.blacklist
 }
 
 // AddStreamProtocol adds the stream protocols to the host to be started and closed

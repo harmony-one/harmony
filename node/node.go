@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -581,6 +580,11 @@ var (
 func (node *Node) StartPubSub() error {
 	node.psCtx, node.psCancel = context.WithCancel(context.Background())
 
+	var (
+		rateLimiter = newPSRateLimiter()
+		blacklist   = newBlacklist(node.host.Blacklist())
+	)
+
 	// groupID and whether this topic is used for consensus
 	type t struct {
 		tp    nodeconfig.GroupID
@@ -675,6 +679,19 @@ func (node *Node) StartPubSub() error {
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
 				nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
+
+				// blacklist is already registered in pub-sub. This is used for more customized blacklist logic.
+				if blacklist.Contains(peer) {
+					blacklistRejectedCounterVec.With(prometheus.Labels{"peer": string(peer)}).Inc()
+					return libp2p_pubsub.ValidationReject
+				}
+				if !rateLimiter.Allow(peer) {
+					// TODO: it would be better to have a cool down and ignored before directly go to blacklist
+					rateLimitRejectedCounterVec.With(prometheus.Labels{"peer": string(peer)}).Inc()
+					blacklist.Add(peer)
+					return libp2p_pubsub.ValidationReject
+				}
+
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message

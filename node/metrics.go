@@ -56,6 +56,31 @@ var (
 			"type",
 		},
 	)
+
+	rateLimitRejectedCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "p2p",
+			Name:      "msg_rate_limited",
+			Help:      "number of pub-sub message rejected and dropped due to rate limit",
+		},
+		[]string{
+			"peer",
+		},
+	)
+
+	blacklistRejectedCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "p2p",
+			Name:      "rate_limited",
+			Help:      "number of pub-sub message rejected and dropped since the sender is blacklisted",
+		},
+		[]string{
+			"peer",
+		},
+	)
+
 	onceMetrics sync.Once
 )
 
