@@ -66,6 +66,7 @@ var (
 		},
 		[]string{
 			"peer",
+			"topic",
 		},
 	)
 
@@ -78,6 +79,7 @@ var (
 		},
 		[]string{
 			"peer",
+			"topic",
 		},
 	)
 
