@@ -407,7 +407,7 @@ func (vc *viewChange) InitPayload(
 		if preparedMsg != nil {
 			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
 				if err := vc.verifyBlock(preparedBlock); err == nil {
-					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Msg("[InitPayload] add my M1 (prepared) type messaage")
+					vc.getLogger().Info().Uint64("viewID", viewID).Uint64("blockNum", blockNum).Int("size", binary.Size(preparedBlock)).Msg("[InitPayload] add my M1 (prepared) type messaage")
 					msgToSign := append(preparedMsg.BlockHash[:], preparedMsg.Payload...)
 					for _, key := range privKeys {
 						// update the dictionary key if the viewID is first time received
