@@ -682,12 +682,12 @@ func (node *Node) StartPubSub() error {
 
 				// blacklist is already registered in pub-sub. This is used for more customized blacklist logic.
 				if blacklist.Contains(peer) {
-					blacklistRejectedCounterVec.With(prometheus.Labels{"peer": string(peer), "topic": topicNamed}).Inc()
+					blacklistRejectedCounterVec.With(prometheus.Labels{"peer": peer.String(), "topic": topicNamed}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
 				if !rateLimiter.Allow(peer) {
 					// TODO: it would be better to have a cool down and ignored before directly go to blacklist
-					rateLimitRejectedCounterVec.With(prometheus.Labels{"peer": string(peer), "topic": topicNamed}).Inc()
+					rateLimitRejectedCounterVec.With(prometheus.Labels{"peer": peer.String(), "topic": topicNamed}).Inc()
 					blacklist.Add(peer)
 					return libp2p_pubsub.ValidationReject
 				}
