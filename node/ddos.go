@@ -22,7 +22,41 @@ const (
 
 // Preconfigured internal nodes
 // TODO: replace all internal node peer ID here
-var trustedPeers []libp2p_peer.ID
+var trustedPeers = []libp2p_peer.ID{
+	"Qme6wYYAXd53FCjB5vQdcDUPuNLsSLDzgU8xUowfgaeyCk",
+	"QmYbvZNqVkQK21B75agEYVgKZJXQmEVsq39EfuvMZtme6Q",
+	"QmUkHXAxqUSPaZ2SFXoF1bVPS7CGJax1FqiDGbfBPFFGPJ",
+	"QmcXfk9W2oEnQWACoFpRaoK9xjrmrtZJPTesJaNqrgc7NF",
+	"QmUZ5S9BFA3ZzaVJ1FcTHyhCG8Fjkw1DWms8z6EHKeJYPz",
+	"QmZSBKVCY3BQKPhPb6BvwdJgv48PpyxdQKHfWHzSJQERFZ",
+	"QmeaCoaVjAgt3i1HUk7WnnGSckKvpxKMApriFvtNvgCQtW",
+	"QmQb1ALhFoEfNFWXSDn2QuS19fsCkZxc8qyGMk4mwfbAi3",
+	"QmTRcgyARZKvia7NzoQgzQgi8KLjwVCcqRWc4sXmcZ4Xp1",
+	"QmQ7fWBuqAmtaG2pozE2n5rPd6bBdvhhneTfeFSbsMSTY9",
+	"QmTrCwSG67mHaoJdv4rWPQbTP9H7BWEKLAsZp85XJqJt8t",
+	"QmWPgidDQpE8teJtqp7N56bj6HttJgvph4C39UVrtkqRTd",
+	"QmSGGt6DRcaJutDci7hP7fmSsgMm61ZbrWnimt7qezpEes",
+	"QmV3v6vhGWmsNrrgbDYqi1PEj58M3QwJ2p7TZwNfM3Btq2",
+	"QmapawakHjFvzK8jtki2dhn2xsW7sx53FsaVjBk7SDtrVZ",
+	"QmXGRV9emo4AZRPqzT2NFJLbkVsfprrGFPMBjyzLTUp2Ne",
+	"QmZCEd9N4G38LMeX3FaDHwdtFsc3gsLbdP9ZCf5oGHpVh7",
+	"QmfWhSdXijFqnBWVTTuzyh4xQwUmDveBSftSprLe5j1H1S",
+	"QmSYHkxMTKXsxrx9Gf53E75K5HorEunHbYG2NehrErfj79",
+	"QmVyEaZafK4a2eagrA5XnT3Y6tihM7iuRyUEpnXk8oHNK6",
+	"QmWNWwD1MCdy4JJqCBfe4rtsSrYkciF4fjPBrMDFh5QFJ3",
+	"QmbxTnbxiiHmuanQuHo25EHFzbJMR1YJWN8mp6bNdKzr2Y",
+	"QmNqvByPqNccFGNA4Znt5eKxoeBXtS5VMWwj1UH2FcTMEh",
+	"QmXhYD6uVTsCLJq44nJSEBkEHwNHCKoowA3NL9RtYZqigz",
+	"QmNkbrtbyJtFZtfdumkJkSzK9oiY1Xu3vVpBMyxXLxKhkp",
+	"QmbSFi1zGwyxJ9VuFuzNbvvrytHqMaxyrR6ha5TPmZxWE9",
+	"QmRgquDUnwW5rCC49iwore86msVsARRZRdTbdiL3iVzHij",
+	"QmTGh5UeGE2EqoEYz3pDKbE1nRSCho3yu4aZBWaCH4VwQ2",
+	"QmQPVKmzvt3Ctt4jfpxM1kprtDRS1AjWVPMxLUfEUwv4yG",
+	"QmWoW9HzC72Ufvg73tm2iQhUM67H4C48hujMSDLFpey62s",
+	"QmdkWrKour5DC8XYFMo7df4THPcw6pcmrvLrcTnGaDehTj",
+	"QmS2GkF9yrFD5MMa5XTpSX57iCMSCmUrbgzKzLJUpboRq5",
+	"QmefubgDnMmPKYpwpHyS41XXuMEkiKDLvfTpwY6RFEXqCX",
+}
 
 func getDefaultTrustedPeerMap() map[libp2p_peer.ID]struct{} {
 	peerMap := make(map[libp2p_peer.ID]struct{})
