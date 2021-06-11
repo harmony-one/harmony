@@ -40,6 +40,7 @@ type Host interface {
 	GetP2PHost() libp2p_host.Host
 	GetDiscovery() discovery.Discovery
 	GetPeerCount() int
+	GetPeerInfo(id libp2p_peer.ID) libp2p_peer.AddrInfo
 	ConnectHostPeer(Peer) error
 	// AddStreamProtocol add the given protocol
 	AddStreamProtocol(protocols ...sttypes.Protocol)
@@ -333,6 +334,11 @@ func (host *HostV2) GetID() libp2p_peer.ID {
 // GetSelfPeer gets self peer
 func (host *HostV2) GetSelfPeer() Peer {
 	return host.self
+}
+
+// GetPeerInfo gets the peer info
+func (host *HostV2) GetPeerInfo(id libp2p_peer.ID) libp2p_peer.AddrInfo {
+	return host.h.Peerstore().PeerInfo(id)
 }
 
 // GetP2PHost returns the p2p.Host
