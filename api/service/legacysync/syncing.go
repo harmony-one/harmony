@@ -29,7 +29,7 @@ import (
 
 // Constants for syncing.
 const (
-	downloadBlocksRetryLimit        = 5 // downloadBlocks service retry limit
+	downloadBlocksRetryLimit        = 10 // downloadBlocks service retry limit
 	RegistrationNumber              = 3
 	SyncingPortDifference           = 3000
 	inSyncThreshold                 = 0   // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
