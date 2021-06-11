@@ -472,8 +472,8 @@ func TestBlacklistedTransactions(t *testing.T) {
 	goodFromAcc, _ := deriveSender(goodTx)
 
 	// Fund from accounts
-	pool.currentState.AddBalance(bannedFromAcc, big.NewInt(50100))
-	pool.currentState.AddBalance(goodFromAcc, big.NewInt(50100))
+	pool.currentState.AddBalance(bannedFromAcc, big.NewInt(50100000000000))
+	pool.currentState.AddBalance(goodFromAcc, big.NewInt(50100000000000))
 
 	DefaultTxPoolConfig.Blacklist[bannedToAcc] = struct{}{}
 	err := pool.AddRemotes(types.PoolTransactions{badTx})
@@ -815,7 +815,7 @@ func TestTransactionPostponing(t *testing.T) {
 		keys[i], _ = crypto.GenerateKey()
 		accs[i] = crypto.PubkeyToAddress(keys[i].PublicKey)
 
-		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(50100))
+		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(50100000000000))
 	}
 	// Add a batch consecutive pending transactions for validation
 	txs := types.PoolTransactions{}
@@ -1067,10 +1067,10 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	pool.currentState.AddBalance(crypto.PubkeyToAddress(remote.PublicKey), big.NewInt(1000000000))
 
 	// Add the two transactions and ensure they both are queued up
-	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(1), local)); err != nil {
+	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(1000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 1, 100000, big.NewInt(1), remote)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(0, 1, 100000, big.NewInt(1000000000), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	pending, queued := pool.Stats()
@@ -1131,7 +1131,7 @@ func testTransactionLimitingEquivalency(t *testing.T, origin uint64) {
 	defer pool2.Stop()
 
 	account2, _ := deriveSender(transaction(0, 0, 0, key2))
-	pool2.currentState.AddBalance(account2, big.NewInt(1000000))
+	pool2.currentState.AddBalance(account2, big.NewInt(1000000000000000))
 
 	txs := types.PoolTransactions{}
 	for i := uint64(0); i < testTxPoolConfig.AccountQueue+5; i++ {
