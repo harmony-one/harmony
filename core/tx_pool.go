@@ -691,10 +691,6 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if pool.currentMaxGas < tx.GasLimit() {
 		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.GasLimit())
 	}
-	// Ensure the transaction doesn't exceed the current block limit gas.
-	if pool.currentMaxGas < tx.GasLimit() {
-		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.GasLimit())
-	}
 	// Make sure the transaction is signed properly
 	from, err := tx.SenderAddress()
 	if err != nil {
