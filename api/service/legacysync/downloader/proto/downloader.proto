@@ -32,6 +32,7 @@ message DownloaderRequest {
   uint32 size = 7;
   bool registerWithSig = 8; // Expect to have NEWBLOCK response of block along with current signature
   bool getBlocksWithSig = 9; // Have block along with signature for BLOCK request.
+  uint64 softSizeCap = 10; // soft cap for response message size for BLOCK request. This is to avoid a response with too much data.
 }
 
 // DownloaderResponse is the generic response of DownloaderRequest.

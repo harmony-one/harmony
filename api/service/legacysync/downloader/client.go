@@ -10,6 +10,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+// defaultSoftCapSize is the default value for size cap of response of BLOCK request.
+// Returned response is capped at 1MB. One exception is that if there is one block greater
+// than 1MB, the block is also returned of data size >1MB.
+const defaultSoftCapSize = 1 * 1024 * 1024
+
 // Client is the client model for downloader package.
 type Client struct {
 	dlClient pb.DownloaderClient
@@ -95,7 +100,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK, GetBlocksWithSig: true}
+	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK, GetBlocksWithSig: true, SoftSizeCap: defaultSoftCapSize}
 	request.Hashes = make([][]byte, len(hashes))
 	for i := range hashes {
 		request.Hashes[i] = make([]byte, len(hashes[i]))
