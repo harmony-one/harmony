@@ -93,7 +93,7 @@ func (client *Client) GetBlocks(hashes [][]byte) *pb.DownloaderResponse {
 
 // GetBlocksAndSigs get blockWithSig in serialization byte array by calling a grpc request
 func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{Type: pb.DownloaderRequest_BLOCK, GetBlocksWithSig: true}
 	request.Hashes = make([][]byte, len(hashes))
