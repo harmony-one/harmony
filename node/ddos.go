@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/abool"
+	"github.com/harmony-one/harmony/p2p"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2p_pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"golang.org/x/time/rate"
@@ -107,7 +108,10 @@ type blacklist struct {
 	trustedPeers map[libp2p_peer.ID]struct{} // Currently fixed after initialization
 }
 
-func newBlacklist(raw libp2p_pubsub.Blacklist) *blacklist {
+// TODO: use hostV2.Blacklist() after this issue (https://github.com/libp2p/go-libp2p-pubsub/issues/426)
+//       is fixed.
+func newBlacklist() *blacklist {
+	raw, _ := libp2p_pubsub.NewTimeCachedBlacklist(p2p.BlacklistExpiry)
 	return &blacklist{
 		bl:           raw,
 		trustedPeers: getDefaultTrustedPeerMap(),

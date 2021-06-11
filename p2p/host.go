@@ -73,7 +73,7 @@ const (
 	// MaxMessageSize is 2Mb
 	MaxMessageSize = 1 << 21
 
-	blacklistExpiry = 5 * time.Minute // blacklist expires 5 minutes
+	BlacklistExpiry = 5 * time.Minute // blacklist expires 5 minutes
 )
 
 // HostConfig is the config structure to create a new host
@@ -115,7 +115,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
-	blacklist, _ := libp2p_pubsub.NewTimeCachedBlacklist(blacklistExpiry)
+	blacklist, _ := libp2p_pubsub.NewTimeCachedBlacklist(BlacklistExpiry)
 
 	options := []libp2p_pubsub.Option{
 		// WithValidateQueueSize sets the buffer of validate queue. Defaults to 32. When queue is full, validation is throttled and new messages are dropped.
@@ -238,6 +238,8 @@ func (host *HostV2) C() (int, int, int) {
 }
 
 // Blacklist return the blacklist of the host
+// TODO: Currently because of a libp2p bug, this option is not used. Make use of this blacklist later
+//       See https://github.com/libp2p/go-libp2p-pubsub/issues/426
 func (host *HostV2) Blacklist() libp2p_pubsub.Blacklist {
 	return host.blacklist
 }
