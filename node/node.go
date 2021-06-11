@@ -804,6 +804,14 @@ func (node *Node) StartPubSub() error {
 		semConsensus := semaphore.NewWeighted(p2p.SetAsideForConsensus)
 		msgChanConsensus := make(chan validated, MsgChanBuffer)
 
+		go func() {
+			select {
+			case <-node.psCtx.Done():
+			case <-time.After(rateLimiterEasyPeriod):
+				rateLimiter.Start()
+			}
+		}()
+
 		// goroutine to handle consensus messages
 		go func() {
 			for {
