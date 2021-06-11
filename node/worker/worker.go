@@ -562,7 +562,7 @@ func New(
 	header := worker.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
-		GasLimit(core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
+		GasLimit(worker.gasFloor). //core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
 		Time(big.NewInt(timestamp)).
 		ShardID(worker.chain.ShardID()).
 		Header()

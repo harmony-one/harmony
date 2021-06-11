@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	//MaxPoolTransactionDataSize is a heuristic data limit for DOS prevention 1.25Mb
-	MaxPoolTransactionDataSize = 1280 * 1024
+	//MaxP2PNodeDataSize is a 1.25Mb heuristic data limit for DOS prevention on node message
+	MaxP2PNodeDataSize = 1280 * 1024
+	//MaxPoolTransactionDataSize is a 128KB heuristic data limit for DOS prevention on txn
+	MaxPoolTransactionDataSize = 128 * 1024
 	//MaxEncodedPoolTransactionSize is a heuristic raw/encoded data size limit. It has an additional 10KB for metadata
 	MaxEncodedPoolTransactionSize = MaxPoolTransactionDataSize + (10 * 1024)
 )

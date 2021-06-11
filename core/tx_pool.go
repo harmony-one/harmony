@@ -170,7 +170,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit: 1,
+	PriceLimit: 1e9, // 1 Gwei/Nano
 	PriceBump:  10,
 
 	AccountSlots: 16,
@@ -686,6 +686,10 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	// transactions but may occur if you create a transaction using the RPC.
 	if tx.Value().Sign() < 0 {
 		return errors.WithMessagef(ErrNegativeValue, "transaction value is %s", tx.Value().String())
+	}
+	// Ensure the transaction doesn't exceed the current block limit gas.
+	if pool.currentMaxGas < tx.GasLimit() {
+		return errors.WithMessagef(ErrGasLimit, "transaction gas is %d", tx.GasLimit())
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
 	if pool.currentMaxGas < tx.GasLimit() {
