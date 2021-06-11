@@ -133,7 +133,7 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 }
 
 func transaction(shardID uint32, nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) types.PoolTransaction {
-	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(1), key)
+	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(1000000000), key)
 }
 
 func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) types.PoolTransaction {
