@@ -403,10 +403,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
-			// only non-beacon nodes process the beacon block sync messages
-			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
-				return nil, 0, errIgnoreBeaconMsg
-			}
+
 			// checks whether the beacon block is larger than current block number
 			blocksPayload := payload[p2pNodeMsgPrefixSize+1:]
 			var blocks []*types.Block
@@ -425,6 +422,11 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
 					return nil, 0, errIgnoreBeaconMsg
 				}
+			}
+
+			// only non-beacon nodes process the beacon block sync messages
+			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
+				return nil, 0, errIgnoreBeaconMsg
 			}
 
 		case proto_node.SlashCandidate:
