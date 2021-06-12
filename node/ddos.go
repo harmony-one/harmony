@@ -22,7 +22,7 @@ const (
 
 // Preconfigured internal nodes
 // TODO: replace all internal node peer ID here
-var trustedPeers = []libp2p_peer.ID{
+var trustedPeers = []string{
 	"Qme6wYYAXd53FCjB5vQdcDUPuNLsSLDzgU8xUowfgaeyCk",
 	"QmYbvZNqVkQK21B75agEYVgKZJXQmEVsq39EfuvMZtme6Q",
 	"QmUkHXAxqUSPaZ2SFXoF1bVPS7CGJax1FqiDGbfBPFFGPJ",
@@ -58,8 +58,8 @@ var trustedPeers = []libp2p_peer.ID{
 	"QmefubgDnMmPKYpwpHyS41XXuMEkiKDLvfTpwY6RFEXqCX",
 }
 
-func getDefaultTrustedPeerMap() map[libp2p_peer.ID]struct{} {
-	peerMap := make(map[libp2p_peer.ID]struct{})
+func getDefaultTrustedPeerMap() map[string]struct{} {
+	peerMap := make(map[string]struct{})
 	for _, peer := range trustedPeers {
 		peerMap[peer] = struct{}{}
 	}
@@ -70,7 +70,7 @@ func getDefaultTrustedPeerMap() map[libp2p_peer.ID]struct{} {
 // TODO: make each message with a weight
 type psRateLimiter struct {
 	limiters     map[libp2p_peer.ID]*rate.Limiter
-	trustedPeers map[libp2p_peer.ID]struct{}
+	trustedPeers map[string]struct{}
 
 	started *abool.AtomicBool
 	lock    sync.Mutex
@@ -125,7 +125,7 @@ func (rl *psRateLimiter) addNewLimiter(id libp2p_peer.ID) *rate.Limiter {
 }
 
 // AddTrustedPeer add a trust peer. Potentially used for RPC calls to add customized trust peers.
-func (rl *psRateLimiter) AddTrustedPeer(id libp2p_peer.ID) {
+func (rl *psRateLimiter) AddTrustedPeer(id string) {
 	rl.lock.Lock()
 	defer rl.lock.Unlock()
 
@@ -133,13 +133,14 @@ func (rl *psRateLimiter) AddTrustedPeer(id libp2p_peer.ID) {
 }
 
 func (rl *psRateLimiter) isTrusted(id libp2p_peer.ID) bool {
-	_, ok := rl.trustedPeers[id]
+	pretty := id.String()
+	_, ok := rl.trustedPeers[pretty]
 	return ok
 }
 
 type blacklist struct {
 	bl           libp2p_pubsub.Blacklist
-	trustedPeers map[libp2p_peer.ID]struct{} // Currently fixed after initialization
+	trustedPeers map[string]struct{} // Currently fixed after initialization
 }
 
 // TODO: use hostV2.Blacklist() after this issue (https://github.com/libp2p/go-libp2p-pubsub/issues/426)
@@ -153,7 +154,7 @@ func newBlacklist() *blacklist {
 }
 
 func (bl *blacklist) Add(id libp2p_peer.ID) bool {
-	_, trusted := bl.trustedPeers[id]
+	_, trusted := bl.trustedPeers[id.String()]
 	if trusted {
 		return false
 	}
