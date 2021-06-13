@@ -710,7 +710,7 @@ func TestTransactionDropping(t *testing.T) {
 	defer pool.Stop()
 
 	account, _ := deriveSender(transaction(0, 0, 0, key))
-	pool.currentState.AddBalance(account, big.NewInt(1000))
+	pool.currentState.AddBalance(account, big.NewInt(1000000000000))
 
 	// Add some pending and some queued transactions
 	var (
