@@ -152,7 +152,7 @@ type TxPoolConfig struct {
 	Rejournal time.Duration    // Time interval to regenerate the local transaction journal
 
 	PriceLimit uint64 // Minimum gas price to enforce for acceptance into the pool
-	PriceBump  uint64 // Minimum price bump percentage to replace an already existing transaction (nonce)
+	PriceBump  uint64 // Minimum price bump to replace an already existing transaction (nonce)
 
 	AccountSlots uint64 // Number of executable transaction slots guaranteed per account
 	GlobalSlots  uint64 // Maximum number of executable transaction slots for all accounts
@@ -171,7 +171,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Rejournal: time.Hour,
 
 	PriceLimit: 1e9, // 1 Gwei/Nano
-	PriceBump:  10,
+	PriceBump:  1e9,
 
 	AccountSlots: 16,
 	GlobalSlots:  4096,
