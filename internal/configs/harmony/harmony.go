@@ -87,8 +87,12 @@ type TxPoolConfig struct {
 }
 
 type PprofConfig struct {
-	Enabled    bool
-	ListenAddr string
+	Enabled            bool
+	ListenAddr         string
+	Folder             string
+	ProfileNames       []string
+	ProfileIntervals   []int `toml:",omitempty"`
+	ProfileDebugValues []int `toml:",omitempty"`
 }
 
 type LogConfig struct {

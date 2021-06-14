@@ -91,3 +91,6 @@ explorer_storage_*
 
 # local blskeys for testing
 .hmy/blskeys
+
+# pprof profiles
+profiles/*.pb.gz

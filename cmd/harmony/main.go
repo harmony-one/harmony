@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -26,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
@@ -134,7 +134,6 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	}
 
 	setupNodeLog(cfg)
-	setupPprof(cfg)
 	setupNodeAndRun(cfg)
 }
 
@@ -242,17 +241,6 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 		ip := config.Log.Context.IP
 		port := config.Log.Context.Port
 		utils.SetLogContext(ip, strconv.Itoa(port))
-	}
-}
-
-func setupPprof(config harmonyconfig.HarmonyConfig) {
-	enabled := config.Pprof.Enabled
-	addr := config.Pprof.ListenAddr
-
-	if enabled {
-		go func() {
-			http.ListenAndServe(addr, nil)
-		}()
 	}
 }
 
@@ -398,6 +386,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
+	}
+	if hc.Pprof.Enabled {
+		setupPprofService(currentNode, hc)
 	}
 	if hc.Prometheus.Enabled {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
@@ -729,6 +720,19 @@ func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, cur
 			currentConsensus.SetIsBackup(true)
 		}
 	}
+}
+
+func setupPprofService(node *node.Node, hc harmonyconfig.HarmonyConfig) {
+	pprofConfig := pprof.Config{
+		Enabled:            hc.Pprof.Enabled,
+		ListenAddr:         hc.Pprof.ListenAddr,
+		Folder:             hc.Pprof.Folder,
+		ProfileNames:       hc.Pprof.ProfileNames,
+		ProfileIntervals:   hc.Pprof.ProfileIntervals,
+		ProfileDebugValues: hc.Pprof.ProfileDebugValues,
+	}
+	s := pprof.NewService(pprofConfig)
+	node.RegisterService(service.Pprof, s)
 }
 
 func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid uint32) {

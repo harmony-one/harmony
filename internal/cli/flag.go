@@ -79,6 +79,23 @@ func (f StringSliceFlag) RegisterTo(fs *pflag.FlagSet) error {
 	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
 }
 
+// IntSliceFlag is the flag with int slice value
+type IntSliceFlag struct {
+	Name       string
+	Shorthand  string
+	Usage      string
+	Deprecated string
+	Hidden     bool
+
+	DefValue []int
+}
+
+// RegisterTo register the string slice flag to FlagSet
+func (f IntSliceFlag) RegisterTo(fs *pflag.FlagSet) error {
+	fs.IntSliceP(f.Name, f.Shorthand, f.DefValue, f.Usage)
+	return markHiddenOrDeprecated(fs, f.Name, f.Deprecated, f.Hidden)
+}
+
 func markHiddenOrDeprecated(fs *pflag.FlagSet, name string, deprecated string, hidden bool) error {
 	if len(deprecated) != 0 {
 		// TODO: after totally removed node.sh, change MarkHidden to MarkDeprecated
@@ -102,6 +119,8 @@ func getFlagName(flag Flag) string {
 	case BoolFlag:
 		return f.Name
 	case StringSliceFlag:
+		return f.Name
+	case IntSliceFlag:
 		return f.Name
 	}
 	return ""

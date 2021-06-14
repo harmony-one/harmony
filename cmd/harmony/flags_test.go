@@ -98,8 +98,10 @@ func TestHarmonyFlags(t *testing.T) {
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
-					Enabled:    false,
-					ListenAddr: "127.0.0.1:6060",
+					Enabled:      false,
+					ListenAddr:   "127.0.0.1:6060",
+					Folder:       "./profiles",
+					ProfileNames: []string{},
 				},
 				Log: harmonyconfig.LogConfig{
 					Folder:     "./latest",
@@ -773,22 +775,67 @@ func TestPprofFlags(t *testing.T) {
 		{
 			args: []string{"--pprof"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: defaultConfig.Pprof.ListenAddr,
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            true,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof=false", "--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    false,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            false,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.names", "cpu,heap,mutex"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       []string{"cpu", "heap", "mutex"},
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.intervals", "0,1"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   []int{0, 1},
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.debug", "0,1,0"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: []int{0, 1, 0},
 			},
 		},
 	}
