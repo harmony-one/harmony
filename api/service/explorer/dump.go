@@ -4,6 +4,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+
+	"sync/atomic"
 )
 
 type DumpHelper interface {
@@ -75,7 +77,8 @@ func (helper *ExplorerDumpHelper) run() {
 
 		case block := <-helper.pendingBlockC:
 			number := block.NumberU64()
-			if number < helper.latestCommittedNumber+10 {
+			latestNumber := atomic.LoadUint64(&helper.latestCommittedNumber)
+			if number < latestNumber+10 {
 				continue
 			}
 
@@ -98,7 +101,7 @@ func (helper *ExplorerDumpHelper) run() {
 				if err != nil {
 					utils.Logger().Error().Err(err).Msg("cannot dump address")
 				} else {
-					helper.latestCommittedNumber = res.block.NumberU64()
+					atomic.StoreUint64(&helper.latestCommittedNumber, res.block.NumberU64())
 					blockCheckpoint := GetCheckpointKey(res.block.Header().Number())
 					// save checkpoint of block dumped
 					storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
