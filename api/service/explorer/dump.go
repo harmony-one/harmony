@@ -120,7 +120,6 @@ func (helper *ExplorerDumpHelper) computeAccountsTransactionsMapForBlock(block *
 		if len(addr) > 0 {
 			addresses[addr] = bytes[:]
 		}
-
 	}
 	for address, txRecords := range acntsStakingTxns {
 		addr, bytes := helper.convertAddressTxRecordsToRLP(address, txRecords, true /* isStaking */)
@@ -137,14 +136,10 @@ func (helper *ExplorerDumpHelper) convertAddressTxRecordsToRLP(addr string, txRe
 	var address Address
 	key := GetAddressKey(addr)
 
-	if cached, ok := helper.storage.addrIndexCache.Get(key); ok {
-		address = cached.(Address)
-	} else {
-		if data, err := helper.storage.GetDB().Get([]byte(key), nil); err == nil {
-			if err = rlp.DecodeBytes(data, &address); err != nil {
-				utils.Logger().Error().
-					Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
-			}
+	if data, err := helper.storage.GetDB().Get([]byte(key), nil); err == nil {
+		if err = rlp.DecodeBytes(data, &address); err != nil {
+			utils.Logger().Error().
+				Bool("isStaking", isStaking).Err(err).Msg("Failed due to error")
 		}
 	}
 
@@ -170,7 +165,6 @@ func (helper *ExplorerDumpHelper) updateTxRecordsToStorage(txResults map[string]
 		if err != nil {
 			return err
 		}
-		helper.storage.addrIndexCache.Add(key, address)
 	}
 	return nil
 }
