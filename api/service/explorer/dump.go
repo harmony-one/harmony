@@ -44,9 +44,7 @@ func (helper *ExplorerDumpHelper) Stop() {
 }
 
 func (helper *ExplorerDumpHelper) UseStorage(s *Storage) {
-	once.Do(func() {
-		helper.storage = s
-	})
+	helper.storage = s
 }
 
 func (helper *ExplorerDumpHelper) Dump(block *types.Block) {
