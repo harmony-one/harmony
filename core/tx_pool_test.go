@@ -815,7 +815,7 @@ func TestTransactionPostponing(t *testing.T) {
 		keys[i], _ = crypto.GenerateKey()
 		accs[i] = crypto.PubkeyToAddress(keys[i].PublicKey)
 
-		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(5010000000000000))
+		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(50100000000000))
 	}
 	// Add a batch consecutive pending transactions for validation
 	txs := types.PoolTransactions{}
@@ -858,7 +858,7 @@ func TestTransactionPostponing(t *testing.T) {
 	}
 	// Reduce the balance of the account, and check that transactions are reorganised
 	for _, addr := range accs {
-		pool.currentState.AddBalance(addr, big.NewInt(-1))
+		pool.currentState.AddBalance(addr, big.NewInt(-1000000000))
 	}
 	pool.lockedReset(nil, nil)
 
