@@ -126,6 +126,10 @@ var (
 	pprofFlags = []cli.Flag{
 		pprofEnabledFlag,
 		pprofListenAddrFlag,
+		pprofFolderFlag,
+		pprofProfileNamesFlag,
+		pprofProfileIntervalFlag,
+		pprofProfileDebugFlag,
 	}
 
 	logFlags = []cli.Flag{
@@ -963,12 +967,51 @@ var (
 		Usage:    "listen address for pprof",
 		DefValue: defaultConfig.Pprof.ListenAddr,
 	}
+	pprofFolderFlag = cli.StringFlag{
+		Name:     "pprof.folder",
+		Usage:    "folder to put pprof profiles",
+		DefValue: defaultConfig.Pprof.Folder,
+		Hidden:   true,
+	}
+	pprofProfileNamesFlag = cli.StringSliceFlag{
+		Name:     "pprof.profile.names",
+		Usage:    "a list of pprof profile names (separated by ,) e.g. cpu,heap,goroutine",
+		DefValue: defaultConfig.Pprof.ProfileNames,
+	}
+	pprofProfileIntervalFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.intervals",
+		Usage:    "a list of pprof profile interval integer values (separated by ,) e.g. 30 saves all profiles every 30 seconds or 0,10 saves the first profile on shutdown and the second profile every 10 seconds",
+		DefValue: defaultConfig.Pprof.ProfileIntervals,
+		Hidden:   true,
+	}
+	pprofProfileDebugFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.debug",
+		Usage:    "a list of pprof profile debug integer values (separated by ,) e.g. 0 writes the gzip-compressed protocol buffer and 1 writes the legacy text format",
+		DefValue: defaultConfig.Pprof.ProfileDebugValues,
+		Hidden:   true,
+	}
 )
 
 func applyPprofFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofFolderFlag) {
+		config.Pprof.Folder = cli.GetStringFlagValue(cmd, pprofFolderFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileNamesFlag) {
+		config.Pprof.ProfileNames = cli.GetStringSliceFlagValue(cmd, pprofProfileNamesFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileIntervalFlag) {
+		config.Pprof.ProfileIntervals = cli.GetIntSliceFlagValue(cmd, pprofProfileIntervalFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileDebugFlag) {
+		config.Pprof.ProfileDebugValues = cli.GetIntSliceFlagValue(cmd, pprofProfileDebugFlag)
 		pprofSet = true
 	}
 	if cli.IsFlagChanged(cmd, pprofEnabledFlag) {
