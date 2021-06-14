@@ -219,9 +219,15 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 		if _, ok := roster.Voters[staked[i].BLSPublicKey]; !ok {
 			roster.Voters[staked[i].BLSPublicKey] = &member
+
+			utils.Logger().Info().
+				Msgf("[CSH::Compute] currentOverallPercent %s key %s", member.OverallPercent, staked[i].BLSPublicKey.Hex())
+
 		} else {
 			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.Hex()).Msg("Duplicate BLS key found")
 		}
+
+		utils.Logger().Info().Msgf("[CSH::Compute] Voters size %d", len(roster.Voters))
 	}
 
 	if !(nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
