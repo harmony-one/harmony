@@ -47,6 +47,7 @@ type Service struct {
 	messageChan chan *msg_pb.Message
 	blockchain  *core.BlockChain
 	backend     hmy.NodeAPI
+	helper      *ExplorerDumpHelper
 }
 
 // New returns explorer service.
@@ -56,6 +57,7 @@ func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service 
 		Port:       selfPeer.Port,
 		blockchain: bc,
 		backend:    backend,
+		helper:     NewExplorerDumpHelper(),
 	}
 }
 
@@ -64,6 +66,7 @@ func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	s.helper.Start()
 	return nil
 }
 
@@ -75,7 +78,13 @@ func (s *Service) Stop() error {
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	s.helper.Stop()
+	utils.Logger().Info().Msg("Stoping explorer dump helper")
 	return nil
+}
+
+func (s *Service) GetExplorerDumpHelper() DumpHelper {
+	return s.helper
 }
 
 // GetExplorerPort returns the port serving explorer dashboard. This port is explorerPortDifference less than the node port.

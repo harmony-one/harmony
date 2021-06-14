@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -119,6 +120,17 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 	return nil
 }
 
+func (node *Node) getExplorerDumpHelper() explorer.DumpHelper {
+	raw_service := node.serviceManager.GetService(service.SupportExplorer)
+	explorer_service := raw_service.(*explorer.Service)
+	return explorer_service.GetExplorerDumpHelper()
+}
+
+func (node *Node) dump(block *types.Block) {
+	node.getExplorerDumpHelper().UseStorage(explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port))
+	node.getExplorerDumpHelper().Dump(block)
+}
+
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
@@ -136,8 +148,9 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
-						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+					// explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
+					// 	node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+					node.dump(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
 				}
 			}()
 		})
@@ -153,7 +166,8 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	}
 	// Dump new block into level db.
 	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
+	//explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
+	node.dump(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
