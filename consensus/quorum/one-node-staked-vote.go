@@ -180,16 +180,12 @@ func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
 func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric.Dec {
 	currentTotal := numeric.ZeroDec()
 
-	utils.Logger().Info().Msgf("[CSH::computeTotalPowerByMask] Voters size %d", len(v.roster.Voters))
 	for key, i := range mask.PublicsIndex {
 		if enabled, err := mask.IndexEnabled(i); err == nil && enabled {
 			if voter, ok := v.roster.Voters[key]; ok {
 				currentTotal = currentTotal.Add(
 					voter.OverallPercent,
 				)
-
-				utils.Logger().Info().
-					Msgf("[CSH::computeTotalPowerByMask] currentTotal %s currentOverallPercent %s key %s", currentTotal.String(), voter.OverallPercent.String(), key.Hex())
 			}
 		}
 	}
