@@ -4,8 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
-
-	"sync/atomic"
 )
 
 type DumpHelper interface {
@@ -17,8 +15,6 @@ type ExplorerDumpHelper struct {
 	storage       *Storage
 	pendingBlockC chan *types.Block
 	closeC        chan struct{}
-
-	latestCommittedNumber uint64
 }
 
 type TempResult struct {
@@ -28,10 +24,9 @@ type TempResult struct {
 
 func NewExplorerDumpHelper() *ExplorerDumpHelper {
 	return &ExplorerDumpHelper{
-		storage:               nil,
-		pendingBlockC:         make(chan *types.Block),
-		closeC:                make(chan struct{}),
-		latestCommittedNumber: 0,
+		storage:       nil,
+		pendingBlockC: make(chan *types.Block),
+		closeC:        make(chan struct{}),
 	}
 }
 
@@ -74,12 +69,6 @@ func (helper *ExplorerDumpHelper) run() {
 			}
 
 		case block := <-helper.pendingBlockC:
-			number := block.NumberU64()
-			latestNumber := atomic.LoadUint64(&helper.latestCommittedNumber)
-			if number < latestNumber+10 {
-				continue
-			}
-
 			sendToCompute(block)
 
 		case block := <-computeC:
@@ -99,7 +88,6 @@ func (helper *ExplorerDumpHelper) run() {
 				if err != nil {
 					utils.Logger().Error().Err(err).Msg("cannot dump address")
 				} else {
-					atomic.StoreUint64(&helper.latestCommittedNumber, res.block.NumberU64())
 					blockCheckpoint := GetCheckpointKey(res.block.Header().Number())
 					// save checkpoint of block dumped
 					storage.GetDB().Put([]byte(blockCheckpoint), []byte{}, nil)
