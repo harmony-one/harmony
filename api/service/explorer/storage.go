@@ -257,8 +257,6 @@ func (storage *Storage) UpdateTxAddressStorage(addr oneAddress, txRecords TxReco
 
 func (storage *Storage) flushLocked() error {
 	storage.lock.Lock()
-	defer storage.lock.Unlock()
-
 	batch := new(leveldb.Batch)
 	for addr, addressInfo := range storage.dirty {
 		key := GetAddressKey(addr)
@@ -273,10 +271,14 @@ func (storage *Storage) flushLocked() error {
 		key := GetCheckpointKey(new(big.Int).SetUint64(bn))
 		batch.Put(key, []byte{})
 	}
+	storage.lock.Unlock()
+
 	if err := storage.db.Write(batch, nil); err != nil {
 		return errors.Wrap(err, "failed to write explorer data")
 	}
 	// clean up
+	storage.lock.Lock()
+	defer storage.lock.Unlock()
 	for addr, addressInfo := range storage.dirty {
 		storage.clean.Add(addr, addressInfo)
 	}
