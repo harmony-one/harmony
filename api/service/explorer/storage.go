@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
@@ -21,13 +22,14 @@ import (
 
 // Constants for storage.
 const (
-	AddressPrefix       = "ad"
-	CheckpointPrefix    = "dc"
-	PrefixLen           = 3
-	addrIndexCacheSize  = 1000
-	flushThreshold      = 100 // flush every 20 blocks
-	newBlockCBuffer     = 100
-	catchupBlockCBuffer = 1
+	AddressPrefix        = "ad"
+	CheckpointPrefix     = "dc"
+	PrefixLen            = 3
+	addrIndexCacheSize   = 1000
+	flushNumberThreshold = 100              // flush every 100 blocks
+	flushTimeThreshold   = 90 * time.Second // flush every 90 seconds
+	newBlockCBuffer      = 100
+	catchupBlockCBuffer  = 1
 )
 
 type oneAddress string
@@ -126,12 +128,15 @@ func (storage *Storage) loop() {
 		close(storage.closeC)
 	}()
 
+	var lastFlush = time.Now()
+
 	for {
 		// flush when reached threshold
 		storage.lock.RLock()
 		numDirty := len(storage.dirtyBNs)
 		storage.lock.RUnlock()
-		if numDirty >= flushThreshold {
+		if numDirty >= flushNumberThreshold || time.Since(lastFlush) >= flushTimeThreshold {
+			lastFlush = time.Now()
 			if err := storage.flushLocked(); err != nil {
 				utils.Logger().Error().Err(err).Msg("[explorer] failed to flush")
 			}
