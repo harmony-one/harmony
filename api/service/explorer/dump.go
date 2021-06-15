@@ -12,9 +12,10 @@ type DumpHelper interface {
 }
 
 type ExplorerDumpHelper struct {
-	storage       *Storage
-	pendingBlockC chan *types.Block
-	closeC        chan struct{}
+	pendingWriteBuf []map[string][]byte
+	storage         *Storage
+	pendingBlockC   chan *types.Block
+	closeC          chan struct{}
 }
 
 type TempResult struct {
@@ -24,9 +25,10 @@ type TempResult struct {
 
 func NewExplorerDumpHelper() *ExplorerDumpHelper {
 	return &ExplorerDumpHelper{
-		storage:       nil,
-		pendingBlockC: make(chan *types.Block),
-		closeC:        make(chan struct{}),
+		pendingWriteBuf: make([]map[string][]byte, 0, 50),
+		storage:         nil,
+		pendingBlockC:   make(chan *types.Block),
+		closeC:          make(chan struct{}),
 	}
 }
 
@@ -159,11 +161,31 @@ func (helper *ExplorerDumpHelper) convertAddressTxRecordsToRLP(addr string, txRe
 }
 
 func (helper *ExplorerDumpHelper) updateTxRecordsToStorage(txResults map[string][]byte) error {
-	for address, encoded := range txResults {
-		key := GetAddressKey(address)
-		err := helper.storage.GetDB().Put([]byte(key), encoded, nil)
+
+	if len(helper.pendingWriteBuf) >= 20 {
+		// flush
+		err := helper.flushTxRecords()
 		if err != nil {
 			return err
+		}
+		// clean pending write buffer
+		helper.pendingWriteBuf = make([]map[string][]byte, 0, 50),
+
+	} else {
+		helper.pendingWriteBuf = append(helper.pendingWriteBuf, txResults)
+	}
+
+	return nil
+}
+
+func (helper *ExplorerDumpHelper) flushTxRecords() error {
+	for _, txResults := range helper.pendingWriteBuf {
+		for address, encoded := range txResults {
+			key := GetAddressKey(address)
+			err := helper.storage.GetDB().Put([]byte(key), encoded, nil)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
