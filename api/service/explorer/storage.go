@@ -282,6 +282,14 @@ func (storage *Storage) flushLocked() error {
 	return nil
 }
 
+// GetAddressInfo get the address info of the given address
+func (storage *Storage) GetAddressInfo(addr string) (*Address, error) {
+	storage.lock.RLock()
+	defer storage.lock.RUnlock()
+
+	return storage.getAddressInfo(oneAddress(addr))
+}
+
 func (storage *Storage) getAddressInfo(addr oneAddress) (*Address, error) {
 	if addrInfo, ok := storage.dirty[addr]; ok {
 		return addrInfo, nil
@@ -291,6 +299,11 @@ func (storage *Storage) getAddressInfo(addr oneAddress) (*Address, error) {
 	}
 	addrInfo, err := storage.readAddressInfoFromDB(addr)
 	if err != nil {
+		if errors.Is(err, leveldb.ErrNotFound) {
+			return &Address{
+				ID: string(addr),
+			}, nil
+		}
 		return nil, err
 	}
 	storage.clean.Add(addr, addrInfo)

@@ -43,7 +43,7 @@ type Data struct {
 // Address ...
 type Address struct {
 	ID         string    `json:"id"`
-	Balance    *big.Int  `json:"balance"`
+	Balance    *big.Int  `json:"balance"` // Deprecated
 	TXs        TxRecords `json:"txs"`
 	StakingTXs TxRecords `json:"staking_txs"`
 }
