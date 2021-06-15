@@ -56,6 +56,7 @@ func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service 
 		Port:       selfPeer.Port,
 		blockchain: bc,
 		backend:    backend,
+		Storage:    GetStorageInstance(selfPeer.IP, selfPeer.Port),
 	}
 }
 
@@ -64,6 +65,7 @@ func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	s.Storage.Start()
 	return nil
 }
 
@@ -89,9 +91,7 @@ func GetExplorerPort(nodePort string) string {
 }
 
 // Init is to initialize for ExplorerService.
-func (s *Service) Init() {
-	s.Storage = GetStorageInstance(s.IP, s.Port)
-}
+func (s *Service) Init() {}
 
 // Run is to run serving explorer.
 func (s *Service) Run() *http.Server {
