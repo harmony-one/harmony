@@ -11,8 +11,8 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -41,20 +41,6 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return err
 		}
 
-		aggSig, mask, err := node.Consensus.ReadSignatureBitmapPayload(
-			recvMsg.Payload, 0,
-		)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Msg("[Explorer] readSignatureBitmapPayload failed")
-			return err
-		}
-
-		if !node.Consensus.Decider.IsQuorumAchievedByMask(mask) {
-			utils.Logger().Error().Msg("[Explorer] not have enough signature power")
-			return nil
-		}
-
 		block := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 
 		if block == nil {
@@ -65,9 +51,16 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			return errBlockBeforeCommit
 		}
 
-		commitPayload := signature.ConstructCommitPayload(node.Blockchain(),
-			block.Epoch(), block.Hash(), block.Number().Uint64(), block.Header().ViewID().Uint64())
-		if !aggSig.VerifyHash(mask.AggregatePublic, commitPayload) {
+		sig, bitmap, err := chain.ParseCommitSigAndBitmap(recvMsg.Payload)
+		if err != nil {
+			utils.Logger().
+				Error().Err(err).
+				Uint64("msgBlock", recvMsg.BlockNum).
+				Msg("[Explorer] Failed to ParseCommitSigAndBitmap")
+			return errFailVerifyMultiSign
+		}
+
+		if err := node.Blockchain().Engine().VerifyHeaderSignature(node.Blockchain(), block.Header(), sig, bitmap); err != nil {
 			utils.Logger().
 				Error().Err(err).
 				Uint64("msgBlock", recvMsg.BlockNum).
