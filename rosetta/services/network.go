@@ -117,8 +117,9 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 
 	targetInt := int64(targetHeight)
+	currentIndex := currentHeader.Number().Int64()
 	ss := &types.SyncStatus{
-		CurrentIndex: currentHeader.Number().Int64(),
+		CurrentIndex: &currentIndex,
 		TargetIndex:  &targetInt,
 		Stage:        &stage,
 	}

@@ -21,6 +21,10 @@ type AccountAPI struct {
 	hmy *hmy.Harmony
 }
 
+func (s *AccountAPI) AccountCoins(ctx context.Context, request *types.AccountCoinsRequest) (*types.AccountCoinsResponse, *types.Error) {
+	panic("implement me")
+}
+
 // NewAccountAPI creates a new instance of a BlockAPI.
 func NewAccountAPI(hmy *hmy.Harmony) server.AccountAPIServicer {
 	return &AccountAPI{

@@ -280,7 +280,7 @@ func GetSideEffectOperationsFromGenesisSpec(
 }
 
 // GetTransactionStatus for any valid harmony transaction given its receipt.
-func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) string {
+func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) *string {
 	if _, ok := tx.(*hmytypes.Transaction); ok {
 		status := common.SuccessOperationStatus.Status
 		if receipt.Status == hmytypes.ReceiptStatusFailed {
@@ -290,12 +290,12 @@ func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt
 				status = common.ContractFailureOperationStatus.Status
 			}
 		}
-		return status
+		return &status
 	} else if _, ok := tx.(*stakingTypes.StakingTransaction); ok {
-		return common.SuccessOperationStatus.Status
+		return &common.SuccessOperationStatus.Status
 	}
 	// Type of tx unknown, so default to failure
-	return common.FailureOperationStatus.Status
+	return &common.FailureOperationStatus.Status
 }
 
 // getBasicTransferNativeOperations extracts & formats the basic native operations for non-staking transaction.
@@ -321,7 +321,7 @@ func getBasicTransferNativeOperations(
 		return nil, rosettaError
 	}
 
-	return newSameShardTransferNativeOperations(from, to, tx.Value(), status, startingOperationIndex), nil
+	return newSameShardTransferNativeOperations(from, to, tx.Value(), *status, startingOperationIndex), nil
 }
 
 // getContractTransferNativeOperations extracts & formats the native operations for any
@@ -341,7 +341,7 @@ func getContractTransferNativeOperations(
 	status := GetTransactionStatus(tx, receipt)
 	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
 	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
-		contractInfo.ExecutionResult, status, &startingIndex,
+		contractInfo.ExecutionResult, *status, &startingIndex,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -368,7 +368,7 @@ func getContractCreationNativeOperations(
 	status := GetTransactionStatus(tx, receipt)
 	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
 	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
-		contractInfo.ExecutionResult, status, &startingIndex,
+		contractInfo.ExecutionResult, *status, &startingIndex,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -466,7 +466,7 @@ func getCrossShardSenderTransferNativeOperations(
 				Index: opIndex,
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -499,7 +499,7 @@ func getSideEffectOperationsFromUndelegationPayoutsMap(
 				Index: opIndex,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accID,
 		}
 
@@ -547,7 +547,7 @@ func getOperationAndTotalAmountFromUndelegationMap(
 				relatedOpIdentifier,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: subAccId,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(amount),
@@ -582,7 +582,7 @@ func getSideEffectOperationsFromValueMap(
 				Index: opIndex,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accID,
 			Amount: &types.Amount{
 				Value:    value.String(),
@@ -694,7 +694,7 @@ func newSameShardTransferNativeOperations(
 		{
 			OperationIdentifier: subOperationID,
 			Type:                common.NativeTransferOperation,
-			Status:              status,
+			Status:              &status,
 			Account:             from,
 			Amount:              subAmount,
 		},
@@ -702,7 +702,7 @@ func newSameShardTransferNativeOperations(
 			OperationIdentifier: addOperationID,
 			RelatedOperations:   addRelatedID,
 			Type:                common.NativeTransferOperation,
-			Status:              status,
+			Status:              &status,
 			Account:             to,
 			Amount:              addAmount,
 		},
@@ -720,7 +720,7 @@ func newNativeOperationsWithGas(
 				Index: 0, // gas operation is always first
 			},
 			Type:    common.ExpendGasOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(gasFeeInATTO),

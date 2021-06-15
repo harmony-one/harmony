@@ -67,7 +67,7 @@ func TestGetStakingOperationsFromCreateValidator(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
@@ -210,7 +210,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    negativeBigValue(tenOnes),
@@ -226,7 +226,7 @@ func TestGetStakingOperationsFromDelegate(t *testing.T) {
 			},
 		},
 		Type:    tx.StakingType().String(),
-		Status:  common.SuccessOperationStatus.Status,
+		Status:  &common.SuccessOperationStatus.Status,
 		Account: senderAccIDWithSubAccount,
 		Amount: &types.Amount{
 			Value:    tenOnes.String(),
@@ -271,7 +271,7 @@ func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 0},
 		Type:                UndelegationPayout,
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             receiverAccId,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("9000"),
@@ -285,7 +285,7 @@ func TestGetSideEffectOperationsFromUndelegationPayouts(t *testing.T) {
 			},
 		},
 		Type:    UndelegationPayout,
-		Status:  common.SuccessOperationStatus.Status,
+		Status:  &common.SuccessOperationStatus.Status,
 		Account: reveiverSubAccId1,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("-9000"),
@@ -349,7 +349,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
@@ -360,7 +360,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 2},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             receiverAccId,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
@@ -421,7 +421,7 @@ func TestGetStakingOperationsFromCollectRewards(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
@@ -475,7 +475,7 @@ func TestGetStakingOperationsFromEditValidator(t *testing.T) {
 	refOperations = append(refOperations, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{Index: 1},
 		Type:                tx.StakingType().String(),
-		Status:              common.SuccessOperationStatus.Status,
+		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
 			Value:    fmt.Sprintf("0"),
@@ -524,7 +524,7 @@ func TestGetBasicTransferOperations(t *testing.T) {
 				Index: startingOpID.Index + 1,
 			},
 			Type:    common.NativeTransferOperation,
-			Status:  common.ContractFailureOperationStatus.Status,
+			Status:  &common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -541,7 +541,7 @@ func TestGetBasicTransferOperations(t *testing.T) {
 				},
 			},
 			Type:    common.NativeTransferOperation,
-			Status:  common.ContractFailureOperationStatus.Status,
+			Status:  &common.ContractFailureOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
@@ -565,8 +565,8 @@ func TestGetBasicTransferOperations(t *testing.T) {
 	}
 
 	// Test successful plain / contract transaction
-	refOperations[0].Status = common.SuccessOperationStatus.Status
-	refOperations[1].Status = common.SuccessOperationStatus.Status
+	refOperations[0].Status = &common.SuccessOperationStatus.Status
+	refOperations[1].Status = &common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful
 	operations, rosettaError = getBasicTransferNativeOperations(tx, receipt, senderAddr, tx.To(), &opIndex)
 	if rosettaError != nil {
@@ -615,7 +615,7 @@ func TestGetCrossShardSenderTransferNativeOperations(t *testing.T) {
 				Index: startingOpID.Index + 1,
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -792,7 +792,7 @@ func TestGetContractInternalTransferNativeOperations(t *testing.T) {
 				)
 			}
 			prevIndex = op.OperationIdentifier.Index
-			if op.Status != refStatus {
+			if op.Status == nil || *op.Status != refStatus {
 				t.Errorf("wrong status for op %v", i)
 			}
 			if op.Type != common.NativeTransferOperation {
@@ -909,7 +909,7 @@ func TestGetContractTransferNativeOperations(t *testing.T) {
 				)
 			}
 			prevIndex = op.OperationIdentifier.Index
-			if op.Status != refStatus {
+			if op.Status == nil || *op.Status != refStatus {
 				t.Errorf("wrong status for op %v", i)
 			}
 			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
@@ -1030,7 +1030,7 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 				Index: startingOpID.Index + 1,
 			},
 			Type:    common.ContractCreationOperation,
-			Status:  common.ContractFailureOperationStatus.Status,
+			Status:  &common.ContractFailureOperationStatus.Status,
 			Account: senderAccID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -1047,7 +1047,7 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 				},
 			},
 			Type:    common.ContractCreationOperation,
-			Status:  common.ContractFailureOperationStatus.Status,
+			Status:  &common.ContractFailureOperationStatus.Status,
 			Account: contractAddressID,
 			Amount: &types.Amount{
 				Value:    tx.Value().String(),
@@ -1072,8 +1072,8 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 	}
 
 	// Test successful contract creation
-	refOperations[0].Status = common.SuccessOperationStatus.Status
-	refOperations[1].Status = common.SuccessOperationStatus.Status
+	refOperations[0].Status = &common.SuccessOperationStatus.Status
+	refOperations[1].Status = &common.SuccessOperationStatus.Status
 	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
 	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
 	if rosettaError != nil {
@@ -1097,7 +1097,7 @@ func TestGetContractCreationNativeOperations(t *testing.T) {
 				)
 			}
 			prevIndex = op.OperationIdentifier.Index
-			if op.Status != refOperations[0].Status {
+			if *op.Status != *refOperations[0].Status {
 				t.Errorf("wrong status for op %v", i)
 			}
 			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
@@ -1169,7 +1169,10 @@ func TestNewNativeOperations(t *testing.T) {
 	if ops[0].OperationIdentifier.Index != 0 {
 		t.Errorf("Expected operational ID to be of index 0")
 	}
-	if ops[0].Status != common.SuccessOperationStatus.Status {
+	if ops[0].Status == nil {
+		t.Error("Expected operation status should not be nil")
+	}
+	if *ops[0].Status != common.SuccessOperationStatus.Status {
 		t.Errorf("Expected operation status to be %v", common.SuccessOperationStatus.Status)
 	}
 }

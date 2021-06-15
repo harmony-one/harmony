@@ -65,7 +65,6 @@ func parseUnsignedTransaction(
 		})
 	}
 
-	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.GasLimit(),
 	}
@@ -86,7 +85,7 @@ func parseUnsignedTransaction(
 			foundSender = true
 			op.Account = wrappedTransaction.From
 		}
-		op.Status = ""
+		op.Status = nil
 	}
 	if !foundSender {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -108,7 +107,6 @@ func parseSignedTransaction(
 		})
 	}
 
-	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.GasLimit(),
 	}
@@ -134,7 +132,7 @@ func parseSignedTransaction(
 		})
 	}
 	for _, op := range formattedTx.Operations {
-		op.Status = ""
+		op.Status = nil
 	}
 	return &types.ConstructionParseResponse{
 		Operations:               formattedTx.Operations,

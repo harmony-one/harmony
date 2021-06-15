@@ -86,6 +86,34 @@ var (
 		Message:   "invalid staking transaction construction",
 		Retriable: false,
 	}
+
+	// ErrCallParametersInvalid ..
+	ErrCallParametersInvalid = types.Error{
+		Code:      11,
+		Message:   "invalid call parameters",
+		Retriable: false,
+	}
+
+	// ErrCallExecute ..
+	ErrCallExecute = types.Error{
+		Code:      12,
+		Message:   "call execute error",
+		Retriable: false,
+	}
+
+	// ErrCallMethodInvalid ..
+	ErrCallMethodInvalid = types.Error{
+		Code:      13,
+		Message:   "call method invalid",
+		Retriable: false,
+	}
+
+	// ErrGetStakingInfo ..
+	ErrGetStakingInfo = types.Error{
+		Code:      14,
+		Message:   "get staking info error",
+		Retriable: false,
+	}
 )
 
 // NewError create a new error with a given detail structure

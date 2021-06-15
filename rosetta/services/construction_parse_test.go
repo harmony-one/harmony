@@ -62,7 +62,7 @@ func TestParseUnsignedTransaction(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 	for _, op := range parsedResponse.Operations {
-		if op.Status != "" {
+		if op.Status != nil {
 			t.Error("expect operation status to be empty for construction")
 		}
 	}
@@ -144,7 +144,7 @@ func TestParseSignedTransaction(t *testing.T) {
 		t.Fatal(rosettaError)
 	}
 	for _, op := range parsedResponse.Operations {
-		if op.Status != "" {
+		if op.Status != nil {
 			t.Error("expect operation status to be empty for construction")
 		}
 	}

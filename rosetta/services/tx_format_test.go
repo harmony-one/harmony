@@ -263,7 +263,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Index: 0, // There is no gas expenditure for cross-shard payout
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),
