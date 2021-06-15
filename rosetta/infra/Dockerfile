@@ -20,6 +20,8 @@ WORKDIR $HMY_PATH/harmony
 
 RUN go mod download
 
+RUN go mod tidy
+
 RUN make linux_static && \
     cp ./bin/harmony /root/harmony && \
     cp ./rosetta/infra/run.sh /root/run.sh
