@@ -63,7 +63,6 @@ func (w *Worker) CommitSortedTransactions(
 	txs *types.TransactionsByPriceAndNonce,
 	coinbase common.Address,
 ) {
-	counter := 0
 	for {
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
@@ -126,11 +125,6 @@ func (w *Worker) CommitSortedTransactions(
 			// nonce-too-high clause will prevent us from executing in vain).
 			utils.Logger().Info().Str("hash", tx.Hash().Hex()).AnErr("err", err).Msg("Transaction failed, account skipped")
 			txs.Shift()
-		}
-		counter++
-		if counter >= 50 {
-			// Limit the number of txn per block as a temporary solution to spams.
-			break
 		}
 	}
 }
@@ -562,7 +556,7 @@ func New(
 	header := worker.factory.NewHeader(epoch).With().
 		ParentHash(parent.Hash()).
 		Number(num.Add(num, common.Big1)).
-		GasLimit(core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
+		GasLimit(worker.gasFloor). //core.CalcGasLimit(parent, worker.gasFloor, worker.gasCeil)).
 		Time(big.NewInt(timestamp)).
 		ShardID(worker.chain.ShardID()).
 		Header()

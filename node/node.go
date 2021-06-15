@@ -386,7 +386,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	// length of payload must > p2pNodeMsgPrefixSize
 
 	// reject huge node messages
-	if len(payload) >= types.MaxEncodedPoolTransactionSize {
+	if len(payload) >= types.MaxP2PNodeDataSize {
 		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_oversized"}).Inc()
 		return nil, 0, core.ErrOversizedData
 	}
