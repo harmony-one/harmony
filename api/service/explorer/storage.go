@@ -25,8 +25,8 @@ const (
 	CheckpointPrefix    = "dc"
 	PrefixLen           = 3
 	addrIndexCacheSize  = 1000
-	flushThreshold      = 20 // flush every 20 blocks
-	newBlockCBuffer     = 20
+	flushThreshold      = 100 // flush every 20 blocks
+	newBlockCBuffer     = 100
 	catchupBlockCBuffer = 1
 )
 
