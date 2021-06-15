@@ -181,7 +181,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			to:      common.BigToAddress(stackPeek(0)),
 			gasIn:   gas,
 			gasCost: cost,
-			value:   (&big.Int{}).Set(stackPeek(0)),
+			value:   env.StateDB.GetBalance(contract.Address()),
 		})
 		return retErr
 	}
@@ -293,7 +293,7 @@ func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.D
 func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 	root := &jst.action
 	headPiece := fmt.Sprintf(
-		`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d,`,
+		`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d`,
 		jst.blockNumber, jst.blockHash.Hex(), jst.transactionHash.Hex(), jst.transactionPosition,
 	)
 
@@ -308,15 +308,17 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		}
 		traceStr, _ := json.Marshal(traceAddress)
 		bodyPiece := fmt.Sprintf(
-			`"subtraces":%d,"traceAddress":%s,"type":"%s","action":%s,`,
+			`,"subtraces":%d,"traceAddress":%s,"type":"%s","action":%s`,
 			len(ac.subCalls), string(traceStr), typStr, *acStr,
 		)
 		var resultPiece string
 		if ac.err != nil {
-			resultPiece = fmt.Sprintf(`"error":"Reverted","revert":"0x%x"`, ac.revert)
+			resultPiece = fmt.Sprintf(`,"error":"Reverted","revert":"0x%x"`, ac.revert)
 
 		} else if outStr != nil {
-			resultPiece = fmt.Sprintf(`"result":%s`, *outStr)
+			resultPiece = fmt.Sprintf(`,"result":%s`, *outStr)
+		} else {
+			resultPiece = `,"result":null`
 		}
 
 		jstr := "{" + headPiece + bodyPiece + resultPiece + "}"
