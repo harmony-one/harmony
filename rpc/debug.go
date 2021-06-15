@@ -64,3 +64,10 @@ func (s *PrivateDebugService) GetConsensusPhase(
 ) string {
 	return s.hmy.NodeAPI.GetConsensusPhase()
 }
+
+// GetConfig get harmony config
+func (s *PrivateDebugService) GetConfig(
+	ctx context.Context,
+) (StructuredResponse, error) {
+	return NewStructuredResponse(s.hmy.NodeAPI.GetConfig())
+}

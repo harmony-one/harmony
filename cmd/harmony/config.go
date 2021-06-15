@@ -9,174 +9,14 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/internal/cli"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/pelletier/go-toml"
 	"github.com/spf13/cobra"
 )
 
-// harmonyConfig contains all the configs user can set for running harmony binary. Served as the bridge
-// from user set flags to internal node configs. Also user can persist this structure to a toml file
-// to avoid inputting all arguments.
-type harmonyConfig struct {
-	Version    string
-	General    generalConfig
-	Network    networkConfig
-	P2P        p2pConfig
-	HTTP       httpConfig
-	WS         wsConfig
-	RPCOpt     rpcOptConfig
-	BLSKeys    blsConfig
-	TxPool     txPoolConfig
-	Pprof      pprofConfig
-	Log        logConfig
-	Sync       syncConfig
-	Sys        *sysConfig        `toml:",omitempty"`
-	Consensus  *consensusConfig  `toml:",omitempty"`
-	Devnet     *devnetConfig     `toml:",omitempty"`
-	Revert     *revertConfig     `toml:",omitempty"`
-	Legacy     *legacyConfig     `toml:",omitempty"`
-	Prometheus *prometheusConfig `toml:",omitempty"`
-	DNSSync    dnsSync
-}
-
-type dnsSync struct {
-	Port          int    // replaces: Network.DNSSyncPort
-	Zone          string // replaces: Network.DNSZone
-	LegacySyncing bool   // replaces: Network.LegacySyncing
-	Client        bool   // replaces: Sync.LegacyClient
-	Server        bool   // replaces: Sync.LegacyServer
-	ServerPort    int
-}
-
-type networkConfig struct {
-	NetworkType string
-	BootNodes   []string
-}
-
-type p2pConfig struct {
-	Port         int
-	IP           string
-	KeyFile      string
-	DHTDataStore *string `toml:",omitempty"`
-}
-
-type generalConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
-}
-
-type consensusConfig struct {
-	MinPeers     int
-	AggregateSig bool
-}
-
-type blsConfig struct {
-	KeyDir   string
-	KeyFiles []string
-	MaxKeys  int
-
-	PassEnabled    bool
-	PassSrcType    string
-	PassFile       string
-	SavePassphrase bool
-
-	KMSEnabled       bool
-	KMSConfigSrcType string
-	KMSConfigFile    string
-}
-
-type txPoolConfig struct {
-	BlacklistFile string
-}
-
-type pprofConfig struct {
-	Enabled    bool
-	ListenAddr string
-}
-
-type logConfig struct {
-	Folder     string
-	FileName   string
-	RotateSize int
-	Verbosity  int
-	Context    *logContext `toml:",omitempty"`
-}
-
-type logContext struct {
-	IP   string
-	Port int
-}
-
-type sysConfig struct {
-	NtpServer string
-}
-
-type httpConfig struct {
-	Enabled        bool
-	IP             string
-	Port           int
-	RosettaEnabled bool
-	RosettaPort    int
-}
-
-type wsConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
-}
-
-type rpcOptConfig struct {
-	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
-	RateLimterEnabled bool // Enable Rate limiter for RPC
-	RequestsPerSecond int  // for RPC rate limiter
-}
-
-type devnetConfig struct {
-	NumShards   int
-	ShardSize   int
-	HmyNodeSize int
-}
-
-// TODO: make `revert` to a separate command
-type revertConfig struct {
-	RevertBeacon bool
-	RevertTo     int
-	RevertBefore int
-}
-
-type legacyConfig struct {
-	WebHookConfig         *string `toml:",omitempty"`
-	TPBroadcastInvalidTxn *bool   `toml:",omitempty"`
-}
-
-type prometheusConfig struct {
-	Enabled    bool
-	IP         string
-	Port       int
-	EnablePush bool
-	Gateway    string
-}
-
-type syncConfig struct {
-	// TODO: Remove this bool after stream sync is fully up.
-	Enabled        bool // enable the stream sync protocol
-	Downloader     bool // start the sync downloader client
-	Concurrency    int  // concurrency used for stream sync protocol
-	MinPeers       int  // minimum streams to start a sync task.
-	InitStreams    int  // minimum streams in bootstrap to start sync loop.
-	DiscSoftLowCap int  // when number of streams is below this value, spin discover during check
-	DiscHardLowCap int  // when removing stream, num is below this value, spin discovery immediately
-	DiscHighCap    int  // upper limit of streams in one sync protocol
-	DiscBatch      int  // size of each discovery
-}
-
 // TODO: use specific type wise validation instead of general string types assertion.
-func validateHarmonyConfig(config harmonyConfig) error {
+func validateHarmonyConfig(config harmonyconfig.HarmonyConfig) error {
 	var accepts []string
 
 	nodeType := config.General.NodeType
@@ -219,7 +59,7 @@ func validateHarmonyConfig(config harmonyConfig) error {
 	return nil
 }
 
-func sanityFixHarmonyConfig(hc *harmonyConfig) {
+func sanityFixHarmonyConfig(hc *harmonyconfig.HarmonyConfig) {
 	// When running sync downloader, set sync.Enabled to true
 	if hc.Sync.Downloader && !hc.Sync.Enabled {
 		fmt.Println("Set Sync.Enabled to true when running stream downloader")
@@ -237,10 +77,10 @@ func checkStringAccepted(flag string, val string, accepts []string) error {
 	return fmt.Errorf("unknown arg for %s: %s (%v)", flag, val, acceptsStr)
 }
 
-func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) dnsSync {
+func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 	zone := nodeconfig.GetDefaultDNSZone(nt)
 	port := nodeconfig.GetDefaultDNSPort(nt)
-	dnsSync := dnsSync{
+	dnsSync := harmonyconfig.DnsSync{
 		Port:          port,
 		Zone:          zone,
 		LegacySyncing: false,
@@ -263,9 +103,9 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) dnsSync {
 	return dnsSync
 }
 
-func getDefaultNetworkConfig(nt nodeconfig.NetworkType) networkConfig {
+func getDefaultNetworkConfig(nt nodeconfig.NetworkType) harmonyconfig.NetworkConfig {
 	bn := nodeconfig.GetDefaultBootNodes(nt)
-	return networkConfig{
+	return harmonyconfig.NetworkConfig{
 		NetworkType: string(nt),
 		BootNodes:   bn,
 	}
@@ -292,7 +132,7 @@ func parseNetworkType(nt string) nodeconfig.NetworkType {
 	}
 }
 
-func getDefaultSyncConfig(nt nodeconfig.NetworkType) syncConfig {
+func getDefaultSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.SyncConfig {
 	switch nt {
 	case nodeconfig.Mainnet:
 		return defaultMainnetSyncConfig
@@ -380,14 +220,14 @@ func promptConfigUpdate() bool {
 	}
 }
 
-func loadHarmonyConfig(file string) (harmonyConfig, string, error) {
+func loadHarmonyConfig(file string) (harmonyconfig.HarmonyConfig, string, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return harmonyConfig{}, "", err
+		return harmonyconfig.HarmonyConfig{}, "", err
 	}
 	config, migratedVer, err := migrateConf(b)
 	if err != nil {
-		return harmonyConfig{}, "", err
+		return harmonyconfig.HarmonyConfig{}, "", err
 	}
 
 	return config, migratedVer, nil
@@ -414,7 +254,7 @@ func updateConfigFile(file string) error {
 	return nil
 }
 
-func writeHarmonyConfigToFile(config harmonyConfig, file string) error {
+func writeHarmonyConfigToFile(config harmonyconfig.HarmonyConfig, file string) error {
 	b, err := toml.Marshal(config)
 	if err != nil {
 		return err

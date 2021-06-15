@@ -3,6 +3,9 @@ package common
 import (
 	"encoding/json"
 
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
@@ -79,4 +82,10 @@ type NodePeerInfo struct {
 	PeerID       peer.ID   `json:"peerid"`
 	BlockedPeers []peer.ID `json:"blocked-peers"`
 	P            []P       `json:"connected-peers"`
+}
+
+type Config struct {
+	HarmonyConfig harmonyconfig.HarmonyConfig
+	NodeConfig    nodeconfig.ConfigType
+	ChainConfig   params.ChainConfig
 }

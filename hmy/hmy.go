@@ -106,6 +106,7 @@ type NodeAPI interface {
 	GetConsensusPhase() string
 	GetConsensusViewChangingID() uint64
 	GetConsensusCurViewID() uint64
+	GetConfig() commonRPC.Config
 	ShutDown()
 }
 

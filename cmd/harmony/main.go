@@ -16,6 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	rpc_common "github.com/harmony-one/harmony/rpc/common"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/bls/ffi/go/bls"
@@ -158,9 +161,9 @@ func raiseFdLimits() error {
 	return nil
 }
 
-func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
+func getHarmonyConfig(cmd *cobra.Command) (harmonyconfig.HarmonyConfig, error) {
 	var (
-		config         harmonyConfig
+		config         harmonyconfig.HarmonyConfig
 		err            error
 		migratedFrom   string
 		configFile     string
@@ -175,7 +178,7 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 		isUsingDefault = true
 	}
 	if err != nil {
-		return harmonyConfig{}, err
+		return harmonyconfig.HarmonyConfig{}, err
 	}
 	if migratedFrom != defaultConfig.Version && !isUsingDefault {
 		fmt.Printf("Old config version detected %s\n",
@@ -199,13 +202,13 @@ func getHarmonyConfig(cmd *cobra.Command) (harmonyConfig, error) {
 	applyRootFlags(cmd, &config)
 
 	if err := validateHarmonyConfig(config); err != nil {
-		return harmonyConfig{}, err
+		return harmonyconfig.HarmonyConfig{}, err
 	}
 	sanityFixHarmonyConfig(&config)
 	return config, nil
 }
 
-func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	// Misc flags shall be applied first since legacy ip / port is overwritten
 	// by new ip / port flags
 	applyLegacyMiscFlags(cmd, config)
@@ -228,7 +231,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyConfig) {
 	applySyncFlags(cmd, config)
 }
 
-func setupNodeLog(config harmonyConfig) {
+func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
 	rotateSize := config.Log.RotateSize
 	verbosity := config.Log.Verbosity
@@ -242,7 +245,7 @@ func setupNodeLog(config harmonyConfig) {
 	}
 }
 
-func setupPprof(config harmonyConfig) {
+func setupPprof(config harmonyconfig.HarmonyConfig) {
 	enabled := config.Pprof.Enabled
 	addr := config.Pprof.ListenAddr
 
@@ -253,7 +256,7 @@ func setupPprof(config harmonyConfig) {
 	}
 }
 
-func setupNodeAndRun(hc harmonyConfig) {
+func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	var err error
 
 	nodeconfigSetShardSchedule(hc)
@@ -379,6 +382,14 @@ func setupNodeAndRun(hc harmonyConfig) {
 
 	nodeconfig.SetPeerID(myHost.GetID())
 
+	if hc.Log.VerbosePrints.Config {
+		utils.Logger().Info().Interface("config", rpc_common.Config{
+			HarmonyConfig: hc,
+			NodeConfig:    *nodeConfig,
+			ChainConfig:   *currentNode.Blockchain().Config(),
+		}).Msg("verbose prints config")
+	}
+
 	// Setup services
 	if hc.Sync.Enabled {
 		setupSyncService(currentNode, myHost, hc)
@@ -443,7 +454,7 @@ func setupNodeAndRun(hc harmonyConfig) {
 	select {}
 }
 
-func nodeconfigSetShardSchedule(config harmonyConfig) {
+func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 	switch config.Network.NetworkType {
 	case nodeconfig.Mainnet:
 		shard.Schedule = shardingconfig.MainnetSchedule
@@ -458,7 +469,7 @@ func nodeconfigSetShardSchedule(config harmonyConfig) {
 	case nodeconfig.Stressnet:
 		shard.Schedule = shardingconfig.StressNetSchedule
 	case nodeconfig.Devnet:
-		var dnConfig devnetConfig
+		var dnConfig harmonyconfig.DevnetConfig
 		if config.Devnet != nil {
 			dnConfig = *config.Devnet
 		} else {
@@ -486,7 +497,7 @@ func findAccountsByPubKeys(config shardingconfig.Instance, pubKeys multibls.Publ
 	}
 }
 
-func setupLegacyNodeAccount(hc harmonyConfig) error {
+func setupLegacyNodeAccount(hc harmonyconfig.HarmonyConfig) error {
 	genesisShardingConfig := shard.Schedule.InstanceForEpoch(big.NewInt(core.GenesisEpoch))
 	multiBLSPubKey := setupConsensusKeys(hc, nodeconfig.GetDefaultConfig())
 
@@ -518,7 +529,7 @@ func setupLegacyNodeAccount(hc harmonyConfig) error {
 	return nil
 }
 
-func setupStakingNodeAccount(hc harmonyConfig) error {
+func setupStakingNodeAccount(hc harmonyconfig.HarmonyConfig) error {
 	pubKeys := setupConsensusKeys(hc, nodeconfig.GetDefaultConfig())
 	shardID, err := nodeconfig.GetDefaultConfig().ShardIDFromConsensusKey()
 	if err != nil {
@@ -539,7 +550,7 @@ func setupStakingNodeAccount(hc harmonyConfig) error {
 	return nil
 }
 
-func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
+func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType, error) {
 	var err error
 
 	if len(initialAccounts) == 0 {
@@ -604,7 +615,7 @@ func createGlobalConfig(hc harmonyConfig) (*nodeconfig.ConfigType, error) {
 	return nodeConfig, nil
 }
 
-func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) *node.Node {
+func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfig.ConfigType) *node.Node {
 	// Consensus object.
 	// TODO: consensus object shouldn't start here
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
@@ -621,7 +632,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 		os.Exit(1)
 	}
 
-	// Parse minPeers from harmonyConfig
+	// Parse minPeers from harmonyconfig.HarmonyConfig
 	var minPeers int
 	var aggregateSig bool
 	if hc.Consensus != nil {
@@ -642,7 +653,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes())
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -712,7 +723,7 @@ func setupConsensusAndNode(hc harmonyConfig, nodeConfig *nodeconfig.ConfigType) 
 	return currentNode
 }
 
-func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
+func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid uint32) {
 	prometheusConfig := prometheus.Config{
 		Enabled:    hc.Prometheus.Enabled,
 		IP:         hc.Prometheus.IP,
@@ -729,7 +740,7 @@ func setupPrometheusService(node *node.Node, hc harmonyConfig, sid uint32) {
 	node.RegisterService(service.Prometheus, p)
 }
 
-func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
+func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyConfig) {
 	blockchains := []*core.BlockChain{node.Blockchain()}
 	if !node.IsRunningBeaconChain() {
 		blockchains = append(blockchains, node.Beaconchain())
@@ -762,7 +773,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyConfig) {
 	node.Consensus.SetDownloader(d)
 }
 
-func setupBlacklist(hc harmonyConfig) (map[ethCommon.Address]struct{}, error) {
+func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
 	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {

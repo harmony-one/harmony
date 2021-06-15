@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/harmony-one/harmony/api/service/legacysync"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
@@ -38,31 +39,31 @@ func doMigrations(confVersion string, confTree *toml.Tree) error {
 	return nil
 }
 
-func migrateConf(confBytes []byte) (harmonyConfig, string, error) {
+func migrateConf(confBytes []byte) (harmonyconfig.HarmonyConfig, string, error) {
 	var (
 		migratedFrom string
 	)
 	confTree, err := toml.LoadBytes(confBytes)
 	if err != nil {
-		return harmonyConfig{}, "", fmt.Errorf("config file parse error - %s", err.Error())
+		return harmonyconfig.HarmonyConfig{}, "", fmt.Errorf("config file parse error - %s", err.Error())
 	}
 	confVersion, found := confTree.Get("Version").(string)
 	if !found {
-		return harmonyConfig{}, "", errors.New("config file invalid - no version entry found")
+		return harmonyconfig.HarmonyConfig{}, "", errors.New("config file invalid - no version entry found")
 	}
 	migratedFrom = confVersion
 	if confVersion != tomlConfigVersion {
 		err = doMigrations(confVersion, confTree)
 		if err != nil {
-			return harmonyConfig{}, "", err
+			return harmonyconfig.HarmonyConfig{}, "", err
 		}
 	}
 
 	// At this point we must be at current config version so
 	// we can safely unmarshal it
-	var config harmonyConfig
+	var config harmonyconfig.HarmonyConfig
 	if err := confTree.Unmarshal(&config); err != nil {
-		return harmonyConfig{}, "", err
+		return harmonyconfig.HarmonyConfig{}, "", err
 	}
 	return config, migratedFrom, nil
 }
@@ -154,6 +155,16 @@ func init() {
 		}
 
 		confTree.Set("Version", "2.0.0")
+		return confTree
+	}
+
+	migrations["2.0.0"] = func(confTree *toml.Tree) *toml.Tree {
+		// Legacy conf missing fields
+		if confTree.Get("Log.VerbosePrints") == nil {
+			confTree.Set("Log.VerbosePrints", defaultConfig.Log.VerbosePrints)
+		}
+
+		confTree.Set("Version", "2.1.0")
 		return confTree
 	}
 }
