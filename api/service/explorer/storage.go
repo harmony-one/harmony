@@ -203,11 +203,11 @@ func (storage *Storage) DumpCatchupBlock(block *types.Block) {
 }
 
 func (storage *Storage) isBlockComputed(bn uint64) bool {
-	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	if _, err := storage.GetDB().Get(blockCheckpoint, nil); err == nil {
+	if _, isDirty := storage.dirtyBNs[bn]; isDirty {
 		return true
 	}
-	if _, isDirty := storage.dirtyBNs[bn]; isDirty {
+	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
+	if _, err := storage.GetDB().Get(blockCheckpoint, nil); err == nil {
 		return true
 	}
 	return false
