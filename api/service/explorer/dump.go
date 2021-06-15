@@ -169,7 +169,7 @@ func (helper *ExplorerDumpHelper) updateTxRecordsToStorage(txResults map[string]
 			return err
 		}
 		// clean pending write buffer
-		helper.pendingWriteBuf = make([]map[string][]byte, 0, 50),
+		helper.pendingWriteBuf = make([]map[string][]byte, 0, 50)
 
 	} else {
 		helper.pendingWriteBuf = append(helper.pendingWriteBuf, txResults)
