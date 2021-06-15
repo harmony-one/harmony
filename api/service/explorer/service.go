@@ -75,6 +75,7 @@ func (s *Service) Stop() error {
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	s.Storage.Close()
 	return nil
 }
 
@@ -157,7 +158,7 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data.Addresses, err = s.Storage.GetAddresses(size, prefix)
+	data.Addresses, err = s.Storage.GetAddresses(size, oneAddress(prefix))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")

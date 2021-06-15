@@ -136,8 +136,8 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
-						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).DumpCatchupBlock(
+						node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
 				}
 			}()
 		})
@@ -153,7 +153,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	}
 	// Dump new block into level db.
 	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
+	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).DumpNewBlock(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
