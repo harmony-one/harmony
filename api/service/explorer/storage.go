@@ -256,7 +256,7 @@ func (storage *Storage) UpdateTxAddressStorage(addr oneAddress, txRecords TxReco
 }
 
 func (storage *Storage) flushLocked() error {
-	storage.lock.Lock()
+	storage.lock.RLock()
 	batch := new(leveldb.Batch)
 	for addr, addressInfo := range storage.dirty {
 		key := GetAddressKey(addr)
@@ -271,8 +271,9 @@ func (storage *Storage) flushLocked() error {
 		key := GetCheckpointKey(new(big.Int).SetUint64(bn))
 		batch.Put(key, []byte{})
 	}
-	storage.lock.Unlock()
+	storage.lock.RUnlock()
 
+	// Hack: during db write, dirty is read-only. We can release the lock for now.
 	if err := storage.db.Write(batch, nil); err != nil {
 		return errors.Wrap(err, "failed to write explorer data")
 	}
