@@ -5,6 +5,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/harmony-one/harmony/api/service"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -136,8 +138,8 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
-						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).DumpCatchupBlock(
+						node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
 				}
 			}()
 		})
@@ -153,7 +155,7 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	}
 	// Dump new block into level db.
 	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
+	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).DumpNewBlock(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
@@ -164,16 +166,8 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	addressData, err := node.explorerGetAddressData(address)
 	if err != nil {
-		utils.Logger().Debug().Err(err).
-			Msgf("[Explorer] Error retrieving transaction history for address %s", address)
-		return make([]common.Hash, 0), nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return nil, err
 	}
 	if order == "DESC" {
@@ -197,16 +191,8 @@ func (node *Node) GetTransactionsHistory(address, txType, order string) ([]commo
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	addressData, err := node.explorerGetAddressData(address)
 	if err != nil {
-		utils.Logger().Debug().Err(err).
-			Msgf("[Explorer] Staking transaction history for address %s not found", address)
-		return make([]common.Hash, 0), nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return nil, err
 	}
 	if order == "DESC" {
@@ -230,15 +216,8 @@ func (node *Node) GetStakingTransactionsHistory(address, txType, order string) (
 
 // GetTransactionsCount returns the number of regular transactions hashes of address for input type.
 func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	addressData, err := node.explorerGetAddressData(address)
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return 0, err
 	}
 
@@ -253,18 +232,10 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 
 // GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
 func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	addressData, err := node.explorerGetAddressData(address)
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return 0, err
 	}
-
 	count := uint64(0)
 	for _, tx := range addressData.StakingTXs {
 		if txType == "" || txType == "ALL" || txType == tx.Type {
@@ -272,4 +243,25 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 		}
 	}
 	return count, nil
+}
+
+func (node *Node) explorerGetAddressData(address string) (*explorer.Address, error) {
+	storage, err := node.getExplorerStorage()
+	if err != nil {
+		return nil, err
+	}
+	addrInfo, err := storage.GetAddressInfo(address)
+	if err != nil {
+		return nil, err
+	}
+	return addrInfo, nil
+}
+
+func (node *Node) getExplorerStorage() (*explorer.Storage, error) {
+	rawService := node.serviceManager.GetService(service.SupportExplorer)
+	if rawService == nil {
+		return nil, errors.New("explorer service not started")
+	}
+	expService := rawService.(*explorer.Service)
+	return expService.Storage, nil
 }

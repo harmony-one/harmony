@@ -56,6 +56,7 @@ func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service 
 		Port:       selfPeer.Port,
 		blockchain: bc,
 		backend:    backend,
+		Storage:    GetStorageInstance(selfPeer.IP, selfPeer.Port),
 	}
 }
 
@@ -64,6 +65,7 @@ func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	s.Storage.Start()
 	return nil
 }
 
@@ -75,6 +77,7 @@ func (s *Service) Stop() error {
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	s.Storage.Close()
 	return nil
 }
 
@@ -88,9 +91,7 @@ func GetExplorerPort(nodePort string) string {
 }
 
 // Init is to initialize for ExplorerService.
-func (s *Service) Init() {
-	s.Storage = GetStorageInstance(s.IP, s.Port)
-}
+func (s *Service) Init() {}
 
 // Run is to run serving explorer.
 func (s *Service) Run() *http.Server {
@@ -157,7 +158,7 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data.Addresses, err = s.Storage.GetAddresses(size, prefix)
+	data.Addresses, err = s.Storage.GetAddresses(size, oneAddress(prefix))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
