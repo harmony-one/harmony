@@ -1054,16 +1054,17 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 	return ss.getMaxPeerHeight(false)
 }
 
-// SyncStatus returns inSync and remote height
-func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64) {
-	outOfSync, remoteNum := ss.IsOutOfSync(bc, false)
-	return !outOfSync, remoteNum
+// SyncStatus returns inSync, remote height, and difference between remote height and local height
+func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64, uint64) {
+	outOfSync, remoteHeight, heightDiff := ss.IsOutOfSync(bc, false)
+	return !outOfSync, remoteHeight, heightDiff
 }
 
 // IsOutOfSync checks whether the node is out of sync from other peers
-func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64) {
+// It returns the sync status, remote height, and the difference betwen local blockchain and remote max height
+func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64, uint64) {
 	if ss.syncConfig == nil {
-		return true, 0 // If syncConfig is not instantiated, return not in sync
+		return true, 0, 0 // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := ss.getMaxPeerHeight(false)
 	lastHeight := bc.CurrentBlock().NumberU64()
@@ -1074,7 +1075,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, u
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
-		return wasOutOfSync, otherHeight1
+		return wasOutOfSync, otherHeight1, otherHeight1 - lastHeight
 	}
 	time.Sleep(1 * time.Second)
 	// double check the sync status after 1 second to confirm (avoid false alarm)
@@ -1090,7 +1091,7 @@ func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, u
 		Uint64("currentHeight", currentHeight).
 		Msg("[SYNC] Checking sync status")
 	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
-	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight, otherHeight2
+	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight, otherHeight2, otherHeight2 - currentHeight
 }
 
 // SyncLoop will keep syncing with peers until catches up

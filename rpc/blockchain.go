@@ -813,13 +813,13 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	inSync, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	return inSync, nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	inSync, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
 	return inSync, nil
 }
 

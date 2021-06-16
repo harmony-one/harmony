@@ -302,7 +302,7 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 		utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if outOfSync, _ := node.stateSync.IsOutOfSync(bc, true); outOfSync {
+	if outOfSync, _, _ := node.stateSync.IsOutOfSync(bc, true); outOfSync {
 		node.IsInSync.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
@@ -673,8 +673,9 @@ func (node *Node) getCommitSigFromDB(block *types.Block) ([]byte, error) {
 }
 
 // SyncStatus return the syncing status, including whether node is syncing
-// and the target block number.
-func (node *Node) SyncStatus(shardID uint32) (bool, uint64) {
+// and the target block number, and the difference between current block
+// and target block.
+func (node *Node) SyncStatus(shardID uint32) (bool, uint64, uint64) {
 	ds := node.getDownloaders()
 	if ds == nil || !ds.IsActive() {
 		// downloaders inactive. Ask DNS sync instead
@@ -683,23 +684,23 @@ func (node *Node) SyncStatus(shardID uint32) (bool, uint64) {
 	return ds.SyncStatus(shardID)
 }
 
-func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64) {
+func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 	switch shardID {
 	case node.NodeConfig.ShardID:
 		if node.stateSync == nil {
-			return false, 0
+			return false, 0, 0
 		}
 		return node.stateSync.SyncStatus(node.Blockchain())
 
 	case shard.BeaconChainShardID:
 		if node.beaconSync == nil {
-			return false, 0
+			return false, 0, 0
 		}
 		return node.beaconSync.SyncStatus(node.Beaconchain())
 
 	default:
 		// Shard node is not working on
-		return false, 0
+		return false, 0, 0
 	}
 }
 
@@ -710,7 +711,7 @@ func (node *Node) IsOutOfSync(shardID uint32) bool {
 		// downloaders inactive. Ask DNS sync instead
 		return node.legacyIsOutOfSync(shardID)
 	}
-	isSyncing, _ := ds.SyncStatus(shardID)
+	isSyncing, _, _ := ds.SyncStatus(shardID)
 	return !isSyncing
 }
 
@@ -720,14 +721,14 @@ func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 		if node.stateSync == nil {
 			return true
 		}
-		outOfSync, _ := node.stateSync.IsOutOfSync(node.Blockchain(), false)
+		outOfSync, _, _ := node.stateSync.IsOutOfSync(node.Blockchain(), false)
 		return outOfSync
 
 	case shard.BeaconChainShardID:
 		if node.beaconSync == nil {
 			return true
 		}
-		outOfSync, _ := node.beaconSync.IsOutOfSync(node.Beaconchain(), false)
+		outOfSync, _, _ := node.beaconSync.IsOutOfSync(node.Beaconchain(), false)
 		return outOfSync
 
 	default:

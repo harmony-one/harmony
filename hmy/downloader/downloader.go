@@ -117,12 +117,12 @@ func (d *Downloader) NumPeers() int {
 }
 
 // IsSyncing return the current sync status
-func (d *Downloader) SyncStatus() (bool, uint64) {
+func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	syncing, target := d.status.get()
 	if !syncing {
 		target = d.bc.CurrentBlock().NumberU64()
 	}
-	return syncing, target
+	return syncing, target, 0
 }
 
 // SubscribeDownloadStarted subscribe download started

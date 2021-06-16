@@ -29,6 +29,7 @@ const (
 	explorerPortDifference = 4000
 	defaultPageSize        = "1000"
 	maxAddresses           = 100000
+	nodeSyncTolerance      = 5
 )
 
 // HTTPError is an HTTP error.
@@ -270,12 +271,19 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetNodeSync returns status code 500 if node is not in sync
+// GetNodeSync returns status code Teapot 418 if node is not in sync
 func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	sync, _ := s.backend.SyncStatus(s.blockchain.ShardID())
+	sync, remote, diff := s.backend.SyncStatus(s.blockchain.ShardID())
 	if !sync {
-		w.WriteHeader(http.StatusTeapot)
+		utils.Logger().Debug().Uint64("remote", remote).Uint64("diff", diff).Msg("GetNodeSyncStatus")
+		if remote == 0 || diff > nodeSyncTolerance {
+			w.WriteHeader(http.StatusTeapot)
+		} else {
+			// return sync'ed if the diff is less than nodeSyncTolerance
+			// this tolerance is only applicable to /node-sync API call
+			sync = true
+		}
 	}
 	if err := json.NewEncoder(w).Encode(sync); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
