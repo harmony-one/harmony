@@ -2,28 +2,21 @@ package explorer
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"path"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // Constants for storage.
 const (
-	AddressPrefix        = "ad"
-	CheckpointPrefix     = "dc"
 	PrefixLen            = 3
 	addrIndexCacheSize   = 1000
 	flushNumberThreshold = 100              // flush every 100 blocks
@@ -34,22 +27,12 @@ const (
 
 type oneAddress string
 
-// GetAddressKey ...
-func GetAddressKey(address oneAddress) []byte {
-	return []byte(fmt.Sprintf("%s_%s", AddressPrefix, address))
-}
-
-// GetCheckpointKey ...
-func GetCheckpointKey(blockNum *big.Int) []byte {
-	return []byte(fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum))
-}
-
 var storage *Storage
 var once sync.Once
 
 // Storage dump the block info into leveldb.
 type Storage struct {
-	db       *leveldb.DB
+	db       database
 	clean    *lru.Cache
 	dirty    map[oneAddress]*Address
 	dirtyBNs map[uint64]struct{}
@@ -75,8 +58,11 @@ func GetStorageInstance(ip, port string) *Storage {
 }
 
 func newStorageInstance(ip, port string) (*Storage, error) {
-	db, err := newStorageDB(ip, port)
+	dbPath := defaultDBPath(ip, port)
+	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
+	db, err := newLvlDB(dbPath)
 	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Failed to create new database")
 		return nil, err
 	}
 	clean, _ := lru.New(addrIndexCacheSize)
@@ -92,23 +78,8 @@ func newStorageInstance(ip, port string) (*Storage, error) {
 	}, nil
 }
 
-func newStorageDB(ip, port string) (*leveldb.DB, error) {
-	dbFileName := path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
-	utils.Logger().Info().Msg("explorer storage folder: " + dbFileName)
-	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
-	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
-	options := &opt.Options{
-		OpenFilesCacheCapacity: 0,
-		BlockCacheCapacity:     0,
-		WriteBuffer:            0,
-		Filter:                 filter.NewBloomFilter(10),
-	}
-	db, err := leveldb.OpenFile(dbFileName, options)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create new database")
-		return nil, err
-	}
-	return db, nil
+func defaultDBPath(ip, port string) string {
+	return path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
 }
 
 func (storage *Storage) Start() {
@@ -169,7 +140,7 @@ func (storage *Storage) loop() {
 }
 
 // GetDB returns the LDBDatabase of the storage.
-func (storage *Storage) GetDB() *leveldb.DB {
+func (storage *Storage) GetDB() database {
 	return storage.db
 }
 
@@ -206,11 +177,7 @@ func (storage *Storage) isBlockComputed(bn uint64) bool {
 	if _, isDirty := storage.dirtyBNs[bn]; isDirty {
 		return true
 	}
-	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	if _, err := storage.GetDB().Get(blockCheckpoint, nil); err == nil {
-		return true
-	}
-	return false
+	return storage.isBlockComputedInDB(bn)
 }
 
 func (storage *Storage) handleBlock(b *types.Block) error {
@@ -260,39 +227,6 @@ func (storage *Storage) UpdateTxAddressStorage(addr oneAddress, txRecords TxReco
 	return nil
 }
 
-func (storage *Storage) flushLocked() error {
-	storage.lock.RLock()
-	batch := new(leveldb.Batch)
-	for addr, addressInfo := range storage.dirty {
-		key := GetAddressKey(addr)
-		encoded, err := rlp.EncodeToBytes(addressInfo)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("error when flushing explorer")
-			return err
-		}
-		batch.Put(key, encoded)
-	}
-	for bn := range storage.dirtyBNs {
-		key := GetCheckpointKey(new(big.Int).SetUint64(bn))
-		batch.Put(key, []byte{})
-	}
-	storage.lock.RUnlock()
-
-	// Hack: during db write, dirty is read-only. We can release the lock for now.
-	if err := storage.db.Write(batch, nil); err != nil {
-		return errors.Wrap(err, "failed to write explorer data")
-	}
-	// clean up
-	storage.lock.Lock()
-	defer storage.lock.Unlock()
-	for addr, addressInfo := range storage.dirty {
-		storage.clean.Add(addr, addressInfo)
-	}
-	storage.dirty = make(map[oneAddress]*Address)
-	storage.dirtyBNs = make(map[uint64]struct{})
-	return nil
-}
-
 // GetAddressInfo get the address info of the given address
 func (storage *Storage) GetAddressInfo(addr string) (*Address, error) {
 	storage.lock.RLock()
@@ -308,7 +242,7 @@ func (storage *Storage) getAddressInfo(addr oneAddress) (*Address, error) {
 	if x, ok := storage.clean.Get(addr); ok {
 		return x.(*Address), nil
 	}
-	addrInfo, err := storage.readAddressInfoFromDB(addr)
+	addrInfo, err := readAddressInfoFromDB(storage.db, addr)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
 			return &Address{
@@ -321,24 +255,11 @@ func (storage *Storage) getAddressInfo(addr oneAddress) (*Address, error) {
 	return addrInfo, nil
 }
 
-func (storage *Storage) readAddressInfoFromDB(addr oneAddress) (*Address, error) {
-	key := GetAddressKey(addr)
-	val, err := storage.GetDB().Get(key, nil)
-	if err != nil {
-		return nil, err
-	}
-	var addrInfo *Address
-	if err := rlp.DecodeBytes(val, &addrInfo); err != nil {
-		return nil, err
-	}
-	return addrInfo, nil
-}
-
 // GetAddresses returns size of addresses from address with prefix.
 func (storage *Storage) GetAddresses(size int, prefix oneAddress) ([]string, error) {
 	db := storage.GetDB()
 	key := GetAddressKey(prefix)
-	iterator := db.NewIterator(&util.Range{Start: []byte(key)}, nil)
+	iterator := db.NewPrefixIterator(key)
 	addresses := make([]string, 0)
 	read := 0
 	for iterator.Next() && read < size {

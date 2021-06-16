@@ -1,0 +1,100 @@
+package explorer
+
+import (
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/filter"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+	levelutil "github.com/syndtr/goleveldb/leveldb/util"
+)
+
+// database is an adapter for *leveldb.DB
+type database interface {
+	databaseWriter
+	databaseReader
+	NewBatch() batch
+}
+
+type databaseWriter interface {
+	Put(key, val []byte) error
+}
+
+type databaseReader interface {
+	Get(key []byte) ([]byte, error)
+	Has(key []byte) (bool, error)
+	NewPrefixIterator(prefix []byte) iterator
+}
+
+type batch interface {
+	databaseWriter
+	Write() error
+}
+
+// lvlDB is the adapter for leveldb.Database
+type lvlDB struct {
+	db *leveldb.DB
+}
+
+func newLvlDB(dbPath string) (database, error) {
+	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
+	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
+	options := &opt.Options{
+		OpenFilesCacheCapacity: 0,
+		BlockCacheCapacity:     0,
+		WriteBuffer:            0,
+		Filter:                 filter.NewBloomFilter(10),
+	}
+	db, err := leveldb.OpenFile(dbPath, options)
+	if err != nil {
+		return nil, err
+	}
+	return &lvlDB{db}, nil
+}
+
+func (db *lvlDB) Put(key, val []byte) error {
+	return db.db.Put(key, val, nil)
+}
+
+func (db *lvlDB) Get(key []byte) ([]byte, error) {
+	return db.db.Get(key, nil)
+}
+
+func (db *lvlDB) Has(key []byte) (bool, error) {
+	return db.db.Has(key, nil)
+}
+
+func (db *lvlDB) NewBatch() batch {
+	batch := new(leveldb.Batch)
+	return &lvlBatch{
+		batch: batch,
+		db:    db.db,
+	}
+}
+
+func (db *lvlDB) NewPrefixIterator(prefix []byte) iterator {
+	rng := levelutil.BytesPrefix(prefix)
+	it := db.db.NewIterator(rng, nil)
+	return it
+}
+
+// Note: lvlBatch is not thread safe
+type lvlBatch struct {
+	batch *leveldb.Batch
+	db    *leveldb.DB
+}
+
+func (b *lvlBatch) Put(key, val []byte) error {
+	b.batch.Put(key, val)
+	return nil
+}
+
+func (b *lvlBatch) Write() error {
+	return b.db.Write(b.batch, nil)
+}
+
+type iterator interface {
+	Next() bool
+	Key() []byte
+	Value() []byte
+	Release()
+	Error() error
+}
