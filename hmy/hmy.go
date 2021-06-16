@@ -88,7 +88,7 @@ type NodeAPI interface {
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
-	SyncStatus(shardID uint32) (bool, uint64)
+	SyncStatus(shardID uint32) (bool, uint64, uint64)
 	SyncPeers() map[string]int
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
