@@ -342,10 +342,84 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 	return sub, nil
 }
 
+// same as TraceBlock, but only use 1 thread
+func (hmy *Harmony) traceBlockNoThread(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
+	// Create the parent state database
+	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
+		return nil, err
+	}
+	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	if parent == nil {
+		return nil, fmt.Errorf("parent %#x not found", block.ParentHash())
+	}
+	reexec := defaultTraceReexec
+	if config != nil && config.Reexec != nil {
+		reexec = *config.Reexec
+	}
+	statedb, err := hmy.ComputeStateDB(parent, reexec)
+	if err != nil {
+		return nil, err
+	}
+	// Execute all the transaction contained within the block concurrently
+	var (
+		hmySigner = types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+		ethSigner = types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+		txs       = block.Transactions()
+		results   = make([]*TxTraceResult, len(txs))
+	)
+
+	blockHash := block.Hash()
+	// Feed the transactions into the tracers and return
+	var failed error
+traceLoop:
+	for i, tx := range txs {
+		signer := hmySigner
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
+		// Generate the next state snapshot fast without tracing
+		msg, _ := tx.AsMessage(signer)
+
+		ethTx := tx.ConvertToEth()
+		statedb.Prepare(ethTx.Hash(), blockHash, i)
+		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		res, err := hmy.TraceTx(ctx, msg, vmctx, statedb, config)
+		if err != nil {
+			results[i] = &TxTraceResult{Error: err.Error()}
+			failed = err
+			break
+		}
+		results[i] = &TxTraceResult{Result: res}
+		// Finalize the state so any modifications are written to the trie
+		statedb.Finalise(true)
+		select {
+		case <-ctx.Done():
+			failed = errors.New("trace task was canceled!")
+			break traceLoop
+		default:
+		}
+	}
+
+	// If execution failed in between, abort
+	if failed != nil {
+		return nil, failed
+	}
+	return results, nil
+}
+
 // TraceBlock configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
 // per transaction, dependent on the requested tracer.
 func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*TxTraceResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("canceled!")
+	default:
+	}
+
+	if *config.Tracer == "ParityBlockTracer" {
+		return hmy.traceBlockNoThread(ctx, block, config)
+	}
 	// Create the parent state database
 	if err := hmy.BlockChain.Engine().VerifyHeader(hmy.BlockChain, block.Header(), true); err != nil {
 		return nil, err
