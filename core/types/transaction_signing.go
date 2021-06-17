@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/harmony-one/harmony/crypto/hash"
+	ourscommon "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -149,6 +150,9 @@ func (s EIP155Signer) Sender(tx InternalTransaction) (common.Address, error) {
 		return common.Address{}, ErrInvalidChainID
 	}
 	V := new(big.Int).Sub(tx.V(), s.chainIDMul)
+	if tx.R().Sign() == 0 && tx.S().Sign() == 0 && V.BitLen() <= 8 && V.Uint64() == 35 {
+		return common.Address(ourscommon.NewEntryPointAddress()), nil
+	}
 	V.Sub(V, big8)
 	return recoverPlain(s.Hash(tx), tx.R(), tx.S(), V, true)
 }
@@ -242,7 +246,7 @@ func (fs FrontierSigner) SignatureValues(tx InternalTransaction, sig []byte) (r,
 func (fs FrontierSigner) Hash(tx InternalTransaction) common.Hash {
 	return hash.FromRLP([]interface{}{
 		tx.Nonce(),
-		tx.GasPrice(),
+		tx.RawGasPrice(),
 		tx.GasLimit(),
 		tx.ShardID(),
 		tx.ToShardID(),
@@ -262,6 +266,9 @@ func recoverPlain(sighash common.Hash, R, S, Vb *big.Int, homestead bool) (commo
 		return common.Address{}, ErrInvalidSig
 	}
 	V := byte(Vb.Uint64() - 27)
+	if R.Sign() == 0 && S.Sign() == 0 && V == 0 {
+		return common.Address(ourscommon.NewEntryPointAddress()), nil
+	}
 	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
 		return common.Address{}, ErrInvalidSig
 	}

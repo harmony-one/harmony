@@ -37,4 +37,10 @@ var (
 
 	// ErrShardStateNotMatch is returned if the calculated shardState hash not equal that in the block header
 	ErrShardStateNotMatch = errors.New("shard state root hash not match")
+
+	ErrInvalidAATransaction = errors.New("invalid account abstraction transaction")
+
+	ErrInvalidAAPrefix = errors.New("invalid account abstraction prefix")
+
+	ErrNoPaygas = errors.New("account abstraction transaction did not call PAYGAS")
 )

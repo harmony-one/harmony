@@ -35,7 +35,7 @@ func TestStrictTxListAdd(t *testing.T) {
 		txs[i] = transaction(0, uint64(i), 0, key)
 	}
 	// Insert the transactions in a random order
-	list := newTxList(true)
+	list := newTxList(true, false)
 	for _, v := range rand.Perm(len(txs)) {
 		list.Add(txs[v], DefaultTxPoolConfig.PriceBump)
 	}

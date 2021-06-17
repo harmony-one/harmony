@@ -36,6 +36,11 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+type headerGetter interface {
+	// GetHeader returns the hash corresponding to their hash.
+	GetHeader(common.Hash, uint64) *block.Header
+}
+
 // ChainContext supports retrieving headers and consensus parameters from the
 // current blockchain to be used during transaction processing.
 type ChainContext interface {
@@ -77,6 +82,10 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		vrfAndProof := header.Vrf()
 		copy(vrf[:], vrfAndProof[:32])
 	}
+	var paygasMode = vm.PaygasNoOp
+	if msg.IsAA() {
+		paygasMode = vm.PaygasContinue
+	}
 	return vm.Context{
 		CanTransfer:           CanTransfer,
 		Transfer:              Transfer,
@@ -100,6 +109,9 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		CalculateMigrationGas: CalculateMigrationGasFn(chain),
 		ShardID:               chain.ShardID(),
 		NumShards:             shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards(),
+
+		PaygasMode: paygasMode,
+		TxGasLimit: msg.Gas(),
 	}
 }
 
@@ -418,7 +430,7 @@ func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 }
 
 // GetHashFn returns a GetHashFunc which retrieves header hashes by number
-func GetHashFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash {
+func GetHashFn(ref *block.Header, chain headerGetter) func(n uint64) common.Hash {
 	var cache map[uint64]common.Hash
 
 	return func(n uint64) common.Hash {

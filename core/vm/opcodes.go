@@ -198,6 +198,11 @@ const (
 	LOG4
 )
 
+// account Abstraction ops.
+const (
+	PAYGAS OpCode = 0xaa + iota
+)
+
 // unofficial opcodes used for parsing.
 const (
 	PUSH OpCode = 0xb0 + iota
@@ -371,6 +376,8 @@ var opCodeToString = map[OpCode]string{
 	LOG3:   "LOG3",
 	LOG4:   "LOG4",
 
+	PAYGAS: "PAYGAS",
+
 	// 0xf0 range.
 	CREATE:       "CREATE",
 	CALL:         "CALL",
@@ -531,6 +538,7 @@ var stringToOp = map[string]OpCode{
 	"LOG2":           LOG2,
 	"LOG3":           LOG3,
 	"LOG4":           LOG4,
+	"PAYGAS":         PAYGAS,
 	"CREATE":         CREATE,
 	"CREATE2":        CREATE2,
 	"CALL":           CALL,

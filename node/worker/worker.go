@@ -92,7 +92,7 @@ func (w *Worker) CommitSortedTransactions(
 		if tx.IsEthCompatible() {
 			signer = w.current.ethSigner
 		}
-		from, _ := types.Sender(signer, tx)
+		sponsor, _ := tx.Sponsor(signer)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
@@ -110,7 +110,7 @@ func (w *Worker) CommitSortedTransactions(
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
 		err := w.commitTransaction(tx, coinbase)
 
-		sender, _ := common2.AddressToBech32(from)
+		sender, _ := common2.AddressToBech32(sponsor)
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account

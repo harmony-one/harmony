@@ -28,6 +28,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
+	"github.com/harmony-one/harmony/block"
+	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,8 +77,20 @@ func (bc *testBlockChain) CurrentBlock() *types.Block {
 		Header(), nil, nil, nil, nil, nil)
 }
 
+func (bc *testBlockChain) Config() *params.ChainConfig {
+	return params.AllProtocolChanges
+}
+
+func (bc *testBlockChain) Engine() consensus_engine.Engine {
+	return nil // TODO
+}
+
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
 	return bc.CurrentBlock()
+}
+
+func (bc *testBlockChain) GetHeader(hash common.Hash, number uint64) *block.Header {
+	return bc.CurrentBlock().Header()
 }
 
 func (bc *testBlockChain) StateAt(common.Hash) (*state.DB, error) {
@@ -520,6 +534,9 @@ func TestTransactionQueue(t *testing.T) {
 	pool.currentState.SetNonce(from, 2)
 	pool.enqueueTx(tx)
 	pool.promoteExecutables([]common.Address{from})
+	if pool.pending[from] == nil {
+		t.Fatal("expected pending transactions")
+	}
 	if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
 		t.Error("expected transaction to be in tx pool")
 	}
@@ -549,6 +566,137 @@ func TestTransactionQueue(t *testing.T) {
 	}
 	if pool.queue[from].Len() != 2 {
 		t.Error("expected len(queue) == 2, got", pool.queue[from].Len())
+	}
+}
+
+func TestAAQueue(t *testing.T) {
+	t.Parallel()
+
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+	key1, _ := crypto.GenerateKey()
+	config := testTxPoolConfig
+	beforeLimit := config.AAGasLimit
+	config.AAGasLimit = 400000
+
+	eoa := crypto.PubkeyToAddress(key1.PublicKey)
+	address1 := crypto.CreateAddress(eoa, 0)
+
+	tx1 := aaTransaction(address1, 50000, 1, false, big.NewInt(1))
+	tx2 := aaTransaction(address1, 400000, 16000, true, big.NewInt(1))
+	tx3 := aaTransaction(address1, 50000, 1, true, big.NewInt(1))
+	tx4 := aaTransaction(address1, 50000, 1, true, big.NewInt(2))
+
+	pool.currentState.SetCode(address1, common.FromHex(contractCode))
+	pool.currentState.AddBalance(address1, big.NewInt(1000000))
+	pool.currentState.SetNonce(address1, 1)
+
+	pool.lockedReset(nil, nil)
+	pool.add(tx1, false)
+	pool.add(tx2, false)
+
+	// any aa validation error (in this case, does not call paygas)
+	// should not progress the tx
+	// Also if gas required is greater than the config max
+	if len(pool.queue) != 0 {
+		t.Error("expected valid txs to be 0 is", len(pool.queue))
+	}
+
+	pool.add(tx3, false)
+
+	if len(pool.queue) != 1 {
+		t.Error("expected valid txs to be 1 is", len(pool.queue))
+	}
+
+	pool.promoteExecutables([]common.Address{address1})
+
+	pool.add(tx4, false)
+
+	if len(pool.queue) > 0 {
+		t.Error("expected transaction queue to be empty. is", len(pool.queue))
+	}
+	if len(pool.pending) != 1 {
+		t.Error("expected pending to have a transaction", len(pool.pending))
+	}
+
+	config.AAGasLimit = beforeLimit
+}
+
+func TestAAQueue2(t *testing.T) {
+	t.Parallel()
+
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+	key1, _ := crypto.GenerateKey()
+
+	eoa := crypto.PubkeyToAddress(key1.PublicKey)
+	address1 := crypto.CreateAddress(eoa, 0)
+
+	tx1 := aaTransaction(address1, 50000, 1, true, big.NewInt(1))
+	tx2 := aaTransaction(address1, 50000, 1, true, big.NewInt(2))
+	tx3 := aaTransaction(address1, 50000, 1, true, big.NewInt(2))
+
+	pool.currentState.SetCode(address1, common.FromHex(contractCode))
+	pool.currentState.AddBalance(address1, big.NewInt(1000000))
+	pool.currentState.SetNonce(address1, 1)
+
+	pool.reset(nil, nil)
+	pool.add(tx1, false)
+	pool.add(tx2, false)
+	pool.add(tx3, false)
+
+	if len(pool.queue) != 1 {
+		t.Error("expected valid txs to be 1 is", len(pool.queue))
+	}
+
+	// higher priced transaction should replace the lower priced
+	if pool.queue[address1].txs.Flatten()[0].Hash() != tx2.Hash() {
+		t.Error("expected higher gas price transaction to be accepted")
+	}
+}
+
+func TestAAPending(t *testing.T) {
+	t.Parallel()
+
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+	key1, _ := crypto.GenerateKey()
+
+	eoa := crypto.PubkeyToAddress(key1.PublicKey)
+	address1 := crypto.CreateAddress(eoa, 0)
+
+	tx1 := aaTransaction(address1, 50000, 1, true, big.NewInt(1))
+	tx2 := aaTransaction(address1, 50000, 1, true, big.NewInt(2))
+	tx3 := aaTransaction(address1, 50000, 1, true, big.NewInt(2))
+
+	pool.currentState.SetCode(address1, common.FromHex(contractCode))
+	pool.currentState.AddBalance(address1, big.NewInt(1000000))
+	pool.currentState.SetNonce(address1, 1)
+
+	pool.lockedReset(nil, nil)
+
+	pool.add(tx1, false)
+	pool.promoteExecutables([]common.Address{address1})
+
+	if len(pool.queue) > 0 {
+		t.Error("expected transaction queue to be empty. is", len(pool.queue))
+	}
+	if len(pool.pending) != 1 {
+		t.Error("expected pending to have a transaction", len(pool.pending))
+	}
+
+	pool.add(tx2, false)
+	pool.add(tx3, false)
+
+	// Should replace the current pending directly
+	if len(pool.queue) > 0 {
+		t.Error("expected transaction queue to be empty. is", len(pool.queue))
+	}
+	if len(pool.pending) != 1 {
+		t.Error("expected pending to have a transaction", len(pool.pending))
+	}
+	if pool.pending[address1].txs.Flatten()[0].Hash() != tx2.Hash() {
+		t.Error("expected higher gas price transaction to be accepted")
 	}
 }
 
@@ -632,6 +780,9 @@ func TestTransactionDoubleNonce(t *testing.T) {
 		t.Errorf("second transaction insert failed (%v) or not reported replacement (%v)", err, replace)
 	}
 	pool.promoteExecutables([]common.Address{addr})
+	if pool.pending[addr] == nil {
+		t.Fatal("expected pending transactions")
+	}
 	if pool.pending[addr].Len() != 1 {
 		t.Error("expected 1 pending transactions, got", pool.pending[addr].Len())
 	}
@@ -667,6 +818,9 @@ func TestTransactionMissingNonce(t *testing.T) {
 	}
 	if len(pool.pending) != 0 {
 		t.Error("expected 0 pending transactions, got", len(pool.pending))
+	}
+	if pool.queue[addr] == nil {
+		t.Fatal("expecting queued transactions")
 	}
 	if pool.queue[addr].Len() != 1 {
 		t.Error("expected 1 queued transaction, got", pool.queue[addr].Len())
@@ -731,6 +885,9 @@ func TestTransactionDropping(t *testing.T) {
 	// Check that pre and post validations leave the pool as is
 	if pool.pending[account].Len() != 3 {
 		t.Errorf("pending transaction mismatch: have %d, want %d", pool.pending[account].Len(), 3)
+	}
+	if pool.queue[account] == nil {
+		t.Fatal("queued transaction mismatch: no queue")
 	}
 	if pool.queue[account].Len() != 3 {
 		t.Errorf("queued transaction mismatch: have %d, want %d", pool.queue[account].Len(), 3)

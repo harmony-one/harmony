@@ -33,6 +33,11 @@ type PoolTransaction interface {
 	Cost() (*big.Int, error)
 	EncodeRLP(w io.Writer) error
 	DecodeRLP(s *rlp.Stream) error
+	// Signature values
+	V() *big.Int
+	R() *big.Int
+	S() *big.Int
+	IsEthCompatible() bool
 }
 
 // PoolTransactions is a PoolTransactions slice type for basic sorting.

@@ -647,6 +647,12 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
 }
 
+// IsAccountAbstraction returns whether num is either equal to the AA fork block or greater.
+func (c *ChainConfig) IsAccountAbstraction(epoch *big.Int) bool {
+	// TODO: Replace with correct block number
+	return false //isForked(c.IstanbulEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -698,7 +704,7 @@ type Rules struct {
 	ChainID    *big.Int
 	EthChainID *big.Int
 	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
-	IsStakingPrecompile, IsCrossShardXferPrecompile, IsChainIdFix bool
+	IsStakingPrecompile, IsCrossShardXferPrecompile, IsChainIdFix, IsAccountAbstraction bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -735,5 +741,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
+		IsAccountAbstraction:       c.IsAccountAbstraction(epoch),
 	}
 }
