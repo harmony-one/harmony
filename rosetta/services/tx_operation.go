@@ -41,7 +41,7 @@ func GetNativeOperationsFromTransaction(
 	}
 
 	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
+	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.RawGasPrice())
 	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
 	startingOpIndex := gasOperations[0].OperationIdentifier.Index + 1
 

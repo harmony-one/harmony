@@ -1,4 +1,4 @@
-// Copyright 2014 The go-ethereum Authors
+// Copyright 2017 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,18 +14,39 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package vm
+package core
 
-import "errors"
+import (
+	"errors"
 
-// List execution errors
-var (
-	ErrOutOfGas                 = errors.New("out of gas")
-	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
-	ErrDepth                    = errors.New("max call depth exceeded")
-	ErrTraceLimitReached        = errors.New("the number of logs reached the specified limit")
-	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
-	ErrContractAddressCollision = errors.New("contract address collision")
-	ErrNoCompatibleInterpreter  = errors.New("no compatible interpreter")
-	ErrPaygasInsufficientFunds  = errors.New("during paygas insufficient funds for gas * price + value")
+	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 )
+
+var (
+	ErrMalformedAATransaction = errors.New("AA transaction malformed")
+)
+
+func Validate(tx *types.Transaction, s types.Signer, evm *vm.EVM, gasLimit uint64) error {
+	msg, err := tx.AsMessage(s)
+	if err != nil {
+		return err
+	} else if !msg.IsAA() {
+		return ErrMalformedAATransaction
+	}
+
+	evm.TxGasLimit = tx.GasLimit()
+	if gasLimit > tx.GasLimit() {
+		gasLimit = tx.GasLimit()
+	}
+	msg.SetGas(gasLimit)
+	gp := new(GasPool).AddGas(gasLimit)
+
+	evm.PaygasMode = vm.PaygasHalt
+	_, err = ApplyMessage(evm, msg, gp)
+	if err != nil {
+		return err
+	}
+	tx.SetAAGasPrice(evm.GasPrice)
+	return nil
+}

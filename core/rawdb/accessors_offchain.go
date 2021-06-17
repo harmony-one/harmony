@@ -301,7 +301,7 @@ func ReadBlockCommitSig(db DatabaseReader, blockNum uint64) ([]byte, error) {
 		//       this is only needed for the compatibility in the migration moment.
 		data, err = db.Get(lastCommitsKey)
 		if err != nil {
-			return nil, errors.New("cannot read commit sig for block " + string(blockNum))
+			return nil, errors.Errorf("cannot read commit sig for block %d", blockNum)
 		}
 	}
 	return data, nil

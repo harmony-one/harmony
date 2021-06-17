@@ -404,6 +404,12 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 	return isForked(c.ReceiptLogEpoch, epoch)
 }
 
+// IsAccountAbstraction returns whether num is either equal to the AA fork block or greater.
+func (c *ChainConfig) IsAccountAbstraction(epoch *big.Int) bool {
+	// TODO: Replace with correct block number
+	return isForked(c.IstanbulEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -455,6 +461,7 @@ type Rules struct {
 	ChainID                                               *big.Int
 	EthChainID                                            *big.Int
 	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
+	IsAccountAbstraction                                  bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -468,12 +475,13 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ethChainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:      new(big.Int).Set(chainID),
-		EthChainID:   new(big.Int).Set(ethChainID),
-		IsCrossLink:  c.IsCrossLink(epoch),
-		IsEIP155:     c.IsEIP155(epoch),
-		IsS3:         c.IsS3(epoch),
-		IsReceiptLog: c.IsReceiptLog(epoch),
-		IsIstanbul:   c.IsIstanbul(epoch),
+		ChainID:              new(big.Int).Set(chainID),
+		EthChainID:           new(big.Int).Set(ethChainID),
+		IsCrossLink:          c.IsCrossLink(epoch),
+		IsEIP155:             c.IsEIP155(epoch),
+		IsS3:                 c.IsS3(epoch),
+		IsReceiptLog:         c.IsReceiptLog(epoch),
+		IsIstanbul:           c.IsIstanbul(epoch),
+		IsAccountAbstraction: c.IsAccountAbstraction(epoch),
 	}
 }

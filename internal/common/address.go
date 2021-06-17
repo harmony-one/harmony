@@ -26,6 +26,15 @@ const (
 // Address represents the 20 byte address of an Harmony account.
 type Address [AddressLength]byte
 
+// NewEntryPointAddress returns an ENTRY_POINT Address.
+func NewEntryPointAddress() Address {
+	var a Address
+	for i := range a {
+		a[i] = 0xFF
+	}
+	return a
+}
+
 // BytesToAddress returns Address with value b.
 // If b is larger than len(h), b will be cropped from the left.
 func BytesToAddress(b []byte) Address {
@@ -48,6 +57,16 @@ func IsBech32Address(s string) bool {
 	hrp, bytes, err := bech32.DecodeAndConvert(s)
 	if err != nil || (hrp != "one" && hrp != "tone") || len(bytes) != AddressLength {
 		return false
+	}
+	return true
+}
+
+// IsEntryPointAddress returns true if the Address is the ENTRY_POINT Address.
+func (a Address) IsEntryPoint() bool {
+	for i := range a {
+		if a[i] != 0xFF {
+			return false
+		}
 	}
 	return true
 }

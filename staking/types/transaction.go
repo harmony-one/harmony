@@ -259,6 +259,14 @@ func (tx *StakingTransaction) IsEthCompatible() bool {
 	return false
 }
 
+func (tx *StakingTransaction) RawGasPrice() *big.Int {
+	return tx.data.Price
+}
+
+func (tx *StakingTransaction) IsAA() bool {
+	return false
+}
+
 type writeCounter common.StorageSize
 
 func (c *writeCounter) Write(b []byte) (int, error) {
@@ -327,4 +335,43 @@ func (tx *StakingTransaction) SenderAddress() (common.Address, error) {
 // From returns the sender address of the transaction
 func (tx *StakingTransaction) From() *atomic.Value {
 	return &tx.from
+}
+
+/*
+// AsMessage returns the transaction as a core.Message.
+//
+// AsMessage requires a signer to derive the sender.
+//
+// XXX Rename message to something less arbitrary?
+func (tx *StakingTransaction) AsMessage(s Signer) (coretypes.Message, error) {
+	msg := Message{
+		nonce:    tx.data.AccountNonce,
+		gasLimit: tx.data.GasLimit,
+		gasPrice: new(big.Int).Set(tx.data.Price),
+		to:       tx.data.Recipient,
+		amount:   tx.data.Amount,
+		data:     tx.data.Payload,
+	}
+
+	var err error
+	msg.from, err = Sender(s, tx)
+	msg.isAA = msg.from.IsEntryPoint()
+	msg.checkNonce = !msg.isAA
+	return msg, err
+}
+*/
+
+// V value of the transaction signature
+func (tx *StakingTransaction) V() *big.Int {
+	return tx.data.V
+}
+
+// R value of the transaction signature
+func (tx *StakingTransaction) R() *big.Int {
+	return tx.data.R
+}
+
+// S value of the transaction signature
+func (tx *StakingTransaction) S() *big.Int {
+	return tx.data.S
 }

@@ -104,6 +104,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	if !cfg.JumpTable[STOP].valid {
 		var jt JumpTable
 		switch {
+		case evm.chainRules.IsAccountAbstraction:
+			jt = newAccountAbstractionInstructionSet(evm.PaygasMode)
 		case evm.chainRules.IsIstanbul:
 			jt = istanbulInstructionSet
 		case evm.chainRules.IsS3:
@@ -208,6 +210,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		op = contract.GetOp(pc)
 		operation := in.cfg.JumpTable[op]
 		if !operation.valid {
+			return nil, fmt.Errorf("invalid opcode 0x%x", int(op))
+		}
+		if in.evm.PaygasMode != PaygasNoOp && !operation.internal {
 			return nil, fmt.Errorf("invalid opcode 0x%x", int(op))
 		}
 		// Validate stack

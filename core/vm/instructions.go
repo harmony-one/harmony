@@ -18,6 +18,7 @@ package vm
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -836,6 +837,15 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, contract *Contract, m
 	// Pop other call parameters.
 	addr, inOffset, inSize, retOffset, retSize := stack.pop(), stack.pop(), stack.pop(), stack.pop(), stack.pop()
 	toAddr := common.BigToAddress(addr)
+
+	// During AA execution before PAYGAS, restrict STATICCALL to only the precompile range as per EIP-1352.
+	// Note: This EIP is not yet accepted, but sufficient for AA prototyping.
+	if interpreter.evm.PaygasMode != PaygasNoOp && addr.Cmp(big.NewInt(0x10000)) != -1 {
+		stack.push(interpreter.intPool.getZero())
+		interpreter.intPool.put(addr, inOffset, inSize, retOffset, retSize)
+		return nil, fmt.Errorf("invalid opcode 0x%x", int(STATICCALL))
+	}
+
 	// Get arguments from the memory.
 	args := memory.GetPtr(inOffset.Int64(), inSize.Int64())
 
@@ -906,6 +916,25 @@ func makeLog(size int) executionFunc {
 		interpreter.intPool.put(mStart, mSize)
 		return nil, nil
 	}
+}
+
+func opPaygas(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
+	gasprice := stack.pop()
+	if interpreter.evm.PaygasMode == PaygasNoOp {
+		interpreter.intPool.put(gasprice)
+	} else {
+		mgval := new(big.Int).Mul(new(big.Int).SetUint64(interpreter.evm.TxGasLimit), gasprice)
+		if interpreter.evm.StateDB.GetBalance(contract.Address()).Cmp(mgval) < 0 {
+			return nil, ErrPaygasInsufficientFunds
+		}
+		interpreter.evm.StateDB.SubBalance(contract.Address(), mgval)
+
+		interpreter.evm.snapshots[len(interpreter.evm.snapshots)-1] = interpreter.evm.StateDB.Snapshot()
+		interpreter.evm.PaygasMode = PaygasNoOp
+		interpreter.evm.GasPrice = gasprice
+	}
+
+	return nil, nil
 }
 
 // opPush1 is a specialized version of pushN

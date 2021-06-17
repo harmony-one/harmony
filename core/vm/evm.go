@@ -68,7 +68,8 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 				}(evm.interpreter)
 				evm.interpreter = interpreter
 			}
-			return interpreter.Run(contract, input, readOnly)
+			res, err := interpreter.Run(contract, input, readOnly)
+			return res, err
 		}
 	}
 	return nil, ErrNoCompatibleInterpreter
@@ -90,8 +91,10 @@ type Context struct {
 	IsValidator IsValidatorFunc
 
 	// Message information
-	Origin   common.Address // Provides information for ORIGIN
-	GasPrice *big.Int       // Provides information for GASPRICE
+	Origin     common.Address // Provides information for ORIGIN
+	GasPrice   *big.Int       // Provides information for GASPRICE
+	PaygasMode PaygasMode     // Controls the behavior of PAYGAS
+	TxGasLimit uint64         // The transaction gas limit, used by PAYGAS
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE
@@ -119,6 +122,8 @@ type EVM struct {
 	StateDB StateDB
 	// Depth is the current call stack
 	depth int
+	// Snapshots is a stack of state snapshots
+	snapshots []int
 
 	// chainConfig contains information about the current chain
 	chainConfig *params.ChainConfig
@@ -214,9 +219,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	var (
-		to       = AccountRef(addr)
-		snapshot = evm.StateDB.Snapshot()
+		to = AccountRef(addr)
 	)
+
+	evm.pushSnapshot()
+
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
@@ -231,6 +238,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
 				evm.vmConfig.Tracer.CaptureEnd(ret, 0, 0, nil)
 			}
+			evm.popSnapshot()
 			return nil, gas, nil
 		}
 		evm.StateDB.CreateAccount(addr)
@@ -262,6 +270,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}()
 	}
 	ret, err = run(evm, contract, input, false)
+
+	snapshot := evm.popSnapshot()
 
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
@@ -296,9 +306,10 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		return nil, gas, ErrInsufficientBalance
 	}
 
+	evm.pushSnapshot()
+
 	var (
-		snapshot = evm.StateDB.Snapshot()
-		to       = AccountRef(caller.Address())
+		to = AccountRef(caller.Address())
 	)
 	// initialise a new contract and set the code that is to be used by the
 	// EVM. The contract is a scoped environment for this execution context
@@ -307,6 +318,9 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	ret, err = run(evm, contract, input, false)
+
+	snapshot := evm.popSnapshot()
+
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -314,6 +328,16 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		}
 	}
 	return ret, contract.Gas, err
+}
+
+func (evm *EVM) pushSnapshot() {
+	evm.snapshots = append(evm.snapshots, evm.StateDB.Snapshot())
+}
+
+func (evm *EVM) popSnapshot() (ret int) {
+	popped := evm.snapshots[len(evm.snapshots)-1]
+	evm.snapshots = evm.snapshots[:len(evm.snapshots)-1]
+	return popped
 }
 
 // DelegateCall executes the contract associated with the addr with the given input
@@ -330,9 +354,10 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		return nil, gas, ErrDepth
 	}
 
+	evm.pushSnapshot()
+
 	var (
-		snapshot = evm.StateDB.Snapshot()
-		to       = AccountRef(caller.Address())
+		to = AccountRef(caller.Address())
 	)
 
 	// Initialise a new contract and make initialise the delegate values
@@ -340,6 +365,9 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	ret, err = run(evm, contract, input, false)
+
+	snapshot := evm.popSnapshot()
+
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -363,9 +391,11 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	}
 
 	var (
-		to       = AccountRef(addr)
-		snapshot = evm.StateDB.Snapshot()
+		to = AccountRef(addr)
 	)
+
+	evm.pushSnapshot()
+
 	// Initialise a new contract and set the code that is to be used by the
 	// EVM. The contract is a scoped environment for this execution context
 	// only.
@@ -382,6 +412,9 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in Homestead this also counts for code storage gas errors.
 	ret, err = run(evm, contract, input, true)
+
+	snapshot := evm.popSnapshot()
+
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -422,7 +455,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
 	// Create a new account on the state
-	snapshot := evm.StateDB.Snapshot()
+	evm.pushSnapshot()
 	evm.StateDB.CreateAccount(address)
 	if evm.ChainConfig().IsEIP155(evm.EpochNumber) {
 		evm.StateDB.SetNonce(address, 1)
@@ -436,6 +469,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	contract.SetCodeOptionalHash(&address, codeAndHash)
 
 	if evm.vmConfig.NoRecursion && evm.depth > 0 {
+		evm.popSnapshot()
 		return nil, address, gas, nil
 	}
 
@@ -445,6 +479,8 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	start := time.Now()
 
 	ret, err := run(evm, contract, nil, false)
+
+	snapshot := evm.popSnapshot()
 
 	// check whether the max code size has been exceeded
 	maxCodeSizeExceeded := evm.ChainConfig().IsEIP155(evm.EpochNumber) && len(ret) > params.MaxCodeSize

@@ -261,15 +261,17 @@ type txList struct {
 	lastStkCheck uint64   // Check all staking transaction validation every 10 blocks
 	costcap      *big.Int // Price of the highest costing transaction (reset only if exceeds balance)
 	gascap       uint64   // Gas limit of the highest spending transaction (reset only if exceeds block limit)
+	isAA         bool
 }
 
 // newTxList create a new transaction list for maintaining nonce-indexable fast,
 // gapped, sortable transaction lists.
-func newTxList(strict bool) *txList {
+func newTxList(strict bool, isAA bool) *txList {
 	return &txList{
 		strict:  strict,
 		txs:     newTxSortedMap(),
 		costcap: new(big.Int),
+		isAA:    isAA,
 	}
 }
 
@@ -315,6 +317,9 @@ func (l *txList) Add(tx types.PoolTransaction, priceBump uint64) (bool, types.Po
 // provided threshold. Every removed transaction is returned for any post-removal
 // maintenance.
 func (l *txList) Forward(threshold uint64) types.PoolTransactions {
+	if l.isAA {
+		return types.PoolTransactions{}
+	}
 	return l.txs.Forward(threshold)
 }
 
@@ -429,6 +434,9 @@ func (l *txList) Ready(start uint64) types.PoolTransactions {
 
 // Len returns the length of the transaction list.
 func (l *txList) Len() int {
+	if l == nil {
+		return 0
+	}
 	return l.txs.Len()
 }
 

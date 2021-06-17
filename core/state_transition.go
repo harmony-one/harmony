@@ -49,6 +49,11 @@ var (
 	errDupBlsKey                   = errors.New("BLS key exists")
 )
 
+var aaPrefix = [...]byte{
+	0x33, 0x73, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0x14, 0x60, 0x24, 0x57, 0x36, 0x60, 0x1f, 0x57, 0x00, 0x5b, 0x60, 0x00, 0x80, 0xfd, 0x5b,
+}
+
 /*
 StateTransition is the State Transitioning Model which is described as follows:
 
@@ -92,6 +97,8 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
+	IsAA() bool
+	Sponsor() common.Address
 	Type() types.TransactionType
 	BlockNum() *big.Int
 }
@@ -209,7 +216,7 @@ func (st *StateTransition) to() common.Address {
 
 func (st *StateTransition) useGas(amount uint64) error {
 	if st.gas < amount {
-		return vm.ErrOutOfGas
+		return ErrIntrinsicGas
 	}
 	st.gas -= amount
 
@@ -217,12 +224,15 @@ func (st *StateTransition) useGas(amount uint64) error {
 }
 
 func (st *StateTransition) buyGas() error {
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
-	if have := st.state.GetBalance(st.msg.From()); have.Cmp(mgval) < 0 {
-		return errors.Wrapf(
-			errInsufficientBalanceForGas,
-			"had: %s but need: %s", have.String(), mgval.String(),
-		)
+	var mgval *big.Int
+	if !st.msg.IsAA() {
+		mgval = new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
+		if have := st.state.GetBalance(st.msg.From()); have.Cmp(mgval) < 0 {
+			return errors.Wrapf(
+				errInsufficientBalanceForGas,
+				"had: %s but need: %s", have.String(), mgval.String(),
+			)
+		}
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
 		return err
@@ -230,7 +240,10 @@ func (st *StateTransition) buyGas() error {
 	st.gas += st.msg.Gas()
 
 	st.initialGas = st.msg.Gas()
-	st.state.SubBalance(st.msg.From(), mgval)
+	if !st.msg.IsAA() {
+		st.state.SubBalance(st.msg.Sponsor(), mgval)
+	}
+
 	return nil
 }
 
@@ -252,6 +265,25 @@ func (st *StateTransition) preCheck() error {
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
 func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
+	if st.msg.IsAA() {
+		if st.msg.Nonce() != 0 || st.msg.GasPrice().Sign() != 0 || st.msg.Value().Sign() != 0 {
+			return ExecutionResult{}, ErrInvalidAATransaction
+		}
+
+		code := st.evm.StateDB.GetCode(st.to())
+		if code == nil || len(code) < len(aaPrefix) {
+			return ExecutionResult{}, ErrInvalidAAPrefix
+		}
+		for i := range aaPrefix {
+			if code[i] != aaPrefix[i] {
+				return ExecutionResult{}, ErrInvalidAAPrefix
+			}
+		}
+		if st.evm.PaygasMode == vm.PaygasNoOp {
+			st.evm.PaygasMode = vm.PaygasContinue
+		}
+	}
+
 	if err := st.preCheck(); err != nil {
 		return ExecutionResult{}, err
 	}
@@ -279,9 +311,28 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	if contractCreation {
 		ret, _, st.gas, vmErr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
-		// Increment the nonce for the next transaction
-		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		if !msg.IsAA() {
+			// Increment the nonce for the next transaction
+			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		}
 		ret, st.gas, vmErr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
+		if msg.IsAA() && st.evm.PaygasMode != vm.PaygasNoOp {
+			if vmErr != nil {
+				return ExecutionResult{}, vmErr
+			} else {
+				return ExecutionResult{}, ErrNoPaygas
+			}
+		}
+	}
+	if st.msg.IsAA() {
+		st.gasPrice = st.evm.GasPrice
+		if msg.IsAA() && st.evm.PaygasMode != vm.PaygasNoOp {
+			if vmErr != nil {
+				return ExecutionResult{}, vmErr
+			} else {
+				return ExecutionResult{}, ErrNoPaygas
+			}
+		}
 	}
 	if vmErr != nil {
 		utils.Logger().Debug().Err(vmErr).Msg("VM returned with error")
@@ -292,6 +343,9 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		if vmErr == vm.ErrInsufficientBalance {
 			return ExecutionResult{}, vmErr
 		}
+	}
+	if st.msg.IsAA() {
+		st.gasPrice = st.evm.GasPrice
 	}
 	st.refundGas()
 
@@ -318,7 +372,7 @@ func (st *StateTransition) refundGas() {
 
 	// Return ETH for remaining gas, exchanged at the original rate.
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(st.gas), st.gasPrice)
-	st.state.AddBalance(st.msg.From(), remaining)
+	st.state.AddBalance(st.msg.Sponsor(), remaining)
 
 	// Also return remaining gas to the block gas counter so it is
 	// available for the next transaction.

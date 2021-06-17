@@ -91,15 +91,18 @@ type CoreTransaction interface {
 	Hash() common.Hash
 	Protected() bool
 	ChainID() *big.Int
+	RawGasPrice() *big.Int
+	IsAA() bool
 }
 
 // Transaction struct.
 type Transaction struct {
 	data txdata
 	// caches
-	hash atomic.Value
-	size atomic.Value
-	from atomic.Value
+	hash  atomic.Value
+	size  atomic.Value
+	from  atomic.Value
+	price atomic.Value
 }
 
 // String print mode string
@@ -286,6 +289,19 @@ func (tx *Transaction) GasLimit() uint64 {
 
 // GasPrice is the gas price of the transaction
 func (tx *Transaction) GasPrice() *big.Int {
+	if tx.IsAA() {
+		if price := tx.price.Load(); price != nil {
+			var current_price *big.Int = price.(*big.Int)
+			return current_price
+		}
+
+		return nil
+	}
+
+	return new(big.Int).Set(tx.data.Price)
+}
+
+func (tx *Transaction) RawGasPrice() *big.Int {
 	return tx.data.Price
 }
 
@@ -451,6 +467,20 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 	return &tx2
 }
 
+// IsAA returns the result of a basic AA signature check.
+func (tx *Transaction) IsAA() bool {
+	return tx.data.R.Sign() == 0 && tx.data.S.Sign() == 0
+}
+
+// Sponsor returns the address of the account paying for the transaction.
+func (tx *Transaction) Sponsor(s Signer) (common.Address, error) {
+	if tx.IsAA() {
+		return *tx.To(), nil
+	} else {
+		return Sender(s, tx)
+	}
+}
+
 // AsMessage returns the transaction as a core.Message.
 //
 // AsMessage requires a signer to derive the sender.
@@ -458,17 +488,18 @@ func (tx *Transaction) ConvertToEth() *EthTransaction {
 // XXX Rename message to something less arbitrary?
 func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 	msg := Message{
-		nonce:      tx.data.AccountNonce,
-		gasLimit:   tx.data.GasLimit,
-		gasPrice:   new(big.Int).Set(tx.data.Price),
-		to:         tx.data.Recipient,
-		amount:     tx.data.Amount,
-		data:       tx.data.Payload,
-		checkNonce: true,
+		nonce:    tx.data.AccountNonce,
+		gasLimit: tx.data.GasLimit,
+		gasPrice: new(big.Int).Set(tx.data.Price),
+		to:       tx.data.Recipient,
+		amount:   tx.data.Amount,
+		data:     tx.data.Payload,
 	}
 
 	var err error
 	msg.from, err = Sender(s, tx)
+	msg.isAA = common2.Address(msg.from).IsEntryPoint()
+	msg.checkNonce = !msg.isAA
 	return msg, err
 }
 
@@ -484,9 +515,19 @@ func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, e
 	return cpy, nil
 }
 
+func (tx *Transaction) WithAASignature() *Transaction {
+	cpy := &Transaction{data: tx.data}
+	cpy.data.V = big.NewInt(27)
+	return cpy
+}
+
 // Cost returns amount + gasprice * gaslimit.
 func (tx *Transaction) Cost() (*big.Int, error) {
-	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
+	total := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.data.GasLimit))
+	if tx.IsAA() {
+		return total, nil
+	}
+
 	total.Add(total, tx.data.Amount)
 	return total, nil
 }
@@ -494,6 +535,10 @@ func (tx *Transaction) Cost() (*big.Int, error) {
 // RawSignatureValues return raw signature values.
 func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
+}
+
+func (tx *Transaction) SetAAGasPrice(price *big.Int) {
+	tx.price.Store(price)
 }
 
 // Copy returns a copy of the transaction.
@@ -568,20 +613,20 @@ type TransactionsByPriceAndNonce struct {
 func NewTransactionsByPriceAndNonce(hmySigner Signer, ethSigner Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
-	for from, accTxs := range txs {
+	for sponsor, accTxs := range txs {
 		if accTxs.Len() == 0 {
 			continue
 		}
 		heads = append(heads, accTxs[0])
-		// Ensure the sender address is from the signer
+		// Ensure the sponsor address is correct
 		signer := hmySigner
 		if accTxs[0].IsEthCompatible() {
 			signer = ethSigner
 		}
-		acc, _ := Sender(signer, accTxs[0])
+		acc, _ := accTxs[0].Sponsor(signer)
 		txs[acc] = accTxs[1:]
-		if from != acc {
-			delete(txs, from)
+		if sponsor != acc {
+			delete(txs, sponsor)
 		}
 	}
 	heap.Init(&heads)
@@ -612,7 +657,7 @@ func (t *TransactionsByPriceAndNonce) Shift() {
 	if t.heads[0].IsEthCompatible() {
 		signer = t.ethSigner
 	}
-	acc, _ := Sender(signer, t.heads[0])
+	acc, _ := t.heads[0].Sponsor(signer)
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)
@@ -639,12 +684,16 @@ type Message struct {
 	gasPrice   *big.Int
 	data       []byte
 	checkNonce bool
+	isAA       bool
 	blockNum   *big.Int
 	txType     TransactionType
 }
 
+var AAEntryMessage = Message{from: common.Address(common2.NewEntryPointAddress()), gasPrice: big.NewInt(0), isAA: true}
+
 // NewMessage returns new message.
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
+	isAA := common2.Address(from).IsEntryPoint()
 	return Message{
 		from:       from,
 		to:         to,
@@ -653,7 +702,8 @@ func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *b
 		gasLimit:   gasLimit,
 		gasPrice:   gasPrice,
 		data:       data,
-		checkNonce: checkNonce,
+		checkNonce: checkNonce && !isAA,
+		isAA:       isAA,
 	}
 }
 
@@ -709,6 +759,19 @@ func (m Message) Data() []byte {
 // CheckNonce returns checkNonce of Message.
 func (m Message) CheckNonce() bool {
 	return m.checkNonce
+}
+
+func (m Message) IsAA() bool {
+	return m.isAA
+}
+
+func (m *Message) SetGas(gasLimit uint64) { m.gasLimit = gasLimit }
+func (m Message) Sponsor() common.Address {
+	if !m.isAA {
+		return m.from
+	} else {
+		return *m.to
+	}
 }
 
 // Type returns the type of message

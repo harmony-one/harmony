@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	ourscommon "github.com/harmony-one/harmony/internal/common"
 )
 
 //go:generate gencodec -type ethTxdata -field-override ethTxdataMarshaling -out gen_eth_tx_json.go
@@ -40,9 +41,10 @@ import (
 type EthTransaction struct {
 	data ethTxdata
 	// caches
-	hash atomic.Value
-	size atomic.Value
-	from atomic.Value
+	hash  atomic.Value
+	size  atomic.Value
+	from  atomic.Value
+	price atomic.Value
 }
 
 type ethTxdata struct {
@@ -264,7 +266,20 @@ func (tx *EthTransaction) Gas() uint64 {
 
 // GasPrice returns gas price of Transaction.
 func (tx *EthTransaction) GasPrice() *big.Int {
+	if tx.IsAA() {
+		if price := tx.price.Load(); price != nil {
+			var current_price *big.Int = price.(*big.Int)
+			return current_price
+		}
+
+		return nil
+	}
+
 	return new(big.Int).Set(tx.data.Price)
+}
+
+func (tx *EthTransaction) RawGasPrice() *big.Int {
+	return tx.data.Price
 }
 
 // Nonce returns account nonce from Transaction.
@@ -275,6 +290,20 @@ func (tx *EthTransaction) Nonce() uint64 {
 // CheckNonce returns check nonce from Transaction.
 func (tx *EthTransaction) CheckNonce() bool {
 	return true
+}
+
+// IsAA returns the result of a basic AA signature check.
+func (tx *EthTransaction) IsAA() bool {
+	return tx.data.R.Sign() == 0 && tx.data.S.Sign() == 0
+}
+
+// Sponsor returns the address of the account paying for the transaction.
+func (tx *EthTransaction) Sponsor(s Signer) (common.Address, error) {
+	if tx.IsAA() {
+		return *tx.To(), nil
+	} else {
+		return Sender(s, tx)
+	}
 }
 
 // To returns the recipient address of the transaction.
@@ -312,7 +341,11 @@ func (tx *EthTransaction) Size() common.StorageSize {
 
 // Cost returns amount + gasprice * gaslimit.
 func (tx *EthTransaction) Cost() (*big.Int, error) {
-	total := new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
+	total := new(big.Int).Mul(tx.GasPrice(), new(big.Int).SetUint64(tx.data.GasLimit))
+	if tx.IsAA() {
+		return total, nil
+	}
+
 	total.Add(total, tx.data.Amount)
 	return total, nil
 }
@@ -345,17 +378,18 @@ func (tx *EthTransaction) IsEthCompatible() bool {
 // XXX Rename message to something less arbitrary?
 func (tx *EthTransaction) AsMessage(s Signer) (Message, error) {
 	msg := Message{
-		nonce:      tx.data.AccountNonce,
-		gasLimit:   tx.data.GasLimit,
-		gasPrice:   new(big.Int).Set(tx.data.Price),
-		to:         tx.data.Recipient,
-		amount:     tx.data.Amount,
-		data:       tx.data.Payload,
-		checkNonce: true,
+		nonce:    tx.data.AccountNonce,
+		gasLimit: tx.data.GasLimit,
+		gasPrice: new(big.Int).Set(tx.data.Price),
+		to:       tx.data.Recipient,
+		amount:   tx.data.Amount,
+		data:     tx.data.Payload,
 	}
 
 	var err error
 	msg.from, err = Sender(s, tx)
+	msg.isAA = ourscommon.Address(msg.from).IsEntryPoint()
+	msg.checkNonce = !msg.isAA
 	return msg, err
 }
 
@@ -371,10 +405,20 @@ func (tx *EthTransaction) WithSignature(signer Signer, sig []byte) (*EthTransact
 	return cpy, nil
 }
 
+func (tx *EthTransaction) WithAASignature() *EthTransaction {
+	cpy := &EthTransaction{data: tx.data}
+	cpy.data.V = big.NewInt(27)
+	return cpy
+}
+
 // RawSignatureValues returns the V, R, S signature values of the transaction.
 // The return values should not be modified by the caller.
 func (tx *EthTransaction) RawSignatureValues() (v, r, s *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
+}
+
+func (tx *EthTransaction) SetAAGasPrice(price *big.Int) {
+	tx.price.Store(price)
 }
 
 // EthTransactions is a Transaction slice type for basic sorting.
