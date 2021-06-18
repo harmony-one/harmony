@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -21,6 +22,10 @@ import (
 const (
 	numWorker = 5
 )
+
+// ErrExplorerNotReady is the error when querying explorer db data when
+// explorer db is doing migration and unavailable
+var ErrExplorerNotReady = errors.New("explorer db not ready")
 
 type storage struct {
 	db database
@@ -59,6 +64,48 @@ func (s *storage) Start() {
 
 func (s *storage) Stop() {
 	close(s.closeC)
+}
+
+func (s *storage) DumpNewBlock(b *types.Block) {
+	s.tm.AddNewTask(b)
+}
+
+func (s *storage) DumpCatchupBlock(b *types.Block) {
+	for s.tm.HasPendingTasks() {
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.tm.AddCatchupTask(b)
+}
+
+func (s *storage) GetAddresses() ([]string, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	addrs, err := getAllAddresses(s.db)
+	if err != nil {
+		return nil, err
+	}
+	display := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		display = append(display, string(addr))
+	}
+	return display, nil
+}
+
+func (s *storage) GetNormalTxsByAddress(addr string) ([]common.Hash, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	hashes, _, err := getNormalTxnHashesByAccount(s.db, oneAddress(addr))
+	return hashes, err
+}
+
+func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	hashes, _, err := getStakingTxnHashesByAccount(s.db, oneAddress(addr))
+	return hashes, err
 }
 
 func (s *storage) run() {
@@ -141,6 +188,13 @@ func (tm *taskManager) AddCatchupTask(b *types.Block) {
 	case tm.C <- struct{}{}:
 	default:
 	}
+}
+
+func (tm *taskManager) HasPendingTasks() bool {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	return len(tm.blocksLP) == 0 && len(tm.blocksHP) == 0
 }
 
 func (tm *taskManager) PullTask() *types.Block {
