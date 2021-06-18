@@ -1,367 +1,326 @@
 package explorer
 
 import (
+	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/abool"
+	"github.com/harmony-one/harmony/core"
+	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/pkg/errors"
-	"github.com/syndtr/goleveldb/leveldb"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/rs/zerolog"
 )
 
-// Constants for storage.
 const (
-	PrefixLen            = 3
-	addrIndexCacheSize   = 1000
-	flushNumberThreshold = 100              // flush every 100 blocks
-	flushTimeThreshold   = 90 * time.Second // flush every 90 seconds
-	newBlockCBuffer      = 100
-	catchupBlockCBuffer  = 1
+	numWorker = 5
 )
 
-type oneAddress string
+type storage struct {
+	db database
+	bc *core.BlockChain
 
-var storage *Storage
-var once sync.Once
+	// TODO: optimize this with priority queue
+	tm      *taskManager
+	resultC chan batch
 
-// Storage dump the block info into leveldb.
-type Storage struct {
-	db       database
-	clean    *lru.Cache
-	dirty    map[oneAddress]*Address
-	dirtyBNs map[uint64]struct{}
-
-	lock          sync.RWMutex
-	newBlockC     chan *types.Block
-	catchupBlockC chan *types.Block
-	closeC        chan struct{}
+	available *abool.AtomicBool
+	closeC    chan struct{}
+	log       zerolog.Logger
 }
 
-// GetStorageInstance returns attack model by using singleton pattern.
-func GetStorageInstance(ip, port string) *Storage {
-	once.Do(func() {
-		var err error
-		storage, err = newStorageInstance(ip, port)
-		// TODO: refactor this
-		if err != nil {
-			fmt.Println("failed to open explorer db:", err.Error())
-			os.Exit(1)
-		}
-	})
-	return storage
-}
-
-func newStorageInstance(ip, port string) (*Storage, error) {
-	dbPath := defaultDBPath(ip, port)
+func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
 	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
 	db, err := newLvlDB(dbPath)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to create new database")
 		return nil, err
 	}
-	clean, _ := lru.New(addrIndexCacheSize)
-	dirty := make(map[oneAddress]*Address)
-	return &Storage{
-		db:            db,
-		clean:         clean,
-		dirty:         dirty,
-		dirtyBNs:      make(map[uint64]struct{}),
-		newBlockC:     make(chan *types.Block, newBlockCBuffer),
-		catchupBlockC: make(chan *types.Block, catchupBlockCBuffer),
-		closeC:        make(chan struct{}),
+	return &storage{
+		db:        db,
+		bc:        bc,
+		tm:        newTaskManager(),
+		resultC:   make(chan batch, numWorker),
+		available: abool.New(),
+		closeC:    make(chan struct{}),
+		log:       utils.Logger().With().Str("module", "explorer storage").Logger(),
 	}, nil
 }
 
-func defaultDBPath(ip, port string) string {
-	return path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
+func (s *storage) Start() {
+	go s.run()
 }
 
-func (storage *Storage) Start() {
-	go storage.loop()
+func (s *storage) Stop() {
+	close(s.closeC)
 }
 
-func (storage *Storage) Close() {
-	storage.closeC <- struct{}{}
-	<-storage.closeC
-}
-
-func (storage *Storage) loop() {
-	defer func() {
-		if err := storage.flushLocked(); err != nil {
-			utils.Logger().Error().Err(err).Msg("[explorer] failed to flush at close")
+func (s *storage) run() {
+	if is, err := isVersionV100(s.db); !is || err != nil {
+		s.available.UnSet()
+		err := s.migrateToV100()
+		if err != nil {
+			s.log.Error().Err(err).Msg("Failed to migrate explorer DB!")
+			fmt.Println("Failed to migrate explorer DB:", err)
+			os.Exit(1)
 		}
-		close(storage.closeC)
-	}()
+	}
+	s.available.Set()
+	go s.loop()
+}
 
-	var lastFlush = time.Now()
-
+func (s *storage) loop() {
+	s.makeWorkersAndStart()
 	for {
-		// flush when reached threshold
-		storage.lock.RLock()
-		numDirty := len(storage.dirtyBNs)
-		storage.lock.RUnlock()
-		if numDirty >= flushNumberThreshold || time.Since(lastFlush) >= flushTimeThreshold {
-			lastFlush = time.Now()
-			if err := storage.flushLocked(); err != nil {
-				utils.Logger().Error().Err(err).Msg("[explorer] failed to flush")
-			}
-		}
-		// prioritize processing new blocks and close C
 		select {
-		case b := <-storage.newBlockC:
-			if err := storage.handleBlock(b); err != nil {
-				utils.Logger().Error().Err(err).Msg("[explorer] handle new block result failed")
+		case btc := <-s.resultC:
+			if err := btc.Write(); err != nil {
+				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
-			continue
-		case <-storage.closeC:
-			return
-		default:
-		}
-		// handles catchupBlock
-		select {
-		case b := <-storage.newBlockC:
-			if err := storage.handleBlock(b); err != nil {
-				utils.Logger().Error().Err(err).Msg("[explorer] handle new block result failed")
-			}
-		case b := <-storage.catchupBlockC:
-			if err := storage.handleBlock(b); err != nil {
-				utils.Logger().Error().Err(err).Msg("[explorer] handle catch up block failed")
-			}
-		case <-storage.closeC:
+
+		case <-s.closeC:
 			return
 		}
 	}
 }
 
-// GetDB returns the LDBDatabase of the storage.
-func (storage *Storage) GetDB() database {
-	return storage.db
+func (s *storage) makeWorkersAndStart() {
+	workers := make([]*blockComputer, 0, numWorker)
+	for i := 0; i != numWorker; i++ {
+		workers = append(workers, &blockComputer{
+			tm:      s.tm,
+			db:      s.db,
+			bc:      s.bc,
+			resultC: s.resultC,
+			closeC:  s.closeC,
+			log:     s.log.With().Int("worker", i).Logger(),
+		})
+	}
+	for _, worker := range workers {
+		go worker.loop()
+	}
 }
 
-// DumpNewBlock extracts information from block and index them into leveldb for explorer.
-func (storage *Storage) DumpNewBlock(block *types.Block) {
-	if block == nil {
-		return
-	}
-	storage.lock.RLock()
-	if storage.isBlockComputed(block.NumberU64()) {
-		storage.lock.RUnlock()
-		return
-	}
-	storage.lock.RUnlock()
+type taskManager struct {
+	blocksHP []*types.Block // blocks with high priorities
+	blocksLP []*types.Block // blocks with low priorities
+	lock     sync.Mutex
 
-	storage.newBlockC <- block // blocking if channel is full
+	C chan struct{}
 }
 
-func (storage *Storage) DumpCatchupBlock(block *types.Block) {
-	if block == nil {
-		return
+func newTaskManager() *taskManager {
+	return &taskManager{
+		C: make(chan struct{}, numWorker),
 	}
-	storage.lock.RLock()
-	if storage.isBlockComputed(block.NumberU64()) {
-		storage.lock.RUnlock()
-		return
-	}
-	storage.lock.RUnlock()
-
-	storage.catchupBlockC <- block
 }
 
-func (storage *Storage) isBlockComputed(bn uint64) bool {
-	if _, isDirty := storage.dirtyBNs[bn]; isDirty {
-		return true
+func (tm *taskManager) AddNewTask(b *types.Block) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	tm.blocksHP = append(tm.blocksHP, b)
+	select {
+	case tm.C <- struct{}{}:
+	default:
 	}
-	return storage.isBlockComputedInDB(bn)
 }
 
-func (storage *Storage) handleBlock(b *types.Block) error {
-	txs, stks := computeAccountsTransactionsMapForBlock(b)
-	return storage.handleBlockResultLocked(b.NumberU64(), txs, stks)
+func (tm *taskManager) AddCatchupTask(b *types.Block) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	tm.blocksLP = append(tm.blocksLP, b)
+	select {
+	case tm.C <- struct{}{}:
+	default:
+	}
 }
 
-func (storage *Storage) handleBlockResultLocked(bn uint64, txs map[oneAddress]TxRecords, stkTxs map[oneAddress]TxRecords) error {
-	storage.lock.Lock()
-	defer storage.lock.Unlock()
+func (tm *taskManager) PullTask() *types.Block {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
 
-	if storage.isBlockComputed(bn) {
-		return nil
+	if len(tm.blocksHP) != 0 {
+		b := tm.blocksHP[0]
+		tm.blocksHP = tm.blocksHP[1:]
+		return b
 	}
-	for address, txRecords := range txs {
-		if err := storage.UpdateTxAddressStorage(address, txRecords, false /* isStaking */); err != nil {
-			utils.Logger().Error().Err(err).Str("address", string(address)).
-				Msg("[explorer] failed to update address")
-			return err
-		}
+	if len(tm.blocksLP) != 0 {
+		b := tm.blocksLP[0]
+		tm.blocksLP = tm.blocksLP[1:]
+		return b
 	}
-	for address, txRecords := range stkTxs {
-		if err := storage.UpdateTxAddressStorage(address, txRecords, true /* isStaking */); err != nil {
-			utils.Logger().Error().Err(err).Str("address", string(address)).
-				Msg("[explorer] failed to update address")
-			return err
-		}
-	}
-	storage.dirtyBNs[bn] = struct{}{}
 	return nil
 }
 
-// UpdateTxAddressStorage updates specific addr tx Address.
-func (storage *Storage) UpdateTxAddressStorage(addr oneAddress, txRecords TxRecords, isStaking bool) error {
-	address, err := storage.getAddressInfo(addr)
-	if err != nil {
-		return err
-	}
-
-	address.ID = string(addr)
-	if isStaking {
-		address.StakingTXs = append(address.StakingTXs, txRecords...)
-	} else {
-		address.TXs = append(address.TXs, txRecords...)
-	}
-	storage.dirty[addr] = address
-	return nil
+type blockComputer struct {
+	tm      *taskManager
+	db      database
+	bc      blockChainTxIndexer
+	resultC chan batch
+	closeC  chan struct{}
+	log     zerolog.Logger
 }
 
-// GetAddressInfo get the address info of the given address
-func (storage *Storage) GetAddressInfo(addr string) (*Address, error) {
-	storage.lock.RLock()
-	defer storage.lock.RUnlock()
+func (bc *blockComputer) loop() {
+LOOP:
+	for {
+		select {
+		case <-bc.tm.C:
+			for {
+				b := bc.tm.PullTask()
+				if b == nil {
+					goto LOOP
+				}
+				res, err := bc.computeBlock(b)
+				if err != nil {
+					bc.log.Error().Err(err).Str("hash", b.Hash().String()).
+						Uint64("number", b.NumberU64()).
+						Msg("explorer failed to handle block")
+					continue
+				}
+				if res == nil {
+					continue
+				}
+				select {
+				case bc.resultC <- res:
+				case <-bc.closeC:
+					return
+				}
+			}
 
-	return storage.getAddressInfo(oneAddress(addr))
-}
-
-func (storage *Storage) getAddressInfo(addr oneAddress) (*Address, error) {
-	if addrInfo, ok := storage.dirty[addr]; ok {
-		return addrInfo, nil
-	}
-	if x, ok := storage.clean.Get(addr); ok {
-		return x.(*Address), nil
-	}
-	addrInfo, err := readAddressInfoFromDB(storage.db, addr)
-	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
-			return &Address{
-				ID: string(addr),
-			}, nil
+		case <-bc.closeC:
+			return
 		}
+	}
+}
+
+func (bc *blockComputer) computeBlock(b *types.Block) (batch, error) {
+	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
+	if err != nil {
 		return nil, err
 	}
-	storage.clean.Add(addr, addrInfo)
-	return addrInfo, nil
+	if is {
+		return nil, nil
+	}
+	btc := bc.db.NewBatch()
+
+	for _, tx := range b.Transactions() {
+		bc.computeNormalTx(btc, b, tx)
+	}
+	for _, stk := range b.StakingTransactions() {
+		bc.computeStakingTx(btc, b, stk)
+	}
+	_ = writeCheckpoint(btc, b.NumberU64())
+	return btc, nil
 }
 
-// GetAddresses returns size of addresses from address with prefix.
-func (storage *Storage) GetAddresses(size int, prefix oneAddress) ([]string, error) {
-	db := storage.GetDB()
-	key := GetAddressKey(prefix)
-	iterator := db.NewPrefixIterator(key)
-	addresses := make([]string, 0)
-	read := 0
-	for iterator.Next() && read < size {
-		address := string(iterator.Key())
-		read++
-		if len(address) < PrefixLen {
-			utils.Logger().Info().Msgf("address len < 3 %s", address)
-			continue
-		}
-		addresses = append(addresses, address[PrefixLen:])
-	}
-	iterator.Release()
-	if err := iterator.Error(); err != nil {
-		utils.Logger().Error().Err(err).Msg("iterator error")
-		return nil, err
-	}
-	return addresses, nil
+func (bc *blockComputer) computeNormalTx(btc batch, b *types.Block, tx *types.Transaction) {
+	ethFrom, _ := tx.SenderAddress()
+	ethTo := *tx.To()
+	from := ethToOneAddress(ethFrom)
+	to := ethToOneAddress(ethTo)
+
+	_ = writeAddressEntry(btc, from)
+	_ = writeAddressEntry(btc, to)
+
+	_, bn, index := bc.bc.ReadTxLookupEntry(tx.HashByType())
+	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+		addr:        from,
+		blockNumber: bn,
+		txnIndex:    index,
+		txnHash:     tx.HashByType(),
+	}, txSent)
+	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+		addr:        to,
+		blockNumber: bn,
+		txnIndex:    index,
+		txnHash:     tx.HashByType(),
+	}, txReceived)
+
+	// Not very sure how this 1000 come from. But it is the logic before migration
+	t := b.Time().Uint64() * 1000
+	tr := &TxRecord{tx.HashByType(), time.Unix(int64(t), 0)}
+	_ = writeTxn(btc, tx.HashByType(), tr)
 }
 
-func computeAccountsTransactionsMapForBlock(
-	block *types.Block,
-) (map[oneAddress]TxRecords, map[oneAddress]TxRecords) {
-	// mapping from account address to TxRecords for txns in the block
-	var acntsTxns = make(map[oneAddress]TxRecords)
-	// mapping from account address to TxRecords for staking txns in the block
-	var acntsStakingTxns = make(map[oneAddress]TxRecords)
+func (bc *blockComputer) computeStakingTx(btc batch, b *types.Block, tx *staking.StakingTransaction) {
+	ethFrom, _ := tx.SenderAddress()
+	from := ethToOneAddress(ethFrom)
+	_ = writeAddressEntry(btc, from)
+	_, bn, index := bc.bc.ReadTxLookupEntry(tx.Hash())
+	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+		addr:        from,
+		blockNumber: bn,
+		txnIndex:    index,
+		txnHash:     tx.Hash(),
+	}, txSent)
+	t := b.Time().Uint64() * 1000
+	tr := &TxRecord{tx.Hash(), time.Unix(int64(t), 0)}
+	_ = writeTxn(btc, tx.Hash(), tr)
 
-	// Store txs
-	for _, tx := range block.Transactions() {
-		explorerTransaction, err := GetTransaction(tx, block)
-		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.HashByType().String()).
-				Msg("[Explorer Storage] Failed to get GetTransaction mapping")
-			continue
-		}
-		from := oneAddress(explorerTransaction.From)
-		to := oneAddress(explorerTransaction.To)
+	ethTo, _ := toFromStakingTx(tx, b)
+	if ethTo == (common.Address{}) {
+		return
+	}
+	to := ethToOneAddress(ethTo)
+	_ = writeAddressEntry(btc, to)
+	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+		addr:        to,
+		blockNumber: bn,
+		txnIndex:    index,
+		txnHash:     tx.Hash(),
+	}, txReceived)
+}
 
-		// store as sent transaction with from address
-		txRecord := &TxRecord{
-			Hash:      explorerTransaction.ID,
-			Type:      Sent,
-			Timestamp: explorerTransaction.Timestamp,
-		}
-		acntTxns, ok := acntsTxns[from]
-		if !ok {
-			acntTxns = make(TxRecords, 0)
-		}
-		acntTxns = append(acntTxns, txRecord)
-		acntsTxns[from] = acntTxns
+func ethToOneAddress(ethAddr common.Address) oneAddress {
+	raw, _ := common2.AddressToBech32(ethAddr)
+	return oneAddress(raw)
+}
 
-		// store as received transaction with to address
-		txRecord = &TxRecord{
-			Hash:      explorerTransaction.ID,
-			Type:      Received,
-			Timestamp: explorerTransaction.Timestamp,
-		}
-		acntTxns, ok = acntsTxns[to]
-		if !ok {
-			acntTxns = make(TxRecords, 0)
-		}
-		acntTxns = append(acntTxns, txRecord)
-		acntsTxns[to] = acntTxns
+func toFromStakingTx(tx *staking.StakingTransaction, addressBlock *types.Block) (common.Address, error) {
+	msg, err := core2.StakingToMessage(tx, addressBlock.Header().Number())
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("Error when parsing tx into message")
+		return common.Address{}, err
 	}
 
-	// Store staking txns
-	for _, tx := range block.StakingTransactions() {
-		explorerTransaction, err := GetStakingTransaction(tx, block)
+	switch tx.StakingType() {
+	case staking.DirectiveDelegate:
+		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveDelegate)
 		if err != nil {
-			utils.Logger().Error().Err(err).Str("txHash", tx.Hash().String()).
-				Msg("[Explorer Storage] Failed to get StakingTransaction mapping")
-			continue
+			return common.Address{}, err
 		}
-		from := oneAddress(explorerTransaction.From)
-		to := oneAddress(explorerTransaction.To)
+		if _, ok := stkMsg.(*staking.Delegate); !ok {
+			return common.Address{}, core2.ErrInvalidMsgForStakingDirective
+		}
+		delegateMsg := stkMsg.(*staking.Delegate)
+		if !bytes.Equal(msg.From().Bytes()[:], delegateMsg.DelegatorAddress.Bytes()[:]) {
+			return common.Address{}, core2.ErrInvalidSender
+		}
+		return delegateMsg.ValidatorAddress, nil
 
-		// store as sent staking transaction with from address
-		txRecord := &TxRecord{
-			Hash:      explorerTransaction.ID,
-			Type:      Sent,
-			Timestamp: explorerTransaction.Timestamp,
+	case staking.DirectiveUndelegate:
+		stkMsg, err := staking.RLPDecodeStakeMsg(tx.Data(), staking.DirectiveUndelegate)
+		if err != nil {
+			return common.Address{}, err
 		}
-		acntStakingTxns, ok := acntsStakingTxns[from]
-		if !ok {
-			acntStakingTxns = make(TxRecords, 0)
+		if _, ok := stkMsg.(*staking.Undelegate); !ok {
+			return common.Address{}, core2.ErrInvalidMsgForStakingDirective
 		}
-		acntStakingTxns = append(acntStakingTxns, txRecord)
-		acntsStakingTxns[from] = acntStakingTxns
-
-		// For delegate/undelegate, also store as received staking transaction with to address
-		txRecord = &TxRecord{
-			Hash:      explorerTransaction.ID,
-			Type:      Received,
-			Timestamp: explorerTransaction.Timestamp,
+		undelegateMsg := stkMsg.(*staking.Undelegate)
+		if !bytes.Equal(msg.From().Bytes()[:], undelegateMsg.DelegatorAddress.Bytes()[:]) {
+			return common.Address{}, core2.ErrInvalidSender
 		}
-		acntStakingTxns, ok = acntsStakingTxns[to]
-		if !ok {
-			acntStakingTxns = make(TxRecords, 0)
-		}
-		acntStakingTxns = append(acntStakingTxns, txRecord)
-		acntsStakingTxns[to] = acntStakingTxns
+		return undelegateMsg.ValidatorAddress, nil
+	default:
+		return common.Address{}, nil
 	}
-
-	return acntsTxns, acntsStakingTxns
 }

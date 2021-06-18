@@ -105,8 +105,8 @@ func (s *Service) Run() *http.Server {
 	// Set up router for addresses.
 	// Fetch addresses request, accepts parameter size: how much addresses to read,
 	// parameter prefix: from which address prefix start
-	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
-	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+	//s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
+	//s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -139,33 +139,33 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
-// GetAddresses serves end-point /addresses, returns size of addresses from address with prefix.
-func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	sizeStr := r.FormValue("size")
-	prefix := r.FormValue("prefix")
-	if sizeStr == "" {
-		sizeStr = defaultPageSize
-	}
-	data := &Data{}
-	defer func() {
-		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
-			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
-		}
-	}()
-
-	size, err := strconv.Atoi(sizeStr)
-	if err != nil || size > maxAddresses {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	data.Addresses, err = s.Storage.GetAddresses(size, oneAddress(prefix))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
-		return
-	}
-}
+//// GetAddresses serves end-point /addresses, returns size of addresses from address with prefix.
+//func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
+//	w.Header().Set("Content-Type", "application/json")
+//	sizeStr := r.FormValue("size")
+//	prefix := r.FormValue("prefix")
+//	if sizeStr == "" {
+//		sizeStr = defaultPageSize
+//	}
+//	data := &Data{}
+//	defer func() {
+//		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
+//			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
+//		}
+//	}()
+//
+//	size, err := strconv.Atoi(sizeStr)
+//	if err != nil || size > maxAddresses {
+//		w.WriteHeader(http.StatusBadRequest)
+//		return
+//	}
+//	data.Addresses, err = s.Storage.GetAddresses(size, oneAddress(prefix))
+//	if err != nil {
+//		w.WriteHeader(http.StatusInternalServerError)
+//		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
+//		return
+//	}
+//}
 
 var (
 	// InaccessibleAddresses are a list of known eth addresses that cannot spend ONE tokens.

@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"os"
 	"path"
 	"sort"
@@ -55,11 +56,7 @@ func TestLevelDBPrefixIterator(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		dbDir := tempTestDir(t, i)
-		db, err := newLvlDB(dbDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		db := newTestLevelDB(t, i)
 		if err := prepareTestLvlDB(db); err != nil {
 			t.Error(err)
 		}
@@ -72,6 +69,15 @@ func TestLevelDBPrefixIterator(t *testing.T) {
 			t.Errorf("Test %v: unexpected iteration size %v / %v", i, count, test.expSize)
 		}
 	}
+}
+
+func newTestLevelDB(t *testing.T, i int) database {
+	dbDir := tempTestDir(t, i)
+	db, err := newLvlDB(dbDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db
 }
 
 func prepareTestLvlDB(db database) error {
@@ -106,7 +112,8 @@ func (db *memDB) Put(key, val []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	db.keyValues[string(key)] = val
+	realKey := hex.EncodeToString(key)
+	db.keyValues[realKey] = val
 	return nil
 }
 
@@ -114,7 +121,8 @@ func (db *memDB) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	_, ok := db.keyValues[string(key)]
+	realKey := hex.EncodeToString(key)
+	_, ok := db.keyValues[realKey]
 	return ok, nil
 }
 
@@ -122,7 +130,8 @@ func (db *memDB) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	val, ok := db.keyValues[string(key)]
+	realKey := hex.EncodeToString(key)
+	val, ok := db.keyValues[realKey]
 	if !ok {
 		return nil, leveldb.ErrNotFound
 	}
@@ -141,7 +150,7 @@ func (db *memDB) NewPrefixIterator(prefix []byte) iterator {
 	defer db.lock.Unlock()
 
 	var (
-		pr     = string(prefix)
+		pr     = hex.EncodeToString(prefix)
 		keys   = make([]string, 0, len(db.keyValues))
 		values = make([][]byte, 0, len(db.keyValues))
 	)
@@ -164,10 +173,12 @@ func (db *memDB) NewPrefixIterator(prefix []byte) iterator {
 type memBatch struct {
 	keyValues map[string][]byte
 	db        *memDB
+	valueSize int
 }
 
 func (b *memBatch) Put(key, val []byte) error {
-	b.keyValues[string(key)] = val
+	b.keyValues[hex.EncodeToString(key)] = val
+	b.valueSize += len(val)
 	return nil
 }
 
@@ -175,7 +186,12 @@ func (b *memBatch) Write() error {
 	for k, v := range b.keyValues {
 		b.db.keyValues[k] = v
 	}
+	b.valueSize = 0
 	return nil
+}
+
+func (b *memBatch) ValueSize() int {
+	return b.valueSize
 }
 
 type memPrefixIterator struct {
@@ -185,7 +201,11 @@ type memPrefixIterator struct {
 }
 
 func (it *memPrefixIterator) Key() []byte {
-	return []byte(it.keys[it.index])
+	b, err := hex.DecodeString(it.keys[it.index])
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 func (it *memPrefixIterator) Value() []byte {

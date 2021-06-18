@@ -5,18 +5,16 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/syndtr/goleveldb/leveldb"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/internal/utils"
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap/buffer"
 )
 
 const (
-	AddressPrefix    = "ad"
+	LegAddressPrefix = "ad_"
 	CheckpointPrefix = "dc"
 
 	oneAddrByteLen = 42 // byte size of string "one1..."
@@ -28,18 +26,14 @@ func GetCheckpointKey(blockNum *big.Int) []byte {
 	return []byte(fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum))
 }
 
-func (storage *Storage) isBlockComputedInDB(bn uint64) bool {
-	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	if _, err := storage.GetDB().Get(blockCheckpoint); err == nil {
-		return true
-	}
-	return false
+func isBlockComputedInDB(db databaseReader, bn uint64) (bool, error) {
+	key := GetCheckpointKey(new(big.Int).SetUint64(bn))
+	return db.Has(key)
 }
 
-func (storage *Storage) writeCheckpointToBatch(b batch, bn uint64) error {
+func writeCheckpoint(db databaseWriter, bn uint64) error {
 	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	b.Put(blockCheckpoint, []byte{})
-	return nil
+	return db.Put(blockCheckpoint, []byte{})
 }
 
 // New schema
@@ -77,20 +71,62 @@ func writeVersion(db databaseWriter, ver *goversion.Version) error {
 }
 
 var (
-	addrNormalTxnPrefix  = []byte("at")
-	addrStakingTxnPrefix = []byte("stk")
-	normalTxnPrefix      = []byte("tx")
+	addrPrefix                = []byte("addr")
+	txnPrefix                 = []byte("tx")
+	addrNormalTxnIndexPrefix  = []byte("at")
+	addrStakingTxnIndexPrefix = []byte("stk")
 )
 
 // bPool is the sync pool for reusing the memory for allocating db keys
 var bPool = buffer.NewPool()
+
+func getAddressKey(addr oneAddress) []byte {
+	b := bPool.Get()
+	defer b.Free()
+
+	_, _ = b.Write(addrPrefix)
+	_, _ = b.Write([]byte(addr))
+	return b.Bytes()
+}
+
+func getAddressFromAddressKey(key []byte) (oneAddress, error) {
+	if len(key) < len(addrPrefix)+oneAddrByteLen {
+		return "", errors.New("address key size unexpected")
+	}
+	addrBytes := key[len(addrPrefix) : len(addrPrefix)+oneAddrByteLen]
+	return oneAddress(addrBytes), nil
+}
+
+func writeAddressEntry(db databaseWriter, addr oneAddress) error {
+	key := getAddressKey(addr)
+	return db.Put(key, []byte{})
+}
+
+func isAddressWritten(db databaseReader, addr oneAddress) (bool, error) {
+	key := getAddressKey(addr)
+	return db.Has(key)
+}
+
+func getAllAddresses(db databaseReader) ([]oneAddress, error) {
+	var addrs []oneAddress
+	it := db.NewPrefixIterator(addrPrefix)
+	defer it.Release()
+	for it.Next() {
+		addr, err := getAddressFromAddressKey(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
 
 // getTxnKey return the transaction key. It's simply a prefix with the transaction hash
 func getTxnKey(txHash common.Hash) []byte {
 	b := bPool.Get()
 	defer b.Free()
 
-	_, _ = b.Write(normalTxnPrefix)
+	_, _ = b.Write(txnPrefix)
 	_, _ = b.Write(txHash[:])
 	return b.Bytes()
 }
@@ -131,7 +167,7 @@ func (index normalTxnIndex) key() []byte {
 	b := bPool.Get()
 	defer b.Free()
 
-	_, _ = b.Write(addrNormalTxnPrefix)
+	_, _ = b.Write(addrNormalTxnIndexPrefix)
 	_, _ = b.Write([]byte(index.addr))
 	_ = binary.Write(b, binary.BigEndian, index.blockNumber)
 	_ = binary.Write(b, binary.BigEndian, index.txnIndex)
@@ -143,13 +179,13 @@ func normalTxnIndexPrefixByAddr(addr oneAddress) []byte {
 	b := bPool.Get()
 	defer b.Free()
 
-	_, _ = b.Write(addrNormalTxnPrefix)
+	_, _ = b.Write(addrNormalTxnIndexPrefix)
 	_, _ = b.Write([]byte(addr))
 	return b.Bytes()
 }
 
 func txnHashFromNormalTxnIndexKey(key []byte) (common.Hash, error) {
-	txStart := len(addrNormalTxnPrefix) + oneAddrByteLen + 8 + 8
+	txStart := len(addrNormalTxnIndexPrefix) + oneAddrByteLen + 8 + 8
 	expSize := txStart + common.HashLength
 	if len(key) < expSize {
 		return common.Hash{}, errors.New("unexpected key size")
@@ -159,26 +195,33 @@ func txnHashFromNormalTxnIndexKey(key []byte) (common.Hash, error) {
 	return txHash, nil
 }
 
-func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, error) {
-	var txHashes []common.Hash
+func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []txType, error) {
+	var (
+		txHashes []common.Hash
+		tts      []txType
+	)
 	prefix := normalTxnIndexPrefixByAddr(addr)
-	err := forEachAtPrefix(db, prefix, func(key, _ []byte) error {
+	err := forEachAtPrefix(db, prefix, func(key, val []byte) error {
 		txHash, err := txnHashFromNormalTxnIndexKey(key)
 		if err != nil {
 			return err
 		}
+		if len(val) < 0 {
+			return errors.New("val size not expected")
+		}
+		tts = append(tts, txType(val[0]))
 		txHashes = append(txHashes, txHash)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return txHashes, nil
+	return txHashes, tts, nil
 }
 
-func writeNormalTxnIndex(db databaseWriter, entry normalTxnIndex) {
+func writeNormalTxnIndex(db databaseWriter, entry normalTxnIndex, tt txType) error {
 	key := entry.key()
-	db.Put(key, []byte{})
+	return db.Put(key, []byte{byte(tt)})
 }
 
 type stakingTxnIndex struct {
@@ -192,7 +235,7 @@ func (index stakingTxnIndex) key() []byte {
 	b := bPool.Get()
 	defer b.Free()
 
-	_, _ = b.Write(addrStakingTxnPrefix)
+	_, _ = b.Write(addrStakingTxnIndexPrefix)
 	_, _ = b.Write([]byte(index.addr))
 	_ = binary.Write(b, binary.BigEndian, index.blockNumber)
 	_ = binary.Write(b, binary.BigEndian, index.txnIndex)
@@ -204,13 +247,13 @@ func stakingTxnIndexPrefixByAddr(addr oneAddress) []byte {
 	b := bPool.Get()
 	defer b.Free()
 
-	_, _ = b.Write(addrStakingTxnPrefix)
+	_, _ = b.Write(addrStakingTxnIndexPrefix)
 	_, _ = b.Write([]byte(addr))
 	return b.Bytes()
 }
 
 func txnHashFromStakingTxnIndexKey(key []byte) (common.Hash, error) {
-	txStart := len(addrStakingTxnPrefix) + oneAddrByteLen + 8 + 8
+	txStart := len(addrStakingTxnIndexPrefix) + oneAddrByteLen + 8 + 8
 	expSize := txStart + common.HashLength
 	if len(key) < expSize {
 		return common.Hash{}, errors.New("unexpected key size")
@@ -220,26 +263,33 @@ func txnHashFromStakingTxnIndexKey(key []byte) (common.Hash, error) {
 	return txHash, nil
 }
 
-func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, error) {
-	var txHashes []common.Hash
+func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []txType, error) {
+	var (
+		txHashes []common.Hash
+		tts      []txType
+	)
 	prefix := stakingTxnIndexPrefixByAddr(addr)
-	err := forEachAtPrefix(db, prefix, func(key, _ []byte) error {
-		txHash, err := txnHashFromNormalTxnIndexKey(key)
+	err := forEachAtPrefix(db, prefix, func(key, val []byte) error {
+		txHash, err := txnHashFromStakingTxnIndexKey(key)
 		if err != nil {
 			return err
 		}
+		if len(val) < 0 {
+			return errors.New("val size not expected")
+		}
+		tts = append(tts, txType(val[0]))
 		txHashes = append(txHashes, txHash)
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return txHashes, nil
+	return txHashes, tts, nil
 }
 
-func writeStakingTxnIndexToBatch(db databaseWriter, entry stakingTxnIndex) {
+func writeStakingTxnIndex(db databaseWriter, entry stakingTxnIndex, tt txType) error {
 	key := entry.key()
-	db.Put(key, []byte{})
+	return db.Put(key, []byte{byte(tt)})
 }
 
 func forEachAtPrefix(db databaseReader, prefix []byte, f func(key, val []byte) error) error {
@@ -257,53 +307,7 @@ func forEachAtPrefix(db databaseReader, prefix []byte, f func(key, val []byte) e
 
 // Legacy Schema
 
-// GetAddressKey ...
-func GetAddressKey(address oneAddress) []byte {
-	return []byte(fmt.Sprintf("%s_%s", AddressPrefix, address))
-}
-
-func readAddressInfoFromDB(db databaseReader, addr oneAddress) (*Address, error) {
-	key := GetAddressKey(addr)
-	val, err := db.Get(key)
-	if err != nil {
-		return nil, err
-	}
-	var addrInfo *Address
-	if err := rlp.DecodeBytes(val, &addrInfo); err != nil {
-		return nil, err
-	}
-	return addrInfo, nil
-}
-
-func (storage *Storage) flushLocked() error {
-	storage.lock.RLock()
-	b := storage.db.NewBatch()
-	for addr, addressInfo := range storage.dirty {
-		key := GetAddressKey(addr)
-		encoded, err := rlp.EncodeToBytes(addressInfo)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("error when flushing explorer")
-			return err
-		}
-		b.Put(key, encoded)
-	}
-	for bn := range storage.dirtyBNs {
-		key := GetCheckpointKey(new(big.Int).SetUint64(bn))
-		b.Put(key, []byte{})
-	}
-	storage.lock.RUnlock()
-
-	// Hack: during db write, dirty is read-only. We can release the lock for now.
-	if err := b.Write(); err != nil {
-		return errors.Wrap(err, "failed to write explorer data")
-	}
-	// clean up
-	storage.lock.Lock()
-	defer storage.lock.Unlock()
-	for addr, addressInfo := range storage.dirty {
-		storage.clean.Add(addr, addressInfo)
-	}
-	storage.dirty = make(map[oneAddress]*Address)
-	storage.dirtyBNs = make(map[uint64]struct{})
-	return nil
+// LegGetAddressKey ...
+func LegGetAddressKey(address oneAddress) []byte {
+	return []byte(fmt.Sprintf("%s%s", LegAddressPrefix, address))
 }

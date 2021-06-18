@@ -1,6 +1,7 @@
 package explorer
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -27,6 +28,7 @@ type databaseReader interface {
 type batch interface {
 	databaseWriter
 	Write() error
+	ValueSize() int
 }
 
 // lvlDB is the adapter for leveldb.Database
@@ -78,17 +80,27 @@ func (db *lvlDB) NewPrefixIterator(prefix []byte) iterator {
 
 // Note: lvlBatch is not thread safe
 type lvlBatch struct {
-	batch *leveldb.Batch
-	db    *leveldb.DB
+	batch     *leveldb.Batch
+	db        *leveldb.DB
+	valueSize int
 }
 
 func (b *lvlBatch) Put(key, val []byte) error {
 	b.batch.Put(key, val)
+	b.valueSize += len(val)
 	return nil
 }
 
 func (b *lvlBatch) Write() error {
-	return b.db.Write(b.batch, nil)
+	if err := b.db.Write(b.batch, nil); err != nil {
+		return err
+	}
+	b.valueSize = 0
+	return nil
+}
+
+func (b *lvlBatch) ValueSize() int {
+	return b.valueSize
 }
 
 type iterator interface {
@@ -97,4 +109,10 @@ type iterator interface {
 	Value() []byte
 	Release()
 	Error() error
+}
+
+// blockChainTxIndexer is the interface to check the loop up entry for transaction.
+// Implemented by *core.BlockChain
+type blockChainTxIndexer interface {
+	ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64)
 }
