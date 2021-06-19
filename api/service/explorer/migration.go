@@ -279,17 +279,17 @@ func (m *migrationV100) checkMigratedAddress(addr oneAddress, addrInfo *Address)
 }
 
 func (m *migrationV100) checkHashes(newHashes []common.Hash, oldTxs []*LegTxRecord) error {
-	if len(newHashes) != len(oldTxs) {
-		return fmt.Errorf("transaction number not expected: %v / %v", len(newHashes), len(oldTxs))
-	}
-	newHashMap := make(map[common.Hash]struct{})
-	for _, hash := range newHashes {
-		newHashMap[hash] = struct{}{}
-	}
+	oldHashMap := make(map[common.Hash]struct{})
 	for _, tx := range oldTxs {
-		txHash := common.HexToHash(tx.Hash)
-		if _, ok := newHashMap[txHash]; !ok {
-			return fmt.Errorf("transaction %v not found", txHash.String())
+		h := common.HexToHash(tx.Hash)
+		oldHashMap[h] = struct{}{}
+	}
+	if len(newHashes) != len(oldHashMap) {
+		return fmt.Errorf("transaction number not expected: %v / %v", len(newHashes), len(oldHashMap))
+	}
+	for _, h := range newHashes {
+		if _, ok := oldHashMap[h]; !ok {
+			return fmt.Errorf("transaction %v not found", h.String())
 		}
 	}
 	return nil

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	numWorker = 5
+	numWorker = 8
 )
 
 // ErrExplorerNotReady is the error when querying explorer db data when
@@ -183,7 +183,7 @@ func (tm *taskManager) HasPendingTasks() bool {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 
-	return len(tm.blocksLP) == 0 && len(tm.blocksHP) == 0
+	return len(tm.blocksLP) != 0 || len(tm.blocksHP) != 0
 }
 
 func (tm *taskManager) PullTask() *types.Block {
