@@ -252,7 +252,7 @@ func (m *migrationV100) checkResult() error {
 
 func (m *migrationV100) checkMigratedAddress(addr oneAddress, addrInfo *Address) error {
 	if addr == "" {
-		return nil // Dirty data. Skipping
+		return nil // Contract creation. Skipping
 	}
 	txns, _, err := getNormalTxnHashesByAccount(m.db, addr)
 	if err != nil {

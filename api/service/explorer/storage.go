@@ -264,11 +264,8 @@ LOOP:
 
 func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
-	if err != nil {
+	if is || err != nil {
 		return nil, err
-	}
-	if is {
-		return nil, nil
 	}
 	btc := bc.db.NewBatch()
 
@@ -287,12 +284,9 @@ func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 
 func (bc *blockComputer) computeNormalTx(btc batch, b *types.Block, tx *types.Transaction) {
 	ethFrom, _ := tx.SenderAddress()
-	ethTo := *tx.To()
 	from := ethToOneAddress(ethFrom)
-	to := ethToOneAddress(ethTo)
 
 	_ = writeAddressEntry(btc, from)
-	_ = writeAddressEntry(btc, to)
 
 	_, bn, index := bc.bc.ReadTxLookupEntry(tx.HashByType())
 	_ = writeNormalTxnIndex(btc, normalTxnIndex{
@@ -301,13 +295,18 @@ func (bc *blockComputer) computeNormalTx(btc batch, b *types.Block, tx *types.Tr
 		txnIndex:    index,
 		txnHash:     tx.HashByType(),
 	}, txSent)
-	_ = writeNormalTxnIndex(btc, normalTxnIndex{
-		addr:        to,
-		blockNumber: bn,
-		txnIndex:    index,
-		txnHash:     tx.HashByType(),
-	}, txReceived)
 
+	ethTo := tx.To()
+	if ethTo != nil { // Skip for contract creation
+		to := ethToOneAddress(*ethTo)
+		_ = writeAddressEntry(btc, to)
+		_ = writeNormalTxnIndex(btc, normalTxnIndex{
+			addr:        to,
+			blockNumber: bn,
+			txnIndex:    index,
+			txnHash:     tx.HashByType(),
+		}, txReceived)
+	}
 	// Not very sure how this 1000 come from. But it is the logic before migration
 	t := b.Time().Uint64() * 1000
 	tr := &TxRecord{tx.HashByType(), time.Unix(int64(t), 0)}
