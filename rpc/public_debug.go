@@ -27,6 +27,7 @@ func NewPublicDebugAPI(hmy *hmy.Harmony, version Version) rpc.API {
 }
 
 // SetLogVerbosity Sets log verbosity on runtime
+// curl -H "Content-Type: application/json" -d '{"method":"hmy_setLogVerbosity","params":[5],"id":1}' http://127.0.0.1:9500
 func (s *PublicDebugService) SetLogVerbosity(ctx context.Context, level int) (map[string]interface{}, error) {
 	if level < int(log.LvlCrit) || level > int(log.LvlTrace) {
 		return nil, ErrInvalidLogLevel
