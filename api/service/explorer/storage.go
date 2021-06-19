@@ -318,7 +318,7 @@ func (bc *blockComputer) computeStakingTx(btc batch, b *types.Block, tx *staking
 	from := ethToOneAddress(ethFrom)
 	_ = writeAddressEntry(btc, from)
 	_, bn, index := bc.bc.ReadTxLookupEntry(tx.Hash())
-	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+	_ = writeStakingTxnIndex(btc, stakingTxnIndex{
 		addr:        from,
 		blockNumber: bn,
 		txnIndex:    index,
@@ -334,7 +334,7 @@ func (bc *blockComputer) computeStakingTx(btc batch, b *types.Block, tx *staking
 	}
 	to := ethToOneAddress(ethTo)
 	_ = writeAddressEntry(btc, to)
-	_ = writeNormalTxnIndex(btc, normalTxnIndex{
+	_ = writeStakingTxnIndex(btc, stakingTxnIndex{
 		addr:        to,
 		blockNumber: bn,
 		txnIndex:    index,
