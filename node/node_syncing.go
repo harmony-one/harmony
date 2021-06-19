@@ -35,6 +35,10 @@ const (
 	// getBlocksRequestHardCap is the hard capped message size at server side for getBlocks request.
 	// The number is 4MB (default gRPC message size) minus 2k reserved for message overhead.
 	getBlocksRequestHardCap = 4*1024*1024 - 2*1024
+
+	// largeNumberDiff is the number of big block diff to set un-sync
+	// TODO: refactor this.
+	largeNumberDiff = 1000
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -676,6 +680,17 @@ func (node *Node) getCommitSigFromDB(block *types.Block) ([]byte, error) {
 // and the target block number, and the difference between current block
 // and target block.
 func (node *Node) SyncStatus(shardID uint32) (bool, uint64, uint64) {
+	if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+		exp, err := node.getExplorerService()
+		if err != nil {
+			// unreachable code
+			return false, 0, largeNumberDiff
+		}
+		if !exp.IsAvailable() {
+			return false, 0, largeNumberDiff
+		}
+	}
+
 	ds := node.getDownloaders()
 	if ds == nil || !ds.IsActive() {
 		// downloaders inactive. Ask DNS sync instead
