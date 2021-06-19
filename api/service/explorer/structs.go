@@ -3,11 +3,14 @@ package explorer
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
+	"io"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
+	"github.com/ethereum/go-ethereum/rlp"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -15,25 +18,105 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-/*
- * All the code here is work of progress for the sprint.
- */
+type oneAddress string
+
+type (
+	// TxRecord is the data structure stored in explorer db for the a Transaction record
+	TxRecord struct {
+		Hash      common.Hash
+		Timestamp time.Time
+	}
+
+	// TxType is the transaction type. Currently on txSent and txReceived.
+	// TODO: add staking to this type logic handle.
+	TxType byte
+)
+
+const (
+	txUnknown TxType = iota
+	txSent
+	txReceived
+
+	txSentStr     = "SENT"
+	txReceivedStr = "RECEIVED"
+)
+
+func (t TxType) String() string {
+	switch t {
+	case txSent:
+		return txSentStr
+	case txReceived:
+		return txReceivedStr
+	}
+	return "UNKNOWN"
+}
+
+func legTxTypeToTxType(legType string) (TxType, error) {
+	switch legType {
+	case LegReceived:
+		return txReceived, nil
+	case LegSent:
+		return txSent, nil
+	}
+	return txUnknown, fmt.Errorf("unknown transaction type: %v", legType)
+}
+
+func legTxRecordToTxRecord(leg *LegTxRecord) (*TxRecord, TxType, error) {
+	txHash := common.HexToHash(leg.Hash)
+	t, err := legTxTypeToTxType(leg.Type)
+	if err != nil {
+		return nil, 0, err
+	}
+	i, err := strconv.ParseInt(leg.Timestamp, 10, 64)
+	if err != nil {
+		return nil, 0, err
+	}
+	tm := time.Unix(i, 0)
+	return &TxRecord{
+		Hash:      txHash,
+		Timestamp: tm,
+	}, t, nil
+}
+
+type storedTxRecord struct {
+	Hash common.Hash
+	Type byte
+	Time uint64
+}
+
+func (tx *TxRecord) EncodeRLP(w io.Writer) error {
+	storedTx := storedTxRecord{
+		Hash: tx.Hash,
+		Time: uint64(tx.Timestamp.Unix()),
+	}
+	return rlp.Encode(w, storedTx)
+}
+
+func (tx *TxRecord) DecodeRLP(st *rlp.Stream) error {
+	var storedTx storedTxRecord
+	if err := st.Decode(&storedTx); err != nil {
+		return err
+	}
+	tx.Hash = storedTx.Hash
+	tx.Timestamp = time.Unix(int64(storedTx.Time), 0)
+	return nil
+}
 
 // Tx types ...
 const (
-	Received = "RECEIVED"
-	Sent     = "SENT"
+	LegReceived = "RECEIVED"
+	LegSent     = "SENT"
 )
 
-// TxRecord ...
-type TxRecord struct {
+// LegTxRecord ...
+type LegTxRecord struct {
 	Hash      string
 	Type      string
 	Timestamp string
 }
 
-// TxRecords ...
-type TxRecords []*TxRecord
+// LegTxRecords ...
+type LegTxRecords []*LegTxRecord
 
 // Data ...
 type Data struct {
@@ -42,10 +125,10 @@ type Data struct {
 
 // Address ...
 type Address struct {
-	ID         string    `json:"id"`
-	Balance    *big.Int  `json:"balance"` // Deprecated
-	TXs        TxRecords `json:"txs"`
-	StakingTXs TxRecords `json:"staking_txs"`
+	ID         string       `json:"id"`
+	Balance    *big.Int     `json:"balance"` // Deprecated
+	TXs        LegTxRecords `json:"txs"`
+	StakingTXs LegTxRecords `json:"staking_txs"`
 }
 
 // Transaction ...
