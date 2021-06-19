@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// flush to db when batch reached 10 MiB
-	writeThreshold      = 10 * 1024 * 1024
+	// flush to db when batch reached 1 MiB
+	writeThreshold      = 1 * 1024 * 1024
 	legAddressPrefixLen = 3
 )
 
@@ -251,6 +251,9 @@ func (m *migrationV100) checkResult() error {
 }
 
 func (m *migrationV100) checkMigratedAddress(addr oneAddress, addrInfo *Address) error {
+	if addr == "" {
+		return nil // Dirty data. Skipping
+	}
 	txns, _, err := getNormalTxnHashesByAccount(m.db, addr)
 	if err != nil {
 		return errors.Wrapf(err, "get normal txn hashes: %v", addr)

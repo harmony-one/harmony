@@ -41,9 +41,9 @@ func newLvlDB(dbPath string) (database, error) {
 	// https://github.com/ethereum/go-ethereum/blob/master/ethdb/leveldb/leveldb.go#L98 options.
 	// We had 0 for handles and cache params before, so set 0s for all of them. Filter opt is the same.
 	options := &opt.Options{
-		OpenFilesCacheCapacity: 0,
-		BlockCacheCapacity:     0,
-		WriteBuffer:            0,
+		OpenFilesCacheCapacity: 500,
+		BlockCacheCapacity:     8 * 1024 * 1024, // 8 MiB
+		WriteBuffer:            4 * 1024 * 1024, // 4 MiB
 		Filter:                 filter.NewBloomFilter(10),
 	}
 	db, err := leveldb.OpenFile(dbPath, options)
