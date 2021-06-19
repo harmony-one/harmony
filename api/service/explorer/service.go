@@ -8,8 +8,11 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"time"
+
+	"github.com/harmony-one/harmony/core/types"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -19,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
@@ -43,7 +47,7 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
-	Storage     *Storage
+	storage     *storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 	blockchain  *core.BlockChain
@@ -52,12 +56,17 @@ type Service struct {
 
 // New returns explorer service.
 func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
+	storage, err := newStorage(bc, dbPath)
+	if err != nil {
+		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")
+	}
 	return &Service{
 		IP:         selfPeer.IP,
 		Port:       selfPeer.Port,
 		blockchain: bc,
 		backend:    backend,
-		Storage:    GetStorageInstance(selfPeer.IP, selfPeer.Port),
+		storage:    storage,
 	}
 }
 
@@ -66,7 +75,7 @@ func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
-	s.Storage.Start()
+	s.storage.Start()
 	return nil
 }
 
@@ -78,7 +87,7 @@ func (s *Service) Stop() error {
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
-	s.Storage.Close()
+	s.storage.Close()
 	return nil
 }
 
@@ -105,8 +114,8 @@ func (s *Service) Run() *http.Server {
 	// Set up router for addresses.
 	// Fetch addresses request, accepts parameter size: how much addresses to read,
 	// parameter prefix: from which address prefix start
-	//s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
-	//s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
+	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -139,33 +148,52 @@ func (s *Service) Run() *http.Server {
 	return server
 }
 
-//// GetAddresses serves end-point /addresses, returns size of addresses from address with prefix.
-//func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
-//	w.Header().Set("Content-Type", "application/json")
-//	sizeStr := r.FormValue("size")
-//	prefix := r.FormValue("prefix")
-//	if sizeStr == "" {
-//		sizeStr = defaultPageSize
-//	}
-//	data := &Data{}
-//	defer func() {
-//		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
-//			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
-//		}
-//	}()
-//
-//	size, err := strconv.Atoi(sizeStr)
-//	if err != nil || size > maxAddresses {
-//		w.WriteHeader(http.StatusBadRequest)
-//		return
-//	}
-//	data.Addresses, err = s.Storage.GetAddresses(size, oneAddress(prefix))
-//	if err != nil {
-//		w.WriteHeader(http.StatusInternalServerError)
-//		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
-//		return
-//	}
-//}
+// GetAddresses serves end-point /addresses, returns size of addresses from address with prefix.
+func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	sizeStr := r.FormValue("size")
+	prefix := r.FormValue("prefix")
+	if sizeStr == "" {
+		sizeStr = defaultPageSize
+	}
+	data := &Data{}
+	defer func() {
+		if err := json.NewEncoder(w).Encode(data.Addresses); err != nil {
+			utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
+		}
+	}()
+
+	size, err := strconv.Atoi(sizeStr)
+	if err != nil || size > maxAddresses {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	data.Addresses, err = s.storage.GetAddresses(size, oneAddress(prefix))
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
+		return
+	}
+}
+
+// GetNormalTxHashesByAccount get the normal transaction hashes by account
+func (s *Service) GetNormalTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
+	return s.storage.GetNormalTxsByAddress(address)
+}
+
+// GetStakingTxHashesByAccount get the staking transaction hashes by account
+func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
+	return s.storage.GetStakingTxsByAddress(address)
+}
+
+// DumpNewBlock instruct the explorer storage to dump block data in explorer DB
+func (s *Service) DumpNewBlock(b *types.Block) {
+	s.storage.DumpNewBlock(b)
+}
+
+func (s *Service) DumpCatchupBlock(b *types.Block) {
+	s.storage.DumpCatchupBlock(b)
+}
 
 var (
 	// InaccessibleAddresses are a list of known eth addresses that cannot spend ONE tokens.
@@ -295,4 +323,8 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // APIs for the services.
 func (s *Service) APIs() []rpc.API {
 	return nil
+}
+
+func defaultDBPath(ip, port string) string {
+	return path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
 }

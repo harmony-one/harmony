@@ -23,6 +23,7 @@ type databaseReader interface {
 	Get(key []byte) ([]byte, error)
 	Has(key []byte) (bool, error)
 	NewPrefixIterator(prefix []byte) iterator
+	NewSizedIterator(start []byte, size int) iterator
 }
 
 type batch interface {
@@ -77,6 +78,39 @@ func (db *lvlDB) NewPrefixIterator(prefix []byte) iterator {
 	it := db.db.NewIterator(rng, nil)
 	return it
 }
+
+func (db *lvlDB) NewSizedIterator(start []byte, size int) iterator {
+	return db.newSizedIterator(start, size)
+}
+
+type sizedIterator struct {
+	it        iterator
+	curIndex  int
+	sizeLimit int
+}
+
+func (db *lvlDB) newSizedIterator(start []byte, size int) *sizedIterator {
+	rng := &levelutil.Range{Start: start, Limit: nil}
+	it := db.db.NewIterator(rng, nil)
+	return &sizedIterator{
+		it:        it,
+		curIndex:  0,
+		sizeLimit: size,
+	}
+}
+
+func (it *sizedIterator) Next() bool {
+	if it.curIndex >= it.sizeLimit-1 {
+		return false
+	}
+	it.curIndex++
+	return it.it.Next()
+}
+
+func (it *sizedIterator) Key() []byte   { return it.it.Key() }
+func (it *sizedIterator) Value() []byte { return it.it.Value() }
+func (it *sizedIterator) Release()      { it.it.Release() }
+func (it *sizedIterator) Error() error  { return it.it.Error() }
 
 // Note: lvlBatch is not thread safe
 type lvlBatch struct {

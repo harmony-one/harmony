@@ -173,7 +173,7 @@ func TestGetStakingTxnHashesByAccount(t *testing.T) {
 			t.Errorf("get normal txn hashes not expected: %v / %v", len(hashes), exp)
 		}
 		if len(hashes) != len(tts) {
-			t.Errorf("hash size not equal to txType size")
+			t.Errorf("hash size not equal to TxType size")
 		}
 		for _, tt := range tts {
 			if tt != txSent {

@@ -27,18 +27,25 @@ const (
 // explorer db is doing migration and unavailable
 var ErrExplorerNotReady = errors.New("explorer db not ready")
 
-type storage struct {
-	db database
-	bc *core.BlockChain
+type (
+	storage struct {
+		db database
+		bc *core.BlockChain
 
-	// TODO: optimize this with priority queue
-	tm      *taskManager
-	resultC chan batch
+		// TODO: optimize this with priority queue
+		tm      *taskManager
+		resultC chan blockResult
 
-	available *abool.AtomicBool
-	closeC    chan struct{}
-	log       zerolog.Logger
-}
+		available *abool.AtomicBool
+		closeC    chan struct{}
+		log       zerolog.Logger
+	}
+
+	blockResult struct {
+		btc batch
+		bn  uint64
+	}
+)
 
 func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
 	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
@@ -51,7 +58,7 @@ func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
 		db:        db,
 		bc:        bc,
 		tm:        newTaskManager(),
-		resultC:   make(chan batch, numWorker),
+		resultC:   make(chan blockResult, numWorker),
 		available: abool.New(),
 		closeC:    make(chan struct{}),
 		log:       utils.Logger().With().Str("module", "explorer storage").Logger(),
@@ -62,7 +69,7 @@ func (s *storage) Start() {
 	go s.run()
 }
 
-func (s *storage) Stop() {
+func (s *storage) Close() {
 	close(s.closeC)
 }
 
@@ -77,11 +84,11 @@ func (s *storage) DumpCatchupBlock(b *types.Block) {
 	s.tm.AddCatchupTask(b)
 }
 
-func (s *storage) GetAddresses() ([]string, error) {
+func (s *storage) GetAddresses(size int, startAddress oneAddress) ([]string, error) {
 	if !s.available.IsSet() {
 		return nil, ErrExplorerNotReady
 	}
-	addrs, err := getAllAddresses(s.db)
+	addrs, err := getAddressesInRange(s.db, startAddress, size)
 	if err != nil {
 		return nil, err
 	}
@@ -92,20 +99,18 @@ func (s *storage) GetAddresses() ([]string, error) {
 	return display, nil
 }
 
-func (s *storage) GetNormalTxsByAddress(addr string) ([]common.Hash, error) {
+func (s *storage) GetNormalTxsByAddress(addr string) ([]common.Hash, []TxType, error) {
 	if !s.available.IsSet() {
-		return nil, ErrExplorerNotReady
+		return nil, nil, ErrExplorerNotReady
 	}
-	hashes, _, err := getNormalTxnHashesByAccount(s.db, oneAddress(addr))
-	return hashes, err
+	return getNormalTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
-func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, error) {
+func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, error) {
 	if !s.available.IsSet() {
-		return nil, ErrExplorerNotReady
+		return nil, nil, ErrExplorerNotReady
 	}
-	hashes, _, err := getStakingTxnHashesByAccount(s.db, oneAddress(addr))
-	return hashes, err
+	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
 func (s *storage) run() {
@@ -126,31 +131,15 @@ func (s *storage) loop() {
 	s.makeWorkersAndStart()
 	for {
 		select {
-		case btc := <-s.resultC:
-			if err := btc.Write(); err != nil {
+		case res := <-s.resultC:
+			s.log.Info().Uint64("block number", res.bn).Msg("writing explorer DB")
+			if err := res.btc.Write(); err != nil {
 				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
 
 		case <-s.closeC:
 			return
 		}
-	}
-}
-
-func (s *storage) makeWorkersAndStart() {
-	workers := make([]*blockComputer, 0, numWorker)
-	for i := 0; i != numWorker; i++ {
-		workers = append(workers, &blockComputer{
-			tm:      s.tm,
-			db:      s.db,
-			bc:      s.bc,
-			resultC: s.resultC,
-			closeC:  s.closeC,
-			log:     s.log.With().Int("worker", i).Logger(),
-		})
-	}
-	for _, worker := range workers {
-		go worker.loop()
 	}
 }
 
@@ -214,11 +203,28 @@ func (tm *taskManager) PullTask() *types.Block {
 	return nil
 }
 
+func (s *storage) makeWorkersAndStart() {
+	workers := make([]*blockComputer, 0, numWorker)
+	for i := 0; i != numWorker; i++ {
+		workers = append(workers, &blockComputer{
+			tm:      s.tm,
+			db:      s.db,
+			bc:      s.bc,
+			resultC: s.resultC,
+			closeC:  s.closeC,
+			log:     s.log.With().Int("worker", i).Logger(),
+		})
+	}
+	for _, worker := range workers {
+		go worker.loop()
+	}
+}
+
 type blockComputer struct {
 	tm      *taskManager
 	db      database
 	bc      blockChainTxIndexer
-	resultC chan batch
+	resultC chan blockResult
 	closeC  chan struct{}
 	log     zerolog.Logger
 }
@@ -244,7 +250,7 @@ LOOP:
 					continue
 				}
 				select {
-				case bc.resultC <- res:
+				case bc.resultC <- *res:
 				case <-bc.closeC:
 					return
 				}
@@ -256,7 +262,7 @@ LOOP:
 	}
 }
 
-func (bc *blockComputer) computeBlock(b *types.Block) (batch, error) {
+func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
 	if err != nil {
 		return nil, err
@@ -273,7 +279,10 @@ func (bc *blockComputer) computeBlock(b *types.Block) (batch, error) {
 		bc.computeStakingTx(btc, b, stk)
 	}
 	_ = writeCheckpoint(btc, b.NumberU64())
-	return btc, nil
+	return &blockResult{
+		btc: btc,
+		bn:  b.NumberU64(),
+	}, nil
 }
 
 func (bc *blockComputer) computeNormalTx(btc batch, b *types.Block, tx *types.Transaction) {

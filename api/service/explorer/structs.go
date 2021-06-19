@@ -9,9 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -28,13 +27,13 @@ type (
 		Timestamp time.Time
 	}
 
-	// txType is the transaction type. Currently on txSent and txReceived.
+	// TxType is the transaction type. Currently on txSent and txReceived.
 	// TODO: add staking to this type logic handle.
-	txType byte
+	TxType byte
 )
 
 const (
-	txUnknown txType = iota
+	txUnknown TxType = iota
 	txSent
 	txReceived
 
@@ -42,7 +41,7 @@ const (
 	txReceivedStr = "RECEIVED"
 )
 
-func (t txType) String() string {
+func (t TxType) String() string {
 	switch t {
 	case txSent:
 		return txSentStr
@@ -52,7 +51,7 @@ func (t txType) String() string {
 	return "UNKNOWN"
 }
 
-func legTxTypeToTxType(legType string) (txType, error) {
+func legTxTypeToTxType(legType string) (TxType, error) {
 	switch legType {
 	case LegReceived:
 		return txReceived, nil
@@ -62,7 +61,7 @@ func legTxTypeToTxType(legType string) (txType, error) {
 	return txUnknown, fmt.Errorf("unknown transaction type: %v", legType)
 }
 
-func legTxRecordToTxRecord(leg *LegTxRecord) (*TxRecord, txType, error) {
+func legTxRecordToTxRecord(leg *LegTxRecord) (*TxRecord, TxType, error) {
 	txHash := common.HexToHash(leg.Hash)
 	t, err := legTxTypeToTxType(leg.Type)
 	if err != nil {

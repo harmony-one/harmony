@@ -170,6 +170,11 @@ func (db *memDB) NewPrefixIterator(prefix []byte) iterator {
 	}
 }
 
+// TODO: implement this and verify
+func (db *memDB) NewSizedIterator(start []byte, size int) iterator {
+	return nil
+}
+
 type memBatch struct {
 	keyValues map[string][]byte
 	db        *memDB

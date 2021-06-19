@@ -14,7 +14,10 @@ import (
 )
 
 // flush to db when batch reached 100 MiB
-const writeThreshold = 100 * 1024 * 1024
+const (
+	writeThreshold      = 100 * 1024 * 1024
+	legAddressPrefixLen = 3
+)
 
 func (s *storage) migrateToV100() error {
 	m := &migrationV100{
@@ -151,10 +154,10 @@ func (m *migrationV100) forEachLegacyAddressInfo(f func(addr oneAddress, addrInf
 			key = string(it.Key())
 			val = it.Value()
 		)
-		if len(key) < LegAddressPrefixLen {
+		if len(key) < legAddressPrefixLen {
 			return fmt.Errorf("address prefix len smaller than 3: %v", key)
 		}
-		addr := oneAddress(key[LegAddressPrefixLen:])
+		addr := oneAddress(key[legAddressPrefixLen:])
 		var addrInfo *Address
 		if err := rlp.DecodeBytes(val, &addrInfo); err != nil {
 			return errors.Wrapf(err, "address %v", addr)

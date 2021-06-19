@@ -121,6 +121,22 @@ func getAllAddresses(db databaseReader) ([]oneAddress, error) {
 	return addrs, nil
 }
 
+func getAddressesInRange(db databaseReader, start oneAddress, size int) ([]oneAddress, error) {
+	var addrs []oneAddress
+	startKey := getAddressKey(start)
+	it := db.NewSizedIterator(startKey, size)
+	defer it.Release()
+
+	for it.Next() {
+		addr, err := getAddressFromAddressKey(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, it.Error()
+}
+
 // getTxnKey return the transaction key. It's simply a prefix with the transaction hash
 func getTxnKey(txHash common.Hash) []byte {
 	b := bPool.Get()
@@ -195,10 +211,10 @@ func txnHashFromNormalTxnIndexKey(key []byte) (common.Hash, error) {
 	return txHash, nil
 }
 
-func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []txType, error) {
+func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []TxType, error) {
 	var (
 		txHashes []common.Hash
-		tts      []txType
+		tts      []TxType
 	)
 	prefix := normalTxnIndexPrefixByAddr(addr)
 	err := forEachAtPrefix(db, prefix, func(key, val []byte) error {
@@ -209,7 +225,7 @@ func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.H
 		if len(val) < 0 {
 			return errors.New("val size not expected")
 		}
-		tts = append(tts, txType(val[0]))
+		tts = append(tts, TxType(val[0]))
 		txHashes = append(txHashes, txHash)
 		return nil
 	})
@@ -219,7 +235,7 @@ func getNormalTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.H
 	return txHashes, tts, nil
 }
 
-func writeNormalTxnIndex(db databaseWriter, entry normalTxnIndex, tt txType) error {
+func writeNormalTxnIndex(db databaseWriter, entry normalTxnIndex, tt TxType) error {
 	key := entry.key()
 	return db.Put(key, []byte{byte(tt)})
 }
@@ -263,10 +279,10 @@ func txnHashFromStakingTxnIndexKey(key []byte) (common.Hash, error) {
 	return txHash, nil
 }
 
-func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []txType, error) {
+func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.Hash, []TxType, error) {
 	var (
 		txHashes []common.Hash
-		tts      []txType
+		tts      []TxType
 	)
 	prefix := stakingTxnIndexPrefixByAddr(addr)
 	err := forEachAtPrefix(db, prefix, func(key, val []byte) error {
@@ -277,7 +293,7 @@ func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.
 		if len(val) < 0 {
 			return errors.New("val size not expected")
 		}
-		tts = append(tts, txType(val[0]))
+		tts = append(tts, TxType(val[0]))
 		txHashes = append(txHashes, txHash)
 		return nil
 	})
@@ -287,7 +303,7 @@ func getStakingTxnHashesByAccount(db databaseReader, addr oneAddress) ([]common.
 	return txHashes, tts, nil
 }
 
-func writeStakingTxnIndex(db databaseWriter, entry stakingTxnIndex, tt txType) error {
+func writeStakingTxnIndex(db databaseWriter, entry stakingTxnIndex, tt TxType) error {
 	key := entry.key()
 	return db.Put(key, []byte{byte(tt)})
 }
@@ -302,7 +318,7 @@ func forEachAtPrefix(db databaseReader, prefix []byte, f func(key, val []byte) e
 			return err
 		}
 	}
-	return nil
+	return it.Error()
 }
 
 // Legacy Schema
