@@ -192,8 +192,14 @@ func (s *Service) DumpNewBlock(b *types.Block) {
 	s.storage.DumpNewBlock(b)
 }
 
+// DumpCatchupBlock instruct the explorer storage to dump a catch up block in explorer DB
 func (s *Service) DumpCatchupBlock(b *types.Block) {
 	s.storage.DumpCatchupBlock(b)
+}
+
+// IsAvailable return whether the explorer db is available for now.
+func (s *Service) IsAvailable() bool {
+	return s.storage.available.IsSet()
 }
 
 var (
