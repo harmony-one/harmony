@@ -50,11 +50,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
-		VRFEpoch:                   EpochTBD,
-		MinDelegation100Epoch:      EpochTBD,
-		MinCommissionRateEpoch:     EpochTBD,
+		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
+		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionPromoPeriod:   big.NewInt(100),
-		EPoSBound35Epoch:           EpochTBD,
+		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
