@@ -30,11 +30,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/harmony-one/harmony/internal/params"
 	"golang.org/x/crypto/ripemd160"
-	
+
 	//Needed for SHA3-256 FIPS202
+	"encoding/hex"
 	"golang.org/x/crypto/sha3"
-    "encoding/hex"
-	 
 )
 
 // PrecompiledContract is the basic interface for native Go contracts. The implementation
@@ -80,9 +79,8 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}): &blake2F{},
 
-	
 	common.BytesToAddress([]byte{102}): &sha3fip{},
-	common.BytesToAddress([]byte{103}):  &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{103}): &ecrecoverPublicKey{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -98,7 +96,6 @@ var PrecompiledContractsVRF = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}):   &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):   &blake2F{},
 	common.BytesToAddress([]byte{255}): &vrf{},
-		 
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
@@ -544,10 +541,10 @@ func (c *vrf) Run(input []byte) ([]byte, error) {
 	return append([]byte{}, input...), nil
 }
 
-
 // SHA3-256 FIPS 202 standard implemented as a native contract.
 
 type sha3fip struct{}
+
 // TODO Check if the gas price calculation needs modification
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
@@ -556,10 +553,10 @@ type sha3fip struct{}
 func (c *sha3fip) RequiredGas(input []byte) uint64 {
 	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
 }
-func (c *sha3fip) Run(input []byte) ([]byte, error) {	
+func (c *sha3fip) Run(input []byte) ([]byte, error) {
 	hexStr := common.Bytes2Hex(input)
 	pub, _ := hex.DecodeString(hexStr)
-    h := sha3.Sum256(pub[:]) 
+	h := sha3.Sum256(pub[:])
 	return h[:], nil
 }
 
@@ -576,10 +573,10 @@ func (c *ecrecoverPublicKey) Run(input []byte) ([]byte, error) {
 	input = common.RightPadBytes(input, ecrecoverPublicKeyInputLength)
 	// "input" is (hash, v, r, s), each 32 bytes
 	// but for ecrecover we want (r, s, v)
-	
+
 	r := new(big.Int).SetBytes(input[64:96])
 	s := new(big.Int).SetBytes(input[96:128])
-	v := input[63] 
+	v := input[63]
 
 	// tighter sig s values input homestead only apply to tx sigs
 	if !allZero(input[32:63]) || !crypto.ValidateSignatureValues(v, r, s, false) {
