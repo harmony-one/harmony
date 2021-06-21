@@ -110,6 +110,9 @@ func TestHarmonyFlags(t *testing.T) {
 						IP:   "8.8.8.8",
 						Port: 9000,
 					},
+					VerbosePrints: harmonyconfig.LogVerbosePrints{
+						Config: true,
+					},
 				},
 				Sys: &harmonyconfig.SysConfig{
 					NtpServer: defaultSysConfig.NtpServer,

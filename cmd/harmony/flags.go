@@ -999,7 +999,7 @@ var (
 	logVerbosePrintsFlag = cli.StringSliceFlag{
 		Name:     "log.verbose-prints",
 		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
-		DefValue: []string{},
+		DefValue: []string{"config"},
 	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{

@@ -72,7 +72,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RotateSize: 100,
 		Verbosity:  3,
 		VerbosePrints: harmonyconfig.LogVerbosePrints{
-			Config: false,
+			Config: true,
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
