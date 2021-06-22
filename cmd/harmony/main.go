@@ -612,6 +612,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 
 	nodeConfig.NtpServer = hc.Sys.NtpServer
 
+	nodeConfig.TraceDir = hc.General.TraceDir
+
 	return nodeConfig, nil
 }
 
@@ -653,7 +655,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	// Current node.
 	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, nodeConfig.TraceDir, blacklist, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn

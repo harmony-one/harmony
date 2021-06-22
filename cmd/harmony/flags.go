@@ -28,6 +28,8 @@ var (
 		legacyShardIDFlag,
 		legacyIsArchiveFlag,
 		legacyDataDirFlag,
+
+		taraceDataDirFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -271,6 +273,12 @@ var (
 		DefValue:   defaultConfig.General.DataDir,
 		Deprecated: "use --datadir",
 	}
+
+	taraceDataDirFlag = cli.StringFlag{
+		Name:     "trace_dir",
+		Usage:    "trace block database directory",
+		DefValue: "",
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -341,6 +349,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, taraceDataDirFlag) {
+		config.General.TraceDir = cli.GetStringFlagValue(cmd, taraceDataDirFlag)
 	}
 }
 

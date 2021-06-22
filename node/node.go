@@ -938,6 +938,7 @@ func New(
 	host p2p.Host,
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
+	traceDB string,
 	blacklist map[common.Address]struct{},
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
@@ -966,7 +967,7 @@ func New(
 	engine := chain.NewEngine()
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
+		chainDBFactory, &genesisInitializer{&node}, engine, traceDB, &chainConfig,
 	)
 
 	for shardID, archival := range isArchival {

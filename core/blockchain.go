@@ -45,6 +45,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -166,6 +167,7 @@ type BlockChain struct {
 	processor              Processor // block processor interface
 	validator              Validator // block and state validator interface
 	vmConfig               vm.Config
+	traceDB                string
 	badBlocks              *lru.Cache              // Bad block cache
 	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	pendingSlashes         slash.Records
@@ -177,7 +179,7 @@ type BlockChain struct {
 // Processor.
 func NewBlockChain(
 	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config,
+	engine consensus_engine.Engine, vmConfig vm.Config, traceDB string,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChain, error) {
 	if cacheConfig == nil {
@@ -228,6 +230,7 @@ func NewBlockChain(
 		blockAccumulatorCache:         blockAccumulatorCache,
 		engine:                        engine,
 		vmConfig:                      vmConfig,
+		traceDB:                       traceDB,
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
 		maxGarbCollectedBlkNum:        -1,
@@ -254,6 +257,8 @@ func NewBlockChain(
 	go bc.update()
 	return bc, nil
 }
+
+var randname = time.Now().Nanosecond()
 
 // ValidateNewBlock validates new block.
 func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
@@ -1446,10 +1451,16 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
-
+		vmConfig := bc.vmConfig
+		if bc.traceDB != "" {
+			vmConfig = vm.Config{
+				Debug:  true,
+				Tracer: &tracers.ParityBlockTracer{},
+			}
+		}
 		// Process block using the parent state as reference point.
 		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
-			block, state, bc.vmConfig,
+			block, state, vmConfig,
 		)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
@@ -1469,6 +1480,19 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		status, err := bc.WriteBlockWithState(
 			block, receipts, cxReceipts, payout, state,
 		)
+		if bc.traceDB != "" {
+			if tracer, ok := vmConfig.Tracer.(*tracers.ParityBlockTracer); ok {
+				result := make([]json.RawMessage, 0)
+				var err error
+				if block.Transactions().Len() > 0 {
+					result, err = tracer.GetResult()
+				}
+				if err == nil {
+					b, _ := json.Marshal(result)
+					fmt.Println(block.NumberU64(), string(b))
+				}
+			}
+		}
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
