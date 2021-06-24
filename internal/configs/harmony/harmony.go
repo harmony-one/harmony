@@ -59,7 +59,7 @@ type GeneralConfig struct {
 	IsBeaconArchival bool
 	IsOffline        bool
 	DataDir          string
-	TraceDir         string
+	TraceEnable      bool
 }
 
 type ConsensusConfig struct {

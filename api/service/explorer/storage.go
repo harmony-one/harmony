@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -35,6 +36,7 @@ type (
 		// TODO: optimize this with priority queue
 		tm      *taskManager
 		resultC chan blockResult
+		resultT chan *traceResult
 
 		available *abool.AtomicBool
 		closeC    chan struct{}
@@ -44,6 +46,12 @@ type (
 	blockResult struct {
 		btc batch
 		bn  uint64
+	}
+
+	traceResult struct {
+		btc  batch
+		hash common.Hash
+		data []byte
 	}
 )
 
@@ -59,6 +67,7 @@ func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
 		bc:        bc,
 		tm:        newTaskManager(),
 		resultC:   make(chan blockResult, numWorker),
+		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
 		closeC:    make(chan struct{}),
 		log:       utils.Logger().With().Str("module", "explorer storage").Logger(),
@@ -71,6 +80,10 @@ func (s *storage) Start() {
 
 func (s *storage) Close() {
 	close(s.closeC)
+}
+
+func (s *storage) TraceNewBlock(hash common.Hash, data []byte) {
+	s.tm.AddNewTraceTask(hash, data)
 }
 
 func (s *storage) DumpNewBlock(b *types.Block) {
@@ -113,6 +126,13 @@ func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, 
 	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
+func (s *storage) GetTraceDataByHash(hash common.Hash) (json.RawMessage, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	return getTraceData(s.db, hash)
+}
+
 func (s *storage) run() {
 	if is, err := isVersionV100(s.db); !is || err != nil {
 		s.available.UnSet()
@@ -136,6 +156,11 @@ func (s *storage) loop() {
 			if err := res.btc.Write(); err != nil {
 				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
+		case res := <-s.resultT:
+			s.log.Info().Str("block hash", res.hash.Hex()).Msg("writing trace into explorer DB")
+			if err := res.btc.Write(); err != nil {
+				s.log.Error().Err(err).Msg("explorer db failed to write trace data")
+			}
 
 		case <-s.closeC:
 			return
@@ -149,6 +174,7 @@ type taskManager struct {
 	lock     sync.Mutex
 
 	C chan struct{}
+	T chan *traceResult
 }
 
 func newTaskManager() *taskManager {
@@ -165,6 +191,13 @@ func (tm *taskManager) AddNewTask(b *types.Block) {
 	select {
 	case tm.C <- struct{}{}:
 	default:
+	}
+}
+
+func (tm *taskManager) AddNewTraceTask(hash common.Hash, data []byte) {
+	tm.T <- &traceResult{
+		hash: hash,
+		data: data,
 	}
 }
 
@@ -211,6 +244,7 @@ func (s *storage) makeWorkersAndStart() {
 			db:      s.db,
 			bc:      s.bc,
 			resultC: s.resultC,
+			resultT: s.resultT,
 			closeC:  s.closeC,
 			log:     s.log.With().Int("worker", i).Logger(),
 		})
@@ -225,6 +259,7 @@ type blockComputer struct {
 	db      database
 	bc      blockChainTxIndexer
 	resultC chan blockResult
+	resultT chan *traceResult
 	closeC  chan struct{}
 	log     zerolog.Logger
 }
@@ -255,7 +290,17 @@ LOOP:
 					return
 				}
 			}
-
+		case traceData := <-bc.tm.T:
+			if exist, err := isTraceDataInDB(bc.db, traceData.hash); exist || err != nil {
+				break
+			}
+			traceData.btc = bc.db.NewBatch()
+			_ = writeTraceData(traceData.btc, traceData.hash, traceData.data)
+			select {
+			case bc.resultT <- traceData:
+			case <-bc.closeC:
+				return
+			}
 		case <-bc.closeC:
 			return
 		}

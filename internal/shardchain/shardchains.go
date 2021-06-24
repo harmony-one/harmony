@@ -40,7 +40,6 @@ type CollectionImpl struct {
 	pool         map[uint32]*core.BlockChain
 	disableCache map[uint32]bool
 	chainConfig  *params.ChainConfig
-	traceDB      string
 }
 
 // NewCollection creates and returns a new shard chain collection.
@@ -50,7 +49,7 @@ type CollectionImpl struct {
 // dbInit is the shard chain initializer to use when the database returned by
 // the factory is brand new (empty).
 func NewCollection(
-	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine, traceDB string,
+	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
 	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
 	return &CollectionImpl{
@@ -60,7 +59,6 @@ func NewCollection(
 		pool:         make(map[uint32]*core.BlockChain),
 		disableCache: make(map[uint32]bool),
 		chainConfig:  chainConfig,
-		traceDB:      traceDB,
 	}
 }
 
@@ -108,7 +106,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
 	}
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, sc.traceDB, nil,
+		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
