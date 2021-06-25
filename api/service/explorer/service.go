@@ -208,28 +208,10 @@ type InaccessibleAddressInfo struct {
 	Nonce      uint64            `json:"nonce"`
 }
 
-// getAllInaccessibleAddresses information according to InaccessibleAddresses
-func (s *Service) getAllInaccessibleAddresses() ([]*InaccessibleAddressInfo, error) {
-	ais, err := chain.GetInaccessibleAddressInfo(s.blockchain)
-	if err != nil {
-		return nil, err
-	}
-	accs := make([]*InaccessibleAddressInfo, 0, len(ais))
-	for _, ai := range ais {
-		accs = append(accs, &InaccessibleAddressInfo{
-			EthAddress: ai.EthAddress,
-			Address:    ai.Address,
-			Balance:    ai.Balance,
-			Nonce:      ai.Nonce,
-		})
-	}
-	return accs, nil
-}
-
 // GetInaccessibleAddressInfo serves /burn-addresses end-point.
 func (s *Service) GetInaccessibleAddressInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	accInfos, err := s.getAllInaccessibleAddresses()
+	accInfos, err := chain.GetInaccessibleTokens(s.blockchain)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible addresses")
 		w.WriteHeader(http.StatusInternalServerError)
