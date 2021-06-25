@@ -211,10 +211,19 @@ type InaccessibleAddressInfo struct {
 // GetInaccessibleAddressInfo serves /burn-addresses end-point.
 func (s *Service) GetInaccessibleAddressInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	accInfos, err := chain.GetInaccessibleTokens(s.blockchain)
+	accInfos, err := chain.GetInaccessibleAddressInfo(s.blockchain)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible addresses")
 		w.WriteHeader(http.StatusInternalServerError)
+	}
+	display := make([]*InaccessibleAddressInfo, 0, len(accInfos))
+	for _, acc := range accInfos {
+		display = append(display, &InaccessibleAddressInfo{
+			EthAddress: acc.EthAddress,
+			Address:    acc.Address,
+			Balance:    acc.Balance,
+			Nonce:      acc.Nonce,
+		})
 	}
 	if err := json.NewEncoder(w).Encode(accInfos); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode inaccessible account info")
