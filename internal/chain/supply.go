@@ -104,7 +104,7 @@ func getAllInaccessibleTokens(chain engine.ChainReader) (numeric.Dec, error) {
 }
 
 func getAllInaccessibleAddresses(chain engine.ChainReader) ([]*InaccessibleAddressInfo, error) {
-	state, err := chain.StateAt(chain.CurrentHeader().Hash())
+	state, err := chain.StateAt(chain.CurrentHeader().Root())
 	if err != nil {
 		return nil, err
 	}
