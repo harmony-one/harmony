@@ -125,7 +125,7 @@ function launch_localnet() {
     esac
 
     # Start the node
-    ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+    ${DRYRUN} "${ROOT}/bin/harmony" --trace_dir=sdf "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"
 }
 

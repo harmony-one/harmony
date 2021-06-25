@@ -50,6 +50,103 @@ func (c *action) push(ac *action) {
 	c.subCalls = append(c.subCalls, ac)
 }
 
+func (c *action) fromBytes(bytes []byte) {
+	readByte := func() byte {
+		val := bytes[0]
+		bytes = bytes[1:]
+		return val
+	}
+	readFixedData := func(size uint) []byte {
+		fixedData := bytes[:size]
+		bytes = bytes[size:]
+		return fixedData
+	}
+	readNumber := func() *big.Int {
+		size := readByte()
+		return (&big.Int{}).SetBytes(readFixedData(uint(size)))
+	}
+	readVarData := func() []byte {
+		num := readNumber()
+		return readFixedData(uint(num.Uint64()))
+	}
+	c.op = vm.OpCode(readByte())
+
+	if c.op == vm.CREATE || c.op == vm.CREATE2 {
+		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.value = readNumber()
+		c.input = readVarData()
+		c.output = readVarData()
+		c.gas = readNumber().Uint64()
+		c.gasUsed = readNumber().Uint64()
+	}
+	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
+		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.value = readNumber()
+		c.input = readVarData()
+		c.output = readVarData()
+		c.gas = readNumber().Uint64()
+		c.gasUsed = readNumber().Uint64()
+	}
+	if c.op == vm.SELFDESTRUCT {
+		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
+		c.value = readNumber()
+	}
+}
+
+func (c action) toBytes() []byte {
+	var output = make([]byte, 0, 16*1024)
+	appendByte := func(n byte) {
+		output = append(output, n)
+	}
+	appendFixed := func(data []byte) {
+		output = append(output, data...)
+	}
+	appendNumber := func(num *big.Int) {
+		bytes := num.Bytes()
+		appendByte(uint8(len(bytes)))
+		appendFixed(bytes)
+	}
+	appendVarData := func(data []byte) {
+		appendNumber(big.NewInt(int64(len(data))))
+		appendFixed(data)
+	}
+
+	appendByte(byte(c.op))
+	if c.op == vm.CREATE || c.op == vm.CREATE2 {
+		appendFixed(c.from[:])
+		appendFixed(c.to[:])
+		appendNumber(c.value)
+		appendVarData(c.input)
+		appendVarData(c.output)
+		appendNumber((&big.Int{}).SetUint64(c.gas))
+		appendNumber((&big.Int{}).SetUint64(c.gasUsed))
+		return output
+	}
+	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
+		if c.value == nil {
+			c.value = big.NewInt(0)
+		}
+		appendFixed(c.from[:])
+		appendFixed(c.to[:])
+		appendNumber(c.value)
+		appendVarData(c.input)
+		appendVarData(c.output)
+		appendNumber((&big.Int{}).SetUint64(c.gas))
+		appendNumber((&big.Int{}).SetUint64(c.gasUsed))
+		return output
+	}
+	if c.op == vm.SELFDESTRUCT {
+		appendFixed(c.from[:])
+		appendFixed(c.to[:])
+		appendNumber(c.value)
+		return output
+	}
+	return nil
+}
+
 func (c action) toJsonStr() (string, *string, *string) {
 	callType := strings.ToLower(c.op.String())
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
