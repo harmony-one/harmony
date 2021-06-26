@@ -180,6 +180,7 @@ type taskManager struct {
 func newTaskManager() *taskManager {
 	return &taskManager{
 		C: make(chan struct{}, numWorker),
+		T: make(chan *traceResult, numWorker),
 	}
 }
 
@@ -292,7 +293,7 @@ LOOP:
 			}
 		case traceData := <-bc.tm.T:
 			if exist, err := isTraceDataInDB(bc.db, traceData.hash); exist || err != nil {
-				break
+				continue
 			}
 			traceData.btc = bc.db.NewBatch()
 			_ = writeTraceData(traceData.btc, traceData.hash, traceData.data)
