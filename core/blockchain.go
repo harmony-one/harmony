@@ -49,6 +49,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -123,6 +125,8 @@ type BlockChain struct {
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
+	trace         bool       // atomic?
+	traceFeed     event.Feed // send trace_block result to explorer
 	rmLogsFeed    event.Feed
 	chainFeed     event.Feed
 	chainSideFeed event.Feed
@@ -1284,13 +1288,7 @@ func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
-	n, events, logs, err := bc.insertChain(chain, verifyHeaders, nil)
-	bc.PostChainEvents(events, logs)
-	return n, err
-}
-
-func (bc *BlockChain) InsertAndTraceChain(chain types.Blocks, verifyHeaders bool, tracers []*vm.Config) (int, error) {
-	n, events, logs, err := bc.insertChain(chain, verifyHeaders, tracers)
+	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
 	return n, err
 }
@@ -1298,7 +1296,7 @@ func (bc *BlockChain) InsertAndTraceChain(chain types.Blocks, verifyHeaders bool
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool, tracers []*vm.Config) (int, []interface{}, []*types.Log, error) {
+func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1426,7 +1424,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool, tracer
 			if len(winner) > 0 {
 				// Import all the pruned blocks to make the state available
 				bc.chainmu.Unlock()
-				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */, nil)
+				_, evs, logs, err := bc.insertChain(winner, true /* verifyHeaders */)
 				bc.chainmu.Lock()
 				events, coalescedLogs = evs, logs
 
@@ -1453,8 +1451,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool, tracer
 			return i, events, coalescedLogs, err
 		}
 		vmConfig := bc.vmConfig
-		if len(tracers) > i && tracers[i] != nil {
-			vmConfig = *tracers[i]
+		if bc.trace {
+			vmConfig = vm.Config{
+				Debug: true,
+
+				Tracer: &tracers.ParityBlockTracer{},
+			}
 		}
 		// Process block using the parent state as reference point.
 		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
@@ -1480,6 +1482,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool, tracer
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
+		}
+		if bc.trace {
+			bc.PostChainEvents([]interface{}{TraceEvent{
+				Block:  block,
+				Tracer: vmConfig.Tracer.(*tracers.ParityBlockTracer),
+			}}, nil)
 		}
 		logger := utils.Logger().With().
 			Str("number", block.Number().String()).
@@ -1596,6 +1604,9 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
+
+		case TraceEvent:
+			bc.traceFeed.Send(ev)
 		}
 	}
 }
@@ -1785,6 +1796,12 @@ func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
+}
+
+// SubscribeChainEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	bc.trace = true
+	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.

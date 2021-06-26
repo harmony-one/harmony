@@ -277,7 +277,7 @@ var (
 	taraceFlag = cli.BoolFlag{
 		Name:     "tracing",
 		Usage:    "indicates if full transaction tracing should be enabled",
-		DefValue: false,
+		DefValue: defaultConfig.General.TraceEnable,
 	}
 )
 

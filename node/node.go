@@ -918,6 +918,7 @@ func (node *Node) StartPubSub() error {
 		}
 	}()
 
+	node.TraceLoopForExplorer()
 	return nil
 }
 

@@ -12,9 +12,8 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -122,31 +121,38 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 	return nil
 }
 
+func (node *Node) TraceLoopForExplorer() {
+	if !node.HarmonyConfig.General.TraceEnable {
+		return
+	}
+	ch := make(chan core.TraceEvent)
+	subscribe := node.Blockchain().SubscribeTraceEvent(ch)
+	go func() {
+	loop:
+		select {
+		case ev := <-ch:
+			if traceResults, err := ev.Tracer.GetResult(); err == nil {
+				if exp, err := node.getExplorerService(); err == nil {
+					if raw, err := json.Marshal(traceResults); err == nil {
+						exp.TraceNewBlock(ev.Block.Hash(), raw)
+					}
+				}
+			}
+			goto loop
+		case <-subscribe.Err():
+			//subscribe.Unsubscribe()
+			break
+		}
+	}()
+}
+
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 
-	vmConfig := &vm.Config{
-		Debug:  node.NodeConfig.TraceEnable,
-		Tracer: &tracers.ParityBlockTracer{},
-	}
-	if _, err := node.Blockchain().InsertAndTraceChain([]*types.Block{block}, false, []*vm.Config{vmConfig}); err == nil {
+	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
 		if block.IsLastBlockInEpoch() {
 			node.Consensus.UpdateConsensusInformation()
-		}
-		if vmConfig.Debug {
-			traceResults := make([]json.RawMessage, 0)
-			var err error
-			if block.Transactions().Len() > 0 {
-				traceResults, err = vmConfig.Tracer.(*tracers.ParityBlockTracer).GetResult()
-			}
-			if err == nil {
-				if exp, err := node.getExplorerService(); err == nil {
-					if raw, err := json.Marshal(traceResults); err == nil {
-						exp.TraceNewBlock(block.Hash(), raw)
-					}
-				}
-			}
 		}
 		// Clean up the blocks to avoid OOM.
 		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())

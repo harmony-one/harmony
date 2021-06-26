@@ -19,6 +19,7 @@ package core
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy/tracers"
 )
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.
@@ -40,6 +41,11 @@ type ChainEvent struct {
 	Block *types.Block
 	Hash  common.Hash
 	Logs  []*types.Log
+}
+
+type TraceEvent struct {
+	Block  *types.Block
+	Tracer *tracers.ParityBlockTracer
 }
 
 // ChainSideEvent is chain side event.
