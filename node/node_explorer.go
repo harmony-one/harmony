@@ -275,7 +275,11 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 
 // GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
 func (node *Node) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
-	return node.GetTraceResultByHash(hash)
+	exp, err := node.getExplorerService()
+	if err != nil {
+		return nil, err
+	}
+	return exp.GetTraceDataByHash(hash)
 }
 
 func (node *Node) getExplorerService() (*explorer.Service, error) {

@@ -187,6 +187,10 @@ func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash,
 	return s.storage.GetStakingTxsByAddress(address)
 }
 
+func (s *Service) GetTraceDataByHash(hash ethCommon.Hash) (json.RawMessage, error) {
+	return s.storage.GetTraceDataByHash(hash)
+}
+
 // TraceNewBlock instruct the explorer storage to trace data in explorer DB
 func (s *Service) TraceNewBlock(hash ethCommon.Hash, data []byte) {
 	s.storage.TraceNewBlock(hash, data)
