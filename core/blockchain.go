@@ -1452,11 +1452,15 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 		vmConfig := bc.vmConfig
 		if bc.trace {
-			vmConfig = vm.Config{
-				Debug: true,
-
+			ev := TraceEvent{
+				Block:  block,
 				Tracer: &tracers.ParityBlockTracer{},
 			}
+			vmConfig = vm.Config{
+				Debug:  true,
+				Tracer: ev.Tracer,
+			}
+			events = append(events, ev)
 		}
 		// Process block using the parent state as reference point.
 		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
@@ -1482,12 +1486,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
-		}
-		if bc.trace {
-			bc.PostChainEvents([]interface{}{TraceEvent{
-				Block:  block,
-				Tracer: vmConfig.Tracer.(*tracers.ParityBlockTracer),
-			}}, nil)
 		}
 		logger := utils.Logger().With().
 			Str("number", block.Number().String()).
