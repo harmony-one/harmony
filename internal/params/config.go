@@ -39,6 +39,7 @@ var (
 		ChainID:                    MainnetChainID,
 		EthCompatibleChainID:       EthMainnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthMainnetShard0ChainID,
+		AccountAbstractionEpoch:    EpochTBD,        // TODO: Replace with correct block number
 		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
@@ -61,6 +62,7 @@ var (
 		ChainID:                    TestnetChainID,
 		EthCompatibleChainID:       EthTestnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		AccountAbstractionEpoch:    EpochTBD,
 		EthCompatibleEpoch:         big.NewInt(73290),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
@@ -84,6 +86,7 @@ var (
 		ChainID:                    PangaeaChainID,
 		EthCompatibleChainID:       EthPangaeaShard0ChainID,
 		EthCompatibleShard0ChainID: EthPangaeaShard0ChainID,
+		AccountAbstractionEpoch:    big.NewInt(0),
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
@@ -107,6 +110,7 @@ var (
 		ChainID:                    PartnerChainID,
 		EthCompatibleChainID:       EthPartnerShard0ChainID,
 		EthCompatibleShard0ChainID: EthPartnerShard0ChainID,
+		AccountAbstractionEpoch:    big.NewInt(0),
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
@@ -130,6 +134,7 @@ var (
 		ChainID:                    StressnetChainID,
 		EthCompatibleChainID:       EthStressnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthStressnetShard0ChainID,
+		AccountAbstractionEpoch:    big.NewInt(0),
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
@@ -152,6 +157,7 @@ var (
 		ChainID:                    TestnetChainID,
 		EthCompatibleChainID:       EthTestnetShard0ChainID,
 		EthCompatibleShard0ChainID: EthTestnetShard0ChainID,
+		AccountAbstractionEpoch:    big.NewInt(0),
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
@@ -176,6 +182,7 @@ var (
 		AllProtocolChangesChainID,          // ChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),                      // AccountAbstractionEpoch
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
@@ -200,6 +207,7 @@ var (
 		TestChainID,          // ChainID
 		EthTestShard0ChainID, // EthCompatibleChainID
 		EthTestShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),        // AccountAbstractionEpoch
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CrossLinkEpoch
@@ -247,6 +255,9 @@ type ChainConfig struct {
 
 	// EthCompatibleShard0ChainID identifies the shard 0 chain id used for ethereum compatible transactions
 	EthCompatibleShard0ChainID *big.Int `json:"eth-compatible-shard-0-chain-id"`
+
+	// AccountAbstractionEpoch is the epoch where EIP-2938  transaction starts being
+	AccountAbstractionEpoch *big.Int `json:"account-abstraction-epoch,omitempty"`
 
 	// EthCompatibleEpoch is the epoch where ethereum-compatible transaction starts being
 	// processed.
@@ -406,8 +417,7 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 
 // IsAccountAbstraction returns whether num is either equal to the AA fork block or greater.
 func (c *ChainConfig) IsAccountAbstraction(epoch *big.Int) bool {
-	// TODO: Replace with correct block number
-	return isForked(c.IstanbulEpoch, epoch)
+	return isForked(c.AccountAbstractionEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
