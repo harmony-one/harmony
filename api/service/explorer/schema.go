@@ -37,21 +37,21 @@ func writeCheckpoint(db databaseWriter, bn uint64) error {
 	return db.Put(blockCheckpoint, []byte{})
 }
 
-func GetTraceDataKey(hash common.Hash) []byte {
+func getTraceResultKey(hash common.Hash) []byte {
 	return []byte(fmt.Sprintf("%s_%x", TracePrefix, hash))
 }
-func isTraceDataInDB(db databaseReader, hash common.Hash) (bool, error) {
-	key := GetTraceDataKey(hash)
+func isTraceResultInDB(db databaseReader, hash common.Hash) (bool, error) {
+	key := getTraceResultKey(hash)
 	return db.Has(key)
 }
 
-func writeTraceData(db databaseWriter, hash common.Hash, data []byte) error {
-	key := GetTraceDataKey(hash)
+func writeTraceResult(db databaseWriter, hash common.Hash, data []byte) error {
+	key := getTraceResultKey(hash)
 	return db.Put(key, data)
 }
 
-func getTraceData(db databaseReader, hash common.Hash) ([]byte, error) {
-	key := GetTraceDataKey(hash)
+func getTraceResult(db databaseReader, hash common.Hash) ([]byte, error) {
+	key := getTraceResultKey(hash)
 	return db.Get(key)
 }
 

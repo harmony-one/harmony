@@ -82,7 +82,7 @@ func (s *storage) Close() {
 	close(s.closeC)
 }
 
-func (s *storage) TraceNewBlock(hash common.Hash, data []byte) {
+func (s *storage) DumpTraceResult(hash common.Hash, data []byte) {
 	s.tm.AddNewTraceTask(hash, data)
 }
 
@@ -126,11 +126,11 @@ func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, 
 	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
-func (s *storage) GetTraceDataByHash(hash common.Hash) (json.RawMessage, error) {
+func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
 	if !s.available.IsSet() {
 		return nil, ErrExplorerNotReady
 	}
-	return getTraceData(s.db, hash)
+	return getTraceResult(s.db, hash)
 }
 
 func (s *storage) run() {
@@ -291,14 +291,14 @@ LOOP:
 					return
 				}
 			}
-		case traceData := <-bc.tm.T:
-			if exist, err := isTraceDataInDB(bc.db, traceData.hash); exist || err != nil {
+		case traceResult := <-bc.tm.T:
+			if exist, err := isTraceResultInDB(bc.db, traceResult.hash); exist || err != nil {
 				continue
 			}
-			traceData.btc = bc.db.NewBatch()
-			_ = writeTraceData(traceData.btc, traceData.hash, traceData.data)
+			traceResult.btc = bc.db.NewBatch()
+			_ = writeTraceResult(traceResult.btc, traceResult.hash, traceResult.data)
 			select {
-			case bc.resultT <- traceData:
+			case bc.resultT <- traceResult:
 			case <-bc.closeC:
 				return
 			}

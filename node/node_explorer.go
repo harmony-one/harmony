@@ -134,7 +134,7 @@ func (node *Node) TraceLoopForExplorer() {
 			if traceResults, err := ev.Tracer.GetResult(); err == nil {
 				if exp, err := node.getExplorerService(); err == nil {
 					if raw, err := json.Marshal(traceResults); err == nil {
-						exp.TraceNewBlock(ev.Block.Hash(), raw)
+						exp.DumpTraceResult(ev.Block.Hash(), raw)
 					}
 				}
 			}
@@ -279,7 +279,7 @@ func (node *Node) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error
 	if err != nil {
 		return nil, err
 	}
-	return exp.GetTraceDataByHash(hash)
+	return exp.GetTraceResultByHash(hash)
 }
 
 func (node *Node) getExplorerService() (*explorer.Service, error) {

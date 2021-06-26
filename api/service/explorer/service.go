@@ -187,13 +187,13 @@ func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash,
 	return s.storage.GetStakingTxsByAddress(address)
 }
 
-func (s *Service) GetTraceDataByHash(hash ethCommon.Hash) (json.RawMessage, error) {
-	return s.storage.GetTraceDataByHash(hash)
+func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, error) {
+	return s.storage.GetTraceResultByHash(hash)
 }
 
-// TraceNewBlock instruct the explorer storage to trace data in explorer DB
-func (s *Service) TraceNewBlock(hash ethCommon.Hash, data []byte) {
-	s.storage.TraceNewBlock(hash, data)
+// DumpTraceResult instruct the explorer storage to trace data in explorer DB
+func (s *Service) DumpTraceResult(hash ethCommon.Hash, data []byte) {
+	s.storage.DumpTraceResult(hash, data)
 }
 
 // DumpNewBlock instruct the explorer storage to dump block data in explorer DB
