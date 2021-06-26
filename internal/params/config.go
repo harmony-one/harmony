@@ -266,6 +266,7 @@ var (
 		AllProtocolChangesChainID,          // ChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleChainID
 		EthAllProtocolChangesShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),                      // AccountAbstractionEpoch
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
@@ -305,6 +306,7 @@ var (
 		TestChainID,          // ChainID
 		EthTestShard0ChainID, // EthCompatibleChainID
 		EthTestShard0ChainID, // EthCompatibleShard0ChainID
+		big.NewInt(0),        // AccountAbstractionEpoch
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CrossLinkEpoch
@@ -367,6 +369,9 @@ type ChainConfig struct {
 
 	// EthCompatibleShard0ChainID identifies the shard 0 chain id used for ethereum compatible transactions
 	EthCompatibleShard0ChainID *big.Int `json:"eth-compatible-shard-0-chain-id"`
+
+	// AccountAbstractionEpoch is the epoch where EIP-2938  transaction starts being
+	AccountAbstractionEpoch *big.Int `json:"account-abstraction-epoch,omitempty"`
 
 	// EthCompatibleEpoch is the epoch where ethereum-compatible transaction starts being
 	// processed.
@@ -649,8 +654,7 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 
 // IsAccountAbstraction returns whether num is either equal to the AA fork block or greater.
 func (c *ChainConfig) IsAccountAbstraction(epoch *big.Int) bool {
-	// TODO: Replace with correct block number
-	return false //isForked(c.IstanbulEpoch, epoch)
+	return isForked(c.AccountAbstractionEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
