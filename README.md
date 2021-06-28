@@ -69,6 +69,7 @@ cd harmony
 
 3. Build the harmony binary & dependent libs
 ```
+go mod tidy
 make
 ```
 > Run `bash scripts/install_build_tools.sh` to ensure build tools are of correct versions.
