@@ -248,6 +248,8 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 func setupPprof(config harmonyconfig.HarmonyConfig) {
 	enabled := config.Pprof.Enabled
 	addr := config.Pprof.ListenAddr
+	// Set mutex matrix. This might have an impact on the performance.
+	runtime.SetMutexProfileFraction(2)
 
 	if enabled {
 		go func() {
