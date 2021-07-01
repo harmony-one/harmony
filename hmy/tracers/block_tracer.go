@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/vm"
 )
 
@@ -50,99 +51,105 @@ func (c *action) push(ac *action) {
 	c.subCalls = append(c.subCalls, ac)
 }
 
-func (c *action) fromBytes(bytes []byte) {
-	readByte := func() byte {
-		val := bytes[0]
-		bytes = bytes[1:]
-		return val
+func (c *action) fromStorage(blockStorage *TraceBlockStorage, acStorage *ActionStorage) {
+
+	c.op = vm.OpCode(acStorage.readByte())
+	errByte := acStorage.readByte()
+	if errByte != 0 {
+		revertIndex := int(acStorage.readNumber().Int64())
+		c.revert = blockStorage.getData(revertIndex)
 	}
-	readFixedData := func(size uint) []byte {
-		fixedData := bytes[:size]
-		bytes = bytes[size:]
-		return fixedData
-	}
-	readNumber := func() *big.Int {
-		size := readByte()
-		return (&big.Int{}).SetBytes(readFixedData(uint(size)))
-	}
-	readVarData := func() []byte {
-		num := readNumber()
-		return readFixedData(uint(num.Uint64()))
-	}
-	c.op = vm.OpCode(readByte())
 
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
-		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.value = readNumber()
-		c.input = readVarData()
-		c.output = readVarData()
-		c.gas = readNumber().Uint64()
-		c.gasUsed = readNumber().Uint64()
+		fromIndex := int(acStorage.readNumber().Int64())
+		toIndex := int(acStorage.readNumber().Int64())
+		c.value = acStorage.readNumber()
+		inputIndex := int(acStorage.readNumber().Int64())
+		outputIndex := int(acStorage.readNumber().Int64())
+		c.gas = acStorage.readNumber().Uint64()
+		c.gasUsed = acStorage.readNumber().Uint64()
+
+		c.from = blockStorage.getAddress(fromIndex)
+		c.to = blockStorage.getAddress(toIndex)
+		c.input = blockStorage.getData(inputIndex)
+		c.output = blockStorage.getData(outputIndex)
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
-		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.value = readNumber()
-		c.input = readVarData()
-		c.output = readVarData()
-		c.gas = readNumber().Uint64()
-		c.gasUsed = readNumber().Uint64()
+		fromIndex := int(acStorage.readNumber().Int64())
+		toIndex := int(acStorage.readNumber().Int64())
+		c.value = acStorage.readNumber()
+		inputIndex := int(acStorage.readNumber().Int64())
+		outputIndex := int(acStorage.readNumber().Int64())
+		c.gas = acStorage.readNumber().Uint64()
+		c.gasUsed = acStorage.readNumber().Uint64()
+
+		c.from = blockStorage.getAddress(fromIndex)
+		c.to = blockStorage.getAddress(toIndex)
+		c.input = blockStorage.getData(inputIndex)
+		c.output = blockStorage.getData(outputIndex)
 	}
 	if c.op == vm.SELFDESTRUCT {
-		c.from = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.to = common.BytesToAddress(readFixedData(common.AddressLength))
-		c.value = readNumber()
+		fromIndex := int(acStorage.readNumber().Int64())
+		toIndex := int(acStorage.readNumber().Int64())
+		c.from = blockStorage.getAddress(fromIndex)
+		c.to = blockStorage.getAddress(toIndex)
+		c.value = acStorage.readNumber()
 	}
 }
 
-func (c action) toBytes() []byte {
-	var output = make([]byte, 0, 16*1024)
-	appendByte := func(n byte) {
-		output = append(output, n)
-	}
-	appendFixed := func(data []byte) {
-		output = append(output, data...)
-	}
-	appendNumber := func(num *big.Int) {
-		bytes := num.Bytes()
-		appendByte(uint8(len(bytes)))
-		appendFixed(bytes)
-	}
-	appendVarData := func(data []byte) {
-		appendNumber(big.NewInt(int64(len(data))))
-		appendFixed(data)
+func (c action) toStorage(blockStorage *TraceBlockStorage) *ActionStorage {
+	acStorage := &ActionStorage{
+		TraceData: make([]byte, 0, 1024),
 	}
 
-	appendByte(byte(c.op))
+	acStorage.appendByte(byte(c.op))
+	var errByte byte
+	if c.err != nil {
+		errByte = 1
+	}
+	acStorage.appendByte(errByte)
+	if errByte != 0 {
+		revertIndex := blockStorage.indexData(c.revert)
+		acStorage.appendNumber(big.NewInt(int64(revertIndex)))
+	}
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
-		appendFixed(c.from[:])
-		appendFixed(c.to[:])
-		appendNumber(c.value)
-		appendVarData(c.input)
-		appendVarData(c.output)
-		appendNumber((&big.Int{}).SetUint64(c.gas))
-		appendNumber((&big.Int{}).SetUint64(c.gasUsed))
-		return output
+		fromIndex := blockStorage.indexAddress(c.from)
+		toIndex := blockStorage.indexAddress(c.to)
+		inputIndex := blockStorage.indexData(c.input)
+		outputIndex := blockStorage.indexData(c.output)
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
+		acStorage.appendNumber(c.value)
+		acStorage.appendNumber(big.NewInt(int64(inputIndex)))
+		acStorage.appendNumber(big.NewInt(int64(outputIndex)))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gas))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gasUsed))
+		return acStorage
 	}
 	if c.op == vm.CALL || c.op == vm.CALLCODE || c.op == vm.DELEGATECALL || c.op == vm.STATICCALL {
 		if c.value == nil {
 			c.value = big.NewInt(0)
 		}
-		appendFixed(c.from[:])
-		appendFixed(c.to[:])
-		appendNumber(c.value)
-		appendVarData(c.input)
-		appendVarData(c.output)
-		appendNumber((&big.Int{}).SetUint64(c.gas))
-		appendNumber((&big.Int{}).SetUint64(c.gasUsed))
-		return output
+		fromIndex := blockStorage.indexAddress(c.from)
+		toIndex := blockStorage.indexAddress(c.to)
+		inputIndex := blockStorage.indexData(c.input)
+		outputIndex := blockStorage.indexData(c.output)
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
+		acStorage.appendNumber(c.value)
+		acStorage.appendNumber(big.NewInt(int64(inputIndex)))
+		acStorage.appendNumber(big.NewInt(int64(outputIndex)))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gas))
+		acStorage.appendNumber((&big.Int{}).SetUint64(c.gasUsed))
+		return acStorage
 	}
 	if c.op == vm.SELFDESTRUCT {
-		appendFixed(c.from[:])
-		appendFixed(c.to[:])
-		appendNumber(c.value)
-		return output
+		fromIndex := blockStorage.indexAddress(c.from)
+		toIndex := blockStorage.indexAddress(c.to)
+		acStorage.appendNumber(big.NewInt(int64(fromIndex)))
+		acStorage.appendNumber(big.NewInt(int64(toIndex)))
+		acStorage.appendNumber(c.value)
+		return acStorage
 	}
 	return nil
 }
@@ -390,6 +397,37 @@ func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.D
 	}
 	jst.tracers = append(jst.tracers, jst.cur)
 	return nil
+}
+
+func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
+	blockStorage := &TraceBlockStorage{
+		Hash:         jst.cur.blockHash,
+		Number:       jst.cur.blockNumber,
+		addressIndex: make(map[common.Address]int),
+		dataIndex:    make(map[common.Hash]int),
+	}
+	txStorage := &TxStorage{
+		Storages: make([]*ActionStorage, 0, 1024),
+	}
+	var finalize func(ac *action, traceAddress []uint)
+	finalize = func(ac *action, traceAddress []uint) {
+		acStorage := ac.toStorage(blockStorage)
+		acStorage.Subtraces = uint(len(ac.subCalls))
+		acStorage.TraceAddress = traceAddress
+		txStorage.Storages = append(txStorage.Storages, acStorage)
+		for i, subAc := range ac.subCalls {
+			finalize(subAc, append(traceAddress[:], uint(i)))
+		}
+	}
+	for _, curTx := range jst.tracers {
+		root := &curTx.action
+		txStorage.Hash = curTx.transactionHash
+		txStorage.Storages = txStorage.Storages[:]
+		finalize(root, make([]uint, 0))
+		b, _ := rlp.EncodeToBytes(txStorage)
+		blockStorage.TraceStorages = append(blockStorage.TraceStorages, b)
+	}
+	return blockStorage
 }
 
 // GetResult calls the Javascript 'result' function and returns its value, or any accumulated error
