@@ -203,6 +203,8 @@ type ParityTxTracer struct {
 	action
 }
 type ParityBlockTracer struct {
+	Hash    common.Hash
+	Number  uint64
 	cur     *ParityTxTracer
 	tracers []*ParityTxTracer
 }
@@ -401,8 +403,8 @@ func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.D
 
 func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
 	blockStorage := &TraceBlockStorage{
-		Hash:         jst.cur.blockHash,
-		Number:       jst.cur.blockNumber,
+		Hash:         jst.Hash,
+		Number:       jst.Number,
 		addressIndex: make(map[common.Address]int),
 		dataIndex:    make(map[common.Hash]int),
 	}

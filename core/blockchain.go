@@ -1453,8 +1453,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		vmConfig := bc.vmConfig
 		if bc.trace {
 			ev := TraceEvent{
-				Block:  block,
-				Tracer: &tracers.ParityBlockTracer{},
+				Tracer: &tracers.ParityBlockTracer{
+					Hash:   block.Hash(),
+					Number: block.NumberU64(),
+				},
 			}
 			vmConfig = vm.Config{
 				Debug:  true,

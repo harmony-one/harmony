@@ -305,7 +305,9 @@ LOOP:
 			}
 			traceResult.btc = bc.db.NewBatch()
 			traceResult.data.ToDB(func(key, value []byte) {
-				_ = writeTraceResult(traceResult.btc, key, value)
+				if exist, err := isTraceResultInDB(bc.db, key); !exist && err == nil {
+					_ = writeTraceResult(traceResult.btc, key, value)
+				}
 			})
 			select {
 			case bc.resultT <- traceResult:

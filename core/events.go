@@ -44,7 +44,6 @@ type ChainEvent struct {
 }
 
 type TraceEvent struct {
-	Block  *types.Block
 	Tracer *tracers.ParityBlockTracer
 }
 
