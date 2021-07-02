@@ -58,6 +58,7 @@ func (c *action) fromStorage(blockStorage *TraceBlockStorage, acStorage *ActionS
 	if errByte != 0 {
 		revertIndex := int(acStorage.readNumber().Int64())
 		c.revert = blockStorage.getData(revertIndex)
+		c.err = errors.New("Reverted")
 	}
 
 	if c.op == vm.CREATE || c.op == vm.CREATE2 {
