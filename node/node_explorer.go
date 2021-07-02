@@ -131,12 +131,9 @@ func (node *Node) TraceLoopForExplorer() {
 	loop:
 		select {
 		case ev := <-ch:
-			if traceResults, err := ev.Tracer.GetResult(); err == nil {
-				if exp, err := node.getExplorerService(); err == nil {
-					if raw, err := json.Marshal(traceResults); err == nil {
-						exp.DumpTraceResult(ev.Block.Hash(), raw)
-					}
-				}
+			if exp, err := node.getExplorerService(); err == nil {
+				storage := ev.Tracer.GetStorage()
+				exp.DumpTraceResult(storage)
 			}
 			goto loop
 		case <-subscribe.Err():

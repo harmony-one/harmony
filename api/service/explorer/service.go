@@ -20,6 +20,7 @@ import (
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -192,8 +193,8 @@ func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, er
 }
 
 // DumpTraceResult instruct the explorer storage to trace data in explorer DB
-func (s *Service) DumpTraceResult(hash ethCommon.Hash, data []byte) {
-	s.storage.DumpTraceResult(hash, data)
+func (s *Service) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.storage.DumpTraceResult(data)
 }
 
 // DumpNewBlock instruct the explorer storage to dump block data in explorer DB

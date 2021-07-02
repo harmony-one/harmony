@@ -14,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -50,8 +51,7 @@ type (
 
 	traceResult struct {
 		btc  batch
-		hash common.Hash
-		data []byte
+		data *tracers.TraceBlockStorage
 	}
 )
 
@@ -82,8 +82,8 @@ func (s *storage) Close() {
 	close(s.closeC)
 }
 
-func (s *storage) DumpTraceResult(hash common.Hash, data []byte) {
-	s.tm.AddNewTraceTask(hash, data)
+func (s *storage) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.tm.AddNewTraceTask(data)
 }
 
 func (s *storage) DumpNewBlock(b *types.Block) {
@@ -130,7 +130,16 @@ func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error
 	if !s.available.IsSet() {
 		return nil, ErrExplorerNotReady
 	}
-	return getTraceResult(s.db, hash)
+	traceStorage := &tracers.TraceBlockStorage{
+		Hash: hash,
+	}
+	err := traceStorage.FromDB(func(key []byte) ([]byte, error) {
+		return getTraceResult(s.db, key)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return traceStorage.ToJson()
 }
 
 func (s *storage) run() {
@@ -157,7 +166,7 @@ func (s *storage) loop() {
 				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
 		case res := <-s.resultT:
-			s.log.Info().Str("block hash", res.hash.Hex()).Msg("writing trace into explorer DB")
+			s.log.Info().Str("block hash", res.data.Hash.Hex()).Msg("writing trace into explorer DB")
 			if err := res.btc.Write(); err != nil {
 				s.log.Error().Err(err).Msg("explorer db failed to write trace data")
 			}
@@ -195,9 +204,8 @@ func (tm *taskManager) AddNewTask(b *types.Block) {
 	}
 }
 
-func (tm *taskManager) AddNewTraceTask(hash common.Hash, data []byte) {
+func (tm *taskManager) AddNewTraceTask(data *tracers.TraceBlockStorage) {
 	tm.T <- &traceResult{
-		hash: hash,
 		data: data,
 	}
 }
@@ -292,11 +300,13 @@ LOOP:
 				}
 			}
 		case traceResult := <-bc.tm.T:
-			if exist, err := isTraceResultInDB(bc.db, traceResult.hash); exist || err != nil {
+			if exist, err := isTraceResultInDB(bc.db, traceResult.data.KeyDB()); exist || err != nil {
 				continue
 			}
 			traceResult.btc = bc.db.NewBatch()
-			_ = writeTraceResult(traceResult.btc, traceResult.hash, traceResult.data)
+			traceResult.data.ToDB(func(key, value []byte) {
+				_ = writeTraceResult(traceResult.btc, key, value)
+			})
 			select {
 			case bc.resultT <- traceResult:
 			case <-bc.closeC:
