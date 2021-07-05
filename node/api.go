@@ -143,6 +143,22 @@ func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
 	}
 }
 
+// IsBackup returns the node is in backup mode
+func (node *Node) IsBackup() bool {
+	return node.Consensus.IsBackup()
+}
+
+// SetNodeBackupMode change node backup mode
+func (node *Node) SetNodeBackupMode(isBackup bool) bool {
+	if node.Consensus.IsBackup() == isBackup {
+		return false
+	}
+
+	node.Consensus.SetIsBackup(isBackup)
+	node.Consensus.ResetViewChangeState()
+	return true
+}
+
 func (node *Node) GetConfig() rpc_common.Config {
 	return rpc_common.Config{
 		HarmonyConfig: *node.HarmonyConfig,

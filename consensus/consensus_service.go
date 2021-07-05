@@ -173,10 +173,23 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
+	if m == Normal && consensus.isBackup {
+		m = NormalBackup
+	}
+
 	consensus.getLogger().Debug().
 		Str("Mode", m.String()).
 		Msg("[SetMode]")
 	consensus.current.SetMode(m)
+}
+
+// SetIsBackup sets the mode of consensus
+func (consensus *Consensus) SetIsBackup(isBackup bool) {
+	consensus.getLogger().Debug().
+		Bool("IsBackup", isBackup).
+		Msg("[SetIsBackup]")
+	consensus.isBackup = isBackup
+	consensus.current.SetIsBackup(isBackup)
 }
 
 // Mode returns the mode of consensus
@@ -200,7 +213,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	if consensus.IgnoreViewIDCheck.IsSet() {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
-		consensus.current.SetMode(Normal)
+		consensus.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")

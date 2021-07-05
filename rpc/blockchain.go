@@ -838,6 +838,14 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 	return uint64(blockNum) > hmy.CurrentBlock().NumberU64()
 }
 
+func (s *PublicBlockchainService) GetCurrentNodeBackupState(ctx context.Context) (bool, error) {
+	return s.hmy.NodeAPI.IsBackup(), nil
+}
+
+func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
+	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
+}
+
 func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
 	// no need format blockArgs.Signers[] as a part of cache key
 	// because it's not input from rpc caller, it's caculate with blockArgs.WithSigners

@@ -92,9 +92,16 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		return errors.Wrapf(err, "unable to parse consensus msg with type: %s", msg.Type)
 	}
 
+	canHandleViewChange := true
 	intendedForValidator, intendedForLeader :=
 		!consensus.IsLeader(),
 		consensus.IsLeader()
+
+	// if in backup normal mode, force ignore view change event and leader event.
+	if consensus.current.Mode() == NormalBackup {
+		canHandleViewChange = false
+		intendedForLeader = false
+	}
 
 	// Route message to handler
 	switch t := msg.Type; true {
@@ -113,9 +120,9 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		consensus.onCommit(fbftMsg)
 
 	// Handle view change messages
-	case t == msg_pb.MessageType_VIEWCHANGE:
+	case t == msg_pb.MessageType_VIEWCHANGE && canHandleViewChange:
 		consensus.onViewChange(fbftMsg)
-	case t == msg_pb.MessageType_NEWVIEW:
+	case t == msg_pb.MessageType_NEWVIEW && canHandleViewChange:
 		consensus.onNewView(fbftMsg)
 	}
 

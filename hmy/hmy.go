@@ -100,6 +100,8 @@ type NodeAPI interface {
 	ListBlockedPeer() []peer.ID
 
 	GetConsensusInternal() commonRPC.ConsensusInternal
+	IsBackup() bool
+	SetNodeBackupMode(isBackup bool) bool
 
 	// debug API
 	GetConsensusMode() string
