@@ -838,10 +838,6 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 	return uint64(blockNum) > hmy.CurrentBlock().NumberU64()
 }
 
-func (s *PublicBlockchainService) GetCurrentNodeBackupState(ctx context.Context) (bool, error) {
-	return s.hmy.NodeAPI.IsBackup(), nil
-}
-
 func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
 	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
 }

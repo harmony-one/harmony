@@ -64,6 +64,7 @@ type NodeMetadata struct {
 	Role            string             `json:"role"`
 	DNSZone         string             `json:"dns-zone"`
 	Archival        bool               `json:"is-archival"`
+	IsBackup        bool               `json:"is-backup"`
 	NodeBootTime    int64              `json:"node-unix-start-time"`
 	PeerID          peer.ID            `json:"peerid"`
 	Consensus       ConsensusInternal  `json:"consensus"`
