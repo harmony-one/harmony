@@ -206,6 +206,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		Role:            cfg.Role().String(),
 		DNSZone:         cfg.DNSZone,
 		Archival:        cfg.GetArchival(),
+		IsBackup:        hmy.NodeAPI.IsBackup(),
 		NodeBootTime:    hmy.NodeAPI.GetNodeBootTime(),
 		PeerID:          nodeconfig.GetPeerID(),
 		Consensus:       consensusInternal,
