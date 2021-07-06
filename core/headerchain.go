@@ -42,6 +42,7 @@ const (
 	headerCacheLimit = 512
 	tdCacheLimit     = 1024
 	numberCacheLimit = 2048
+	indexCacheLimit  = 2048
 )
 
 // HeaderChain implements the basic block header chain logic that is shared by
@@ -61,6 +62,7 @@ type HeaderChain struct {
 	headerCache *lru.Cache // Cache for the most recent block headers
 	tdCache     *lru.Cache // Cache for the most recent block total difficulties
 	numberCache *lru.Cache // Cache for the most recent block numbers
+	indexCache  *lru.Cache // number -> Hash
 
 	procInterrupt func() bool
 
@@ -76,6 +78,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
+	indexCache, _ := lru.New(indexCacheLimit)
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -89,6 +92,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		headerCache:   headerCache,
 		tdCache:       tdCache,
 		numberCache:   numberCache,
+		indexCache:    indexCache,
 		procInterrupt: procInterrupt,
 		rand:          mrand.New(mrand.NewSource(seed.Int64())),
 		engine:        engine,
@@ -434,11 +438,22 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
 func (hc *HeaderChain) GetHeaderByNumber(number uint64) *block.Header {
-	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	hash := hc.getHashByNumber(number)
 	if hash == (common.Hash{}) {
 		return nil
 	}
 	return hc.GetHeader(hash, number)
+}
+
+func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
+	// Since canonical chain is immutable, it's safe to read header
+	// hash by number.
+	if hash, ok := hc.indexCache.Get(number); ok {
+		return hash.(common.Hash)
+	}
+	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	hc.indexCache.Add(number, hash)
+	return hash
 }
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
@@ -505,6 +520,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 	hc.headerCache.Purge()
 	hc.tdCache.Purge()
 	hc.numberCache.Purge()
+	hc.indexCache.Purge()
 
 	if hc.CurrentHeader() == nil {
 		hc.currentHeader.Store(hc.genesisHeader)
