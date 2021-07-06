@@ -51,6 +51,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
+		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
+		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
+		MinCommissionPromoPeriod:   big.NewInt(100),
+		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
 		IstanbulEpoch:              big.NewInt(314),
@@ -74,6 +79,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
+		VRFEpoch:                   big.NewInt(73880),
+		MinDelegation100Epoch:      big.NewInt(73880),
+		MinCommissionRateEpoch:     big.NewInt(73880),
+		MinCommissionPromoPeriod:   big.NewInt(10),
+		EPoSBound35Epoch:           big.NewInt(73880),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(43800),
@@ -98,6 +108,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
+		MinCommissionPromoPeriod:   big.NewInt(10),
+		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -122,6 +137,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
+		MinCommissionPromoPeriod:   big.NewInt(10),
+		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -146,6 +166,11 @@ var (
 		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
+		MinCommissionPromoPeriod:   big.NewInt(10),
+		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -169,6 +194,11 @@ var (
 		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
+		VRFEpoch:                   big.NewInt(0),
+		MinDelegation100Epoch:      big.NewInt(0),
+		MinCommissionRateEpoch:     big.NewInt(0),
+		MinCommissionPromoPeriod:   big.NewInt(10),
+		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
@@ -194,6 +224,11 @@ var (
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
+		big.NewInt(0),                      // VRFEpoch
+		big.NewInt(0),                      // MinDelegation100Epoch
+		big.NewInt(0),                      // MinCommissionRateEpoch
+		big.NewInt(10),                     // MinCommissionPromoPeriod
+		big.NewInt(0),                      // EPoSBound35Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
 		big.NewInt(0),                      // IstanbulEpoch
@@ -219,6 +254,11 @@ var (
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
+		big.NewInt(0),        // VRFEpoch
+		big.NewInt(0),        // MinDelegation100Epoch
+		big.NewInt(0),        // MinCommissionRateEpoch
+		big.NewInt(10),       // MinCommissionPromoPeriod
+		big.NewInt(0),        // EPoSBound35Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
 		big.NewInt(0),        // IstanbulEpoch
@@ -298,6 +338,21 @@ type ChainConfig struct {
 	// NoEarlyUnlockEpoch is the epoch when the early unlock of undelegated token from validators who were elected for
 	// more than 7 epochs is disabled
 	NoEarlyUnlockEpoch *big.Int `json:"no-early-unlock-epoch,omitempty"`
+
+	// VRFEpoch is the epoch when VRF randomness is enabled
+	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
+
+	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
+	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
+
+	// MinCommissionRateEpoch is the epoch when policy for minimum comission rate of 5% is started
+	MinCommissionRateEpoch *big.Int `json:"min-commission-rate-epoch,omitempty"`
+
+	// MinCommissionPromoPeriod is the number of epochs when newly elected validators can have 0% commission
+	MinCommissionPromoPeriod *big.Int `json:"commission-promo-period,omitempty"`
+
+	// EPoSBound35Epoch is the epoch when the EPoS bound parameter c is changed from 15% to 35%
+	EPoSBound35Epoch *big.Int `json:"epos-bound-35-epoch,omitempty"`
 
 	// EIP155 hard fork epoch (include EIP158 too)
 	EIP155Epoch *big.Int `json:"eip155-epoch,omitempty"`
@@ -385,6 +440,26 @@ func (c *ChainConfig) IsNoEarlyUnlock(epoch *big.Int) bool {
 	return isForked(c.NoEarlyUnlockEpoch, epoch)
 }
 
+// IsVRF determines whether it is the epoch to enable vrf
+func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
+	return isForked(c.VRFEpoch, epoch)
+}
+
+// IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
+func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
+	return isForked(c.MinDelegation100Epoch, epoch)
+}
+
+// IsMinCommissionRate determines whether it is the epoch to start the policy of 5% min commission
+func (c *ChainConfig) IsMinCommissionRate(epoch *big.Int) bool {
+	return isForked(c.MinCommissionRateEpoch, epoch)
+}
+
+// IsEPoSBound35 determines whether it is the epoch to extend the EPoS bound to 35%
+func (c *ChainConfig) IsEPoSBound35(epoch *big.Int) bool {
+	return isForked(c.EPoSBound35Epoch, epoch)
+}
+
 // IsPreStaking determines whether staking transactions are allowed
 func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
 	return isForked(c.PreStakingEpoch, epoch)
@@ -468,10 +543,10 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                               *big.Int
-	EthChainID                                            *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul bool
-	IsAccountAbstraction                                  bool
+	ChainID                                                      *big.Int
+	EthChainID                                                   *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
+	IsAccountAbstraction                                         bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -492,6 +567,7 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsS3:                 c.IsS3(epoch),
 		IsReceiptLog:         c.IsReceiptLog(epoch),
 		IsIstanbul:           c.IsIstanbul(epoch),
+		IsVRF:                c.IsVRF(epoch),
 		IsAccountAbstraction: c.IsAccountAbstraction(epoch),
 	}
 }

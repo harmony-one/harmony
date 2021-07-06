@@ -1,3 +1,4 @@
+// TODO: refactor this whole module to v0 and v1
 package explorer
 
 import (
@@ -7,8 +8,11 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"time"
+
+	"github.com/harmony-one/harmony/core/types"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -18,6 +22,7 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/p2p"
@@ -29,6 +34,7 @@ const (
 	explorerPortDifference = 4000
 	defaultPageSize        = "1000"
 	maxAddresses           = 100000
+	nodeSyncTolerance      = 5
 )
 
 // HTTPError is an HTTP error.
@@ -42,7 +48,7 @@ type Service struct {
 	router      *mux.Router
 	IP          string
 	Port        string
-	Storage     *Storage
+	storage     *storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
 	blockchain  *core.BlockChain
@@ -51,11 +57,17 @@ type Service struct {
 
 // New returns explorer service.
 func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
+	storage, err := newStorage(bc, dbPath)
+	if err != nil {
+		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")
+	}
 	return &Service{
 		IP:         selfPeer.IP,
 		Port:       selfPeer.Port,
 		blockchain: bc,
 		backend:    backend,
+		storage:    storage,
 	}
 }
 
@@ -64,6 +76,7 @@ func (s *Service) Start() error {
 	utils.Logger().Info().Msg("Starting explorer service.")
 	s.Init()
 	s.server = s.Run()
+	s.storage.Start()
 	return nil
 }
 
@@ -75,6 +88,7 @@ func (s *Service) Stop() error {
 	} else {
 		utils.Logger().Info().Msg("Shutting down explorer server successfully")
 	}
+	s.storage.Close()
 	return nil
 }
 
@@ -88,9 +102,7 @@ func GetExplorerPort(nodePort string) string {
 }
 
 // Init is to initialize for ExplorerService.
-func (s *Service) Init() {
-	s.Storage = GetStorageInstance(s.IP, s.Port)
-}
+func (s *Service) Init() {}
 
 // Run is to run serving explorer.
 func (s *Service) Run() *http.Server {
@@ -157,12 +169,37 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data.Addresses, err = s.Storage.GetAddresses(size, prefix)
+	data.Addresses, err = s.storage.GetAddresses(size, oneAddress(prefix))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
 		return
 	}
+}
+
+// GetNormalTxHashesByAccount get the normal transaction hashes by account
+func (s *Service) GetNormalTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
+	return s.storage.GetNormalTxsByAddress(address)
+}
+
+// GetStakingTxHashesByAccount get the staking transaction hashes by account
+func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
+	return s.storage.GetStakingTxsByAddress(address)
+}
+
+// DumpNewBlock instruct the explorer storage to dump block data in explorer DB
+func (s *Service) DumpNewBlock(b *types.Block) {
+	s.storage.DumpNewBlock(b)
+}
+
+// DumpCatchupBlock instruct the explorer storage to dump a catch up block in explorer DB
+func (s *Service) DumpCatchupBlock(b *types.Block) {
+	s.storage.DumpCatchupBlock(b)
+}
+
+// IsAvailable return whether the explorer db is available for now.
+func (s *Service) IsAvailable() bool {
+	return s.storage.available.IsSet()
 }
 
 var (
@@ -269,12 +306,19 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetNodeSync returns status code 500 if node is not in sync
+// GetNodeSync returns status code Teapot 418 if node is not in sync
 func (s *Service) GetNodeSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	sync, _ := s.backend.SyncStatus(s.blockchain.ShardID())
+	sync, remote, diff := s.backend.SyncStatus(s.blockchain.ShardID())
 	if !sync {
-		w.WriteHeader(http.StatusTeapot)
+		utils.Logger().Debug().Uint64("remote", remote).Uint64("diff", diff).Msg("GetNodeSyncStatus")
+		if remote == 0 || diff > nodeSyncTolerance {
+			w.WriteHeader(http.StatusTeapot)
+		} else {
+			// return sync'ed if the diff is less than nodeSyncTolerance
+			// this tolerance is only applicable to /node-sync API call
+			sync = true
+		}
 	}
 	if err := json.NewEncoder(w).Encode(sync); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode total supply")
@@ -293,4 +337,8 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 // APIs for the services.
 func (s *Service) APIs() []rpc.API {
 	return nil
+}
+
+func defaultDBPath(ip, port string) string {
+	return path.Join(nodeconfig.GetDefaultConfig().DBDir, "explorer_storage_"+ip+"_"+port)
 }

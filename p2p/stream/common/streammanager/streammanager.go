@@ -109,6 +109,7 @@ func (sm *streamManager) loop() {
 		discCtx    context.Context
 		discCancel func()
 	)
+	defer discTicker.Stop()
 	// bootstrap discovery
 	sm.discCh <- discTask{}
 

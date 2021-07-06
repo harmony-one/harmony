@@ -67,6 +67,7 @@ func (api *PublicFilterAPI) isEth() bool {
 func (api *PublicFilterAPI) timeoutLoop() {
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
 	for {
 		<-ticker.C
 		api.filtersMu.Lock()

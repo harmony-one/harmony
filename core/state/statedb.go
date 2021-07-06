@@ -859,6 +859,23 @@ func (db *DB) UpdateValidatorWrapper(
 	return nil
 }
 
+// SetValidatorFirstElectionEpoch sets the epoch when the validator is first elected
+func (db *DB) SetValidatorFirstElectionEpoch(addr common.Address, epoch *big.Int) {
+	firstEpoch := db.GetValidatorFirstElectionEpoch(addr)
+	if firstEpoch.Uint64() == 0 {
+		// Set only when it's not set (or it's 0)
+		bytes := common.BigToHash(epoch)
+		db.SetState(addr, staking.FirstElectionEpochKey, bytes)
+	}
+}
+
+// GetValidatorFirstElectionEpoch gets the epoch when the validator was first elected
+func (db *DB) GetValidatorFirstElectionEpoch(addr common.Address) *big.Int {
+	so := db.getStateObject(addr)
+	value := so.GetState(db.db, staking.FirstElectionEpochKey)
+	return value.Big()
+}
+
 // SetValidatorFlag checks whether it is a validator object
 func (db *DB) SetValidatorFlag(addr common.Address) {
 	db.SetState(addr, staking.IsValidatorKey, staking.IsValidator)

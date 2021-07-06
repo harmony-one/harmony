@@ -84,7 +84,7 @@ func (node *Node) StopRPC() error {
 // StartRosetta start rosetta service
 func (node *Node) StartRosetta() error {
 	harmony := hmy.New(node, node.TxPool, node.CxPool, node.Consensus.ShardID)
-	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer)
+	return rosetta.StartServers(harmony, node.NodeConfig.RosettaServer, node.NodeConfig.RPCServer.RateLimiterEnabled, node.NodeConfig.RPCServer.RequestsPerSecond)
 }
 
 // StopRosetta stops rosetta service
@@ -140,5 +140,29 @@ func (node *Node) GetConsensusInternal() rpc_common.ConsensusInternal {
 		Phase:         node.GetConsensusPhase(),
 		BlockNum:      node.GetConsensusBlockNum(),
 		ConsensusTime: node.Consensus.GetFinality(),
+	}
+}
+
+// IsBackup returns the node is in backup mode
+func (node *Node) IsBackup() bool {
+	return node.Consensus.IsBackup()
+}
+
+// SetNodeBackupMode change node backup mode
+func (node *Node) SetNodeBackupMode(isBackup bool) bool {
+	if node.Consensus.IsBackup() == isBackup {
+		return false
+	}
+
+	node.Consensus.SetIsBackup(isBackup)
+	node.Consensus.ResetViewChangeState()
+	return true
+}
+
+func (node *Node) GetConfig() rpc_common.Config {
+	return rpc_common.Config{
+		HarmonyConfig: *node.HarmonyConfig,
+		NodeConfig:    *node.NodeConfig,
+		ChainConfig:   node.chainConfig,
 	}
 }

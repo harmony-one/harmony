@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync"
 
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+
 	"github.com/harmony-one/harmony/internal/blsgen"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/multibls"
@@ -16,7 +18,7 @@ var (
 )
 
 // setupConsensusKeys load bls keys and set the keys to nodeConfig. Return the loaded public keys.
-func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibls.PublicKeys {
+func setupConsensusKeys(hc harmonyconfig.HarmonyConfig, config *nodeconfig.ConfigType) multibls.PublicKeys {
 	onceLoadBLSKey.Do(func() {
 		var err error
 		multiBLSPriKey, err = loadBLSKeys(hc.BLSKeys)
@@ -30,7 +32,7 @@ func setupConsensusKeys(hc harmonyConfig, config *nodeconfig.ConfigType) multibl
 	return multiBLSPriKey.GetPublicKeys()
 }
 
-func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
+func loadBLSKeys(raw harmonyconfig.BlsConfig) (multibls.PrivateKeys, error) {
 	config, err := parseBLSLoadingConfig(raw)
 	if err != nil {
 		return nil, err
@@ -48,7 +50,7 @@ func loadBLSKeys(raw blsConfig) (multibls.PrivateKeys, error) {
 	return keys.Dedup(), err
 }
 
-func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {
+func parseBLSLoadingConfig(raw harmonyconfig.BlsConfig) (blsgen.Config, error) {
 	var (
 		config blsgen.Config
 		err    error
@@ -69,7 +71,7 @@ func parseBLSLoadingConfig(raw blsConfig) (blsgen.Config, error) {
 	return config, nil
 }
 
-func parseBLSPassConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+func parseBLSPassConfig(cfg blsgen.Config, raw harmonyconfig.BlsConfig) (blsgen.Config, error) {
 	if !raw.PassEnabled {
 		cfg.PassSrcType = blsgen.PassSrcNil
 		return blsgen.Config{}, nil
@@ -90,7 +92,7 @@ func parseBLSPassConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error)
 	return cfg, nil
 }
 
-func parseBLSKmsConfig(cfg blsgen.Config, raw blsConfig) (blsgen.Config, error) {
+func parseBLSKmsConfig(cfg blsgen.Config, raw harmonyconfig.BlsConfig) (blsgen.Config, error) {
 	if !raw.KMSEnabled {
 		cfg.AwsCfgSrcType = blsgen.AwsCfgSrcNil
 		return cfg, nil

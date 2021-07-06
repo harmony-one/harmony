@@ -58,6 +58,7 @@ func (bh *beaconHelper) close() {
 
 func (bh *beaconHelper) loop() {
 	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
 	for {
 		select {
 		case <-t.C:

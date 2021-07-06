@@ -13,7 +13,7 @@ ENV BLS_DIR=${HMY_PATH}/bls
 ENV CGO_CFLAGS="-I${BLS_DIR}/include -I${MCL_DIR}/include"
 ENV CGO_LDFLAGS="-L${BLS_DIR}/lib"
 ENV LD_LIBRARY_PATH=${BLS_DIR}/lib:${MCL_DIR}/lib
-ENV GIMME_GO_VERSION="1.14.1"
+ENV GIMME_GO_VERSION="1.16.3"
 ENV PATH="/root/bin:${PATH}"
 
 RUN apt-get update -y

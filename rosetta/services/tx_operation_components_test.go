@@ -6,7 +6,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/crypto"
-
+	"github.com/harmony-one/harmony/crypto/bls"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
 )
@@ -485,6 +485,591 @@ func TestGetTransferOperationComponents(t *testing.T) {
 
 	// Test nil operations
 	_, rosettaError = getTransferOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestCreateValidatorOperationComponents(t *testing.T) {
+	refFromKey := internalCommon.MustGeneratePrivateKey()
+	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	validatorKey := internalCommon.MustGeneratePrivateKey()
+	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
+	validatorBech32Addr, _ := internalCommon.AddressToBech32(validatorAddr)
+	blsKey := bls.RandPrivateKey()
+	var serializedPubKey bls.SerializedPublicKey
+	copy(serializedPubKey[:], blsKey.GetPublicKey().Serialize())
+
+	// test valid operations
+	refOperations := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.CreateValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorBech32Addr,
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"maxCommissionRate":  new(big.Int).SetInt64(90),
+			"maxChangeRate":      new(big.Int).SetInt64(2),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"amount":             new(big.Int).SetInt64(100000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	testComponents, rosettaError := getCreateValidatorOperationComponents(refOperations)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if testComponents.Type != refOperations.Type {
+		t.Error("expected same operation")
+	}
+	if testComponents.From == nil || types.Hash(testComponents.From) != types.Hash(refFrom) {
+		t.Error("expected same sender")
+	}
+	if testComponents.Amount != nil {
+		t.Error("expected nil amount")
+	}
+	if testComponents.To != nil {
+		t.Error("expected nil to")
+	}
+
+	// test invalid operation
+
+	// test nil account
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.CreateValidatorOperation,
+		Account: nil,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorAddr,
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"maxCommissionRate":  new(big.Int).SetInt64(90),
+			"maxChangeRate":      new(big.Int).SetInt64(2),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"amount":             new(big.Int).SetInt64(100000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	_, rosettaError = getCreateValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = getCreateValidatorOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid validator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.CreateValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"maxCommissionRate":  new(big.Int).SetInt64(90),
+			"maxChangeRate":      new(big.Int).SetInt64(2),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"amount":             new(big.Int).SetInt64(100000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+	_, rosettaError = getCreateValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid commission rate
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.CreateValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorAddr,
+			"maxCommissionRate":  new(big.Int).SetInt64(90),
+			"maxChangeRate":      new(big.Int).SetInt64(2),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"amount":             new(big.Int).SetInt64(100000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	_, rosettaError = getCreateValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestEditValidatorOperationComponents(t *testing.T) {
+	refFromKey := internalCommon.MustGeneratePrivateKey()
+	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	validatorKey := internalCommon.MustGeneratePrivateKey()
+	validatorAddr := crypto.PubkeyToAddress(validatorKey.PublicKey)
+	validatorBech32Addr, _ := internalCommon.AddressToBech32(validatorAddr)
+
+	// test valid operations
+	refOperations := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.EditValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorBech32Addr,
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	testComponents, rosettaError := getEditValidatorOperationComponents(refOperations)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if testComponents.Type != refOperations.Type {
+		t.Error("expected same operation")
+	}
+	if testComponents.From == nil || types.Hash(testComponents.From) != types.Hash(refFrom) {
+		t.Error("expected same sender")
+	}
+	if testComponents.Amount != nil {
+		t.Error("expected nil amount")
+	}
+	if testComponents.To != nil {
+		t.Error("expected nil to")
+	}
+
+	// test invalid operation
+
+	// test nil account
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.EditValidatorOperation,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorAddr,
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	_, rosettaError = getEditValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = getEditValidatorOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid validator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.EditValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"commissionRate":     new(big.Int).SetInt64(10),
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+
+	_, rosettaError = getEditValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid commission rate
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.EditValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"validatorAddress":   validatorAddr,
+			"minSelfDelegation":  new(big.Int).SetInt64(10000),
+			"maxTotalDelegation": new(big.Int).SetInt64(10000000),
+			"name":               "Test validator",
+			"website":            "https://test.website.com",
+			"identity":           "test identity",
+			"securityContact":    "security contact",
+			"details":            "test detail",
+		},
+	}
+	_, rosettaError = getEditValidatorOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestDelegateOperationComponents(t *testing.T) {
+	refFromKey := internalCommon.MustGeneratePrivateKey()
+	delegatorAddr := crypto.PubkeyToAddress(refFromKey.PublicKey)
+	delegatorBech32Addr, _ := internalCommon.AddressToBech32(delegatorAddr)
+	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	validatorKey := internalCommon.MustGeneratePrivateKey()
+	validatorAddr, _ := internalCommon.AddressToBech32(crypto.PubkeyToAddress(validatorKey.PublicKey))
+
+	// test valid operations
+	refOperations := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.DelegateOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorBech32Addr,
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	testComponents, rosettaError := getDelegateOperationComponents(refOperations)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if testComponents.Type != refOperations.Type {
+		t.Error("expected same operation")
+	}
+	if testComponents.From == nil || types.Hash(testComponents.From) != types.Hash(refFrom) {
+		t.Error("expected same sender")
+	}
+	if testComponents.Amount != nil {
+		t.Error("expected nil amount")
+	}
+	if testComponents.To != nil {
+		t.Error("expected nil to")
+	}
+
+	// test nil account
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.DelegateOperation,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getDelegateOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = getDelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid delegator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.DelegateOperation,
+		Metadata: map[string]interface{}{
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getDelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid validator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.DelegateOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getDelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid amount
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.DelegateOperation,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"validatorAddress": validatorAddr,
+		},
+	}
+
+	_, rosettaError = getDelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+}
+
+func TestUndelegateOperationComponents(t *testing.T) {
+	refFromKey := internalCommon.MustGeneratePrivateKey()
+	delegatorAddr := crypto.PubkeyToAddress(refFromKey.PublicKey)
+	delegatorBech32Addr, _ := internalCommon.AddressToBech32(delegatorAddr)
+	refFrom, rosettaError := newAccountIdentifier(crypto.PubkeyToAddress(refFromKey.PublicKey))
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	validatorKey := internalCommon.MustGeneratePrivateKey()
+	validatorAddr, _ := internalCommon.AddressToBech32(crypto.PubkeyToAddress(validatorKey.PublicKey))
+
+	// test valid operations
+	refOperations := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.UndelegateOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorBech32Addr,
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	testComponents, rosettaError := getUndelegateOperationComponents(refOperations)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if testComponents.Type != refOperations.Type {
+		t.Error("expected same operation")
+	}
+	if testComponents.From == nil || types.Hash(testComponents.From) != types.Hash(refFrom) {
+		t.Error("expected same sender")
+	}
+	if testComponents.Amount != nil {
+		t.Error("expected nil amount")
+	}
+	if testComponents.To != nil {
+		t.Error("expected nil to")
+	}
+
+	// test nil account
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.UndelegateOperation,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getUndelegateOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test nil operation
+	_, rosettaError = getUndelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid delegator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.UndelegateOperation,
+		Metadata: map[string]interface{}{
+			"validatorAddress": validatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getUndelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid validator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.UndelegateOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"amount":           new(big.Int).SetInt64(100),
+		},
+	}
+
+	_, rosettaError = getUndelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid amount
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.UndelegateOperation,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorAddr,
+			"validatorAddress": validatorAddr,
+		},
+	}
+
+	_, rosettaError = getUndelegateOperationComponents(nil)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+}
+
+func TestCollectRewardsOperationComponents(t *testing.T) {
+	refFromKey := internalCommon.MustGeneratePrivateKey()
+	validatorAddr := crypto.PubkeyToAddress(refFromKey.PublicKey)
+	refFrom, rosettaError := newAccountIdentifier(validatorAddr)
+	delegatorBech32Addr, _ := internalCommon.AddressToBech32(validatorAddr)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	// test valid operations
+	refOperations := &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:    common.EditValidatorOperation,
+		Account: refFrom,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": delegatorBech32Addr,
+		},
+	}
+
+	testComponents, rosettaError := getCollectRewardsOperationComponents(refOperations)
+	if rosettaError != nil {
+		t.Fatal(rosettaError)
+	}
+	if testComponents.Type != refOperations.Type {
+		t.Error("expected same operation")
+	}
+	if testComponents.From == nil || types.Hash(testComponents.From) != types.Hash(refFrom) {
+		t.Error("expected same sender")
+	}
+	if testComponents.Amount != nil {
+		t.Error("expected nil amount")
+	}
+	if testComponents.To != nil {
+		t.Error("expected nil to")
+	}
+
+	// test invalid operation
+
+	// test nil operation
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type: common.EditValidatorOperation,
+		Metadata: map[string]interface{}{
+			"delegatorAddress": validatorAddr,
+		},
+	}
+
+	_, rosettaError = getCollectRewardsOperationComponents(refOperations)
+	if rosettaError == nil {
+		t.Error("expected error")
+	}
+
+	// test invalid delegator
+	refOperations = &types.Operation{
+		OperationIdentifier: &types.OperationIdentifier{
+			Index: 0,
+		},
+		Type:     common.EditValidatorOperation,
+		Account:  refFrom,
+		Metadata: map[string]interface{}{},
+	}
+
+	_, rosettaError = getCollectRewardsOperationComponents(refOperations)
 	if rosettaError == nil {
 		t.Error("expected error")
 	}

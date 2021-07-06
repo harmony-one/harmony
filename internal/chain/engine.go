@@ -5,6 +5,11 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/harmony-one/harmony/internal/params"
+
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
+	blsvrf "github.com/harmony-one/harmony/crypto/vrf/bls"
+
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
@@ -29,6 +34,8 @@ import (
 const (
 	verifiedSigCache = 100
 	epochCtxCache    = 20
+	vrfBeta          = 32 // 32 bytes randomness
+	vrfProof         = 96 // 96 bytes proof (bls sig)
 )
 
 type engineImpl struct {
@@ -135,6 +142,104 @@ func (e *engineImpl) VerifyShardState(
 	return nil
 }
 
+// VerifyVRF implements Engine, checking the vrf is valid
+func (e *engineImpl) VerifyVRF(
+	bc engine.ChainReader, header *block.Header,
+) error {
+	if bc.ShardID() != header.ShardID() {
+		return errors.Errorf(
+			"[VerifyVRF] shardID not match %d %d", bc.ShardID(), header.ShardID(),
+		)
+	}
+
+	if bc.Config().IsVRF(header.Epoch()) && len(header.Vrf()) != vrfBeta+vrfProof {
+		return errors.Errorf(
+			"[VerifyVRF] invalid vrf data format or no vrf proposed %x", header.Vrf(),
+		)
+	}
+	if !bc.Config().IsVRF(header.Epoch()) {
+		if len(header.Vrf()) != 0 {
+			return errors.Errorf(
+				"[VerifyVRF] vrf data present in pre-vrf epoch %x", header.Vrf(),
+			)
+		}
+		return nil
+	}
+
+	leaderPubKey, err := GetLeaderPubKeyFromCoinbase(bc, header)
+
+	if leaderPubKey == nil || err != nil {
+		return err
+	}
+
+	vrfPk := blsvrf.NewVRFVerifier(leaderPubKey.Object)
+
+	previousHeader := bc.GetHeaderByNumber(
+		header.Number().Uint64() - 1,
+	)
+	if previousHeader == nil {
+		return errors.New("[VerifyVRF] no parent header found")
+	}
+
+	previousHash := previousHeader.Hash()
+	vrfProof := [vrfProof]byte{}
+	copy(vrfProof[:], header.Vrf()[vrfBeta:])
+	hash, err := vrfPk.ProofToHash(previousHash[:], vrfProof[:])
+
+	if err != nil {
+		return errors.New("[VerifyVRF] Failed VRF verification")
+	}
+
+	if !bytes.Equal(hash[:], header.Vrf()[:vrfBeta]) {
+		return errors.New("[VerifyVRF] VRF proof is not valid")
+	}
+
+	return nil
+}
+
+// retrieve corresponding blsPublicKey from Coinbase Address
+func GetLeaderPubKeyFromCoinbase(
+	blockchain engine.ChainReader, h *block.Header,
+) (*bls.PublicKeyWrapper, error) {
+	shardState, err := blockchain.ReadShardState(h.Epoch())
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			h.Epoch(),
+			h.Coinbase().Hash().Hex(),
+		)
+	}
+
+	committee, err := shardState.FindCommitteeByID(h.ShardID())
+	if err != nil {
+		return nil, err
+	}
+
+	committerKey := new(bls2.PublicKey)
+	isStaking := blockchain.Config().IsStaking(h.Epoch())
+	for _, member := range committee.Slots {
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		} else {
+			if member.EcdsaAddress == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		}
+	}
+	return nil, errors.Errorf(
+		"cannot find corresponding BLS Public Key coinbase %s",
+		h.Coinbase().Hex(),
+	)
+}
+
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 // Note that each block header contains the bls signature of the parent block
@@ -187,7 +292,7 @@ func (e *engineImpl) Finalize(
 
 		// Needs to be after payoutUndelegations because payoutUndelegations
 		// depends on the old LastEpochInCommittee
-		if err := setLastEpochInCommittee(header, state); err != nil {
+		if err := setElectionEpochAndMinFee(header, state, chain.Config()); err != nil {
 			return nil, nil, err
 		}
 
@@ -289,7 +394,7 @@ func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) b
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
+func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *params.ChainConfig) error {
 	newShardState, err := header.GetShardState()
 	if err != nil {
 		const msg = "[Finalize] failed to read shard state"
@@ -302,7 +407,20 @@ func setLastEpochInCommittee(header *block.Header, state *state.DB) error {
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
+		// Set last epoch in committee
 		wrapper.LastEpochInCommittee = newShardState.Epoch
+
+		if config.IsMinCommissionRate(newShardState.Epoch) {
+			// Set first election epoch
+			state.SetValidatorFirstElectionEpoch(addr, newShardState.Epoch)
+
+			// Update minimum commission fee
+			if err := availability.UpdateMinimumCommissionFee(
+				newShardState.Epoch, state, addr, config.MinCommissionPromoPeriod.Int64(),
+			); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

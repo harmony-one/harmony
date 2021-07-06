@@ -117,12 +117,12 @@ func (d *Downloader) NumPeers() int {
 }
 
 // IsSyncing return the current sync status
-func (d *Downloader) SyncStatus() (bool, uint64) {
+func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	syncing, target := d.status.get()
 	if !syncing {
 		target = d.bc.CurrentBlock().NumberU64()
 	}
-	return syncing, target
+	return syncing, target, 0
 }
 
 // SubscribeDownloadStarted subscribe download started
@@ -157,7 +157,7 @@ func (d *Downloader) waitForBootFinish() {
 	trigger()
 
 	t := time.NewTicker(10 * time.Second)
-
+	defer t.Stop()
 	for {
 		d.logger.Info().Msg("waiting for initial bootstrap discovery")
 		select {
@@ -179,6 +179,7 @@ func (d *Downloader) waitForBootFinish() {
 
 func (d *Downloader) loop() {
 	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 	initSync := true
 	trigger := func() {
 		select {

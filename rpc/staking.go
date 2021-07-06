@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/pkg/errors"
-
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
+	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -501,8 +502,8 @@ func (s *PublicStakingService) GetDelegationsByDelegator(
 
 // GetDelegationsByDelegatorByBlockNumber returns list of delegations for a delegator address at given block number
 func (s *PublicStakingService) GetDelegationsByDelegatorByBlockNumber(
-	ctx context.Context, address string, blockNumber BlockNumber,
-) ([]StructuredResponse, error) {
+	ctx context.Context, aol AddressOrList, blockNumber BlockNumber,
+) (interface{}, error) {
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -512,20 +513,34 @@ func (s *PublicStakingService) GetDelegationsByDelegatorByBlockNumber(
 	if isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
-
-	// Fetch delegation for block number
-	delegatorAddress, err := internal_common.ParseAddr(address)
-	if err != nil {
-		return nil, err
-	}
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
 	}
-	validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(delegatorAddress, blk)
 
-	// Format response
-	result := []StructuredResponse{}
+	if aol.Address != nil { // single address
+		delegatorAddress := *aol.Address
+		validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(delegatorAddress, blk)
+		return s.parseGetDelegationsByDelegatorResp(delegatorAddress, validators, delegations)
+
+	} else { // multiple address
+		srs := make([][]StructuredResponse, 0, len(aol.AddressList))
+		for _, delegatorAddress := range aol.AddressList {
+			validators, delegations := s.hmy.GetDelegationsByDelegatorByBlock(delegatorAddress, blk)
+			res, err := s.parseGetDelegationsByDelegatorResp(delegatorAddress, validators, delegations)
+			if err != nil {
+				return nil, err
+			}
+			srs = append(srs, res)
+		}
+		return srs, nil
+	}
+}
+
+func (s *PublicStakingService) parseGetDelegationsByDelegatorResp(
+	delegator common.Address, validators []common.Address, delegations []*staking.Delegation,
+) ([]StructuredResponse, error) {
+	var result []StructuredResponse
 	for i := range delegations {
 		delegation := delegations[i]
 		undelegations := make([]Undelegation, len(delegation.Undelegations))
@@ -537,7 +552,7 @@ func (s *PublicStakingService) GetDelegationsByDelegatorByBlockNumber(
 			}
 		}
 		valAddr, _ := internal_common.AddressToBech32(validators[i])
-		delAddr, _ := internal_common.AddressToBech32(delegatorAddress)
+		delAddr, _ := internal_common.AddressToBech32(delegator)
 
 		// Response output is the same for all versions
 		del, err := NewStructuredResponse(Delegation{
@@ -584,6 +599,11 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
+
+		// Skip delegations with zero amount and empty undelegation
+		if delegation.Amount.Cmp(common.Big0) == 0 && len(undelegations) == 0 {
+			continue
+		}
 
 		// Response output is the same for all versions
 		del, err := NewStructuredResponse(Delegation{

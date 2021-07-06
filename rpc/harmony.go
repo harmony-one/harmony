@@ -63,9 +63,9 @@ func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error
 	// Format response according to version
 	switch s.version {
 	case V1, Eth:
-		return (*hexutil.Big)(big.NewInt(1)), nil
+		return (*hexutil.Big)(big.NewInt(1e10)), nil
 	case V2:
-		return 1, nil
+		return 1e10, nil
 	default:
 		return nil, ErrUnknownRPCVersion
 	}

@@ -83,10 +83,10 @@ func (ds *Downloaders) NumPeers() map[uint32]int {
 
 // SyncStatus returns whether the given shard is doing syncing task and the target block
 // number.
-func (ds *Downloaders) SyncStatus(shardID uint32) (bool, uint64) {
+func (ds *Downloaders) SyncStatus(shardID uint32) (bool, uint64, uint64) {
 	d, ok := ds.ds[shardID]
 	if !ok {
-		return false, 0
+		return false, 0, 0
 	}
 	return d.SyncStatus()
 }

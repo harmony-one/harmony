@@ -88,7 +88,7 @@ type NodeAPI interface {
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
-	SyncStatus(shardID uint32) (bool, uint64)
+	SyncStatus(shardID uint32) (bool, uint64, uint64)
 	SyncPeers() map[string]int
 	ReportStakingErrorSink() types.TransactionErrorReports
 	ReportPlainErrorSink() types.TransactionErrorReports
@@ -100,12 +100,15 @@ type NodeAPI interface {
 	ListBlockedPeer() []peer.ID
 
 	GetConsensusInternal() commonRPC.ConsensusInternal
+	IsBackup() bool
+	SetNodeBackupMode(isBackup bool) bool
 
 	// debug API
 	GetConsensusMode() string
 	GetConsensusPhase() string
 	GetConsensusViewChangingID() uint64
 	GetConsensusCurViewID() uint64
+	GetConfig() commonRPC.Config
 	ShutDown()
 }
 
@@ -203,6 +206,7 @@ func (hmy *Harmony) GetNodeMetadata() commonRPC.NodeMetadata {
 		Role:            cfg.Role().String(),
 		DNSZone:         cfg.DNSZone,
 		Archival:        cfg.GetArchival(),
+		IsBackup:        hmy.NodeAPI.IsBackup(),
 		NodeBootTime:    hmy.NodeAPI.GetNodeBootTime(),
 		PeerID:          nodeconfig.GetPeerID(),
 		Consensus:       consensusInternal,

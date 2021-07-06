@@ -92,7 +92,7 @@ func (rm *requestManager) DoRequest(ctx context.Context, raw sttypes.Request, op
 func (rm *requestManager) doRequestAsync(ctx context.Context, raw sttypes.Request, options ...RequestOption) <-chan responseData {
 	req := &request{
 		Request: raw,
-		respC:   make(chan responseData),
+		respC:   make(chan responseData, 1),
 		doneC:   make(chan struct{}),
 	}
 	for _, opt := range options {
@@ -134,6 +134,7 @@ func (rm *requestManager) loop() {
 		throttleC = make(chan struct{}, 1) // throttle the waiting requests periodically
 		ticker    = time.NewTicker(throttleInterval)
 	)
+	defer ticker.Stop()
 	throttle := func() {
 		select {
 		case throttleC <- struct{}{}:

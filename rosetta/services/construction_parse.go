@@ -18,7 +18,7 @@ func (s *ConstructAPI) ConstructionParse(
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
-	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.Transaction)
+	wrappedTransaction, tx, rosettaError := unpackWrappedTransactionFromString(request.Transaction, request.Signed)
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
@@ -30,7 +30,23 @@ func (s *ConstructAPI) ConstructionParse(
 	if request.Signed {
 		return parseSignedTransaction(ctx, wrappedTransaction, tx)
 	}
-	return parseUnsignedTransaction(ctx, wrappedTransaction, tx)
+
+	rsp, err := parseUnsignedTransaction(ctx, wrappedTransaction, tx)
+	if err != nil {
+		return nil, common.NewError(common.InvalidTransactionConstructionError, map[string]interface{}{
+			"message": err,
+		})
+	}
+
+	// it is unsigned as it reach to here, makes no sense, just to happy rosetta testing
+	switch rsp.Operations[0].Type {
+	case common.CreateValidatorOperation:
+		delete(rsp.Operations[0].Metadata, "slotPubKeys")
+		delete(rsp.Operations[0].Metadata, "slotKeySigs")
+		return rsp, nil
+	default:
+		return rsp, nil
+	}
 }
 
 // parseUnsignedTransaction ..
@@ -49,12 +65,11 @@ func parseUnsignedTransaction(
 		})
 	}
 
-	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.GasLimit(),
 	}
 	formattedTx, rosettaError := FormatTransaction(
-		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode},
+		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode}, false,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -70,7 +85,7 @@ func parseUnsignedTransaction(
 			foundSender = true
 			op.Account = wrappedTransaction.From
 		}
-		op.Status = ""
+		op.Status = nil
 	}
 	if !foundSender {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
@@ -92,12 +107,11 @@ func parseSignedTransaction(
 		})
 	}
 
-	// TODO (dm): implement intended receipt for staking transactions
 	intendedReceipt := &hmyTypes.Receipt{
 		GasUsed: tx.GasLimit(),
 	}
 	formattedTx, rosettaError := FormatTransaction(
-		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode},
+		tx, intendedReceipt, &ContractInfo{ContractCode: wrappedTransaction.ContractCode}, true,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -118,7 +132,7 @@ func parseSignedTransaction(
 		})
 	}
 	for _, op := range formattedTx.Operations {
-		op.Status = ""
+		op.Status = nil
 	}
 	return &types.ConstructionParseResponse{
 		Operations:               formattedTx.Operations,

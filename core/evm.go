@@ -19,6 +19,8 @@ package core
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
@@ -49,6 +51,9 @@ type ChainContext interface {
 
 	// ReadValidatorList returns the list of all validators
 	ReadValidatorList() ([]common.Address, error)
+
+	// Config returns chain config
+	Config() *params.ChainConfig
 }
 
 // NewEVMContext creates a new context for use in the EVM.
@@ -64,6 +69,11 @@ func NewEVMContext(msg Message, header *block.Header, chain headerGetter, author
 	if msg.IsAA() {
 		paygasMode = vm.PaygasContinue
 	}
+	vrf := common.Hash{}
+	if len(header.Vrf()) >= 32 {
+		vrfAndProof := header.Vrf()
+		copy(vrf[:], vrfAndProof[:32])
+	}
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -73,6 +83,7 @@ func NewEVMContext(msg Message, header *block.Header, chain headerGetter, author
 		Coinbase:    beneficiary,
 		BlockNumber: header.Number(),
 		EpochNumber: header.Epoch(),
+		VRF:         vrf,
 		Time:        header.Time(),
 		GasLimit:    header.GasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),

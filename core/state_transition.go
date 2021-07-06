@@ -43,6 +43,7 @@ var (
 	errNoDelegationToUndelegate    = errors.New("no delegation to undelegate")
 	errCommissionRateChangeTooFast = errors.New("change on commission rate can not be more than max change rate within the same epoch")
 	errCommissionRateChangeTooHigh = errors.New("commission rate can not be higher than maximum commission rate")
+	errCommissionRateChangeTooLow  = errors.New("commission rate can not be lower than min rate of 5%")
 	errNoRewardsToCollect          = errors.New("no rewards to collect")
 	errNegativeAmount              = errors.New("amount can not be negative")
 	errDupIdentity                 = errors.New("validator identity exists")
@@ -510,7 +511,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 		return err
 	}
 	updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
-		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig().IsRedelegation(st.evm.EpochNumber))
+		st.state, st.evm.EpochNumber, delegate, delegations, st.evm.ChainConfig())
 	if err != nil {
 		return err
 	}

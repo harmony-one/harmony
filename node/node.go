@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
 	"github.com/harmony-one/abool"
@@ -103,6 +106,7 @@ type Node struct {
 	ContractAddresses            []common.Address
 	// Channel to notify consensus service to really start consensus
 	startConsensus chan struct{}
+	HarmonyConfig  *harmonyconfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
@@ -373,6 +377,8 @@ var (
 	errInvalidShard      = errors.New("invalid shard")
 )
 
+const beaconBlockHeightTolerance = 2
+
 // validateNodeMessage validate node message
 func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	[]byte, proto_node.MessageType, error) {
@@ -380,7 +386,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 	// length of payload must > p2pNodeMsgPrefixSize
 
 	// reject huge node messages
-	if len(payload) >= types.MaxEncodedPoolTransactionSize {
+	if len(payload) >= types.MaxP2PNodeDataSize {
 		nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_oversized"}).Inc()
 		return nil, 0, core.ErrOversizedData
 	}
@@ -399,10 +405,32 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 		switch proto_node.BlockMessageType(payload[p2pNodeMsgPrefixSize]) {
 		case proto_node.Sync:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "block_sync"}).Inc()
+
+			// checks whether the beacon block is larger than current block number
+			blocksPayload := payload[p2pNodeMsgPrefixSize+1:]
+			var blocks []*types.Block
+			if err := rlp.DecodeBytes(blocksPayload, &blocks); err != nil {
+				return nil, 0, errors.Wrap(err, "block decode error")
+			}
+			curBeaconHeight := node.Beaconchain().CurrentBlock().NumberU64()
+			for _, block := range blocks {
+				// Ban blocks number that is smaller than tolerance
+				if block.NumberU64()+beaconBlockHeightTolerance <= curBeaconHeight {
+					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
+						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
+					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
+				} else if block.NumberU64() <= curBeaconHeight {
+					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
+						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
+					return nil, 0, errIgnoreBeaconMsg
+				}
+			}
+
 			// only non-beacon nodes process the beacon block sync messages
 			if node.Blockchain().ShardID() == shard.BeaconChainShardID {
 				return nil, 0, errIgnoreBeaconMsg
 			}
+
 		case proto_node.SlashCandidate:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "slash"}).Inc()
 			// only beacon chain node process slash candidate messages
@@ -912,6 +940,7 @@ func New(
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
 	isArchival map[uint32]bool,
+	harmonyconfig *harmonyconfig.HarmonyConfig,
 ) *Node {
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
@@ -922,6 +951,7 @@ func New(
 	} else {
 		node.NodeConfig = nodeconfig.GetDefaultConfig()
 	}
+	node.HarmonyConfig = harmonyconfig
 
 	copy(node.syncID[:], GenerateRandomString(SyncIDLength))
 	if host != nil {

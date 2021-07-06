@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/harmony-one/harmony/crypto/bls"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -35,7 +37,8 @@ type State struct {
 	// it is the next view id
 	viewChangingID uint64
 
-	viewMux sync.RWMutex
+	viewMux  sync.RWMutex
+	isBackup bool
 }
 
 // Mode return the current node mode
@@ -47,6 +50,10 @@ func (pm *State) Mode() Mode {
 
 // SetMode set the node mode as required
 func (pm *State) SetMode(s Mode) {
+	if s == Normal && pm.isBackup {
+		s = NormalBackup
+	}
+
 	pm.modeMux.Lock()
 	defer pm.modeMux.Unlock()
 	pm.mode = s
@@ -91,6 +98,10 @@ func (pm *State) GetViewChangeDuraion() time.Duration {
 	defer pm.cViewMux.RUnlock()
 	diff := int64(pm.viewChangingID - pm.blockViewID)
 	return time.Duration(diff * diff * int64(viewChangeDuration))
+}
+
+func (pm *State) SetIsBackup(isBackup bool) {
+	pm.isBackup = isBackup
 }
 
 // fallbackNextViewID return the next view ID and duration when there is an exception
@@ -174,7 +185,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			stuckBlockViewID := curHeader.ViewID().Uint64() + 1
 			gap = int(viewID - stuckBlockViewID)
 			// this is the truth of the leader based on blockchain blocks
-			lastLeaderPubKey, err = consensus.getLeaderPubKeyFromCoinbase(curHeader)
+			lastLeaderPubKey, err = chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, curHeader)
 			if err != nil || lastLeaderPubKey == nil {
 				consensus.getLogger().Error().Err(err).
 					Msg("[getNextLeaderKey] Unable to get leaderPubKey from coinbase. Set it to consensus.LeaderPubKey")
@@ -227,7 +238,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	if consensus.disableViewChange {
+	if consensus.disableViewChange || consensus.IsBackup() {
 		return
 	}
 	consensus.mutex.Lock()

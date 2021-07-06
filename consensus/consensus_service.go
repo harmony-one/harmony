@@ -12,7 +12,6 @@ import (
 	protobuf "github.com/golang/protobuf/proto"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
-	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -174,10 +173,23 @@ func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKe
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
+	if m == Normal && consensus.isBackup {
+		m = NormalBackup
+	}
+
 	consensus.getLogger().Debug().
 		Str("Mode", m.String()).
 		Msg("[SetMode]")
 	consensus.current.SetMode(m)
+}
+
+// SetIsBackup sets the mode of consensus
+func (consensus *Consensus) SetIsBackup(isBackup bool) {
+	consensus.getLogger().Debug().
+		Bool("IsBackup", isBackup).
+		Msg("[SetIsBackup]")
+	consensus.isBackup = isBackup
+	consensus.current.SetIsBackup(isBackup)
 }
 
 // Mode returns the mode of consensus
@@ -201,7 +213,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	if consensus.IgnoreViewIDCheck.IsSet() {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
-		consensus.current.SetMode(Normal)
+		consensus.SetMode(Normal)
 		consensus.SetViewIDs(msg.ViewID)
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
@@ -239,49 +251,6 @@ func (consensus *Consensus) ReadSignatureBitmapPayload(
 	members := consensus.Decider.Participants()
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, members,
-	)
-}
-
-// retrieve corresponding blsPublicKey from Coinbase Address
-func (consensus *Consensus) getLeaderPubKeyFromCoinbase(
-	header *block.Header,
-) (*bls.PublicKeyWrapper, error) {
-	shardState, err := consensus.Blockchain.ReadShardState(header.Epoch())
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
-			header.Epoch(),
-			header.Coinbase().Hash().Hex(),
-		)
-	}
-
-	committee, err := shardState.FindCommitteeByID(header.ShardID())
-	if err != nil {
-		return nil, err
-	}
-
-	committerKey := new(bls_core.PublicKey)
-	isStaking := consensus.Blockchain.Config().IsStaking(header.Epoch())
-	for _, member := range committee.Slots {
-		if isStaking {
-			// After staking the coinbase address will be the address of bls public key
-			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == header.Coinbase() {
-				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
-					return nil, err
-				}
-				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
-			}
-		} else {
-			if member.EcdsaAddress == header.Coinbase() {
-				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
-					return nil, err
-				}
-				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
-			}
-		}
-	}
-	return nil, errors.Errorf(
-		"cannot find corresponding BLS Public Key coinbase %s",
-		header.Coinbase().Hex(),
 	)
 }
 
@@ -424,7 +393,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	// a solution to take care of this case because the coinbase of the latest block doesn't really represent the
 	// the real current leader in case of M1 view change.
 	if !curHeader.IsLastBlockInEpoch() && curHeader.Number().Uint64() != 0 {
-		leaderPubKey, err := consensus.getLeaderPubKeyFromCoinbase(curHeader)
+		leaderPubKey, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, curHeader)
 		if err != nil || leaderPubKey == nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[UpdateConsensusInformation] Unable to get leaderPubKey from coinbase")
@@ -478,15 +447,6 @@ func (consensus *Consensus) IsLeader() bool {
 			return true
 		}
 	}
-	return false
-}
-
-// NeedsRandomNumberGeneration returns true if the current epoch needs random number generation
-func (consensus *Consensus) NeedsRandomNumberGeneration(epoch *big.Int) bool {
-	if consensus.ShardID == 0 && epoch.Uint64() >= shard.Schedule.RandomnessStartingEpoch() {
-		return true
-	}
-
 	return false
 }
 

@@ -78,7 +78,7 @@ func testFormatStakingTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{}, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -133,7 +133,7 @@ func testFormatPlainTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{}, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -190,7 +190,7 @@ func testFormatCrossShardSenderTransaction(
 		Status:  hmytypes.ReceiptStatusSuccessful,
 		GasUsed: gasUsed,
 	}
-	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{})
+	rosettaTx, rosettaError := FormatTransaction(tx, receipt, &ContractInfo{}, true)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
@@ -263,7 +263,7 @@ func TestFormatCrossShardReceiverTransaction(t *testing.T) {
 				Index: 0, // There is no gas expenditure for cross-shard payout
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: receiverAccID,
 			Amount: &types.Amount{
 				Value:    fmt.Sprintf("%v", tx.Value().Uint64()),

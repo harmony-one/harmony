@@ -38,6 +38,7 @@ type Config struct {
 	Coinbase    common.Address
 	BlockNumber *big.Int
 	EpochNumber *big.Int
+	VRF         common.Hash
 	Time        *big.Int
 	GasLimit    uint64
 	GasPrice    *big.Int

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/harmony-one/harmony/internal/params"
+
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -53,8 +55,10 @@ var (
 	hundredKOnes    = new(big.Int).Mul(big.NewInt(100000), oneBig)
 
 	negRate           = numeric.NewDecWithPrec(-1, 10)
+	pointZeroOneDec   = numeric.NewDecWithPrec(1, 2)
 	pointOneDec       = numeric.NewDecWithPrec(1, 1)
 	pointTwoDec       = numeric.NewDecWithPrec(2, 1)
+	pointFourDec      = numeric.NewDecWithPrec(4, 1)
 	pointFiveDec      = numeric.NewDecWithPrec(5, 1)
 	pointSevenDec     = numeric.NewDecWithPrec(7, 1)
 	pointEightFiveDec = numeric.NewDecWithPrec(85, 2)
@@ -463,7 +467,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			expWrapper: func() staking.ValidatorWrapper {
 				vw := defaultExpWrapperEditValidator()
 				vw.UpdateHeight = big.NewInt(defaultSnapBlockNumber)
-				vw.Rate = pointFiveDec
+				vw.Rate = pointFourDec
 				return vw
 			}(),
 		},
@@ -652,6 +656,51 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			msg:      defaultMsgEditValidator(),
 
 			expErr: errors.New("banned status"),
+		},
+		{
+			// 14: Rate is lower than min rate of 5%
+			sdb: makeStateDBForStake(t),
+			bc: func() *fakeChainContext {
+				chain := makeFakeChainContextForStake()
+				vw := chain.vWrappers[validatorAddr]
+				vw.Rate = pointFourDec
+				chain.vWrappers[validatorAddr] = vw
+				return chain
+			}(),
+			epoch:    big.NewInt(20),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.EditValidator {
+				msg := defaultMsgEditValidator()
+				msg.CommissionRate = &pointZeroOneDec
+				return msg
+			}(),
+
+			expErr: errCommissionRateChangeTooLow,
+		},
+		{
+			// 15: Rate is ok within the promo period
+			sdb: makeStateDBForStake(t),
+			bc: func() *fakeChainContext {
+				chain := makeFakeChainContextForStake()
+				vw := chain.vWrappers[validatorAddr]
+				vw.Rate = pointFourDec
+				chain.vWrappers[validatorAddr] = vw
+				return chain
+			}(),
+			epoch:    big.NewInt(15),
+			blockNum: big.NewInt(defaultBlockNumber),
+			msg: func() staking.EditValidator {
+				msg := defaultMsgEditValidator()
+				msg.CommissionRate = &pointZeroOneDec
+				return msg
+			}(),
+
+			expWrapper: func() staking.ValidatorWrapper {
+				vw := defaultExpWrapperEditValidator()
+				vw.UpdateHeight = big.NewInt(defaultBlockNumber)
+				vw.Rate = pointZeroOneDec
+				return vw
+			}(),
 		},
 	}
 	for i, test := range tests {
@@ -1000,9 +1049,49 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			}(),
 			expAmt: tenKOnes,
 		},
+		{
+			// 17: small amount v2
+			sdb: makeStateDBForStake(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = new(big.Int).Mul(big.NewInt(90), oneBig)
+				return msg
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(100),
+			redelegate: false,
+
+			expErr: errDelegationTooSmallV2,
+		},
+		{
+			// 18: valid amount v2
+			sdb: makeStateDBForStake(t),
+			msg: func() staking.Delegate {
+				msg := defaultMsgDelegate()
+				msg.Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				return msg
+			}(),
+			ds:         makeMsgCollectRewards(),
+			epoch:      big.NewInt(100),
+			redelegate: false,
+
+			expVWrappers: func() []staking.ValidatorWrapper {
+				wrapper := defaultExpVWrapperDelegate()
+				wrapper.Delegations[1].Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
+				return []staking.ValidatorWrapper{wrapper}
+			}(),
+			expAmt: new(big.Int).Mul(big.NewInt(500), oneBig),
+		},
 	}
 	for i, test := range tests {
-		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, test.redelegate)
+		config := &params.ChainConfig{}
+		config.MinDelegation100Epoch = big.NewInt(100)
+		if test.redelegate {
+			config.RedelegationEpoch = test.epoch
+		} else {
+			config.RedelegationEpoch = big.NewInt(test.epoch.Int64() + 1)
+		}
+		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, config)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1546,6 +1635,7 @@ func updateStateValidators(sdb *state.DB, ws []*staking.ValidatorWrapper) error 
 	for i, w := range ws {
 		sdb.SetValidatorFlag(w.Address)
 		sdb.AddBalance(w.Address, hundredKOnes)
+		sdb.SetValidatorFirstElectionEpoch(w.Address, big.NewInt(10))
 		if err := sdb.UpdateValidatorWrapper(w.Address, w); err != nil {
 			return fmt.Errorf("update %v vw error: %v", i, err)
 		}
@@ -1633,6 +1723,13 @@ func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 	return nil
 }
 
+func (chain *fakeChainContext) Config() *params.ChainConfig {
+	config := &params.ChainConfig{}
+	config.MinCommissionRateEpoch = big.NewInt(0)
+	config.MinCommissionPromoPeriod = big.NewInt(10)
+	return config
+}
+
 func (chain *fakeChainContext) GetHeader(common.Hash, uint64) *block.Header {
 	return nil
 }
@@ -1665,6 +1762,12 @@ func (chain *fakeErrChainContext) Engine() consensus_engine.Engine {
 
 func (chain *fakeErrChainContext) GetHeader(common.Hash, uint64) *block.Header {
 	return nil
+}
+
+func (chain *fakeErrChainContext) Config() *params.ChainConfig {
+	config := &params.ChainConfig{}
+	config.MinCommissionRateEpoch = big.NewInt(10)
+	return config
 }
 
 func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {

@@ -8,12 +8,14 @@ import (
 	"reflect"
 	"testing"
 
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-type testCfgOpt func(config *harmonyConfig)
+type testCfgOpt func(config *harmonyconfig.HarmonyConfig)
 
-func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) harmonyConfig {
+func makeTestConfig(nt nodeconfig.NetworkType, opt testCfgOpt) harmonyconfig.HarmonyConfig {
 	cfg := getDefaultHmyConfigCopy(nt)
 	if opt != nil {
 		opt(&cfg)
@@ -30,8 +32,8 @@ func init() {
 }
 
 func TestV1_0_4Config(t *testing.T) {
-	testConfig := `Version = "1.0.4"
-
+	testConfig := `
+Version = "1.0.4"
 [BLSKeys]
   KMSConfigFile = ""
   KMSConfigSrcType = "shared"
@@ -104,7 +106,7 @@ func TestV1_0_4Config(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := loadHarmonyConfig(file)
+	config, migratedFrom, err := loadHarmonyConfig(file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +120,7 @@ func TestV1_0_4Config(t *testing.T) {
 	if config.P2P.IP != defConf.P2P.IP {
 		t.Errorf("Expect default p2p IP if old config is provided")
 	}
-	if config.Version != "1.0.4" {
+	if migratedFrom != "1.0.4" {
 		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
 	config.Version = defConf.Version // Shortcut for testing, value checked above
@@ -133,7 +135,7 @@ func TestPersistConfig(t *testing.T) {
 	os.MkdirAll(testDir, 0777)
 
 	tests := []struct {
-		config harmonyConfig
+		config harmonyconfig.HarmonyConfig
 	}{
 		{
 			config: makeTestConfig("mainnet", nil),
@@ -142,7 +144,7 @@ func TestPersistConfig(t *testing.T) {
 			config: makeTestConfig("devnet", nil),
 		},
 		{
-			config: makeTestConfig("mainnet", func(cfg *harmonyConfig) {
+			config: makeTestConfig("mainnet", func(cfg *harmonyconfig.HarmonyConfig) {
 				consensus := getDefaultConsensusConfigCopy()
 				cfg.Consensus = &consensus
 
@@ -153,7 +155,7 @@ func TestPersistConfig(t *testing.T) {
 				cfg.Revert = &revert
 
 				webHook := "web hook"
-				cfg.Legacy = &legacyConfig{
+				cfg.Legacy = &harmonyconfig.LegacyConfig{
 					WebHookConfig:         &webHook,
 					TPBroadcastInvalidTxn: &trueBool,
 				}
@@ -169,7 +171,7 @@ func TestPersistConfig(t *testing.T) {
 		if err := writeHarmonyConfigToFile(test.config, file); err != nil {
 			t.Fatal(err)
 		}
-		config, err := loadHarmonyConfig(file)
+		config, _, err := loadHarmonyConfig(file)
 		if err != nil {
 			t.Fatal(err)
 		}

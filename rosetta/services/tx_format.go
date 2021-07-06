@@ -30,7 +30,7 @@ type ContractInfo struct {
 
 // FormatTransaction for staking, cross-shard sender, and plain transactions
 func FormatTransaction(
-	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractInfo *ContractInfo,
+	tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt, contractInfo *ContractInfo, signed bool,
 ) (fmtTx *types.Transaction, rosettaError *types.Error) {
 	var operations []*types.Operation
 	var isCrossShard, isStaking, isContractCreation bool
@@ -40,7 +40,7 @@ func FormatTransaction(
 	case *stakingTypes.StakingTransaction:
 		isStaking = true
 		stakingTx := tx.(*stakingTypes.StakingTransaction)
-		operations, rosettaError = GetNativeOperationsFromStakingTransaction(stakingTx, receipt)
+		operations, rosettaError = GetNativeOperationsFromStakingTransaction(stakingTx, receipt, signed)
 		if rosettaError != nil {
 			return nil, rosettaError
 		}
@@ -146,7 +146,7 @@ func FormatCrossShardReceiverTransaction(
 					Index: 0, // There is no gas expenditure for cross-shard transaction payout
 				},
 				Type:    common.NativeCrossShardTransferOperation,
-				Status:  common.SuccessOperationStatus.Status,
+				Status:  &common.SuccessOperationStatus.Status,
 				Account: receiverAccountID,
 				Amount: &types.Amount{
 					Value:    cxReceipt.Amount.String(),
@@ -165,4 +165,9 @@ func negativeBigValue(num *big.Int) string {
 		value = fmt.Sprintf("-%v", new(big.Int).Abs(num))
 	}
 	return value
+}
+
+func positiveStringValue(amount string) string {
+	bigInt, _ := new(big.Int).SetString(amount, 10)
+	return new(big.Int).Abs(bigInt).String()
 }

@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+	"golang.org/x/time/rate"
 
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -21,23 +26,48 @@ import (
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
+
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockchainService struct {
-	hmy     *hmy.Harmony
-	version Version
+	hmy        *hmy.Harmony
+	version    Version
+	limiter    *rate.Limiter
+	blockCache *lru.Cache
 }
 
+const (
+	DefaultRateLimiterWaitTimeout = 5 * time.Second
+	blockCacheLimit               = 256
+)
+
 // NewPublicBlockchainAPI creates a new API for the RPC interface
-func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version) rpc.API {
-	return rpc.API{
-		Namespace: version.Namespace(),
-		Version:   APIVersion,
-		Service:   &PublicBlockchainService{hmy, version},
-		Public:    true,
+func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	blockCache, _ := lru.New(blockCacheLimit)
+	if limiterEnable {
+		limiter := rate.NewLimiter(rate.Limit(limit), 1)
+		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+		rpcRateLimitCounterVec.With(prometheus.Labels{
+			"rate_limit": strLimit,
+		}).Add(float64(0))
+		return rpc.API{
+			Namespace: version.Namespace(),
+			Version:   APIVersion,
+			Service:   &PublicBlockchainService{hmy, version, limiter, blockCache},
+			Public:    true,
+		}
+	} else {
+		return rpc.API{
+			Namespace: version.Namespace(),
+			Version:   APIVersion,
+			Service:   &PublicBlockchainService{hmy, version, nil, blockCache},
+			Public:    true,
+		}
 	}
+
 }
 
 // ChainId returns the chain id of the chain - required by MetaMask
@@ -122,14 +152,30 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 	}
 }
 
+func (s *PublicBlockchainService) wait(ctx context.Context) error {
+	if s.limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !s.limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(s.limiter.Limit()))
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"rate_limit": strLimit,
+			}).Inc()
+		}
+
+		return s.limiter.Wait(deadlineCtx)
+	}
+	return nil
+}
+
 // GetBlockByNumber returns the requested block. When blockNum is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 // When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
+
 	// Process arguments based on version
-	blockNum := blockNumber.EthBlockNumber()
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
 	if !ok {
@@ -139,6 +185,23 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		}
 	}
 	blockArgs.InclTx = true
+
+	blockNum := blockNumber.EthBlockNumber()
+	if blockNum != rpc.PendingBlockNumber {
+		realBlockNum := uint64(blockNum)
+		if blockNum == rpc.LatestBlockNumber {
+			realBlockNum = s.hmy.CurrentBlock().NumberU64()
+		}
+		cacheKey := combineCacheKey(realBlockNum, s.version, blockArgs)
+		if block, ok := s.blockCache.Get(cacheKey); ok {
+			return block.(StructuredResponse), nil
+		}
+	}
+
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
 	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
@@ -186,6 +249,10 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			}
 		}
 
+		if blockNum != rpc.PendingBlockNumber {
+			cacheKey := combineCacheKey(blk.NumberU64(), s.version, blockArgs)
+			s.blockCache.Add(cacheKey, response)
+		}
 		return response, err
 	}
 
@@ -198,6 +265,12 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 func (s *PublicBlockchainService) GetBlockByHash(
 	ctx context.Context, blockHash common.Hash, opts interface{},
 ) (response StructuredResponse, err error) {
+
+	err = s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -260,6 +333,12 @@ func (s *PublicBlockchainService) GetBlocks(
 	ctx context.Context, blockNumberStart BlockNumber,
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
 
@@ -469,6 +548,11 @@ func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error)
 func (s *PublicBlockchainService) GetShardingStructure(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Get header and number of shards.
 	epoch := s.hmy.CurrentBlock().Epoch()
 	numShard := shard.Schedule.InstanceForEpoch(epoch).NumShards()
@@ -487,6 +571,12 @@ func (s *PublicBlockchainService) GetShardID(ctx context.Context) (int, error) {
 func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (interface{}, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -512,6 +602,12 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 
 // LatestHeader returns the latest header information
 func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
@@ -535,6 +631,12 @@ func (s *PublicBlockchainService) GetLatestChainHeaders(
 func (s *PublicBlockchainService) GetLastCrossLinks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -561,6 +663,11 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 func (s *PublicBlockchainService) GetHeaderByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -583,6 +690,11 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -601,6 +713,11 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 func (s *PublicBlockchainService) GetSuperCommittees(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -619,6 +736,12 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// Fetch bad blocks and format
 	badBlocks := []StructuredResponse{}
 	for _, blk := range s.hmy.GetCurrentBadBlocks() {
@@ -651,6 +774,12 @@ func (s *PublicBlockchainService) GetCirculatingSupply(
 func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+
+	err := s.wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -688,13 +817,13 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	inSync, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	return inSync, nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	inSync, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
 	return inSync, nil
 }
 
@@ -707,4 +836,14 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 		return false
 	}
 	return uint64(blockNum) > hmy.CurrentBlock().NumberU64()
+}
+
+func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
+	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
+}
+
+func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
+	// no need format blockArgs.Signers[] as a part of cache key
+	// because it's not input from rpc caller, it's caculate with blockArgs.WithSigners
+	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.InclTx) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
 }

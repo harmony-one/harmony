@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/harmony-one/harmony/api/service/legacysync"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/spf13/cobra"
@@ -29,15 +30,23 @@ var (
 		legacyDataDirFlag,
 	}
 
-	networkFlags = []cli.Flag{
-		networkTypeFlag,
-		bootNodeFlag,
+	dnsSyncFlags = []cli.Flag{
 		dnsZoneFlag,
 		dnsPortFlag,
+		dnsServerPortFlag,
+		dnsClientFlag,
+		dnsServerFlag,
 
+		syncLegacyClientFlag,
+		syncLegacyServerFlag,
 		legacyDNSZoneFlag,
 		legacyDNSPortFlag,
 		legacyDNSFlag,
+	}
+
+	networkFlags = []cli.Flag{
+		networkTypeFlag,
+		bootNodeFlag,
 		legacyNetworkTypeFlag,
 	}
 
@@ -66,6 +75,8 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcRateLimiterEnabledFlag,
+		rpcRateLimitFlag,
 	}
 
 	blsFlags = append(newBLSFlags, legacyBLSFlags...)
@@ -124,6 +135,7 @@ var (
 		logContextIPFlag,
 		logContextPortFlag,
 		logVerbosityFlag,
+		logVerbosePrintsFlag,
 		legacyVerbosityFlag,
 
 		legacyLogFolderFlag,
@@ -180,11 +192,8 @@ var (
 	}
 
 	syncFlags = []cli.Flag{
+		syncStreamEnabledFlag,
 		syncDownloaderFlag,
-		syncLegacyClientFlag,
-		syncLegacyServerFlag,
-		syncLegacyServerPortFlag,
-
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -226,6 +235,11 @@ var (
 		Name:     "run.offline",
 		Usage:    "run node in offline mode",
 		DefValue: defaultConfig.General.IsOffline,
+	}
+	isBackupFlag = cli.BoolFlag{
+		Name:     "run.backup",
+		Usage:    "run node in backup mode",
+		DefValue: defaultConfig.General.IsBackup,
 	}
 	dataDirFlag = cli.StringFlag{
 		Name:     "datadir",
@@ -271,6 +285,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, configFlag)
 	flags = append(flags, generalFlags...)
 	flags = append(flags, networkFlags...)
+	flags = append(flags, dnsSyncFlags...)
 	flags = append(flags, p2pFlags...)
 	flags = append(flags, httpFlags...)
 	flags = append(flags, wsFlags...)
@@ -290,7 +305,7 @@ func getRootFlags() []cli.Flag {
 	return flags
 }
 
-func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, nodeTypeFlag) {
 		config.General.NodeType = cli.GetStringFlagValue(cmd, nodeTypeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyNodeTypeFlag) {
@@ -332,6 +347,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyConfig) {
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
 	}
+
+	if cli.IsFlagChanged(cmd, isBackupFlag) {
+		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
+	}
 }
 
 // network flags
@@ -346,6 +365,32 @@ var (
 		Name:  "bootnodes",
 		Usage: "a list of bootnode multiaddress (delimited by ,)",
 	}
+	legacyDNSZoneFlag = cli.StringFlag{
+		Name:       "dns_zone",
+		Usage:      "use peers from the zone for state syncing",
+		Deprecated: "use --dns.zone",
+	}
+	legacyNetworkTypeFlag = cli.StringFlag{
+		Name:       "network_type",
+		Usage:      "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet)",
+		Deprecated: "use --network",
+	}
+)
+
+// DNSSync flags
+var (
+	legacyDNSPortFlag = cli.IntFlag{
+		Name:       "dns_port",
+		Usage:      "port of dns node",
+		Deprecated: "use --dns.port",
+	}
+	legacyDNSFlag = cli.BoolFlag{
+		Name:       "dns",
+		DefValue:   true,
+		Hidden:     true,
+		Usage:      "use dns for syncing",
+		Deprecated: "only set to false to use self discovered peers for syncing",
+	}
 	dnsZoneFlag = cli.StringFlag{
 		Name:  "dns.zone",
 		Usage: "use customized peers from the zone for state syncing",
@@ -353,28 +398,38 @@ var (
 	dnsPortFlag = cli.IntFlag{
 		Name:     "dns.port",
 		DefValue: nodeconfig.DefaultDNSPort,
-		Usage:    "data port of the remote DNS service provider",
+		Usage:    "dns sync remote server port",
 	}
-	legacyDNSZoneFlag = cli.StringFlag{
-		Name:       "dns_zone",
-		Usage:      "use peers from the zone for state syncing",
-		Deprecated: "use --dns.zone",
+	dnsServerPortFlag = cli.IntFlag{
+		Name:     "dns.server-port",
+		DefValue: nodeconfig.DefaultDNSPort,
+		Usage:    "dns sync local server port",
 	}
-	legacyDNSPortFlag = cli.IntFlag{
-		Name:       "dns_port",
-		Usage:      "data port of the remote DNS service provider",
-		Deprecated: "use --dns.zone",
+	syncLegacyClientFlag = cli.BoolFlag{
+		Name:       "sync.legacy.client",
+		Usage:      "Enable the legacy centralized sync service for block synchronization",
+		Hidden:     true,
+		DefValue:   false,
+		Deprecated: "use dns.client instead",
 	}
-	legacyDNSFlag = cli.BoolFlag{
-		Name:       "dns",
+	dnsClientFlag = cli.BoolFlag{
+		Name:     "dns.client",
+		Usage:    "Enable the legacy centralized sync service for block synchronization",
+		Hidden:   true,
+		DefValue: false,
+	}
+	syncLegacyServerFlag = cli.BoolFlag{
+		Name:       "sync.legacy.server",
+		Usage:      "Enable the gRPC sync server for backward compatibility",
+		Hidden:     true,
 		DefValue:   true,
-		Usage:      "use dns for syncing",
-		Deprecated: "only set to false to use self discovered peers for syncing",
+		Deprecated: "use dns.server instead",
 	}
-	legacyNetworkTypeFlag = cli.StringFlag{
-		Name:       "network_type",
-		Usage:      "network to join (mainnet, testnet, pangaea, localnet, partner, stressnet, devnet)",
-		Deprecated: "use --network",
+	dnsServerFlag = cli.BoolFlag{
+		Name:     "dns.server",
+		Usage:    "Enable the gRPC sync server for backward compatibility",
+		Hidden:   true,
+		DefValue: true,
 	}
 )
 
@@ -391,30 +446,45 @@ func getNetworkType(cmd *cobra.Command) nodeconfig.NetworkType {
 	return parseNetworkType(raw)
 }
 
-func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyConfig) {
-	if cli.IsFlagChanged(cmd, bootNodeFlag) {
-		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
-	}
-
+func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, dnsZoneFlag) {
-		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, dnsZoneFlag)
+		cfg.DNSSync.Zone = cli.GetStringFlagValue(cmd, dnsZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSZoneFlag) {
-		cfg.Network.DNSZone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
+		cfg.DNSSync.Zone = cli.GetStringFlagValue(cmd, legacyDNSZoneFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
 		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
 		if !val {
-			cfg.Network.LegacySyncing = true
+			cfg.DNSSync.LegacySyncing = true
 		}
 	}
 
 	if cli.IsFlagChanged(cmd, dnsPortFlag) {
-		cfg.Network.DNSSyncPort = cli.GetIntFlagValue(cmd, dnsPortFlag)
+		cfg.DNSSync.Port = cli.GetIntFlagValue(cmd, dnsPortFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDNSPortFlag) {
-		// Still using node.sh to launch the node. Flag --dns_port should have
-		// port arithmetic of actual port being val - 3000.
-		rawPort := cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
-		mutatedPort, _ := strconv.Atoi(legacysync.GetSyncingPort(strconv.Itoa(rawPort)))
-		cfg.Network.DNSSyncPort = mutatedPort
+		cfg.DNSSync.Port = cli.GetIntFlagValue(cmd, legacyDNSPortFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {
+		cfg.DNSSync.Server = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
+	} else if cli.IsFlagChanged(cmd, dnsServerFlag) {
+		cfg.DNSSync.Server = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, syncLegacyClientFlag) {
+		cfg.DNSSync.Client = cli.GetBoolFlagValue(cmd, syncLegacyClientFlag)
+	} else if cli.IsFlagChanged(cmd, dnsClientFlag) {
+		cfg.DNSSync.Client = cli.GetBoolFlagValue(cmd, dnsClientFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, dnsServerPortFlag) {
+		cfg.DNSSync.ServerPort = cli.GetIntFlagValue(cmd, dnsServerPortFlag)
+	}
+
+}
+
+func applyNetworkFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, bootNodeFlag) {
+		cfg.Network.BootNodes = cli.GetStringSliceFlagValue(cmd, bootNodeFlag)
 	}
 }
 
@@ -449,7 +519,7 @@ var (
 	}
 )
 
-func applyP2PFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pPortFlag) {
 		config.P2P.Port = cli.GetIntFlagValue(cmd, p2pPortFlag)
 	}
@@ -501,7 +571,7 @@ var (
 	}
 )
 
-func applyHTTPFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyHTTPFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var isRPCSpecified, isRosettaSpecified bool
 
 	if cli.IsFlagChanged(cmd, httpIPFlag) {
@@ -552,7 +622,7 @@ var (
 	}
 )
 
-func applyWSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, wsEnabledFlag) {
 		config.WS.Enabled = cli.GetBoolFlagValue(cmd, wsEnabledFlag)
 	}
@@ -572,12 +642,31 @@ var (
 		DefValue: defaultConfig.RPCOpt.DebugEnabled,
 		Hidden:   true,
 	}
+
+	rpcRateLimiterEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.ratelimiter",
+		Usage:    "enable rate limiter for RPCs",
+		DefValue: defaultConfig.RPCOpt.RateLimterEnabled,
+	}
+
+	rpcRateLimitFlag = cli.IntFlag{
+		Name:     "rpc.ratelimit",
+		Usage:    "the number of requests per second for RPCs",
+		DefValue: defaultConfig.RPCOpt.RequestsPerSecond,
+	}
 )
 
-func applyRPCOptFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
 	}
+	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
+		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcRateLimitFlag) {
+		config.RPCOpt.RequestsPerSecond = cli.GetIntFlagValue(cmd, rpcRateLimitFlag)
+	}
+
 }
 
 // bls flags
@@ -672,7 +761,7 @@ var (
 	}
 )
 
-func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyBLSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, blsDirFlag) {
 		config.BLSKeys.KeyDir = cli.GetStringFlagValue(cmd, blsDirFlag)
 	} else if cli.IsFlagChanged(cmd, legacyBLSFolderFlag) {
@@ -700,7 +789,7 @@ func applyBLSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyBLSPassFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var passFileSpecified bool
 
 	if cli.IsFlagChanged(cmd, passEnabledFlag) {
@@ -720,7 +809,7 @@ func applyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyKMSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var fileSpecified bool
 
 	if cli.IsFlagChanged(cmd, kmsEnabledFlag) {
@@ -737,7 +826,7 @@ func applyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyBLSPassFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyBLSPassFlag)
 		legacyApplyBLSPassVal(val, config)
@@ -747,14 +836,14 @@ func applyLegacyBLSPassFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 }
 
-func applyLegacyKMSFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyKMSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyKMSConfigSourceFlag) {
 		val := cli.GetStringFlagValue(cmd, legacyKMSConfigSourceFlag)
 		legacyApplyKMSSourceVal(val, config)
 	}
 }
 
-func legacyApplyBLSPassVal(src string, config *harmonyConfig) {
+func legacyApplyBLSPassVal(src string, config *harmonyconfig.HarmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -775,7 +864,7 @@ func legacyApplyBLSPassVal(src string, config *harmonyConfig) {
 	}
 }
 
-func legacyApplyKMSSourceVal(src string, config *harmonyConfig) {
+func legacyApplyKMSSourceVal(src string, config *harmonyconfig.HarmonyConfig) {
 	methodArgs := strings.SplitN(src, ":", 2)
 	method := methodArgs[0]
 
@@ -826,7 +915,7 @@ var (
 	}
 )
 
-func applyConsensusFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if config.Consensus == nil && cli.HasFlagsChanged(cmd, consensusValidFlags) {
 		cfg := getDefaultConsensusConfigCopy()
 		config.Consensus = &cfg
@@ -858,7 +947,7 @@ var (
 	}
 )
 
-func applyTxPoolFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
@@ -880,7 +969,7 @@ var (
 	}
 )
 
-func applyPprofFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyPprofFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
@@ -916,6 +1005,11 @@ var (
 		Usage:     "logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail",
 		DefValue:  defaultConfig.Log.Verbosity,
 	}
+	logVerbosePrintsFlag = cli.StringSliceFlag{
+		Name:     "log.verbose-prints",
+		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
+		DefValue: []string{"config"},
+	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{
 		Name:     "log.ctx.ip",
@@ -949,7 +1043,7 @@ var (
 	}
 )
 
-func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, logFolderFlag) {
 		config.Log.Folder = cli.GetStringFlagValue(cmd, logFolderFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogFolderFlag) {
@@ -970,6 +1064,11 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyConfig) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, logVerbosityFlag)
 	} else if cli.IsFlagChanged(cmd, legacyVerbosityFlag) {
 		config.Log.Verbosity = cli.GetIntFlagValue(cmd, legacyVerbosityFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logVerbosePrintsFlag) {
+		verbosePrintsFlagSlice := cli.GetStringSliceFlagValue(cmd, logVerbosePrintsFlag)
+		config.Log.VerbosePrints = harmonyconfig.FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice)
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {
@@ -994,7 +1093,7 @@ var (
 	}
 )
 
-func applySysFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applySysFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, sysFlags) || config.Sys == nil {
 		cfg := getDefaultSysConfigCopy()
 		config.Sys = &cfg
@@ -1044,7 +1143,7 @@ var (
 	}
 )
 
-func applyDevnetFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyDevnetFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, devnetFlags) && config.Devnet == nil {
 		cfg := getDefaultDevnetConfigCopy()
 		config.Devnet = &cfg
@@ -1119,7 +1218,7 @@ var (
 	}
 )
 
-func applyRevertFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.HasFlagsChanged(cmd, revertFlags) {
 		cfg := getDefaultRevertConfigCopy()
 		config.Revert = &cfg
@@ -1184,7 +1283,7 @@ var (
 )
 
 // Note: this function need to be called before parse other flags
-func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, legacyPortFlag) {
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
@@ -1194,8 +1293,8 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 
 		legPortStr := strconv.Itoa(legacyPort)
 		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))
-		config.Network.DNSSyncPort = syncPort
-		config.Sync.LegacyServerPort = syncPort
+		config.DNSSync.Port = syncPort
+		config.DNSSync.ServerPort = syncPort
 	}
 
 	if cli.IsFlagChanged(cmd, legacyIPFlag) {
@@ -1219,7 +1318,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 		logPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.Log.FileName = fmt.Sprintf("validator-%v-%v.log", logIP, logPort)
 
-		logCtx := &logContext{
+		logCtx := &harmonyconfig.LogContext{
 			IP:   logIP,
 			Port: logPort,
 		}
@@ -1227,7 +1326,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyConfig) {
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{legacyWebHookConfigFlag, legacyTPBroadcastInvalidTxFlag}) {
-		config.Legacy = &legacyConfig{}
+		config.Legacy = &harmonyconfig.LegacyConfig{}
 		if cli.IsFlagChanged(cmd, legacyWebHookConfigFlag) {
 			val := cli.GetStringFlagValue(cmd, legacyWebHookConfigFlag)
 			config.Legacy.WebHookConfig = &val
@@ -1268,7 +1367,7 @@ var (
 	}
 )
 
-func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applyPrometheusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if config.Prometheus == nil {
 		cfg := getDefaultPrometheusConfigCopy()
 		config.Prometheus = &cfg
@@ -1299,30 +1398,17 @@ func applyPrometheusFlags(cmd *cobra.Command, config *harmonyConfig) {
 }
 
 var (
+	syncStreamEnabledFlag = cli.BoolFlag{
+		Name:     "sync",
+		Usage:    "Enable the stream sync protocol (experimental feature)",
+		DefValue: false,
+	}
 	// TODO: Deprecate this flag, and always set to true after stream sync is fully up.
 	syncDownloaderFlag = cli.BoolFlag{
 		Name:     "sync.downloader",
 		Usage:    "Enable the downloader module to sync through stream sync protocol",
 		Hidden:   true,
-		DefValue: defaultConfig.Sync.Downloader,
-	}
-	syncLegacyServerFlag = cli.BoolFlag{
-		Name:     "sync.legacy.server",
-		Usage:    "Enable the gRPC sync server for backward compatibility",
-		Hidden:   true,
-		DefValue: defaultConfig.Sync.LegacyServer,
-	}
-	syncLegacyServerPortFlag = cli.IntFlag{
-		Name:     "sync.legacy.server.port",
-		Usage:    "port used for gRPC sync server",
-		Hidden:   true,
-		DefValue: defaultConfig.Sync.LegacyServerPort,
-	}
-	syncLegacyClientFlag = cli.BoolFlag{
-		Name:     "sync.legacy.client",
-		Usage:    "Enable the legacy centralized sync service for block synchronization",
-		Hidden:   true,
-		DefValue: defaultConfig.Sync.LegacyClient,
+		DefValue: false,
 	}
 	syncConcurrencyFlag = cli.IntFlag{
 		Name:   "sync.concurrency",
@@ -1362,21 +1448,13 @@ var (
 )
 
 // applySyncFlags apply the sync flags.
-func applySyncFlags(cmd *cobra.Command, config *harmonyConfig) {
+func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, syncStreamEnabledFlag) {
+		config.Sync.Enabled = cli.GetBoolFlagValue(cmd, syncStreamEnabledFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, syncLegacyServerFlag) {
-		config.Sync.LegacyServer = cli.GetBoolFlagValue(cmd, syncLegacyServerFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, syncLegacyServerPortFlag) {
-		config.Sync.LegacyServerPort = cli.GetIntFlagValue(cmd, syncLegacyServerPortFlag)
-	}
-
-	if cli.IsFlagChanged(cmd, syncLegacyClientFlag) {
-		config.Sync.LegacyClient = cli.GetBoolFlagValue(cmd, syncLegacyClientFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {

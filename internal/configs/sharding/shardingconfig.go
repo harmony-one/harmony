@@ -30,10 +30,6 @@ type Schedule interface {
 	// VDFDifficulty returns number of iterations for VDF calculation
 	VdfDifficulty() int
 
-	// TODO: remove it after randomness feature turned on mainnet
-	//RandomnessStartingEpoch returns starting epoch of randonness generation
-	RandomnessStartingEpoch() uint64
-
 	// GetNetworkID() return networkID type.
 	GetNetworkID() NetworkID
 

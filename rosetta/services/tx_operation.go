@@ -74,7 +74,7 @@ func GetNativeOperationsFromTransaction(
 // GetNativeOperationsFromStakingTransaction for all staking directives
 // Note that only native token operations can come from staking transactions.
 func GetNativeOperationsFromStakingTransaction(
-	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt,
+	tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt, signed bool,
 ) ([]*types.Operation, *types.Error) {
 	senderAddress, err := tx.SenderAddress()
 	if err != nil {
@@ -85,12 +85,16 @@ func GetNativeOperationsFromStakingTransaction(
 		return nil, rosettaError
 	}
 
-	// All operations excepts for cross-shard tx payout expend gas
-	gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-	gasOperations := newNativeOperationsWithGas(gasExpended, accountID)
+	var operations []*types.Operation
+
+	if signed {
+		// All operations excepts for cross-shard tx payout expend gas
+		gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
+		operations = newNativeOperationsWithGas(gasExpended, accountID)
+	}
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
-	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0)
+	rpcStakingTx, err := rpcV2.NewStakingTransaction(tx, ethcommon.Hash{}, 0, 0, 0, signed)
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
@@ -125,26 +129,42 @@ func GetNativeOperationsFromStakingTransaction(
 		}
 	}
 
-	operations := append(gasOperations, &types.Operation{
-		OperationIdentifier: &types.OperationIdentifier{
-			Index: gasOperations[0].OperationIdentifier.Index + 1,
-		},
-		Type:     tx.StakingType().String(),
-		Status:   GetTransactionStatus(tx, receipt),
-		Account:  accountID,
-		Amount:   amount,
-		Metadata: metadata,
-	})
-
-	// expose delegated balance
-	if tx.StakingType() == stakingTypes.DirectiveDelegate {
-		op2 := getDelegateOperationForSubAccount(tx, operations[1])
-		return append(operations, op2), nil
+	if len(operations) > 0 {
+		operations = append(operations, &types.Operation{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: operations[0].OperationIdentifier.Index + 1,
+			},
+			Type:     tx.StakingType().String(),
+			Status:   GetTransactionStatus(tx, receipt),
+			Account:  accountID,
+			Amount:   amount,
+			Metadata: metadata,
+		})
+	} else {
+		operations = []*types.Operation{{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: 0,
+			},
+			Type:     tx.StakingType().String(),
+			Status:   GetTransactionStatus(tx, receipt),
+			Account:  accountID,
+			Amount:   amount,
+			Metadata: metadata,
+		}}
 	}
 
-	if tx.StakingType() == stakingTypes.DirectiveUndelegate {
-		op2 := getUndelegateOperationForSubAccount(tx, operations[1], receipt)
-		return append(operations, op2), nil
+	if signed {
+
+		// expose delegated balance
+		if tx.StakingType() == stakingTypes.DirectiveDelegate {
+			op2 := getDelegateOperationForSubAccount(tx, operations[1])
+			return append(operations, op2), nil
+		}
+
+		if tx.StakingType() == stakingTypes.DirectiveUndelegate {
+			op2 := getUndelegateOperationForSubAccount(tx, operations[1], receipt)
+			return append(operations, op2), nil
+		}
 	}
 
 	return operations, nil
@@ -260,7 +280,7 @@ func GetSideEffectOperationsFromGenesisSpec(
 }
 
 // GetTransactionStatus for any valid harmony transaction given its receipt.
-func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) string {
+func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) *string {
 	if _, ok := tx.(*hmytypes.Transaction); ok {
 		status := common.SuccessOperationStatus.Status
 		if receipt.Status == hmytypes.ReceiptStatusFailed {
@@ -270,12 +290,12 @@ func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt
 				status = common.ContractFailureOperationStatus.Status
 			}
 		}
-		return status
+		return &status
 	} else if _, ok := tx.(*stakingTypes.StakingTransaction); ok {
-		return common.SuccessOperationStatus.Status
+		return &common.SuccessOperationStatus.Status
 	}
 	// Type of tx unknown, so default to failure
-	return common.FailureOperationStatus.Status
+	return &common.FailureOperationStatus.Status
 }
 
 // getBasicTransferNativeOperations extracts & formats the basic native operations for non-staking transaction.
@@ -301,7 +321,7 @@ func getBasicTransferNativeOperations(
 		return nil, rosettaError
 	}
 
-	return newSameShardTransferNativeOperations(from, to, tx.Value(), status, startingOperationIndex), nil
+	return newSameShardTransferNativeOperations(from, to, tx.Value(), *status, startingOperationIndex), nil
 }
 
 // getContractTransferNativeOperations extracts & formats the native operations for any
@@ -321,7 +341,7 @@ func getContractTransferNativeOperations(
 	status := GetTransactionStatus(tx, receipt)
 	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
 	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
-		contractInfo.ExecutionResult, status, &startingIndex,
+		contractInfo.ExecutionResult, *status, &startingIndex,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -348,7 +368,7 @@ func getContractCreationNativeOperations(
 	status := GetTransactionStatus(tx, receipt)
 	startingIndex := basicOps[len(basicOps)-1].OperationIdentifier.Index + 1
 	internalTxOps, rosettaError := getContractInternalTransferNativeOperations(
-		contractInfo.ExecutionResult, status, &startingIndex,
+		contractInfo.ExecutionResult, *status, &startingIndex,
 	)
 	if rosettaError != nil {
 		return nil, rosettaError
@@ -446,7 +466,7 @@ func getCrossShardSenderTransferNativeOperations(
 				Index: opIndex,
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -479,7 +499,7 @@ func getSideEffectOperationsFromUndelegationPayoutsMap(
 				Index: opIndex,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accID,
 		}
 
@@ -527,7 +547,7 @@ func getOperationAndTotalAmountFromUndelegationMap(
 				relatedOpIdentifier,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: subAccId,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(amount),
@@ -562,7 +582,7 @@ func getSideEffectOperationsFromValueMap(
 				Index: opIndex,
 			},
 			Type:    opType,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accID,
 			Amount: &types.Amount{
 				Value:    value.String(),
@@ -635,11 +655,6 @@ func getAmountFromCollectRewards(
 			break
 		}
 	}
-	if amount == nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": fmt.Sprintf("collect rewards amount not found for %v", senderAddress.String()),
-		})
-	}
 	return amount, nil
 }
 
@@ -679,7 +694,7 @@ func newSameShardTransferNativeOperations(
 		{
 			OperationIdentifier: subOperationID,
 			Type:                common.NativeTransferOperation,
-			Status:              status,
+			Status:              &status,
 			Account:             from,
 			Amount:              subAmount,
 		},
@@ -687,7 +702,7 @@ func newSameShardTransferNativeOperations(
 			OperationIdentifier: addOperationID,
 			RelatedOperations:   addRelatedID,
 			Type:                common.NativeTransferOperation,
-			Status:              status,
+			Status:              &status,
 			Account:             to,
 			Amount:              addAmount,
 		},
@@ -705,7 +720,7 @@ func newNativeOperationsWithGas(
 				Index: 0, // gas operation is always first
 			},
 			Type:    common.ExpendGasOperation,
-			Status:  common.SuccessOperationStatus.Status,
+			Status:  &common.SuccessOperationStatus.Status,
 			Account: accountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(gasFeeInATTO),

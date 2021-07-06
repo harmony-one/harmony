@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.14 AS build
+FROM golang:1.16 AS build
 
 RUN apt update -y && \
     apt install libgmp-dev libssl-dev git -y && \
@@ -17,6 +17,10 @@ RUN git clone https://github.com/harmony-one/harmony.git && \
     git clone https://github.com/harmony-one/mcl.git
 
 WORKDIR $HMY_PATH/harmony
+
+RUN go mod download
+
+RUN go mod tidy
 
 RUN make linux_static && \
     cp ./bin/harmony /root/harmony && \

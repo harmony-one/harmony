@@ -82,7 +82,7 @@ func (s *NetworkAPI) NetworkStatus(
 	if rosettaError != nil {
 		return nil, rosettaError
 	}
-	isSyncing, targetHeight := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	isSyncing, targetHeight, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	syncStatus := common.SyncingFinish
 	if targetHeight == 0 {
 		syncStatus = common.SyncingUnknown
@@ -117,8 +117,9 @@ func (s *NetworkAPI) NetworkStatus(
 	}
 
 	targetInt := int64(targetHeight)
+	currentIndex := currentHeader.Number().Int64()
 	ss := &types.SyncStatus{
-		CurrentIndex: currentHeader.Number().Int64(),
+		CurrentIndex: &currentIndex,
 		TargetIndex:  &targetInt,
 		Stage:        &stage,
 	}

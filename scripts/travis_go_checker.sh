@@ -80,6 +80,8 @@ else
 fi
 
 echo "Running go test..."
+# Fix https://github.com/golang/go/issues/44129#issuecomment-788351567
+go get -t ./...
 if go test -v -count=1 ./...
 then
 	echo "go test succeeded."

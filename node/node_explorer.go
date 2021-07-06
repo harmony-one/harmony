@@ -2,12 +2,12 @@ package node
 
 import (
 	"context"
-	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
+	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/signature"
@@ -135,9 +135,13 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 			utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
 				Msg("[Explorer] Populating explorer data from state synced blocks")
 			go func() {
+				exp, err := node.getExplorerService()
+				if err != nil {
+					// shall be unreachable
+					utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+				}
 				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(
-						node.Blockchain().GetBlockByNumber(uint64(blockHeight)), uint64(blockHeight))
+					exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
 				}
 			}()
 		})
@@ -153,7 +157,12 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 	}
 	// Dump new block into level db.
 	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).Dump(block, block.NumberU64())
+	exp, err := node.getExplorerService()
+	if err != nil {
+		// shall be unreachable
+		utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+	}
+	exp.DumpNewBlock(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {
@@ -164,87 +173,53 @@ func (node *Node) commitBlockForExplorer(block *types.Block) {
 
 // GetTransactionsHistory returns list of transactions hashes of address.
 func (node *Node) GetTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	exp, err := node.getExplorerService()
 	if err != nil {
-		utils.Logger().Debug().Err(err).
-			Msgf("[Explorer] Error retrieving transaction history for address %s", address)
-		return make([]common.Hash, 0), nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return nil, err
 	}
+	allTxs, tts, err := exp.GetNormalTxHashesByAccount(address)
+	if err != nil {
+		return nil, err
+	}
+	txs := getTargetTxHashes(allTxs, tts, txType)
+
 	if order == "DESC" {
-		sort.Slice(addressData.TXs[:], func(i, j int) bool {
-			return addressData.TXs[i].Timestamp > addressData.TXs[j].Timestamp
-		})
-	} else {
-		sort.Slice(addressData.TXs[:], func(i, j int) bool {
-			return addressData.TXs[i].Timestamp < addressData.TXs[j].Timestamp
-		})
+		reverseTxs(txs)
 	}
-	hashes := make([]common.Hash, 0)
-	for _, tx := range addressData.TXs {
-		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.Hash)
-			hashes = append(hashes, hash)
-		}
-	}
-	return hashes, nil
+	return txs, nil
 }
 
 // GetStakingTransactionsHistory returns list of staking transactions hashes of address.
 func (node *Node) GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	exp, err := node.getExplorerService()
 	if err != nil {
-		utils.Logger().Debug().Err(err).
-			Msgf("[Explorer] Staking transaction history for address %s not found", address)
-		return make([]common.Hash, 0), nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return nil, err
 	}
+	allTxs, tts, err := exp.GetStakingTxHashesByAccount(address)
+	if err != nil {
+		return nil, err
+	}
+	txs := getTargetTxHashes(allTxs, tts, txType)
+
 	if order == "DESC" {
-		sort.Slice(addressData.StakingTXs[:], func(i, j int) bool {
-			return addressData.StakingTXs[i].Timestamp > addressData.StakingTXs[j].Timestamp
-		})
-	} else {
-		sort.Slice(addressData.StakingTXs[:], func(i, j int) bool {
-			return addressData.StakingTXs[i].Timestamp < addressData.StakingTXs[j].Timestamp
-		})
+		reverseTxs(txs)
 	}
-	hashes := make([]common.Hash, 0)
-	for _, tx := range addressData.StakingTXs {
-		if txType == "" || txType == "ALL" || txType == tx.Type {
-			hash := common.HexToHash(tx.Hash)
-			hashes = append(hashes, hash)
-		}
-	}
-	return hashes, nil
+	return txs, nil
 }
 
 // GetTransactionsCount returns the number of regular transactions hashes of address for input type.
 func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	exp, err := node.getExplorerService()
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return 0, err
 	}
-
+	_, tts, err := exp.GetNormalTxHashesByAccount(address)
+	if err != nil {
+		return 0, err
+	}
 	count := uint64(0)
-	for _, tx := range addressData.TXs {
-		if txType == "" || txType == "ALL" || txType == tx.Type {
+	for _, tt := range tts {
+		if isTargetTxType(tt, txType) {
 			count++
 		}
 	}
@@ -253,23 +228,48 @@ func (node *Node) GetTransactionsCount(address, txType string) (uint64, error) {
 
 // GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
 func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, error) {
-	addressData := &explorer.Address{}
-	key := explorer.GetAddressKey(address)
-	bytes, err := explorer.GetStorageInstance(node.SelfPeer.IP, node.SelfPeer.Port).GetDB().Get([]byte(key), nil)
+	exp, err := node.getExplorerService()
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("addr", address).Msg("[Explorer] Address not found")
-		return 0, nil
-	}
-	if err = rlp.DecodeBytes(bytes, &addressData); err != nil {
-		utils.Logger().Error().Err(err).Msg("[Explorer] Cannot convert address data from DB")
 		return 0, err
 	}
-
+	_, tts, err := exp.GetStakingTxHashesByAccount(address)
+	if err != nil {
+		return 0, err
+	}
 	count := uint64(0)
-	for _, tx := range addressData.StakingTXs {
-		if txType == "" || txType == "ALL" || txType == tx.Type {
+	for _, tt := range tts {
+		if isTargetTxType(tt, txType) {
 			count++
 		}
 	}
 	return count, nil
+}
+
+func (node *Node) getExplorerService() (*explorer.Service, error) {
+	rawService := node.serviceManager.GetService(service.SupportExplorer)
+	if rawService == nil {
+		return nil, errors.New("explorer service not started")
+	}
+	return rawService.(*explorer.Service), nil
+}
+
+func isTargetTxType(tt explorer.TxType, target string) bool {
+	return target == "" || target == "ALL" || target == tt.String()
+}
+
+func getTargetTxHashes(txs []common.Hash, tts []explorer.TxType, target string) []common.Hash {
+	var res []common.Hash
+	for i, tx := range txs {
+		if isTargetTxType(tts[i], target) {
+			res = append(res, tx)
+		}
+	}
+	return res
+}
+
+func reverseTxs(txs []common.Hash) {
+	for i := 0; i < len(txs)/2; i++ {
+		j := len(txs) - i - 1
+		txs[i], txs[j] = txs[j], txs[i]
+	}
 }
