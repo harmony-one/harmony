@@ -78,7 +78,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
-	indexCache, _ := lru.New(canonicalCacheLimit)
+	canonicalHash, _ := lru.New(canonicalCacheLimit)
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -92,7 +92,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		headerCache:    headerCache,
 		tdCache:        tdCache,
 		numberCache:    numberCache,
-		canonicalCache: indexCache,
+		canonicalCache: canonicalHash,
 		procInterrupt:  procInterrupt,
 		rand:           mrand.New(mrand.NewSource(seed.Int64())),
 		engine:         engine,
