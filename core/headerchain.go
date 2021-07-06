@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	headerCacheLimit    = 2048
+	headerCacheLimit    = 2048 // with 2s/block, 2048 headers is roughly block produced in 1 hour.
 	tdCacheLimit        = 1024
 	numberCacheLimit    = 4096
 	canonicalCacheLimit = 4096
