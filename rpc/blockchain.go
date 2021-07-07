@@ -174,6 +174,8 @@ func (s *PublicBlockchainService) wait(ctx context.Context) error {
 func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
+	timer := DoMetricRPCRequest(GetBlockByNumber)
+	defer timer.ObserveDuration()
 
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
@@ -181,6 +183,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	if !ok {
 		blockArgs, err = s.getBlockOptions(opts)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 			return nil, err
 		}
 	}
@@ -200,6 +203,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 
 	err = s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, err
 	}
 
@@ -208,6 +212,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
 	// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
 	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, ErrRequestedBlockTooHigh
 	}
 
@@ -216,6 +221,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		if blockArgs.WithSigners {
 			blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
 			if err != nil {
+				DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 				return nil, err
 			}
 		}
@@ -234,6 +240,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			return nil, ErrUnknownRPCVersion
 		}
 		if err != nil {
+			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 			return nil, err
 		}
 
@@ -255,7 +262,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		}
 		return response, err
 	}
-
+	DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 	return nil, err
 }
 
@@ -265,9 +272,12 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 func (s *PublicBlockchainService) GetBlockByHash(
 	ctx context.Context, blockHash common.Hash, opts interface{},
 ) (response StructuredResponse, err error) {
+	timer := DoMetricRPCRequest(GetBlockByHash)
+	defer timer.ObserveDuration()
 
 	err = s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 		return nil, err
 	}
 
@@ -277,6 +287,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	if !ok {
 		blockArgs, err = s.getBlockOptions(opts)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 			return nil, err
 		}
 	}
@@ -288,6 +299,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 		if blockArgs.WithSigners {
 			blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
 			if err != nil {
+				DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 				return nil, err
 			}
 		}
@@ -306,11 +318,12 @@ func (s *PublicBlockchainService) GetBlockByHash(
 			return nil, ErrUnknownRPCVersion
 		}
 		if err != nil {
+			DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(rpcBlock)
 	}
-
+	DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 	return nil, err
 }
 
@@ -318,14 +331,28 @@ func (s *PublicBlockchainService) GetBlockByHash(
 func (s *PublicBlockchainService) GetBlockByNumberNew(
 	ctx context.Context, blockNum BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) (StructuredResponse, error) {
-	return s.GetBlockByNumber(ctx, blockNum, blockArgs)
+	timer := DoMetricRPCRequest(GetBlockByNumberNew)
+	defer timer.ObserveDuration()
+
+	res, err := s.GetBlockByNumber(ctx, blockNum, blockArgs)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumberNew, FailedNumber)
+	}
+	return res, err
 }
 
 // GetBlockByHashNew is an alias for GetBlocksByHash using rpc_common.BlockArgs
 func (s *PublicBlockchainService) GetBlockByHashNew(
 	ctx context.Context, blockHash common.Hash, blockArgs *rpc_common.BlockArgs,
 ) (StructuredResponse, error) {
-	return s.GetBlockByHash(ctx, blockHash, blockArgs)
+	timer := DoMetricRPCRequest(GetBlockByHashNew)
+	defer timer.ObserveDuration()
+
+	res, err := s.GetBlockByHash(ctx, blockHash, blockArgs)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByHashNew, FailedNumber)
+	}
+	return res, err
 }
 
 // GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
@@ -333,11 +360,8 @@ func (s *PublicBlockchainService) GetBlocks(
 	ctx context.Context, blockNumberStart BlockNumber,
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) ([]StructuredResponse, error) {
-
-	err := s.wait(ctx)
-	if err != nil {
-		return nil, err
-	}
+	timer := DoMetricRPCRequest(GetBlocks)
+	defer timer.ObserveDuration()
 
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
@@ -352,6 +376,7 @@ func (s *PublicBlockchainService) GetBlocks(
 		// rpcBlock is already formatted according to version
 		rpcBlock, err := s.GetBlockByNumber(ctx, blockNum, blockArgs)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 			utils.Logger().Warn().Err(err).Msg("RPC Get Blocks Error")
 		}
 		if rpcBlock != nil {
@@ -548,8 +573,12 @@ func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error)
 func (s *PublicBlockchainService) GetShardingStructure(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetShardingStructure)
+	defer timer.ObserveDuration()
+
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetShardingStructure, FailedNumber)
 		return nil, err
 	}
 
@@ -571,21 +600,20 @@ func (s *PublicBlockchainService) GetShardID(ctx context.Context) (int, error) {
 func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (interface{}, error) {
-
-	err := s.wait(ctx)
-	if err != nil {
-		return nil, err
-	}
+	timer := DoMetricRPCRequest(GetBalanceByBlockNumber)
+	defer timer.ObserveDuration()
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch balance
 	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetBalanceByBlockNumber, FailedNumber)
 		return nil, ErrRequestedBlockTooHigh
 	}
 	balance, err := s.getBalanceByBlockNumber(ctx, address, blockNum)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetBalanceByBlockNumber, FailedNumber)
 		return nil, err
 	}
 
@@ -602,15 +630,19 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 
 // LatestHeader returns the latest header information
 func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(LatestHeader)
+	defer timer.ObserveDuration()
 
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(LatestHeader, FailedNumber)
 		return nil, err
 	}
 
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
+		DoMetricRPCQueryInfo(LatestHeader, FailedNumber)
 		return nil, err
 	}
 
@@ -624,6 +656,8 @@ func (s *PublicBlockchainService) GetLatestChainHeaders(
 	ctx context.Context,
 ) (StructuredResponse, error) {
 	// Response output is the same for all versions
+	timer := DoMetricRPCRequest(GetLatestChainHeaders)
+	defer timer.ObserveDuration()
 	return NewStructuredResponse(s.hmy.GetLatestChainHeaders())
 }
 
@@ -631,19 +665,24 @@ func (s *PublicBlockchainService) GetLatestChainHeaders(
 func (s *PublicBlockchainService) GetLastCrossLinks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetLastCrossLinks)
+	defer timer.ObserveDuration()
 
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
 		return nil, err
 	}
 
 	if !isBeaconShard(s.hmy) {
+		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
 
 	// Fetch crosslinks
 	crossLinks, err := s.hmy.GetLastCrossLinks()
 	if err != nil {
+		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
 		return nil, err
 	}
 
@@ -652,6 +691,7 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 	for _, el := range crossLinks {
 		response, err := NewStructuredResponse(el)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
 			return nil, err
 		}
 		responseSlice = append(responseSlice, response)
@@ -663,8 +703,12 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 func (s *PublicBlockchainService) GetHeaderByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetHeaderByNumber)
+	defer timer.ObserveDuration()
+
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
 		return nil, err
 	}
 
@@ -673,6 +717,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 
 	// Ensure valid block number
 	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
 		return nil, ErrRequestedBlockTooHigh
 	}
 
@@ -690,18 +735,24 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCurrentUtilityMetrics)
+	defer timer.ObserveDuration()
+
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
 		return nil, err
 	}
 
 	if !isBeaconShard(s.hmy) {
+		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
 
 	// Fetch metrics
 	metrics, err := s.hmy.GetCurrentUtilityMetrics()
 	if err != nil {
+		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
 		return nil, err
 	}
 
@@ -713,18 +764,24 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 func (s *PublicBlockchainService) GetSuperCommittees(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetSuperCommittees)
+	defer timer.ObserveDuration()
+
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
 		return nil, err
 	}
 
 	if !isBeaconShard(s.hmy) {
+		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
 
 	// Fetch super committees
 	cmt, err := s.hmy.GetSuperCommittees()
 	if err != nil {
+		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
 		return nil, err
 	}
 
@@ -736,9 +793,12 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCurrentBadBlocks)
+	defer timer.ObserveDuration()
 
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetCurrentBadBlocks, FailedNumber)
 		return nil, err
 	}
 
@@ -748,6 +808,7 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 		// Response output is the same for all versions
 		fmtBadBlock, err := NewStructuredResponse(blk)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetCurrentBadBlocks, FailedNumber)
 			return nil, err
 		}
 		badBlocks = append(badBlocks, fmtBadBlock)
@@ -774,34 +835,43 @@ func (s *PublicBlockchainService) GetCirculatingSupply(
 func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingNetworkInfo)
+	defer timer.ObserveDuration()
 
 	err := s.wait(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 
 	if !isBeaconShard(s.hmy) {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
 	totalStaking := s.hmy.GetTotalStakingSnapshot()
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 	medianSnapshot, err := s.hmy.GetMedianRawStakeSnapshot()
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 	epochLastBlock, err := s.EpochLastBlock(ctx, header.Epoch().Uint64())
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 	totalSupply, err := s.GetTotalSupply(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 	circulatingSupply, err := s.GetCirculatingSupply(ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err
 	}
 
