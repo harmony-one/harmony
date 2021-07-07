@@ -454,7 +454,9 @@ func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
 		return hash.(common.Hash)
 	}
 	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
-	hc.canonicalCache.Add(number, hash)
+	if hash != (common.Hash{}) {
+		hc.canonicalCache.Add(number, hash)
+	}
 	return hash
 }
 
