@@ -312,10 +312,6 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 		config.General.NodeType = cli.GetStringFlagValue(cmd, legacyNodeTypeFlag)
 	}
 
-	if config.General.NodeType == nodeTypeExplorer {
-		config.General.IsArchival = true
-	}
-
 	if cli.IsFlagChanged(cmd, shardIDFlag) {
 		config.General.ShardID = cli.GetIntFlagValue(cmd, shardIDFlag)
 	} else if cli.IsFlagChanged(cmd, legacyShardIDFlag) {
