@@ -238,6 +238,11 @@ var (
 		Usage:    "run node in offline mode",
 		DefValue: defaultConfig.General.IsOffline,
 	}
+	isBackupFlag = cli.BoolFlag{
+		Name:     "run.backup",
+		Usage:    "run node in backup mode",
+		DefValue: defaultConfig.General.IsBackup,
+	}
 	dataDirFlag = cli.StringFlag{
 		Name:     "datadir",
 		Usage:    "directory of chain database",
@@ -353,6 +358,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, taraceFlag) {
 		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
+  }
+ 
+	if cli.IsFlagChanged(cmd, isBackupFlag) {
+		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
 	}
 }
 
