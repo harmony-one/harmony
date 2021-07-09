@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,7 +17,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/harmony-one/harmony/hmy"
-	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -767,7 +768,7 @@ func (s *PublicBlockchainService) GetTotalSupply(
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
-	return chain.GetCirculatingSupply(ctx, s.hmy.BlockChain)
+	return chain.GetCirculatingSupply(s.hmy.BlockChain)
 }
 
 // GetStakingNetworkInfo ..
