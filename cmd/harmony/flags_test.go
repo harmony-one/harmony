@@ -198,7 +198,7 @@ func TestGeneralFlags(t *testing.T) {
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
-				IsArchival: true,
+				IsArchival: false,
 				DataDir:    "./",
 			},
 		},
