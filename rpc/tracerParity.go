@@ -86,5 +86,11 @@ func (s *PublicParityTracerService) Filter(ctx context.Context, filter FilterOpt
 	if limit == 0 {
 		return results, nil
 	}
-	return results[filter.After : filter.After+filter.Count], nil
+	if limit > uint(len(results)) {
+		limit = uint(len(results))
+	}
+	if filter.After > limit {
+		return results[:0], nil
+	}
+	return results[filter.After:limit], nil
 }
