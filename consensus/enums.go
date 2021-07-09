@@ -14,6 +14,8 @@ const (
 	Syncing
 	// Listening ..
 	Listening
+	// NormalBackup Backup Node ..
+	NormalBackup
 )
 
 // FBFTPhase : different phases of consensus
@@ -32,6 +34,7 @@ var (
 		ViewChanging: "ViewChanging",
 		Syncing:      "Syncing",
 		Listening:    "Listening",
+		NormalBackup: "NormalBackup",
 	}
 	phaseNames = map[FBFTPhase]string{
 		FBFTAnnounce: "Announce",

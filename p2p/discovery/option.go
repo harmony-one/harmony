@@ -33,6 +33,7 @@ func (opt DHTConfig) getLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 		opts = append(opts, dsOption)
 	}
 
+	opts = append(opts, libp2p_dht.Concurrency(1))
 	return opts, nil
 }
 
