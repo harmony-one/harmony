@@ -60,16 +60,21 @@ func (s *PublicContractService) Call(
 func (s *PublicContractService) GetCode(
 	ctx context.Context, addr string, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	timer := DoMetricRPCRequest(GetCode)
+	defer timer.ObserveDuration()
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
 	address, err := hmyCommon.ParseAddr(addr)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetCode, FailedNumber)
 		return nil, err
 	}
 	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
+		DoMetricRPCQueryInfo(GetCode, FailedNumber)
 		return nil, err
 	}
 	code := state.GetCode(address)
@@ -84,16 +89,20 @@ func (s *PublicContractService) GetCode(
 func (s *PublicContractService) GetStorageAt(
 	ctx context.Context, addr string, key string, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	timer := DoMetricRPCRequest(GetStorageAt)
+	defer timer.ObserveDuration()
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
 	// Fetch state
 	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
+		DoMetricRPCQueryInfo(GetStorageAt, FailedNumber)
 		return nil, err
 	}
 	address, err := hmyCommon.ParseAddr(addr)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetStorageAt, FailedNumber)
 		return nil, err
 	}
 	res := state.GetState(address, common.HexToHash(key))
@@ -107,6 +116,9 @@ func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
+	timer := DoMetricRPCRequest(DoEvmCall)
+	defer timer.ObserveDuration()
+
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
@@ -116,6 +128,7 @@ func DoEVMCall(
 	// Fetch state
 	state, header, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
 	if state == nil || err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
 
@@ -138,6 +151,7 @@ func DoEVMCall(
 	// Get a new instance of the EVM.
 	evm, err := hmy.GetEVM(ctx, msg, state, header)
 	if err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
 
@@ -153,11 +167,13 @@ func DoEVMCall(
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
 	result, err := core.ApplyMessage(evm, msg, gp)
 	if err != nil {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, err
 	}
 
 	// If the timer caused an abort, return an appropriate error message
 	if evm.Cancelled() {
+		DoMetricRPCQueryInfo(DoEvmCall, FailedNumber)
 		return core.ExecutionResult{}, fmt.Errorf("execution aborted (timeout = %v)", timeout)
 	}
 

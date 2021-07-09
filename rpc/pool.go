@@ -44,6 +44,9 @@ func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicPoolService) SendRawTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
+	timer := DoMetricRPCRequest(SendRawTransaction)
+	defer timer.ObserveDuration()
+
 	// DOS prevention
 	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
 		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
@@ -128,6 +131,9 @@ func (s *PublicPoolService) verifyChainID(tx *types.Transaction) error {
 func (s *PublicPoolService) SendRawStakingTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
+	timer := DoMetricRPCRequest(SendRawStakingTransaction)
+	defer timer.ObserveDuration()
+
 	// DOS prevention
 	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
 		err := errors.Wrapf(core.ErrOversizedData, "encoded tx size: %d", len(encodedTx))
@@ -165,6 +171,9 @@ func (s *PublicPoolService) SendRawStakingTransaction(
 func (s *PublicPoolService) GetPoolStats(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetPoolStats)
+	defer timer.ObserveDuration()
+
 	pendingCount, queuedCount := s.hmy.GetPoolStats()
 
 	// Response output is the same for all versions
@@ -178,9 +187,13 @@ func (s *PublicPoolService) GetPoolStats(
 func (s *PublicPoolService) PendingTransactions(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(PendingTransactions)
+	defer timer.ObserveDuration()
+
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
 	if err != nil {
+		DoMetricRPCQueryInfo(PendingTransactions, FailedNumber)
 		return nil, err
 	}
 
@@ -239,9 +252,13 @@ func (s *PublicPoolService) PendingTransactions(
 func (s *PublicPoolService) PendingStakingTransactions(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(PendingStakingTransactions)
+	defer timer.ObserveDuration()
+
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
 	if err != nil {
+		DoMetricRPCQueryInfo(PendingStakingTransactions, FailedNumber)
 		return nil, err
 	}
 
@@ -292,11 +309,15 @@ func (s *PublicPoolService) PendingStakingTransactions(
 func (s *PublicPoolService) GetCurrentTransactionErrorSink(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCurrentTransactionErrorSink)
+	defer timer.ObserveDuration()
+
 	// For each transaction error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
 	for _, txError := range s.hmy.GetCurrentTransactionErrorSink() {
 		formattedErr, err := NewStructuredResponse(txError)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetCurrentTransactionErrorSink, FailedNumber)
 			return nil, err
 		}
 		formattedErrors = append(formattedErrors, formattedErr)
@@ -308,11 +329,15 @@ func (s *PublicPoolService) GetCurrentTransactionErrorSink(
 func (s *PublicPoolService) GetCurrentStakingErrorSink(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCurrentStakingErrorSink)
+	defer timer.ObserveDuration()
+
 	// For each staking tx error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
 	for _, txErr := range s.hmy.GetCurrentStakingErrorSink() {
 		formattedErr, err := NewStructuredResponse(txErr)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetCurrentStakingErrorSink, FailedNumber)
 			return nil, err
 		}
 		formattedErrors = append(formattedErrors, formattedErr)
@@ -324,11 +349,15 @@ func (s *PublicPoolService) GetCurrentStakingErrorSink(
 func (s *PublicPoolService) GetPendingCXReceipts(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetPendingCXReceipts)
+	defer timer.ObserveDuration()
+
 	// For each cx receipt, format the response (same format for all versions)
 	formattedReceipts := []StructuredResponse{}
 	for _, receipts := range s.hmy.GetPendingCXReceipts() {
 		formattedReceipt, err := NewStructuredResponse(receipts)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetPendingCXReceipts, FailedNumber)
 			return nil, err
 		}
 		formattedReceipts = append(formattedReceipts, formattedReceipt)
