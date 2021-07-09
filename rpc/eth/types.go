@@ -29,6 +29,8 @@ type Block struct {
 	Size             hexutil.Uint64      `json:"size"`
 	GasLimit         hexutil.Uint64      `json:"gasLimit"`
 	GasUsed          hexutil.Uint64      `json:"gasUsed"`
+	VRF              common.Hash         `json:"vrf"`
+	VRFProof         hexutil.Bytes       `json:"vrfProof"`
 	Timestamp        hexutil.Uint64      `json:"timestamp"`
 	TransactionsRoot common.Hash         `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash         `json:"receiptsRoot"`
@@ -173,6 +175,13 @@ func NewBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leaderAddress str
 func newBlock(b *types.Block, leader common.Address) *Block {
 	head := b.Header()
 
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	return &Block{
 		Number:           (*hexutil.Big)(head.Number()),
 		Hash:             b.Hash(),
@@ -188,6 +197,8 @@ func newBlock(b *types.Block, leader common.Address) *Block {
 		Size:             hexutil.Uint64(b.Size()),
 		GasLimit:         hexutil.Uint64(head.GasLimit()),
 		GasUsed:          hexutil.Uint64(head.GasUsed()),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        hexutil.Uint64(head.Time().Uint64()),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
