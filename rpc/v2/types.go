@@ -35,6 +35,8 @@ type BlockWithTxHash struct {
 	Size             uint64         `json:"size"`
 	GasLimit         uint64         `json:"gasLimit"`
 	GasUsed          uint64         `json:"gasUsed"`
+	VRF              common.Hash    `json:"vrf"`
+	VRFProof         hexutil.Bytes  `json:"vrfProof"`
 	Timestamp        *big.Int       `json:"timestamp"`
 	TransactionsRoot common.Hash    `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
@@ -63,6 +65,8 @@ type BlockWithFullTx struct {
 	Size             uint64                `json:"size"`
 	GasLimit         uint64                `json:"gasLimit"`
 	GasUsed          uint64                `json:"gasUsed"`
+	VRF              common.Hash           `json:"vrf"`
+	VRFProof         hexutil.Bytes         `json:"vrfProof"`
 	Timestamp        *big.Int              `json:"timestamp"`
 	TransactionsRoot common.Hash           `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash           `json:"receiptsRoot"`
@@ -604,6 +608,14 @@ func NewBlockWithTxHash(
 	}
 
 	head := b.Header()
+
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	blk := &BlockWithTxHash{
 		Number:           head.Number(),
 		ViewID:           head.ViewID(),
@@ -620,6 +632,8 @@ func NewBlockWithTxHash(
 		Size:             uint64(b.Size()),
 		GasLimit:         head.GasLimit(),
 		GasUsed:          head.GasUsed(),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        head.Time(),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
@@ -655,6 +669,14 @@ func NewBlockWithFullTx(
 	}
 
 	head := b.Header()
+
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	blk := &BlockWithFullTx{
 		Number:           head.Number(),
 		ViewID:           head.ViewID(),
@@ -671,6 +693,8 @@ func NewBlockWithFullTx(
 		Size:             uint64(b.Size()),
 		GasLimit:         head.GasLimit(),
 		GasUsed:          head.GasUsed(),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        head.Time(),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
