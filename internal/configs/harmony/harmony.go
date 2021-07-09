@@ -91,8 +91,8 @@ type PprofConfig struct {
 	ListenAddr         string
 	Folder             string
 	ProfileNames       []string
-	ProfileIntervals   []int `toml:",omitempty"`
-	ProfileDebugValues []int `toml:",omitempty"`
+	ProfileIntervals   []int
+	ProfileDebugValues []int
 }
 
 type LogConfig struct {

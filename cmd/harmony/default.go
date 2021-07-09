@@ -63,10 +63,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
-		Enabled:      false,
-		ListenAddr:   "127.0.0.1:6060",
-		Folder:       "./profiles",
-		ProfileNames: []string{},
+		Enabled:            false,
+		ListenAddr:         "127.0.0.1:6060",
+		Folder:             "./profiles",
+		ProfileNames:       []string{},
+		ProfileIntervals:   []int{},
+		ProfileDebugValues: []int{},
 	},
 	Log: harmonyconfig.LogConfig{
 		Folder:     "./latest",
