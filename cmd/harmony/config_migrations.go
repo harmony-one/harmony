@@ -177,13 +177,13 @@ func init() {
 			confTree.Set("Pprof.Folder", defaultConfig.Pprof.Folder)
 		}
 		if confTree.Get("Pprof.ProfileNames") == nil {
-			confTree.Set("Pprof.ProfileNames", "")
+			confTree.Set("Pprof.ProfileNames", []string{})
 		}
 		if confTree.Get("Pprof.ProfileIntervals") == nil {
-			confTree.Set("Pprof.ProfileIntervals", "")
+			confTree.Set("Pprof.ProfileIntervals", []string{})
 		}
 		if confTree.Get("Pprof.ProfileDebugValues") == nil {
-			confTree.Set("Pprof.ProfileDebugValues", "")
+			confTree.Set("Pprof.ProfileDebugValues", []string{})
 		}
 
 		confTree.Set("Version", "2.2.0")
