@@ -149,17 +149,17 @@ func scheduleProfile(profile Profile, dir string) {
 func saveProfile(profile Profile, dir string) error {
 	f, err := newTempFile(dir, profile.Name, ".pb.gz")
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not save profile: %s", profile.Name))
+		utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not save pprof profile: %s", profile.Name))
 		return err
 	}
 	defer f.Close()
 	if profile.ProfileRef != nil {
 		err = profile.ProfileRef.WriteTo(f, profile.Debug)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not write profile: %s", profile.Name))
+			utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not write pprof profile: %s", profile.Name))
 			return err
 		}
-		utils.Logger().Info().Msg(fmt.Sprintf("Saved profile in: %s", f.Name()))
+		utils.Logger().Info().Msg(fmt.Sprintf("Saved pprof profile in: %s", f.Name()))
 	}
 	return nil
 }
@@ -170,9 +170,9 @@ func handleCpuProfile(profile Profile, dir string) {
 	f, err := newTempFile(dir, profile.Name, ".pb.gz")
 	if err == nil {
 		pprof.StartCPUProfile(f)
-		utils.Logger().Info().Msg(fmt.Sprintf("Saved CPU profile in: %s", f.Name()))
+		utils.Logger().Info().Msg(fmt.Sprintf("Saved pprof CPU profile in: %s", f.Name()))
 	} else {
-		utils.Logger().Error().Err(err).Msg("Could not start CPU profile")
+		utils.Logger().Error().Err(err).Msg("Could not start pprof CPU profile")
 	}
 }
 
@@ -203,7 +203,7 @@ func (config *Config) unpackProfilesIntoMap() (map[string]Profile, error) {
 		// Try set the profile reference
 		if profile.Name != CPU {
 			if p := pprof.Lookup(profile.Name); p == nil {
-				return nil, fmt.Errorf("Profile does not exist: %s", profile.Name)
+				return nil, fmt.Errorf("Pprof profile does not exist: %s", profile.Name)
 			} else {
 				profile.ProfileRef = p
 			}
@@ -219,7 +219,7 @@ func newTempFile(dir, name, suffix string) (*os.File, error) {
 	currentTime := time.Now().Unix()
 	f, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("%s%d%s", prefix, currentTime, suffix)), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("could not create file of the form %s%d%s", prefix, currentTime, suffix)
+		return nil, fmt.Errorf("Could not create file of the form %s%d%s", prefix, currentTime, suffix)
 	}
 	return f, nil
 }

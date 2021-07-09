@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime/pprof"
 	"strings"
 	"testing"
 )
@@ -16,41 +17,46 @@ func TestUnpackProfilesIntoMap(t *testing.T) {
 	}{
 		{
 			input:  &Config{},
-			expMap: make(map[string]Profile),
+			expMap: nil,
 		},
 		{
 			input: &Config{
-				ProfileNames: []string{"test", "test"},
+				ProfileNames: []string{"cpu", "cpu"},
 			},
-			expMap: nil,
-			expErr: errors.New("Pprof profile names contains duplicate: test"),
+			expMap: map[string]Profile{
+				"cpu": {
+					Name:       "cpu",
+					Interval:   0,
+					Debug:      0,
+					ProfileRef: pprof.Lookup("cpu"),
+				},
+			},
 		},
 		{
 			input: &Config{
 				ProfileNames: []string{"test"},
 			},
-			expMap: map[string]Profile{
-				"test": {
-					Name: "test",
-				},
-			},
+			expMap: nil,
+			expErr: errors.New("Pprof profile does not exist: test"),
 		},
 		{
 			input: &Config{
-				ProfileNames:       []string{"test1", "test2"},
+				ProfileNames:       []string{"cpu", "heap"},
 				ProfileIntervals:   []int{0, 60},
 				ProfileDebugValues: []int{1},
 			},
 			expMap: map[string]Profile{
-				"test1": {
-					Name:     "test1",
-					Interval: 0,
-					Debug:    1,
+				"cpu": {
+					Name:       "cpu",
+					Interval:   0,
+					Debug:      1,
+					ProfileRef: pprof.Lookup("cpu"),
 				},
-				"test2": {
-					Name:     "test2",
-					Interval: 60,
-					Debug:    1,
+				"heap": {
+					Name:       "heap",
+					Interval:   60,
+					Debug:      1,
+					ProfileRef: pprof.Lookup("heap"),
 				},
 			},
 		},
