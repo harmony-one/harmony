@@ -45,3 +45,42 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	}
 	return resultArray, nil
 }
+
+type FilterOption struct {
+	FromBlock   rpc.BlockNumber  // Quantity or Tag - (optional) From this block.
+	ToBlock     rpc.BlockNumber  // Quantity or Tag - (optional) To this block.
+	FromAddress []common.Address //  Array - (optional) Sent from these addresses.
+	ToAddress   []common.Address // Address - (optional) Sent to these addresses.
+	After       uint             // Quantity - (optional) The offset trace number
+	Count       uint             // Quantity - (optional) Integer number of traces to display in a batch.
+}
+
+// trace_filter RPC
+func (s *PublicParityTracerService) Filter(ctx context.Context, filter FilterOption) (interface{}, error) {
+	var results []json.RawMessage
+	fromBlock := filter.FromBlock
+	toBlock := filter.ToBlock
+	if toBlock == 0 {
+		toBlock = rpc.BlockNumber(s.hmy.CurrentBlock().NumberU64())
+	}
+	fromAddresses := make(map[common.Address]bool, len(filter.FromAddress))
+	toAddresses := make(map[common.Address]bool, len(filter.ToAddress))
+	for _, addr := range filter.FromAddress {
+		fromAddresses[addr] = true
+	}
+	for _, addr := range filter.ToAddress {
+		toAddresses[addr] = true
+	}
+	for number := fromBlock; number <= toBlock; number++ {
+		if len(results) >= int(filter.After+filter.Count) {
+			break
+		}
+		block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
+		if resp, err := s.hmy.NodeAPI.GetTraceResultWithFilter(block.Hash(), fromAddresses, toAddresses); err == nil {
+			results = append(results, resp...)
+		} else {
+			return nil, err
+		}
+	}
+	return results[filter.After : filter.After+filter.Count], nil
+}

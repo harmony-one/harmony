@@ -188,8 +188,12 @@ func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash,
 	return s.storage.GetStakingTxsByAddress(address)
 }
 
-func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, error) {
+func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) ([]json.RawMessage, error) {
 	return s.storage.GetTraceResultByHash(hash)
+}
+
+func (s *Service) GetTraceResultWithFilter(hash ethCommon.Hash, from, to map[ethCommon.Address]bool) ([]json.RawMessage, error) {
+	return s.storage.GetTraceResultWithFilter(hash, from, to)
 }
 
 // DumpTraceResult instruct the explorer storage to trace data in explorer DB

@@ -270,13 +270,22 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 	return count, nil
 }
 
-// GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
-func (node *Node) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
+// GetTraceResultByHash returns the trace data of the block
+func (node *Node) GetTraceResultByHash(hash common.Hash) ([]json.RawMessage, error) {
 	exp, err := node.getExplorerService()
 	if err != nil {
 		return nil, err
 	}
 	return exp.GetTraceResultByHash(hash)
+}
+
+// GetTraceResultWithFilter returns the trace data of the block filtered by from and to
+func (node *Node) GetTraceResultWithFilter(hash common.Hash, from, to map[common.Address]bool) ([]json.RawMessage, error) {
+	exp, err := node.getExplorerService()
+	if err != nil {
+		return nil, err
+	}
+	return exp.GetTraceResultWithFilter(hash, from, to)
 }
 
 func (node *Node) getExplorerService() (*explorer.Service, error) {

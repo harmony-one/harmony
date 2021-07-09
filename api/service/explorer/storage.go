@@ -126,7 +126,11 @@ func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, 
 	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
-func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
+func (s *storage) GetTraceResultByHash(hash common.Hash) ([]json.RawMessage, error) {
+	return s.GetTraceResultWithFilter(hash, nil, nil)
+}
+
+func (s *storage) GetTraceResultWithFilter(hash common.Hash, from, to map[common.Address]bool) ([]json.RawMessage, error) {
 	if !s.available.IsSet() {
 		return nil, ErrExplorerNotReady
 	}
@@ -139,7 +143,7 @@ func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error
 	if err != nil {
 		return nil, err
 	}
-	return traceStorage.ToJson()
+	return traceStorage.ToJson(from, to)
 }
 
 func (s *storage) run() {

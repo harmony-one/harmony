@@ -144,7 +144,7 @@ func (ts *TraceBlockStorage) FromDB(read func([]byte) ([]byte, error)) error {
 	return nil
 }
 
-func (ts *TraceBlockStorage) TxJson(index int) ([]json.RawMessage, error) {
+func (ts *TraceBlockStorage) TxJson(index int, from, to map[common.Address]bool) ([]json.RawMessage, error) {
 	var results []json.RawMessage
 	var txStorage TxStorage
 	var err error
@@ -162,6 +162,13 @@ func (ts *TraceBlockStorage) TxJson(index int) ([]json.RawMessage, error) {
 	for _, acStorage := range txStorage.Storages {
 		ac := &action{}
 		ac.fromStorage(ts, acStorage)
+		if len(from) > 0 || len(to) > 0 {
+			fromIn := from != nil && from[ac.from]
+			toIn := to != nil && to[ac.to]
+			if !fromIn && !toIn {
+				continue
+			}
+		}
 
 		typStr, acStr, outStr := ac.toJsonStr()
 		if acStr == nil {
@@ -187,16 +194,16 @@ func (ts *TraceBlockStorage) TxJson(index int) ([]json.RawMessage, error) {
 	return results, nil
 }
 
-func (ts *TraceBlockStorage) ToJson() (json.RawMessage, error) {
+func (ts *TraceBlockStorage) ToJson(from, to map[common.Address]bool) ([]json.RawMessage, error) {
 	var results []json.RawMessage
 	for i := range ts.TraceStorages {
-		tx, err := ts.TxJson(i)
+		tx, err := ts.TxJson(i, from, to)
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, tx...)
 	}
-	return json.Marshal(results)
+	return results, nil
 }
 
 type JsonCallAction struct {

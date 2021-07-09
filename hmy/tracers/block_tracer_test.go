@@ -3,6 +3,8 @@ package tracers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,10 +17,13 @@ func TestStorage(t *testing.T) {
 
 	var sizeDB []byte
 	var memDB [][2][]byte
-	//TestJsonsMock, _ := os.ReadFile("/tmp/out.json")
+	TestJsonsMock, _ := os.ReadFile("/tmp/out.json")
 	json.Unmarshal(TestJsonsMock, &testJsons)
 
-	for _, testJson := range testJsons {
+	for i := 0; i <= 10; i++ {
+		bo := fmt.Sprintf("%d", i+14097999)
+		testJson := testJsons[bo]
+		//for bo, testJson := range testJsons {
 		block := &TraceBlockStorage{
 			addressIndex: make(map[common.Address]int),
 			dataIndex:    make(map[common.Hash]int),
@@ -66,7 +71,8 @@ func TestStorage(t *testing.T) {
 		if !bytes.Equal(jsonRaw, testJson) {
 			t.Fatal("restroe failed!")
 		}
-		//os.WriteFile("/tmp/trace.raw", sizeDB, os.ModePerm)
+		rawName := fmt.Sprintf("/tmp/%s.x.raw", bo)
+		os.WriteFile(rawName, sizeDB, os.ModePerm)
 	}
 
 }
