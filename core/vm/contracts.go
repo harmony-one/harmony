@@ -33,6 +33,7 @@ import (
 
 	//Needed for SHA3-256 FIPS202
 	"encoding/hex"
+
 	"golang.org/x/crypto/sha3"
 )
 
@@ -96,7 +97,7 @@ var PrecompiledContractsVRF = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}):   &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):   &blake2F{},
 	common.BytesToAddress([]byte{255}): &vrf{},
-	
+
 	common.BytesToAddress([]byte{102}): &sha3fip{},
 	common.BytesToAddress([]byte{103}): &ecrecoverPublicKey{},
 }
