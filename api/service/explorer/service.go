@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net"
 	"net/http"
 	"path"
@@ -21,7 +20,6 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
-	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -202,14 +200,6 @@ func (s *Service) IsAvailable() bool {
 	return s.storage.available.IsSet()
 }
 
-var (
-	// InaccessibleAddresses are a list of known eth addresses that cannot spend ONE tokens.
-	InaccessibleAddresses = []ethCommon.Address{
-		// one10000000000000000000000000000dead5shlag
-		ethCommon.HexToAddress("0x7bDeF7Bdef7BDeF7BDEf7bDef7bdef7bdeF6E7AD"),
-	}
-)
-
 // InaccessibleAddressInfo ..
 type InaccessibleAddressInfo struct {
 	EthAddress ethCommon.Address `json:"eth-address"`
@@ -218,47 +208,22 @@ type InaccessibleAddressInfo struct {
 	Nonce      uint64            `json:"nonce"`
 }
 
-// getAllInaccessibleAddresses information according to InaccessibleAddresses
-func (s *Service) getAllInaccessibleAddresses() ([]*InaccessibleAddressInfo, error) {
-	state, err := s.blockchain.StateAt(s.blockchain.CurrentHeader().Root())
-	if err != nil {
-		return nil, err
-	}
-
-	accs := []*InaccessibleAddressInfo{}
-	for _, addr := range InaccessibleAddresses {
-		accs = append(accs, &InaccessibleAddressInfo{
-			EthAddress: addr,
-			Address:    common.MustAddressToBech32(addr),
-			Balance:    numeric.NewDecFromBigIntWithPrec(state.GetBalance(addr), 18),
-			Nonce:      state.GetNonce(addr),
-		})
-	}
-
-	return accs, nil
-}
-
-// getTotalInaccessibleTokens in ONE at the latest header.
-func (s *Service) getTotalInaccessibleTokens() (numeric.Dec, error) {
-	addrInfos, err := s.getAllInaccessibleAddresses()
-	if err != nil {
-		return numeric.Dec{}, err
-	}
-
-	total := numeric.NewDecFromBigIntWithPrec(big.NewInt(0), 18)
-	for _, addr := range addrInfos {
-		total = total.Add(addr.Balance)
-	}
-	return total, nil
-}
-
 // GetInaccessibleAddressInfo serves /burn-addresses end-point.
 func (s *Service) GetInaccessibleAddressInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	accInfos, err := s.getAllInaccessibleAddresses()
+	accInfos, err := chain.GetInaccessibleAddressInfo(s.blockchain)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible addresses")
 		w.WriteHeader(http.StatusInternalServerError)
+	}
+	display := make([]*InaccessibleAddressInfo, 0, len(accInfos))
+	for _, acc := range accInfos {
+		display = append(display, &InaccessibleAddressInfo{
+			EthAddress: acc.EthAddress,
+			Address:    acc.Address,
+			Balance:    acc.Balance,
+			Nonce:      acc.Nonce,
+		})
 	}
 	if err := json.NewEncoder(w).Encode(accInfos); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode inaccessible account info")
@@ -270,17 +235,12 @@ func (s *Service) GetInaccessibleAddressInfo(w http.ResponseWriter, r *http.Requ
 // Note that known InaccessibleAddresses have their funds removed from the supply for this endpoint.
 func (s *Service) GetCirculatingSupply(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	circulatingSupply, err := chain.GetCirculatingSupply(context.Background(), s.blockchain)
+	cs, err := chain.GetCirculatingSupply(s.blockchain)
 	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("unable to fetch circulating supply")
+		utils.Logger().Warn().Msg("Failed to get circulating supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	totalInaccessible, err := s.getTotalInaccessibleTokens()
-	if err != nil {
-		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible tokens")
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-	if err := json.NewEncoder(w).Encode(circulatingSupply.Sub(totalInaccessible)); err != nil {
+	if err := json.NewEncoder(w).Encode(cs); err != nil {
 		utils.Logger().Warn().Msg("cannot JSON-encode circulating supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -295,7 +255,7 @@ func (s *Service) GetTotalSupply(w http.ResponseWriter, r *http.Request) {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch total supply")
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	totalInaccessible, err := s.getTotalInaccessibleTokens()
+	totalInaccessible, err := chain.GetInaccessibleTokens(s.blockchain)
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("unable to fetch inaccessible tokens")
 		w.WriteHeader(http.StatusInternalServerError)
