@@ -71,8 +71,9 @@ func (s *PublicParityTracerService) Filter(ctx context.Context, filter FilterOpt
 	for _, addr := range filter.ToAddress {
 		toAddresses[addr] = true
 	}
+	limit := filter.After + filter.Count
 	for number := fromBlock; number <= toBlock; number++ {
-		if len(results) >= int(filter.After+filter.Count) {
+		if limit > 0 && len(results) >= int(limit) {
 			break
 		}
 		block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
@@ -81,6 +82,9 @@ func (s *PublicParityTracerService) Filter(ctx context.Context, filter FilterOpt
 		} else {
 			return nil, err
 		}
+	}
+	if limit == 0 {
+		return results, nil
 	}
 	return results[filter.After : filter.After+filter.Count], nil
 }
