@@ -214,6 +214,8 @@ type HeaderInformation struct {
 	UnixTime         uint64            `json:"unixtime"`
 	LastCommitSig    string            `json:"lastCommitSig"`
 	LastCommitBitmap string            `json:"lastCommitBitmap"`
+	VRF              string            `json:"vrf"`
+	VRFProof         string            `json:"vrfProof"`
 	CrossLinks       *types.CrossLinks `json:"crossLinks,omitempty"`
 }
 
@@ -223,6 +225,13 @@ func NewHeaderInformation(header *block.Header, leader string) *HeaderInformatio
 		return nil
 	}
 
+	vrfAndProof := header.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	result := &HeaderInformation{
 		BlockHash:        header.Hash(),
 		BlockNumber:      header.Number().Uint64(),
@@ -233,6 +242,8 @@ func NewHeaderInformation(header *block.Header, leader string) *HeaderInformatio
 		UnixTime:         header.Time().Uint64(),
 		Timestamp:        time.Unix(header.Time().Int64(), 0).UTC().String(),
 		LastCommitBitmap: hex.EncodeToString(header.LastCommitBitmap()),
+		VRF:              hex.EncodeToString(vrf[:]),
+		VRFProof:         hex.EncodeToString(vrfProof),
 	}
 
 	sig := header.LastCommitSignature()

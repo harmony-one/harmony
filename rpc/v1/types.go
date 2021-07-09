@@ -33,6 +33,8 @@ type BlockWithTxHash struct {
 	Size             hexutil.Uint64 `json:"size"`
 	GasLimit         hexutil.Uint64 `json:"gasLimit"`
 	GasUsed          hexutil.Uint64 `json:"gasUsed"`
+	VRF              common.Hash    `json:"vrf"`
+	VRFProof         hexutil.Bytes  `json:"vrfProof"`
 	Timestamp        hexutil.Uint64 `json:"timestamp"`
 	TransactionsRoot common.Hash    `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash    `json:"receiptsRoot"`
@@ -61,6 +63,8 @@ type BlockWithFullTx struct {
 	Size             hexutil.Uint64        `json:"size"`
 	GasLimit         hexutil.Uint64        `json:"gasLimit"`
 	GasUsed          hexutil.Uint64        `json:"gasUsed"`
+	VRF              common.Hash           `json:"vrf"`
+	VRFProof         hexutil.Bytes         `json:"vrfProof"`
 	Timestamp        hexutil.Uint64        `json:"timestamp"`
 	TransactionsRoot common.Hash           `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash           `json:"receiptsRoot"`
@@ -588,6 +592,14 @@ func NewBlockWithTxHash(
 	}
 
 	head := b.Header()
+
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	blk := &BlockWithTxHash{
 		Number:           (*hexutil.Big)(head.Number()),
 		ViewID:           (*hexutil.Big)(head.ViewID()),
@@ -604,6 +616,8 @@ func NewBlockWithTxHash(
 		Size:             hexutil.Uint64(b.Size()),
 		GasLimit:         hexutil.Uint64(head.GasLimit()),
 		GasUsed:          hexutil.Uint64(head.GasUsed()),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        hexutil.Uint64(head.Time().Uint64()),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
@@ -639,6 +653,14 @@ func NewBlockWithFullTx(
 	}
 
 	head := b.Header()
+
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	blk := &BlockWithFullTx{
 		Number:           (*hexutil.Big)(head.Number()),
 		ViewID:           (*hexutil.Big)(head.ViewID()),
@@ -655,6 +677,8 @@ func NewBlockWithFullTx(
 		Size:             hexutil.Uint64(b.Size()),
 		GasLimit:         hexutil.Uint64(head.GasLimit()),
 		GasUsed:          hexutil.Uint64(head.GasUsed()),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        hexutil.Uint64(head.Time().Uint64()),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
