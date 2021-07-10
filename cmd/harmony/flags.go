@@ -354,8 +354,8 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, taraceFlag) {
 		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
-  }
- 
+	}
+
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
 		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
 	}
