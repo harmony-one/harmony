@@ -55,13 +55,13 @@ type operation struct {
 }
 
 var (
-	frontierInstructionSet           = newFrontierInstructionSet()
-	homesteadInstructionSet          = newHomesteadInstructionSet()
-	tangerineWhistleInstructionSet   = newTangerineWhistleInstructionSet()
-	spuriousDragonInstructionSet     = newSpuriousDragonInstructionSet()
-	byzantiumInstructionSet          = newByzantiumInstructionSet()
-	constantinopleInstructionSet     = newConstantinopleInstructionSet()
-	istanbulInstructionSet           = newIstanbulInstructionSet()
+	frontierInstructionSet         = newFrontierInstructionSet()
+	homesteadInstructionSet        = newHomesteadInstructionSet()
+	tangerineWhistleInstructionSet = newTangerineWhistleInstructionSet()
+	spuriousDragonInstructionSet   = newSpuriousDragonInstructionSet()
+	byzantiumInstructionSet        = newByzantiumInstructionSet()
+	constantinopleInstructionSet   = newConstantinopleInstructionSet()
+	istanbulInstructionSet         = newIstanbulInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.

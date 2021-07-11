@@ -63,6 +63,7 @@ var (
 func init() {
 	testTxPoolConfig = DefaultTxPoolConfig
 	testTxPoolConfig.Journal = ""
+	testTxPoolConfig.PriceLimit = 1
 }
 
 type testBlockChain struct {
@@ -640,7 +641,7 @@ func TestAAQueue2(t *testing.T) {
 	pool.currentState.AddBalance(address1, big.NewInt(1000000))
 	pool.currentState.SetNonce(address1, 1)
 
-	pool.reset(nil, nil)
+	pool.lockedReset(nil, nil)
 	pool.add(tx1, false)
 	pool.add(tx2, false)
 	pool.add(tx3, false)
