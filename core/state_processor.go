@@ -18,6 +18,7 @@ package core
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -85,6 +86,7 @@ func (p *StateProcessor) Process(
 		return nil, nil, nil, 0, nil, err
 	}
 
+	startTime := time.Now()
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
@@ -100,6 +102,9 @@ func (p *StateProcessor) Process(
 		}
 		allLogs = append(allLogs, receipt.Logs...)
 	}
+	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Normal Txns")
+
+	startTime = time.Now()
 	// Iterate over and process the staking transactions
 	L := len(block.Transactions())
 	for i, tx := range block.StakingTransactions() {
@@ -113,6 +118,7 @@ func (p *StateProcessor) Process(
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
+	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
 
 	// incomingReceipts should always be processed
 	// after transactions (to be consistent with the block proposal)

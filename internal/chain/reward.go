@@ -199,11 +199,12 @@ func AccumulateRewardsAndCountSigs(
 
 		// Handle rewards for shardchain
 		if cxLinks := header.CrossLinks(); len(cxLinks) > 0 {
-			utils.AnalysisStart("accumulateRewardShardchainPayout", nowEpoch, blockNow)
+			startTime := time.Now()
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return network.EmptyPayout, err
 			}
+			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Decode Cross Links")
 
 			type slotPayable struct {
 				shard.Slot
@@ -221,8 +222,8 @@ func AccumulateRewardsAndCountSigs(
 
 			allPayables, allMissing := []slotPayable{}, []slotMissing{}
 
+			startTime = time.Now()
 			for i := range crossLinks {
-
 				cxLink := crossLinks[i]
 				epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
 				if !bc.Config().IsStaking(epoch) {
@@ -342,7 +343,7 @@ func AccumulateRewardsAndCountSigs(
 					})
 				}
 			}
-			utils.AnalysisEnd("accumulateRewardShardchainPayout", nowEpoch, blockNow)
+			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
 		}
 
 		// Block here until the commit sigs are ready or timeout.
@@ -351,7 +352,7 @@ func AccumulateRewardsAndCountSigs(
 			return network.EmptyPayout, err
 		}
 
-		utils.AnalysisStart("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
+		startTime := time.Now()
 		// Take care of my own beacon chain committee, _ is missing, for slashing
 		parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 		if err != nil {
@@ -413,7 +414,7 @@ func AccumulateRewardsAndCountSigs(
 				})
 			}
 		}
-		utils.AnalysisEnd("accumulateRewardBeaconchainSelfPayout", nowEpoch, blockNow)
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Beacon Chain Reward")
 
 		return network.NewStakingEraRewardForRound(
 			newRewards, missing, beaconP, shardP,
