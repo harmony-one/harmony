@@ -127,8 +127,6 @@ func AccumulateRewardsAndCountSigs(
 	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
 ) (reward.Reader, error) {
 	blockNum := header.Number().Uint64()
-	currentHeader := beaconChain.CurrentHeader()
-	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 
 	if blockNum == 0 || (bc.Config().IsStaking(header.Epoch()) &&
 		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID) {
