@@ -62,7 +62,7 @@ var (
 			Namespace: "hmy",
 			Subsystem: "stream",
 			Name:      "setup_stream_duration",
-			Help:      "duration in seconds of setting up connection to a discovered peer",
+			Help:      "duration in milliseconds of setting up connection to a discovered peer",
 			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, +INF
 			Buckets: prometheus.ExponentialBuckets(0.02, 2, 8),
 		},

@@ -111,7 +111,7 @@ var (
 			Namespace: "hmy",
 			Subsystem: "rpc",
 			Name:      "rpc_request_delay",
-			Help:      "delay in seconds to do rpc requests",
+			Help:      "delay in milliseconds to do rpc requests",
 			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, +INF
 			Buckets: prometheus.ExponentialBuckets(0.02, 2, 8),
 		},

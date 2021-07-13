@@ -40,7 +40,7 @@ var (
 			Namespace: "hmy",
 			Subsystem: "stream_sync",
 			Name:      "client_request_delay",
-			Help:      "delay in seconds to do sync requests as a client",
+			Help:      "delay in milliseconds to do sync requests as a client",
 			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, +INF
 			Buckets: prometheus.ExponentialBuckets(0.02, 2, 8),
 		},
