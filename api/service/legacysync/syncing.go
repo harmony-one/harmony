@@ -836,9 +836,12 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 			if err != nil {
 				return errors.Wrap(err, "parse commitSigAndBitmap")
 			}
+
+			startTime := time.Now()
 			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
+			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[Sync] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
