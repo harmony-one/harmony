@@ -53,6 +53,28 @@ type BlockWithFullTx struct {
 	Signers      []string       `json:"signers,omitempty"`
 }
 
+// BlockReceipts represents a block all receipts that will serialize to the RPC representation.
+type BlockReceipts struct {
+	TxReceipts []*TxReceipt `json:"txReceipts"`
+}
+
+// TxReceipt represents a transaction receipt that will serialize to the RPC representation.
+type TxReceipt struct {
+	BlockHash         common.Hash     `json:"blockHash"`
+	TransactionHash   common.Hash     `json:"transactionHash"`
+	BlockNumber       hexutil.Uint64  `json:"blockNumber"`
+	TransactionIndex  hexutil.Uint64  `json:"transactionIndex"`
+	GasUsed           hexutil.Uint64  `json:"gasUsed"`
+	CumulativeGasUsed hexutil.Uint64  `json:"cumulativeGasUsed"`
+	ContractAddress   *common.Address `json:"contractAddress"`
+	Logs              []*types.Log    `json:"logs"`
+	LogsBloom         ethtypes.Bloom  `json:"logsBloom"`
+	From              common.Address  `json:"from"`
+	To                *common.Address `json:"to"`
+	Root              hexutil.Bytes   `json:"root"`
+	Status            hexutil.Uint    `json:"status"`
+}
+
 // Transaction represents a transaction that will serialize to the RPC representation of a transaction
 type Transaction struct {
 	BlockHash        *common.Hash    `json:"blockHash"`
@@ -114,7 +136,7 @@ func NewTransaction(
 }
 
 // NewReceipt returns the RPC data for a new receipt
-func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (map[string]interface{}, error) {
+func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, blockIndex uint64, receipt *types.Receipt) (*TxReceipt, error) {
 	senderAddr, err := tx.SenderAddress()
 	if err != nil {
 		return nil, err
@@ -126,35 +148,56 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 		receipt.Logs[i].TxHash = ethTxHash
 	}
 
-	fields := map[string]interface{}{
-		"blockHash":         blockHash,
-		"blockNumber":       hexutil.Uint64(blockNumber),
-		"transactionHash":   ethTxHash,
-		"transactionIndex":  hexutil.Uint64(blockIndex),
-		"from":              senderAddr,
-		"to":                tx.To(),
-		"gasUsed":           hexutil.Uint64(receipt.GasUsed),
-		"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
-		"contractAddress":   nil,
-		"logs":              receipt.Logs,
-		"logsBloom":         receipt.Bloom,
+	// Declare receipt
+	txReceipt := &TxReceipt{
+		BlockHash:         blockHash,
+		TransactionHash:   ethTxHash,
+		BlockNumber:       hexutil.Uint64(blockNumber),
+		TransactionIndex:  hexutil.Uint64(blockIndex),
+		GasUsed:           hexutil.Uint64(receipt.GasUsed),
+		CumulativeGasUsed: hexutil.Uint64(receipt.CumulativeGasUsed),
+		Logs:              receipt.Logs,
+		LogsBloom:         receipt.Bloom,
+		From:              senderAddr,
+		To:                tx.To(),
+		ContractAddress:   nil,
 	}
 
 	// Assign receipt status or post state.
 	if len(receipt.PostState) > 0 {
-		fields["root"] = hexutil.Bytes(receipt.PostState)
+		txReceipt.Root = hexutil.Bytes(receipt.PostState)
 	} else {
-		fields["status"] = hexutil.Uint(receipt.Status)
+
+		txReceipt.Status = hexutil.Uint(receipt.Status)
 	}
 	if receipt.Logs == nil {
-		fields["logs"] = [][]*types.Log{}
+		txReceipt.Logs = []*types.Log{}
 	}
 	// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
 	if receipt.ContractAddress != (common.Address{}) {
-		fields["contractAddress"] = receipt.ContractAddress
+		txReceipt.ContractAddress = &receipt.ContractAddress
 	}
 
-	return fields, nil
+	return txReceipt, nil
+}
+
+// NewReceipts returns the RPC data for receipts of the block
+func NewReceipts(txn []interface{}, blockHash common.Hash, blockNumber uint64, receipts types.Receipts) (interface{}, error) {
+	blockReceipts := &BlockReceipts{
+		TxReceipts: []*TxReceipt{},
+	}
+	for index, tx := range txn {
+		plainTx, ok := tx.(*types.Transaction)
+		if ok {
+			ethTx := plainTx.ConvertToEth()
+			rec, err := NewReceipt(ethTx, blockHash, blockNumber, uint64(index), receipts[index])
+			if err != nil {
+				return nil, err
+			}
+			blockReceipts.TxReceipts = append(blockReceipts.TxReceipts, rec)
+		}
+	}
+	return blockReceipts, nil
 }
 
 // NewBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are

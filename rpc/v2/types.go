@@ -174,6 +174,12 @@ type UndelegateMsg struct {
 	Amount           *big.Int `json:"amount"`
 }
 
+// BlockReceipts represents a block all receipts that will serialize to the RPC representation.
+type BlockReceipts struct {
+	TxReceipts        []*TxReceipt        `json:"txReceipts"`
+	StakingTxReceipts []*StakingTxReceipt `json:"stakingTxReceipts"`
+}
+
 // TxReceipt represents a transaction receipt that will serialize to the RPC representation.
 type TxReceipt struct {
 	BlockHash         common.Hash    `json:"blockHash"`
@@ -317,6 +323,40 @@ func NewReceipt(
 		return NewStakingTxReceipt(stakingTx, blockHash, blockNumber, blockIndex, receipt)
 	}
 	return nil, fmt.Errorf("unknown transaction type for RPC receipt")
+}
+
+// NewReceipts returns all receipts of the block that will serialize to the RPC representation
+func NewReceipts(txn []interface{}, blockHash common.Hash, blockNumber uint64, receipts types.Receipts) (interface{}, error) {
+
+	blockReceipts := &BlockReceipts{
+		TxReceipts:        []*TxReceipt{},
+		StakingTxReceipts: []*StakingTxReceipt{},
+	}
+
+	for index, receipt := range receipts {
+		plainTx, ok := txn[index].(*types.Transaction)
+		if ok {
+			tx, err := NewTxReceipt(plainTx, blockHash, blockNumber, uint64(index), receipt)
+			if err != nil {
+				return nil, err
+			}
+			blockReceipts.TxReceipts = append(blockReceipts.TxReceipts, tx)
+			continue
+		}
+		stakingTx, ok := txn[index].(*staking.StakingTransaction)
+		if ok {
+			stx, err := NewStakingTxReceipt(stakingTx, blockHash, blockNumber, uint64(index), receipt)
+			if err != nil {
+				return nil, err
+			}
+			blockReceipts.StakingTxReceipts = append(blockReceipts.StakingTxReceipts, stx)
+			continue
+		}
+
+		return nil, fmt.Errorf("unknown transaction type for RPC receipt")
+	}
+
+	return blockReceipts, nil
 }
 
 // NewTxReceipt returns a plain transaction receipt that will serialize to the RPC representation

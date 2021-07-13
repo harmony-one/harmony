@@ -640,6 +640,58 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 	}
 }
 
+func (s *PublicTransactionService) GetReceiptsByBlockHash(
+	ctx context.Context, hash common.Hash,
+) (StructuredResponse, error) {
+	receipts, err := s.hmy.GetReceipts(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	var tx *types.Transaction
+	var stx *staking.StakingTransaction
+	var blockHash common.Hash = hash
+	var blockNumber uint64
+	var txn []interface{}
+	for _, receipt := range receipts {
+		tx, _, blockNumber, _ = rawdb.ReadTransaction(s.hmy.ChainDb(), receipt.TxHash)
+		if tx == nil {
+			stx, _, blockNumber, _ = rawdb.ReadStakingTransaction(s.hmy.ChainDb(), receipt.TxHash)
+			if stx == nil {
+				return nil, nil
+			}
+			txn = append(txn, stx)
+		} else {
+			txn = append(txn, tx)
+		}
+	}
+
+	// Format response according to version
+	var RPCReceipts interface{}
+	switch s.version {
+	case V1:
+		RPCReceipts, err = v1.NewReceipts(txn, blockHash, blockNumber, receipts)
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipts)
+	case V2:
+		RPCReceipts, err = v2.NewReceipts(txn, blockHash, blockNumber, receipts)
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipts)
+	case Eth:
+		RPCReceipts, err = eth.NewReceipts(txn, blockHash, blockNumber, receipts)
+		if err != nil {
+			return nil, err
+		}
+		return NewStructuredResponse(RPCReceipts)
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+}
+
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionService) GetTransactionReceipt(
 	ctx context.Context, hash common.Hash,
