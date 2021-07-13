@@ -227,7 +227,9 @@ func AccumulateRewardsAndCountSigs(
 				if !bc.Config().IsStaking(epoch) {
 					continue
 				}
+				startTimeLocal := time.Now()
 				shardState, err := bc.ReadShardState(epoch)
+				utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (ReadShardState)")
 
 				if err != nil {
 					return network.EmptyPayout, err
@@ -238,23 +240,30 @@ func AccumulateRewardsAndCountSigs(
 					return network.EmptyPayout, err
 				}
 
+				startTimeLocal = time.Now()
 				payableSigners, missing, err := availability.BlockSigners(
 					cxLink.Bitmap(), subComm,
 				)
+				utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
+
 				if err != nil {
 					return network.EmptyPayout, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
 				}
 
 				staked := subComm.StakedValidators()
+				startTimeLocal = time.Now()
 				if err := availability.IncrementValidatorSigningCounts(
 					beaconChain, staked, state, payableSigners, missing,
 				); err != nil {
 					return network.EmptyPayout, err
 				}
+				utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (IncrementValidatorSigningCounts)")
 
+				startTimeLocal = time.Now()
 				votingPower, err := lookupVotingPower(
 					epoch, subComm,
 				)
+				utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (lookupVotingPower)")
 
 				if err != nil {
 					return network.EmptyPayout, err
@@ -269,6 +278,7 @@ func AccumulateRewardsAndCountSigs(
 					}
 				}
 
+				startTimeLocal = time.Now()
 				for j := range payableSigners {
 					voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
 					if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
@@ -284,6 +294,7 @@ func AccumulateRewardsAndCountSigs(
 						})
 					}
 				}
+				utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (allPayables)")
 
 				for j := range missing {
 					allMissing = append(allMissing, slotMissing{
@@ -314,6 +325,7 @@ func AccumulateRewardsAndCountSigs(
 			}
 
 			// Finally do the pay
+			startTimeLocal := time.Now()
 			for bucket := range resultsHandle {
 				for payThem := range resultsHandle[bucket] {
 					payable := resultsHandle[bucket][payThem]
@@ -341,6 +353,7 @@ func AccumulateRewardsAndCountSigs(
 					})
 				}
 			}
+			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
 			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
 		}
 
