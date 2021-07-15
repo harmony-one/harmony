@@ -45,7 +45,7 @@ func (s *PublicPoolService) SendRawTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
 	timer := DoMetricRPCRequest(SendRawTransaction)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(SendRawTransaction, timer)
 
 	// DOS prevention
 	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
@@ -132,7 +132,7 @@ func (s *PublicPoolService) SendRawStakingTransaction(
 	ctx context.Context, encodedTx hexutil.Bytes,
 ) (common.Hash, error) {
 	timer := DoMetricRPCRequest(SendRawStakingTransaction)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(SendRawStakingTransaction, timer)
 
 	// DOS prevention
 	if len(encodedTx) >= types.MaxEncodedPoolTransactionSize {
@@ -172,7 +172,7 @@ func (s *PublicPoolService) GetPoolStats(
 	ctx context.Context,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetPoolStats)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetPoolStats, timer)
 
 	pendingCount, queuedCount := s.hmy.GetPoolStats()
 
@@ -188,7 +188,7 @@ func (s *PublicPoolService) PendingTransactions(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(PendingTransactions)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(PendingTransactions, timer)
 
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
@@ -253,7 +253,7 @@ func (s *PublicPoolService) PendingStakingTransactions(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(PendingStakingTransactions)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(PendingStakingTransactions, timer)
 
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
@@ -310,7 +310,7 @@ func (s *PublicPoolService) GetCurrentTransactionErrorSink(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetCurrentTransactionErrorSink)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetCurrentTransactionErrorSink, timer)
 
 	// For each transaction error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
@@ -330,7 +330,7 @@ func (s *PublicPoolService) GetCurrentStakingErrorSink(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetCurrentStakingErrorSink)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetCurrentStakingErrorSink, timer)
 
 	// For each staking tx error in the error sink, format the response (same format for all versions)
 	formattedErrors := []StructuredResponse{}
@@ -350,7 +350,7 @@ func (s *PublicPoolService) GetPendingCXReceipts(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetPendingCXReceipts)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetPendingCXReceipts, timer)
 
 	// For each cx receipt, format the response (same format for all versions)
 	formattedReceipts := []StructuredResponse{}

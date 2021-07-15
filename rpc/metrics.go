@@ -82,6 +82,7 @@ func init() {
 		rpcRateLimitCounterVec,
 		rpcQueryInfoCounterVec,
 		rpcRequestDurationVec,
+		rpcRequestDurationGaugeVec,
 	)
 }
 
@@ -110,11 +111,20 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: "hmy",
 			Subsystem: "rpc",
-			Name:      "rpc_request_delay",
+			Name:      "request_delay_histogram",
 			Help:      "delay in seconds to do rpc requests",
-			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, +INF
-			Buckets: prometheus.ExponentialBuckets(0.02, 2, 8),
+			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, 2560ms, 5120ms, +INF
+			Buckets: prometheus.ExponentialBuckets(0.02, 2, 10),
 		},
+		[]string{"rpc_name"},
+	)
+
+	rpcRequestDurationGaugeVec = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "hmy",
+		Subsystem: "rpc",
+		Name:      "request_delay_gauge",
+		Help:      "delay in seconds to do rpc requests",
+	},
 		[]string{"rpc_name"},
 	)
 )
@@ -124,6 +134,11 @@ func DoMetricRPCRequest(rpcName string) *prometheus.Timer {
 	pLabel := getRPCDurationPromLabel(rpcName)
 	timer := prometheus.NewTimer(rpcRequestDurationVec.With(pLabel))
 	return timer
+}
+
+func DoRPCRequestDuration(rpcName string, timer *prometheus.Timer) {
+	pLabel := getRPCDurationPromLabel(rpcName)
+	rpcRequestDurationGaugeVec.With(pLabel).Set(timer.ObserveDuration().Seconds())
 }
 
 func DoMetricRPCQueryInfo(rpcName string, infoType string) {

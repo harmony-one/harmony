@@ -243,7 +243,7 @@ func (s *PublicStakingService) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformation)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetAllValidatorInformation, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
@@ -280,7 +280,7 @@ func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 	ctx context.Context, page int, blockNumber BlockNumber,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformationByBlockNumber)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetAllValidatorInformationByBlockNumber, timer)
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -303,7 +303,7 @@ func (s *PublicStakingService) GetValidatorInformation(
 	ctx context.Context, address string,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetValidatorInformation)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetValidatorInformation, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetValidatorInformation, FailedNumber)
@@ -338,7 +338,7 @@ func (s *PublicStakingService) GetValidatorInformationByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetValidatorInformationByBlockNumber)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetValidatorInformationByBlockNumber, timer)
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -440,7 +440,7 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 	ctx context.Context, page int,
 ) ([][]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetAllDelegationInformation)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetAllDelegationInformation, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
@@ -489,7 +489,7 @@ func (s *PublicStakingService) GetDelegationsByDelegator(
 	ctx context.Context, address string,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetDelegationsByDelegator)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetDelegationsByDelegator, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetDelegationsByDelegator, FailedNumber)
@@ -611,7 +611,7 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 	ctx context.Context, address string,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetDelegationsByValidator)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetDelegationsByValidator, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetDelegationsByValidator, FailedNumber)
@@ -667,7 +667,7 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 	ctx context.Context, address string, validator string,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetDelegationByDelegatorAndValidator)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetDelegationByDelegatorAndValidator, timer)
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetDelegationByDelegatorAndValidator, FailedNumber)

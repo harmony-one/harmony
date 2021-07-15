@@ -61,7 +61,7 @@ func (s *PublicContractService) GetCode(
 	ctx context.Context, addr string, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(GetCode)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetCode, timer)
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -90,7 +90,7 @@ func (s *PublicContractService) GetStorageAt(
 	ctx context.Context, addr string, key string, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
 	timer := DoMetricRPCRequest(GetStorageAt)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetStorageAt, timer)
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -117,7 +117,7 @@ func DoEVMCall(
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
 	timer := DoMetricRPCRequest(DoEvmCall)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(DoEvmCall, timer)
 
 	defer func(start time.Time) {
 		utils.Logger().Debug().
