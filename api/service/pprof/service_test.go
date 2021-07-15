@@ -37,7 +37,7 @@ func TestUnpackProfilesIntoMap(t *testing.T) {
 				ProfileNames: []string{"test"},
 			},
 			expMap: nil,
-			expErr: errors.New("Pprof profile does not exist: test"),
+			expErr: errors.New("pprof profile does not exist: test"),
 		},
 		{
 			input: &Config{

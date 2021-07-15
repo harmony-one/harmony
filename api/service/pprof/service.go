@@ -49,6 +49,7 @@ type Service struct {
 var (
 	initOnce sync.Once
 	svc      = &Service{}
+	cpuFile  *os.File
 )
 
 // NewService creates the new pprof service
@@ -61,21 +62,21 @@ func NewService(cfg Config) *Service {
 
 func newService(cfg Config) *Service {
 	if !cfg.Enabled {
-		utils.Logger().Info().Msg("Pprof service disabled...")
+		utils.Logger().Info().Msg("pprof service disabled...")
 		return nil
 	}
 
-	utils.Logger().Debug().Str("cfg", cfg.String()).Msg("Pprof")
+	utils.Logger().Debug().Str("cfg", cfg.String()).Msg("pprof")
 	svc.config = cfg
 
-	if profiles, err := cfg.unpackProfilesIntoMap(); err != nil {
-		log.Fatal("Could not unpack pprof profiles into map")
-	} else {
-		svc.profiles = profiles
+	profiles, err := cfg.unpackProfilesIntoMap()
+	if err != nil {
+		log.Fatal("could not unpack pprof profiles into map")
 	}
+	svc.profiles = profiles
 
 	go func() {
-		utils.Logger().Info().Str("address", cfg.ListenAddr).Msg("Starting pprof HTTP service")
+		utils.Logger().Info().Str("address", cfg.ListenAddr).Msg("starting pprof HTTP service")
 		http.ListenAndServe(cfg.ListenAddr, nil)
 	}()
 
@@ -93,8 +94,10 @@ func (s *Service) Start() error {
 		return err
 	}
 
-	if cpuProfile, ok := s.profiles[CPU]; ok {
-		go handleCpuProfile(cpuProfile, dir)
+	if _, ok := s.profiles[CPU]; ok {
+		// The nature of the pprof CPU profile is fundamentally different to the other profiles, because it streams output to a file during profiling.
+		// Thus it has to be started outside of the defined interval.
+		go restartCpuProfile(dir)
 	}
 
 	for _, profile := range s.profiles {
@@ -112,9 +115,12 @@ func (s *Service) Stop() error {
 	}
 	for _, profile := range s.profiles {
 		if profile.Name == CPU {
-			pprof.StopCPUProfile()
+			stopCpuProfile()
 		} else {
-			saveProfile(profile, dir)
+			err := saveProfile(profile, dir)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg(fmt.Sprintf("could not save pprof profile: %s", profile.Name))
+			}
 		}
 	}
 	return nil
@@ -135,9 +141,15 @@ func scheduleProfile(profile Profile, dir string) {
 				select {
 				case <-ticker.C:
 					if profile.Name == CPU {
-						handleCpuProfile(profile, dir)
+						err := restartCpuProfile(dir)
+						if err != nil {
+							utils.Logger().Error().Err(err).Msg("could not start pprof CPU profile")
+						}
 					} else {
-						saveProfile(profile, dir)
+						err := saveProfile(profile, dir)
+						if err != nil {
+							utils.Logger().Error().Err(err).Msg(fmt.Sprintf("could not save pprof profile: %s", profile.Name))
+						}
 					}
 				}
 			}
@@ -149,30 +161,39 @@ func scheduleProfile(profile Profile, dir string) {
 func saveProfile(profile Profile, dir string) error {
 	f, err := newTempFile(dir, profile.Name, ".pb.gz")
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not save pprof profile: %s", profile.Name))
 		return err
 	}
 	defer f.Close()
-	if profile.ProfileRef != nil {
-		err = profile.ProfileRef.WriteTo(f, profile.Debug)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg(fmt.Sprintf("Could not write pprof profile: %s", profile.Name))
-			return err
-		}
-		utils.Logger().Info().Msg(fmt.Sprintf("Saved pprof profile in: %s", f.Name()))
+	if profile.ProfileRef == nil {
+		return nil
 	}
+	err = profile.ProfileRef.WriteTo(f, profile.Debug)
+	if err != nil {
+		return err
+	}
+	utils.Logger().Info().Msg(fmt.Sprintf("saved pprof profile in: %s", f.Name()))
 	return nil
 }
 
-// handleCpuProfile handles the provided CPU profile
-func handleCpuProfile(profile Profile, dir string) {
+// restartCpuProfile stops the current CPU profile, if any and then starts a new CPU profile. While profiling in the background, the profile will be buffered and written to a file.
+func restartCpuProfile(dir string) error {
+	stopCpuProfile()
+	f, err := newTempFile(dir, CPU, ".pb.gz")
+	if err != nil {
+		return err
+	}
+	pprof.StartCPUProfile(f)
+	cpuFile = f
+	utils.Logger().Info().Msg(fmt.Sprintf("saved pprof CPU profile in: %s", f.Name()))
+	return nil
+}
+
+// stopCpuProfile stops the current CPU profile, if any
+func stopCpuProfile() {
 	pprof.StopCPUProfile()
-	f, err := newTempFile(dir, profile.Name, ".pb.gz")
-	if err == nil {
-		pprof.StartCPUProfile(f)
-		utils.Logger().Info().Msg(fmt.Sprintf("Saved pprof CPU profile in: %s", f.Name()))
-	} else {
-		utils.Logger().Error().Err(err).Msg("Could not start pprof CPU profile")
+	if cpuFile != nil {
+		cpuFile.Close()
+		cpuFile = nil
 	}
 }
 
@@ -185,8 +206,8 @@ func (config *Config) unpackProfilesIntoMap() (map[string]Profile, error) {
 	for index, name := range config.ProfileNames {
 		profile := Profile{
 			Name:     name,
-			Interval: 0,
-			Debug:    0,
+			Interval: 0, // 0 saves the profile when stopping the service
+			Debug:    0, // 0 writes the gzip-compressed protocol buffer
 		}
 		// Try set interval value
 		if len(config.ProfileIntervals) == len(config.ProfileNames) {
@@ -203,7 +224,7 @@ func (config *Config) unpackProfilesIntoMap() (map[string]Profile, error) {
 		// Try set the profile reference
 		if profile.Name != CPU {
 			if p := pprof.Lookup(profile.Name); p == nil {
-				return nil, fmt.Errorf("Pprof profile does not exist: %s", profile.Name)
+				return nil, fmt.Errorf("pprof profile does not exist: %s", profile.Name)
 			} else {
 				profile.ProfileRef = p
 			}
@@ -219,7 +240,7 @@ func newTempFile(dir, name, suffix string) (*os.File, error) {
 	currentTime := time.Now().Unix()
 	f, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("%s%d%s", prefix, currentTime, suffix)), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("Could not create file of the form %s%d%s", prefix, currentTime, suffix)
+		return nil, fmt.Errorf("could not create file of the form %s%d%s", prefix, currentTime, suffix)
 	}
 	return f, nil
 }
