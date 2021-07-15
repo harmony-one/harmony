@@ -986,7 +986,7 @@ var (
 	}
 	pprofProfileDebugFlag = cli.IntSliceFlag{
 		Name:     "pprof.profile.debug",
-		Usage:    "a list of pprof profile debug integer values (separated by ,) e.g. 0 writes the gzip-compressed protocol buffer and 1 writes the legacy text format",
+		Usage:    "a list of pprof profile debug integer values (separated by ,) e.g. 0 writes the gzip-compressed protocol buffer and 1 writes the legacy text format. Predefined profiles may assign meaning to other debug values: https://golang.org/pkg/runtime/pprof/",
 		DefValue: defaultConfig.Pprof.ProfileDebugValues,
 		Hidden:   true,
 	}

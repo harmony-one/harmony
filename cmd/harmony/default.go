@@ -67,8 +67,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ListenAddr:         "127.0.0.1:6060",
 		Folder:             "./profiles",
 		ProfileNames:       []string{},
-		ProfileIntervals:   []int{},
-		ProfileDebugValues: []int{},
+		ProfileIntervals:   []int{600},
+		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
 		Folder:     "./latest",
