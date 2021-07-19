@@ -50,6 +50,7 @@ var (
 	initOnce sync.Once
 	svc      = &Service{}
 	cpuFile  *os.File
+	lock     sync.Mutex
 )
 
 // NewService creates the new pprof service
@@ -75,11 +76,6 @@ func newService(cfg Config) *Service {
 	}
 	svc.profiles = profiles
 
-	go func() {
-		utils.Logger().Info().Str("address", cfg.ListenAddr).Msg("starting pprof HTTP service")
-		http.ListenAndServe(cfg.ListenAddr, nil)
-	}()
-
 	return svc
 }
 
@@ -93,6 +89,11 @@ func (s *Service) Start() error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		utils.Logger().Info().Str("address", s.config.ListenAddr).Msg("starting pprof HTTP service")
+		http.ListenAndServe(s.config.ListenAddr, nil)
+	}()
 
 	if _, ok := s.profiles[CPU]; ok {
 		// The nature of the pprof CPU profile is fundamentally different to the other profiles, because it streams output to a file during profiling.
@@ -177,6 +178,8 @@ func saveProfile(profile Profile, dir string) error {
 
 // restartCpuProfile stops the current CPU profile, if any and then starts a new CPU profile. While profiling in the background, the profile will be buffered and written to a file.
 func restartCpuProfile(dir string) error {
+	lock.Lock()
+	defer lock.Unlock()
 	stopCpuProfile()
 	f, err := newTempFile(dir, CPU, ".pb.gz")
 	if err != nil {
