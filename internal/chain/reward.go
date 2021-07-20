@@ -210,9 +210,14 @@ func AccumulateRewardsAndCountSigs(
 		// Handle rewards for shardchain
 		if bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
 			if blockNum%RewardFrequency != 0 {
+				// Block here until the commit sigs are ready or timeout.
+				// sigsReady signal indicates that the commit sigs are already populated in the header object.
+				if err := waitForCommitSigs(sigsReady); err != nil {
+					return network.EmptyPayout, err
+				}
 				return network.EmptyPayout, nil
 			}
-			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
 		} else {
 			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
 		}
@@ -303,7 +308,17 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 
 	allCrossLinks := types.CrossLinks{}
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
-		curHeader := bc.GetHeaderByNumber(i)
+		if i < 0 {
+			continue
+		}
+
+		var curHeader *block.Header
+		if i == curBlockNum {
+			curHeader = header
+		} else {
+			curHeader = bc.GetHeaderByNumber(i)
+		}
+
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
 
 			startTime := time.Now()
