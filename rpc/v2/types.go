@@ -704,7 +704,7 @@ func NewBlockWithFullTx(
 	}
 
 	for _, tx := range b.Transactions() {
-		fmtTx, err := NewTransactionFromBlockHash(b, tx.Hash())
+		fmtTx, err := NewTransactionFromHash(b, tx.Hash())
 		if err != nil {
 			return nil, err
 		}
@@ -727,8 +727,8 @@ func NewBlockWithFullTx(
 	return blk, nil
 }
 
-// NewTransactionFromBlockHash returns a transaction that will serialize to the RPC representation.
-func NewTransactionFromBlockHash(b *types.Block, hash common.Hash) (*Transaction, error) {
+// NewTransactionFromHash returns a transaction that will serialize to the RPC representation.
+func NewTransactionFromHash(b *types.Block, hash common.Hash) (*Transaction, error) {
 	for idx, tx := range b.Transactions() {
 		if tx.Hash() == hash {
 			return NewTransactionFromBlockIndex(b, uint64(idx))

@@ -42,7 +42,8 @@ type PublicBlockchainService struct {
 
 const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
-	blockCacheLimit               = 256
+	blockCacheLimit               = 2048
+	rpcGetBlocksLimit             = 1024
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
@@ -68,7 +69,6 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable boo
 			Public:    true,
 		}
 	}
-
 }
 
 // ChainId returns the chain id of the chain - required by MetaMask
@@ -188,7 +188,6 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 			return nil, err
 		}
 	}
-	blockArgs.InclTx = true
 
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum != rpc.PendingBlockNumber {
@@ -218,53 +217,52 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 
 	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if blk != nil && err == nil {
-		if blockArgs.WithSigners {
-			blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
-			if err != nil {
-				DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-				return nil, err
-			}
-		}
-
-		// Format the response according to version
-		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-		var rpcBlock interface{}
-		switch s.version {
-		case V1:
-			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-		case V2:
-			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-		case Eth:
-			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
-		default:
-			return nil, ErrUnknownRPCVersion
-		}
+	if blk == nil || err != nil {
+		return nil, err
+	}
+	if blockArgs.WithSigners {
+		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
 		if err != nil {
 			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 			return nil, err
 		}
-
-		response, err = NewStructuredResponse(rpcBlock)
-		if err != nil {
-			return nil, err
-		}
-
-		// Pending blocks need to nil out a few fields
-		if blockNum == rpc.PendingBlockNumber {
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
-
-		if blockNum != rpc.PendingBlockNumber {
-			cacheKey := combineCacheKey(blk.NumberU64(), s.version, blockArgs)
-			s.blockCache.Add(cacheKey, response)
-		}
-		return response, err
 	}
-	DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-	return nil, err
+
+	// Format the response according to version
+	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
+	var rpcBlock interface{}
+	switch s.version {
+	case V1:
+		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
+	case V2:
+		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
+	case Eth:
+		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		return nil, err
+	}
+
+	response, err = NewStructuredResponse(rpcBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pending blocks need to nil out a few fields
+	if blockNum == rpc.PendingBlockNumber {
+		for _, field := range []string{"hash", "nonce", "miner"} {
+			response[field] = nil
+		}
+	}
+
+	if blockNum != rpc.PendingBlockNumber {
+		cacheKey := combineCacheKey(blk.NumberU64(), s.version, blockArgs)
+		s.blockCache.Add(cacheKey, response)
+	}
+	return response, err
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
@@ -292,7 +290,6 @@ func (s *PublicBlockchainService) GetBlockByHash(
 			return nil, err
 		}
 	}
-	blockArgs.InclTx = true
 
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
@@ -366,10 +363,22 @@ func (s *PublicBlockchainService) GetBlocks(
 
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
+	if blockNumberEnd.EthBlockNumber() == rpc.LatestBlockNumber {
+		blockEnd = s.hmy.BlockChain.CurrentHeader().Number().Int64()
+	}
+	if blockEnd >= blockStart && blockEnd-blockStart > rpcGetBlocksLimit {
+		return nil, fmt.Errorf("GetBlocks query must be smaller than size %v", rpcGetBlocksLimit)
+	}
 
 	// Fetch blocks within given range
 	result := []StructuredResponse{}
 	for i := blockStart; i <= blockEnd; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		blockNum := BlockNumber(i)
 		if blockNum.Int64() > s.hmy.CurrentBlock().Number().Int64() {
 			break
@@ -916,5 +925,5 @@ func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBac
 func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
 	// no need format blockArgs.Signers[] as a part of cache key
 	// because it's not input from rpc caller, it's caculate with blockArgs.WithSigners
-	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.InclTx) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
+	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
 }
