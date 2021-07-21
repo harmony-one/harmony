@@ -54,6 +54,8 @@ const (
 	DefaultWSPort = 9800
 	// DefaultPrometheusPort is the default prometheus port. The actual port used is 9000+900
 	DefaultPrometheusPort = 9900
+	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
+	DefaultP2PConcurrency = 0
 )
 
 const (

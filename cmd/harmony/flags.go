@@ -55,7 +55,7 @@ var (
 		p2pIPFlag,
 		p2pKeyFileFlag,
 		p2pDHTDataStoreFlag,
-
+		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
 	}
 
@@ -517,6 +517,11 @@ var (
 		DefValue:   defaultConfig.P2P.KeyFile,
 		Deprecated: "use --p2p.keyfile",
 	}
+	p2pDiscoveryConcurrencyFlag = cli.IntFlag{
+		Name:     "p2p.disc.concurrency",
+		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
+		DefValue: defaultConfig.P2P.DiscConcurrency,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -539,6 +544,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pDHTDataStoreFlag) {
 		ds := cli.GetStringFlagValue(cmd, p2pDHTDataStoreFlag)
 		config.P2P.DHTDataStore = &ds
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
+		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
 	}
 }
 
