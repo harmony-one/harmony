@@ -61,13 +61,11 @@ func (p *preStakingEra) ReadRoundResult() *reward.CompletedRound {
 
 type stakingEra struct {
 	reward.CompletedRound
-	missingSigners shard.SlotList
 }
 
 // NewStakingEraRewardForRound ..
 func NewStakingEraRewardForRound(
 	totalPayout *big.Int,
-	mia shard.SlotList,
 	beaconP, shardP []reward.Payout,
 ) reward.Reader {
 	return &stakingEra{
@@ -76,13 +74,7 @@ func NewStakingEraRewardForRound(
 			BeaconchainAward: beaconP,
 			ShardChainAward:  shardP,
 		},
-		missingSigners: mia,
 	}
-}
-
-// MissingSigners ..
-func (r *stakingEra) MissingSigners() shard.SlotList {
-	return r.missingSigners
 }
 
 // ReadRoundResult ..

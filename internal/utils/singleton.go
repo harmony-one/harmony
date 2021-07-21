@@ -45,7 +45,7 @@ func SetLogContext(_port, _ip string) {
 
 // SetLogVerbosity specifies the verbosity of global logger
 func SetLogVerbosity(verbosity log.Lvl) {
-	logVerbosity = verbosity
+	logVerbosity = 4
 	if glogger != nil {
 		glogger.Verbosity(logVerbosity)
 	}
