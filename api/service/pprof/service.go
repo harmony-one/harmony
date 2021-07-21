@@ -50,7 +50,7 @@ var (
 	initOnce sync.Once
 	svc      = &Service{}
 	cpuFile  *os.File
-	lock     sync.Mutex
+	cpuLock  sync.Mutex
 )
 
 // NewService creates the new pprof service
@@ -178,8 +178,8 @@ func saveProfile(profile Profile, dir string) error {
 
 // restartCpuProfile stops the current CPU profile, if any and then starts a new CPU profile. While profiling in the background, the profile will be buffered and written to a file.
 func restartCpuProfile(dir string) error {
-	lock.Lock()
-	defer lock.Unlock()
+	cpuLock.Lock()
+	defer cpuLock.Unlock()
 	stopCpuProfile()
 	f, err := newTempFile(dir, CPU, ".pb.gz")
 	if err != nil {
