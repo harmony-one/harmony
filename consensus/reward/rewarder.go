@@ -17,9 +17,8 @@ type Payout struct {
 
 // CompletedRound ..
 type CompletedRound struct {
-	Total            *big.Int
-	BeaconchainAward []Payout
-	ShardChainAward  []Payout
+	Total   *big.Int
+	Payouts []Payout
 }
 
 // Reader ..
