@@ -18,6 +18,10 @@ var (
 	deadline = 5 * time.Minute // consider a filter inactive if it has not been polled for within deadline
 )
 
+const (
+	rpcGetLogsLimit = 1024
+)
+
 // filter is a helper struct that holds meta information over the filter type
 // and associated subscription in the event system.
 type filter struct {
@@ -378,6 +382,10 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 		if crit.ToBlock != nil {
 			end = crit.ToBlock.Int64()
 		}
+		if end >= begin && end-begin > rpcGetLogsLimit {
+			return nil, fmt.Errorf("GetLogs query must be smaller than size %v", rpcGetLogsLimit)
+		}
+
 		// Construct the range filter
 		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics, api.isEth())
 	}
