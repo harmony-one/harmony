@@ -210,15 +210,15 @@ func AccumulateRewardsAndCountSigs(
 
 		// Handle rewards for shardchain
 		if bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
-			if blockNum%RewardFrequency != 0 {
-				// Block here until the commit sigs are ready or timeout.
-				// sigsReady signal indicates that the commit sigs are already populated in the header object.
-				if err := waitForCommitSigs(sigsReady); err != nil {
-					return network.EmptyPayout, err
-				}
+			// Block here until the commit sigs are ready or timeout.
+			// sigsReady signal indicates that the commit sigs are already populated in the header object.
+			if err := waitForCommitSigs(sigsReady); err != nil {
+				return network.EmptyPayout, err
+			}
+			if blockNum%RewardFrequency != RewardFrequency-1 {
 				return network.EmptyPayout, nil
 			}
-			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 		} else {
 			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
 		}
@@ -300,7 +300,7 @@ func waitForCommitSigs(sigsReady chan bool) error {
 }
 
 func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec, sigsReady chan bool) (reward.Reader, error) {
+	defaultReward numeric.Dec) (reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -308,6 +308,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	curBlockNum := header.Number().Uint64()
 
 	allCrossLinks := types.CrossLinks{}
+	startTime := time.Now()
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
 		if i < 0 {
 			continue
@@ -336,9 +337,12 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 	}
 
-	startTime := time.Now()
 	for i := range allCrossLinks {
 		cxLink := allCrossLinks[i]
+		if !bc.Config().IsStaking(cxLink.Epoch()) {
+			continue
+		}
+		utils.Logger().Info().Msg(fmt.Sprintf("allCrossLinks shard %d block %d", cxLink.ShardID(), cxLink.BlockNum()))
 		payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
 
 		if err != nil {
@@ -392,8 +396,8 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			return network.EmptyPayout, err
 		}
 	}
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (AddReward)")
-	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Shard Chain Reward")
+	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("After Chain Reward (AddReward)")
+	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("After Chain Reward")
 
 	return network.NewStakingEraRewardForRound(
 		newRewards, payouts,
@@ -517,8 +521,6 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 		}
 	}
 	for beaconMember := range payable {
-		// TODO Give out whatever leftover to the last voter/handle
-		// what to do about share of those that didn't sign
 		blsKey := payable[beaconMember].BLSPublicKey
 		voter := votingPower.Voters[blsKey]
 		if !voter.IsHarmonyNode {
