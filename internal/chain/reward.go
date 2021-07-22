@@ -218,8 +218,10 @@ func AccumulateRewardsAndCountSigs(
 			if blockNum%RewardFrequency != RewardFrequency-1 {
 				return network.EmptyPayout, nil
 			}
-			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 		} else {
+			if blockNum%RewardFrequency == RewardFrequency-1 {
+				distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+			}
 			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
 		}
 	}
