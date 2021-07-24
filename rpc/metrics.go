@@ -113,8 +113,8 @@ var (
 			Subsystem: "rpc",
 			Name:      "request_delay_histogram",
 			Help:      "delay in seconds to do rpc requests",
-			// buckets: 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1280ms, 2560ms, 5120ms, +INF
-			Buckets: prometheus.ExponentialBuckets(0.02, 2, 10),
+			// buckets: 50ms, 100ms, 200ms, 400ms, 800ms, 1600ms, 3200ms, +INF
+			Buckets: prometheus.ExponentialBuckets(0.05, 2, 8),
 		},
 		[]string{"rpc_name"},
 	)
