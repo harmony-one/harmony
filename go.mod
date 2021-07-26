@@ -30,19 +30,19 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/json-iterator/go v1.1.10
-	github.com/libp2p/go-libp2p v0.14.2
-	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p v0.14.4
+	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-kad-dht v0.12.2
-	github.com/libp2p/go-libp2p-pubsub v0.4.1
-	github.com/multiformats/go-multiaddr v0.3.1
+	github.com/libp2p/go-libp2p-pubsub v0.4.2
+	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.8.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.7.0 // indirect
