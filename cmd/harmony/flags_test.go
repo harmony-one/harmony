@@ -30,7 +30,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -57,9 +57,10 @@ func TestHarmonyFlags(t *testing.T) {
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: harmonyconfig.P2pConfig{
-					Port:    9000,
-					IP:      defaultConfig.P2P.IP,
-					KeyFile: defaultConfig.P2P.KeyFile,
+					Port:            9000,
+					IP:              defaultConfig.P2P.IP,
+					KeyFile:         defaultConfig.P2P.KeyFile,
+					DiscConcurrency: 5,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -373,6 +374,15 @@ func TestP2PFlags(t *testing.T) {
 				KeyFile: "./key.file",
 			},
 		},
+		{
+			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:            9001,
+				IP:              nodeconfig.DefaultPublicListenIP,
+				KeyFile:         "./.hmykey",
+				DiscConcurrency: 5,
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
@@ -391,7 +401,7 @@ func TestP2PFlags(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(got.P2P, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
+			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.P2P, test.expConfig)
 		}
 		ts.tearDown()
 	}

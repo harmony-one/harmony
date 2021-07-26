@@ -185,6 +185,9 @@ func init() {
 		if confTree.Get("Pprof.ProfileDebugValues") == nil {
 			confTree.Set("Pprof.ProfileDebugValues", defaultConfig.Pprof.ProfileDebugValues)
 		}
+		if confTree.Get("P2P.DiscConcurrency") == nil {
+			confTree.Set("P2P.DiscConcurrency", defaultConfig.P2P.DiscConcurrency)
+		}
 
 		confTree.Set("Version", "2.2.0")
 		return confTree

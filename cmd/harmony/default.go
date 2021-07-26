@@ -24,9 +24,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:    nodeconfig.DefaultP2PPort,
-		IP:      nodeconfig.DefaultPublicListenIP,
-		KeyFile: "./.hmykey",
+		Port:            nodeconfig.DefaultP2PPort,
+		IP:              nodeconfig.DefaultPublicListenIP,
+		KeyFile:         "./.hmykey",
+		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
