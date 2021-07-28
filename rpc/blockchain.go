@@ -4,13 +4,18 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
+
 	"github.com/harmony-one/harmony/core/types"
+	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -23,10 +28,6 @@ import (
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/time/rate"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
@@ -36,6 +37,7 @@ type PublicBlockchainService struct {
 	version         Version
 	limiter         *rate.Limiter
 	rpcBlockFactory rpc_common.BlockFactory
+	helper          *bcServiceHelper
 }
 
 const (
@@ -59,14 +61,15 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable boo
 		version: version,
 		limiter: limiter,
 	}
+	s.helper = s.newHelper()
 
 	switch version {
 	case V1:
-		s.rpcBlockFactory = v1.NewBlockFactory(s.helper())
+		s.rpcBlockFactory = v1.NewBlockFactory(s.helper)
 	case V2:
-		s.rpcBlockFactory = v2.NewBlockFactory(s.helper())
+		s.rpcBlockFactory = v2.NewBlockFactory(s.helper)
 	case Eth:
-		s.rpcBlockFactory = eth.NewBlockFactory(s.helper())
+		s.rpcBlockFactory = eth.NewBlockFactory(s.helper)
 	default:
 		// This shall not happen for legitimate code.
 	}
@@ -101,30 +104,6 @@ func (s *PublicBlockchainService) ChainId(ctx context.Context) (interface{}, err
 // Instead, users should send already signed raw transactions using hmy_sendRawTransaction or eth_sendRawTransaction
 func (s *PublicBlockchainService) Accounts() []common.Address {
 	return []common.Address{}
-}
-
-// getBlockOptions is a helper to get block args given an interface option from RPC params.
-func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common.BlockArgs, error) {
-	switch s.version {
-	case V1, Eth:
-		fullTx, ok := opts.(bool)
-		if !ok {
-			return nil, fmt.Errorf("invalid type for block arguments")
-		}
-		return &rpc_common.BlockArgs{
-			WithSigners: false,
-			FullTx:      fullTx,
-			InclStaking: true,
-		}, nil
-	case V2:
-		parsedBlockArgs := rpc_common.BlockArgs{}
-		if err := parsedBlockArgs.UnmarshalFromInterface(opts); err != nil {
-			return nil, err
-		}
-		return &parsedBlockArgs, nil
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
 }
 
 // getBalanceByBlockNumber returns balance by block number at given eth blockNum without checks
@@ -193,14 +172,10 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 
 	// Process arguments based on version
-	var blockArgs *rpc_common.BlockArgs
-	blockArgs, ok := opts.(*rpc_common.BlockArgs)
-	if !ok {
-		blockArgs, err = s.getBlockOptions(opts)
-		if err != nil {
-			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-			return nil, err
-		}
+	blockArgs, err := s.getBlockOptions(opts)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		return nil, err
 	}
 
 	if blockNumber.EthBlockNumber() == rpc.PendingBlockNumber {
@@ -214,16 +189,16 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 
 	blk := s.hmy.BlockChain.GetBlockByNumber(blockNum)
+	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
+	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
+	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
+	// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
 	if blk == nil {
-		// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
-		// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
-		// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
-		// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		if s.version == Eth {
-			return nil, ErrRequestedBlockTooHigh
+			return nil, nil
 		}
-		return nil, errors.New("block unknown")
+		return nil, ErrRequestedBlockTooHigh
 	}
 	// Format the response according to version
 	rpcBlock, err := s.rpcBlockFactory.NewBlock(blk, blockArgs)
@@ -250,14 +225,10 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	}
 
 	// Process arguments based on version
-	var blockArgs *rpc_common.BlockArgs
-	blockArgs, ok := opts.(*rpc_common.BlockArgs)
-	if !ok {
-		blockArgs, err = s.getBlockOptions(opts)
-		if err != nil {
-			DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
-			return nil, err
-		}
+	blockArgs, err := s.getBlockOptions(opts)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
+		return nil, err
 	}
 
 	// Fetch the block
@@ -339,6 +310,7 @@ func (s *PublicBlockchainService) GetBlocks(
 		if err != nil {
 			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 			utils.Logger().Warn().Err(err).Msg("RPC Get Blocks Error")
+			return nil, err
 		}
 		if rpcBlock != nil {
 			result = append(result, rpcBlock)
@@ -369,7 +341,9 @@ func (s *PublicBlockchainService) GetBlockSigners(
 ) ([]string, error) {
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
-
+	if blockNum == rpc.PendingBlockNumber {
+		return nil, errors.New("cannot get signer keys for pending blocks")
+	}
 	// Ensure correct block
 	if blockNum.Int64() == 0 || blockNum.Int64() >= s.hmy.CurrentBlock().Number().Int64() {
 		return []string{}, nil
@@ -377,25 +351,18 @@ func (s *PublicBlockchainService) GetBlockSigners(
 	if isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
-
+	var bn uint64
+	if blockNum == rpc.LatestBlockNumber {
+		bn = s.hmy.CurrentBlock().NumberU64()
+	} else {
+		bn = uint64(blockNum.Int64())
+	}
+	blk := s.hmy.BlockChain.GetBlockByNumber(bn)
+	if blk == nil {
+		return nil, errors.New("unknown block")
+	}
 	// Fetch signers
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
-	if err != nil {
-		return nil, err
-	}
-
-	// Response output is the same for all versions
-	signers := []string{}
-	for _, validator := range slots {
-		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
-		if err != nil {
-			return nil, err
-		}
-		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
-			signers = append(signers, oneAddress)
-		}
-	}
-	return signers, nil
+	return s.helper.GetSigners(blk)
 }
 
 // GetBlockSignerKeys returns bls public keys that signed the block.
@@ -404,7 +371,9 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 ) ([]string, error) {
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
-
+	if blockNum == rpc.PendingBlockNumber {
+		return nil, errors.New("cannot get signer keys for pending blocks")
+	}
 	// Ensure correct block
 	if blockNum.Int64() == 0 || blockNum.Int64() >= s.hmy.CurrentBlock().Number().Int64() {
 		return []string{}, nil
@@ -412,21 +381,14 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 	if isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return nil, ErrRequestedBlockTooHigh
 	}
-
+	var bn uint64
+	if blockNum == rpc.LatestBlockNumber {
+		bn = s.hmy.CurrentBlock().NumberU64()
+	} else {
+		bn = uint64(blockNum.Int64())
+	}
 	// Fetch signers
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
-	if err != nil {
-		return nil, err
-	}
-
-	// Response output is the same for all versions
-	signers := []string{}
-	for _, validator := range slots {
-		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
-			signers = append(signers, validator.BLSPublicKey.Hex())
-		}
-	}
-	return signers, nil
+	return s.helper.GetBLSSigners(bn)
 }
 
 // IsBlockSigner returns true if validator with address signed blockNum block.
@@ -443,27 +405,17 @@ func (s *PublicBlockchainService) IsBlockSigner(
 	if isBlockGreaterThanLatest(s.hmy, blockNum) {
 		return false, ErrRequestedBlockTooHigh
 	}
+	var bn uint64
+	if blockNum == rpc.PendingBlockNumber {
+		return false, errors.New("no signing data for pending block number")
+	} else if blockNum == rpc.LatestBlockNumber {
+		bn = s.hmy.BlockChain.CurrentBlock().NumberU64()
+	} else {
+		bn = uint64(blockNum.Int64())
+	}
 
 	// Fetch signers
-	slots, mask, err := s.hmy.GetBlockSigners(ctx, blockNum)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if given address is in slots (response output is the same for all versions)
-	for _, validator := range slots {
-		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
-		if err != nil {
-			return false, err
-		}
-		if oneAddress != address {
-			continue
-		}
-		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
-			return true, nil
-		}
-	}
-	return false, nil
+	return s.helper.IsSigner(address, bn)
 }
 
 // GetSignedBlocks returns how many blocks a particular validator signed for
@@ -472,18 +424,41 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 	ctx context.Context, address string,
 ) (interface{}, error) {
 	// Fetch the number of signed blocks within default period
-	totalSigned := uint64(0)
-	lastBlock := uint64(0)
-	blockHeight := s.hmy.CurrentBlock().Number().Uint64()
-	instance := shard.Schedule.InstanceForEpoch(s.hmy.CurrentBlock().Epoch())
-	if blockHeight >= instance.BlocksPerEpoch() {
-		lastBlock = blockHeight - instance.BlocksPerEpoch() + 1
-	}
-	for i := lastBlock; i <= blockHeight; i++ {
-		signed, err := s.IsBlockSigner(ctx, BlockNumber(i), address)
-		if err == nil && signed {
-			totalSigned++
+	curEpoch := s.hmy.CurrentBlock().Epoch()
+	var totalSigned uint64
+	if !s.hmy.ChainConfig().IsStaking(curEpoch) {
+		// calculate signed before staking epoch
+		totalSigned := uint64(0)
+		lastBlock := uint64(0)
+		blockHeight := s.hmy.CurrentBlock().Number().Uint64()
+		instance := shard.Schedule.InstanceForEpoch(s.hmy.CurrentBlock().Epoch())
+		if blockHeight >= instance.BlocksPerEpoch() {
+			lastBlock = blockHeight - instance.BlocksPerEpoch() + 1
 		}
+		for i := lastBlock; i <= blockHeight; i++ {
+			signed, err := s.IsBlockSigner(ctx, BlockNumber(i), address)
+			if err == nil && signed {
+				totalSigned++
+			}
+		}
+	} else {
+		ethAddr, err := internal_common.Bech32ToAddress(address)
+		if err != nil {
+			return nil, err
+		}
+		curVal, err := s.hmy.BlockChain.ReadValidatorInformation(ethAddr)
+		if err != nil {
+			return nil, err
+		}
+		prevVal, err := s.hmy.BlockChain.ReadValidatorSnapshot(ethAddr)
+		if err != nil {
+			return nil, err
+		}
+		signedInEpoch := new(big.Int).Sub(curVal.Counters.NumBlocksSigned, prevVal.Validator.Counters.NumBlocksSigned)
+		if signedInEpoch.Cmp(common.Big0) < 0 {
+			return nil, errors.New("negative signed in epoch")
+		}
+		totalSigned = signedInEpoch.Uint64()
 	}
 
 	// Format the response according to the version
@@ -520,13 +495,9 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 // GetLeader returns current shard leader.
 func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error) {
 	// Fetch Header
-	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil {
-		return "", err
-	}
-
+	blk := s.hmy.BlockChain.CurrentBlock()
 	// Response output is the same for all versions
-	leader := s.hmy.GetLeaderAddress(header.Coinbase(), header.Epoch())
+	leader := s.helper.GetLeader(blk)
 	return leader, nil
 }
 
@@ -858,6 +829,34 @@ func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error
 	return inSync, nil
 }
 
+// getBlockOptions block args given an interface option from RPC params.
+func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common.BlockArgs, error) {
+	blockArgs, ok := opts.(*rpc_common.BlockArgs)
+	if ok {
+		return blockArgs, nil
+	}
+	switch s.version {
+	case V1, Eth:
+		fullTx, ok := opts.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for block arguments")
+		}
+		return &rpc_common.BlockArgs{
+			WithSigners: false,
+			FullTx:      fullTx,
+			InclStaking: true,
+		}, nil
+	case V2:
+		parsedBlockArgs := rpc_common.BlockArgs{}
+		if err := parsedBlockArgs.UnmarshalFromInterface(opts); err != nil {
+			return nil, err
+		}
+		return &parsedBlockArgs, nil
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+}
+
 func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 	// rpc.BlockNumber is int64 (latest = -1. pending = -2) and currentBlockNum is uint64.
 	if blockNum == rpc.PendingBlockNumber {
@@ -873,12 +872,6 @@ func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBac
 	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
 }
 
-func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
-	// no need format blockArgs.Signers[] as a part of cache key
-	// because it's not input from rpc caller, it's calculate with blockArgs.WithSigners
-	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
-}
-
 const (
 	blockCacheSize      = 2048
 	signersCacheSize    = blockCacheSize
@@ -887,7 +880,7 @@ const (
 )
 
 type (
-	// bcServiceHelper is the helper for block factory. Implements
+	// bcServiceHelper is the getHelper for block factory. Implements
 	// rpc_common.BlockDataProvider
 	bcServiceHelper struct {
 		version Version
@@ -902,7 +895,7 @@ type (
 	}
 )
 
-func (s *PublicBlockchainService) helper() *bcServiceHelper {
+func (s *PublicBlockchainService) newHelper() *bcServiceHelper {
 	signerCache, _ := lru.New(signersCacheSize)
 	stakingTxsCache, _ := lru.New(stakingTxsCacheSize)
 	leaderCache, _ := lru.New(leaderCacheSize)
@@ -926,19 +919,6 @@ func (helper *bcServiceHelper) GetLeader(b *types.Block) string {
 	leader := helper.hmy.GetLeaderAddress(b.Coinbase(), b.Epoch())
 	helper.cache.leaderCache.Add(b.NumberU64(), leader)
 	return leader
-}
-
-func (helper *bcServiceHelper) GetSigners(b *types.Block) ([]string, error) {
-	x, ok := helper.cache.signersCache.Get(b.NumberU64())
-	if ok && x != nil {
-		return x.([]string), nil
-	}
-	signers, err := getSigners(helper.hmy, b.NumberU64())
-	if err != nil {
-		return nil, errors.Wrap(err, "getSigners")
-	}
-	helper.cache.signersCache.Add(b.NumberU64(), signers)
-	return signers, nil
 }
 
 func (helper *bcServiceHelper) GetStakingTxs(b *types.Block) (interface{}, error) {
@@ -977,20 +957,77 @@ func (helper *bcServiceHelper) GetStakingTxHashes(b *types.Block) []common.Hash 
 	return res
 }
 
-func getSigners(hmy *hmy.Harmony, number uint64) ([]string, error) {
+// signerData is the cached signing data for a block
+type signerData struct {
+	signers    []string           // one address for signers
+	blsSigners []string           // bls hex for signers
+	slots      shard.SlotList     // computed slots for epoch shard committee
+	mask       *internal_bls.Mask // mask for the block
+}
+
+func (helper *bcServiceHelper) GetSigners(b *types.Block) ([]string, error) {
+	sd, err := helper.getSignerData(b.NumberU64())
+	if err != nil {
+		return nil, err
+	}
+	return sd.signers, nil
+}
+
+func (helper *bcServiceHelper) GetBLSSigners(bn uint64) ([]string, error) {
+	sd, err := helper.getSignerData(bn)
+	if err != nil {
+		return nil, err
+	}
+	return sd.blsSigners, nil
+}
+
+func (helper *bcServiceHelper) IsSigner(oneAddr string, bn uint64) (bool, error) {
+	sd, err := helper.getSignerData(bn)
+	if err != nil {
+		return false, err
+	}
+	for _, signer := range sd.signers {
+		if oneAddr == signer {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (helper *bcServiceHelper) getSignerData(bn uint64) (*signerData, error) {
+	x, ok := helper.cache.signersCache.Get(bn)
+	if ok && x != nil {
+		return x.(*signerData), nil
+	}
+	sd, err := getSignerData(helper.hmy, bn)
+	if err != nil {
+		return nil, errors.Wrap(err, "getSignerData")
+	}
+	helper.cache.signersCache.Add(bn, sd)
+	return sd, nil
+}
+
+func getSignerData(hmy *hmy.Harmony, number uint64) (*signerData, error) {
 	slots, mask, err := hmy.GetBlockSigners(context.Background(), rpc.BlockNumber(number))
 	if err != nil {
 		return nil, err
 	}
 	signers := make([]string, 0, len(slots))
+	blsSigners := make([]string, 0, len(slots))
 	for _, validator := range slots {
 		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
 		if err != nil {
 			return nil, err
 		}
 		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
+			blsSigners = append(blsSigners, validator.BLSPublicKey.Hex())
 			signers = append(signers, oneAddress)
 		}
 	}
-	return signers, nil
+	return &signerData{
+		signers:    signers,
+		blsSigners: blsSigners,
+		slots:      slots,
+		mask:       mask,
+	}, nil
 }
