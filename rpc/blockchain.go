@@ -7,16 +7,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/chain"
-
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"golang.org/x/time/rate"
-
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -27,47 +23,59 @@ import (
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	"github.com/harmony-one/harmony/shard"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
-
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 )
 
 // PublicBlockchainService provides an API to access the Harmony blockchain.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicBlockchainService struct {
-	hmy        *hmy.Harmony
-	version    Version
-	limiter    *rate.Limiter
-	blockCache *lru.Cache
+	hmy             *hmy.Harmony
+	version         Version
+	limiter         *rate.Limiter
+	rpcBlockFactory rpc_common.BlockFactory
 }
 
 const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
-	blockCacheLimit               = 2048
 	rpcGetBlocksLimit             = 1024
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
-	blockCache, _ := lru.New(blockCacheLimit)
+	var limiter *rate.Limiter
 	if limiterEnable {
 		limiter := rate.NewLimiter(rate.Limit(limit), 1)
 		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
 		rpcRateLimitCounterVec.With(prometheus.Labels{
 			"rate_limit": strLimit,
 		}).Add(float64(0))
-		return rpc.API{
-			Namespace: version.Namespace(),
-			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, limiter, blockCache},
-			Public:    true,
-		}
-	} else {
-		return rpc.API{
-			Namespace: version.Namespace(),
-			Version:   APIVersion,
-			Service:   &PublicBlockchainService{hmy, version, nil, blockCache},
-			Public:    true,
-		}
+	}
+
+	s := &PublicBlockchainService{
+		hmy:     hmy,
+		version: version,
+		limiter: limiter,
+	}
+
+	switch version {
+	case V1:
+		s.rpcBlockFactory = v1.NewBlockFactory(s.helper())
+	case V2:
+		s.rpcBlockFactory = v2.NewBlockFactory(s.helper())
+	case Eth:
+		s.rpcBlockFactory = eth.NewBlockFactory(s.helper())
+	default:
+		// This shall not happen for legitimate code.
+	}
+
+	return rpc.API{
+		Namespace: version.Namespace(),
+		Version:   APIVersion,
+		Service:   s,
+		Public:    true,
 	}
 }
 
@@ -174,9 +182,16 @@ func (s *PublicBlockchainService) wait(ctx context.Context) error {
 // When withSigners in BlocksArgs is true it shows block signers for this block in list of one addresses.
 func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
-) (response StructuredResponse, err error) {
+) (response interface{}, err error) {
 	timer := DoMetricRPCRequest(GetBlockByNumber)
 	defer DoRPCRequestDuration(GetBlockByNumber, timer)
+
+	err = s.wait(ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		return nil, err
+	}
+
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -188,80 +203,35 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		}
 	}
 
-	blockNum := blockNumber.EthBlockNumber()
-	if blockNum != rpc.PendingBlockNumber {
-		realBlockNum := uint64(blockNum)
-		if blockNum == rpc.LatestBlockNumber {
-			realBlockNum = s.hmy.CurrentBlock().NumberU64()
-		}
-		cacheKey := combineCacheKey(realBlockNum, s.version, blockArgs)
-		if block, ok := s.blockCache.Get(cacheKey); ok {
-			return block.(StructuredResponse), nil
-		}
+	if blockNumber.EthBlockNumber() == rpc.PendingBlockNumber {
+		return nil, errors.New("pending block number not implemented")
+	}
+	var blockNum uint64
+	if blockNumber.EthBlockNumber() == rpc.LatestBlockNumber {
+		blockNum = s.hmy.BlockChain.CurrentHeader().Number().Uint64()
+	} else {
+		blockNum = uint64(blockNumber.EthBlockNumber().Int64())
 	}
 
-	err = s.wait(ctx)
-	if err != nil {
+	blk := s.hmy.BlockChain.GetBlockByNumber(blockNum)
+	if blk == nil {
+		// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
+		// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
+		// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
+		// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-		return nil, err
-	}
-
-	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
-	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
-	// Throwing an error like "requested block number greater than current block number" breaks this retry functionality.
-	// Disable isBlockGreaterThanLatest checks for Ethereum RPC:s, but keep them in place for legacy hmy_ RPC:s for now to ensure backwards compatibility
-	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
-		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-		return nil, ErrRequestedBlockTooHigh
-	}
-
-	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if blk == nil || err != nil {
-		return nil, err
-	}
-	if blockArgs.WithSigners {
-		blockArgs.Signers, err = s.GetBlockSigners(ctx, blockNumber)
-		if err != nil {
-			DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
-			return nil, err
+		if s.version == Eth {
+			return nil, ErrRequestedBlockTooHigh
 		}
+		return nil, errors.New("block unknown")
 	}
-
 	// Format the response according to version
-	leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-	var rpcBlock interface{}
-	switch s.version {
-	case V1:
-		rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-	case V2:
-		rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-	case Eth:
-		rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
-	default:
-		return nil, ErrUnknownRPCVersion
-	}
+	rpcBlock, err := s.rpcBlockFactory.NewBlock(blk, blockArgs)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, err
 	}
-
-	response, err = NewStructuredResponse(rpcBlock)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pending blocks need to nil out a few fields
-	if blockNum == rpc.PendingBlockNumber {
-		for _, field := range []string{"hash", "nonce", "miner"} {
-			response[field] = nil
-		}
-	}
-
-	if blockNum != rpc.PendingBlockNumber {
-		cacheKey := combineCacheKey(blk.NumberU64(), s.version, blockArgs)
-		s.blockCache.Add(cacheKey, response)
-	}
-	return response, err
+	return rpcBlock, err
 }
 
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
@@ -269,7 +239,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 // it shows block signers for this block in list of one addresses.
 func (s *PublicBlockchainService) GetBlockByHash(
 	ctx context.Context, blockHash common.Hash, opts interface{},
-) (response StructuredResponse, err error) {
+) (response interface{}, err error) {
 	timer := DoMetricRPCRequest(GetBlockByHash)
 	defer DoRPCRequestDuration(GetBlockByHash, timer)
 
@@ -292,42 +262,24 @@ func (s *PublicBlockchainService) GetBlockByHash(
 
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
-	if blk != nil && err == nil {
-		if blockArgs.WithSigners {
-			blockArgs.Signers, err = s.GetBlockSigners(ctx, BlockNumber(blk.NumberU64()))
-			if err != nil {
-				DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
-				return nil, err
-			}
-		}
-
-		// Format the response according to version
-		leader := s.hmy.GetLeaderAddress(blk.Header().Coinbase(), blk.Header().Epoch())
-		var rpcBlock interface{}
-		switch s.version {
-		case V1:
-			rpcBlock, err = v1.NewBlock(blk, blockArgs, leader)
-		case V2:
-			rpcBlock, err = v2.NewBlock(blk, blockArgs, leader)
-		case Eth:
-			rpcBlock, err = eth.NewBlock(blk, blockArgs, leader)
-		default:
-			return nil, ErrUnknownRPCVersion
-		}
-		if err != nil {
-			DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
-			return nil, err
-		}
-		return NewStructuredResponse(rpcBlock)
+	if err != nil || blk == nil {
+		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
+		return nil, err
 	}
-	DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
-	return nil, err
+
+	// Format the response according to version
+	rpcBlock, err := s.rpcBlockFactory.NewBlock(blk, blockArgs)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		return nil, err
+	}
+	return rpcBlock, err
 }
 
 // GetBlockByNumberNew is an alias for GetBlockByNumber using rpc_common.BlockArgs
 func (s *PublicBlockchainService) GetBlockByNumberNew(
 	ctx context.Context, blockNum BlockNumber, blockArgs *rpc_common.BlockArgs,
-) (StructuredResponse, error) {
+) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetBlockByNumberNew)
 	defer DoRPCRequestDuration(GetBlockByNumberNew, timer)
 
@@ -341,7 +293,7 @@ func (s *PublicBlockchainService) GetBlockByNumberNew(
 // GetBlockByHashNew is an alias for GetBlocksByHash using rpc_common.BlockArgs
 func (s *PublicBlockchainService) GetBlockByHashNew(
 	ctx context.Context, blockHash common.Hash, blockArgs *rpc_common.BlockArgs,
-) (StructuredResponse, error) {
+) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetBlockByHashNew)
 	defer DoRPCRequestDuration(GetBlockByHashNew, timer)
 
@@ -356,7 +308,7 @@ func (s *PublicBlockchainService) GetBlockByHashNew(
 func (s *PublicBlockchainService) GetBlocks(
 	ctx context.Context, blockNumberStart BlockNumber,
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
-) ([]StructuredResponse, error) {
+) ([]interface{}, error) {
 	timer := DoMetricRPCRequest(GetBlocks)
 	defer DoRPCRequestDuration(GetBlocks, timer)
 
@@ -370,7 +322,7 @@ func (s *PublicBlockchainService) GetBlocks(
 	}
 
 	// Fetch blocks within given range
-	result := []StructuredResponse{}
+	result := make([]interface{}, 0)
 	for i := blockStart; i <= blockEnd; i++ {
 		select {
 		case <-ctx.Done():
@@ -923,6 +875,122 @@ func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBac
 
 func combineCacheKey(number uint64, version Version, blockArgs *rpc_common.BlockArgs) string {
 	// no need format blockArgs.Signers[] as a part of cache key
-	// because it's not input from rpc caller, it's caculate with blockArgs.WithSigners
+	// because it's not input from rpc caller, it's calculate with blockArgs.WithSigners
 	return strconv.FormatUint(number, 10) + strconv.FormatInt(int64(version), 10) + strconv.FormatBool(blockArgs.WithSigners) + strconv.FormatBool(blockArgs.FullTx) + strconv.FormatBool(blockArgs.InclStaking)
+}
+
+const (
+	blockCacheSize      = 2048
+	signersCacheSize    = blockCacheSize
+	stakingTxsCacheSize = blockCacheSize
+	leaderCacheSize     = blockCacheSize
+)
+
+type (
+	// bcServiceHelper is the helper for block factory. Implements
+	// rpc_common.BlockDataProvider
+	bcServiceHelper struct {
+		version Version
+		hmy     *hmy.Harmony
+		cache   *bcServiceCache
+	}
+
+	bcServiceCache struct {
+		signersCache    *lru.Cache // numberU64 -> []string
+		stakingTxsCache *lru.Cache // numberU64 -> interface{} (v1.StakingTransactions / v2.StakingTransactions)
+		leaderCache     *lru.Cache // numberUint64 -> string
+	}
+)
+
+func (s *PublicBlockchainService) helper() *bcServiceHelper {
+	signerCache, _ := lru.New(signersCacheSize)
+	stakingTxsCache, _ := lru.New(stakingTxsCacheSize)
+	leaderCache, _ := lru.New(leaderCacheSize)
+	cache := &bcServiceCache{
+		signersCache:    signerCache,
+		stakingTxsCache: stakingTxsCache,
+		leaderCache:     leaderCache,
+	}
+	return &bcServiceHelper{
+		version: s.version,
+		hmy:     s.hmy,
+		cache:   cache,
+	}
+}
+
+func (helper *bcServiceHelper) GetLeader(b *types.Block) string {
+	x, ok := helper.cache.leaderCache.Get(b.NumberU64())
+	if ok && x != nil {
+		return x.(string)
+	}
+	leader := helper.hmy.GetLeaderAddress(b.Coinbase(), b.Epoch())
+	helper.cache.leaderCache.Add(b.NumberU64(), leader)
+	return leader
+}
+
+func (helper *bcServiceHelper) GetSigners(b *types.Block) ([]string, error) {
+	x, ok := helper.cache.signersCache.Get(b.NumberU64())
+	if ok && x != nil {
+		return x.([]string), nil
+	}
+	signers, err := getSigners(helper.hmy, b.NumberU64())
+	if err != nil {
+		return nil, errors.Wrap(err, "getSigners")
+	}
+	helper.cache.signersCache.Add(b.NumberU64(), signers)
+	return signers, nil
+}
+
+func (helper *bcServiceHelper) GetStakingTxs(b *types.Block) (interface{}, error) {
+	x, ok := helper.cache.stakingTxsCache.Get(b.NumberU64())
+	if ok && x != nil {
+		return x, nil
+	}
+	var (
+		rpcStakings interface{}
+		err         error
+	)
+	switch helper.version {
+	case V1:
+		rpcStakings, err = v1.StakingTransactionsFromBlock(b)
+	case V2:
+		rpcStakings, err = v2.StakingTransactionsFromBlock(b)
+	case Eth:
+		err = errors.New("staking transaction data is unsupported to Eth service")
+	default:
+		err = fmt.Errorf("unsupported version %v", helper.version)
+	}
+	if err != nil {
+		return nil, err
+	}
+	helper.cache.stakingTxsCache.Add(b.NumberU64(), rpcStakings)
+	return rpcStakings, nil
+}
+
+func (helper *bcServiceHelper) GetStakingTxHashes(b *types.Block) []common.Hash {
+	stkTxs := b.StakingTransactions()
+
+	res := make([]common.Hash, 0, len(stkTxs))
+	for _, tx := range stkTxs {
+		res = append(res, tx.Hash())
+	}
+	return res
+}
+
+func getSigners(hmy *hmy.Harmony, number uint64) ([]string, error) {
+	slots, mask, err := hmy.GetBlockSigners(context.Background(), rpc.BlockNumber(number))
+	if err != nil {
+		return nil, err
+	}
+	signers := make([]string, 0, len(slots))
+	for _, validator := range slots {
+		oneAddress, err := internal_common.AddressToBech32(validator.EcdsaAddress)
+		if err != nil {
+			return nil, err
+		}
+		if ok, err := mask.KeyEnabled(validator.BLSPublicKey); err == nil && ok {
+			signers = append(signers, oneAddress)
+		}
+	}
+	return signers, nil
 }

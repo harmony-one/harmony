@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -589,24 +588,8 @@ func NewStakingTransaction(
 	return result, nil
 }
 
-// NewBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
-// returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
-// transaction hashes.
-func NewBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leader string) (interface{}, error) {
-	if blockArgs.FullTx {
-		return NewBlockWithFullTx(b, blockArgs, leader)
-	}
-	return NewBlockWithTxHash(b, blockArgs, leader)
-}
-
-// NewBlockWithTxHash return a block with only the transaction hash that will serialize to the RPC representation
-func NewBlockWithTxHash(
-	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
-) (*BlockWithTxHash, error) {
-	if blockArgs.FullTx {
-		return nil, fmt.Errorf("block args specifies full tx, but requested RPC block with only tx hash")
-	}
-
+// blockWithTxHashFromBlock return a block with only the transaction hash that will serialize to the RPC representation
+func blockWithTxHashFromBlock(b *types.Block) *BlockWithTxHash {
 	head := b.Header()
 
 	vrfAndProof := head.Vrf()
@@ -626,7 +609,6 @@ func NewBlockWithTxHash(
 		MixHash:          head.MixDigest(),
 		LogsBloom:        head.Bloom(),
 		StateRoot:        head.Root(),
-		Miner:            leader,
 		Difficulty:       0, // Remove this because we don't have it in our header
 		ExtraData:        hexutil.Bytes(head.Extra()),
 		Size:             uint64(b.Size()),
@@ -648,26 +630,11 @@ func NewBlockWithTxHash(
 		blk.EthTransactions = append(blk.EthTransactions, tx.ConvertToEth().Hash())
 	}
 
-	if blockArgs.InclStaking {
-		for _, stx := range b.StakingTransactions() {
-			blk.StakingTxs = append(blk.StakingTxs, stx.Hash())
-		}
-	}
-
-	if blockArgs.WithSigners {
-		blk.Signers = blockArgs.Signers
-	}
-	return blk, nil
+	return blk
 }
 
 // NewBlockWithFullTx return a block with the transaction that will serialize to the RPC representation
-func NewBlockWithFullTx(
-	b *types.Block, blockArgs *rpc_common.BlockArgs, leader string,
-) (*BlockWithFullTx, error) {
-	if !blockArgs.FullTx {
-		return nil, fmt.Errorf("block args specifies NO full tx, but requested RPC block with full tx")
-	}
-
+func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 	head := b.Header()
 
 	vrfAndProof := head.Vrf()
@@ -687,7 +654,6 @@ func NewBlockWithFullTx(
 		MixHash:          head.MixDigest(),
 		LogsBloom:        head.Bloom(),
 		StateRoot:        head.Root(),
-		Miner:            leader,
 		Difficulty:       0, // Remove this because we don't have it in our header
 		ExtraData:        hexutil.Bytes(head.Extra()),
 		Size:             uint64(b.Size()),
@@ -709,20 +675,6 @@ func NewBlockWithFullTx(
 			return nil, err
 		}
 		blk.Transactions = append(blk.Transactions, fmtTx)
-	}
-
-	if blockArgs.InclStaking {
-		for _, stx := range b.StakingTransactions() {
-			fmtStx, err := NewStakingTransactionFromBlockHash(b, stx.Hash())
-			if err != nil {
-				return nil, err
-			}
-			blk.StakingTxs = append(blk.StakingTxs, fmtStx)
-		}
-	}
-
-	if blockArgs.WithSigners {
-		blk.Signers = blockArgs.Signers
 	}
 	return blk, nil
 }
@@ -746,6 +698,20 @@ func NewTransactionFromBlockIndex(b *types.Block, index uint64) (*Transaction, e
 		)
 	}
 	return NewTransaction(txs[index], b.Hash(), b.NumberU64(), b.Time().Uint64(), index)
+}
+
+// StakingTransactionsFromBlock return rpc staking transactions from a block
+func StakingTransactionsFromBlock(b *types.Block) ([]*StakingTransaction, error) {
+	rawStakings := b.StakingTransactions()
+	rpcStakings := make([]*StakingTransaction, 0, len(rawStakings))
+	for idx, raw := range rawStakings {
+		rpcStk, err := NewStakingTransaction(raw, b.Hash(), b.NumberU64(), b.Time().Uint64(), uint64(idx), true)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse staking transaction %v", raw.Hash())
+		}
+		rpcStakings = append(rpcStakings, rpcStk)
+	}
+	return rpcStakings, nil
 }
 
 // NewStakingTransactionFromBlockHash returns a staking transaction that will serialize to the RPC representation.
