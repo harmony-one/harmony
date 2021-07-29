@@ -169,7 +169,7 @@ func (s *PublicTransactionService) GetTransactionByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetTransactionByHash)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetTransactionByHash, timer)
 	// Try to return an already finalized transaction
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	if tx == nil {
@@ -223,7 +223,7 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetStakingTransactionByHash)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetStakingTransactionByHash, timer)
 
 	// Try to return an already finalized transaction
 	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
@@ -270,7 +270,7 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 	ctx context.Context, args TxHistoryArgs,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetTransactionsHistory)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetTransactionsHistory, timer)
 	// Fetch transaction history
 	var address string
 	var result []common.Hash
@@ -323,7 +323,7 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 	ctx context.Context, args TxHistoryArgs,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetStakingTransactionsHistory)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetStakingTransactionsHistory, timer)
 
 	// Fetch transaction history
 	var address string

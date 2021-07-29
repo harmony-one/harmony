@@ -366,7 +366,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs
 func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([]*types.Log, error) {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.GetLogs)
-	defer timer.ObserveDuration()
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.GetLogs, timer)
 
 	var filter *Filter
 	if crit.BlockHash != nil {
@@ -403,7 +403,7 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_uninstallfilter
 func (api *PublicFilterAPI) UninstallFilter(id rpc.ID) bool {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.UninstallFilter)
-	defer timer.ObserveDuration()
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.UninstallFilter, timer)
 
 	api.filtersMu.Lock()
 	f, found := api.filters[id]
@@ -424,7 +424,7 @@ func (api *PublicFilterAPI) UninstallFilter(id rpc.ID) bool {
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs
 func (api *PublicFilterAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]*types.Log, error) {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.GetFilterLogs)
-	defer timer.ObserveDuration()
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.GetFilterLogs, timer)
 
 	api.filtersMu.Lock()
 	f, found := api.filters[id]

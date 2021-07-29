@@ -46,7 +46,7 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 // Note that the return type is an interface to account for the different versions
 func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 	timer := DoMetricRPCRequest(PeerCount)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(PeerCount, timer)
 	// Format response according to version
 	switch s.version {
 	case V1, Eth:

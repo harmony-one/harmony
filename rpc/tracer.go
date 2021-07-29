@@ -99,7 +99,7 @@ func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.Blo
 // EVM and returns them as a JSON object.
 func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc.BlockNumber, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlockByNumber)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(TraceBlockByNumber, timer)
 
 	// Fetch the block that we want to trace
 	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
@@ -111,7 +111,7 @@ func (s *PublicTracerService) TraceBlockByNumber(ctx context.Context, number rpc
 // EVM and returns them as a JSON object.
 func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.Hash, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlockByHash)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(TraceBlockByHash, timer)
 
 	block := s.hmy.BlockChain.GetBlockByHash(hash)
 	if block == nil {
@@ -125,7 +125,7 @@ func (s *PublicTracerService) TraceBlockByHash(ctx context.Context, hash common.
 // and returns them as a JSON object.
 func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, config *hmy.TraceConfig) ([]*hmy.TxTraceResult, error) {
 	timer := DoMetricRPCRequest(TraceBlock)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(TraceBlock, timer)
 
 	block := new(types.Block)
 	if err := rlp.Decode(bytes.NewReader(blob), block); err != nil {
@@ -139,7 +139,7 @@ func (s *PublicTracerService) TraceBlock(ctx context.Context, blob []byte, confi
 // and returns them as a JSON object.
 func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.Hash, config *hmy.TraceConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceTransaction)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(TraceTransaction, timer)
 
 	// Retrieve the transaction and assemble its EVM context
 	tx, blockHash, _, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
@@ -172,7 +172,7 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 // NOTE: Our version only supports block number as an input
 func (s *PublicTracerService) TraceCall(ctx context.Context, args CallArgs, blockNr rpc.BlockNumber, config *hmy.TraceConfig) (interface{}, error) {
 	timer := DoMetricRPCRequest(TraceCall)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(TraceCall, timer)
 
 	// First try to retrieve the state
 	statedb, header, err := s.hmy.StateAndHeaderByNumber(ctx, blockNr)

@@ -176,8 +176,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	ctx context.Context, blockNumber BlockNumber, opts interface{},
 ) (response StructuredResponse, err error) {
 	timer := DoMetricRPCRequest(GetBlockByNumber)
-	defer timer.ObserveDuration()
-
+	defer DoRPCRequestDuration(GetBlockByNumber, timer)
 	// Process arguments based on version
 	var blockArgs *rpc_common.BlockArgs
 	blockArgs, ok := opts.(*rpc_common.BlockArgs)
@@ -272,7 +271,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	ctx context.Context, blockHash common.Hash, opts interface{},
 ) (response StructuredResponse, err error) {
 	timer := DoMetricRPCRequest(GetBlockByHash)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetBlockByHash, timer)
 
 	err = s.wait(ctx)
 	if err != nil {
@@ -330,7 +329,7 @@ func (s *PublicBlockchainService) GetBlockByNumberNew(
 	ctx context.Context, blockNum BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetBlockByNumberNew)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetBlockByNumberNew, timer)
 
 	res, err := s.GetBlockByNumber(ctx, blockNum, blockArgs)
 	if err != nil {
@@ -344,7 +343,7 @@ func (s *PublicBlockchainService) GetBlockByHashNew(
 	ctx context.Context, blockHash common.Hash, blockArgs *rpc_common.BlockArgs,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetBlockByHashNew)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetBlockByHashNew, timer)
 
 	res, err := s.GetBlockByHash(ctx, blockHash, blockArgs)
 	if err != nil {
@@ -359,7 +358,7 @@ func (s *PublicBlockchainService) GetBlocks(
 	blockNumberEnd BlockNumber, blockArgs *rpc_common.BlockArgs,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetBlocks)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetBlocks, timer)
 
 	blockStart := blockNumberStart.Int64()
 	blockEnd := blockNumberEnd.Int64()
@@ -584,7 +583,7 @@ func (s *PublicBlockchainService) GetShardingStructure(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetShardingStructure)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetShardingStructure, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -611,7 +610,7 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetBalanceByBlockNumber)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetBalanceByBlockNumber, timer)
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -641,7 +640,7 @@ func (s *PublicBlockchainService) GetBalanceByBlockNumber(
 // LatestHeader returns the latest header information
 func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(LatestHeader)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(LatestHeader, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -667,7 +666,7 @@ func (s *PublicBlockchainService) GetLatestChainHeaders(
 ) (StructuredResponse, error) {
 	// Response output is the same for all versions
 	timer := DoMetricRPCRequest(GetLatestChainHeaders)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetLatestChainHeaders, timer)
 	return NewStructuredResponse(s.hmy.GetLatestChainHeaders())
 }
 
@@ -676,7 +675,7 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetLastCrossLinks)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetLastCrossLinks, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -714,7 +713,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetHeaderByNumber)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetHeaderByNumber, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -746,7 +745,7 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetCurrentUtilityMetrics)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetCurrentUtilityMetrics, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -775,7 +774,7 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 	ctx context.Context,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetSuperCommittees)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetSuperCommittees, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -804,7 +803,7 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	ctx context.Context,
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetCurrentBadBlocks)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetCurrentBadBlocks, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
@@ -846,7 +845,7 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	ctx context.Context,
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetStakingNetworkInfo)
-	defer timer.ObserveDuration()
+	defer DoRPCRequestDuration(GetStakingNetworkInfo, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
