@@ -215,6 +215,8 @@ func AccumulateRewardsAndCountSigs(
 			if err := waitForCommitSigs(sigsReady); err != nil {
 				return network.EmptyPayout, err
 			}
+
+			// Only do reward distribution at the 63th block in the modulus
 			if blockNum%RewardFrequency != RewardFrequency-1 {
 				return network.EmptyPayout, nil
 			}
@@ -309,6 +311,8 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 
 	allCrossLinks := types.CrossLinks{}
 	startTime := time.Now()
+	// loop through [0...63] position in the modulus index of the 64 blocks
+	// Note the current block is at position 63 of the modulus.
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
 		if i < 0 {
 			continue
@@ -316,6 +320,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 
 		var curHeader *block.Header
 		if i == curBlockNum {
+			// When it's the current block (63th), we should use the provided header since it's not written in db yet.
 			curHeader = header
 		} else {
 			curHeader = bc.GetHeaderByNumber(i)
@@ -326,13 +331,10 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 
 		// Put the real crosslinks in the list
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
-
-			startTime := time.Now()
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
 				return network.EmptyPayout, err
 			}
-			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Decode Cross Links")
 			allCrossLinks = append(allCrossLinks, crossLinks...)
 		}
 	}
@@ -352,6 +354,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		allPayables = append(allPayables, payables...)
 	}
 
+	// Aggregate all the rewards for each validator
 	allValidatorPayable := map[common.Address]*big.Int{}
 	allAddresses := []common.Address{}
 	for _, payThem := range allPayables {
@@ -372,6 +375,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		allAddresses = append(allAddresses, addr)
 	}
 
+	// always sort validators by address before rewarding
 	sort.SliceStable(allAddresses,
 		func(i, j int) bool {
 			return bytes.Compare(allAddresses[i][:], allAddresses[j][:]) < 0
