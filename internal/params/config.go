@@ -42,6 +42,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
+		AggregatedRewardEpoch:      EpochTBD,
 		StakingEpoch:               big.NewInt(186),
 		PreStakingEpoch:            big.NewInt(185),
 		QuickUnlockEpoch:           big.NewInt(191),
@@ -69,6 +70,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(73290),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      EpochTBD,
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -97,6 +99,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -125,6 +128,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -153,6 +157,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -180,6 +185,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(0),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -209,6 +215,7 @@ var (
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
+		big.NewInt(0),                      // AggregatedRewardEpoch
 		big.NewInt(0),                      // StakingEpoch
 		big.NewInt(0),                      // PreStakingEpoch
 		big.NewInt(0),                      // QuickUnlockEpoch
@@ -238,6 +245,7 @@ var (
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CrossLinkEpoch
+		big.NewInt(0),        // AggregatedRewardEpoch
 		big.NewInt(0),        // StakingEpoch
 		big.NewInt(0),        // PreStakingEpoch
 		big.NewInt(0),        // QuickUnlockEpoch
@@ -299,6 +307,9 @@ type ChainConfig struct {
 	// CrossLinkEpoch is the epoch where beaconchain starts containing
 	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"cross-link-epoch,omitempty"`
+
+	// AggregatedRewardEpoch is the epoch when block rewards are distributed every 64 blocks
+	AggregatedRewardEpoch *big.Int `json:"aggregated-reward-epoch,omitempty"`
 
 	// StakingEpoch is the epoch when shard assign takes staking into account
 	StakingEpoch *big.Int `json:"staking-epoch,omitempty"`
@@ -397,6 +408,11 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 // IsEthCompatible determines whether it is ethereum compatible epoch
 func (c *ChainConfig) IsEthCompatible(epoch *big.Int) bool {
 	return isForked(c.EthCompatibleEpoch, epoch)
+}
+
+// IsAggregatedRewardEpoch determines whether it is the epoch when rewards are distributed every 64 blocks
+func (c *ChainConfig) IsAggregatedRewardEpoch(epoch *big.Int) bool {
+	return isForked(c.AggregatedRewardEpoch, epoch)
 }
 
 // IsStaking determines whether it is staking epoch
