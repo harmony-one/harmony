@@ -281,16 +281,6 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 			}
 		}
 	}
-	if st.msg.IsAA() {
-		st.gasPrice = st.evm.GasPrice
-		if msg.IsAA() && st.evm.PaygasMode != vm.PaygasNoOp {
-			if vmErr != nil {
-				return ExecutionResult{}, vmErr
-			} else {
-				return ExecutionResult{}, ErrNoPaygas
-			}
-		}
-	}
 	if vmErr != nil {
 		utils.Logger().Debug().Err(vmErr).Msg("VM returned with error")
 		// The only possible consensus-error would be if there wasn't

@@ -349,7 +349,7 @@ func (pool *TxPool) loop() {
 	defer journal.Stop()
 
 	// Track the previous head headers for transaction reorgs
-	head := pool.chain.CurrentBlock().Header()
+	head := pool.chain.CurrentBlock()
 
 	// Keep waiting for and reacting to the various events
 	for {
@@ -364,8 +364,8 @@ func (pool *TxPool) loop() {
 				if pool.chainconfig.IsIstanbul(ev.Block.Epoch()) {
 					pool.istanbul = true
 				}
-				pool.reset(head, ev.Block.Header())
-				head = ev.Block.Header()
+				pool.reset(head.Header(), ev.Block.Header())
+				head = ev.Block
 				pool.mu.Unlock()
 			}
 		// Be unsubscribed due to system stopped
