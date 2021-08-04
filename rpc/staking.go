@@ -51,7 +51,7 @@ func (s *PublicStakingService) getBalanceByBlockNumber(
 	return balance, nil
 }
 
-// getAllValidatorInformation getHelper function to get all validator information for a given eth block number
+// getAllValidatorInformation is the helper function to get all validator information for a given eth block number
 func (s *PublicStakingService) getAllValidatorInformation(
 	ctx context.Context, page int, blockNum rpc.BlockNumber,
 ) ([]StructuredResponse, error) {
