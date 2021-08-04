@@ -70,7 +70,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(73290),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
-		AggregatedRewardEpoch:      EpochTBD,
+		AggregatedRewardEpoch:      big.NewInt(74275),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
