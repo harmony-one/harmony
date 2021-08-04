@@ -820,7 +820,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	}
 	cap = hi
 
-	// Create a getHelper to check if a gas allowance results in an executable transaction
+	// Create a helper to check if a gas allowance results in an executable transaction
 	executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
