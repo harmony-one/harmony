@@ -203,7 +203,7 @@ func GenerateChain(
 			}
 
 			// Write state changes to db
-			root, err := statedb.Commit(config.IsS3(b.header.Epoch()))
+			root, err := statedb.Commit(config.IsS3(b.header.Epoch()), true)
 			if err != nil {
 				panic(fmt.Sprintf("state write error: %v", err))
 			}

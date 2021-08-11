@@ -627,7 +627,7 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 		if err := tc.state.UpdateValidatorWrapper(tc.current.Address, tc.current); err != nil {
 			t.Error(err)
 		}
-		if _, err := tc.state.Commit(true); err != nil {
+		if _, err := tc.state.Commit(true, true); err != nil {
 			t.Error(err)
 		}
 	}

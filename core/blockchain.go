@@ -76,6 +76,7 @@ const (
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInMemory                      = 128
+	triesInMemoryBlocksInterval        = 128
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
@@ -118,9 +119,10 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db     ethdb.Database // Low level persistent database to store final content in
-	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+	db              ethdb.Database // Low level persistent database to store final content in
+	triegc          *prque.Prque   // Priority queue mapping block numbers to tries to gc
+	gcproc          time.Duration  // Accumulates canonical block processing for trie dumping
+	validatorBlkCnt uint64         // validator wrapper block counter
 
 	hc            *HeaderChain
 	rmLogsFeed    event.Feed
@@ -208,6 +210,7 @@ func NewBlockChain(
 		cacheConfig:                   cacheConfig,
 		db:                            db,
 		triegc:                        prque.New(nil),
+		validatorBlkCnt:               0,
 		stateCache:                    state.NewDatabase(db),
 		quit:                          make(chan struct{}),
 		shouldPreserve:                shouldPreserve,
@@ -1141,6 +1144,14 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 	return nil
 }
 
+func (bc *BlockChain) commitWithoutValidatorWrapper(state *state.DB, epoch *big.Int) (root common.Hash, err error) {
+	return state.Commit(bc.chainConfig.IsS3(epoch), false)
+}
+
+func (bc *BlockChain) commitWithValidatorWrapper(state *state.DB, epoch *big.Int) (root common.Hash, err error) {
+	return state.Commit(bc.chainConfig.IsS3(epoch), true)
+}
+
 // WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
@@ -1161,15 +1172,29 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 
 	// Commit state object changes to in-memory trie
-	root, err := state.Commit(bc.chainConfig.IsS3(block.Epoch()))
+	var root common.Hash
+	if bc.cacheConfig.Disabled && !block.IsLastBlockInEpoch() {
+		if bc.validatorBlkCnt >= triesInMemoryBlocksInterval {
+			root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
+			bc.validatorBlkCnt = 0
+		} else {
+			root, err = bc.commitWithoutValidatorWrapper(state, block.Epoch())
+			bc.validatorBlkCnt++
+		}
+	} else {
+		root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
+	}
+
 	if err != nil {
 		return NonStatTy, err
 	}
 
-	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
+
+	// if its archival node or last block in epoch , must flush into disk
 	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
-		if err := triedb.Commit(root, false); err != nil {
+		err = triedb.Commit(root, false)
+		if err != nil {
 			if isUnrecoverableErr(err) {
 				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
 				os.Exit(1)

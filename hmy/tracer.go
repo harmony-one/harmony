@@ -286,7 +286,7 @@ func (hmy *Harmony) TraceChain(ctx context.Context, start, end *types.Block, con
 				break
 			}
 			// Finalize the state so any modifications are written to the trie
-			root, err := statedb.Commit(true)
+			root, err := statedb.Commit(true, true)
 			if err != nil {
 				failed = err
 				break
@@ -679,7 +679,7 @@ func (hmy *Harmony) ComputeStateDB(block *types.Block, reexec uint64) (*state.DB
 			return nil, fmt.Errorf("processing block %d failed: %v", block.NumberU64(), err)
 		}
 		// Finalize the state so any modifications are written to the trie
-		root, err := statedb.Commit(true)
+		root, err := statedb.Commit(true, true)
 		if err != nil {
 			return nil, err
 		}

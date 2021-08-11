@@ -19,13 +19,17 @@ package state
 import (
 	"bytes"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
 var toAddr = common.BytesToAddress
@@ -39,6 +43,60 @@ func newStateTest() *stateTest {
 	db := rawdb.NewMemoryDatabase()
 	sdb, _ := New(common.Hash{}, NewDatabase(db))
 	return &stateTest{db: db, state: sdb}
+}
+
+func removeAllMeanlessChars(str string) string {
+	var res string = str
+	res = strings.ReplaceAll(res, " ", "")
+	res = strings.ReplaceAll(res, "\r", "")
+	res = strings.ReplaceAll(res, "\n", "")
+	return strings.ReplaceAll(res, "\t", "")
+}
+
+func TestValidatorWrapperDump(t *testing.T) {
+
+	{
+		s := newStateTest()
+		obj := s.state.GetOrNewStateObject(toAddr([]byte{0x01}))
+
+		wrapper := &staking.ValidatorWrapper{}
+		wrapper.Delegations = []staking.Delegation{
+			staking.NewDelegation(toAddr([]byte{0x01, 0x55}), big.NewInt(66)),
+		}
+		wrapper.Counters.NumBlocksSigned = big.NewInt(2)
+		wrapper.Counters.NumBlocksToSign = big.NewInt(3)
+		wrapper.BlockReward = big.NewInt(7)
+
+		by, err := rlp.EncodeToBytes(wrapper)
+		if err != nil {
+			t.Errorf("rlp.EncodeToBytes failed: %s\n", err.Error())
+		}
+		obj.SetCode(crypto.Keccak256Hash(by), by)
+
+		s.state.Commit(false, true)
+
+		got := string(s.state.Dump(false, false, true))
+		got = removeAllMeanlessChars(got)
+		want := `{
+        "root": "a60fb05bed50f768eb6cd57ce7fe109e51487e11da9a3242c2080fe2fedf8290",
+        "accounts": {
+            "0x0000000000000000000000000000000000000001": {
+                "balance": "0",
+                "nonce": 0,
+                "root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+                "codeHash": "2c8412d60ea65e985b7b5d9bc6123aa3e85f169eb80637b0df7020461118af0d",
+                "code": "f849ea940000000000000000000000000000000000000000c080808080c8c6c180c180c18080c5808080808080d9d89400000000000000000000000000000000000001554280c0c2030207"
+            }
+        }
+    }`
+
+		want = removeAllMeanlessChars(want)
+
+		if got != want {
+			t.Errorf("validator wrapper dump mismatch:\ngot: %s\nwant: %s\n", got, want)
+		}
+	}
+
 }
 
 func TestDump(t *testing.T) {
@@ -55,7 +113,7 @@ func TestDump(t *testing.T) {
 	// write some of them to the trie
 	s.state.updateStateObject(obj1)
 	s.state.updateStateObject(obj2)
-	s.state.Commit(false)
+	s.state.Commit(false, true)
 
 	// check that dump contains the state objects that are in trie
 	got := string(s.state.Dump(false, false, true))
@@ -96,7 +154,7 @@ func TestNull(t *testing.T) {
 	var value common.Hash
 
 	s.state.SetState(address, common.Hash{}, value)
-	s.state.Commit(false)
+	s.state.Commit(false, true)
 
 	if value := s.state.GetState(address, common.Hash{}); value != (common.Hash{}) {
 		t.Errorf("expected empty current value, got %x", value)
@@ -168,7 +226,7 @@ func TestSnapshot2(t *testing.T) {
 	so0.deleted = false
 	state.setStateObject(so0)
 
-	root, _ := state.Commit(false)
+	root, _ := state.Commit(false, true)
 	state.Reset(root)
 
 	// and one with deleted == true

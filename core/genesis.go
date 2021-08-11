@@ -269,7 +269,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 		ShardStateHash(g.ShardStateHash).
 		ShardState(shardStateBytes).
 		Header()
-	statedb.Commit(false)
+	statedb.Commit(false, true)
 	statedb.Database().TrieDB().Commit(root, true)
 
 	return types.NewBlock(head, nil, nil, nil, nil, nil)
