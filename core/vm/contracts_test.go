@@ -679,7 +679,7 @@ var sha3fipTests = []precompiledTest{
 func TestPrecompiledSHA3fip(t *testing.T) {
 
 	for _, test := range sha3fipTests {
-		testPrecompiled("66", test, t)
+		testPrecompiled("FD", test, t)
 	}
 
 }
@@ -713,7 +713,7 @@ var ecRecoverPublicKeyTests = []precompiledTest{
 
 func TestPrecompiledEcrecoverPublicKey(t *testing.T) {
 	for _, test := range ecRecoverPublicKeyTests {
-		testPrecompiled("67", test, t)
+		testPrecompiled("FE", test, t)
 	}
 
 }
