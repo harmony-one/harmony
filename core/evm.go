@@ -70,11 +70,11 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Transfer:    Transfer,
 		IsValidator: IsValidator,
 		GetHash:     GetHashFn(header, chain),
+		GetVRF:      GetVRFFn(header, chain),
 		Origin:      msg.From(),
 		Coinbase:    beneficiary,
 		BlockNumber: header.Number(),
 		EpochNumber: header.Epoch(),
-		VRF:         vrf,
 		Time:        header.Time(),
 		GasLimit:    header.GasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
@@ -101,6 +101,35 @@ func GetHashFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash
 			cache[header.Number().Uint64()-1] = header.ParentHash()
 			if n == header.Number().Uint64()-1 {
 				return header.ParentHash()
+			}
+		}
+		return common.Hash{}
+	}
+}
+func GetVRFFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash {
+	var cache map[uint64]common.Hash
+
+	return func(n uint64) common.Hash {
+		// If there's no hash cache yet, make one
+		if cache == nil {
+			cache = map[uint64]common.Hash{
+				ref.Number().Uint64() - 1: ref.ParentHash(),
+			}
+		}
+		// Try to fulfill the request from the cache
+		if hash, ok := cache[n]; ok {
+			return hash
+		}
+		// Not cached, iterate the blocks and cache the hashes
+		for header := chain.GetHeader(ref.ParentHash(), ref.Number().Uint64()-1); header != nil; header = chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1) {
+			cache[header.Number().Uint64()-1] = header.ParentHash()
+			if n == header.Number().Uint64()-1 {
+				vrf := common.Hash{}
+				if len(header.Vrf()) >= 32 {
+					vrfAndProof := header.Vrf()
+					copy(vrf[:], vrfAndProof[:32])
+				}
+				return vrf
 			}
 		}
 		return common.Hash{}
