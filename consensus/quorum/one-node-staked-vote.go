@@ -332,3 +332,7 @@ func (v *stakedVoteWeight) ResetViewChangeVotes() {
 	v.reset([]Phase{ViewChange})
 	v.voteTally.ViewChange = &tallyAndQuorum{numeric.NewDec(0), false}
 }
+
+func (v *stakedVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error){
+	return v.currentTotalPower(p)
+}

@@ -129,3 +129,8 @@ func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
 func (v *uniformVoteWeight) ResetViewChangeVotes() {
 	v.reset([]Phase{ViewChange})
 }
+
+func (v *uniformVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error){
+	power := numeric.NewDec(v.SignersCount(p)).Quo(numeric.NewDec(v.ParticipantsCount()))
+	return &power, nil
+}

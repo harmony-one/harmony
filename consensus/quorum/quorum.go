@@ -132,6 +132,7 @@ type Decider interface {
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
+	CurrentTotalPower(p Phase) (*numeric.Dec, error)
 }
 
 // Registry ..

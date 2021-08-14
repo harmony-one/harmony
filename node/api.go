@@ -2,6 +2,7 @@ package node
 
 import (
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta"
@@ -165,4 +166,15 @@ func (node *Node) GetConfig() rpc_common.Config {
 		NodeConfig:    *node.NodeConfig,
 		ChainConfig:   node.chainConfig,
 	}
+}
+
+// GetLastSigningPower get last signed power
+func (node *Node) GetLastSigningPower() (float64, error) {
+	power, err := node.Consensus.Decider.CurrentTotalPower(quorum.Commit)
+	if err != nil {
+		return 0, err
+	}
+
+	round := float64(power.MulInt64(10000).RoundInt64()) / 10000
+	return round, nil
 }
