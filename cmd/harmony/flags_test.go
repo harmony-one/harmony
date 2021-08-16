@@ -30,7 +30,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -57,9 +57,10 @@ func TestHarmonyFlags(t *testing.T) {
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: harmonyconfig.P2pConfig{
-					Port:    9000,
-					IP:      defaultConfig.P2P.IP,
-					KeyFile: defaultConfig.P2P.KeyFile,
+					Port:            9000,
+					IP:              defaultConfig.P2P.IP,
+					KeyFile:         defaultConfig.P2P.KeyFile,
+					DiscConcurrency: 5,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -98,8 +99,12 @@ func TestHarmonyFlags(t *testing.T) {
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
-					Enabled:    false,
-					ListenAddr: "127.0.0.1:6060",
+					Enabled:            false,
+					ListenAddr:         "127.0.0.1:6060",
+					Folder:             "./profiles",
+					ProfileNames:       []string{},
+					ProfileIntervals:   []int{600},
+					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
 					Folder:     "./latest",
@@ -109,6 +114,9 @@ func TestHarmonyFlags(t *testing.T) {
 					Context: &harmonyconfig.LogContext{
 						IP:   "8.8.8.8",
 						Port: 9000,
+					},
+					VerbosePrints: harmonyconfig.LogVerbosePrints{
+						Config: true,
 					},
 				},
 				Sys: &harmonyconfig.SysConfig{
@@ -195,7 +203,7 @@ func TestGeneralFlags(t *testing.T) {
 				NodeType:   "explorer",
 				NoStaking:  false,
 				ShardID:    0,
-				IsArchival: true,
+				IsArchival: false,
 				DataDir:    "./",
 			},
 		},
@@ -366,6 +374,15 @@ func TestP2PFlags(t *testing.T) {
 				KeyFile: "./key.file",
 			},
 		},
+		{
+			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:            9001,
+				IP:              nodeconfig.DefaultPublicListenIP,
+				KeyFile:         "./.hmykey",
+				DiscConcurrency: 5,
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, append(p2pFlags, legacyMiscFlags...),
@@ -384,7 +401,7 @@ func TestP2PFlags(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(got.P2P, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
+			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.P2P, test.expConfig)
 		}
 		ts.tearDown()
 	}
@@ -770,22 +787,67 @@ func TestPprofFlags(t *testing.T) {
 		{
 			args: []string{"--pprof"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: defaultConfig.Pprof.ListenAddr,
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            true,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof=false", "--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    false,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            false,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.names", "cpu,heap,mutex"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       []string{"cpu", "heap", "mutex"},
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.intervals", "0,1"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   []int{0, 1},
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.debug", "0,1,0"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: []int{0, 1, 0},
 			},
 		},
 	}

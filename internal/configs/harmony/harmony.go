@@ -45,10 +45,11 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port         int
-	IP           string
-	KeyFile      string
-	DHTDataStore *string `toml:",omitempty"`
+	Port            int
+	IP              string
+	KeyFile         string
+	DHTDataStore    *string `toml:",omitempty"`
+	DiscConcurrency int     // Discovery Concurrency value
 }
 
 type GeneralConfig struct {
@@ -56,6 +57,7 @@ type GeneralConfig struct {
 	NoStaking        bool
 	ShardID          int
 	IsArchival       bool
+	IsBackup         bool
 	IsBeaconArchival bool
 	IsOffline        bool
 	DataDir          string
@@ -86,8 +88,12 @@ type TxPoolConfig struct {
 }
 
 type PprofConfig struct {
-	Enabled    bool
-	ListenAddr string
+	Enabled            bool
+	ListenAddr         string
+	Folder             string
+	ProfileNames       []string
+	ProfileIntervals   []int
+	ProfileDebugValues []int
 }
 
 type LogConfig struct {

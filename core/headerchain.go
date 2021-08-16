@@ -39,9 +39,10 @@ import (
 )
 
 const (
-	headerCacheLimit = 512
-	tdCacheLimit     = 1024
-	numberCacheLimit = 2048
+	headerCacheLimit    = 2048 // with 2s/block, 2048 headers is roughly block produced in 1 hour.
+	tdCacheLimit        = 1024
+	numberCacheLimit    = 4096
+	canonicalCacheLimit = 4096
 )
 
 // HeaderChain implements the basic block header chain logic that is shared by
@@ -58,9 +59,10 @@ type HeaderChain struct {
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
 	currentHeaderHash common.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
 
-	headerCache *lru.Cache // Cache for the most recent block headers
-	tdCache     *lru.Cache // Cache for the most recent block total difficulties
-	numberCache *lru.Cache // Cache for the most recent block numbers
+	headerCache    *lru.Cache // Cache for the most recent block headers
+	tdCache        *lru.Cache // Cache for the most recent block total difficulties
+	numberCache    *lru.Cache // Cache for the most recent block numbers
+	canonicalCache *lru.Cache // number -> Hash
 
 	procInterrupt func() bool
 
@@ -76,6 +78,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	headerCache, _ := lru.New(headerCacheLimit)
 	tdCache, _ := lru.New(tdCacheLimit)
 	numberCache, _ := lru.New(numberCacheLimit)
+	canonicalHash, _ := lru.New(canonicalCacheLimit)
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -84,14 +87,15 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 	}
 
 	hc := &HeaderChain{
-		config:        config,
-		chainDb:       chainDb,
-		headerCache:   headerCache,
-		tdCache:       tdCache,
-		numberCache:   numberCache,
-		procInterrupt: procInterrupt,
-		rand:          mrand.New(mrand.NewSource(seed.Int64())),
-		engine:        engine,
+		config:         config,
+		chainDb:        chainDb,
+		headerCache:    headerCache,
+		tdCache:        tdCache,
+		numberCache:    numberCache,
+		canonicalCache: canonicalHash,
+		procInterrupt:  procInterrupt,
+		rand:           mrand.New(mrand.NewSource(seed.Int64())),
+		engine:         engine,
 	}
 
 	hc.genesisHeader = hc.GetHeaderByNumber(0)
@@ -191,6 +195,8 @@ func (hc *HeaderChain) WriteHeader(header *block.Header) (status WriteStatus, er
 
 	hc.headerCache.Add(hash, header)
 	hc.numberCache.Add(hash, number)
+	// when writing headers, it will write to canonical by default
+	hc.canonicalCache.Add(number, hash)
 
 	return
 }
@@ -434,11 +440,24 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
 func (hc *HeaderChain) GetHeaderByNumber(number uint64) *block.Header {
-	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	hash := hc.getHashByNumber(number)
 	if hash == (common.Hash{}) {
 		return nil
 	}
 	return hc.GetHeader(hash, number)
+}
+
+func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
+	// Since canonical chain is immutable, it's safe to read header
+	// hash by number from cache.
+	if hash, ok := hc.canonicalCache.Get(number); ok {
+		return hash.(common.Hash)
+	}
+	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	if hash != (common.Hash{}) {
+		hc.canonicalCache.Add(number, hash)
+	}
+	return hash
 }
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
@@ -505,6 +524,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 	hc.headerCache.Purge()
 	hc.tdCache.Purge()
 	hc.numberCache.Purge()
+	hc.canonicalCache.Purge()
 
 	if hc.CurrentHeader() == nil {
 		hc.currentHeader.Store(hc.genesisHeader)

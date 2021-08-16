@@ -55,7 +55,7 @@ var (
 		p2pIPFlag,
 		p2pKeyFileFlag,
 		p2pDHTDataStoreFlag,
-
+		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
 	}
 
@@ -126,6 +126,10 @@ var (
 	pprofFlags = []cli.Flag{
 		pprofEnabledFlag,
 		pprofListenAddrFlag,
+		pprofFolderFlag,
+		pprofProfileNamesFlag,
+		pprofProfileIntervalFlag,
+		pprofProfileDebugFlag,
 	}
 
 	logFlags = []cli.Flag{
@@ -236,6 +240,11 @@ var (
 		Usage:    "run node in offline mode",
 		DefValue: defaultConfig.General.IsOffline,
 	}
+	isBackupFlag = cli.BoolFlag{
+		Name:     "run.backup",
+		Usage:    "run node in backup mode",
+		DefValue: defaultConfig.General.IsBackup,
+	}
 	dataDirFlag = cli.StringFlag{
 		Name:     "datadir",
 		Usage:    "directory of chain database",
@@ -307,10 +316,6 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 		config.General.NodeType = cli.GetStringFlagValue(cmd, legacyNodeTypeFlag)
 	}
 
-	if config.General.NodeType == nodeTypeExplorer {
-		config.General.IsArchival = true
-	}
-
 	if cli.IsFlagChanged(cmd, shardIDFlag) {
 		config.General.ShardID = cli.GetIntFlagValue(cmd, shardIDFlag)
 	} else if cli.IsFlagChanged(cmd, legacyShardIDFlag) {
@@ -341,6 +346,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, isBackupFlag) {
+		config.General.IsBackup = cli.GetBoolFlagValue(cmd, isBackupFlag)
 	}
 }
 
@@ -508,6 +517,11 @@ var (
 		DefValue:   defaultConfig.P2P.KeyFile,
 		Deprecated: "use --p2p.keyfile",
 	}
+	p2pDiscoveryConcurrencyFlag = cli.IntFlag{
+		Name:     "p2p.disc.concurrency",
+		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
+		DefValue: defaultConfig.P2P.DiscConcurrency,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -530,6 +544,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, p2pDHTDataStoreFlag) {
 		ds := cli.GetStringFlagValue(cmd, p2pDHTDataStoreFlag)
 		config.P2P.DHTDataStore = &ds
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
+		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
 	}
 }
 
@@ -958,12 +976,51 @@ var (
 		Usage:    "listen address for pprof",
 		DefValue: defaultConfig.Pprof.ListenAddr,
 	}
+	pprofFolderFlag = cli.StringFlag{
+		Name:     "pprof.folder",
+		Usage:    "folder to put pprof profiles",
+		DefValue: defaultConfig.Pprof.Folder,
+		Hidden:   true,
+	}
+	pprofProfileNamesFlag = cli.StringSliceFlag{
+		Name:     "pprof.profile.names",
+		Usage:    "a list of pprof profile names (separated by ,) e.g. cpu,heap,goroutine",
+		DefValue: defaultConfig.Pprof.ProfileNames,
+	}
+	pprofProfileIntervalFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.intervals",
+		Usage:    "a list of pprof profile interval integer values (separated by ,) e.g. 30 saves all profiles every 30 seconds or 0,10 saves the first profile on shutdown and the second profile every 10 seconds",
+		DefValue: defaultConfig.Pprof.ProfileIntervals,
+		Hidden:   true,
+	}
+	pprofProfileDebugFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.debug",
+		Usage:    "a list of pprof profile debug integer values (separated by ,) e.g. 0 writes the gzip-compressed protocol buffer and 1 writes the legacy text format. Predefined profiles may assign meaning to other debug values: https://golang.org/pkg/runtime/pprof/",
+		DefValue: defaultConfig.Pprof.ProfileDebugValues,
+		Hidden:   true,
+	}
 )
 
 func applyPprofFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofFolderFlag) {
+		config.Pprof.Folder = cli.GetStringFlagValue(cmd, pprofFolderFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileNamesFlag) {
+		config.Pprof.ProfileNames = cli.GetStringSliceFlagValue(cmd, pprofProfileNamesFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileIntervalFlag) {
+		config.Pprof.ProfileIntervals = cli.GetIntSliceFlagValue(cmd, pprofProfileIntervalFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileDebugFlag) {
+		config.Pprof.ProfileDebugValues = cli.GetIntSliceFlagValue(cmd, pprofProfileDebugFlag)
 		pprofSet = true
 	}
 	if cli.IsFlagChanged(cmd, pprofEnabledFlag) {
@@ -999,7 +1056,7 @@ var (
 	logVerbosePrintsFlag = cli.StringSliceFlag{
 		Name:     "log.verbose-prints",
 		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
-		DefValue: []string{},
+		DefValue: []string{"config"},
 	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{

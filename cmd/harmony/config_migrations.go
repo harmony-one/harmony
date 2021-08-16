@@ -167,4 +167,29 @@ func init() {
 		confTree.Set("Version", "2.1.0")
 		return confTree
 	}
+
+	migrations["2.1.0"] = func(confTree *toml.Tree) *toml.Tree {
+		// Legacy conf missing fields
+		if confTree.Get("Pprof.Enabled") == nil {
+			confTree.Set("Pprof.Enabled", true)
+		}
+		if confTree.Get("Pprof.Folder") == nil {
+			confTree.Set("Pprof.Folder", defaultConfig.Pprof.Folder)
+		}
+		if confTree.Get("Pprof.ProfileNames") == nil {
+			confTree.Set("Pprof.ProfileNames", defaultConfig.Pprof.ProfileNames)
+		}
+		if confTree.Get("Pprof.ProfileIntervals") == nil {
+			confTree.Set("Pprof.ProfileIntervals", defaultConfig.Pprof.ProfileIntervals)
+		}
+		if confTree.Get("Pprof.ProfileDebugValues") == nil {
+			confTree.Set("Pprof.ProfileDebugValues", defaultConfig.Pprof.ProfileDebugValues)
+		}
+		if confTree.Get("P2P.DiscConcurrency") == nil {
+			confTree.Set("P2P.DiscConcurrency", defaultConfig.P2P.DiscConcurrency)
+		}
+
+		confTree.Set("Version", "2.2.0")
+		return confTree
+	}
 }

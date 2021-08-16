@@ -105,6 +105,27 @@ func getStringSliceFlagValue(fs *pflag.FlagSet, flag StringSliceFlag) []string {
 	return val
 }
 
+// GetIntSliceFlagValue get the int slice value for the given IntSliceFlag from
+// the local flags of the cobra command.
+func GetIntSliceFlagValue(cmd *cobra.Command, flag IntSliceFlag) []int {
+	return getIntSliceFlagValue(cmd.Flags(), flag)
+}
+
+// GetIntSlicePersistentFlagValue get the int slice value for the given IntSliceFlag
+// from the persistent flags of the cobra command.
+func GetIntSlicePersistentFlagValue(cmd *cobra.Command, flag IntSliceFlag) []int {
+	return getIntSliceFlagValue(cmd.PersistentFlags(), flag)
+}
+
+func getIntSliceFlagValue(fs *pflag.FlagSet, flag IntSliceFlag) []int {
+	val, err := fs.GetIntSlice(flag.Name)
+	if err != nil {
+		handleParseError(err)
+		return nil
+	}
+	return val
+}
+
 // IsFlagChanged returns whether the flag has been changed in command
 func IsFlagChanged(cmd *cobra.Command, flag Flag) bool {
 	name := getFlagName(flag)

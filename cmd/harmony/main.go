@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -26,6 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
@@ -134,7 +134,6 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	}
 
 	setupNodeLog(cfg)
-	setupPprof(cfg)
 	setupNodeAndRun(cfg)
 }
 
@@ -242,17 +241,6 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 		ip := config.Log.Context.IP
 		port := config.Log.Context.Port
 		utils.SetLogContext(ip, strconv.Itoa(port))
-	}
-}
-
-func setupPprof(config harmonyconfig.HarmonyConfig) {
-	enabled := config.Pprof.Enabled
-	addr := config.Pprof.ListenAddr
-
-	if enabled {
-		go func() {
-			http.ListenAndServe(addr, nil)
-		}()
 	}
 }
 
@@ -398,6 +386,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
+	}
+	if hc.Pprof.Enabled {
+		setupPprofService(currentNode, hc)
 	}
 	if hc.Prometheus.Enabled {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
@@ -587,10 +578,11 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	}
 
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:          &selfPeer,
-		BLSKey:        nodeConfig.P2PPriKey,
-		BootNodes:     hc.Network.BootNodes,
-		DataStoreFile: hc.P2P.DHTDataStore,
+		Self:            &selfPeer,
+		BLSKey:          nodeConfig.P2PPriKey,
+		BootNodes:       hc.Network.BootNodes,
+		DataStoreFile:   hc.P2P.DHTDataStore,
+		DiscConcurrency: hc.P2P.DiscConcurrency,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -686,15 +678,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	)
 
 	nodeconfig.GetDefaultConfig().DBDir = nodeConfig.DBDir
-	switch hc.General.NodeType {
-	case nodeTypeExplorer:
-		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
-		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
-
-	case nodeTypeValidator:
-		nodeconfig.SetDefaultRole(nodeconfig.Validator)
-		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
-	}
+	processNodeType(hc, currentNode, currentConsensus)
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
@@ -721,6 +705,35 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
 	currentConsensus.NextBlockDue = time.Now()
 	return currentNode
+}
+
+func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, currentConsensus *consensus.Consensus) {
+	switch hc.General.NodeType {
+	case nodeTypeExplorer:
+		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
+		currentNode.NodeConfig.SetRole(nodeconfig.ExplorerNode)
+
+	case nodeTypeValidator:
+		nodeconfig.SetDefaultRole(nodeconfig.Validator)
+		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
+
+		if hc.General.IsBackup {
+			currentConsensus.SetIsBackup(true)
+		}
+	}
+}
+
+func setupPprofService(node *node.Node, hc harmonyconfig.HarmonyConfig) {
+	pprofConfig := pprof.Config{
+		Enabled:            hc.Pprof.Enabled,
+		ListenAddr:         hc.Pprof.ListenAddr,
+		Folder:             hc.Pprof.Folder,
+		ProfileNames:       hc.Pprof.ProfileNames,
+		ProfileIntervals:   hc.Pprof.ProfileIntervals,
+		ProfileDebugValues: hc.Pprof.ProfileDebugValues,
+	}
+	s := pprof.NewService(pprofConfig)
+	node.RegisterService(service.Pprof, s)
 }
 
 func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid uint32) {

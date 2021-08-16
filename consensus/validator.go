@@ -57,9 +57,14 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		return
 	}
 	consensus.prepare()
+	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 func (consensus *Consensus) prepare() {
+	if consensus.IsBackup() {
+		return
+	}
+
 	priKeys := consensus.getPriKeysInCommittee()
 
 	p2pMsgs := consensus.constructP2pMessages(msg_pb.MessageType_PREPARE, nil, priKeys)
@@ -71,12 +76,14 @@ func (consensus *Consensus) prepare() {
 			Str("blockHash", hex.EncodeToString(consensus.blockHash[:])).
 			Msg("[OnAnnounce] Sent Prepare Message!!")
 	}
-
-	consensus.switchPhase("Announce", FBFTPrepare)
 }
 
 // sendCommitMessages send out commit messages to leader
 func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
+	if consensus.IsBackup() {
+		return
+	}
+
 	priKeys := consensus.getPriKeysInCommittee()
 
 	// Sign commit signature on the received block and construct the p2p messages

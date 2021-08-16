@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.1.0"
+const tomlConfigVersion = "2.2.0"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -24,9 +24,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:    nodeconfig.DefaultP2PPort,
-		IP:      nodeconfig.DefaultPublicListenIP,
-		KeyFile: "./.hmykey",
+		Port:            nodeconfig.DefaultP2PPort,
+		IP:              nodeconfig.DefaultPublicListenIP,
+		KeyFile:         "./.hmykey",
+		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -63,8 +64,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
-		Enabled:    false,
-		ListenAddr: "127.0.0.1:6060",
+		Enabled:            false,
+		ListenAddr:         "127.0.0.1:6060",
+		Folder:             "./profiles",
+		ProfileNames:       []string{},
+		ProfileIntervals:   []int{600},
+		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
 		Folder:     "./latest",
@@ -72,7 +77,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RotateSize: 100,
 		Verbosity:  3,
 		VerbosePrints: harmonyconfig.LogVerbosePrints{
-			Config: false,
+			Config: true,
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),

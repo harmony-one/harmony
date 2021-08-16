@@ -13,9 +13,8 @@ import (
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
-	InclTx      bool     `json:"inclTx"`
 	FullTx      bool     `json:"fullTx"`
-	Signers     []string `json:"signers"`
+	Signers     []string `json:"-"`
 	InclStaking bool     `json:"inclStaking"`
 }
 
@@ -64,6 +63,7 @@ type NodeMetadata struct {
 	Role            string             `json:"role"`
 	DNSZone         string             `json:"dns-zone"`
 	Archival        bool               `json:"is-archival"`
+	IsBackup        bool               `json:"is-backup"`
 	NodeBootTime    int64              `json:"node-unix-start-time"`
 	PeerID          peer.ID            `json:"peerid"`
 	Consensus       ConsensusInternal  `json:"consensus"`
