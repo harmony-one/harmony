@@ -752,6 +752,7 @@ func (db *DB) clearJournalAndRefund() {
 
 // Commit writes the state to the underlying in-memory trie database.
 func (db *DB) Commit(deleteEmptyObjects bool, commitValidatorWrapper bool) (root common.Hash, err error) {
+
 	// Finalize any pending changes and merge everything into the tries
 	db.IntermediateRoot(deleteEmptyObjects)
 
@@ -761,6 +762,7 @@ func (db *DB) Commit(deleteEmptyObjects bool, commitValidatorWrapper bool) (root
 			// Write any contract code associated with the state object
 			if obj.code != nil && obj.dirtyCode {
 				if !commitValidatorWrapper && obj.IsValidator(db.db) {
+					db.deleteStateObject(obj)
 					continue
 				}
 				db.db.TrieDB().InsertBlob(common.BytesToHash(obj.CodeHash()), obj.code)

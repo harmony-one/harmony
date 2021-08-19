@@ -1178,7 +1178,9 @@ func (bc *BlockChain) WriteBlockWithState(
 			root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
 			bc.validatorBlkCnt = 0
 		} else {
-			root, err = bc.commitWithoutValidatorWrapper(state, block.Epoch())
+			stateCopy := state.Copy()
+			root, err = bc.commitWithoutValidatorWrapper(stateCopy, block.Epoch())
+			bc.commitWithValidatorWrapper(state, block.Epoch())
 			bc.validatorBlkCnt++
 		}
 	} else {
@@ -1193,6 +1195,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// if its archival node or last block in epoch , must flush into disk
 	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
+
 		err = triedb.Commit(root, false)
 		if err != nil {
 			if isUnrecoverableErr(err) {
@@ -1201,6 +1204,7 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 			return NonStatTy, err
 		}
+
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
