@@ -29,6 +29,7 @@ func NewEnv(cfg *Config) *vm.EVM {
 		Transfer:    core.Transfer,
 		IsValidator: core.IsValidator,
 		GetHash:     func(uint64) common.Hash { return common.Hash{} },
+		GetVRF:      func(uint64) common.Hash { return common.Hash{} },
 
 		Origin:      cfg.Origin,
 		Coinbase:    cfg.Coinbase,

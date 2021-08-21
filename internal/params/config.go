@@ -52,6 +52,7 @@ var (
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
+		PrevVRFEpoch:               EpochTBD,
 		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionPromoPeriod:   big.NewInt(100),
@@ -80,6 +81,7 @@ var (
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   big.NewInt(73880),
+		PrevVRFEpoch:               EpochTBD,
 		MinDelegation100Epoch:      big.NewInt(73880),
 		MinCommissionRateEpoch:     big.NewInt(73880),
 		MinCommissionPromoPeriod:   big.NewInt(10),
@@ -109,6 +111,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
@@ -138,6 +141,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
@@ -167,6 +171,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
@@ -195,6 +200,7 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
@@ -225,6 +231,7 @@ var (
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // VRFEpoch
+		big.NewInt(0),                      // PrevVRFEpoch
 		big.NewInt(0),                      // MinDelegation100Epoch
 		big.NewInt(0),                      // MinCommissionRateEpoch
 		big.NewInt(10),                     // MinCommissionPromoPeriod
@@ -255,6 +262,7 @@ var (
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // VRFEpoch
+		big.NewInt(0),        // PrevVRFEpoch
 		big.NewInt(0),        // MinDelegation100Epoch
 		big.NewInt(0),        // MinCommissionRateEpoch
 		big.NewInt(10),       // MinCommissionPromoPeriod
@@ -341,6 +349,9 @@ type ChainConfig struct {
 
 	// VRFEpoch is the epoch when VRF randomness is enabled
 	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
+
+	// PrevVRFEpoch is the epoch when previous VRF randomness can be fetched
+	PrevVRFEpoch *big.Int `json:"prev-vrf-epoch,omitempty"`
 
 	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
 	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
@@ -450,6 +461,11 @@ func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
 	return isForked(c.VRFEpoch, epoch)
 }
 
+// IsPrevVRF determines whether it is the epoch to enable previous vrf
+func (c *ChainConfig) IsPrevVRF(epoch *big.Int) bool {
+	return isForked(c.PrevVRFEpoch, epoch)
+}
+
 // IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
 func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
 	return isForked(c.MinDelegation100Epoch, epoch)
@@ -543,9 +559,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                      *big.Int
-	EthChainID                                                   *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
+	ChainID                                                                 *big.Int
+	EthChainID                                                              *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -567,5 +583,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsReceiptLog: c.IsReceiptLog(epoch),
 		IsIstanbul:   c.IsIstanbul(epoch),
 		IsVRF:        c.IsVRF(epoch),
+		IsPrevVRF:    c.IsPrevVRF(epoch),
 	}
 }
