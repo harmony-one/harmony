@@ -71,10 +71,16 @@ func (n Version) Namespace() string {
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
 	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
+	authApis := getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)
 
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
 		if err := startHTTP(apis); err != nil {
+			return err
+		}
+
+		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPAuthPort)
+		if err := startAuthHTTP(authApis); err != nil {
 			return err
 		}
 	}
@@ -120,6 +126,10 @@ func StopServers() error {
 	return nil
 }
 
+func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
+	return []rpc.API{}
+}
+
 // getAPIs returns all the API methods for the RPC interface
 func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
 	publicAPIs := []rpc.API{
@@ -163,6 +173,23 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelim
 }
 
 func startHTTP(apis []rpc.API) (err error) {
+	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
+		httpEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+	)
+	if err != nil {
+		return err
+	}
+
+	utils.Logger().Info().
+		Str("url", fmt.Sprintf("http://%s", httpEndpoint)).
+		Str("cors", strings.Join(httpOrigins, ",")).
+		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
+		Msg("HTTP endpoint opened")
+	fmt.Printf("Started RPC server at: %v\n", httpEndpoint)
+	return nil
+}
+
+func startAuthHTTP(apis []rpc.API) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
 		httpEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
