@@ -763,6 +763,7 @@ func (db *DB) Commit(deleteEmptyObjects bool, commitValidatorWrapper bool) (root
 			if obj.code != nil && obj.dirtyCode {
 				if !commitValidatorWrapper && obj.IsValidator(db.db) {
 					db.deleteStateObject(obj)
+					obj.deleted = true
 					continue
 				}
 				db.db.TrieDB().InsertBlob(common.BytesToHash(obj.CodeHash()), obj.code)

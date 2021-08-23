@@ -97,6 +97,43 @@ func TestValidatorWrapperDump(t *testing.T) {
 		}
 	}
 
+	{
+		s := newStateTest()
+		addr := toAddr([]byte{0x01})
+		obj := s.state.GetOrNewStateObject(addr)
+
+		wrapper := &staking.ValidatorWrapper{}
+		wrapper.Delegations = []staking.Delegation{
+			staking.NewDelegation(toAddr([]byte{0x01, 0x55}), big.NewInt(66)),
+		}
+		wrapper.Counters.NumBlocksSigned = big.NewInt(2)
+		wrapper.Counters.NumBlocksToSign = big.NewInt(3)
+		wrapper.BlockReward = big.NewInt(7)
+
+		by, err := rlp.EncodeToBytes(wrapper)
+		if err != nil {
+			t.Errorf("rlp.EncodeToBytes failed: %s\n", err.Error())
+		}
+		obj.SetCode(crypto.Keccak256Hash(by), by)
+		s.state.SetValidatorFlag(addr)
+		s.state.Commit(false, false)
+
+		got := string(s.state.Dump(false, false, true))
+		got = removeAllMeanlessChars(got)
+		want := `{
+        "root": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "accounts": {
+			
+		}
+    }`
+
+		want = removeAllMeanlessChars(want)
+
+		if got != want {
+			t.Errorf("validator wrapper dump mismatch:\ngot: %s\nwant: %s\n", got, want)
+		}
+	}
+
 }
 
 func TestDump(t *testing.T) {
