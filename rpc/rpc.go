@@ -156,6 +156,8 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelim
 		NewPublicStakingAPI(hmy, V2),
 		NewPublicDebugAPI(hmy, V1),
 		NewPublicDebugAPI(hmy, V2),
+		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
+		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
 		eth.NewPublicEthService(hmy, "eth"),
