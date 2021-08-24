@@ -17,7 +17,6 @@
 package vm
 
 import (
-	"github.com/harmony-one/harmony/internal/utils"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -64,11 +63,9 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
 				if evm.chainRules.IsPrevVRF {
-					utils.Logger().Info().Bytes("input", input).Msg("TEST")
-					requestedBlockNum := big.NewInt(0).SetBytes(input)
+					requestedBlockNum := big.NewInt(0).SetBytes(input[0:32])
 					minBlockNum := big.NewInt(0).Sub(evm.BlockNumber, common.Big257)
 
-					utils.Logger().Info().Str("requestedBlockNum", requestedBlockNum.String()).Msg("TEST")
 					if requestedBlockNum.Cmp(evm.BlockNumber) == 0 {
 						input = evm.Context.VRF.Bytes()
 					} else if requestedBlockNum.Cmp(minBlockNum) > 0 && requestedBlockNum.Cmp(evm.BlockNumber) < 0 {
