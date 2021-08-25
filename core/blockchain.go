@@ -1178,8 +1178,7 @@ func (bc *BlockChain) WriteBlockWithState(
 			root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
 			bc.validatorBlkCnt = 0
 		} else {
-			stateCopy := state.Copy()
-			root, err = bc.commitWithoutValidatorWrapper(stateCopy, block.Epoch())
+			root, err = bc.commitWithoutValidatorWrapper(state.Copy(), block.Epoch())
 			bc.commitWithValidatorWrapper(state, block.Epoch())
 			bc.validatorBlkCnt++
 		}
