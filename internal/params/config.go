@@ -81,7 +81,7 @@ var (
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   big.NewInt(73880),
-		PrevVRFEpoch:               EpochTBD,
+		PrevVRFEpoch:               big.NewInt(74384),
 		MinDelegation100Epoch:      big.NewInt(73880),
 		MinCommissionRateEpoch:     big.NewInt(73880),
 		MinCommissionPromoPeriod:   big.NewInt(10),

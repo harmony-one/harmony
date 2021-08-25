@@ -63,7 +63,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
 				if evm.chainRules.IsPrevVRF {
-					requestedBlockNum := big.NewInt(0).SetBytes(input[0:32])
+					requestedBlockNum := big.NewInt(0).SetBytes(input)
 					minBlockNum := big.NewInt(0).Sub(evm.BlockNumber, common.Big257)
 
 					if requestedBlockNum.Cmp(evm.BlockNumber) == 0 {
