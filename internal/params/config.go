@@ -43,7 +43,7 @@ var (
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
 		AggregatedRewardEpoch:      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
-		StakingEpoch:               big.NewInt(186), 
+		StakingEpoch:               big.NewInt(186),
 		PreStakingEpoch:            big.NewInt(185),
 		QuickUnlockEpoch:           big.NewInt(191),
 		FiveSecondsEpoch:           big.NewInt(230),
