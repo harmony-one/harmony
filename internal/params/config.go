@@ -42,7 +42,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
-		AggregatedRewardEpoch:      EpochTBD,
+		AggregatedRewardEpoch:      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		StakingEpoch:               big.NewInt(186),
 		PreStakingEpoch:            big.NewInt(185),
 		QuickUnlockEpoch:           big.NewInt(191),
