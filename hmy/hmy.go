@@ -110,6 +110,7 @@ type NodeAPI interface {
 	GetConsensusCurViewID() uint64
 	GetConfig() commonRPC.Config
 	ShutDown()
+	GetLastSigningPower() (float64, error)
 }
 
 // New creates a new Harmony object (including the

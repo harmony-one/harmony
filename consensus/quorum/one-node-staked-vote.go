@@ -49,6 +49,7 @@ type stakedVoteWeight struct {
 	DependencyInjectionReader
 	roster    votepower.Roster
 	voteTally VoteTally
+	lastPower map[Phase]numeric.Dec
 }
 
 // Policy ..
@@ -323,12 +324,25 @@ func newVoteTally() VoteTally {
 }
 
 func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
+	v.lastPower[Prepare] = v.voteTally.Prepare.tally
+	v.lastPower[Commit] = v.voteTally.Commit.tally
+
 	v.reset([]Phase{Prepare, Commit})
 	v.voteTally.Prepare = &tallyAndQuorum{numeric.NewDec(0), false}
 	v.voteTally.Commit = &tallyAndQuorum{numeric.NewDec(0), false}
 }
 
 func (v *stakedVoteWeight) ResetViewChangeVotes() {
+	v.lastPower[ViewChange] = v.voteTally.ViewChange.tally
+
 	v.reset([]Phase{ViewChange})
 	v.voteTally.ViewChange = &tallyAndQuorum{numeric.NewDec(0), false}
+}
+
+func (v *stakedVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
+	if power, ok := v.lastPower[p]; ok {
+		return &power, nil
+	} else {
+		return nil, errors.New("stakedVoteWeight not cache this phase")
+	}
 }
