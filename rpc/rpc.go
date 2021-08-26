@@ -53,6 +53,7 @@ var (
 	wsListener       net.Listener
 	wsHandler        *rpc.Server
 	httpEndpoint     = ""
+	httpAuthEndpoint = ""
 	wsEndpoint       = ""
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
@@ -79,7 +80,7 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 			return err
 		}
 
-		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPAuthPort)
+		httpAuthEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPAuthPort)
 		if err := startAuthHTTP(authApis); err != nil {
 			return err
 		}
@@ -201,11 +202,11 @@ func startAuthHTTP(apis []rpc.API) (err error) {
 	}
 
 	utils.Logger().Info().
-		Str("url", fmt.Sprintf("http://%s", httpEndpoint)).
+		Str("url", fmt.Sprintf("http://%s", httpAuthEndpoint)).
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
-	fmt.Printf("Started RPC server at: %v\n", httpEndpoint)
+	fmt.Printf("Started RPC server at: %v\n", httpAuthEndpoint)
 	return nil
 }
 
