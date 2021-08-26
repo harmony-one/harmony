@@ -52,7 +52,7 @@ var (
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
-		PrevVRFEpoch:               EpochTBD,
+		PrevVRFEpoch:               big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionPromoPeriod:   big.NewInt(100),
