@@ -195,7 +195,7 @@ func startHTTP(apis []rpc.API) (err error) {
 
 func startAuthHTTP(apis []rpc.API) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
-		httpEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+		httpAuthEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
 	if err != nil {
 		return err
