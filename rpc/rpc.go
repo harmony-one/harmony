@@ -206,7 +206,7 @@ func startAuthHTTP(apis []rpc.API) (err error) {
 		Str("cors", strings.Join(httpOrigins, ",")).
 		Str("vhosts", strings.Join(httpVirtualHosts, ",")).
 		Msg("HTTP endpoint opened")
-	fmt.Printf("Started RPC server at: %v\n", httpAuthEndpoint)
+	fmt.Printf("Started Auth-RPC server at: %v\n", httpAuthEndpoint)
 	return nil
 }
 
