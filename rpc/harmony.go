@@ -87,8 +87,8 @@ func (s *PublicHarmonyService) GetPeerInfo(
 	return NewStructuredResponse(s.hmy.GetPeerInfo())
 }
 
-// GetPendingCrosslinks returns length of hmy.BlockChain.ReadPendingCrossLinks()
-func (s *PublicHarmonyService) GetPendingCrosslinks() (int, error) {
+// GetNumPendingCrossLinks returns length of hmy.BlockChain.ReadPendingCrossLinks()
+func (s *PublicHarmonyService) GetNumPendingCrossLinks() (int, error) {
 	links, err := s.hmy.BlockChain.ReadPendingCrossLinks()
 	if err != nil {
 		return 0, err
