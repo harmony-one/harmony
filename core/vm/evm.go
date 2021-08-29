@@ -94,6 +94,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 				}(evm.interpreter)
 				evm.interpreter = interpreter
 			}
+
+			if evm.ChainConfig().IsDataCopyFixEpoch(evm.EpochNumber) {
+				contract.WithDataCopyFix = true
+			}
 			return interpreter.Run(contract, input, readOnly)
 
 		}
