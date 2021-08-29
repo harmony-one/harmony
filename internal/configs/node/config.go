@@ -98,9 +98,10 @@ type ConfigType struct {
 
 // RPCServerConfig is the config for rpc listen addresses
 type RPCServerConfig struct {
-	HTTPEnabled bool
-	HTTPIp      string
-	HTTPPort    int
+	HTTPEnabled  bool
+	HTTPIp       string
+	HTTPPort     int
+	HTTPAuthPort int
 
 	WSEnabled bool
 	WSIp      string

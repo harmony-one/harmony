@@ -136,6 +136,7 @@ type HttpConfig struct {
 	Enabled        bool
 	IP             string
 	Port           int
+	AuthPort       int
 	RosettaEnabled bool
 	RosettaPort    int
 }

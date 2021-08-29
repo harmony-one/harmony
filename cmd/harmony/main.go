@@ -313,6 +313,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		HTTPEnabled:        hc.HTTP.Enabled,
 		HTTPIp:             hc.HTTP.IP,
 		HTTPPort:           hc.HTTP.Port,
+		HTTPAuthPort:       hc.HTTP.AuthPort,
 		WSEnabled:          hc.WS.Enabled,
 		WSIp:               hc.WS.IP,
 		WSPort:             hc.WS.Port,
