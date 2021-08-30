@@ -59,6 +59,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
+		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
 	}
@@ -88,6 +89,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(73880),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -118,6 +120,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -148,6 +151,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -178,6 +182,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -207,6 +212,7 @@ var (
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -238,6 +244,7 @@ var (
 		big.NewInt(0),                      // EPoSBound35Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
+		big.NewInt(0),                      // DataCopyFixEpoch
 		big.NewInt(0),                      // IstanbulEpoch
 		big.NewInt(0),                      // ReceiptLogEpoch
 	}
@@ -269,6 +276,7 @@ var (
 		big.NewInt(0),        // EPoSBound35Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
+		big.NewInt(0),        // DataCopyFixEpoch
 		big.NewInt(0),        // IstanbulEpoch
 		big.NewInt(0),        // ReceiptLogEpoch
 	}
@@ -370,6 +378,9 @@ type ChainConfig struct {
 
 	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
+
+	// DataCopyFix epoch is the first epoch containing fix for evm datacopy bug.
+	DataCopyFixEpoch *big.Int `json:"data-copy-fix-epoch,omitempty"`
 
 	// Istanbul epoch
 	IstanbulEpoch *big.Int `json:"istanbul-epoch,omitempty"`
@@ -499,6 +510,11 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
+}
+
+// IsDataCopyFixEpoch returns whether epoch has the fix for DataCopy evm bug.
+func (c *ChainConfig) IsDataCopyFixEpoch(epoch *big.Int) bool {
+	return isForked(c.DataCopyFixEpoch, epoch)
 }
 
 // IsIstanbul returns whether epoch is either equal to the Istanbul fork epoch or greater.
