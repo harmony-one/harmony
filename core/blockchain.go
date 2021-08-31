@@ -119,10 +119,9 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db              ethdb.Database // Low level persistent database to store final content in
-	triegc          *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc          time.Duration  // Accumulates canonical block processing for trie dumping
-	validatorBlkCnt uint64         // validator wrapper block counter
+	db     ethdb.Database // Low level persistent database to store final content in
+	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
+	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
 	rmLogsFeed    event.Feed
@@ -210,7 +209,6 @@ func NewBlockChain(
 		cacheConfig:                   cacheConfig,
 		db:                            db,
 		triegc:                        prque.New(nil),
-		validatorBlkCnt:               0,
 		stateCache:                    state.NewDatabase(db),
 		quit:                          make(chan struct{}),
 		shouldPreserve:                shouldPreserve,
@@ -1174,13 +1172,11 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Commit state object changes to in-memory trie
 	var root common.Hash
 	if bc.cacheConfig.Disabled && !block.IsLastBlockInEpoch() {
-		if bc.validatorBlkCnt >= triesInMemoryBlocksInterval {
+		if block.NumberU64()%triesInMemoryBlocksInterval == 0 {
 			root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
-			bc.validatorBlkCnt = 0
 		} else {
 			root, err = bc.commitWithoutValidatorWrapper(state.Copy(), block.Epoch())
 			bc.commitWithValidatorWrapper(state, block.Epoch())
-			bc.validatorBlkCnt++
 		}
 	} else {
 		root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
