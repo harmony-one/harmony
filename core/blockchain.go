@@ -1172,7 +1172,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Commit state object changes to in-memory trie
 	var root common.Hash
 	if bc.cacheConfig.Disabled && !block.IsLastBlockInEpoch() {
-		if block.NumberU64()%triesInMemoryBlocksInterval == 0 {
+		if block.NumberU64()%triesInMemoryBlocksInterval != 0 {
 			root, err = bc.commitWithValidatorWrapper(state, block.Epoch())
 		} else {
 			root, err = bc.commitWithoutValidatorWrapper(state.Copy(), block.Epoch())
