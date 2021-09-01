@@ -34,12 +34,6 @@ func (opt DHTConfig) getLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 		opts = append(opts, dsOption)
 	}
 
-	// if Concurrency <= 0, it uses default concurrency supplied from libp2p dht
-	// the concurrency num meaning you can see Section 2.3 in the KAD paper https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf
-	if opt.DiscConcurrency > 0 {
-		opts = append(opts, libp2p_dht.Concurrency(opt.DiscConcurrency))
-	}
-
 	return opts, nil
 }
 
