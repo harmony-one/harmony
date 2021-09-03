@@ -364,3 +364,23 @@ func (s *PublicPoolService) GetPendingCXReceipts(
 	}
 	return formattedReceipts, nil
 }
+
+// GetNumPendingCXReceipts ..
+func (s *PublicPoolService) GetNumPendingCXReceipts(
+	ctx context.Context,
+) (int, error) {
+	timer := DoMetricRPCRequest(GetPendingCXReceipts)
+	defer DoRPCRequestDuration(GetPendingCXReceipts, timer)
+
+	// For each cx receipt, format the response (same format for all versions)
+	formattedReceipts := []StructuredResponse{}
+	for _, receipts := range s.hmy.GetPendingCXReceipts() {
+		formattedReceipt, err := NewStructuredResponse(receipts)
+		if err != nil {
+			DoMetricRPCQueryInfo(GetPendingCXReceipts, FailedNumber)
+			return 0, err
+		}
+		formattedReceipts = append(formattedReceipts, formattedReceipt)
+	}
+	return len(formattedReceipts), nil
+}
