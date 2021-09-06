@@ -38,11 +38,6 @@ func (s *SearchAPI) SearchTransactions(ctx context.Context, request *types.Searc
 
 	var filteredHash, rangeHash []common.Hash
 
-	filteredType := ""
-	if request.Type != nil {
-		filteredType = *request.Type
-	}
-
 	if request.AccountIdentifier != nil {
 		ddr, err := internal_common.ParseAddr(request.AccountIdentifier.Address)
 		if err != nil {
@@ -54,7 +49,7 @@ func (s *SearchAPI) SearchTransactions(ctx context.Context, request *types.Searc
 			return nil, &rosetta_common.ErrCallParametersInvalid
 		}
 
-		histories, err := s.hmy.GetTransactionsHistory(address, filteredType, "")
+		histories, err := s.hmy.GetTransactionsHistory(address, "", "")
 		if err != nil {
 			return nil, rosetta_common.NewError(rosetta_common.CatchAllError, map[string]interface{}{
 				"message": err.Error(),
