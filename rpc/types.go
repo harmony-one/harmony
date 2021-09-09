@@ -125,10 +125,10 @@ type BlockNumber rpc.BlockNumber
 
 const (
 	// LatestBlockNumber is the alias to rpc latest block number
-	LatestBlockNumber BlockNumber = rpc.LatestBlockNumber
+	LatestBlockNumber = BlockNumber(rpc.LatestBlockNumber)
 
 	// PendingBlockNumber is the alias to rpc pending block number
-	PendingBlockNumber BlockNumber = rpc.PendingBlockNumber
+	PendingBlockNumber = BlockNumber(rpc.PendingBlockNumber)
 )
 
 // UnmarshalJSON converts a hex string or integer to a block number
