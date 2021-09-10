@@ -2,7 +2,6 @@ package hmy
 
 import (
 	"context"
-	"github.com/harmony-one/harmony/hmy/gasprice"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -17,11 +16,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/configs/node"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
@@ -63,7 +62,7 @@ type Harmony struct {
 	ShardID   uint32
 
 	// Gas price suggestion oracle
-	gpo *gasprice.Oracle
+	gpo *Oracle
 
 	// Internals
 	eventMux *event.TypeMux
