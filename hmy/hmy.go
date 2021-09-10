@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"github.com/harmony-one/harmony/hmy/gasprice"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,11 +17,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/configs/node"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/singleflight"
@@ -60,6 +61,9 @@ type Harmony struct {
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap *big.Int `toml:",omitempty"`
 	ShardID   uint32
+
+	// Gas price suggestion oracle
+	gpo *gasprice.Oracle
 
 	// Internals
 	eventMux *event.TypeMux
@@ -125,7 +129,8 @@ func New(
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
 	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Start(nodeAPI.Blockchain())
-	return &Harmony{
+
+	backend := &Harmony{
 		ShutdownChan:                make(chan bool),
 		BloomRequests:               make(chan chan *bloombits.Retrieval),
 		BloomIndexer:                bloomIndexer,
@@ -144,6 +149,17 @@ func New(
 		undelegationPayoutsCache:    undelegationPayoutsCache,
 		preStakingBlockRewardsCache: preStakingBlockRewardsCache,
 	}
+
+	// Setup gas price oracle
+	gpoParams := GasPriceConfig{
+		Blocks:     20,
+		Percentile: 60,
+		Default:    big.NewInt(1e10),
+	}
+	gpo := NewOracle(backend, gpoParams)
+	backend.gpo = gpo
+
+	return backend
 }
 
 // SingleFlightRequest ..

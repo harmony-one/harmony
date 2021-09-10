@@ -357,7 +357,7 @@ func (hmy *Harmony) GetValidatorInformation(
 	// b.apiCache.Forget(prevKey)
 
 	// calculate last APRHistoryLength epochs for averaging APR
-	// epochFrom := bc.Config().StakingEpoch
+	// epochFrom := bc.GasPriceConfig().StakingEpoch
 	// nowMinus := big.NewInt(0).Sub(now, big.NewInt(staking.APRHistoryLength))
 	// if nowMinus.Cmp(epochFrom) > 0 {
 	// 	epochFrom = nowMinus
