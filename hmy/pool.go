@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
@@ -45,4 +46,8 @@ func (hmy *Harmony) GetPoolTransactions() (types.PoolTransactions, error) {
 		txs = append(txs, batch...)
 	}
 	return txs, nil
+}
+
+func (hmy *Harmony) SuggestPrice(ctx context.Context) (*big.Int, error) {
+	return hmy.gpo.SuggestPrice(ctx)
 }
