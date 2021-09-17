@@ -48,6 +48,8 @@ const (
 	DefaultDNSPort = 6000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
 	DefaultRPCPort = 9500
+	// DefaultAuthRPCPort is the default rpc auth port. The actual port used is 9000+501
+	DefaultAuthRPCPort = 9501
 	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
 	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
@@ -66,6 +68,9 @@ const (
 const (
 	// rpcHTTPPortOffset is the port offset for RPC HTTP requests
 	rpcHTTPPortOffset = 500
+
+	// rpcHTTPAuthPortOffset is the port offset for RPC Auth HTTP requests
+	rpcHTTPAuthPortOffset = 501
 
 	// rpcHTTPPortOffset is the port offset for rosetta HTTP requests
 	rosettaHTTPPortOffset = 700
@@ -121,6 +126,11 @@ func GetDefaultDNSPort(NetworkType) int {
 // GetRPCHTTPPortFromBase return the rpc HTTP port from base port
 func GetRPCHTTPPortFromBase(basePort int) int {
 	return basePort + rpcHTTPPortOffset
+}
+
+// GetRPCAuthHTTPPortFromBase return the rpc HTTP port from base port
+func GetRPCAuthHTTPPortFromBase(basePort int) int {
+	return basePort + rpcHTTPAuthPortOffset
 }
 
 // GetRosettaHTTPPortFromBase return the rosetta HTTP port from base port

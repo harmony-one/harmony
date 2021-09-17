@@ -2,8 +2,9 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"math/big"
+
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,6 +18,8 @@ import (
 
 const (
 	validatorsPageSize = 100
+
+	validatorInfoCacheSize = 128
 )
 
 // PublicStakingService provides an API to access Harmony's staking services.
@@ -24,15 +27,22 @@ const (
 type PublicStakingService struct {
 	hmy     *hmy.Harmony
 	version Version
+
+	validatorInfoCache *lru.Cache // cache for detailed validator information per page and block
 }
 
 // NewPublicStakingAPI creates a new API for the RPC interface
 func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
+	viCache, _ := lru.New(validatorInfoCacheSize)
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicStakingService{hmy, version},
-		Public:    true,
+		Service: &PublicStakingService{
+			hmy:                hmy,
+			version:            version,
+			validatorInfoCache: viCache,
+		},
+		Public: true,
 	}
 }
 
@@ -49,53 +59,6 @@ func (s *PublicStakingService) getBalanceByBlockNumber(
 		return nil, err
 	}
 	return balance, nil
-}
-
-// getAllValidatorInformation is the helper function to get all validator information for a given eth block number
-func (s *PublicStakingService) getAllValidatorInformation(
-	ctx context.Context, page int, blockNum rpc.BlockNumber,
-) ([]StructuredResponse, error) {
-	if page < -1 {
-		return nil, errors.Errorf("page given %d cannot be less than -1", page)
-	}
-
-	// Get all validators
-	addresses := s.hmy.GetAllValidatorAddresses()
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
-		return []StructuredResponse{}, nil
-	}
-
-	// Set page start
-	validatorsNum := len(addresses)
-	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
-	}
-
-	// Fetch block
-	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
-	}
-
-	// Fetch validator information for block
-	validators := []StructuredResponse{}
-	for i := start; i < start+validatorsNum; i++ {
-		validatorInfo, err := s.hmy.GetValidatorInformation(addresses[i], blk)
-		if err == nil {
-			// Response output is the same for all versions
-			information, err := NewStructuredResponse(validatorInfo)
-			if err != nil {
-				return nil, err
-			}
-			validators = append(validators, information)
-		}
-	}
-	return validators, nil
 }
 
 // GetTotalStaking returns total staking by validators, only meant to be called on beaconchain
@@ -241,7 +204,7 @@ func (s *PublicStakingService) GetValidatorKeys(
 // If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicStakingService) GetAllValidatorInformation(
 	ctx context.Context, page int,
-) ([]StructuredResponse, error) {
+) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformation)
 	defer DoRPCRequestDuration(GetAllValidatorInformation, timer)
 
@@ -250,35 +213,21 @@ func (s *PublicStakingService) GetAllValidatorInformation(
 		return nil, ErrNotBeaconShard
 	}
 
-	// fetch current block number
-	blockNum := s.hmy.CurrentBlock().NumberU64()
-
-	// delete cache for previous block
-	prevKey := fmt.Sprintf("all-info-%d", blockNum-1)
-	s.hmy.SingleFlightForgetKey(prevKey)
-
-	// Fetch all validator information in a single flight request
-	key := fmt.Sprintf("all-info-%d", blockNum)
-	res, err := s.hmy.SingleFlightRequest(
-		key,
-		func() (interface{}, error) {
-			return s.getAllValidatorInformation(ctx, page, rpc.LatestBlockNumber)
-		},
-	)
+	res, err := s.getPagedValidatorInformationCached(ctx, page, LatestBlockNumber)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
 		return nil, err
 	}
 
 	// Response output is the same for all versions
-	return res.([]StructuredResponse), nil
+	return res, nil
 }
 
 // GetAllValidatorInformationByBlockNumber returns information about all validators.
 // If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 	ctx context.Context, page int, blockNumber BlockNumber,
-) ([]StructuredResponse, error) {
+) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformationByBlockNumber)
 	defer DoRPCRequestDuration(GetAllValidatorInformationByBlockNumber, timer)
 
@@ -295,7 +244,82 @@ func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 	}
 
 	// Response output is the same for all versions
-	return s.getAllValidatorInformation(ctx, page, blockNum)
+	res, err := s.getPagedValidatorInformationCached(ctx, page, blockNumber)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllValidatorInformationByBlockNumber, FailedNumber)
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *PublicStakingService) getPagedValidatorInformationCached(ctx context.Context, page int, blockNumber BlockNumber) (interface{}, error) {
+	type cacheKey struct {
+		bn   uint64
+		page int
+	}
+	var bn uint64
+	if blockNumber == LatestBlockNumber {
+		bn = s.hmy.CurrentBlock().NumberU64()
+	} else {
+		bn = uint64(blockNumber)
+	}
+
+	key := cacheKey{bn, page}
+	val, ok := s.validatorInfoCache.Get(key)
+	if ok && val != nil {
+		return val, nil
+	}
+
+	res, err := s.getAllValidatorInformation(ctx, page, bn)
+	if err != nil {
+		return nil, err
+	}
+	s.validatorInfoCache.Add(key, res)
+	return res, nil
+}
+
+// getAllValidatorInformation is the helper function to get all validator information for a given eth block number
+func (s *PublicStakingService) getAllValidatorInformation(
+	ctx context.Context, page int, blockNum uint64,
+) (interface{}, error) {
+	if page < -1 {
+		return nil, errors.Errorf("page given %d cannot be less than -1", page)
+	}
+
+	// Get all validators
+	addresses := s.hmy.GetAllValidatorAddresses()
+	if page != -1 && len(addresses) <= page*validatorsPageSize {
+		return []StructuredResponse{}, nil
+	}
+
+	// Set page start
+	validatorsNum := len(addresses)
+	start := 0
+	if page != -1 {
+		validatorsNum = validatorsPageSize
+		start = page * validatorsPageSize
+		if len(addresses)-start < validatorsPageSize {
+			validatorsNum = len(addresses) - start
+		}
+	}
+
+	// Fetch block
+	blk, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
+	}
+
+	// Fetch validator information for block
+	validators := make([]*staking.ValidatorRPCEnhanced, 0, validatorsNum)
+	for i := start; i < start+validatorsNum; i++ {
+		validatorInfo, err := s.hmy.GetValidatorInformation(addresses[i], blk)
+		if err != nil {
+			return nil, err
+		}
+		// Response output is the same for all versions
+		validators = append(validators, validatorInfo)
+	}
+	return validators, nil
 }
 
 // GetValidatorInformation returns information about a validator.

@@ -132,6 +132,7 @@ type Decider interface {
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
+	CurrentTotalPower(p Phase) (*numeric.Dec, error)
 }
 
 // Registry ..
@@ -408,15 +409,19 @@ func NewDecider(p Policy, shardID uint32) Decider {
 	switch p {
 	case SuperMajorityVote:
 		return &uniformVoteWeight{
-			c.DependencyInjectionWriter, c.DependencyInjectionReader, c,
+			DependencyInjectionWriter:  c.DependencyInjectionWriter,
+			DependencyInjectionReader:  c.DependencyInjectionReader,
+			SignatureReader:            c,
+			lastPowerSignersCountCache: make(map[Phase]int64),
 		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
-			c.SignatureReader,
-			c.DependencyInjectionWriter,
-			c.DependencyInjectionWriter.(DependencyInjectionReader),
-			*votepower.NewRoster(shardID),
-			newVoteTally(),
+			SignatureReader:           c.SignatureReader,
+			DependencyInjectionWriter: c.DependencyInjectionWriter,
+			DependencyInjectionReader: c.DependencyInjectionWriter.(DependencyInjectionReader),
+			roster:                    *votepower.NewRoster(shardID),
+			voteTally:                 newVoteTally(),
+			lastPower:                 make(map[Phase]numeric.Dec),
 		}
 	default:
 		// Should not be possible

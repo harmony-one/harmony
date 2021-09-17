@@ -192,4 +192,13 @@ func init() {
 		confTree.Set("Version", "2.2.0")
 		return confTree
 	}
+
+	migrations["2.2.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("HTTP.AuthPort") == nil {
+			confTree.Set("HTTP.AuthPort", defaultConfig.HTTP.AuthPort)
+		}
+
+		confTree.Set("Version", "2.3.0")
+		return confTree
+	}
 }

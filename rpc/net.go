@@ -62,7 +62,7 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 func (s *PublicNetService) Version(ctx context.Context) interface{} {
 	switch s.version {
 	case Eth:
-		return nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.Uint64()
+		return nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.String()
 	default:
 		return fmt.Sprintf("%d", s.chainID)
 	}

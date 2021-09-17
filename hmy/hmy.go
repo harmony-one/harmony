@@ -61,6 +61,9 @@ type Harmony struct {
 	RPCGasCap *big.Int `toml:",omitempty"`
 	ShardID   uint32
 
+	// Gas price suggestion oracle
+	gpo *Oracle
+
 	// Internals
 	eventMux *event.TypeMux
 	chainDb  ethdb.Database // Block chain database
@@ -110,6 +113,7 @@ type NodeAPI interface {
 	GetConsensusCurViewID() uint64
 	GetConfig() commonRPC.Config
 	ShutDown()
+	GetLastSigningPower() (float64, error)
 }
 
 // New creates a new Harmony object (including the
@@ -124,7 +128,8 @@ func New(
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
 	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Start(nodeAPI.Blockchain())
-	return &Harmony{
+
+	backend := &Harmony{
 		ShutdownChan:                make(chan bool),
 		BloomRequests:               make(chan chan *bloombits.Retrieval),
 		BloomIndexer:                bloomIndexer,
@@ -143,6 +148,17 @@ func New(
 		undelegationPayoutsCache:    undelegationPayoutsCache,
 		preStakingBlockRewardsCache: preStakingBlockRewardsCache,
 	}
+
+	// Setup gas price oracle
+	gpoParams := GasPriceConfig{
+		Blocks:     20,
+		Percentile: 60,
+		Default:    big.NewInt(1e10),
+	}
+	gpo := NewOracle(backend, gpoParams)
+	backend.gpo = gpo
+
+	return backend
 }
 
 // SingleFlightRequest ..

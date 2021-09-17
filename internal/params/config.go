@@ -42,7 +42,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
-		AggregatedRewardEpoch:      EpochTBD,
+		AggregatedRewardEpoch:      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		StakingEpoch:               big.NewInt(186),
 		PreStakingEpoch:            big.NewInt(185),
 		QuickUnlockEpoch:           big.NewInt(191),
@@ -52,12 +52,14 @@ var (
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
+		PrevVRFEpoch:               big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionPromoPeriod:   big.NewInt(100),
 		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
+		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
 	}
@@ -80,12 +82,14 @@ var (
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   big.NewInt(73880),
+		PrevVRFEpoch:               big.NewInt(74384),
 		MinDelegation100Epoch:      big.NewInt(73880),
 		MinCommissionRateEpoch:     big.NewInt(73880),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(73880),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -109,12 +113,14 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -138,12 +144,14 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -167,12 +175,14 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -195,12 +205,14 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 	}
@@ -225,12 +237,14 @@ var (
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // VRFEpoch
+		big.NewInt(0),                      // PrevVRFEpoch
 		big.NewInt(0),                      // MinDelegation100Epoch
 		big.NewInt(0),                      // MinCommissionRateEpoch
 		big.NewInt(10),                     // MinCommissionPromoPeriod
 		big.NewInt(0),                      // EPoSBound35Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
+		big.NewInt(0),                      // DataCopyFixEpoch
 		big.NewInt(0),                      // IstanbulEpoch
 		big.NewInt(0),                      // ReceiptLogEpoch
 	}
@@ -255,12 +269,14 @@ var (
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // VRFEpoch
+		big.NewInt(0),        // PrevVRFEpoch
 		big.NewInt(0),        // MinDelegation100Epoch
 		big.NewInt(0),        // MinCommissionRateEpoch
 		big.NewInt(10),       // MinCommissionPromoPeriod
 		big.NewInt(0),        // EPoSBound35Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
+		big.NewInt(0),        // DataCopyFixEpoch
 		big.NewInt(0),        // IstanbulEpoch
 		big.NewInt(0),        // ReceiptLogEpoch
 	}
@@ -342,6 +358,9 @@ type ChainConfig struct {
 	// VRFEpoch is the epoch when VRF randomness is enabled
 	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
 
+	// PrevVRFEpoch is the epoch when previous VRF randomness can be fetched
+	PrevVRFEpoch *big.Int `json:"prev-vrf-epoch,omitempty"`
+
 	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
 	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
 
@@ -359,6 +378,9 @@ type ChainConfig struct {
 
 	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
+
+	// DataCopyFix epoch is the first epoch containing fix for evm datacopy bug.
+	DataCopyFixEpoch *big.Int `json:"data-copy-fix-epoch,omitempty"`
 
 	// Istanbul epoch
 	IstanbulEpoch *big.Int `json:"istanbul-epoch,omitempty"`
@@ -450,6 +472,11 @@ func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
 	return isForked(c.VRFEpoch, epoch)
 }
 
+// IsPrevVRF determines whether it is the epoch to enable previous vrf
+func (c *ChainConfig) IsPrevVRF(epoch *big.Int) bool {
+	return isForked(c.PrevVRFEpoch, epoch)
+}
+
 // IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
 func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
 	return isForked(c.MinDelegation100Epoch, epoch)
@@ -483,6 +510,11 @@ func (c *ChainConfig) IsCrossLink(epoch *big.Int) bool {
 // IsS3 returns whether epoch is either equal to the S3 fork epoch or greater.
 func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
+}
+
+// IsDataCopyFixEpoch returns whether epoch has the fix for DataCopy evm bug.
+func (c *ChainConfig) IsDataCopyFixEpoch(epoch *big.Int) bool {
+	return isForked(c.DataCopyFixEpoch, epoch)
 }
 
 // IsIstanbul returns whether epoch is either equal to the Istanbul fork epoch or greater.
@@ -543,9 +575,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                      *big.Int
-	EthChainID                                                   *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
+	ChainID                                                                 *big.Int
+	EthChainID                                                              *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -567,5 +599,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsReceiptLog: c.IsReceiptLog(epoch),
 		IsIstanbul:   c.IsIstanbul(epoch),
 		IsVRF:        c.IsVRF(epoch),
+		IsPrevVRF:    c.IsPrevVRF(epoch),
 	}
 }
