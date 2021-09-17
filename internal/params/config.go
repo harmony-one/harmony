@@ -62,6 +62,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
+		SHA3Epoch:                  EpochTBD, //EpochTBD
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -92,6 +93,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  EpochTBD, //EpochTBD
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -123,6 +125,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -154,6 +157,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -185,6 +189,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -215,6 +220,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -247,6 +253,7 @@ var (
 		big.NewInt(0),                      // DataCopyFixEpoch
 		big.NewInt(0),                      // IstanbulEpoch
 		big.NewInt(0),                      // ReceiptLogEpoch
+		big.NewInt(0),
 	}
 
 	// TestChainConfig ...
@@ -279,6 +286,7 @@ var (
 		big.NewInt(0),        // DataCopyFixEpoch
 		big.NewInt(0),        // IstanbulEpoch
 		big.NewInt(0),        // ReceiptLogEpoch
+		big.NewInt(0),
 	}
 
 	// TestRules ...
@@ -387,11 +395,14 @@ type ChainConfig struct {
 
 	// ReceiptLogEpoch is the first epoch support receiptlog
 	ReceiptLogEpoch *big.Int `json:"receipt-log-epoch,omitempty"`
+
+	// IsSHA3Epoch is the first epoch in supporting SHA3 FIPS-202 standard
+	SHA3Epoch *big.Int `json:"sha3-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch:%v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -399,6 +410,7 @@ func (c *ChainConfig) String() string {
 		c.StakingEpoch,
 		c.CrossLinkEpoch,
 		c.ReceiptLogEpoch,
+		c.SHA3Epoch,
 	)
 }
 
@@ -527,6 +539,11 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 	return isForked(c.ReceiptLogEpoch, epoch)
 }
 
+// IsSHA3 returns whether epoch is either equal to the IsSHA3 fork epoch or greater.
+func (c *ChainConfig) IsSHA3(epoch *big.Int) bool {
+	return isForked(c.SHA3Epoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -575,9 +592,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                 *big.Int
-	EthChainID                                                              *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF bool
+	ChainID                                                                         *big.Int
+	EthChainID                                                                      *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -600,5 +617,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsIstanbul:   c.IsIstanbul(epoch),
 		IsVRF:        c.IsVRF(epoch),
 		IsPrevVRF:    c.IsPrevVRF(epoch),
+		IsSHA3:       c.IsSHA3(epoch),
 	}
 }

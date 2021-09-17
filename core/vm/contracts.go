@@ -79,9 +79,6 @@ var PrecompiledContractsIstanbul = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}): &blake2F{},
-
-	common.BytesToAddress([]byte{253}): &sha3fip{},
-	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 }
 
 // PrecompiledContractsIstanbul contains the default set of pre-compiled Ethereum
@@ -97,9 +94,24 @@ var PrecompiledContractsVRF = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}):   &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}):   &blake2F{},
 	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+// PrecompiledContractsSHA3FIPS contains the default set of pre-compiled Ethereum
+// contracts used in the Istanbul release. plus VRF  and SHA3FIPS-202 standard
+var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}):   &ecrecover{},
+	common.BytesToAddress([]byte{2}):   &sha256hash{},
+	common.BytesToAddress([]byte{3}):   &ripemd160hash{},
+	common.BytesToAddress([]byte{4}):   &dataCopy{},
+	common.BytesToAddress([]byte{5}):   &bigModExp{},
+	common.BytesToAddress([]byte{6}):   &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}):   &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}):   &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}):   &blake2F{},
+	common.BytesToAddress([]byte{255}): &vrf{},
 
 	common.BytesToAddress([]byte{253}): &sha3fip{},
-	common.BytesToAddress([]byte{234}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
@@ -555,7 +567,7 @@ type sha3fip struct{}
 // This method does not require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
 func (c *sha3fip) RequiredGas(input []byte) uint64 {
-	return uint64(len(input)+31)/32*params.Sha256PerWordGas + params.Sha256BaseGas
+	return uint64(len(input)+31)/32*params.Sha3FipsWordGas + params.Sha3FipsGas
 }
 func (c *sha3fip) Run(input []byte) ([]byte, error) {
 	hexStr := common.Bytes2Hex(input)
