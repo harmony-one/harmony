@@ -82,6 +82,25 @@ func (w *Worker) CommitSortedTransactions(
 			signer = w.current.ethSigner
 		}
 		from, _ := types.Sender(signer, tx)
+
+		// temporarily filter addresses
+		tempFilterAddrs := []common.Address{
+			common.HexToAddress("0x1e3B6b278BA3b340d4BE7321e9be6DfeD0121Eac"),
+			common.HexToAddress("0x79F0d0670D17a89f509Ad1c16BB6021187964A29"),
+		}
+		found := false
+		for _, addr := range tempFilterAddrs {
+			if bytes.Compare(addr.Bytes(), from.Bytes()) == 0 {
+				utils.Logger().Info().Str("skipping filter address", addr.Hex())
+				found = true
+				break
+			}
+		}
+		if found {
+			txs.Pop()
+			continue
+		}
+
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Epoch()) {
