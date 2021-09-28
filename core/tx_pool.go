@@ -1290,7 +1290,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 // invalidated transactions (low nonce, low balance) are deleted.
 func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 	// Track the promoted transactions to broadcast them at once
-	var promoted types.PoolTransactions
+	var promoted []types.PoolTransaction
 	logger := utils.Logger().With().Stack().Logger()
 
 	// Gather all the accounts potentially needing updates
@@ -1353,9 +1353,9 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 		}
 	}
 	// Notify subsystem for new promoted transactions.
-	//if len(promoted) > 0 {
-	//	go pool.txFeed.Send(NewTxsEvent{promoted})
-	//}
+	if len(promoted) > 0 {
+		go pool.txFeed.Send(NewTxsEvent{promoted})
+	}
 	// If the pending limit is overflown, start equalizing allowances
 	pending := uint64(0)
 	for _, list := range pool.pending {

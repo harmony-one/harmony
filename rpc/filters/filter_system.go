@@ -348,7 +348,7 @@ func (es *EventSystem) broadcast(filters filterIndex, ev interface{}) {
 	case core.NewTxsEvent:
 		hashes := make([]common.Hash, 0, len(e.Txs))
 		for _, tx := range e.Txs {
-			hashes = append(hashes, tx.HashByType())
+			hashes = append(hashes, tx.Hash())
 		}
 		for _, f := range filters[PendingTransactionsSubscription] {
 			f.hashes <- hashes
