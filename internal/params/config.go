@@ -226,7 +226,7 @@ var (
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
-		HIP6And8Epoch:              big.NewInt(0),
+		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 	}
 
 	// AllProtocolChanges ...
