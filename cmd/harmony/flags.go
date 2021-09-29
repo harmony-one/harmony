@@ -1063,7 +1063,7 @@ var (
 	logRotateMaxAgeFlag = cli.IntFlag{
 		Name:     "log.rotate-max-age",
 		Usage:    "maximum number of days to retain old log files",
-		DefValue: defaultConfig.Log.RotateCount,
+		DefValue: defaultConfig.Log.RotateMaxAge,
 	}
 	logFileNameFlag = cli.StringFlag{
 		Name:     "log.name",
