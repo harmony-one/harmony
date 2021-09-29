@@ -62,7 +62,8 @@ var (
 		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
-		SHA3Epoch:                  EpochTBD, //EpochTBD
+		SHA3Epoch:                  EpochTBD,        //EpochTBD
+		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -94,6 +95,7 @@ var (
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  EpochTBD, //EpochTBD
+		HIP6And8Epoch:              big.NewInt(74590),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -126,6 +128,7 @@ var (
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -158,6 +161,7 @@ var (
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -190,6 +194,7 @@ var (
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -221,6 +226,7 @@ var (
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 	}
 
 	// AllProtocolChanges ...
@@ -253,7 +259,8 @@ var (
 		big.NewInt(0),                      // DataCopyFixEpoch
 		big.NewInt(0),                      // IstanbulEpoch
 		big.NewInt(0),                      // ReceiptLogEpoch
-		big.NewInt(0),
+		big.NewInt(0),                      // SHA3Epoch
+		big.NewInt(0),                      // HIP6And8Epoch
 	}
 
 	// TestChainConfig ...
@@ -286,7 +293,8 @@ var (
 		big.NewInt(0),        // DataCopyFixEpoch
 		big.NewInt(0),        // IstanbulEpoch
 		big.NewInt(0),        // ReceiptLogEpoch
-		big.NewInt(0),
+		big.NewInt(0),        // SHA3Epoch
+		big.NewInt(0),        // HIP6And8Epoch
 	}
 
 	// TestRules ...
@@ -398,6 +406,9 @@ type ChainConfig struct {
 
 	// IsSHA3Epoch is the first epoch in supporting SHA3 FIPS-202 standard
 	SHA3Epoch *big.Int `json:"sha3-epoch,omitempty"`
+
+	// IsHIP6And8Epoch is the first epoch to support HIP-6 and HIP-8
+	HIP6And8Epoch *big.Int `json:"hip6_8-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -542,6 +553,13 @@ func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 // IsSHA3 returns whether epoch is either equal to the IsSHA3 fork epoch or greater.
 func (c *ChainConfig) IsSHA3(epoch *big.Int) bool {
 	return isForked(c.SHA3Epoch, epoch)
+}
+
+// IsHIP6And8Epoch determines whether it is the epoch to support
+// HIP-6: reduce the internal voting power from 60% to 49%
+// HIP-8: increase external nodes from 800 to 900
+func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
+	return isForked(c.HIP6And8Epoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
