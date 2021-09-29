@@ -53,6 +53,11 @@ type mainnetSchedule struct{}
 
 func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.MainnetChainConfig.IsHIP6And8Epoch(epoch):
+		// Decrease internal voting power from 60% to 49%
+		// Increase external nodes from 800 to 900
+		// which happens around 10/11/2021 22:00 PDT
+		return mainnetV3_2
 	case params.MainnetChainConfig.IsSixtyPercent(epoch):
 		// Decrease internal voting power from 68% to 60%
 		// which happens around 1/27/2021 22:00 PDT
@@ -213,4 +218,5 @@ var (
 	mainnetV2_2 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
 	mainnetV3   = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 	mainnetV3_1 = MustNewInstance(4, 250, 50, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_2 = MustNewInstance(4, 250, 25, numeric.MustNewDecFromStr("0.49"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )
