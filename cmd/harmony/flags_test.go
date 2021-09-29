@@ -108,10 +108,12 @@ func TestHarmonyFlags(t *testing.T) {
 					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
-					Folder:     "./latest",
-					FileName:   "validator-8.8.8.8-9000.log",
-					RotateSize: 100,
-					Verbosity:  3,
+					Folder:       "./latest",
+					FileName:     "validator-8.8.8.8-9000.log",
+					RotateSize:   100,
+					RotateCount:  10,
+					RotateMaxAge: 0,
+					Verbosity:    3,
 					Context: &harmonyconfig.LogContext{
 						IP:   "8.8.8.8",
 						Port: 9000,
@@ -929,12 +931,14 @@ func TestLogFlags(t *testing.T) {
 			},
 		},
 		{
-			args: []string{"--log_folder", "latest_log", "--log_max_size", "10", "--verbosity",
-				"5", "--ip", "8.8.8.8", "--port", "9001"},
+			args: []string{"--log_folder", "latest_log", "--log_max_size", "10", "--log_rotate_count", "0",
+				"--log_rotate_max_age", "10", "--verbosity", "5", "--ip", "8.8.8.8", "--port", "9001"},
 			expConfig: harmonyconfig.LogConfig{
 				Folder:        "latest_log",
 				FileName:      "validator-8.8.8.8-9001.log",
 				RotateSize:    10,
+				RotateCount:   0,
+				RotateMaxAge:  10,
 				Verbosity:     5,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{
