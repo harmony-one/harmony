@@ -53,9 +53,10 @@ func SetLogVerbosity(verbosity log.Lvl) {
 }
 
 // AddLogFile creates a StreamHandler that outputs JSON logs
-// into rotating files with specified max file size
-func AddLogFile(filepath string, maxSize int) {
-	setZeroLoggerFileOutput(filepath, maxSize)
+// into rotating files with specified max file size and storing at
+// max rotateCount files
+func AddLogFile(filepath string, maxSize int, rotateCount int, rotateMaxAge int) {
+	setZeroLoggerFileOutput(filepath, maxSize, rotateCount, rotateMaxAge)
 }
 
 // AddLogHandler add a log handler
@@ -97,7 +98,7 @@ func setZeroLogContext(port string, ip string) {
 
 // SetZeroLoggerFileOutput sets zeroLogger's output stream
 // to destinated filepath with log file rotation.
-func setZeroLoggerFileOutput(filepath string, maxSize int) error {
+func setZeroLoggerFileOutput(filepath string, maxSize int, rotateCount int, rotateMaxAge int) error {
 	dir := path.Dir(filepath)
 	filename := path.Base(filepath)
 
@@ -105,9 +106,11 @@ func setZeroLoggerFileOutput(filepath string, maxSize int) error {
 	// TODO: zerolog filename prefix can be removed once all loggers
 	// has been replaced
 	childLogger := Logger().Output(&lumberjack.Logger{
-		Filename: fmt.Sprintf("%s/zerolog-%s", dir, filename),
-		MaxSize:  maxSize,
-		Compress: true,
+		Filename:   fmt.Sprintf("%s/zerolog-%s", dir, filename),
+		MaxSize:    maxSize,
+		MaxBackups: rotateCount,
+		MaxAge:     rotateMaxAge,
+		Compress:   true,
 	})
 	zeroLogger = &childLogger
 

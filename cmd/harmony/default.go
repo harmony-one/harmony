@@ -73,10 +73,11 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
-		Folder:     "./latest",
-		FileName:   "harmony.log",
-		RotateSize: 100,
-		Verbosity:  3,
+		Folder:      "./latest",
+		FileName:    "harmony.log",
+		RotateSize:  100,
+		RotateCount: 10,
+		Verbosity:   3,
 		VerbosePrints: harmonyconfig.LogVerbosePrints{
 			Config: true,
 		},

@@ -100,6 +100,8 @@ type LogConfig struct {
 	Folder        string
 	FileName      string
 	RotateSize    int
+	RotateCount   int
+	RotateMaxAge  int
 	Verbosity     int
 	VerbosePrints LogVerbosePrints
 	Context       *LogContext `toml:",omitempty"`

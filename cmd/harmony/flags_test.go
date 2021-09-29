@@ -896,13 +896,16 @@ func TestLogFlags(t *testing.T) {
 			expConfig: defaultConfig.Log,
 		},
 		{
-			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.name", "harmony.log",
-				"--log.verb", "5", "--log.verbose-prints", "config"},
+			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.rotate-count", "3",
+				"--log.rotate-max-age", "0", "--log.name", "harmony.log", "--log.verb", "5",
+				"--log.verbose-prints", "config"},
 			expConfig: harmonyconfig.LogConfig{
-				Folder:     "latest_log",
-				FileName:   "harmony.log",
-				RotateSize: 10,
-				Verbosity:  5,
+				Folder:       "latest_log",
+				FileName:     "harmony.log",
+				RotateSize:   10,
+				RotateCount:  3,
+				RotateMaxAge: 0,
+				Verbosity:    5,
 				VerbosePrints: harmonyconfig.LogVerbosePrints{
 					Config: true,
 				},
@@ -915,6 +918,8 @@ func TestLogFlags(t *testing.T) {
 				Folder:        defaultConfig.Log.Folder,
 				FileName:      defaultConfig.Log.FileName,
 				RotateSize:    defaultConfig.Log.RotateSize,
+				RotateCount:   defaultConfig.Log.RotateCount,
+				RotateMaxAge:  defaultConfig.Log.RotateMaxAge,
 				Verbosity:     defaultConfig.Log.Verbosity,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{
