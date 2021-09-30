@@ -94,8 +94,8 @@ var (
 		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  big.NewInt(74590),
-		HIP6And8Epoch:              big.NewInt(74590),
+		SHA3Epoch:                  big.NewInt(74570),
+		HIP6And8Epoch:              big.NewInt(74570),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
