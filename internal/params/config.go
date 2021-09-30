@@ -62,7 +62,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
-		SHA3Epoch:                  EpochTBD,        //EpochTBD
+		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 	}
 
@@ -94,7 +94,7 @@ var (
 		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
-		SHA3Epoch:                  EpochTBD, //EpochTBD
+		SHA3Epoch:                  big.NewInt(74570), //Around 1st Sept 2AM UTC
 		HIP6And8Epoch:              big.NewInt(74590),
 	}
 
