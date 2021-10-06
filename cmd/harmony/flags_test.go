@@ -100,10 +100,10 @@ func TestHarmonyFlags(t *testing.T) {
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
-					Enabled:            false,
+					Enabled:            true,
 					ListenAddr:         "127.0.0.1:6060",
 					Folder:             "./profiles",
-					ProfileNames:       []string{},
+					ProfileNames:       []string{"cpu", "heap", "goroutine"},
 					ProfileIntervals:   []int{600},
 					ProfileDebugValues: []int{0},
 				},
@@ -802,9 +802,9 @@ func TestPprofFlags(t *testing.T) {
 			expConfig: defaultConfig.Pprof,
 		},
 		{
-			args: []string{"--pprof"},
+			args: []string{"--pprof=false"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:            true,
+				Enabled:            false,
 				ListenAddr:         defaultConfig.Pprof.ListenAddr,
 				Folder:             defaultConfig.Pprof.Folder,
 				ProfileNames:       defaultConfig.Pprof.ProfileNames,

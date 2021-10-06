@@ -65,10 +65,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
-		Enabled:            false,
+		Enabled:            true,
 		ListenAddr:         "127.0.0.1:6060",
 		Folder:             "./profiles",
-		ProfileNames:       []string{},
+		ProfileNames:       []string{"cpu", "heap", "goroutine"},
 		ProfileIntervals:   []int{600},
 		ProfileDebugValues: []int{0},
 	},
