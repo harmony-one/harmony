@@ -233,9 +233,11 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
 	rotateSize := config.Log.RotateSize
+	rotateCount := config.Log.RotateCount
+	rotateMaxAge := config.Log.RotateMaxAge
 	verbosity := config.Log.Verbosity
 
-	utils.AddLogFile(logPath, rotateSize)
+	utils.AddLogFile(logPath, rotateSize, rotateCount, rotateMaxAge)
 	utils.SetLogVerbosity(log.Lvl(verbosity))
 	if config.Log.Context != nil {
 		ip := config.Log.Context.IP

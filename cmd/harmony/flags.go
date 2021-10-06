@@ -136,6 +136,8 @@ var (
 	logFlags = []cli.Flag{
 		logFolderFlag,
 		logRotateSizeFlag,
+		logRotateCountFlag,
+		logRotateMaxAgeFlag,
 		logFileNameFlag,
 		logContextIPFlag,
 		logContextPortFlag,
@@ -1053,6 +1055,16 @@ var (
 		Usage:    "rotation log size in megabytes",
 		DefValue: defaultConfig.Log.RotateSize,
 	}
+	logRotateCountFlag = cli.IntFlag{
+		Name:     "log.rotate-count",
+		Usage:    "maximum number of old log files to retain",
+		DefValue: defaultConfig.Log.RotateCount,
+	}
+	logRotateMaxAgeFlag = cli.IntFlag{
+		Name:     "log.rotate-max-age",
+		Usage:    "maximum number of days to retain old log files",
+		DefValue: defaultConfig.Log.RotateMaxAge,
+	}
 	logFileNameFlag = cli.StringFlag{
 		Name:     "log.name",
 		Usage:    "log file name (e.g. harmony.log)",
@@ -1113,6 +1125,14 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, logRotateSizeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogRotateSizeFlag) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, legacyLogRotateSizeFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateCountFlag) {
+		config.Log.RotateCount = cli.GetIntFlagValue(cmd, logRotateCountFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateMaxAgeFlag) {
+		config.Log.RotateMaxAge = cli.GetIntFlagValue(cmd, logRotateMaxAgeFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, logFileNameFlag) {
