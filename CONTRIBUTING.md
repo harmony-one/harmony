@@ -21,20 +21,20 @@ To pursue engineering excellence, we have insisted on the highest stardard on th
 The best practice is to reorder and squash your local commits before the PR submission to create an atomic and self-contained PR.
 This [book chapter](https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History) provides detailed explanation and guidance on how to rewrite the local git history.
 
-For exampple, a typical workflow is like the following.
+For example, a typical workflow is like the following.
 ```bash
-# assuming you are working on a fix of bug1, and use a local branch called "fixes_of_bug1".
+# assuming you are working on a fix of bug1, and use a local forked branch called "fixes_of_bug1".
 
-git clone https://github.com/harmony-one/harmony
+git clone https://github.com/YOUR-USERNAME/harmony
 cd harmony
 
-# create a local branch to keep track of the origin/master
-git branch fixes_of_bug1 origin/master
+# create a local branch to keep track of the origin/main
+git branch fixes_of_bug1 origin/main
 git checkout fixes_of_bug_1
 
 # make changes, build, test locally, commit changes locally
 # don't forget to squash or rearrange your commits using "git rebase -i"
-git rebase -i origin/master
+git rebase -i origin/main
 
 # rebase your change on the top of the tree
 git pull --rebase

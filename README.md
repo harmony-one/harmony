@@ -128,7 +128,7 @@ One can start a local network (a.k.a localnet) with your current code using the 
 ```bash
 make debug
 ```
-> This localnet has 2 shards, with 11 nodes on shard 0 (+1 explorer node) and 10 nodes on shard 0 (+1 explorer node).
+> This localnet has 2 shards, with 11 nodes on shard 0 (+1 explorer node) and 10 nodes on shard 1 (+1 explorer node).
 >
 > The shard 0 endpoint will be on the explorer at `http://localhost:9599`. The shard 1 endpoint will be on the explorer at `http://localhost:9598`.
 >
