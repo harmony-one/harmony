@@ -33,7 +33,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 	consensus.StartFinalityCount()
 
-	consensus.getLogger().Debug().
+	consensus.getLogger().Info().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
@@ -64,7 +64,12 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if len(recvMsg.Block) > 0 {
 		go func() {
 			// Best effort check, no need to error out.
-			consensus.validateNewBlock(recvMsg)
+			_, err := consensus.validateNewBlock(recvMsg)
+
+			if err == nil {
+				consensus.getLogger().Info().
+					Msg("[Announce] Block verified")
+			}
 		}()
 	}
 }
@@ -87,6 +92,8 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 				return nil, errors.New("Failed parsing new block")
 			}
 		}
+		consensus.getLogger().Info().
+			Msg("[validateNewBlock] Block Already verified")
 		return blockObj, nil
 	}
 	// check validity of block if any
@@ -98,12 +105,14 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 			Msg("[validateNewBlock] Unparseable block header data")
 		return nil, errors.New("Failed parsing new block")
 	}
+
+	consensus.FBFTLog.AddBlock(&blockObj)
+
 	// let this handle it own logs
 	if !consensus.newBlockSanityChecks(&blockObj, recvMsg) {
 		return nil, errors.New("new block failed sanity checks")
 	}
 
-	consensus.FBFTLog.AddBlock(&blockObj)
 	// add block field
 	blockPayload := make([]byte, len(recvMsg.Block))
 	copy(blockPayload[:], recvMsg.Block[:])
