@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -268,7 +269,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 		return ExecutionResult{}, err
 	}
 	if err = st.useGas(gas); err != nil {
-		return ExecutionResult{}, err
+		return ExecutionResult{}, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 	}
 
 	evm := st.evm
