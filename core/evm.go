@@ -17,9 +17,13 @@
 package core
 
 import (
+	"bytes"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/internal/params"
+	staking2 "github.com/harmony-one/harmony/staking"
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
@@ -79,6 +83,12 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Time:        header.Time(),
 		GasLimit:    header.GasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
+
+		CreateValidator: CreateValidatorFn(chain, header.Epoch(), header.Number()),
+		EditValidator:   EditValidatorFn(chain, header.Epoch(), header.Number()),
+		Delegate:        DelegateFn(chain, header.Epoch(), header.Number()),
+		Undelegate:      UndelegateFn(chain, header.Epoch(), header.Number()),
+		CollectRewards:  CollectRewardsFn(chain, header.Epoch(), header.Number()),
 	}
 }
 
@@ -166,5 +176,129 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int, 
 	}
 	if txType == types.SameShardTx {
 		db.AddBalance(recipient, amount)
+	}
+}
+
+func CreateValidatorFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.CreateValidatorFunc {
+	return func(db vm.StateDB, createValidator *staking.CreateValidator) error {
+		wrapper, err := VerifyAndCreateValidatorFromMsg(
+			db, chain, epoch, blockNum, createValidator,
+		)
+		if err != nil {
+			return err
+		}
+		if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+			return err
+		}
+		db.SetValidatorFlag(createValidator.ValidatorAddress)
+		db.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
+		return nil
+	}
+}
+
+func EditValidatorFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.EditValidatorFunc {
+	return func(db vm.StateDB, editValidator *staking.EditValidator) error {
+		wrapper, err := VerifyAndEditValidatorFromMsg(
+			db, chain, epoch, blockNum, editValidator,
+		)
+		if err != nil {
+			return err
+		}
+		return db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	}
+}
+
+func DelegateFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.DelegateFunc {
+	return func(db vm.StateDB, delegate *staking.Delegate) error {
+		delegations, err := chain.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
+			db, epoch, delegate, delegations, chain.Config())
+		if err != nil {
+			return err
+		}
+
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+
+		db.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
+
+		if len(fromLockedTokens) > 0 {
+			sortedKeys := []common.Address{}
+			for key := range fromLockedTokens {
+				sortedKeys = append(sortedKeys, key)
+			}
+			sort.SliceStable(sortedKeys, func(i, j int) bool {
+				return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
+			})
+			// Add log if everything is good
+			for _, key := range sortedKeys {
+				redelegatedToken, ok := fromLockedTokens[key]
+				if !ok {
+					return errors.New("Key missing for delegation receipt")
+				}
+				encodedRedelegationData := []byte{}
+				addrBytes := key.Bytes()
+				encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+				encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+				// The data field format is:
+				// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
+				// [rest of the bytes]: the bigInt serialized bytes for the token amount.
+				db.AddLog(&types.Log{
+					Address:     delegate.DelegatorAddress,
+					Topics:      []common.Hash{staking2.DelegateTopic},
+					Data:        encodedRedelegationData,
+					BlockNumber: blockNum.Uint64(),
+				})
+			}
+		}
+		return nil
+	}
+}
+
+func UndelegateFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.UndelegateFunc {
+	return func(db vm.StateDB, undelegate *staking.Undelegate) error {
+		wrapper, err := VerifyAndUndelegateFromMsg(db, epoch, undelegate)
+		if err != nil {
+			return err
+		}
+		return db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	}
+}
+func CollectRewardsFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.CollectRewardsFunc {
+	return func(db vm.StateDB, collectRewards *staking.CollectRewards) error {
+		if chain == nil {
+			return errors.New("[CollectRewards] No chain context provided")
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+			db, delegations,
+		)
+		if err != nil {
+			return err
+		}
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
+
+		// Add log if everything is good
+		db.AddLog(&types.Log{
+			Address:     collectRewards.DelegatorAddress,
+			Topics:      []common.Hash{staking2.CollectRewardsTopic},
+			Data:        totalRewards.Bytes(),
+			BlockNumber: blockNum.Uint64(),
+		})
+		return nil
 	}
 }

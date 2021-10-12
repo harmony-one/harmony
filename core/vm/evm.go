@@ -17,20 +17,26 @@
 package vm
 
 import (
+	"errors"
 	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/core/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-// emptyCodeHash is used by create to ensure deployment is disallowed to already
-// deployed contract addresses (relevant after the account abstraction).
-var emptyCodeHash = crypto.Keccak256Hash(nil)
+var (
+	// emptyCodeHash is used by create to ensure deployment is disallowed to already
+	// deployed contract addresses (relevant after the account abstraction).
+	emptyCodeHash    = crypto.Keccak256Hash(nil)
+	errInvalidSigner = errors.New("invalid signer for staking transaction")
+)
 
 type (
 	// CanTransferFunc is the signature of a transfer guard function
@@ -45,12 +51,19 @@ type (
 	// GetVRFFunc returns the nth block vrf in the blockchain
 	// and is used by the precompile VRF contract.
 	GetVRFFunc func(uint64) common.Hash
+
+	CreateValidatorFunc func(StateDB, *staking.CreateValidator) error // staking VerifyAndCreateValidatorFromMsg
+	EditValidatorFunc   func(StateDB, *staking.EditValidator) error   // staking VerifyAndEditValidatorFromMsg
+	DelegateFunc        func(StateDB, *staking.Delegate) error        // VerifyAndDelegateFromMsg
+	UndelegateFunc      func(StateDB, *staking.Undelegate) error      // VerifyAndUndelegateFromMsg
+	CollectRewardsFunc  func(StateDB, *staking.CollectRewards) error  // VerifyAndCollectRewardsFromDelegation
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
 func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	if contract.CodeAddr != nil {
 		precompiles := PrecompiledContractsHomestead
+		precompilesRW := PrecompiledRWContractsEVMStake
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -83,6 +96,9 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					input = evm.Context.VRF.Bytes()
 				}
 
+			}
+			if p, ok := precompilesRW[*contract.CodeAddr]; ok {
+				return RunPrecompiledContractRW(p, evm, contract, input, readOnly)
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
@@ -136,6 +152,12 @@ type Context struct {
 	EpochNumber *big.Int       // Provides information for EPOCH
 	Time        *big.Int       // Provides information for TIME
 	VRF         common.Hash    // Provides information for VRF
+
+	CreateValidator CreateValidatorFunc
+	EditValidator   EditValidatorFunc
+	Delegate        DelegateFunc
+	Undelegate      UndelegateFunc
+	CollectRewards  CollectRewardsFunc
 
 	TxType types.TransactionType
 }
@@ -539,6 +561,59 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 	codeAndHash := &codeAndHash{code: code}
 	contractAddr = crypto.CreateAddress2(caller.Address(), common.BigToHash(salt), codeAndHash.Hash().Bytes())
 	return evm.create(caller, codeAndHash, gas, endowment, contractAddr)
+}
+
+func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []byte) (err error) {
+	switch txType {
+	case types.StakeCreateVal:
+		stkMsg := &staking.CreateValidator{}
+		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
+			return err
+		}
+		if caller.Address() != stkMsg.ValidatorAddress {
+			return errInvalidSigner
+		}
+		err = evm.CreateValidator(evm.StateDB, stkMsg)
+	case types.StakeEditVal:
+		stkMsg := &staking.EditValidator{}
+		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
+			return err
+		}
+		if caller.Address() != stkMsg.ValidatorAddress {
+			return errInvalidSigner
+		}
+		err = evm.EditValidator(evm.StateDB, stkMsg)
+	case types.Delegate:
+		stkMsg := &staking.Delegate{}
+		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
+			return err
+		}
+		if caller.Address() != stkMsg.DelegatorAddress {
+			return errInvalidSigner
+		}
+		err = evm.Delegate(evm.StateDB, stkMsg)
+	case types.Undelegate:
+		stkMsg := &staking.Undelegate{}
+		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
+			return err
+		}
+		if caller.Address() != stkMsg.DelegatorAddress {
+			return errInvalidSigner
+		}
+		err = evm.Undelegate(evm.StateDB, stkMsg)
+	case types.CollectRewards:
+		stkMsg := &staking.CollectRewards{}
+		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
+			return err
+		}
+		if caller.Address() != stkMsg.DelegatorAddress {
+			return errInvalidSigner
+		}
+		err = evm.CollectRewards(evm.StateDB, stkMsg)
+	default:
+		return staking.ErrInvalidStakingKind
+	}
+	return err
 }
 
 // ChainConfig returns the environment's chain configuration

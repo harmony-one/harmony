@@ -23,7 +23,6 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
@@ -35,7 +34,6 @@ import (
 )
 
 var (
-	errInvalidSigner               = errors.New("invalid signer for staking transaction")
 	errInsufficientBalanceForGas   = errors.New("insufficient balance to pay for gas")
 	errInsufficientBalanceForStake = errors.New("insufficient balance to stake")
 	errValidatorExist              = errors.New("staking validator already exists")
@@ -357,62 +355,11 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
-	switch msg.Type() {
-	case types.StakeCreateVal:
-		stkMsg := &staking.CreateValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().
-			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyCreateValidatorTx(stkMsg, msg.BlockNum())
-	case types.StakeEditVal:
-		stkMsg := &staking.EditValidator{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().
-			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyEditValidatorTx(stkMsg, msg.BlockNum())
-	case types.Delegate:
-		stkMsg := &staking.Delegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyDelegateTx(stkMsg)
-	case types.Undelegate:
-		stkMsg := &staking.Undelegate{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		err = st.verifyAndApplyUndelegateTx(stkMsg)
-	case types.CollectRewards:
-		stkMsg := &staking.CollectRewards{}
-		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
-		}
-		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
-		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
-		}
-		_, err = st.verifyAndApplyCollectRewards(stkMsg)
-	default:
-		return 0, staking.ErrInvalidStakingKind
+	err = st.evm.Stake(sender, msg.Type(), msg.Data())
+	if err != nil {
+		return 0, err
 	}
+
 	st.refundGas()
 
 	// Burn Txn Fees
