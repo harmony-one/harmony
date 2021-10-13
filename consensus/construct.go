@@ -99,6 +99,7 @@ func (consensus *Consensus) construct(
 	needMsgSig := true
 	switch p {
 	case msg_pb.MessageType_ANNOUNCE:
+		consensusMsg.Block = consensus.block
 		consensusMsg.Payload = consensus.blockHash[:]
 	case msg_pb.MessageType_PREPARE:
 		needMsgSig = false

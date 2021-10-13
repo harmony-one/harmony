@@ -3,6 +3,8 @@ package consensus
 import (
 	"encoding/hex"
 
+	"github.com/pkg/errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
@@ -31,7 +33,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 	consensus.StartFinalityCount()
 
-	consensus.getLogger().Debug().
+	consensus.getLogger().Info().
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
@@ -58,6 +60,81 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 	consensus.prepare()
 	consensus.switchPhase("Announce", FBFTPrepare)
+
+	if len(recvMsg.Block) > 0 {
+		go func() {
+			// Best effort check, no need to error out.
+			_, err := consensus.validateNewBlock(recvMsg)
+
+			if err == nil {
+				consensus.getLogger().Info().
+					Msg("[Announce] Block verified")
+			}
+		}()
+	}
+}
+
+func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
+	// Lock to prevent race condition between announce and prepare
+	consensus.verifyBlockMutex.Lock()
+	defer consensus.verifyBlockMutex.Unlock()
+
+	if consensus.FBFTLog.IsBlockVerified(recvMsg.BlockHash) {
+		var blockObj *types.Block
+
+		blockObj = consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+		if blockObj == nil {
+			if err := rlp.DecodeBytes(recvMsg.Block, &blockObj); err != nil {
+				consensus.getLogger().Warn().
+					Err(err).
+					Uint64("MsgBlockNum", recvMsg.BlockNum).
+					Msg("[validateNewBlock] Unparseable block header data")
+				return nil, errors.New("Failed parsing new block")
+			}
+		}
+		consensus.getLogger().Info().
+			Msg("[validateNewBlock] Block Already verified")
+		return blockObj, nil
+	}
+	// check validity of block if any
+	var blockObj types.Block
+	if err := rlp.DecodeBytes(recvMsg.Block, &blockObj); err != nil {
+		consensus.getLogger().Warn().
+			Err(err).
+			Uint64("MsgBlockNum", recvMsg.BlockNum).
+			Msg("[validateNewBlock] Unparseable block header data")
+		return nil, errors.New("Failed parsing new block")
+	}
+
+	consensus.FBFTLog.AddBlock(&blockObj)
+
+	// let this handle it own logs
+	if !consensus.newBlockSanityChecks(&blockObj, recvMsg) {
+		return nil, errors.New("new block failed sanity checks")
+	}
+
+	// add block field
+	blockPayload := make([]byte, len(recvMsg.Block))
+	copy(blockPayload[:], recvMsg.Block[:])
+	consensus.block = blockPayload
+	recvMsg.Block = []byte{} // save memory space
+	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
+	consensus.getLogger().Debug().
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Hex("blockHash", recvMsg.BlockHash[:]).
+		Msg("[validateNewBlock] Prepared message and block added")
+
+	if consensus.BlockVerifier == nil {
+		consensus.getLogger().Debug().Msg("[validateNewBlock] consensus received message before init. Ignoring")
+		return nil, errors.New("nil block verifier")
+	}
+
+	if err := consensus.VerifyBlock(&blockObj); err != nil {
+		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
+		return nil, errors.New("Block verification failed")
+	}
+	return &blockObj, nil
 }
 
 func (consensus *Consensus) prepare() {
@@ -149,41 +226,12 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		return
 	}
 
-	// check validity of block
-	var blockObj types.Block
-	if err := rlp.DecodeBytes(recvMsg.Block, &blockObj); err != nil {
+	var blockObj *types.Block
+	if blockObj, err = consensus.validateNewBlock(recvMsg); err != nil {
 		consensus.getLogger().Warn().
-			Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Msg("[OnPrepared] Unparseable block header data")
-		return
-	}
-	// let this handle it own logs
-	if !consensus.onPreparedSanityChecks(&blockObj, recvMsg) {
-		return
-	}
-
-	consensus.FBFTLog.AddBlock(&blockObj)
-	// add block field
-	blockPayload := make([]byte, len(recvMsg.Block))
-	copy(blockPayload[:], recvMsg.Block[:])
-	consensus.block = blockPayload
-	recvMsg.Block = []byte{} // save memory space
-	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
-	consensus.getLogger().Debug().
-		Uint64("MsgViewID", recvMsg.ViewID).
-		Uint64("MsgBlockNum", recvMsg.BlockNum).
-		Hex("blockHash", recvMsg.BlockHash[:]).
-		Msg("[OnPrepared] Prepared message and block added")
-
-	if consensus.BlockVerifier == nil {
-		consensus.getLogger().Debug().Msg("[onPrepared] consensus received message before init. Ignoring")
-		return
-	}
-
-	if err := consensus.VerifyBlock(&blockObj); err != nil {
-		consensus.getLogger().Error().Err(err).Msg("[OnPrepared] Block verification failed")
-		return
+			Uint64("MsgViewID", recvMsg.ViewID).
+			Msg("[OnPrepared] failed to verify new block")
 	}
 
 	if consensus.checkViewID(recvMsg) != nil {
@@ -212,7 +260,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	// tryCatchup is also run in onCommitted(), so need to lock with commitMutex.
 	if consensus.current.Mode() == Normal {
-		consensus.sendCommitMessages(&blockObj)
+		consensus.sendCommitMessages(blockObj)
 		consensus.switchPhase("onPrepared", FBFTCommit)
 	} else {
 		// don't sign the block that is not verified

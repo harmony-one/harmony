@@ -84,6 +84,8 @@ type Consensus struct {
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
 	mutex sync.Mutex
+	// mutex for verify new block
+	verifyBlockMutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -136,7 +138,7 @@ type Consensus struct {
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks
 func (consensus *Consensus) VerifyBlock(block *types.Block) error {
-	if !consensus.FBFTLog.IsBlockVerified(block) {
+	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
 			return errors.New("Block verification failed")
 		}
