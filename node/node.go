@@ -38,6 +38,7 @@ import (
 	"github.com/harmony-one/harmony/internal/chain"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/internal/mmr"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/shardchain"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -71,6 +72,14 @@ type syncConfig struct {
 	client    *downloader.Client
 	// Determine to send encoded BlockWithSig or Block
 	withSig bool
+}
+
+type FileDbMmrChanItem struct {
+	Number      *big.Int
+	ParentHash  common.Hash
+	Epoch       *big.Int
+	ShardID     uint32
+	IsLastBlock bool
 }
 
 // Node represents a protocol-participating node in the network
@@ -125,6 +134,11 @@ type Node struct {
 	// InSync flag indicates the node is in-sync or not
 	IsInSync      *abool.AtomicBool
 	proposedBlock map[uint64]*types.Block
+
+	// Mmr tree pointer
+	FileDbMmr          *mmr.Mmr
+	MemDbMmr           *mmr.Mmr
+	MmrBlockHeaderChan chan FileDbMmrChanItem
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -1066,6 +1080,12 @@ func New(
 
 	// update reward values now that node is ready
 	node.updateInitialRewardValues()
+
+	// mmr channel
+	node.MmrBlockHeaderChan = make(chan FileDbMmrChanItem)
+	node.FileDbMmr = node.initializeFileDBMmr(node.Consensus.ShardID, big.NewInt(0))
+	node.MemDbMmr = node.initializeMemDBMmr(node.Consensus.ShardID, big.NewInt(0))
+	go node.FileDbMmrSync()
 
 	// init metrics
 	initMetrics()

@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -24,6 +22,7 @@ import (
 	v1 "github.com/harmony-one/harmony/rpc/v1"
 	v2 "github.com/harmony-one/harmony/rpc/v2"
 	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -924,4 +923,26 @@ func (e *revertError) ErrorCode() int {
 // ErrorData returns the hex encoded revert reason.
 func (e *revertError) ErrorData() interface{} {
 	return e.reason
+}
+
+type MmrProofReponse struct {
+	Root     string   `json:"root"`
+	Width    int64    `json:"width"`
+	Index    int64    `json:"index"`
+	Peaks    []string `json:"peaks"`
+	Siblings []string `json:"siblings"`
+}
+
+func (s *PublicTransactionService) GetTxMmrProof(ctx context.Context, hash common.Hash, withRespectToBlockNumber uint64) (MmrProofReponse, error) {
+	_, blockHash, blockNumber, _ := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
+	mmrProof := s.hmy.NodeAPI.GetProof(hash, blockHash, blockNumber, withRespectToBlockNumber)
+	peaks := []string{}
+	for i := range mmrProof.Peaks {
+		peaks = append(peaks, common.Bytes2Hex(mmrProof.Peaks[i]))
+	}
+	siblings := []string{}
+	for i := range mmrProof.Siblings {
+		siblings = append(siblings, common.Bytes2Hex(mmrProof.Siblings[i]))
+	}
+	return MmrProofReponse{common.Bytes2Hex(mmrProof.Root), mmrProof.Width, mmrProof.Index, peaks, siblings}, nil
 }
