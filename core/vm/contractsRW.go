@@ -39,10 +39,10 @@ type PrecompiledContractRW interface {
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
 func RunPrecompiledContractRW(p PrecompiledContractRW, evm *EVM, contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
 	gas := p.RequiredGas(input)
-	if contract.UseGas(gas) {
-		return p.RunRW(evm, contract, input, readOnly)
+	if !contract.UseGas(gas) {
+		return nil, ErrOutOfGas
 	}
-	return nil, ErrOutOfGas
+	return p.RunRW(evm, contract, input, readOnly)
 }
 
 func newCreateValidator(input []byte) (types.Directive, types.StakeMsg) {
