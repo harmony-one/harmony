@@ -21,7 +21,16 @@ func NewSearchAPI(hmy *hmy.Harmony) *SearchAPI {
 }
 
 // SearchTransactions implements the /search/transactions endpoint
-func (s *SearchAPI) SearchTransactions(ctx context.Context, request *types.SearchTransactionsRequest) (*types.SearchTransactionsResponse, *types.Error) {
+func (s *SearchAPI) SearchTransactions(ctx context.Context, request *types.SearchTransactionsRequest) (resp *types.SearchTransactionsResponse, err *types.Error) {
+	cacheItem, cacheHelper, cacheErr := rosettaCacheHelper("SearchTransactions", request)
+	if cacheErr == nil {
+		if cacheItem != nil {
+			return cacheItem.resp.(*types.SearchTransactionsResponse), nil
+		} else {
+			defer cacheHelper(resp, err)
+		}
+	}
+
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, s.hmy.ShardID); err != nil {
 		return nil, err
 	}
@@ -64,7 +73,7 @@ func (s *SearchAPI) SearchTransactions(ctx context.Context, request *types.Searc
 		filteredHash = operatorFilter(request.Operator, filteredHash, []common.Hash{hash})
 	}
 
-	resp := &types.SearchTransactionsResponse{}
+	resp = &types.SearchTransactionsResponse{}
 	if int64(len(filteredHash)) < offset {
 		return resp, nil
 	} else if int64(len(filteredHash)) < offset+limit {

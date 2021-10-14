@@ -17,7 +17,16 @@ func NewEventAPI(hmy *hmy.Harmony) *EventAPI {
 }
 
 // EventsBlocks implements the /events/blocks endpoint
-func (e *EventAPI) EventsBlocks(ctx context.Context, request *types.EventsBlocksRequest) (*types.EventsBlocksResponse, *types.Error) {
+func (e *EventAPI) EventsBlocks(ctx context.Context, request *types.EventsBlocksRequest) (resp *types.EventsBlocksResponse, err *types.Error) {
+	cacheItem, cacheHelper, cacheErr := rosettaCacheHelper("EventsBlocks", request)
+	if cacheErr == nil {
+		if cacheItem != nil {
+			return cacheItem.resp.(*types.EventsBlocksResponse), nil
+		} else {
+			defer cacheHelper(resp, err)
+		}
+	}
+
 	if err := assertValidNetworkIdentifier(request.NetworkIdentifier, e.hmy.ShardID); err != nil {
 		return nil, err
 	}
@@ -39,7 +48,7 @@ func (e *EventAPI) EventsBlocks(ctx context.Context, request *types.EventsBlocks
 		offset = *request.Offset
 	}
 
-	resp := &types.EventsBlocksResponse{
+	resp = &types.EventsBlocksResponse{
 		MaxSequence: e.hmy.BlockChain.CurrentHeader().Number().Int64(),
 	}
 
