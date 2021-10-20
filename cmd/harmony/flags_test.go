@@ -104,7 +104,7 @@ func TestHarmonyFlags(t *testing.T) {
 					ListenAddr:         "127.0.0.1:6060",
 					Folder:             "./profiles",
 					ProfileNames:       []string{"cpu", "heap", "goroutine"},
-					ProfileIntervals:   []int{600},
+					ProfileIntervals:   []int{3600},
 					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
