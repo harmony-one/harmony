@@ -55,8 +55,9 @@ type Validator interface {
 // of gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
-	Process(block *types.Block, statedb *state.DB, cfg vm.Config) (
+	Process(block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool) (
 		types.Receipts, types.CXReceipts,
-		[]*types.Log, uint64, reward.Reader, error,
+		[]*types.Log, uint64, reward.Reader, *state.DB, error,
 	)
+	CacheProcessorResult(cacheKey interface{}, result *ProcessorResult)
 }
