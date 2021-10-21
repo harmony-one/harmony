@@ -44,7 +44,6 @@ type environment struct {
 	stakingTxs []*staking.StakingTransaction
 	receipts   []*types.Receipt
 	logs       []*types.Log
-	usedGas    uint64
 	reward     reward.Reader
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)

@@ -304,7 +304,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		return nil, err
 	}
 
-	// Saving process result in the cache for later use for faster block commitment to db.
+	// Save process result in the cache for later use for faster block commitment to db.
 	result := node.Worker.GetCurrentResult()
 	node.Blockchain().Processor().CacheProcessorResult(finalizedBlock.Hash(), result)
 	return finalizedBlock, nil

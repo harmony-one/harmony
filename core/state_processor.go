@@ -40,7 +40,7 @@ import (
 )
 
 const (
-	resultCacheLimit = 64
+	resultCacheLimit = 64 // The number of cached results from processing blocks
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -95,7 +95,7 @@ func (p *StateProcessor) Process(
 			// Return the cached result to avoid process the same block again.
 			// Only the successful results are cached in case for retry.
 			result := cached.(*ProcessorResult)
-			utils.Logger().Info().Str("block num", block.Number().String()).Msg("USED CACHE")
+			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
 			return result.Receipts, result.CxReceipts, result.Logs, result.UsedGas, result.Reward, result.State, nil
 		}
 	}
@@ -195,6 +195,7 @@ func (p *StateProcessor) Process(
 	return receipts, outcxs, allLogs, *usedGas, payout, statedb, nil
 }
 
+// CacheProcessorResult caches the process result on the cache key.
 func (p *StateProcessor) CacheProcessorResult(cacheKey interface{}, result *ProcessorResult) {
 	p.resultCache.Add(cacheKey, result)
 }

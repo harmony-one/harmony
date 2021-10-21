@@ -264,6 +264,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
+	// Do not read cache from processor.
 	receipts, cxReceipts, _, usedGas, _, _, err := bc.processor.Process(
 		block, state, bc.vmConfig, false,
 	)
