@@ -37,6 +37,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+var TxHashToStakeMsgs map[string][]staking.StakeMsg
+
+func init() {
+	TxHashToStakeMsgs = make(map[string][]staking.StakeMsg)
+}
+
+func GetTxHashToStakeMsgs() map[string][]staking.StakeMsg {
+	return TxHashToStakeMsgs
+}
+
 // StateProcessor is a basic Processor, which takes care of transitioning
 // state from one point to another.
 //
@@ -219,6 +229,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
 		return nil, nil, 0, err
+	}
+	if vmenv.StakeMsgs != nil {
+		TxHashToStakeMsgs[tx.Hash().Hex()] = vmenv.StakeMsgs
+		vmenv.StakeMsgs = nil
 	}
 	// Update the state with pending changes
 	var root []byte
