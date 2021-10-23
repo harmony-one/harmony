@@ -59,25 +59,46 @@ type (
 	CollectRewardsFunc  func(StateDB, *staking.CollectRewards) error  // VerifyAndCollectRewardsFromDelegation
 )
 
+func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
+	precompiles := PrecompiledContractsHomestead
+	if evm.ChainConfig().IsS3(evm.EpochNumber) {
+		precompiles = PrecompiledContractsByzantium
+	}
+	if evm.chainRules.IsIstanbul {
+		precompiles = PrecompiledContractsIstanbul
+	}
+	if evm.chainRules.IsVRF {
+		precompiles = PrecompiledContractsVRF
+	}
+	if evm.chainRules.IsSHA3 {
+		precompiles = PrecompiledContractsSHA3FIPS
+	}
+	if evm.chainRules.IsEVMStaking {
+		precompiles = PrecompiledContractsEVMStake
+	}
+	p, ok := precompiles[addr]
+	return p, ok && p != nil
+}
+
+func (evm *EVM) precompileVRF(contract PrecompiledContract) (*vrf, bool) {
+	v, ok := contract.(*vrf)
+	return v, ok && v != nil
+}
+
+func (evm *EVM) precompileRW(addr common.Address) (PrecompiledContractRW, bool) {
+	if evm.chainRules.IsEVMStaking {
+		return nil, false
+	}
+	precompilesRW := PrecompiledRWContractsEVMStake
+	p, ok := precompilesRW[addr]
+	return p, ok && p != nil
+}
+
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
 func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	if contract.CodeAddr != nil {
-		precompiles := PrecompiledContractsHomestead
-		precompilesRW := PrecompiledRWContractsEVMStake
-		if evm.ChainConfig().IsS3(evm.EpochNumber) {
-			precompiles = PrecompiledContractsByzantium
-		}
-		if evm.chainRules.IsIstanbul {
-			precompiles = PrecompiledContractsIstanbul
-		}
-		if evm.chainRules.IsVRF {
-			precompiles = PrecompiledContractsVRF
-		}
-		if evm.chainRules.IsSHA3 {
-			precompiles = PrecompiledContractsSHA3FIPS
-		}
-		if p := precompiles[*contract.CodeAddr]; p != nil {
-			if _, ok := p.(*vrf); ok {
+		if p, ok := evm.precompile(*contract.CodeAddr); ok {
+			if _, ok := evm.precompileVRF(p); ok {
 				if evm.chainRules.IsPrevVRF {
 					requestedBlockNum := big.NewInt(0).SetBytes(input)
 					minBlockNum := big.NewInt(0).Sub(evm.BlockNumber, common.Big257)
@@ -95,12 +116,12 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					// Override the input with vrf data of the requested block so it can be returned to the contract program.
 					input = evm.Context.VRF.Bytes()
 				}
-
-			}
-			if p, ok := precompilesRW[*contract.CodeAddr]; ok {
-				return RunPrecompiledContractRW(p, evm, contract, input, readOnly)
 			}
 			return RunPrecompiledContract(p, input, contract)
+		}
+
+		if p, ok := evm.precompileRW(*contract.CodeAddr); ok {
+			return RunPrecompiledContractRW(p, evm, contract, input, readOnly)
 		}
 	}
 	for _, interpreter := range evm.interpreters {
@@ -153,6 +174,7 @@ type Context struct {
 	Time        *big.Int       // Provides information for TIME
 	VRF         common.Hash    // Provides information for VRF
 
+	CanStaking      bool
 	CreateValidator CreateValidatorFunc
 	EditValidator   EditValidatorFunc
 	Delegate        DelegateFunc
@@ -277,21 +299,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		snapshot = evm.StateDB.Snapshot()
 	)
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
-		precompiles := PrecompiledContractsHomestead
-		if evm.ChainConfig().IsS3(evm.EpochNumber) {
-			precompiles = PrecompiledContractsByzantium
-		}
-		if evm.chainRules.IsIstanbul {
-			precompiles = PrecompiledContractsIstanbul
-		}
-		if evm.chainRules.IsVRF {
-			precompiles = PrecompiledContractsVRF
-		}
-		if evm.chainRules.IsSHA3 {
-			precompiles = PrecompiledContractsSHA3FIPS
-		}
-
-		if precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		_, precompile := evm.precompile(addr)
+		_, precompileRW := evm.precompileRW(addr)
+		isPrecompile := precompile || precompileRW
+		if !isPrecompile && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
@@ -564,6 +575,9 @@ func (evm *EVM) Create2(caller ContractRef, code []byte, gas uint64, endowment *
 }
 
 func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []byte) (err error) {
+	if !evm.CanStaking {
+		return errors.New("only beacon chain support staking")
+	}
 	switch txType {
 	case types.StakeCreateVal:
 		stkMsg := &staking.CreateValidator{}
@@ -573,7 +587,7 @@ func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []
 		if caller.Address() != stkMsg.ValidatorAddress {
 			return errInvalidSigner
 		}
-		err = evm.CreateValidator(evm.StateDB, stkMsg)
+		err = evm.CreateValidator(evm.StateDB, stkMsg) // impl: core/evm.go::CreateValidatorFn()
 	case types.StakeEditVal:
 		stkMsg := &staking.EditValidator{}
 		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
@@ -582,7 +596,7 @@ func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []
 		if caller.Address() != stkMsg.ValidatorAddress {
 			return errInvalidSigner
 		}
-		err = evm.EditValidator(evm.StateDB, stkMsg)
+		err = evm.EditValidator(evm.StateDB, stkMsg) // impl: core/evm.go::EditValidatorFn()
 	case types.Delegate:
 		stkMsg := &staking.Delegate{}
 		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
@@ -591,7 +605,7 @@ func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []
 		if caller.Address() != stkMsg.DelegatorAddress {
 			return errInvalidSigner
 		}
-		err = evm.Delegate(evm.StateDB, stkMsg)
+		err = evm.Delegate(evm.StateDB, stkMsg) // impl: core/evm.go::DelegateFn()
 	case types.Undelegate:
 		stkMsg := &staking.Undelegate{}
 		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
@@ -600,7 +614,7 @@ func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []
 		if caller.Address() != stkMsg.DelegatorAddress {
 			return errInvalidSigner
 		}
-		err = evm.Undelegate(evm.StateDB, stkMsg)
+		err = evm.Undelegate(evm.StateDB, stkMsg) // impl: core/evm.go::UndelegateFn()
 	case types.CollectRewards:
 		stkMsg := &staking.CollectRewards{}
 		if err = rlp.DecodeBytes(input, stkMsg); err != nil {
@@ -609,7 +623,7 @@ func (evm *EVM) Stake(caller ContractRef, txType types.TransactionType, input []
 		if caller.Address() != stkMsg.DelegatorAddress {
 			return errInvalidSigner
 		}
-		err = evm.CollectRewards(evm.StateDB, stkMsg)
+		err = evm.CollectRewards(evm.StateDB, stkMsg) // impl: core/evm.go::CollectRewardsFn()
 	default:
 		return staking.ErrInvalidStakingKind
 	}

@@ -22,6 +22,7 @@ import (
 	"sort"
 
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/shard"
 	staking2 "github.com/harmony-one/harmony/staking"
 	"github.com/pkg/errors"
 
@@ -84,6 +85,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		GasLimit:    header.GasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
 
+		CanStaking:      header.ShardID() == shard.BeaconChainShardID, // Is it safe to get shard from header?
 		CreateValidator: CreateValidatorFn(chain, header.Epoch(), header.Number()),
 		EditValidator:   EditValidatorFn(chain, header.Epoch(), header.Number()),
 		Delegate:        DelegateFn(chain, header.Epoch(), header.Number()),

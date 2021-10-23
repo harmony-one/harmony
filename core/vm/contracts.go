@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
@@ -128,9 +129,24 @@ var PrecompiledContractsEVMStake = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}):   &blake2F{},
 	common.BytesToAddress([]byte{255}): &vrf{},
 
-	common.BytesToAddress([]byte{252}): &evmStake{}, // also in PrecompiledRWContractsEVMStake
+	common.BytesToAddress([]byte{252}): nil, // nil means it assigned to PrecompiledContractRW
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+}
+
+func init() {
+	precompiled := PrecompiledContractsEVMStake
+	precompiledRW := PrecompiledRWContractsEVMStake
+	for addr, p := range precompiled {
+		if p != nil && precompiledRW[addr] != nil {
+			panic(fmt.Errorf("%v is included in both PrecompiledContract and PrecompiledContractRW", addr))
+		}
+	}
+	for addr, p := range precompiledRW {
+		if p != nil && precompiled[addr] != nil {
+			panic(fmt.Errorf("%v is included in both PrecompiledContract and PrecompiledContractRW", addr))
+		}
+	}
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.

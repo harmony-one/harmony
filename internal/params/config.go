@@ -535,6 +535,11 @@ func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
 }
 
+// IsEVMStaking returns whether epoch is either equal to the EVMStaking fork epoch or greater.
+func (c *ChainConfig) IsEVMStaking(epoch *big.Int) bool {
+	return false
+}
+
 // IsDataCopyFixEpoch returns whether epoch has the fix for DataCopy evm bug.
 func (c *ChainConfig) IsDataCopyFixEpoch(epoch *big.Int) bool {
 	return isForked(c.DataCopyFixEpoch, epoch)
@@ -610,9 +615,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                         *big.Int
-	EthChainID                                                                      *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3 bool
+	ChainID                                                                                       *big.Int
+	EthChainID                                                                                    *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsEVMStaking bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -636,5 +641,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsVRF:        c.IsVRF(epoch),
 		IsPrevVRF:    c.IsPrevVRF(epoch),
 		IsSHA3:       c.IsSHA3(epoch),
+		IsEVMStaking: c.IsEVMStaking(epoch),
 	}
 }
