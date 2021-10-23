@@ -28,6 +28,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IP:              nodeconfig.DefaultPublicListenIP,
 		KeyFile:         "./.hmykey",
 		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,

@@ -53,7 +53,6 @@ func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network
 		peers = append(peers, peerID)
 		m.peers.Store(ip, peers)
 	}
-
 	if len(peers) > m.maxConnPerIP {
 		if err := net.ClosePeer(conn.RemotePeer()); err != nil {
 			return err

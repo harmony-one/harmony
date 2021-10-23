@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	goversion "github.com/hashicorp/go-version"
+	"github.com/pelletier/go-toml"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	goversion "github.com/hashicorp/go-version"
-	"github.com/pelletier/go-toml"
 )
 
 const legacyConfigVersion = "1.0.4"
@@ -187,6 +188,9 @@ func init() {
 		}
 		if confTree.Get("P2P.DiscConcurrency") == nil {
 			confTree.Set("P2P.DiscConcurrency", defaultConfig.P2P.DiscConcurrency)
+		}
+		if confTree.Get("P2P.MaxConnsPerIP") == nil {
+			confTree.Set("P2P.MaxConnsPerIP", defaultConfig.P2P.MaxConnsPerIP)
 		}
 
 		confTree.Set("Version", "2.2.0")

@@ -20,9 +20,10 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/pprof"
@@ -579,13 +580,13 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
-
 	myHost, err = p2p.NewHost(p2p.HostConfig{
 		Self:            &selfPeer,
 		BLSKey:          nodeConfig.P2PPriKey,
 		BootNodes:       hc.Network.BootNodes,
 		DataStoreFile:   hc.P2P.DHTDataStore,
 		DiscConcurrency: hc.P2P.DiscConcurrency,
+		MaxConnPerIP:    hc.P2P.MaxConnsPerIP,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
