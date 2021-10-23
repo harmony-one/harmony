@@ -35,7 +35,7 @@ func TestPrepareStakingMetadata(t *testing.T) {
       t.Errorf("Got error %v in prepareStakingMetaData", err)
     }
   } else {
-    // when called indepedently there is no error
+    // when called independently there is no error
   }
 }
 
