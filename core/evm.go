@@ -18,18 +18,18 @@ package core
 
 import (
 	"bytes"
-	"sort"
 	"errors"
 	"math/big"
+	"sort"
 
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/internal/params"
 	staking "github.com/harmony-one/harmony/staking"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -53,7 +53,7 @@ type ChainContext interface {
 	// Config returns chain config
 	Config() *params.ChainConfig
 
-	ShardID() uint32	// this is implemented by blockchain.go already
+	ShardID() uint32 // this is implemented by blockchain.go already
 }
 
 // NewEVMContext creates a new context for use in the EVM.
@@ -71,25 +71,25 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		copy(vrf[:], vrfAndProof[:32])
 	}
 	return vm.Context{
-		CanTransfer: 			CanTransfer,
-		Transfer:    			Transfer,
-		IsValidator: 			IsValidator,
-		GetHash:     			GetHashFn(header, chain),
-		GetVRF:      			GetVRFFn(header, chain),
-		CreateValidator: 	CreateValidatorFn(header, chain),
-		EditValidator: 		EditValidatorFn(header, chain),
-		Delegate: 				DelegateFn(header, chain),
-		Undelegate: 			UndelegateFn(header, chain),
-		CollectRewards: 	CollectRewardsFn(header, chain),
-		Origin:      			msg.From(),
-		Coinbase:    			beneficiary,
-		BlockNumber: 			header.Number(),
-		EpochNumber: 			header.Epoch(),
-		VRF:         			vrf,
-		Time:        			header.Time(),
-		GasLimit:    			header.GasLimit(),
-		GasPrice:    			new(big.Int).Set(msg.GasPrice()),
-		ShardID:					chain.ShardID(),
+		CanTransfer:     CanTransfer,
+		Transfer:        Transfer,
+		IsValidator:     IsValidator,
+		GetHash:         GetHashFn(header, chain),
+		GetVRF:          GetVRFFn(header, chain),
+		CreateValidator: CreateValidatorFn(header, chain),
+		EditValidator:   EditValidatorFn(header, chain),
+		Delegate:        DelegateFn(header, chain),
+		Undelegate:      UndelegateFn(header, chain),
+		CollectRewards:  CollectRewardsFn(header, chain),
+		Origin:          msg.From(),
+		Coinbase:        beneficiary,
+		BlockNumber:     header.Number(),
+		EpochNumber:     header.Epoch(),
+		VRF:             vrf,
+		Time:            header.Time(),
+		GasLimit:        header.GasLimit(),
+		GasPrice:        new(big.Int).Set(msg.GasPrice()),
+		ShardID:         chain.ShardID(),
 	}
 }
 

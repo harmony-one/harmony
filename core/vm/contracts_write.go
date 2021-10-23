@@ -2,9 +2,10 @@ package vm
 
 import (
 	"errors"
+
 	"github.com/ethereum/go-ethereum/common"
-	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	staking "github.com/harmony-one/harmony/staking"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 var WriteCapablePrecompiledContracts = map[common.Address]WriteCapablePrecompiledContract{
@@ -15,7 +16,7 @@ var WriteCapablePrecompiledContracts = map[common.Address]WriteCapablePrecompile
 // These have the capability to alter the state (those in contracts.go do not)
 type WriteCapablePrecompiledContract interface {
 	RequiredGas(evm *EVM, input []byte) (uint64, error) // RequiredPrice calculates the contract gas use
-  // use a different name from read-only contracts to be safe
+	// use a different name from read-only contracts to be safe
 	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
 }
 
@@ -44,10 +45,10 @@ func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) (uint64, error) 
 	homestead := evm.ChainConfig().IsS3(evm.EpochNumber)
 	istanbul := evm.ChainConfig().IsIstanbul(evm.EpochNumber)
 	gas, err := IntrinsicGas(input,
-												 false, /* contractCreation */
-												 homestead,
-												 istanbul,
-												 stakingTypes.Directive(getData(input, 63, 64)[0]) == stakingTypes.DirectiveCreateValidator)
+		false, /* contractCreation */
+		homestead,
+		istanbul,
+		stakingTypes.Directive(getData(input, 63, 64)[0]) == stakingTypes.DirectiveCreateValidator)
 	if err != nil {
 		return 0, err
 	}
@@ -66,11 +67,12 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 	// discard length of structure (first 32 members of the array)
 	input = input[32:]
 	// directive is a single byte
-  var directive = stakingTypes.Directive(getData(input, 31, 32)[0])
+	var directive = stakingTypes.Directive(getData(input, 31, 32)[0])
 	// store passed information in map
 	args := map[string]interface{}{}
 	switch directive {
-		case stakingTypes.DirectiveCreateValidator: {
+	case stakingTypes.DirectiveCreateValidator:
+		{
 			if err := staking.UnpackFromStakingMethod("CreateValidator", args, input); err != nil {
 				return nil, err
 			}
@@ -108,14 +110,14 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 				return nil, err
 			}
 			stakeMsg := &stakingTypes.CreateValidator{
-				ValidatorAddress: address,
-				Amount: amount,
-				Description: description,
-				CommissionRates: commissionRates,
-				MinSelfDelegation: minSelfDelegation,
+				ValidatorAddress:   address,
+				Amount:             amount,
+				Description:        description,
+				CommissionRates:    commissionRates,
+				MinSelfDelegation:  minSelfDelegation,
 				MaxTotalDelegation: maxTotalDelegation,
-				SlotPubKeys: slotPubKeys,
-				SlotKeySigs: slotKeySigs,
+				SlotPubKeys:        slotPubKeys,
+				SlotKeySigs:        slotKeySigs,
 			}
 			if err := evm.CreateValidator(evm.StateDB, stakeMsg); err != nil {
 				return nil, err
@@ -124,7 +126,8 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 				return nil, nil
 			}
 		}
-		case stakingTypes.DirectiveEditValidator: {
+	case stakingTypes.DirectiveEditValidator:
+		{
 			if err := staking.UnpackFromStakingMethod("EditValidator", args, input); err != nil {
 				return nil, err
 			}
@@ -161,18 +164,19 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 				return nil, err
 			}
 			stakeMsg := &stakingTypes.EditValidator{
-				ValidatorAddress: address,
-				Description: description,
-				CommissionRate: commissionRate,
-				MinSelfDelegation: minSelfDelegation,
+				ValidatorAddress:   address,
+				Description:        description,
+				CommissionRate:     commissionRate,
+				MinSelfDelegation:  minSelfDelegation,
 				MaxTotalDelegation: maxTotalDelegation,
-				SlotKeyToRemove: slotKeyToRemove,
-				SlotKeyToAdd: slotKeyToAdd,
-				SlotKeyToAddSig: slotKeyToAddSig,
+				SlotKeyToRemove:    slotKeyToRemove,
+				SlotKeyToAdd:       slotKeyToAdd,
+				SlotKeyToAddSig:    slotKeyToAddSig,
 			}
 			return nil, evm.EditValidator(evm.StateDB, stakeMsg)
 		}
-		case stakingTypes.DirectiveDelegate: {
+	case stakingTypes.DirectiveDelegate:
+		{
 			if err := staking.UnpackFromStakingMethod("DelegateOrUndelegate", args, input); err != nil {
 				return nil, err
 			}
@@ -192,7 +196,7 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 			stakeMsg := &stakingTypes.Delegate{
 				DelegatorAddress: address,
 				ValidatorAddress: validatorAddress,
-				Amount: amount,
+				Amount:           amount,
 			}
 			if err := evm.Delegate(evm.StateDB, stakeMsg); err != nil {
 				return nil, err
@@ -201,7 +205,8 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 				return nil, nil
 			}
 		}
-		case stakingTypes.DirectiveUndelegate: {
+	case stakingTypes.DirectiveUndelegate:
+		{
 			if err := staking.UnpackFromStakingMethod("DelegateOrUndelegate", args, input); err != nil {
 				return nil, err
 			}
@@ -222,11 +227,12 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 			stakeMsg := &stakingTypes.Undelegate{
 				DelegatorAddress: address,
 				ValidatorAddress: validatorAddress,
-				Amount: amount,
+				Amount:           amount,
 			}
 			return nil, evm.Undelegate(evm.StateDB, stakeMsg)
 		}
-		case stakingTypes.DirectiveCollectRewards: {
+	case stakingTypes.DirectiveCollectRewards:
+		{
 			if err := staking.UnpackFromStakingMethod("CollectRewards", args, input); err != nil {
 				return nil, err
 			}
@@ -240,9 +246,10 @@ func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input 
 			}
 			return nil, evm.CollectRewards(evm.StateDB, stakeMsg)
 		}
-		default: {
+	default:
+		{
 			return nil, stakingTypes.ErrInvalidStakingKind
 		}
 	}
-  // return nil, nil -> this never reached
+	// return nil, nil -> this never reached
 }

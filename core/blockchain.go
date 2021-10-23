@@ -2758,8 +2758,8 @@ func (bc *BlockChain) prepareStakingMetaData(
 						newDelegations,
 						bc,
 						blockNum); err != nil {
-							return nil, nil, err
-						}
+						return nil, nil, err
+					}
 				} else if delegate, ok := stakeMsg.(*staking.Delegate); ok {
 					if err := processDelegateMetadata(delegate,
 						newValidators,
@@ -2767,8 +2767,8 @@ func (bc *BlockChain) prepareStakingMetaData(
 						state,
 						bc,
 						blockNum); err != nil {
-							return nil, nil, err
-						}
+						return nil, nil, err
+					}
 				}
 			}
 			// delete the temporary entry later
@@ -2786,30 +2786,30 @@ func (bc *BlockChain) prepareStakingMetaData(
 		}
 
 		switch txn.StakingType() {
-			case staking.DirectiveCreateValidator:
-				createValidator := decodePayload.(*staking.CreateValidator)
-				if err := processCreateValidatorMetadata(createValidator,
-					&newValidators,
-					newDelegations,
-					bc,
-					blockNum); err != nil {
-						return nil, nil, err
-					}
-			case staking.DirectiveEditValidator:
-			case staking.DirectiveDelegate:
-				delegate := decodePayload.(*staking.Delegate)
-				if err := processDelegateMetadata(delegate,
-					newValidators,
-					newDelegations,
-					state,
-					bc,
-					blockNum); err != nil {
-						return nil, nil, err
-					}
+		case staking.DirectiveCreateValidator:
+			createValidator := decodePayload.(*staking.CreateValidator)
+			if err := processCreateValidatorMetadata(createValidator,
+				&newValidators,
+				newDelegations,
+				bc,
+				blockNum); err != nil {
+				return nil, nil, err
+			}
+		case staking.DirectiveEditValidator:
+		case staking.DirectiveDelegate:
+			delegate := decodePayload.(*staking.Delegate)
+			if err := processDelegateMetadata(delegate,
+				newValidators,
+				newDelegations,
+				state,
+				bc,
+				blockNum); err != nil {
+				return nil, nil, err
+			}
 
-			case staking.DirectiveUndelegate:
-			case staking.DirectiveCollectRewards:
-			default:
+		case staking.DirectiveUndelegate:
+		case staking.DirectiveCollectRewards:
+		default:
 		}
 	}
 

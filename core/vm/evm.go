@@ -23,8 +23,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -47,10 +47,10 @@ type (
 	GetVRFFunc func(uint64) common.Hash
 	// Below functions are used by staking precompile / state transition
 	CreateValidatorFunc func(db StateDB, stakeMsg *stakingTypes.CreateValidator) error
-	EditValidatorFunc func(db StateDB, stakeMsg *stakingTypes.EditValidator) error
-	DelegateFunc func(db StateDB, stakeMsg *stakingTypes.Delegate) error
-	UndelegateFunc func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
-	CollectRewardsFunc func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
+	EditValidatorFunc   func(db StateDB, stakeMsg *stakingTypes.EditValidator) error
+	DelegateFunc        func(db StateDB, stakeMsg *stakingTypes.Delegate) error
+	UndelegateFunc      func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
+	CollectRewardsFunc  func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -153,13 +153,13 @@ type Context struct {
 	TxType types.TransactionType
 
 	CreateValidator CreateValidatorFunc
-	EditValidator 	EditValidatorFunc
+	EditValidator   EditValidatorFunc
 	Delegate        DelegateFunc
 	Undelegate      UndelegateFunc
 	CollectRewards  CollectRewardsFunc
 
 	// staking precompile checks this before proceeding forward
-	ShardID					uint32
+	ShardID uint32
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides

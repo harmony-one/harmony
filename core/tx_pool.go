@@ -34,11 +34,11 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
-	"github.com/harmony-one/harmony/core/vm"
 )
 
 const (

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	emptyBLSPubKey = SerializedPublicKey{}
+	emptyBLSPubKey    = SerializedPublicKey{}
 	emptyBLSSignature = SerializedSignature{}
 )
 

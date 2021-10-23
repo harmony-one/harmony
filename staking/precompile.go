@@ -1,15 +1,15 @@
 package staking
 
 import (
-  "math/big"
-  "strings"
+	"math/big"
+	"strings"
 
-  stakingTypes "github.com/harmony-one/harmony/staking/types"
-  "github.com/harmony-one/harmony/accounts/abi"
-  "github.com/harmony-one/harmony/numeric"
-  "github.com/harmony-one/harmony/crypto/bls"
-  "github.com/ethereum/go-ethereum/common"
-  "github.com/pkg/errors"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/numeric"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
+	"github.com/pkg/errors"
 )
 
 var abiStaking abi.ABI
@@ -292,18 +292,18 @@ func ParseDescription(args map[string]interface{}) (stakingTypes.Description, er
 	// except the JSON tag for SecurityContact is security-contact there
 	// so type assert it through this one
 	if description, ok := args["Description"].(struct {
-			Name string "json:\"Name\""
-			Identity string "json:\"Identity\""
-			Website string "json:\"Website\""
-			SecurityContact string "json:\"SecurityContact\""
-			Details string "json:\"Details\""
-		}); ok {
-			return stakingTypes.Description{
-				description.Name,
-				description.Identity,
-				description.Website,
-				description.SecurityContact,
-				description.Details,
+		Name            string "json:\"Name\""
+		Identity        string "json:\"Identity\""
+		Website         string "json:\"Website\""
+		SecurityContact string "json:\"SecurityContact\""
+		Details         string "json:\"Details\""
+	}); ok {
+		return stakingTypes.Description{
+			description.Name,
+			description.Identity,
+			description.Website,
+			description.SecurityContact,
+			description.Details,
 		}, nil
 	} else {
 		return stakingTypes.Description{}, errors.Errorf(
@@ -316,23 +316,23 @@ func ParseCommissionRates(args map[string]interface{}) (stakingTypes.CommissionR
 	// whereas the actual stakingTypes.CommissionRates has numeric.Dec
 	// create a new structure on the fly to allow type assertion
 	if commissionRates, ok := args["CommissionRates"].(struct {
-			Rate string "json:\"Rate\""
-			MaxRate string "json:\"MaxRate\""
-			MaxChangeRate string "json:\"MaxChangeRate\""
-		}); ok {
-			rate, err := numeric.NewDecFromStr(commissionRates.Rate)
-			if err != nil {
-				return stakingTypes.CommissionRates{}, err
-			}
-			maxRate, err := numeric.NewDecFromStr(commissionRates.MaxRate)
-			if err != nil {
-				return stakingTypes.CommissionRates{}, err
-			}
-			maxChangeRate, err := numeric.NewDecFromStr(commissionRates.MaxChangeRate)
-			if err != nil {
-				return stakingTypes.CommissionRates{}, err
-			}
-			return stakingTypes.CommissionRates{rate, maxRate, maxChangeRate}, nil
+		Rate          string "json:\"Rate\""
+		MaxRate       string "json:\"MaxRate\""
+		MaxChangeRate string "json:\"MaxChangeRate\""
+	}); ok {
+		rate, err := numeric.NewDecFromStr(commissionRates.Rate)
+		if err != nil {
+			return stakingTypes.CommissionRates{}, err
+		}
+		maxRate, err := numeric.NewDecFromStr(commissionRates.MaxRate)
+		if err != nil {
+			return stakingTypes.CommissionRates{}, err
+		}
+		maxChangeRate, err := numeric.NewDecFromStr(commissionRates.MaxChangeRate)
+		if err != nil {
+			return stakingTypes.CommissionRates{}, err
+		}
+		return stakingTypes.CommissionRates{rate, maxRate, maxChangeRate}, nil
 	} else {
 		return stakingTypes.CommissionRates{}, errors.Errorf(
 			"Cannot parse CommissionRates from %v", args["CommissionRates"])
@@ -340,7 +340,7 @@ func ParseCommissionRates(args map[string]interface{}) (stakingTypes.CommissionR
 }
 
 func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, error) {
-	bigInt, ok := args[key].(*big.Int);
+	bigInt, ok := args[key].(*big.Int)
 	if !ok {
 		return nil, errors.Errorf(
 			"Cannot parse BigInt from %v", args[key])
@@ -351,7 +351,7 @@ func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, erro
 
 func ParseSlotPubKeys(args map[string]interface{}) ([]bls.SerializedPublicKey, error) {
 	// cast it into bytes
-	pubKeys, ok := args["SlotPubKeys"].([][]byte);
+	pubKeys, ok := args["SlotPubKeys"].([][]byte)
 	if !ok {
 		return nil, errors.Errorf(
 			"Cannot parse SlotPubKeys from %v", args["SlotPubKeys"])
@@ -369,7 +369,7 @@ func ParseSlotPubKeys(args map[string]interface{}) ([]bls.SerializedPublicKey, e
 
 func ParseSlotKeySigs(args map[string]interface{}) ([]bls.SerializedSignature, error) {
 	// cast it into bytes
-	sigs, ok := args["SlotKeySigs"].([][]byte);
+	sigs, ok := args["SlotKeySigs"].([][]byte)
 	if !ok {
 		return nil, errors.Errorf(
 			"Cannot parse SlotKeySigs from %v", args["SlotKeySigs"])
@@ -387,7 +387,7 @@ func ParseSlotKeySigs(args map[string]interface{}) ([]bls.SerializedSignature, e
 
 func ParseSlotPubKeyFromKey(args map[string]interface{}, key string) (*bls.SerializedPublicKey, error) {
 	// convert to bytes
-	pubKeyBytes, ok := args[key].([]byte);
+	pubKeyBytes, ok := args[key].([]byte)
 	if !ok {
 		return nil, errors.Errorf(
 			"Cannot parse SlotPubKey from %v", args[key])
@@ -401,7 +401,7 @@ func ParseSlotPubKeyFromKey(args map[string]interface{}, key string) (*bls.Seria
 
 func ParseSlotKeySigFromKey(args map[string]interface{}, key string) (*bls.SerializedSignature, error) {
 	// convert to bytes
-	sigBytes, ok := args[key].([]byte);
+	sigBytes, ok := args[key].([]byte)
 	if !ok {
 		return nil, errors.Errorf(
 			"Cannot parse SlotKeySig from %v", args[key])

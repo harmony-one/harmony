@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"math/big"
+
 	"github.com/harmony-one/harmony/staking/availability"
 
 	"github.com/harmony-one/harmony/internal/params"

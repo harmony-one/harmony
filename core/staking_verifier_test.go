@@ -20,10 +20,10 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	staketest "github.com/harmony-one/harmony/staking/types/test"
-	"github.com/harmony-one/harmony/shard"
 )
 
 const (
@@ -1780,7 +1780,7 @@ func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (st
 }
 
 func (chain *fakeErrChainContext) ShardID() uint32 {
-	return 900	// arbitrary number different from BeaconChainShardID
+	return 900 // arbitrary number different from BeaconChainShardID
 }
 
 func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
