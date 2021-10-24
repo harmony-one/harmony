@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

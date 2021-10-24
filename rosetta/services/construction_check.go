@@ -11,7 +11,7 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	ethRpc "github.com/ethereum/go-ethereum/rpc"
+	ethRpc "github.com/harmony-one/harmony/eth/rpc"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/internal/params"

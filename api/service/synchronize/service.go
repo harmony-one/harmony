@@ -1,7 +1,7 @@
 package synchronize
 
 import (
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/p2p"
