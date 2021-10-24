@@ -29,6 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -45,6 +46,8 @@ type ChainContext interface {
 
 	// ReadDelegationsByDelegator returns the validators list of a delegator
 	ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error)
+
+	ReadValidatorInformationAtState(addr common.Address, state *state.DB) (*staking.ValidatorWrapper, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error)
@@ -91,6 +94,8 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Delegate:        DelegateFn(chain, header.Epoch(), header.Number()),
 		Undelegate:      UndelegateFn(chain, header.Epoch(), header.Number()),
 		CollectRewards:  CollectRewardsFn(chain, header.Epoch(), header.Number()),
+
+		GetDelegationsByDelegator: GetDelegationsByDelegatorFn(chain),
 	}
 }
 
@@ -302,5 +307,31 @@ func CollectRewardsFn(chain ChainContext, epoch *big.Int, blockNum *big.Int) vm.
 			BlockNumber: blockNum.Uint64(),
 		})
 		return nil
+	}
+}
+
+func GetDelegationsByDelegatorFn(chain ChainContext) vm.GetDelegationsByDelegatorFuncView {
+	return func(db vm.StateDB, delegator common.Address) ([]common.Address, []*staking.Delegation, error) {
+		delegationIndexes, err := chain.ReadDelegationsByDelegator(delegator)
+		if err != nil {
+			return nil, nil, err
+		}
+		addresses := []common.Address{}
+		delegations := []*staking.Delegation{}
+		for i := range delegationIndexes {
+			delegationI := delegationIndexes[i]
+			wrapper, err := chain.ReadValidatorInformationAtState(delegationI.ValidatorAddress, db.(*state.DB))
+			if err == nil && wrapper != nil {
+				err = errors.New("no validator info")
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			if uint64(len(wrapper.Delegations)) > delegationI.Index {
+				delegations = append(delegations, &wrapper.Delegations[delegationI.Index])
+				addresses = append(addresses, delegationI.ValidatorAddress)
+			}
+		}
+		return addresses, delegations, nil
 	}
 }

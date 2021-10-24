@@ -57,6 +57,8 @@ type (
 	DelegateFunc        func(StateDB, *staking.Delegate) error        // VerifyAndDelegateFromMsg
 	UndelegateFunc      func(StateDB, *staking.Undelegate) error      // VerifyAndUndelegateFromMsg
 	CollectRewardsFunc  func(StateDB, *staking.CollectRewards) error  // VerifyAndCollectRewardsFromDelegation
+
+	GetDelegationsByDelegatorFuncView func(StateDB, common.Address) ([]common.Address, []*staking.Delegation, error) // GetDelegationsByDelegatorFunc
 )
 
 func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
@@ -180,6 +182,8 @@ type Context struct {
 	Delegate        DelegateFunc
 	Undelegate      UndelegateFunc
 	CollectRewards  CollectRewardsFunc
+
+	GetDelegationsByDelegator GetDelegationsByDelegatorFuncView
 
 	TxType types.TransactionType
 }

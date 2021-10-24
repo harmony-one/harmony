@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
@@ -16,6 +17,7 @@ struct CommissionRates{
 	// maximum increase of the validator commission every epoch, as a fraction
 	uint256 MaxChangeRate;
 }
+
 struct CreateValidator {
 	address ValidatorAddress;
 	Description _Description;
@@ -37,19 +39,39 @@ struct EditValidator {
 	bytes SlotKeyToAddSig;
 	byte EPOSStatus;
 }
+
 struct Delegate {
 	address DelegatorAddress;
 	address ValidatorAddress;
 	uint256 Amount;
 }
+
 struct CollectRewards {
 	address DelegatorAddress;
 }
+
+
 // Undelegate - type for removing delegation responsibility
 struct Undelegate {
 	address DelegatorAddress;
 	address ValidatorAddress;
 	uint256 Amount;
+}
+
+struct Undelegation {
+	uint256 Amount;
+	uint256 Epoch;
+}
+
+struct _Delegation {
+    address	DelegatorAddress;
+    uint256	Amount;
+    uint256	Reward;
+	Undelegation[] Undelegations;
+}
+struct Delegation {
+    address Validator;
+	_Delegation Delegation;
 }
 
 abstract contract Staking {
@@ -59,4 +81,6 @@ abstract contract Staking {
     function delegate(Delegate calldata stkMsg) external virtual;
     function undelegate(Undelegate calldata stkMsg) external virtual;
     function collectRewards(CollectRewards calldata stkMsg) external virtual;
+    function getDelegationsByDelegator(address delegator) external view virtual returns(Delegation[] memory);
 }
+

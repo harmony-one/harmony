@@ -17,10 +17,8 @@
 package vm
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"strings"
 
@@ -31,6 +29,7 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/types"
+	staking "github.com/harmony-one/harmony/staking/types"
 
 	coreTypes "github.com/harmony-one/harmony/core/types"
 )
@@ -70,7 +69,7 @@ func RunPrecompiledContractRW(p PrecompiledContractRW, evm *EVM, contract *Contr
 }
 
 // ABI from core/vm/staking.sol
-var stakingJsonABI = `[{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"}],"internalType":"struct CollectRewards","name":"stkMsg","type":"tuple"}],"name":"collectRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"ValidatorAddress","type":"address"},{"components":[{"internalType":"string","name":"Name","type":"string"},{"internalType":"string","name":"Identity","type":"string"},{"internalType":"string","name":"Website","type":"string"},{"internalType":"string","name":"SecurityContact","type":"string"},{"internalType":"string","name":"Details","type":"string"}],"internalType":"struct Description","name":"_Description","type":"tuple"},{"components":[{"internalType":"uint256","name":"Rate","type":"uint256"},{"internalType":"uint256","name":"MaxRate","type":"uint256"},{"internalType":"uint256","name":"MaxChangeRate","type":"uint256"}],"internalType":"struct CommissionRates","name":"_CommissionRates","type":"tuple"},{"internalType":"uint256","name":"MinSelfDelegation","type":"uint256"},{"internalType":"uint256","name":"MaxTotalDelegation","type":"uint256"},{"internalType":"bytes[]","name":"SlotPubKeys","type":"bytes[]"},{"internalType":"bytes[]","name":"SlotKeySigs","type":"bytes[]"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct CreateValidator","name":"stkMsg","type":"tuple"}],"name":"createValidator","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"},{"internalType":"address","name":"ValidatorAddress","type":"address"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct Delegate","name":"stkMsg","type":"tuple"}],"name":"delegate","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"ValidatorAddress","type":"address"},{"components":[{"internalType":"string","name":"Name","type":"string"},{"internalType":"string","name":"Identity","type":"string"},{"internalType":"string","name":"Website","type":"string"},{"internalType":"string","name":"SecurityContact","type":"string"},{"internalType":"string","name":"Details","type":"string"}],"internalType":"struct Description","name":"_Description","type":"tuple"},{"internalType":"uint256","name":"CommissionRate","type":"uint256"},{"internalType":"uint256","name":"MinSelfDelegation","type":"uint256"},{"internalType":"uint256","name":"MaxTotalDelegation","type":"uint256"},{"internalType":"bytes","name":"SlotKeyToRemove","type":"bytes"},{"internalType":"bytes","name":"SlotKeyToAdd","type":"bytes"},{"internalType":"bytes","name":"SlotKeyToAddSig","type":"bytes"},{"internalType":"bytes1","name":"EPOSStatus","type":"bytes1"}],"internalType":"struct EditValidator","name":"stkMsg","type":"tuple"}],"name":"editValidator","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"},{"internalType":"address","name":"ValidatorAddress","type":"address"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct Undelegate","name":"stkMsg","type":"tuple"}],"name":"undelegate","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+var stakingJsonABI = `[{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"}],"internalType":"struct CollectRewards","name":"stkMsg","type":"tuple"}],"name":"collectRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"ValidatorAddress","type":"address"},{"components":[{"internalType":"string","name":"Name","type":"string"},{"internalType":"string","name":"Identity","type":"string"},{"internalType":"string","name":"Website","type":"string"},{"internalType":"string","name":"SecurityContact","type":"string"},{"internalType":"string","name":"Details","type":"string"}],"internalType":"struct Description","name":"_Description","type":"tuple"},{"components":[{"internalType":"uint256","name":"Rate","type":"uint256"},{"internalType":"uint256","name":"MaxRate","type":"uint256"},{"internalType":"uint256","name":"MaxChangeRate","type":"uint256"}],"internalType":"struct CommissionRates","name":"_CommissionRates","type":"tuple"},{"internalType":"uint256","name":"MinSelfDelegation","type":"uint256"},{"internalType":"uint256","name":"MaxTotalDelegation","type":"uint256"},{"internalType":"bytes[]","name":"SlotPubKeys","type":"bytes[]"},{"internalType":"bytes[]","name":"SlotKeySigs","type":"bytes[]"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct CreateValidator","name":"stkMsg","type":"tuple"}],"name":"createValidator","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"},{"internalType":"address","name":"ValidatorAddress","type":"address"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct Delegate","name":"stkMsg","type":"tuple"}],"name":"delegate","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"ValidatorAddress","type":"address"},{"components":[{"internalType":"string","name":"Name","type":"string"},{"internalType":"string","name":"Identity","type":"string"},{"internalType":"string","name":"Website","type":"string"},{"internalType":"string","name":"SecurityContact","type":"string"},{"internalType":"string","name":"Details","type":"string"}],"internalType":"struct Description","name":"_Description","type":"tuple"},{"internalType":"uint256","name":"CommissionRate","type":"uint256"},{"internalType":"uint256","name":"MinSelfDelegation","type":"uint256"},{"internalType":"uint256","name":"MaxTotalDelegation","type":"uint256"},{"internalType":"bytes","name":"SlotKeyToRemove","type":"bytes"},{"internalType":"bytes","name":"SlotKeyToAdd","type":"bytes"},{"internalType":"bytes","name":"SlotKeyToAddSig","type":"bytes"},{"internalType":"bytes1","name":"EPOSStatus","type":"bytes1"}],"internalType":"struct EditValidator","name":"stkMsg","type":"tuple"}],"name":"editValidator","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"delegator","type":"address"}],"name":"getDelegationsByDelegator","outputs":[{"components":[{"internalType":"address","name":"Validator","type":"address"},{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"},{"internalType":"uint256","name":"Amount","type":"uint256"},{"internalType":"uint256","name":"Reward","type":"uint256"},{"components":[{"internalType":"uint256","name":"Amount","type":"uint256"},{"internalType":"uint256","name":"Epoch","type":"uint256"}],"internalType":"struct Undelegation[]","name":"Undelegations","type":"tuple[]"}],"internalType":"struct _Delegation","name":"Delegation","type":"tuple"}],"internalType":"struct Delegation[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"components":[{"internalType":"address","name":"DelegatorAddress","type":"address"},{"internalType":"address","name":"ValidatorAddress","type":"address"},{"internalType":"uint256","name":"Amount","type":"uint256"}],"internalType":"struct Undelegate","name":"stkMsg","type":"tuple"}],"name":"undelegate","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
 
 type Description struct {
 	Name            string
@@ -114,6 +113,17 @@ type EditValidator struct {
 type Delegate types.Delegate
 type CollectRewards types.CollectRewards
 type Undelegate types.Undelegate
+
+type Delegator common.Address
+type Deletaion struct {
+	Validator common.Address
+	staking.Delegation
+}
+type Delegations []Deletaion
+
+func (d Delegator) toNativeStakeMsg() (types.Directive, types.StakeMsg, error) {
+	return types.DirectiveDelegate, nil, errors.New("not stake msg")
+}
 
 func (d Delegate) toNativeStakeMsg() (types.Directive, types.StakeMsg, error) {
 	return types.DirectiveDelegate, types.Delegate(d), nil
@@ -208,24 +218,37 @@ func emptyUndelegate() solStakeMsg {
 	return &Undelegate{}
 }
 
+func emptyDelegator() solStakeMsg {
+	return &Delegator{}
+}
+
 type methodID [4]byte
 type convertor struct {
 	solABI abi.Method
 	goABI  struct {
 		input solStakeMsgAlloctor
 	}
+	readOnly bool
 }
 
-// convert solidity calldata to go struct
-func (c convertor) toGo(data []byte) (types.Directive, types.StakeMsg, error) {
+func (c convertor) toGoStruct(data []byte) (solStakeMsg, error) {
 	solStkMsg := c.goABI.input()
 	args := c.solABI.Inputs // refers to accounts/abi/abi.go:UnpackIntoInterface(...)
 	unpacked, err := args.Unpack(data)
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 	if err := args.Copy(solStkMsg, unpacked); err != nil {
-		return 0, nil, err
+		return nil, err
+	}
+	return solStkMsg, nil
+}
+
+// convert solidity calldata to go struct
+func (c convertor) toGoStakeMsg(data []byte) (types.Directive, types.StakeMsg, error) {
+	solStkMsg, err := c.toGoStruct(data)
+	if err != nil {
+		return types.DirectiveCreateValidator, nil, err
 	}
 	return solStkMsg.toNativeStakeMsg()
 }
@@ -240,25 +263,33 @@ type evmStake struct {
 	convertors map[methodID]convertor
 }
 
-// JSON returns a parsed ABI interface and error if it failed.
-func JSON(reader io.Reader) (abi.ABI, error) {
-	dec := json.NewDecoder(reader)
-	var _abi abi.ABI
-	if err := dec.Decode(&_abi); err != nil {
-		return abi.ABI{}, err
+func stakeViewFunc(evm *EVM, param interface{}) (interface{}, error) {
+	switch v := param.(type) {
+	case Delegator:
+		validators, delegations, err := evm.GetDelegationsByDelegator(evm.StateDB, common.Address(v))
+		if err != nil {
+			return nil, err
+		}
+		ret := make(Delegations, len(validators))
+		for i, validator := range validators {
+			ret[i].Validator = validator
+			ret[i].Delegation = *delegations[i]
+		}
+		return ret, nil
+	default:
+		return nil, errors.New("unknow type")
 	}
-	return _abi, nil
 }
 
 func newEvmStake() *evmStake {
-	_abi, err := JSON(strings.NewReader(stakingJsonABI))
+	_abi, err := abi.JSON(strings.NewReader(stakingJsonABI))
 	if err != nil {
 		panic("invalid staking ABI") // abi must be valid
 	}
 	es := &evmStake{
 		convertors: make(map[methodID]convertor, 5),
 	}
-	addConvertor := func(method string, input solStakeMsgAlloctor) {
+	addConvertor := func(method string, input solStakeMsgAlloctor, readOnly bool) {
 		var id methodID
 		var convertor convertor
 		solMethodABI, exist := _abi.Methods[method]
@@ -270,11 +301,12 @@ func newEvmStake() *evmStake {
 		convertor.goABI.input = input
 		es.convertors[id] = convertor
 	}
-	addConvertor("createValidator", emptyCreateValidator)
-	addConvertor("editValidator", emptyEditValidator)
-	addConvertor("delegate", emptyDelegate)
-	addConvertor("undelegate", emptyUndelegate)
-	addConvertor("collectRewards", emptyCollectRewards)
+	addConvertor("createValidator", emptyCreateValidator, false)
+	addConvertor("editValidator", emptyEditValidator, false)
+	addConvertor("delegate", emptyDelegate, false)
+	addConvertor("undelegate", emptyUndelegate, false)
+	addConvertor("collectRewards", emptyCollectRewards, false)
+	addConvertor("getDelegationsByDelegator", emptyDelegator, true)
 	return es
 }
 
@@ -287,16 +319,28 @@ func (c *evmStake) RequiredGas(input []byte) uint64 {
 }
 
 func (c *evmStake) RunRW(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
-	if readOnly {
-		return nil, errWriteProtection
-	}
 	var id methodID
 	copy(id[:], input)
 	convertor, exist := c.convertors[id]
 	if !exist {
 		return nil, errors.New("invalid staking api")
 	}
-	typ, stkMsg, err := convertor.toGo(input[4:])
+	if !convertor.readOnly && readOnly {
+		return nil, errWriteProtection
+	}
+	endata := input[4:]
+	if convertor.readOnly {
+		arg, err := convertor.toGoStruct(endata)
+		if err != nil {
+			return nil, err
+		}
+		response, err := stakeViewFunc(evm, arg)
+		if err != nil {
+			return nil, err
+		}
+		return convertor.toSol(response)
+	}
+	typ, stkMsg, err := convertor.toGoStakeMsg(endata)
 	if err != nil {
 		return nil, err
 	}
