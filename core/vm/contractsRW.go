@@ -227,7 +227,7 @@ func (c convertor) toGo(data []byte) (types.Directive, types.StakeMsg, error) {
 	if err := args.Copy(solStkMsg, unpacked); err != nil {
 		return 0, nil, err
 	}
-	return solStkMsg.(solStakeMsg).toNativeStakeMsg()
+	return solStkMsg.toNativeStakeMsg()
 }
 
 // convert go structs to solidity return data
@@ -287,6 +287,9 @@ func (c *evmStake) RequiredGas(input []byte) uint64 {
 }
 
 func (c *evmStake) RunRW(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
+	if readOnly {
+		return nil, errWriteProtection
+	}
 	var id methodID
 	copy(id[:], input)
 	convertor, exist := c.convertors[id]

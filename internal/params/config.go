@@ -537,6 +537,7 @@ func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 
 // IsEVMStaking returns whether epoch is either equal to the EVMStaking fork epoch or greater.
 func (c *ChainConfig) IsEVMStaking(epoch *big.Int) bool {
+	// TODO
 	return false
 }
 
