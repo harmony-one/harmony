@@ -1,15 +1,14 @@
-package eth
+package main
 
 import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"testing"
 	"time"
 )
 
-func Test10KB(t *testing.T) {
+func Test10KB() {
 	url := "http://127.0.0.1:9500"
 	var method = "624fbfdc"
 	var loc = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -40,7 +39,7 @@ func Test10KB(t *testing.T) {
 	fmt.Println("Average time taken(in Ns) over 10 iterations: ", avgTimeNS/10)
 }
 
-func Test100KB(t *testing.T) {
+func Test100KB() {
 	url := "http://127.0.0.1:9500"
 	var method = "624fbfdc"
 	var loc = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -71,7 +70,7 @@ func Test100KB(t *testing.T) {
 	fmt.Println("Average time taken(in Ns) over 10 iterations: ", avgTimeNS/10)
 }
 
-func Test1MB(t *testing.T) {
+func Test1MB() {
 	url := "http://127.0.0.1:9500"
 	var method = "624fbfdc"
 	var loc = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -100,4 +99,10 @@ func Test1MB(t *testing.T) {
 		resp.Body.Close()
 	}
 	fmt.Println("Average time taken(in Ns) over 10 iterations: ", avgTimeNS/10)
+}
+
+func main() {
+	Test10KB()
+	Test100KB()
+	Test1MB()
 }
