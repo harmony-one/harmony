@@ -54,6 +54,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
 		Undelegate:      UndelegateFn(),
 		CreateValidator: CreateValidatorFn(),
 		EditValidator:   EditValidatorFn(),
+		ShardID:         0,
 	}, nil, params.TestChainConfig, Config{})
 	// use required gas to avoid out of gas errors
 	p := &stakingPrecompile{}

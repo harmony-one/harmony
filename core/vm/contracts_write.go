@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -42,6 +43,11 @@ func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) (uint64, error) 
 	if len(input) < 64 {
 		return 0, errors.New("Input is malformed")
 	}
+	if evm.Context.ShardID != shard.BeaconChainShardID {
+		return 0, errors.New("Staking not supported on this shard")
+		// we are not shard 0, so no processing
+		// but do not fail silently
+	}
 	homestead := evm.ChainConfig().IsS3(evm.EpochNumber)
 	istanbul := evm.ChainConfig().IsIstanbul(evm.EpochNumber)
 	gas, err := IntrinsicGas(input,
@@ -56,10 +62,6 @@ func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) (uint64, error) 
 }
 
 func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error) {
-	// if evm.Context.ShardID != shard.BeaconChainShardID {
-	// 	return nil, nil	// we are not shard 0, so this is not for us
-	// }
-
 	// need at least (1) initial 32 bytes for size, and (2) next 32 bytes for directive
 	if len(input) < 64 {
 		return nil, errors.New("Input is malformed")

@@ -39,7 +39,7 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *
 			Config:  chainConfig,
 			Factory: blockFactory,
 			Alloc:   GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
-			ShardID: 10,
+			ShardID: 0,
 		}
 		engine = chain2.NewEngine()
 	)
