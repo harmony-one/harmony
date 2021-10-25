@@ -64,7 +64,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	}
 	contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), gas)
 	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input); err != nil {
+		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -86,6 +86,19 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
 func TestWriteCapablePrecompiles(t *testing.T) {
 	for _, test := range WriteCapablePrecompileTests {
 		testWriteCapablePrecompile(test, t)
+	}
+}
+
+func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
+	p := &stakingPrecompile{}
+	expectedError := errWriteProtection
+	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
+	if err != nil {
+		if err.Error() != expectedError.Error() {
+			t.Errorf("Expected error %v, got %v", expectedError, err)
+		}
+	} else {
+		t.Errorf("Expected an error %v but instead got result %v", expectedError, res)
 	}
 }
 

@@ -97,7 +97,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			return RunPrecompiledContract(p, input, contract)
 		}
 		if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
-			return RunWriteCapablePrecompiledContract(p, evm, contract, input)
+			return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
 		}
 	}
 	for _, interpreter := range evm.interpreters {

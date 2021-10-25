@@ -22,7 +22,12 @@ type WriteCapablePrecompiledContract interface {
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
-func RunWriteCapablePrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte) ([]byte, error) {
+func RunWriteCapablePrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
+	// immediately error out if readOnly
+	// do not calculate / consume gas
+	if readOnly {
+		return nil, errWriteProtection
+	}
 	gas, err := p.RequiredGas(evm, input)
 	if err != nil {
 		return nil, err
