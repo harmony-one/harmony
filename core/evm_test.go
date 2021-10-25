@@ -48,8 +48,6 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *
 
 	// fake blockchain
 	chain, _ := NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
-	// fake statedb => not set up correctly
-	// db, _ := state.New(common.Hash{}, state.NewDatabase(database))
 	db, _ := chain.StateAt(genesis.Root())
 
 	// make a fake block header (use epoch 1 so that locked tokens can be tested)
@@ -239,9 +237,9 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	address := common.BytesToAddress([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252})
 	// caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int)
 	_, _, err := evm.Call(vm.AccountRef(common.Address{}), address,
-		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
 		math.MaxUint64, new(big.Int))
-	expectedError := errors.New("abi: cannot marshal in to go type: length insufficient 32 require 64")
+	expectedError := errors.New("abi: cannot marshal in to go type: length insufficient 31 require 32")
 	if err != nil {
 		if err.Error() != expectedError.Error() {
 			t.Errorf(fmt.Sprintf("Got error %v in evm.Call but expected %v", err, expectedError))

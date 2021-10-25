@@ -20,230 +20,229 @@ func init() {
 	StakingABIJSON := `
 	[
 	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "delegatorAddress",
+	        "type": "address"
+	      }
+	    ],
 	    "name": "CollectRewards",
 	    "outputs": [],
-	    "inputs": [
-	      {
-	        "type": "uint8",
-	        "name": "DirectiveUnused",
-	        "indexed": false
-	      },
-	      {
-	        "type": "address",
-	        "name": "DelegatorAddress",
-	        "indexed": false
-	      }
-	    ],
-	    "constant": false,
-	    "payable": false,
+	    "stateMutability": "nonpayable",
 	    "type": "function"
 	  },
 	  {
-	    "name": "DelegateOrUndelegate",
-	    "outputs": [],
 	    "inputs": [
 	      {
-	        "type": "uint8",
-	        "name": "DirectiveUnused",
-	        "indexed": false
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
 	      },
 	      {
-	        "type": "address",
-	        "name": "DelegatorAddress",
-	        "indexed": false
+	        "components": [
+	          {
+	            "internalType": "string",
+	            "name": "name",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "identity",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "website",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "securityContact",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "details",
+	            "type": "string"
+	          }
+	        ],
+	        "internalType": "struct Description",
+	        "name": "description",
+	        "type": "tuple"
 	      },
 	      {
-	        "type": "address",
-	        "name": "ValidatorAddress",
-	        "indexed": false
+	        "components": [
+	          {
+	            "internalType": "string",
+	            "name": "rate",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "maxRate",
+	            "type": "string"
+	          },
+	          {
+	            "internalType": "string",
+	            "name": "maxChangeRate",
+	            "type": "string"
+	          }
+	        ],
+	        "internalType": "struct CommissionRate",
+	        "name": "commissionRates",
+	        "type": "tuple"
 	      },
 	      {
-	        "type": "uint256",
-	        "name": "Amount",
-	        "indexed": false
+	        "internalType": "uint256",
+	        "name": "minSelfDelegation",
+	        "type": "uint256"
+	      },
+	      {
+	        "internalType": "uint256",
+	        "name": "maxTotalDelegation",
+	        "type": "uint256"
+	      },
+	      {
+	        "internalType": "bytes[]",
+	        "name": "slotPubKeys",
+	        "type": "bytes[]"
+	      },
+	      {
+	        "internalType": "bytes[]",
+	        "name": "slotKeySigs",
+	        "type": "bytes[]"
+	      },
+	      {
+	        "internalType": "uint256",
+	        "name": "amount",
+	        "type": "uint256"
 	      }
 	    ],
-	    "constant": false,
-	    "payable": false,
-	    "type": "function"
-	  },
-	  {
 	    "name": "CreateValidator",
 	    "outputs": [],
-	    "inputs": [
-	      {
-	        "type": "uint8",
-	        "name": "DirectiveUnused",
-	        "indexed": false
-	      },
-	      {
-	        "name": "ValidatorAddress",
-	        "type": "address",
-	        "indexed": false
-	      },
-	      {
-	        "components": [
-	          {
-	            "name": "Name",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "Identity",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "Website",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "SecurityContact",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "Details",
-	            "type": "string",
-	            "indexed": false
-	          }
-	        ],
-	        "name": "Description",
-	        "type": "tuple",
-	        "indexed": false
-	      },
-	      {
-	        "components": [
-	          {
-	            "name": "Rate",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "MaxRate",
-	            "type": "string",
-	            "indexed": false
-	          },
-	          {
-	            "name": "MaxChangeRate",
-	            "type": "string",
-	            "indexed": false
-	          }
-	        ],
-	        "name": "CommissionRates",
-	        "type": "tuple",
-	        "indexed": false
-	      },
-	      {
-	        "name": "MinSelfDelegation",
-	        "type": "uint256",
-	        "indexed": false
-	      },
-	      {
-	        "name": "MaxTotalDelegation",
-	        "type": "uint256",
-	        "indexed": false
-	      },
-	      {
-	        "name": "SlotPubKeys",
-	        "type": "bytes[]",
-	        "indexed": false
-	      },
-				{
-	        "name": "SlotKeySigs",
-	        "type": "bytes[]",
-	        "indexed": false
-	      },
-	      {
-	        "name": "Amount",
-	        "type": "uint256",
-	        "indexed": false
-	      }
-	    ],
-	    "constant": false,
-	    "payable": false,
+	    "stateMutability": "nonpayable",
 	    "type": "function"
 	  },
 	  {
-	    "name": "EditValidator",
-	    "outputs": [],
 	    "inputs": [
 	      {
-	        "type": "uint8",
-	        "name": "DirectiveUnused",
-	        "indexed": false
+	        "internalType": "address",
+	        "name": "delegatorAddress",
+	        "type": "address"
 	      },
 	      {
-	        "name": "ValidatorAddress",
-	        "type": "address",
-	        "indexed": false
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "uint256",
+	        "name": "amount",
+	        "type": "uint256"
+	      }
+	    ],
+	    "name": "Delegate",
+	    "outputs": [],
+	    "stateMutability": "nonpayable",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
 	      },
 	      {
 	        "components": [
 	          {
-	            "name": "Name",
-	            "type": "string",
-	            "indexed": false
+	            "internalType": "string",
+	            "name": "name",
+	            "type": "string"
 	          },
 	          {
-	            "name": "Identity",
-	            "type": "string",
-	            "indexed": false
+	            "internalType": "string",
+	            "name": "identity",
+	            "type": "string"
 	          },
 	          {
-	            "name": "Website",
-	            "type": "string",
-	            "indexed": false
+	            "internalType": "string",
+	            "name": "website",
+	            "type": "string"
 	          },
 	          {
-	            "name": "SecurityContact",
-	            "type": "string",
-	            "indexed": false
+	            "internalType": "string",
+	            "name": "securityContact",
+	            "type": "string"
 	          },
 	          {
-	            "name": "Details",
-	            "type": "string",
-	            "indexed": false
+	            "internalType": "string",
+	            "name": "details",
+	            "type": "string"
 	          }
 	        ],
-	        "name": "Description",
-	        "type": "tuple",
-	        "indexed": false
+	        "internalType": "struct Description",
+	        "name": "description",
+	        "type": "tuple"
 	      },
 	      {
-	        "name": "CommissionRate",
-	        "type": "string",
-	        "indexed": false
+	        "internalType": "string",
+	        "name": "commissionRate",
+	        "type": "string"
 	      },
 	      {
-	        "name": "MinSelfDelegation",
-	        "type": "uint256",
-	        "indexed": false
+	        "internalType": "uint256",
+	        "name": "minSelfDelegation",
+	        "type": "uint256"
 	      },
 	      {
-	        "name": "MaxTotalDelegation",
-	        "type": "uint256",
-	        "indexed": false
+	        "internalType": "uint256",
+	        "name": "maxTotalDelegation",
+	        "type": "uint256"
 	      },
 	      {
-	        "name": "SlotKeyToRemove",
-	        "type": "bytes",
-	        "indexed": false
+	        "internalType": "bytes",
+	        "name": "slotKeyToRemove",
+	        "type": "bytes"
 	      },
 	      {
-	        "name": "SlotKeyToAdd",
-	        "type": "bytes",
-	        "indexed": false
+	        "internalType": "bytes",
+	        "name": "slotKeyToAdd",
+	        "type": "bytes"
 	      },
-				{
-	        "name": "SlotKeyToAddSig",
-	        "type": "bytes",
-	        "indexed": false
+	      {
+	        "internalType": "bytes",
+	        "name": "slotKeyToAddSig",
+	        "type": "bytes"
 	      }
 	    ],
-	    "constant": false,
-	    "payable": false,
+	    "name": "EditValidator",
+	    "outputs": [],
+	    "stateMutability": "nonpayable",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "delegatorAddress",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "uint256",
+	        "name": "amount",
+	        "type": "uint256"
+	      }
+	    ],
+	    "name": "Undelegate",
+	    "outputs": [],
+	    "stateMutability": "nonpayable",
 	    "type": "function"
 	  }
 	]
@@ -251,14 +250,8 @@ func init() {
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
 }
 
-func UnpackFromStakingMethod(methodName string, args map[string]interface{}, input []byte) error {
-	if method, ok := abiStaking.Methods[methodName]; ok {
-		err := method.Inputs.UnpackIntoMap(args, input)
-		return err
-	} else {
-		// this should never happen, unless you make a typo in the precompiled code
-		return errors.Errorf("Key %s is not an ABI method", methodName)
-	}
+func ParseStakingMethod(input []byte) (*abi.Method, error) {
+	return abiStaking.MethodById(input)
 }
 
 func ValidateContractAddress(contractCaller common.Address, args map[string]interface{}, key string) (common.Address, error) {
@@ -287,16 +280,16 @@ func ParseAddressFromKey(args map[string]interface{}, key string) (common.Addres
 	}
 }
 
-func ParseDescription(args map[string]interface{}) (stakingTypes.Description, error) {
+func ParseDescription(args map[string]interface{}, key string) (stakingTypes.Description, error) {
 	// mostly the same struct as stakingTypes.Description
 	// except the JSON tag for SecurityContact is security-contact there
 	// so type assert it through this one
-	if description, ok := args["Description"].(struct {
-		Name            string "json:\"Name\""
-		Identity        string "json:\"Identity\""
-		Website         string "json:\"Website\""
-		SecurityContact string "json:\"SecurityContact\""
-		Details         string "json:\"Details\""
+	if description, ok := args[key].(struct {
+		Name            string "json:\"name\""
+		Identity        string "json:\"identity\""
+		Website         string "json:\"website\""
+		SecurityContact string "json:\"securityContact\""
+		Details         string "json:\"details\""
 	}); ok {
 		return stakingTypes.Description{
 			description.Name,
@@ -307,18 +300,18 @@ func ParseDescription(args map[string]interface{}) (stakingTypes.Description, er
 		}, nil
 	} else {
 		return stakingTypes.Description{}, errors.Errorf(
-			"Cannot parse Description from %v", args["Description"])
+			"Cannot parse Description from %v", args[key])
 	}
 }
 
-func ParseCommissionRates(args map[string]interface{}) (stakingTypes.CommissionRates, error) {
+func ParseCommissionRates(args map[string]interface{}, key string) (stakingTypes.CommissionRates, error) {
 	// CommissionRates here is parsed as containing 3 strings
 	// whereas the actual stakingTypes.CommissionRates has numeric.Dec
 	// create a new structure on the fly to allow type assertion
-	if commissionRates, ok := args["CommissionRates"].(struct {
-		Rate          string "json:\"Rate\""
-		MaxRate       string "json:\"MaxRate\""
-		MaxChangeRate string "json:\"MaxChangeRate\""
+	if commissionRates, ok := args[key].(struct {
+		Rate          string "json:\"rate\""
+		MaxRate       string "json:\"maxRate\""
+		MaxChangeRate string "json:\"maxChangeRate\""
 	}); ok {
 		rate, err := numeric.NewDecFromStr(commissionRates.Rate)
 		if err != nil {
@@ -335,7 +328,7 @@ func ParseCommissionRates(args map[string]interface{}) (stakingTypes.CommissionR
 		return stakingTypes.CommissionRates{rate, maxRate, maxChangeRate}, nil
 	} else {
 		return stakingTypes.CommissionRates{}, errors.Errorf(
-			"Cannot parse CommissionRates from %v", args["CommissionRates"])
+			"Cannot parse CommissionRates from %v", args[key])
 	}
 }
 
@@ -349,12 +342,12 @@ func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, erro
 	}
 }
 
-func ParseSlotPubKeys(args map[string]interface{}) ([]bls.SerializedPublicKey, error) {
+func ParseSlotPubKeys(args map[string]interface{}, key string) ([]bls.SerializedPublicKey, error) {
 	// cast it into bytes
-	pubKeys, ok := args["SlotPubKeys"].([][]byte)
+	pubKeys, ok := args[key].([][]byte)
 	if !ok {
 		return nil, errors.Errorf(
-			"Cannot parse SlotPubKeys from %v", args["SlotPubKeys"])
+			"Cannot parse SlotPubKeys from %v", args[key])
 	}
 	result := make([]bls.SerializedPublicKey, len(pubKeys))
 	for i, pubKey := range pubKeys {
@@ -367,12 +360,12 @@ func ParseSlotPubKeys(args map[string]interface{}) ([]bls.SerializedPublicKey, e
 	return result, nil
 }
 
-func ParseSlotKeySigs(args map[string]interface{}) ([]bls.SerializedSignature, error) {
+func ParseSlotKeySigs(args map[string]interface{}, key string) ([]bls.SerializedSignature, error) {
 	// cast it into bytes
-	sigs, ok := args["SlotKeySigs"].([][]byte)
+	sigs, ok := args[key].([][]byte)
 	if !ok {
 		return nil, errors.Errorf(
-			"Cannot parse SlotKeySigs from %v", args["SlotKeySigs"])
+			"Cannot parse SlotKeySigs from %v", args[key])
 	}
 	result := make([]bls.SerializedSignature, len(sigs))
 	for i, sig := range sigs {
@@ -413,12 +406,12 @@ func ParseSlotKeySigFromKey(args map[string]interface{}, key string) (*bls.Seria
 	}
 }
 
-func ParseCommissionRate(args map[string]interface{}) (*numeric.Dec, error) {
+func ParseCommissionRate(args map[string]interface{}, key string) (*numeric.Dec, error) {
 	// expect string
-	commissionRate, ok := args["CommissionRate"].(string)
+	commissionRate, ok := args[key].(string)
 	if !ok {
 		return nil, errors.Errorf(
-			"Cannot parse CommissionRate from %v", args["CommissionRate"])
+			"Cannot parse CommissionRate from %v", args[key])
 	} else {
 		rate, err := numeric.NewDecFromStr(commissionRate)
 		if err != nil {
