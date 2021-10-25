@@ -9,7 +9,7 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-var WriteCapablePrecompiledContracts = map[common.Address]WriteCapablePrecompiledContract{
+var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 

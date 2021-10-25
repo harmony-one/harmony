@@ -72,7 +72,8 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			precompiles = PrecompiledContractsSHA3FIPS
 		}
 		if evm.chainRules.IsStakingPrecompile {
-			writeCapablePrecompiles = WriteCapablePrecompiledContracts
+			precompiles = PrecompiledContractsStaking
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
@@ -295,7 +296,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			precompiles = PrecompiledContractsSHA3FIPS
 		}
 		if evm.chainRules.IsStakingPrecompile {
-			writeCapablePrecompiles = WriteCapablePrecompiledContracts
+			precompiles = PrecompiledContractsStaking
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
 
 		if writeCapablePrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {

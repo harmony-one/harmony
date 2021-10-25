@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
@@ -112,6 +113,35 @@ var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
 
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+}
+
+var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{2}): &sha256hash{},
+	common.BytesToAddress([]byte{3}): &ripemd160hash{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
+	common.BytesToAddress([]byte{5}): &bigModExp{},
+	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}): &blake2F{},
+
+	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
+	// marked nil to ensure no overwrite
+	common.BytesToAddress([]byte{253}): &sha3fip{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+func init() {
+	// check that there is no overlap, and panic if there is
+	readOnlyContracts := PrecompiledContractsStaking
+	writeCapableContracts := WriteCapablePrecompiledContractsStaking
+	for address, readOnlyContract := range readOnlyContracts {
+		if readOnlyContract != nil && writeCapableContracts[address] != nil {
+			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))
+		}
+	}
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
