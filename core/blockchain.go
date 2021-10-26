@@ -115,8 +115,9 @@ type CacheConfig struct {
 // included in the canonical one where as GetBlockByNumber always represents the
 // canonical chain.
 type BlockChain struct {
-	chainConfig *params.ChainConfig // Chain & network configuration
-	cacheConfig *CacheConfig        // Cache configuration for pruning
+	chainConfig            *params.ChainConfig // Chain & network configuration
+	cacheConfig            *CacheConfig        // Cache configuration for pruning
+	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
@@ -148,16 +149,17 @@ type BlockChain struct {
 	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache               *lru.Cache
 	lastCommitsCache              *lru.Cache
-	epochCache                    *lru.Cache    // Cache epoch number → first block number
-	randomnessCache               *lru.Cache    // Cache for vrf/vdf
-	validatorSnapshotCache        *lru.Cache    // Cache for validator snapshot
-	validatorStatsCache           *lru.Cache    // Cache for validator stats
-	validatorListCache            *lru.Cache    // Cache of validator list
-	validatorListByDelegatorCache *lru.Cache    // Cache of validator list by delegator
-	pendingCrossLinksCache        *lru.Cache    // Cache of last pending crosslinks
-	blockAccumulatorCache         *lru.Cache    // Cache of block accumulators
-	quit                          chan struct{} // blockchain quit channel
-	running                       int32         // running must be called atomically
+	epochCache                    *lru.Cache        // Cache epoch number → first block number
+	randomnessCache               *lru.Cache        // Cache for vrf/vdf
+	validatorSnapshotCache        *lru.Cache        // Cache for validator snapshot
+	validatorStatsCache           *lru.Cache        // Cache for validator stats
+	validatorListCache            *lru.Cache        // Cache of validator list
+	validatorListByDelegatorCache *lru.Cache        // Cache of validator list by delegator
+	pendingCrossLinksCache        *lru.Cache        // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache        // Cache of block accumulators
+	quit                          chan struct{}     // blockchain quit channel
+	running                       int32             // running must be called atomically
+	blockchainPruner              *blockchainPruner // use to prune beacon chain
 	// procInterrupt must be atomically called
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
@@ -226,6 +228,7 @@ func NewBlockChain(
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
+		blockchainPruner:              newBlockchainPruner(db),
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -1253,6 +1256,20 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 	if err := rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages()); err != nil {
 		return NonStatTy, err
+	}
+
+	if bc.IsEnablePruneBeaconChainFeature() {
+		if block.Number().Cmp(big.NewInt(pruneBeaconChainBlockBefore)) > 0 && block.Epoch().Cmp(big.NewInt(pruneBeaconChainBeforeEpoch)) > 0 {
+			maxBlockNum := big.NewInt(0).Sub(block.Number(), big.NewInt(pruneBeaconChainBlockBefore)).Uint64()
+			maxEpoch := big.NewInt(0).Sub(block.Epoch(), big.NewInt(pruneBeaconChainBeforeEpoch))
+			go func() {
+				err := bc.blockchainPruner.Start(maxBlockNum, maxEpoch)
+				if err != nil {
+					utils.Logger().Info().Err(err).Msg("pruneBeaconChain init error")
+					return
+				}
+			}()
+		}
 	}
 
 	if err := batch.Write(); err != nil {
@@ -3029,6 +3046,15 @@ func (bc *BlockChain) SuperCommitteeForNextEpoch(
 
 	}
 	return nextCommittee, err
+}
+
+func (bc *BlockChain) EnablePruneBeaconChainFeature() {
+	bc.pruneBeaconChainEnable = true
+}
+
+// IsEnablePruneBeaconChainFeature returns is enable prune BeaconChain feature
+func (bc *BlockChain) IsEnablePruneBeaconChainFeature() bool {
+	return bc.pruneBeaconChainEnable
 }
 
 var (
