@@ -4,9 +4,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/hashicorp/golang-lru"
 	"time"
+
+	"github.com/coinbase/rosetta-sdk-go/types"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const (
