@@ -54,14 +54,15 @@ type P2pConfig struct {
 }
 
 type GeneralConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBackup         bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
+	NodeType               string
+	NoStaking              bool
+	ShardID                int
+	IsArchival             bool
+	IsBackup               bool
+	IsBeaconArchival       bool
+	IsOffline              bool
+	DataDir                string
+	EnablePruneBeaconChain bool
 }
 
 type ConsensusConfig struct {
