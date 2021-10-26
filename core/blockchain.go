@@ -258,15 +258,15 @@ func NewBlockChain(
 // ValidateNewBlock validates new block.
 func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
-
 	if err != nil {
 		return err
 	}
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
-		block, state, bc.vmConfig,
+	// Do not read cache from processor.
+	receipts, cxReceipts, _, usedGas, _, _, err := bc.processor.Process(
+		block, state, bc.vmConfig, false,
 	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -1448,9 +1448,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
-			block, state, bc.vmConfig,
+		receipts, cxReceipts, logs, usedGas, payout, newState, err := bc.processor.Process(
+			block, state, bc.vmConfig, true,
 		)
+		state = newState // update state in case the new state is cached.
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err

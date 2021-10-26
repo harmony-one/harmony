@@ -303,6 +303,10 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Failed verifying the new block header")
 		return nil, err
 	}
+
+	// Save process result in the cache for later use for faster block commitment to db.
+	result := node.Worker.GetCurrentResult()
+	node.Blockchain().Processor().CacheProcessorResult(finalizedBlock.Hash(), result)
 	return finalizedBlock, nil
 }
 
