@@ -155,6 +155,12 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
+	// only available in validator node and shard 1-3
+	isEnablePruneBeaconChain := node.HarmonyConfig != nil && node.HarmonyConfig.General.EnablePruneBeaconChain
+	isNotBeaconChainValidator := node.NodeConfig.Role() == nodeconfig.Validator && node.NodeConfig.ShardID != shard.BeaconChainShardID
+	if isEnablePruneBeaconChain && isNotBeaconChainValidator {
+		bc.EnablePruneBeaconChainFeature()
+	}
 	return bc
 }
 

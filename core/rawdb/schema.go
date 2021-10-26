@@ -89,6 +89,11 @@ func encodeBlockNumber(number uint64) []byte {
 	return enc
 }
 
+// decodeBlockNumber decodes a block number as big endian uint64
+func decodeBlockNumber(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b)
+}
+
 // headerKey = headerPrefix + num (uint64 big endian) + hash
 func headerKey(number uint64, hash common.Hash) []byte {
 	return append(append(headerPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
