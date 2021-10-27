@@ -387,6 +387,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	}
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
+		if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID && currentNode.HarmonyConfig.General.PruneBeaconchain {
+			currentNode.Beaconchain().Config().ShouldPrune = true
+		}
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
 	}

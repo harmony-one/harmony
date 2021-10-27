@@ -21,6 +21,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsBeaconArchival: false,
 		IsOffline:        false,
 		DataDir:          "./",
+		PruneBeaconchain: true,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{

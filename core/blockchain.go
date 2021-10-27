@@ -88,8 +88,9 @@ const (
 	blockAccumulatorCacheLimit         = 256
 	maxPendingSlashes                  = 512
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
-	BlockChainVersion = 3
-	pendingCLCacheKey = "pendingCLs"
+	BlockChainVersion   = 3
+	pendingCLCacheKey   = "pendingCLs"
+	PreserveBlockAmount = 100000
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -1286,6 +1287,11 @@ func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
+
+	if bc.chainConfig.ShouldPrune {
+		bc.PruneBlocks(PreserveBlockAmount)
+	}
+
 	return n, err
 }
 

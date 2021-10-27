@@ -61,6 +61,7 @@ type GeneralConfig struct {
 	IsBeaconArchival bool
 	IsOffline        bool
 	DataDir          string
+	PruneBeaconchain bool // delete beaconchain blocks that are no longer needed for validator nodes
 }
 
 type ConsensusConfig struct {

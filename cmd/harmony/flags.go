@@ -22,6 +22,7 @@ var (
 		isBeaconArchiveFlag,
 		isOfflineFlag,
 		dataDirFlag,
+		pruneBeaconchainFlag,
 
 		legacyNodeTypeFlag,
 		legacyIsStakingFlag,
@@ -253,6 +254,11 @@ var (
 		Usage:    "directory of chain database",
 		DefValue: defaultConfig.General.DataDir,
 	}
+	pruneBeaconchainFlag = cli.BoolFlag{
+		Name:     "run.prune_beaconchain",
+		Usage:    "whether to delete beaconchain blocks that are no longer needed for validator nodes",
+		DefValue: defaultConfig.General.PruneBeaconchain,
+	}
 	legacyNodeTypeFlag = cli.StringFlag{
 		Name:       "node_type",
 		Usage:      "run node type (validator, explorer)",
@@ -345,6 +351,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 		config.General.DataDir = cli.GetStringFlagValue(cmd, dataDirFlag)
 	} else if cli.IsFlagChanged(cmd, legacyDataDirFlag) {
 		config.General.DataDir = cli.GetStringFlagValue(cmd, legacyDataDirFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, pruneBeaconchainFlag) {
+		config.General.PruneBeaconchain = cli.GetBoolFlagValue(cmd, pruneBeaconchainFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {

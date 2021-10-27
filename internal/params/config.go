@@ -261,6 +261,7 @@ var (
 		big.NewInt(0),                      // ReceiptLogEpoch
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
+		false,                              // ShouldPrune
 	}
 
 	// TestChainConfig ...
@@ -295,6 +296,7 @@ var (
 		big.NewInt(0),        // ReceiptLogEpoch
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
+		false,                // ShouldPrune
 	}
 
 	// TestRules ...
@@ -409,6 +411,9 @@ type ChainConfig struct {
 
 	// IsHIP6And8Epoch is the first epoch to support HIP-6 and HIP-8
 	HIP6And8Epoch *big.Int `json:"hip6_8-epoch,omitempty"`
+
+	// ShouldPrune determines whether to delete old blocks from the chain
+	ShouldPrune bool
 }
 
 // String implements the fmt.Stringer interface.
