@@ -90,7 +90,7 @@ const (
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion   = 3
 	pendingCLCacheKey   = "pendingCLs"
-	PreserveBlockAmount = 100000
+	PreserveBlockAmount = 262144 // Preserve 8 epochs of blocks (2^15) * 8
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
