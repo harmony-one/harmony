@@ -26,10 +26,10 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/ethereum/go-ethereum/signer/core"
 	"github.com/harmony-one/harmony/accounts"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 )
 
 // ExternalBackend is a struct for external backend

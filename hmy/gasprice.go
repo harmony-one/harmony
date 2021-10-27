@@ -23,8 +23,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"

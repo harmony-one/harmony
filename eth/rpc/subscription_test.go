@@ -18,11 +18,12 @@ package rpc
 
 import (
 	"fmt"
-	"github.com/goccy/go-json"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 func TestNewID(t *testing.T) {

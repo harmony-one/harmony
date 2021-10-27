@@ -22,12 +22,13 @@ import (
 	std_json "encoding/json"
 	"errors"
 	"fmt"
-	"github.com/goccy/go-json"
 	"io"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 const (

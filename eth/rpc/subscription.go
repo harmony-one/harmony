@@ -24,12 +24,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
-	"github.com/goccy/go-json"
 	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 var (
