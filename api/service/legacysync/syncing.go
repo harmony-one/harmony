@@ -162,7 +162,7 @@ func CreateStateSync(ip string, port string, peerHash [20]byte, isExplorer bool)
 	stateSync.lastMileBlocks = []*types.Block{}
 	stateSync.isExplorer = isExplorer
 	stateSync.syncConfig = &SyncConfig{}
-	stateSync.lastSyncCheckResult = syncCheckResult{true, 0, 0}
+	stateSync.lastOutOfSyncResult = outOfSyncCheckResult{true, 0, 0}
 	return stateSync
 }
 
@@ -179,11 +179,11 @@ type StateSync struct {
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
 
-	lastSyncCheckResult syncCheckResult
-	syncResultLock      sync.RWMutex
+	lastOutOfSyncResult outOfSyncCheckResult
+	outOfSyncResultLock sync.RWMutex
 }
 
-type syncCheckResult struct {
+type outOfSyncCheckResult struct {
 	isOutOfSync bool
 	otherHeight uint64
 	heightDiff  uint64
@@ -1069,7 +1069,7 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 
 // SyncStatus returns inSync, remote height, and difference between remote height and local height
 func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64, uint64) {
-	outOfSync, remoteHeight, heightDiff := ss.GetSyncStatus()
+	outOfSync, remoteHeight, heightDiff := ss.GetOutOfSyncStatus()
 	return !outOfSync, remoteHeight, heightDiff
 }
 
@@ -1078,24 +1078,24 @@ func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64, uint64) {
 func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64, uint64) {
 	outOfSync, otherHeight, heightDiff := ss.isOutOfSync(bc, doubleCheck)
 
-	ss.syncResultLock.Lock()
-	ss.lastSyncCheckResult = syncCheckResult{
+	ss.outOfSyncResultLock.Lock()
+	ss.lastOutOfSyncResult = outOfSyncCheckResult{
 		isOutOfSync: outOfSync,
 		otherHeight: otherHeight,
 		heightDiff:  heightDiff,
 	}
-	ss.syncResultLock.Unlock()
+	ss.outOfSyncResultLock.Unlock()
 
 	return outOfSync, otherHeight, heightDiff
 }
 
-// GetSyncStatus return the sync result of last isOutOfSync check.
+// GetOutOfSyncStatus return the sync result of last isOutOfSync check.
 // Return isOutofSync, otherHeight, and heightDifferent
-func (ss *StateSync) GetSyncStatus() (bool, uint64, uint64) {
-	ss.syncResultLock.RLock()
-	defer ss.syncResultLock.RUnlock()
+func (ss *StateSync) GetOutOfSyncStatus() (bool, uint64, uint64) {
+	ss.outOfSyncResultLock.RLock()
+	defer ss.outOfSyncResultLock.RUnlock()
 
-	sr := ss.lastSyncCheckResult
+	sr := ss.lastOutOfSyncResult
 	return sr.isOutOfSync, sr.otherHeight, sr.heightDiff
 }
 
