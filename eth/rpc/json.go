@@ -19,6 +19,7 @@ package rpc
 import (
 	"bytes"
 	"context"
+	std_json "encoding/json"
 	"errors"
 	"fmt"
 	"github.com/goccy/go-json"
@@ -239,7 +240,7 @@ func parseMessage(raw json.RawMessage) ([]*jsonrpcMessage, bool) {
 		json.Unmarshal(raw, &msgs[0])
 		return msgs, false
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec := std_json.NewDecoder(bytes.NewReader(raw))
 	dec.Token() // skip '['
 	var msgs []*jsonrpcMessage
 	for dec.More() {
