@@ -1,6 +1,7 @@
 package rawdb
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -311,6 +312,19 @@ func ReadBlockCommitSig(db DatabaseReader, blockNum uint64) ([]byte, error) {
 // WriteBlockCommitSig ..
 func WriteBlockCommitSig(db DatabaseWriter, blockNum uint64, sigAndBitmap []byte) error {
 	return db.Put(blockCommitSigKey(blockNum), sigAndBitmap)
+}
+
+func ReadBlockPruningState(db DatabaseReader, shardID uint32) *uint64 {
+	blockNumBytes, _ := db.Get(pruneBlockStateKey(shardID))
+	if len(blockNumBytes) != 8 {
+		return nil
+	}
+	blockNum := binary.BigEndian.Uint64(blockNumBytes)
+	return &blockNum
+}
+
+func WriteBlockPruningState(db DatabaseWriter, shardID uint32, blockNum uint64) error {
+	return db.Put(pruneBlockStateKey(shardID), encodeBlockNumber(blockNum))
 }
 
 //// Resharding ////

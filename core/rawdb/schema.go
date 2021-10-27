@@ -72,6 +72,7 @@ var (
 	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix = []byte("blk-rwd-")
+	pruneBlockStatePrefix       = []byte("prune-blocks-shard-")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of
@@ -221,4 +222,10 @@ func blockRewardAccumKey(number uint64) []byte {
 
 func blockCommitSigKey(number uint64) []byte {
 	return append(blockCommitSigPrefix, encodeBlockNumber(number)...)
+}
+
+func pruneBlockStateKey(shardID uint32) []byte {
+	shardBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(shardBytes, shardID)
+	return append(pruneBlockStatePrefix, shardBytes...)
 }
