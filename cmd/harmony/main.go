@@ -389,6 +389,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.RegisterValidatorServices()
 		if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID && currentNode.HarmonyConfig.General.PruneBeaconchain {
 			currentNode.Beaconchain().Config().ShouldPrune = true
+			// Prune blocks before syncing starts so we can prune them one-at-a-time later
+			go currentNode.Beaconchain().PruneBlocks(core.PreserveBlockAmount)
 		}
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()

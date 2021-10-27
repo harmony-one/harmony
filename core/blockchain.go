@@ -1287,11 +1287,6 @@ func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
-
-	if bc.chainConfig.ShouldPrune {
-		bc.PruneBlocks(PreserveBlockAmount)
-	}
-
 	return n, err
 }
 
@@ -1504,6 +1499,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		stats.usedGas += usedGas
 		cache, _ := bc.stateCache.TrieDB().Size()
 		stats.report(chain, i, cache)
+
+		if bc.chainConfig.ShouldPrune {
+			go bc.PruneBlock(block.NumberU64() - PreserveBlockAmount)
+		}
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
