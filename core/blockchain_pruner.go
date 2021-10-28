@@ -49,7 +49,7 @@ func (bc *BlockChain) PruneBlock(blockNumber uint64) bool {
 	blockToDelete := bc.GetBlockByNumber(blockNumber)
 
 	if blockToDelete == nil {
-		utils.Logger().Info().Msgf("Did not find block number %d to prune\n", blockNumber)
+		utils.Logger().Debug().Msgf("Did not find block number %d to prune\n", blockNumber)
 		return false
 	} else if blockToDelete.NumberU64() == bc.Genesis().NumberU64() {
 		utils.Logger().Info().Msgf("Requested to prune genesis block number %d. Cancelling deletion.\n", blockNumber)
