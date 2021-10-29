@@ -56,6 +56,20 @@ func (bc *BlockChain) PruneBlock(blockNumber uint64) bool {
 		return false
 	}
 
+	for _, tx := range blockToDelete.Transactions() {
+		rawdb.DeleteTxLookupEntry(bc.ChainDb(), tx.Hash())
+	}
+	for _, stx := range blockToDelete.StakingTransactions() {
+		rawdb.DeleteTxLookupEntry(bc.ChainDb(), stx.Hash())
+	}
+	for _, cx := range blockToDelete.IncomingReceipts() {
+		rawdb.DeleteCXReceiptsProofSpent(bc.ChainDb(), bc.ShardID(), cx.MerkleProof.BlockNum.Uint64())
+		rawdb.DeleteCxReceipts(bc.ChainDb(), bc.ShardID(), blockToDelete.NumberU64(), blockToDelete.Hash())
+		for _, cxp := range cx.Receipts {
+			rawdb.DeleteCxLookupEntry(bc.ChainDb(), cxp.TxHash)
+		}
+	}
+
 	rawdb.DeleteBlock(bc.ChainDb(), blockToDelete.Hash(), blockToDelete.NumberU64())
 
 	utils.Logger().Debug().Msgf("Pruned block number %d\n", blockNumber)

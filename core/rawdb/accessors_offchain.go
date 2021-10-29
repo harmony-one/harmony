@@ -113,6 +113,15 @@ func WriteCXReceipts(db DatabaseWriter, shardID uint32, number uint64, hash comm
 	return err
 }
 
+func DeleteCxReceipts(db DatabaseDeleter, shardID uint32, number uint64, hash common.Hash) error {
+	err := db.Delete(cxReceiptKey(shardID, number, hash))
+	if err != nil {
+		utils.Logger().Error().Msgf("[DeleteCXReceipts] Failed to delete cross shard tx receipts for block num %d", number)
+		return err
+	}
+	return nil
+}
+
 // ReadCXReceiptsProofSpent check whether a CXReceiptsProof is unspent
 func ReadCXReceiptsProofSpent(db DatabaseReader, shardID uint32, number uint64) (byte, error) {
 	data, err := db.Get(cxReceiptSpentKey(shardID, number))
