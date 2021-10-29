@@ -70,10 +70,6 @@ func (node *Node) StartRPC() error {
 	// Gather all the possible APIs to surface
 	apis := node.APIs(harmony)
 
-	for _, service := range node.serviceManager.GetServices() {
-		apis = append(apis, service.APIs()...)
-	}
-
 	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer)
 }
 
