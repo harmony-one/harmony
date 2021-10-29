@@ -268,7 +268,9 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 	i, externalCount := 0, 0
 
 	totalRaw := numeric.ZeroDec()
-	for identity, voter := range v.roster.Voters {
+	for _, slot := range v.roster.OrderedSlots {
+		identity := slot
+		voter := v.roster.Voters[slot]
 		member := u{
 			voter.IsHarmonyNode,
 			common2.MustAddressToBech32(voter.EarningAccount),
