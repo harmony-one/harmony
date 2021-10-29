@@ -17,7 +17,7 @@ var (
 	requestCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
-			Subsystem: "rpc_new",
+			Subsystem: "rpc2",
 			Name:      "request_count",
 			Help:      "counters for each RPC method",
 		},
@@ -27,7 +27,7 @@ var (
 	requestErroredCounterVec = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "hmy",
-			Subsystem: "rpc_new",
+			Subsystem: "rpc2",
 			Name:      "err_count",
 			Help:      "counters of errored RPC method",
 		},
@@ -37,7 +37,7 @@ var (
 	requestDurationHistVec = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "hmy",
-			Subsystem: "rpc_new",
+			Subsystem: "rpc2",
 			Name:      "delay_histogram",
 			Help:      "delays histogram in seconds",
 			// buckets: 50ms, 100ms, 200ms, 400ms, 800ms, 1600ms, 3200ms, +INF
