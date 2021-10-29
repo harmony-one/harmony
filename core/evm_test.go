@@ -44,7 +44,6 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *
 		engine = chain2.NewEngine()
 	)
 	genesis := gspec.MustCommit(database)
-	// _ = genesis
 
 	// fake blockchain
 	chain, _ := NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)

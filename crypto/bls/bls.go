@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	emptyBLSPubKey    = SerializedPublicKey{}
-	emptyBLSSignature = SerializedSignature{}
+	emptyBLSPubKey = SerializedPublicKey{}
 )
 
 // PublicKeySizeInBytes ..
@@ -111,42 +110,4 @@ func SeparateSigAndMask(commitSigs []byte) ([]byte, []byte, error) {
 	copy(bitmap[:], commitSigs[offset:])
 	//#### END Read payload data from committed msg
 	return aggSig, bitmap, nil
-}
-
-// set bytes but no checks for low or high length
-// use only when the length is known to be correct
-func (a *SerializedPublicKey) SetBytesUnsafe(b []byte) {
-	copy(a[:], b)
-}
-
-// set bytes but no checks for low or high length
-// use only when the length is known to be correct
-func (a *SerializedSignature) SetBytesUnsafe(b []byte) {
-	copy(a[:], b)
-}
-
-// BytesToSerializedPublicKey returns SerializedPublicKey with value b
-// Returns error if length is different from the expected length
-func BytesToSerializedPublicKey(b []byte) (SerializedPublicKey, error) {
-	if len(b) != PublicKeySizeInBytes {
-		return emptyBLSPubKey, errors.Errorf(
-			"key size (BLS) size mismatch, expected %d have %d", PublicKeySizeInBytes, len(b),
-		)
-	}
-	var a SerializedPublicKey
-	a.SetBytesUnsafe(b)
-	return a, nil
-}
-
-// BytesToSerializedSignature returns SerializedSignature with value b
-// Returns error if length is different from the expected length
-func BytesToSerializedSignature(b []byte) (SerializedSignature, error) {
-	if len(b) != BLSSignatureSizeInBytes {
-		return emptyBLSSignature, errors.Errorf(
-			"signature size (BLS) size mismatch, expected %d have %d", BLSSignatureSizeInBytes, len(b),
-		)
-	}
-	var a SerializedSignature
-	a.SetBytesUnsafe(b)
-	return a, nil
 }

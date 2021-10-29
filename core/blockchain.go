@@ -2752,15 +2752,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 	for _, txn := range block.Transactions() {
 		if stakeMsgs, ok := txHashToStakeMsgs[txn.Hash().Hex()]; ok {
 			for _, stakeMsg := range stakeMsgs {
-				if createValidator, ok := stakeMsg.(*staking.CreateValidator); ok {
-					if err := processCreateValidatorMetadata(createValidator,
-						&newValidators,
-						newDelegations,
-						bc,
-						blockNum); err != nil {
-						return nil, nil, err
-					}
-				} else if delegate, ok := stakeMsg.(*staking.Delegate); ok {
+				if delegate, ok := stakeMsg.(*staking.Delegate); ok {
 					if err := processDelegateMetadata(delegate,
 						newValidators,
 						newDelegations,

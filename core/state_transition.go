@@ -313,6 +313,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	// Increment the nonce for the next transaction
 	st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
+	// from worker.go, we get here with shardID == BeaconChainShardID
+	// from node_handler.go, via blockchain.go => it is checked that block shard == node shard
+	// same via consensus
+	// so only possible to reach here if shardID == BeaconChainShardID (no need to check further)
 	switch msg.Type() {
 	case types.StakeCreateVal:
 		stkMsg := &stakingTypes.CreateValidator{}

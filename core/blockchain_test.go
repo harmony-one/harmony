@@ -19,7 +19,7 @@ func TestPrepareStakingMetadata(t *testing.T) {
 	txs := []*types.Transaction{tx}
 	// record the stakeMsgs onto it
 	txHashToStakeMsgs := GetTxHashToStakeMsgs()
-	txHashToStakeMsgs[tx.Hash().Hex()] = []staking.StakeMsg{&staking.CreateValidator{}, &staking.Delegate{}}
+	txHashToStakeMsgs[tx.Hash().Hex()] = []staking.StakeMsg{&staking.Delegate{}}
 
 	// fake staking transactions
 	stx1 := signedCreateValidatorStakingTxn(key)

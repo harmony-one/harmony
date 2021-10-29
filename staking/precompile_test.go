@@ -44,94 +44,10 @@ func TestValidateContractAddress(t *testing.T) {
 	}
 }
 
-func TestParseDescription(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse Description from <nil>")
-	if _, err := ParseDescription(args, "Description"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseCommissionRates(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse CommissionRates from <nil>")
-	if _, err := ParseCommissionRates(args, "CommissionRates"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
 func TestParseBigIntFromKey(t *testing.T) {
 	args := map[string]interface{}{}
 	expectedError := errors.New("Cannot parse BigInt from <nil>")
 	if _, err := ParseBigIntFromKey(args, "PotentialBigInt"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseSlotPubKeys(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse SlotPubKeys from <nil>")
-	if _, err := ParseSlotPubKeys(args, "SlotPubKeys"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseSlotKeySigs(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse SlotKeySigs from <nil>")
-	if _, err := ParseSlotKeySigs(args, "SlotKeySigs"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseSlotPubKeyFromKey(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse SlotPubKey from <nil>")
-	if _, err := ParseSlotPubKeyFromKey(args, "SlotPubKey"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseSlotKeySigFromKey(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse SlotKeySig from <nil>")
-	if _, err := ParseSlotKeySigFromKey(args, "SlotKeySig"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
-func TestParseCommissionRate(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse CommissionRate from <nil>")
-	if _, err := ParseCommissionRate(args, "CommissionRate"); err != nil {
 		if expectedError.Error() != err.Error() {
 			t.Errorf("Expected error %v, got %v", expectedError, err)
 		}
