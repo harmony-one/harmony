@@ -548,7 +548,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 
 // downloadBlocks downloads blocks from state sync task queue.
 func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
-	// Initialize blockChain
+	// Initialize blockchain
 	var wg sync.WaitGroup
 	count := 0
 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
@@ -873,7 +873,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockChain %d %d",
+				"[SYNC]  bloUpdateBlockAndStatus: Error adding newck to blockchain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
@@ -1020,7 +1020,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	return count
 }
 
-// getMaxPeerHeight gets the maximum blockChain heights from peers
+// getMaxPeerHeight gets the maximum blockchain heights from peers
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
 	var wg sync.WaitGroup
@@ -1073,12 +1073,12 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
 			utils.Logger().Info().
-				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
+				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
 		}
 		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
+			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
@@ -1089,7 +1089,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
 		if err != nil {
 			utils.Logger().Error().Err(err).
-				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
+				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			ss.purgeOldBlocksFromCache()
 			break
