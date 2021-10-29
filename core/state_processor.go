@@ -20,6 +20,8 @@ import (
 	"math/big"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -37,6 +39,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+<<<<<<< HEAD
 var TxHashToStakeMsgs map[string][]staking.StakeMsg
 
 func init() {
@@ -46,25 +49,42 @@ func init() {
 func GetTxHashToStakeMsgs() map[string][]staking.StakeMsg {
 	return TxHashToStakeMsgs
 }
+=======
+const (
+	resultCacheLimit = 64 // The number of cached results from processing blocks
+)
+>>>>>>> 791c9d2018eebd96405a062eb3f0379c41898720
 
 // StateProcessor is a basic Processor, which takes care of transitioning
 // state from one point to another.
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config *params.ChainConfig     // Chain configuration options
-	bc     *BlockChain             // Canonical block chain
-	engine consensus_engine.Engine // Consensus engine used for block rewards
+	config      *params.ChainConfig     // Chain configuration options
+	bc          *BlockChain             // Canonical block chain
+	engine      consensus_engine.Engine // Consensus engine used for block rewards
+	resultCache *lru.Cache              // Cache for result after a certain block is processed
+}
+
+type ProcessorResult struct {
+	Receipts   types.Receipts
+	CxReceipts types.CXReceipts
+	Logs       []*types.Log
+	UsedGas    uint64
+	Reward     reward.Reader
+	State      *state.DB
 }
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
 	config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
+	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{
-		config: config,
-		bc:     bc,
-		engine: engine,
+		config:      config,
+		bc:          bc,
+		engine:      engine,
+		resultCache: resultCache,
 	}
 }
 
@@ -76,11 +96,22 @@ func NewStateProcessor(
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(
-	block *types.Block, statedb *state.DB, cfg vm.Config,
+	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
 	types.Receipts, types.CXReceipts,
-	[]*types.Log, uint64, reward.Reader, error,
+	[]*types.Log, uint64, reward.Reader, *state.DB, error,
 ) {
+	cacheKey := block.Hash()
+	if readCache {
+		if cached, ok := p.resultCache.Get(cacheKey); ok {
+			// Return the cached result to avoid process the same block again.
+			// Only the successful results are cached in case for retry.
+			result := cached.(*ProcessorResult)
+			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
+			return result.Receipts, result.CxReceipts, result.Logs, result.UsedGas, result.Reward, result.State, nil
+		}
+	}
+
 	var (
 		receipts types.Receipts
 		outcxs   types.CXReceipts
@@ -93,7 +124,7 @@ func (p *StateProcessor) Process(
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 	if err != nil {
-		return nil, nil, nil, 0, nil, err
+		return nil, nil, nil, 0, nil, statedb, err
 	}
 
 	startTime := time.Now()
@@ -104,7 +135,7 @@ func (p *StateProcessor) Process(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, err
+			return nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
@@ -123,7 +154,7 @@ func (p *StateProcessor) Process(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, err
+			return nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -137,14 +168,14 @@ func (p *StateProcessor) Process(
 			p.config, statedb, header, cx,
 		); err != nil {
 			return nil, nil,
-				nil, 0, nil, errors.New("[Process] Cannot apply incoming receipts")
+				nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, errors.New(
+			return nil, nil, nil, 0, nil, statedb, errors.New(
 				"[Process] Cannot finalize block",
 			)
 		}
@@ -161,10 +192,24 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, errors.New("[Process] Cannot finalize block")
+		return nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
 	}
 
-	return receipts, outcxs, allLogs, *usedGas, payout, nil
+	result := &ProcessorResult{
+		Receipts:   receipts,
+		CxReceipts: outcxs,
+		Logs:       allLogs,
+		UsedGas:    *usedGas,
+		Reward:     payout,
+		State:      statedb,
+	}
+	p.resultCache.Add(cacheKey, result)
+	return receipts, outcxs, allLogs, *usedGas, payout, statedb, nil
+}
+
+// CacheProcessorResult caches the process result on the cache key.
+func (p *StateProcessor) CacheProcessorResult(cacheKey interface{}, result *ProcessorResult) {
+	p.resultCache.Add(cacheKey, result)
 }
 
 // return true if it is valid

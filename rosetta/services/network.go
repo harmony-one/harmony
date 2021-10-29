@@ -7,7 +7,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/harmony-one/harmony/block"
