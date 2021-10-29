@@ -84,12 +84,12 @@ func (node *Node) DoSyncWithoutConsensus() {
 // IsSameHeight tells whether node is at same bc height as a peer
 func (node *Node) IsSameHeight() (uint64, bool) {
 	if node.stateSync == nil {
-		node.stateSync = node.createStateSync()
+		node.stateSync = node.createStateSync(node.Blockchain())
 	}
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
-func (node *Node) createStateSync() *legacysync.StateSync {
+func (node *Node) createStateSync(bc *core.BlockChain) *legacysync.StateSync {
 	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
 	// But registration is done through an old way of port arithmetics (syncPort + 3000).
 	// Thus for compatibility, we are doing the arithmetics here, and not to change the
@@ -104,7 +104,7 @@ func (node *Node) createStateSync() *legacysync.StateSync {
 		mySyncPort = nodeconfig.DefaultDNSPort
 	}
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
-	return legacysync.CreateStateSync(node.SelfPeer.IP, mutatedPort,
+	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
 		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode)
 }
 
@@ -244,7 +244,7 @@ func (node *Node) doBeaconSyncing() {
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = node.createStateSync()
+			node.beaconSync = node.createStateSync(node.Beaconchain())
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
@@ -306,7 +306,7 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 		utils.Logger().Debug().Int("len", node.stateSync.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if outOfSync, _, _ := node.stateSync.IsOutOfSync(bc, true); outOfSync {
+	if result := node.stateSync.GetSyncStatusDoubleChecked(); !result.IsInSync {
 		node.IsInSync.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
@@ -353,7 +353,7 @@ func (node *Node) supportSyncing() {
 	}
 
 	if node.stateSync == nil {
-		node.stateSync = node.createStateSync()
+		node.stateSync = node.createStateSync(node.Blockchain())
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 
@@ -705,13 +705,15 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 		if node.stateSync == nil {
 			return false, 0, 0
 		}
-		return node.stateSync.SyncStatus(node.Blockchain())
+		result := node.stateSync.GetSyncStatus()
+		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	case shard.BeaconChainShardID:
 		if node.beaconSync == nil {
 			return false, 0, 0
 		}
-		return node.beaconSync.SyncStatus(node.Beaconchain())
+		result := node.beaconSync.GetSyncStatus()
+		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	default:
 		// Shard node is not working on
@@ -736,15 +738,15 @@ func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 		if node.stateSync == nil {
 			return true
 		}
-		outOfSync, _, _ := node.stateSync.IsOutOfSync(node.Blockchain(), false)
-		return outOfSync
+		result := node.stateSync.GetSyncStatus()
+		return !result.IsInSync
 
 	case shard.BeaconChainShardID:
 		if node.beaconSync == nil {
 			return true
 		}
-		outOfSync, _, _ := node.beaconSync.IsOutOfSync(node.Beaconchain(), false)
-		return outOfSync
+		result := node.beaconSync.GetSyncStatus()
+		return !result.IsInSync
 
 	default:
 		return true

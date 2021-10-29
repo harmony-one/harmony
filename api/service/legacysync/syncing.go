@@ -153,8 +153,9 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(ip string, port string, peerHash [20]byte, isExplorer bool) *StateSync {
+func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool) *StateSync {
 	stateSync := &StateSync{}
+	stateSync.blockChain = bc
 	stateSync.selfip = ip
 	stateSync.selfport = port
 	stateSync.selfPeerHash = peerHash
@@ -162,12 +163,14 @@ func CreateStateSync(ip string, port string, peerHash [20]byte, isExplorer bool)
 	stateSync.lastMileBlocks = []*types.Block{}
 	stateSync.isExplorer = isExplorer
 	stateSync.syncConfig = &SyncConfig{}
-	stateSync.lastOutOfSyncResult = outOfSyncCheckResult{true, 0, 0}
+
+	stateSync.syncStatus = newSyncStatus()
 	return stateSync
 }
 
 // StateSync is the struct that implements StateSyncInterface.
 type StateSync struct {
+	blockChain         *core.BlockChain
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
@@ -179,14 +182,7 @@ type StateSync struct {
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
 
-	lastOutOfSyncResult outOfSyncCheckResult
-	outOfSyncResultLock sync.RWMutex
-}
-
-type outOfSyncCheckResult struct {
-	isOutOfSync bool
-	otherHeight uint64
-	heightDiff  uint64
+	syncStatus syncStatus
 }
 
 func (ss *StateSync) purgeAllBlocksFromCache() {
@@ -552,7 +548,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 
 // downloadBlocks downloads blocks from state sync task queue.
 func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
-	// Initialize blockchain
+	// Initialize blockChain
 	var wg sync.WaitGroup
 	count := 0
 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
@@ -877,7 +873,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
+				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockChain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
@@ -1024,7 +1020,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	return count
 }
 
-// getMaxPeerHeight gets the maximum blockchain heights from peers
+// getMaxPeerHeight gets the maximum blockChain heights from peers
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
 	var wg sync.WaitGroup
@@ -1067,78 +1063,6 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 	return ss.getMaxPeerHeight(false)
 }
 
-// SyncStatus returns inSync, remote height, and difference between remote height and local height
-func (ss *StateSync) SyncStatus(bc *core.BlockChain) (bool, uint64, uint64) {
-	outOfSync, remoteHeight, heightDiff := ss.GetOutOfSyncStatus()
-	return !outOfSync, remoteHeight, heightDiff
-}
-
-// IsOutOfSync checks whether the node is out of sync from other peers
-// It returns the sync status, remote height, and the difference betwen local blockchain and remote max height
-func (ss *StateSync) IsOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64, uint64) {
-	outOfSync, otherHeight, heightDiff := ss.isOutOfSync(bc, doubleCheck)
-
-	ss.outOfSyncResultLock.Lock()
-	ss.lastOutOfSyncResult = outOfSyncCheckResult{
-		isOutOfSync: outOfSync,
-		otherHeight: otherHeight,
-		heightDiff:  heightDiff,
-	}
-	ss.outOfSyncResultLock.Unlock()
-
-	return outOfSync, otherHeight, heightDiff
-}
-
-// GetOutOfSyncStatus return the sync result of last isOutOfSync check.
-// Return isOutofSync, otherHeight, and heightDifferent
-func (ss *StateSync) GetOutOfSyncStatus() (bool, uint64, uint64) {
-	ss.outOfSyncResultLock.RLock()
-	defer ss.outOfSyncResultLock.RUnlock()
-
-	sr := ss.lastOutOfSyncResult
-	return sr.isOutOfSync, sr.otherHeight, sr.heightDiff
-}
-
-func (ss *StateSync) isOutOfSync(bc *core.BlockChain, doubleCheck bool) (bool, uint64, uint64) {
-	if ss.syncConfig == nil {
-		return true, 0, 0 // If syncConfig is not instantiated, return not in sync
-	}
-	otherHeight1 := ss.getMaxPeerHeight(false)
-	lastHeight := bc.CurrentBlock().NumberU64()
-	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
-
-	if !doubleCheck {
-		heightDiff := otherHeight1 - lastHeight
-		if otherHeight1 < lastHeight {
-			heightDiff = 0 //
-		}
-		utils.Logger().Info().
-			Uint64("OtherHeight", otherHeight1).
-			Uint64("lastHeight", lastHeight).
-			Msg("[SYNC] Checking sync status")
-		return wasOutOfSync, otherHeight1, heightDiff
-	}
-	time.Sleep(1 * time.Second)
-	// double check the sync status after 1 second to confirm (avoid false alarm)
-
-	otherHeight2 := ss.getMaxPeerHeight(false)
-	currentHeight := bc.CurrentBlock().NumberU64()
-
-	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
-	utils.Logger().Info().
-		Uint64("OtherHeight1", otherHeight1).
-		Uint64("OtherHeight2", otherHeight2).
-		Uint64("lastHeight", lastHeight).
-		Uint64("currentHeight", currentHeight).
-		Msg("[SYNC] Checking sync status")
-	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
-	heightDiff := otherHeight2 - lastHeight
-	if otherHeight2 < lastHeight {
-		heightDiff = 0 // overflow
-	}
-	return wasOutOfSync && isOutOfSync && lastHeight == currentHeight, otherHeight2, heightDiff
-}
-
 // SyncLoop will keep syncing with peers until catches up
 func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
 	if !isBeacon {
@@ -1149,12 +1073,12 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
 			utils.Logger().Info().
-				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
 		}
 		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
@@ -1165,7 +1089,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
 		if err != nil {
 			utils.Logger().Error().Err(err).
-				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, OtherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			ss.purgeOldBlocksFromCache()
 			break
@@ -1208,4 +1132,120 @@ func GetSyncingPort(nodePort string) string {
 		return fmt.Sprintf("%d", port-SyncingPortDifference)
 	}
 	return ""
+}
+
+// syncStatusExpiration is the expiration time out of a sync status.
+// If last sync result in memory is before the expiration, the sync status
+// will be updated.
+const syncStatusExpiration = 6 * time.Second
+
+type (
+	syncStatus struct {
+		lastResult     SyncCheckResult
+		lastUpdateTime time.Time
+		lock           sync.RWMutex
+	}
+
+	SyncCheckResult struct {
+		IsInSync    bool
+		OtherHeight uint64
+		HeightDiff  uint64
+	}
+)
+
+func newSyncStatus() syncStatus {
+	return syncStatus{}
+}
+
+func (status *syncStatus) isStatusExpired() bool {
+	status.lock.RLock()
+	defer status.lock.RUnlock()
+
+	return time.Since(status.lastUpdateTime) > syncStatusExpiration
+}
+
+func (status *syncStatus) update(result SyncCheckResult) {
+	status.lock.Lock()
+	defer status.lock.Unlock()
+
+	status.lastUpdateTime = time.Now()
+	status.lastResult = result
+}
+
+func (status *syncStatus) get() SyncCheckResult {
+	status.lock.RLock()
+	defer status.lock.RUnlock()
+
+	return status.lastResult
+}
+
+// GetSyncStatus get the last sync status for other modules (E.g. RPC, explorer).
+// If the last sync result is not expired, return the sync result immediately.
+// If the last result is expired, ask the remote DNS nodes for latest height and return the result.
+func (ss *StateSync) GetSyncStatus() SyncCheckResult {
+	if !ss.syncStatus.isStatusExpired() {
+		return ss.syncStatus.get()
+	}
+	// If the result is expired, query the latest sync result
+	result := ss.isInSync(false)
+	ss.syncStatus.update(result)
+	return result
+}
+
+// GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
+// with a double check to avoid false alarm.
+func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
+	result := ss.isInSync(true)
+	ss.syncStatus.update(result)
+	return result
+}
+
+// isInSync query the remote DNS node for the latest height to check what is the current
+// sync status
+func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
+	if ss.syncConfig == nil {
+		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
+	}
+	otherHeight1 := ss.getMaxPeerHeight(false)
+	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
+	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
+
+	if !doubleCheck {
+		heightDiff := otherHeight1 - lastHeight
+		if otherHeight1 < lastHeight {
+			heightDiff = 0 //
+		}
+		utils.Logger().Info().
+			Uint64("OtherHeight", otherHeight1).
+			Uint64("lastHeight", lastHeight).
+			Msg("[SYNC] Checking sync status")
+		return SyncCheckResult{
+			IsInSync:    !wasOutOfSync,
+			OtherHeight: otherHeight1,
+			HeightDiff:  heightDiff,
+		}
+	}
+	// double check the sync status after 1 second to confirm (avoid false alarm)
+	time.Sleep(1 * time.Second)
+
+	otherHeight2 := ss.getMaxPeerHeight(false)
+	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
+
+	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
+	utils.Logger().Info().
+		Uint64("OtherHeight1", otherHeight1).
+		Uint64("OtherHeight2", otherHeight2).
+		Uint64("lastHeight", lastHeight).
+		Uint64("currentHeight", currentHeight).
+		Msg("[SYNC] Checking sync status")
+	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
+	heightDiff := otherHeight2 - lastHeight
+	if otherHeight2 < lastHeight {
+		heightDiff = 0 // overflow
+	}
+	return SyncCheckResult{
+		IsInSync:    !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		OtherHeight: otherHeight2,
+		HeightDiff:  heightDiff,
+	}
 }
