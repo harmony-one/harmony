@@ -39,7 +39,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-<<<<<<< HEAD
 var TxHashToStakeMsgs map[string][]staking.StakeMsg
 
 func init() {
@@ -49,11 +48,10 @@ func init() {
 func GetTxHashToStakeMsgs() map[string][]staking.StakeMsg {
 	return TxHashToStakeMsgs
 }
-=======
+
 const (
 	resultCacheLimit = 64 // The number of cached results from processing blocks
 )
->>>>>>> 791c9d2018eebd96405a062eb3f0379c41898720
 
 // StateProcessor is a basic Processor, which takes care of transitioning
 // state from one point to another.
