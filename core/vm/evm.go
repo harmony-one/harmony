@@ -317,18 +317,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// If address is a validator address, then it's not a smart contract address
 	// we don't use its code and codeHash fields
 	if evm.Context.IsValidator(evm.StateDB, addr) {
-		if evm.chainRules.IsStakingPrecompile {
-			// it contains validator details and code
-			wrapper, err := evm.StateDB.ValidatorWrapperCopy(addr)
-			if err != nil {
-				return nil, gas, err
-			}
-			code = wrapper.ContractCode
-			codeHash = crypto.Keccak256Hash(code)
-		} else {
-			codeHash = emptyCodeHash
-			code = nil
-		}
+		codeHash = emptyCodeHash
+		code = nil
 	}
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
