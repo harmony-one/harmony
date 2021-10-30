@@ -22,26 +22,27 @@ func (bc *BlockChain) InitialBlockPruning() {
 	}
 	utils.Logger().Info().Msgf("Pruning all blocks before block number %d\n", blockNumberToDelete)
 	numDeletedBlocksThisBatch := 0
+	highestBlockNumInBatch := blockNumberToDelete - 1
 	for {
 		blockNumberToDelete--
 		pruned := bc.PruneBlock(blockNumberToDelete)
-		logProgress := blockNumberToDelete%logPruningProgressBatchCount == 0
+		finishedBatch := blockNumberToDelete%logPruningProgressBatchCount == 0
 		if pruned {
 			numDeletedBlocksThisBatch++
+			if numDeletedBlocksThisBatch == 1 { // track the first deleted block for compaction later
+				highestBlockNumInBatch = blockNumberToDelete
+			}
 		}
-		// If we haven't deleted any blocks yet this batch then we're done
-		if logProgress && numDeletedBlocksThisBatch == 0 {
-			utils.Logger().Info().Msgf("No blocks were pruned between %d and %d. Done pruning\n", blockNumberToDelete+logPruningProgressBatchCount, blockNumberToDelete)
-			break
-		}
-		if logProgress {
-			numDeletedBlocksThisBatch = 0
-			utils.Logger().Info().Msgf("Pruned back to block number %d. Continuing\n", blockNumberToDelete)
+		if finishedBatch {
+			utils.Logger().Info().Msgf("Pruned back to block number %d. %d blocks were pruned. Continuing\n", blockNumberToDelete, numDeletedBlocksThisBatch)
 			rawdb.WriteBlockPruningState(bc.ChainDb(), bc.ShardID(), blockNumberToDelete)
-			rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), blockNumberToDelete, blockNumberToDelete+logPruningProgressBatchCount)
+			if numDeletedBlocksThisBatch > 0 { // if we deleted anything this batch, do compaction
+				rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), blockNumberToDelete, highestBlockNumInBatch)
+			}
 			if blockNumberToDelete == 0 {
 				break
 			}
+			numDeletedBlocksThisBatch = 0
 		}
 	}
 
@@ -69,7 +70,11 @@ func (bc *BlockChain) PruneBlock(blockNumber uint64) bool {
 
 	// If this was pruned outside of initial pruning, trigger compaction if necessary
 	if blockNumber > bc.GetInitialPruningStartBlockNum() && bc.ShouldDoCompaction(blockNumber) {
-		rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), blockNumber-logPruningProgressBatchCount, blockNumber)
+		startBlockNum := blockNumber - logPruningProgressBatchCount
+		if bc.GetInitialPruningStartBlockNum() > startBlockNum { // Prevent overlapping compaction with initial pruning
+			startBlockNum = bc.GetInitialPruningStartBlockNum()
+		}
+		rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), startBlockNum, blockNumber)
 	}
 	return true
 }
