@@ -17,9 +17,6 @@ func TestPrepareStakingMetadata(t *testing.T) {
 	// fake transaction
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 	txs := []*types.Transaction{tx}
-	// record the stakeMsgs onto it
-	txHashToStakeMsgs := GetTxHashToStakeMsgs()
-	txHashToStakeMsgs[tx.Hash().Hex()] = []staking.StakeMsg{&staking.Delegate{}}
 
 	// fake staking transactions
 	stx1 := signedCreateValidatorStakingTxn(key)
@@ -30,7 +27,7 @@ func TestPrepareStakingMetadata(t *testing.T) {
 	block := types.NewBlock(header, txs, []*types.Receipt{types.NewReceipt([]byte{}, false, 0), types.NewReceipt([]byte{}, false, 0),
 		types.NewReceipt([]byte{}, false, 0)}, nil, nil, stxs)
 	// run it
-	if _, _, err := chain.prepareStakingMetaData(block, db); err != nil {
+	if _, _, err := chain.prepareStakingMetaData(block, []staking.StakeMsg{&staking.Delegate{}}, db); err != nil {
 		if err.Error() != "address not present in state" { // when called in test for core/vm
 			t.Errorf("Got error %v in prepareStakingMetaData", err)
 		}

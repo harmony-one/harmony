@@ -225,7 +225,7 @@ func (w *Worker) commitTransaction(
 ) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(
+	receipt, cx, _, _, err := core.ApplyTransaction(
 		w.config,
 		w.chain,
 		&coinbase,
