@@ -387,10 +387,15 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	}
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
+		// set up initial block pruning for beacon chain
 		if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID && currentNode.HarmonyConfig.General.PruneBeaconchain {
-			currentNode.Beaconchain().Config().ShouldPrune = true
-			// Prune blocks before syncing starts so we can prune them one-at-a-time later
-			go currentNode.Beaconchain().PruneBlocks(core.PreserveBlockAmount)
+			beaconchain := currentNode.Beaconchain()
+			beaconchain.Config().ShouldPrune = true
+			utils.Logger().Info().Msgf("ShardID %d currentBlock %d", beaconchain.ShardID(), beaconchain.CurrentBlock().NumberU64())
+			pruningStartingBlockNum := core.DetermineInitialPruningStartingBlockNumber(
+				beaconchain.ChainDb(), beaconchain.ShardID(), beaconchain.CurrentBlock().NumberU64(), core.PreserveBlockAmount)
+			beaconchain.SetInitialPruningStartBlockNum(pruningStartingBlockNum)
+			go beaconchain.InitialBlockPruning()
 		}
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
