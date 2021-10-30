@@ -103,7 +103,7 @@ type topLevelRegistry struct {
 type Roster struct {
 	Voters map[bls.SerializedPublicKey]*AccommodateHarmonyVote
 	topLevelRegistry
-	ShardID uint32
+	ShardID      uint32
 	OrderedSlots []bls.SerializedPublicKey
 }
 
