@@ -9,8 +9,8 @@ import (
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/core"
 	ethRpc "github.com/harmony-one/harmony/eth/rpc"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/internal/params"
@@ -239,7 +239,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 			)
 		}
 	} else {
-		estGasUsed, err = vm.IntrinsicGas(data, false, false,
+		estGasUsed, err = core.IntrinsicGas(data, false, false,
 			false, options.OperationType == common.CreateValidatorOperation)
 		estGasUsed *= 2
 

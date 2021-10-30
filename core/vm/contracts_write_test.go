@@ -59,17 +59,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	// use required gas to avoid out of gas errors
 	p := &stakingPrecompile{}
 	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
-		gas, err := p.RequiredGas(env, test.input)
-		if err != nil {
-			if test.expectedError != nil {
-				if test.expectedError.Error() != err.Error() {
-					t.Errorf("Expected error %v, got %v", test.expectedError, err)
-				}
-			} else {
-				t.Errorf("Expected pass but got error %v", err)
-			}
-			return
-		}
+		gas := p.RequiredGas(env, test.input)
 		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), gas)
 		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
 			if test.expectedError != nil {

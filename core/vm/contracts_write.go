@@ -17,7 +17,7 @@ var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePre
 // These have the capability to alter the state (those in contracts.go do not)
 type WriteCapablePrecompiledContract interface {
 	// RequiredGas calculates the contract gas use
-	RequiredGas(evm *EVM, input []byte) (uint64, error)
+	RequiredGas(evm *EVM, input []byte) uint64
 	// use a different name from read-only contracts to be safe
 	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
 }
@@ -25,16 +25,10 @@ type WriteCapablePrecompiledContract interface {
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
 func RunWriteCapablePrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	// immediately error out if readOnly
-	// do not calculate / consume gas
 	if readOnly {
 		return nil, errWriteProtection
 	}
-	// if gas can be calculated
-	gas, err := p.RequiredGas(evm, input)
-	if err != nil {
-		return nil, err
-	}
-	// only then consume it
+	gas := p.RequiredGas(evm, input)
 	if !contract.UseGas(gas) {
 		return nil, ErrOutOfGas
 	}
@@ -47,36 +41,32 @@ type stakingPrecompile struct{}
 //
 // This method does not require any overflow checking as the input size gas costs
 // required for anything significant is so high it's impossible to pay for.
-func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) (uint64, error) {
-	if len(input) < 36 { // first 32 for size and next 4 for method, at a minimum
-		return 0, errors.New("Input is malformed")
-	}
-	if evm.Context.ShardID != shard.BeaconChainShardID {
-		return 0, errors.New("Staking not supported on this shard")
-		// we are not shard 0, so no processing
-		// but do not fail silently
-	}
-	input = input[32:] // drop the word length
-	_, err := staking.ParseStakingMethod(input)
-	if err != nil {
-		return 0, stakingTypes.ErrInvalidStakingKind
-	}
-	homestead := evm.ChainConfig().IsS3(evm.EpochNumber)
-	istanbul := evm.ChainConfig().IsIstanbul(evm.EpochNumber)
-	gas, err := IntrinsicGas(input,
-		false, /* contractCreation */
-		homestead,
-		istanbul,
-		false /* isValidatorCreation */)
-	if err != nil {
-		return 0, err
-	}
-	return gas, nil
+func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) uint64 {
+	// If you check the tests, they contain a bunch of successful transactions
+	// which are of the type Delegate / Undelegate / CollectRewards
+	// these consume anywhere between 22-25k of gas, which is in line with
+	// what would happen for a non-EVM staking tx
+	// so no additional gas needs to be consumed here
+	return 0
+	// nb: failed transactions result in consumption of
+	// all the gas that was passed, as per core/vm/evm.go
+	// if err != ErrExecutionReverted {
+	//	contract.UseGas(contract.Gas)
+	// }
 }
 
 func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error) {
-	// if we are here, we have checked for shard 0,
-	// readOnly and length already
+	// checks include input, shard, method
+	// readOnly has already been checked by RunWriteCapablePrecompiledContract
+	// first 32 for size and next 4 for method, at a minimum
+	if len(input) < 36 {
+		return nil, errors.New("Input is malformed")
+	}
+	if evm.Context.ShardID != shard.BeaconChainShardID {
+		return nil, errors.New("Staking not supported on this shard")
+		// we are not shard 0, so no processing
+		// but do not fail silently
+	}
 	input = input[32:] // drop the initial start of word information
 	method, err := staking.ParseStakingMethod(input)
 	if err != nil {
