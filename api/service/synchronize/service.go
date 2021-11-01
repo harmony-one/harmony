@@ -2,7 +2,6 @@ package synchronize
 
 import (
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy/downloader"
 	"github.com/harmony-one/harmony/p2p"
 )
@@ -28,10 +27,5 @@ func (s *Service) Start() error {
 // Stop stop the service
 func (s *Service) Stop() error {
 	s.Downloaders.Close()
-	return nil
-}
-
-// APIs return all APIs of the service
-func (s *Service) APIs() []rpc.API {
 	return nil
 }

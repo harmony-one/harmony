@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
@@ -124,11 +123,6 @@ func (s *Service) Stop() error {
 			}
 		}
 	}
-	return nil
-}
-
-// APIs return all APIs of the service
-func (s *Service) APIs() []rpc.API {
 	return nil
 }
 
