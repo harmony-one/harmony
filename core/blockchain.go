@@ -171,6 +171,7 @@ type BlockChain struct {
 	pendingSlashes              slash.Records
 	maxGarbCollectedBlkNum      int64
 	initialPruningStartBlockNum uint64
+	pruningMutex                sync.Mutex // pruning deletion lock
 }
 
 // NewBlockChain returns a fully initialised block chain using information

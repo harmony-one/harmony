@@ -57,6 +57,9 @@ func (bc *BlockChain) PruneBlock(blockNumber uint64) bool {
 
 	utils.Logger().Debug().Msgf("Pruning block number %d\n", blockNumber)
 
+	bc.pruningMutex.Lock()
+	defer bc.pruningMutex.Unlock()
+
 	blockHash := rawdb.ReadCanonicalHash(bc.ChainDb(), blockNumber)
 	blockToDelete := rawdb.ReadBlock(bc.ChainDb(), blockHash, blockNumber)
 	if blockToDelete == nil {
@@ -97,13 +100,13 @@ func deleteAllBlockData(db ethdb.Database, shardID uint32, blockToDelete *types.
 	rawdb.DeleteBlock(db, blockToDelete.Hash(), blockToDelete.NumberU64())
 }
 
-func DetermineInitialPruningStartingBlockNumber(db rawdb.DatabaseReader, shardID uint32, currentBlockNumber uint64, amountToPreserve uint64) uint64 {
+func DetermineInitialPruningStartingBlockNumber(db rawdb.DatabaseReader, currentBlockNumber uint64, amountToPreserve uint64) uint64 {
 	if currentBlockNumber <= amountToPreserve {
 		return 0
 	}
 	startingBlockNumber := currentBlockNumber - amountToPreserve
 
-	blockPruningStateNum := rawdb.ReadBlockPruningState(db, shardID)
+	blockPruningStateNum := rawdb.ReadBlockPruningState(db, 0)
 
 	// If there's no block num in db or the block num in db is greater
 	// than it should be, return the value based on current block num
