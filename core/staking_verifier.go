@@ -119,10 +119,6 @@ func VerifyAndCreateValidatorFromMsg(
 	wrapper.Counters.NumBlocksSigned = big.NewInt(0)
 	wrapper.Counters.NumBlocksToSign = big.NewInt(0)
 	wrapper.BlockReward = big.NewInt(0)
-	// if there is a contract at this address, its code should be retained
-	// so far there has been no writing to this address, so the code is available
-	// via a simple call
-	wrapper.ContractCode = stateDB.GetCode(msg.ValidatorAddress)
 	if err := wrapper.SanityCheck(); err != nil {
 		return nil, err
 	}

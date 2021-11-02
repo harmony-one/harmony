@@ -93,9 +93,6 @@ type ValidatorWrapper struct {
 	Counters counters `json:"-"`
 	// All the rewarded accumulated so far
 	BlockReward *big.Int `json:"-"`
-	// if the contract becomes a validator
-	// store the byte code here
-	ContractCode []byte `json:"contract-code",rlp:"tail"`
 }
 
 // ValidatorSnapshot contains validator snapshot and the corresponding epoch
