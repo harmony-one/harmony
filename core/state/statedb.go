@@ -37,6 +37,7 @@ import (
 	"github.com/harmony-one/harmony/staking"
 	"github.com/harmony-one/harmony/staking/effective"
 	stk "github.com/harmony-one/harmony/staking/types"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
 	"github.com/pkg/errors"
 )
 
@@ -632,6 +633,10 @@ func (db *DB) Copy() *DB {
 			state.stateObjects[addr] = db.stateObjects[addr].deepCopy(state)
 		}
 		state.stateObjectsDirty[addr] = struct{}{}
+	}
+	for addr := range db.stateValidators {
+		validatorWrapper := staketest.CopyValidatorWrapper(*db.stateValidators[addr])
+		state.stateValidators[addr] = &validatorWrapper
 	}
 	for hash, logs := range db.logs {
 		cpy := make([]*types.Log, len(logs))
