@@ -20,6 +20,7 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
+	v4 "github.com/harmony-one/harmony/block/v4"
 	"io"
 	"math/big"
 	"reflect"
@@ -143,7 +144,7 @@ type Body struct {
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
-	case *v3.Header:
+	case *v4.Header, *v3.Header:
 		bi = new(BodyV2)
 	case *v2.Header, *v1.Header:
 		bi = new(BodyV1)
@@ -423,7 +424,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 
 	switch h := b.header.Header.(type) {
-	case *v3.Header:
+	case *v4.Header, *v3.Header:
 		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}

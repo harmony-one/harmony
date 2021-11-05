@@ -1,6 +1,7 @@
 package blockfactory
 
 import (
+	v4 "github.com/harmony-one/harmony/block/v4"
 	"math/big"
 
 	"github.com/harmony-one/harmony/block"
@@ -30,6 +31,8 @@ func NewFactory(chainConfig *params.ChainConfig) Factory {
 func (f *factory) NewHeader(epoch *big.Int) *block.Header {
 	var impl blockif.Header
 	switch {
+	case f.chainConfig.IsExtraCommit(epoch):
+		impl = v4.NewHeader()
 	case f.chainConfig.IsPreStaking(epoch) || f.chainConfig.IsStaking(epoch):
 		impl = v3.NewHeader()
 	case f.chainConfig.IsCrossLink(epoch):
