@@ -369,7 +369,7 @@ func TestP2PFlags(t *testing.T) {
 				IP:            nodeconfig.DefaultPublicListenIP,
 				KeyFile:       "./key.file",
 				DHTDataStore:  &defDataStore,
-				MaxConnsPerIP: 2,
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
@@ -378,7 +378,7 @@ func TestP2PFlags(t *testing.T) {
 				Port:          9001,
 				IP:            nodeconfig.DefaultPublicListenIP,
 				KeyFile:       "./key.file",
-				MaxConnsPerIP: 2,
+				MaxConnsPerIP: 10,
 			},
 		},
 		{

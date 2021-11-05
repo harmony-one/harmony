@@ -100,7 +100,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Output version info")
 	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
-	maxConnPerIP := flag.Int("max_conn_per_ip", 2, "max connections number for same ip")
+	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 
 	flag.Parse()
 

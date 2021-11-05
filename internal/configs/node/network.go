@@ -58,7 +58,7 @@ const (
 	DefaultPrometheusPort = 9900
 	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
 	DefaultP2PConcurrency = 0
-	DefaultMaxConnPerIP   = 2
+	DefaultMaxConnPerIP   = 10
 )
 
 const (
