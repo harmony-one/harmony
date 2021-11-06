@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 func TestManager_StartServices(t *testing.T) {

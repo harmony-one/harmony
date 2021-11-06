@@ -3,7 +3,7 @@ package rpc
 import (
 	"context"
 
-	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
