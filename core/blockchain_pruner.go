@@ -12,34 +12,34 @@ const (
 	PreserveBlockAmount          = 262144 // Preserve 8 epochs of blocks (2^15) * 8
 )
 
-// InitialBlockPruning deletes all blocks from the blockchain backwards
-// from the current block preserving 8 epochs worth of blocks
-func (bc *BlockChain) InitialBlockPruning() {
-	blockNumberToDelete := bc.GetInitialPruningStartBlockNum()
-	if blockNumberToDelete == 0 {
-		utils.Logger().Info().Msgf("Initial pruning canceled - start number is 0\n")
+// InitialBlockPruning deletes all blocks from the blockchain between the given
+// startBlockNum and endBlockNum, ensuring we preserve 8 epochs worth of blocks
+func (bc *BlockChain) InitialBlockPruning(startBlockNum, endBlockNum uint64) {
+	if startBlockNum+1 >= endBlockNum {
+		utils.Logger().Info().Msgf("Initial pruning canceled. StartBlockNum %d EndBlockNum %d\n", startBlockNum, endBlockNum)
 		return
 	}
-	utils.Logger().Info().Msgf("Pruning all blocks before block number %d\n", blockNumberToDelete)
+	utils.Logger().Info().Msgf("Pruning all blocks after block number %d and before block number %d\n", startBlockNum, endBlockNum)
 	numDeletedBlocksThisBatch := 0
-	highestBlockNumInBatch := blockNumberToDelete - 1
+	lowestBlockNumInBatch := startBlockNum
+	blockNumberToDelete := startBlockNum
 	for {
-		blockNumberToDelete--
+		blockNumberToDelete++
 		pruned := bc.PruneBlock(blockNumberToDelete)
-		finishedBatch := blockNumberToDelete%logPruningProgressBatchCount == 0
+		finishedBatch := blockNumberToDelete%logPruningProgressBatchCount == 0 || blockNumberToDelete == endBlockNum
 		if pruned {
 			numDeletedBlocksThisBatch++
 			if numDeletedBlocksThisBatch == 1 { // track the first deleted block for compaction later
-				highestBlockNumInBatch = blockNumberToDelete
+				lowestBlockNumInBatch = blockNumberToDelete
 			}
 		}
 		if finishedBatch {
-			utils.Logger().Info().Msgf("Pruned back to block number %d. %d blocks were pruned. Continuing\n", blockNumberToDelete, numDeletedBlocksThisBatch)
+			utils.Logger().Info().Msgf("Pruned up to block number %d. %d blocks were pruned. Continuing\n", blockNumberToDelete, numDeletedBlocksThisBatch)
 			rawdb.WriteBlockPruningState(bc.ChainDb(), bc.ShardID(), blockNumberToDelete)
 			if numDeletedBlocksThisBatch > 0 { // if we deleted anything this batch, do compaction
-				rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), blockNumberToDelete, highestBlockNumInBatch)
+				bc.compactBatch(lowestBlockNumInBatch, blockNumberToDelete)
 			}
-			if blockNumberToDelete == 0 {
+			if blockNumberToDelete == endBlockNum {
 				break
 			}
 			numDeletedBlocksThisBatch = 0
@@ -71,15 +71,21 @@ func (bc *BlockChain) PruneBlock(blockNumber uint64) bool {
 
 	utils.Logger().Debug().Msgf("Pruned block number %d\n", blockNumber)
 
-	// If this was pruned outside of initial pruning, trigger compaction if necessary
-	if blockNumber > bc.GetInitialPruningStartBlockNum() && bc.ShouldDoCompaction(blockNumber) {
+	// If this was pruned outside of initial pruning, trigger writing of batch and compaction
+	if blockNumber > bc.GetInitialPruningEndBlockNum() && ShouldDoCompaction(blockNumber) {
 		startBlockNum := blockNumber - logPruningProgressBatchCount
-		if bc.GetInitialPruningStartBlockNum() > startBlockNum { // Prevent overlapping compaction with initial pruning
-			startBlockNum = bc.GetInitialPruningStartBlockNum()
+		if bc.GetInitialPruningEndBlockNum() > startBlockNum { // Prevent overlapping compaction with initial pruning
+			startBlockNum = bc.GetInitialPruningEndBlockNum()
 		}
-		rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), startBlockNum, blockNumber)
+		bc.compactBatch(startBlockNum, blockNumber)
 	}
 	return true
+}
+
+func (bc *BlockChain) compactBatch(startBlockNum uint64, endBlockNum uint64) {
+	bc.compactionMutex.Lock()
+	rawdb.CompactPrunedBlocks(bc.ChainDb(), bc.ShardID(), startBlockNum, endBlockNum)
+	bc.compactionMutex.Unlock()
 }
 
 func deleteAllBlockData(db ethdb.Database, shardID uint32, blockToDelete *types.Block) {
@@ -100,31 +106,35 @@ func deleteAllBlockData(db ethdb.Database, shardID uint32, blockToDelete *types.
 	rawdb.DeleteBlock(db, blockToDelete.Hash(), blockToDelete.NumberU64())
 }
 
-func DetermineInitialPruningStartingBlockNumber(db rawdb.DatabaseReader, currentBlockNumber uint64, amountToPreserve uint64) uint64 {
-	if currentBlockNumber <= amountToPreserve {
-		return 0
+func GetInitialPruningRange(db rawdb.DatabaseReader, currentBlockNumber uint64) (uint64, uint64) {
+	startBlockNum := uint64(0)
+	endBlockNum := uint64(0)
+	if currentBlockNumber <= PreserveBlockAmount {
+		return startBlockNum, endBlockNum
 	}
-	startingBlockNumber := currentBlockNumber - amountToPreserve
+	endBlockNum = currentBlockNumber - PreserveBlockAmount
 
 	blockPruningStateNum := rawdb.ReadBlockPruningState(db, 0)
-
-	// If there's no block num in db or the block num in db is greater
-	// than it should be, return the value based on current block num
-	if blockPruningStateNum == nil || *blockPruningStateNum > startingBlockNumber {
-		return startingBlockNumber
-	} else {
-		return *blockPruningStateNum
+	if blockPruningStateNum != nil {
+		startBlockNum = *blockPruningStateNum
 	}
+
+	// if the checkpoint value is somehow further than the end block, try to start pruning from the beginning again
+	if startBlockNum > endBlockNum {
+		startBlockNum = 0
+	}
+
+	return startBlockNum, endBlockNum
 }
 
-func (bc *BlockChain) SetInitialPruningStartBlockNum(blockNum uint64) {
-	bc.initialPruningStartBlockNum = blockNum
+func (bc *BlockChain) SetInitialPruningEndBlockNum(blockNum uint64) {
+	bc.initialPruningEndBlockNum = blockNum
 }
 
-func (bc *BlockChain) GetInitialPruningStartBlockNum() uint64 {
-	return bc.initialPruningStartBlockNum
+func (bc *BlockChain) GetInitialPruningEndBlockNum() uint64 {
+	return bc.initialPruningEndBlockNum
 }
 
-func (bc *BlockChain) ShouldDoCompaction(prunedBlockNumber uint64) bool {
+func ShouldDoCompaction(prunedBlockNumber uint64) bool {
 	return prunedBlockNumber%logPruningProgressBatchCount == 0
 }

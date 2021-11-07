@@ -391,10 +391,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		if currentNode.NodeConfig.ShardID != shard.BeaconChainShardID && currentNode.HarmonyConfig.General.PruneBeaconchain {
 			beaconchain := currentNode.Beaconchain()
 			beaconchain.Config().ShouldPrune = true
-			pruningStartingBlockNum := core.DetermineInitialPruningStartingBlockNumber(
-				beaconchain.ChainDb(), beaconchain.CurrentBlock().NumberU64(), core.PreserveBlockAmount)
-			beaconchain.SetInitialPruningStartBlockNum(pruningStartingBlockNum)
-			go beaconchain.InitialBlockPruning()
+			pruningStartBlockNum, pruningEndBlockNum := core.GetInitialPruningRange(beaconchain.ChainDb(), beaconchain.CurrentBlock().NumberU64())
+			beaconchain.SetInitialPruningEndBlockNum(pruningEndBlockNum)
+			go beaconchain.InitialBlockPruning(pruningStartBlockNum, pruningEndBlockNum)
 		}
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()

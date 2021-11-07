@@ -162,16 +162,17 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine                      consensus_engine.Engine
-	processor                   Processor // block processor interface
-	validator                   Validator // block and state validator interface
-	vmConfig                    vm.Config
-	badBlocks                   *lru.Cache              // Bad block cache
-	shouldPreserve              func(*types.Block) bool // Function used to determine whether should preserve the given block.
-	pendingSlashes              slash.Records
-	maxGarbCollectedBlkNum      int64
-	initialPruningStartBlockNum uint64
-	pruningMutex                sync.Mutex // pruning deletion lock
+	engine                    consensus_engine.Engine
+	processor                 Processor // block processor interface
+	validator                 Validator // block and state validator interface
+	vmConfig                  vm.Config
+	badBlocks                 *lru.Cache              // Bad block cache
+	shouldPreserve            func(*types.Block) bool // Function used to determine whether should preserve the given block.
+	pendingSlashes            slash.Records
+	maxGarbCollectedBlkNum    int64
+	initialPruningEndBlockNum uint64
+	pruningMutex              sync.Mutex // pruning deletion lock
+	compactionMutex           sync.Mutex // compaction lock
 }
 
 // NewBlockChain returns a fully initialised block chain using information
