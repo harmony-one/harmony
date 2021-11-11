@@ -110,7 +110,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	return decider, tally, slotList, sKeys
 }
 
-func sign(d Decider, k secretKeyMap, p Phase) {
+func sign(d Decider, k secretKeyMap, p SigType) {
 	for k, v := range k {
 		sig := v.Sign(msg)
 		// TODO Make upstream test provide meaningful test values

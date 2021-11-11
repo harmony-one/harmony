@@ -36,12 +36,18 @@ const (
 	AsyncProposal
 )
 
+type CommitSigBitmaps struct {
+	CommitSigBitmap []byte
+	ExtraCommitSigBitmap []byte
+}
+
 // VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
 type VerifyBlockFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
 	Decider quorum.Decider
+	LastBlockDecider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
@@ -57,6 +63,7 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
+	extraCommitBitmap         *bls_cosi.Mask
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 	multiSigMutex  sync.RWMutex
@@ -91,7 +98,7 @@ type Consensus struct {
 	// Signal channel for proposing a new block and start new consensus
 	ReadySignal chan ProposalType
 	// Channel to send full commit signatures to finish new block proposal
-	CommitSigChannel chan []byte
+	CommitSigChannel chan CommitSigBitmaps
 	// The post-consensus job func passed from Node object
 	// Called when consensus on a new block is done
 	PostConsensusJob func(*types.Block) error
@@ -228,7 +235,7 @@ func New(
 	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.ReadySignal = make(chan ProposalType)
-	consensus.CommitSigChannel = make(chan []byte)
+	consensus.CommitSigChannel = make(chan CommitSigBitmaps)
 	// channel for receiving newly generated VDF
 	consensus.RndChannel = make(chan [vdfAndSeedSize]byte)
 	consensus.IgnoreViewIDCheck = abool.NewBool(false)

@@ -27,7 +27,7 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan consensus.CommitSigBitmaps, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
@@ -80,8 +80,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							}
 						case commitSigs := <-commitSigsChan:
 							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
-							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
-								newCommitSigsChan <- commitSigs
+							if len(commitSigs.CommitSigBitmap) > bls.BLSSignatureSizeInBytes {
+								newCommitSigsChan <- commitSigs.CommitSigBitmap
 							}
 						}
 					}()

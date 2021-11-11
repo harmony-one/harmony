@@ -251,7 +251,8 @@ func (consensus *Consensus) finalCommit() {
 			// pipelining
 			go func() {
 				select {
-				case consensus.CommitSigChannel <- commitSigAndBitmap:
+				// TODO: add logic to handle extra commit sigs
+				case consensus.CommitSigChannel <- CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}:
 				case <-time.After(CommitSigSenderTimeout):
 					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
 				}

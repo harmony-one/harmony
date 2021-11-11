@@ -162,7 +162,7 @@ func (consensus *Consensus) construct(
 
 // constructQuorumSigAndBitmap constructs the aggregated sig and bitmap as
 // a byte slice in format of: [[aggregated sig], [sig bitmap]]
-func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
+func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.SigType) []byte {
 	buffer := bytes.Buffer{}
 	// 96 bytes aggregated signature
 	aggSig := consensus.Decider.AggregateVotes(p)

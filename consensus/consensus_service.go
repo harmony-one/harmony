@@ -141,9 +141,11 @@ func (consensus *Consensus) UpdateBitmaps() {
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	extraCommitBitmap, _ := bls_cosi.NewMask(members, nil)
 	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.extraCommitBitmap = extraCommitBitmap
 	consensus.multiSigMutex.Lock()
 	consensus.multiSigBitmap = multiSigBitmap
 	consensus.multiSigMutex.Unlock()
@@ -161,6 +163,9 @@ func (consensus *Consensus) ResetState() {
 	}
 	if consensus.commitBitmap != nil {
 		consensus.commitBitmap.Clear()
+	}
+	if consensus.extraCommitBitmap != nil {
+		consensus.extraCommitBitmap.Clear()
 	}
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil

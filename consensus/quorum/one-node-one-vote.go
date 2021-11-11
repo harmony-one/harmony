@@ -23,7 +23,7 @@ type uniformVoteWeight struct {
 	DependencyInjectionReader
 	SignatureReader
 
-	lastPowerSignersCountCache map[Phase]int64
+	lastPowerSignersCountCache map[SigType]int64
 	lastParticipantsCount      int64
 }
 
@@ -34,7 +34,7 @@ func (v *uniformVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *uniformVoteWeight) AddNewVote(
-	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
+	p SigType, pubKeys []*bls_cosi.PublicKeyWrapper,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
@@ -45,7 +45,7 @@ func (v *uniformVoteWeight) AddNewVote(
 }
 
 // IsQuorumAchieved ..
-func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
+func (v *uniformVoteWeight) IsQuorumAchieved(p SigType) bool {
 	r := v.SignersCount(p) >= v.TwoThirdsSignersCount()
 	utils.Logger().Info().Str("phase", p.String()).
 		Int64("signers-count", v.SignersCount(p)).
@@ -81,6 +81,11 @@ func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
 // IsAllSigsCollected ..
 func (v *uniformVoteWeight) IsAllSigsCollected() bool {
 	return v.SignersCount(Commit) == v.ParticipantsCount()
+}
+
+// IsAllSigsCollected ..
+func (v *uniformVoteWeight) IsAllSigsCollectedInPreviousBlock() bool {
+	return v.SignersCount(LastCommit) == v.ParticipantsCount()
 }
 
 func (v *uniformVoteWeight) SetVoters(
@@ -132,17 +137,17 @@ func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
 	v.lastPowerSignersCountCache[Commit] = v.SignersCount(Commit)
 	v.lastParticipantsCount = v.ParticipantsCount()
 
-	v.reset([]Phase{Prepare, Commit})
+	v.reset([]SigType{Prepare, Commit})
 }
 
 func (v *uniformVoteWeight) ResetViewChangeVotes() {
 	v.lastPowerSignersCountCache[ViewChange] = v.SignersCount(ViewChange)
 	v.lastParticipantsCount = v.ParticipantsCount()
 
-	v.reset([]Phase{ViewChange})
+	v.reset([]SigType{ViewChange})
 }
 
-func (v *uniformVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
+func (v *uniformVoteWeight) CurrentTotalPower(p SigType) (*numeric.Dec, error) {
 	if v.lastParticipantsCount == 0 {
 		return nil, errors.New("uniformVoteWeight not cache last participants count")
 	}
