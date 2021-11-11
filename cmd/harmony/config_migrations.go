@@ -189,9 +189,6 @@ func init() {
 		if confTree.Get("P2P.DiscConcurrency") == nil {
 			confTree.Set("P2P.DiscConcurrency", defaultConfig.P2P.DiscConcurrency)
 		}
-		if confTree.Get("P2P.MaxConnsPerIP") == nil {
-			confTree.Set("P2P.MaxConnsPerIP", defaultConfig.P2P.MaxConnsPerIP)
-		}
 
 		confTree.Set("Version", "2.2.0")
 		return confTree
@@ -205,4 +202,14 @@ func init() {
 		confTree.Set("Version", "2.3.0")
 		return confTree
 	}
+
+	migrations["2.3.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.MaxConnsPerIP") == nil {
+			confTree.Set("P2P.MaxConnsPerIP", defaultConfig.P2P.MaxConnsPerIP)
+		}
+
+		confTree.Set("Version", "2.4.0")
+		return confTree
+	}
+
 }
