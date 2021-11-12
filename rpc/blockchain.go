@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +39,10 @@ type PublicBlockchainService struct {
 	limiter         *rate.Limiter
 	rpcBlockFactory rpc_common.BlockFactory
 	helper          *bcServiceHelper
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterGetStakingNetworkInfo    *rate.Limiter
+	limiterGetSuperCommittees       *rate.Limiter
+	limiterGetCurrentUtilityMetrics *rate.Limiter
 }
 
 const (
@@ -49,7 +54,7 @@ const (
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	var limiter *rate.Limiter
 	if limiterEnable {
-		limiter := rate.NewLimiter(rate.Limit(limit), 1)
+		limiter = rate.NewLimiter(rate.Limit(limit), limit)
 		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
 		rpcRateLimitCounterVec.With(prometheus.Labels{
 			"rate_limit": strLimit,
@@ -57,9 +62,12 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable boo
 	}
 
 	s := &PublicBlockchainService{
-		hmy:     hmy,
-		version: version,
-		limiter: limiter,
+		hmy:                             hmy,
+		version:                         version,
+		limiter:                         limiter,
+		limiterGetStakingNetworkInfo:    rate.NewLimiter(5, 10),
+		limiterGetSuperCommittees:       rate.NewLimiter(5, 10),
+		limiterGetCurrentUtilityMetrics: rate.NewLimiter(5, 10),
 	}
 	s.helper = s.newHelper()
 
@@ -140,18 +148,19 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 	}
 }
 
-func (s *PublicBlockchainService) wait(ctx context.Context) error {
-	if s.limiter != nil {
+func (s *PublicBlockchainService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
-		if !s.limiter.Allow() {
-			strLimit := fmt.Sprintf("%d", int64(s.limiter.Limit()))
+		if !limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+			name := reflect.TypeOf(limiter).Elem().Name()
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				"rate_limit": strLimit,
+				name: strLimit,
 			}).Inc()
 		}
 
-		return s.limiter.Wait(deadlineCtx)
+		return limiter.Wait(deadlineCtx)
 	}
 	return nil
 }
@@ -165,7 +174,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	timer := DoMetricRPCRequest(GetBlockByNumber)
 	defer DoRPCRequestDuration(GetBlockByNumber, timer)
 
-	err = s.wait(ctx)
+	err = s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, err
@@ -218,7 +227,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	timer := DoMetricRPCRequest(GetBlockByHash)
 	defer DoRPCRequestDuration(GetBlockByHash, timer)
 
-	err = s.wait(ctx)
+	err = s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
 		return nil, err
@@ -508,7 +517,7 @@ func (s *PublicBlockchainService) GetShardingStructure(
 	timer := DoMetricRPCRequest(GetShardingStructure)
 	defer DoRPCRequestDuration(GetShardingStructure, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetShardingStructure, FailedNumber)
 		return nil, err
@@ -565,7 +574,7 @@ func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredR
 	timer := DoMetricRPCRequest(LatestHeader)
 	defer DoRPCRequestDuration(LatestHeader, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(LatestHeader, FailedNumber)
 		return nil, err
@@ -600,7 +609,7 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 	timer := DoMetricRPCRequest(GetLastCrossLinks)
 	defer DoRPCRequestDuration(GetLastCrossLinks, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
 		return nil, err
@@ -638,7 +647,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	timer := DoMetricRPCRequest(GetHeaderByNumber)
 	defer DoRPCRequestDuration(GetHeaderByNumber, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
 		return nil, err
@@ -670,7 +679,7 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	timer := DoMetricRPCRequest(GetCurrentUtilityMetrics)
 	defer DoRPCRequestDuration(GetCurrentUtilityMetrics, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetCurrentUtilityMetrics, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
 		return nil, err
@@ -699,7 +708,7 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 	timer := DoMetricRPCRequest(GetSuperCommittees)
 	defer DoRPCRequestDuration(GetSuperCommittees, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetSuperCommittees, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
 		return nil, err
@@ -728,7 +737,7 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	timer := DoMetricRPCRequest(GetCurrentBadBlocks)
 	defer DoRPCRequestDuration(GetCurrentBadBlocks, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetCurrentBadBlocks, FailedNumber)
 		return nil, err
@@ -770,7 +779,7 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	timer := DoMetricRPCRequest(GetStakingNetworkInfo)
 	defer DoRPCRequestDuration(GetStakingNetworkInfo, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetStakingNetworkInfo, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
 		return nil, err

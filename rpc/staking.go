@@ -2,7 +2,12 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"reflect"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -29,6 +34,9 @@ type PublicStakingService struct {
 	version Version
 
 	validatorInfoCache *lru.Cache // cache for detailed validator information per page and block
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterGetAllValidatorInformation  *rate.Limiter
+	limiterGetAllDelegationInformation *rate.Limiter
 }
 
 // NewPublicStakingAPI creates a new API for the RPC interface
@@ -38,12 +46,32 @@ func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
 		Service: &PublicStakingService{
-			hmy:                hmy,
-			version:            version,
-			validatorInfoCache: viCache,
+			hmy:                                hmy,
+			version:                            version,
+			validatorInfoCache:                 viCache,
+			limiterGetAllValidatorInformation:  rate.NewLimiter(1, 3),
+			limiterGetAllDelegationInformation: rate.NewLimiter(1, 3),
 		},
 		Public: true,
 	}
+}
+
+func (s *PublicStakingService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				name: strLimit,
+			}).Inc()
+		}
+
+		return limiter.Wait(deadlineCtx)
+	}
+	return nil
 }
 
 // getBalanceByBlockNumber returns balance by block number at given eth blockNum without checks
@@ -208,6 +236,12 @@ func (s *PublicStakingService) GetAllValidatorInformation(
 	timer := DoMetricRPCRequest(GetAllValidatorInformation)
 	defer DoRPCRequestDuration(GetAllValidatorInformation, timer)
 
+	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
 		return nil, ErrNotBeaconShard
@@ -230,6 +264,12 @@ func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 ) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformationByBlockNumber)
 	defer DoRPCRequestDuration(GetAllValidatorInformationByBlockNumber, timer)
+
+	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllValidatorInformationByBlockNumber, FailedNumber)
+		return nil, err
+	}
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -466,6 +506,12 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 	timer := DoMetricRPCRequest(GetAllDelegationInformation)
 	defer DoRPCRequestDuration(GetAllDelegationInformation, timer)
 
+	err := s.wait(s.limiterGetAllDelegationInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
 		return nil, ErrNotBeaconShard
@@ -495,7 +541,6 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 
 	// Fetch all delegations
 	validators := make([][]StructuredResponse, validatorsNum)
-	var err error
 	for i := start; i < start+validatorsNum; i++ {
 		validators[i-start], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
 		if err != nil {
