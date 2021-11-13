@@ -50,6 +50,7 @@ type P2pConfig struct {
 	KeyFile         string
 	DHTDataStore    *string `toml:",omitempty"`
 	DiscConcurrency int     // Discovery Concurrency value
+	MaxConnsPerIP   int
 }
 
 type GeneralConfig struct {

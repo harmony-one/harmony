@@ -7,10 +7,11 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -57,6 +58,7 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		maxConnPerIPFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -525,6 +527,11 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	maxConnPerIPFlag = cli.IntFlag{
+		Name:     "p2p.security.max-conn-per-ip",
+		Usage:    "maximum number of connections allowed per node",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -551,6 +558,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
 		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
+		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
 	}
 }
 
