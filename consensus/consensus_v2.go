@@ -153,6 +153,7 @@ func (consensus *Consensus) finalCommit() {
 		network.Bytes,
 		network.FBFTMsg
 	commitSigAndBitmap := FBFTMsg.Payload
+
 	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
@@ -171,6 +172,16 @@ func (consensus *Consensus) finalCommit() {
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
+	commitSigBitmap := CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}
+	parentHeader := consensus.Blockchain.GetBlockByHash(block.ParentHash())
+	if consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
+		commitSigBitmap.ShouldProcessExtraCommit = true
+		// Fill in this field when parent block is in the ExtraCommit epoch
+		commitSigBitmap.ExtraCommitSigBitmap = consensus.constructQuorumSigAndBitmap(quorum.ExtraCommit)
+		block.SetExtraCommitSig(commitSigBitmap.ExtraCommitSigBitmap)
+	}
+
+	// TODO set extra commit  in block database
 	block.SetCurrentCommitSig(commitSigAndBitmap)
 	err = consensus.commitBlock(block, FBFTMsg)
 
@@ -251,8 +262,7 @@ func (consensus *Consensus) finalCommit() {
 			// pipelining
 			go func() {
 				select {
-				// TODO: add logic to handle extra commit sigs
-				case consensus.CommitSigChannel <- CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}:
+				case consensus.CommitSigChannel <- commitSigBitmap:
 				case <-time.After(CommitSigSenderTimeout):
 					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
 				}
@@ -263,9 +273,9 @@ func (consensus *Consensus) finalCommit() {
 
 // BlockCommitSigs returns the byte array of aggregated
 // commit signature and bitmap signed on the block
-func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
+func (consensus *Consensus) BlockCommitSigs(blockNum uint64) (*CommitSigBitmaps, error) {
 	if consensus.blockNum <= 1 {
-		return nil, nil
+		return &CommitSigBitmaps{}, nil
 	}
 	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
 	if err != nil ||
@@ -276,15 +286,22 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
 				Int("numCommittedMsg", len(msgs)).
-				Msg("GetLastCommitSig failed with wrong number of committed message")
+				Msg("BlockCommitSigs failed with wrong number of committed message")
 			return nil, errors.Errorf(
-				"GetLastCommitSig failed with wrong number of committed message %d", len(msgs),
+				"BlockCommitSigs failed with wrong number of committed message %d", len(msgs),
 			)
 		}
 		lastCommits = msgs[0].Payload
 	}
 
-	return lastCommits, nil
+	result := &CommitSigBitmaps{CommitSigBitmap: lastCommits}
+
+	extraCommits, err := consensus.Blockchain.ReadExtraCommitSig(blockNum)
+	if err == nil || len(extraCommits) >= bls.BLSSignatureSizeInBytes {
+		result.ExtraCommitSigBitmap = extraCommits
+	}
+
+	return result, nil
 }
 
 // Start waits for the next new block and run consensus

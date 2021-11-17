@@ -140,6 +140,7 @@ func (e *engineImpl) VerifyShardState(
 		return errors.New("shard state header did not match as expected")
 	}
 
+	utils.Logger().Info().Str("block number", header.Number().String()).Msg("VERIFIED SHARD STATE")
 	return nil
 }
 
@@ -264,8 +265,65 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		bitmap: header.LastCommitBitmap(),
 	}
 
-	if err := e.verifySignatureCached(chain, pas, sas); err != nil {
-		return errors.Wrapf(err, "verify signature for parent %s", parentHash.String())
+	if err := e.verifySignatureCached(chain, pas, sas, true); err != nil {
+		return errors.Wrapf(err, "[VerifySeal] Failed to verify signature for parent %s", parentHash.String())
+	}
+
+	if parentHeader.Number().Uint64() > uint64(1) && chain.Config().IsExtraCommit(parentHeader.Epoch()) {
+		grandParentHeader := chain.GetHeaderByHash(parentHeader.ParentHash())
+		if chain.Config().IsExtraCommit(grandParentHeader.Epoch()) {
+			// Check the validity of the extra commit signature signed on the grand parent block
+			pas := payloadArgsFromHeader(grandParentHeader)
+			sas := sigArgs{
+				sig:    header.ExtraCommitSignature(),
+				bitmap: header.ExtraCommitBitmap(),
+			}
+			if err := e.verifySignatureCached(chain, pas, sas, false); err != nil {
+				return errors.Wrapf(err, "[VerifySeal] Failed to verify extra signature for grand parent %s", parentHash.String())
+			}
+
+			// Obtain bitmap for extra commit in current block
+			ec, err := e.getEpochCtxCached(chain, pas.shardID, pas.epoch.Uint64())
+			if err != nil {
+				return err
+			}
+			mask, err := bls.NewMask(ec.pubKeys, nil)
+			if err != nil {
+				return errors.Wrapf(err, "[VerifySeal] unable to setup mask from payload")
+			}
+			if err := mask.SetMask(sas.bitmap); err != nil {
+				utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
+			}
+
+			// Obtain bitmap for last commit in parent block
+			mask2, err := bls.NewMask(ec.pubKeys, nil)
+			if err != nil {
+				return errors.Wrapf(err, "[VerifySeal] unable to setup mask from payload")
+			}
+			if err := mask2.SetMask(parentHeader.LastCommitBitmap()); err != nil {
+				utils.Logger().Warn().Err(err).Msg("mask.SetMask failed")
+			}
+
+			// Check the two bitmap doesn't have any conflicts since they are signed on the same grand parent block.
+			if mask.CountTotal() != mask2.CountTotal() {
+				return errors.Errorf("[VerifySeal] extra commit bitmap and last commit bitmap length mismatch: %x, %x",
+					mask.Mask(), mask2.Mask())
+			}
+			for i := 0; i < mask.CountTotal(); i++ {
+				enabled1, err := mask.IndexEnabled(i)
+				if err != nil {
+					return err
+				}
+				enabled2, err := mask2.IndexEnabled(i)
+				if err != nil {
+					return err
+				}
+				if enabled1 && enabled2 {
+					return errors.Errorf("[VerifySeal] conflicting extra commit bitmap and last commit bitmap: %x, %x",
+						mask.Mask(), mask2.Mask())
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -535,7 +593,7 @@ func (e *engineImpl) VerifyHeaderSignature(chain engine.ChainReader, header *blo
 	pas := payloadArgsFromHeader(header)
 	sas := sigArgs{commitSig, commitBitmap}
 
-	return e.verifySignatureCached(chain, pas, sas)
+	return e.verifySignatureCached(chain, pas, sas, true)
 }
 
 // VerifyCrossLink verifies the signature of the given CrossLink.
@@ -550,23 +608,23 @@ func (e *engineImpl) VerifyCrossLink(chain engine.ChainReader, cl types.CrossLin
 	pas := payloadArgsFromCrossLink(cl)
 	sas := sigArgs{cl.Signature(), cl.Bitmap()}
 
-	return e.verifySignatureCached(chain, pas, sas)
+	return e.verifySignatureCached(chain, pas, sas, true)
 }
 
-func (e *engineImpl) verifySignatureCached(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
-	verifiedKey := newVerifiedSigKey(pas.blockHash, sas.sig, sas.bitmap)
+func (e *engineImpl) verifySignatureCached(chain engine.ChainReader, pas payloadArgs, sas sigArgs, requireQuorum bool) error {
+	verifiedKey := newVerifiedSigKey(pas.blockHash, sas.sig, sas.bitmap, requireQuorum)
 	if _, ok := e.verifiedSigCache.Get(verifiedKey); ok {
 		return nil
 	}
 	// Not in cache, do verify.
-	if err := e.verifySignature(chain, pas, sas); err != nil {
+	if err := e.verifySignature(chain, pas, sas, requireQuorum); err != nil {
 		return err
 	}
 	e.verifiedSigCache.Add(verifiedKey, struct{}{})
 	return nil
 }
 
-func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, sas sigArgs) error {
+func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, sas sigArgs, requireQuorum bool) error {
 	ec, err := e.getEpochCtxCached(chain, pas.shardID, pas.epoch.Uint64())
 	if err != nil {
 		return err
@@ -581,7 +639,7 @@ func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, 
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	if !qrVerifier.IsQuorumAchievedByMask(mask) {
+	if requireQuorum && !qrVerifier.IsQuorumAchievedByMask(mask) {
 		return errors.New("not enough signature collected")
 	}
 	commitPayload := pas.constructPayload(chain)
@@ -613,19 +671,21 @@ const bitmapKeyBytes = 64
 
 // verifiedSigKey is the key for caching header verification results
 type verifiedSigKey struct {
-	blockHash common.Hash
-	signature bls_cosi.SerializedSignature
-	bitmap    [bitmapKeyBytes]byte
+	blockHash     common.Hash
+	signature     bls_cosi.SerializedSignature
+	bitmap        [bitmapKeyBytes]byte
+	requireQuorum bool
 }
 
-func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, bitmap []byte) verifiedSigKey {
+func newVerifiedSigKey(blockHash common.Hash, sig bls_cosi.SerializedSignature, bitmap []byte, requireQuorum bool) verifiedSigKey {
 	var keyBM [bitmapKeyBytes]byte
 	copy(keyBM[:], bitmap)
 
 	return verifiedSigKey{
-		blockHash: blockHash,
-		signature: sig,
-		bitmap:    keyBM,
+		blockHash:     blockHash,
+		signature:     sig,
+		bitmap:        keyBM,
+		requireQuorum: requireQuorum,
 	}
 }
 

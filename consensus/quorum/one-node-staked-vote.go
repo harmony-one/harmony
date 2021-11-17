@@ -113,7 +113,7 @@ func (v *stakedVoteWeight) AddNewVote(
 			return v.voteTally.Commit
 		case ViewChange:
 			return v.voteTally.ViewChange
-		case ExtraCommit:  // For ExtraCommit sigs, the voting power is accumulated in LastCommit tally.
+		case ExtraCommit: // For ExtraCommit sigs, the voting power is accumulated in LastCommit tally.
 			return v.voteTally.LastCommit
 		default:
 			// Should not happen
@@ -133,7 +133,7 @@ func (v *stakedVoteWeight) AddNewVote(
 		}
 	}
 	utils.Logger().Info().
-		Str("phase", p.String()).
+		Str("sig-type", p.String()).
 		Uint64("block-num", height).
 		Int64("signer-count", v.SignersCount(p)).
 		Str("new-power-added", additionalVotePower.String()).
@@ -330,8 +330,8 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 	v.lastPower[Prepare] = v.voteTally.Prepare.tally
 	v.lastPower[Commit] = v.voteTally.Commit.tally
 
-	v.reset([]SigType{Prepare, Commit})
-	v.voteTally.LastCommit = v.voteTally.Commit  // Keep the current commit as last commit so we can handle extra commit
+	v.reset([]SigType{Prepare, Commit, ExtraCommit})
+	v.voteTally.LastCommit = v.voteTally.Commit // Keep the current commit as last commit so we can handle extra commit
 	v.voteTally.Prepare = &tallyAndQuorum{numeric.NewDec(0), false}
 	v.voteTally.Commit = &tallyAndQuorum{numeric.NewDec(0), false}
 }

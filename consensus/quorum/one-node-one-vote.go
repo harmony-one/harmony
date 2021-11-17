@@ -137,7 +137,7 @@ func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
 	v.lastPowerSignersCountCache[Commit] = v.SignersCount(Commit)
 	v.lastParticipantsCount = v.ParticipantsCount()
 
-	v.reset([]SigType{Prepare, Commit})
+	v.reset([]SigType{Prepare, Commit, ExtraCommit})
 }
 
 func (v *uniformVoteWeight) ResetViewChangeVotes() {

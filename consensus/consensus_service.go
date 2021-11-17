@@ -232,7 +232,8 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurBlockViewID() {
+	} else if msg.ViewID < consensus.GetCurBlockViewID()-1 {
+		// Allow the previous block to be valid for extra commit sigs
 		return errors.New("view ID belongs to the past")
 	}
 	return nil

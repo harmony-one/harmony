@@ -172,6 +172,11 @@ func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.SigType) []byte
 		buffer.Write(consensus.prepareBitmap.Bitmap)
 	} else if p == quorum.Commit {
 		buffer.Write(consensus.commitBitmap.Bitmap)
+	} else if p == quorum.ExtraCommit {
+		if len(consensus.Decider.ReadAllBallots(p)) == 0 {
+			return []byte{}
+		}
+		buffer.Write(consensus.extraCommitBitmap.Bitmap)
 	} else {
 		utils.Logger().Error().
 			Str("phase", p.String()).

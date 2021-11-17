@@ -78,6 +78,7 @@ const (
 	triesInMemory                      = 128
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
+	extraCommitsCacheLimit             = 10
 	epochCacheLimit                    = 10
 	randomnessCacheLimit               = 10
 	validatorCacheLimit                = 1024
@@ -148,6 +149,7 @@ type BlockChain struct {
 	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache               *lru.Cache
 	lastCommitsCache              *lru.Cache
+	extraCommitsCache             *lru.Cache
 	epochCache                    *lru.Cache    // Cache epoch number → first block number
 	randomnessCache               *lru.Cache    // Cache for vrf/vdf
 	validatorSnapshotCache        *lru.Cache    // Cache for validator snapshot
@@ -194,6 +196,7 @@ func NewBlockChain(
 	badBlocks, _ := lru.New(badBlockLimit)
 	shardCache, _ := lru.New(shardCacheLimit)
 	commitsCache, _ := lru.New(commitsCacheLimit)
+	extraCommitsCache, _ := lru.New(extraCommitsCacheLimit)
 	epochCache, _ := lru.New(epochCacheLimit)
 	randomnessCache, _ := lru.New(randomnessCacheLimit)
 	validatorCache, _ := lru.New(validatorCacheLimit)
@@ -218,6 +221,7 @@ func NewBlockChain(
 		futureBlocks:                  futureBlocks,
 		shardStateCache:               shardCache,
 		lastCommitsCache:              commitsCache,
+		extraCommitsCache:             extraCommitsCache,
 		epochCache:                    epochCache,
 		randomnessCache:               randomnessCache,
 		validatorSnapshotCache:        validatorCache,
@@ -1855,6 +1859,29 @@ func (bc *BlockChain) WriteCommitSig(blockNum uint64, lastCommits []byte) error 
 		return err
 	}
 	bc.lastCommitsCache.Add(blockNum, lastCommits)
+	return nil
+}
+
+// ReadExtraCommitSig retrieves the extra commit signature on a block.
+func (bc *BlockChain) ReadExtraCommitSig(blockNum uint64) ([]byte, error) {
+	if cached, ok := bc.extraCommitsCache.Get(blockNum); ok {
+		extraCommits := cached.([]byte)
+		return extraCommits, nil
+	}
+	extraCommits, err := rawdb.ReadBlockExtraCommitSig(bc.db, blockNum)
+	if err != nil {
+		return nil, err
+	}
+	return extraCommits, nil
+}
+
+// WriteExtraCommitSig saves the extra commits signatures signed on a block.
+func (bc *BlockChain) WriteExtraCommitSig(blockNum uint64, extraCommits []byte) error {
+	err := rawdb.WriteBlockExtraCommitSig(bc.db, blockNum, extraCommits)
+	if err != nil {
+		return err
+	}
+	bc.extraCommitsCache.Add(blockNum, extraCommits)
 	return nil
 }
 

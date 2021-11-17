@@ -304,6 +304,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - End
 
 	if !quorumWasMet && quorumIsMet {
+		isExtraCommitEpoch := consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch())
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.FBFTLog.MarkBlockVerified(blockObj)
 
@@ -312,30 +313,35 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		go func(viewID uint64) {
-			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
+		if !isExtraCommitEpoch {
+			go func(viewID uint64) {
+				waitTime := 1000 * time.Millisecond
+				maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+				if maxWaitTime > waitTime {
+					waitTime = maxWaitTime
+				}
+				consensus.getLogger().Info().Str("waitTime", waitTime.String()).
+					Msg("[OnCommit] Starting Grace Period")
+				time.Sleep(waitTime)
+				logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			if viewID == consensus.GetCurBlockViewID() {
-				consensus.finalCommit()
-			}
-		}(viewID)
+				consensus.mutex.Lock()
+				defer consensus.mutex.Unlock()
+				if viewID == consensus.GetCurBlockViewID() {
+					consensus.finalCommit()
+				}
+			}(viewID)
+		} else {
+			// Directly final commit in extra commit epoch since we don't need to wait for the sigs beyond 2/3 commit.
+			consensus.finalCommit()
+		}
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
 }
 
 func (consensus *Consensus) processExtraCommit(recvMsg *FBFTMessage) {
-	// No need to lock as it's already locked on the caller of onCommit()
+	// No need to lock as it's already locked on the caller onCommit()
 	if consensus.Decider.IsAllSigsCollectedInPreviousBlock() {
 		return
 	}
@@ -400,14 +406,6 @@ func (consensus *Consensus) processExtraCommit(recvMsg *FBFTMessage) {
 	}
 
 	//// Write - Start
-	// Check for potential double signing
-
-	// FIXME (leo): failed view change, will comeback later
-	/*
-		if consensus.checkDoubleSign(recvMsg) {
-			return
-		}
-	*/
 	if _, err := consensus.Decider.AddNewVote(
 		quorum.ExtraCommit, recvMsg.SenderPubkeys,
 		&sign, recvMsg.BlockHash,

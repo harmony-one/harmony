@@ -331,7 +331,7 @@ func (h *Header) ShardStateHash() common.Hash {
 func (h *Header) SetShardStateHash(newShardStateHash common.Hash) {
 	h.Logger(utils.Logger()).Warn().
 		Str("shardStateHash", newShardStateHash.Hex()).
-		Msg("cannot store ShardStateHash in V3 header")
+		Msg("cannot store ShardStateHash in V4 header")
 }
 
 // Vrf is the output of the VRF for the epoch.

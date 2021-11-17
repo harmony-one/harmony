@@ -35,10 +35,10 @@ const (
 
 var (
 	phaseNames = map[SigType]string{
-		Prepare:    "Prepare",
-		Commit:     "Commit",
-		ViewChange: "viewChange",
-		LastCommit: "LastCommit",
+		Prepare:     "Prepare",
+		Commit:      "Commit",
+		ViewChange:  "viewChange",
+		LastCommit:  "LastCommit",
 		ExtraCommit: "ExtraCommit",
 	}
 	errPhaseUnknown = errors.New("invariant of known phase violated")
@@ -169,8 +169,8 @@ type cIdentities struct {
 	keyIndexMap map[bls.SerializedPublicKey]int
 	prepare     *votepower.Round
 	commit      *votepower.Round
-	lastCommit      *votepower.Round
-	extraCommit      *votepower.Round
+	lastCommit  *votepower.Round
+	extraCommit *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
@@ -295,8 +295,6 @@ func (s *cIdentities) SignersCount(p SigType) int64 {
 	}
 }
 
-
-
 func (s *cIdentities) submitExtraCommit(pubkeys []bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
@@ -388,8 +386,12 @@ func (s *cIdentities) reset(ps []SigType) {
 		case Commit:
 			// Move current commit to lastCommit and reset both commit/extraCommit.
 			s.lastCommit = s.commit
+			if s.lastCommit == nil {
+				s.lastCommit = votepower.NewRound()
+			}
 			s.commit = m
-			s.extraCommit = votepower.NewRound()
+		case ExtraCommit:
+			s.extraCommit = m
 		case ViewChange:
 			s.viewChange = m
 		}
@@ -432,6 +434,8 @@ func (s *cIdentities) ReadAllBallots(p SigType) []*votepower.Ballot {
 		m = s.commit.BallotBox
 	case ViewChange:
 		m = s.viewChange.BallotBox
+	case ExtraCommit:
+		m = s.extraCommit.BallotBox
 	}
 	ballots := make([]*votepower.Ballot, 0, len(m))
 	for i := range m {

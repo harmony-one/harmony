@@ -313,6 +313,21 @@ func WriteBlockCommitSig(db DatabaseWriter, blockNum uint64, sigAndBitmap []byte
 	return db.Put(blockCommitSigKey(blockNum), sigAndBitmap)
 }
 
+// ReadBlockExtraCommitSig retrieves the extra signature signed on a block.
+func ReadBlockExtraCommitSig(db DatabaseReader, blockNum uint64) ([]byte, error) {
+	var data []byte
+	data, err := db.Get(blockExtraCommitSigKey(blockNum))
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("cannot read commit sig for block: %d ", blockNum))
+	}
+	return data, nil
+}
+
+// WriteBlockExtraCommitSig ..
+func WriteBlockExtraCommitSig(db DatabaseWriter, blockNum uint64, extraSigAndBitmap []byte) error {
+	return db.Put(blockExtraCommitSigKey(blockNum), extraSigAndBitmap)
+}
+
 //// Resharding ////
 
 // ReadEpochBlockNumber retrieves the epoch block number for the given epoch,

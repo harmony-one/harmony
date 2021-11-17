@@ -69,7 +69,7 @@ func (consensus *Consensus) isCurrentBlockNumAndViewID(recvMsg *FBFTMessage,
 
 func (consensus *Consensus) isPreviousBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
-	if recvMsg.ViewID != consensus.GetCurBlockViewID() - 1 || recvMsg.BlockNum != consensus.blockNum - 1 {
+	if recvMsg.ViewID != consensus.GetCurBlockViewID()-1 || recvMsg.BlockNum != consensus.blockNum-1 {
 		consensus.getLogger().Debug().
 			Uint64("blockNum", consensus.blockNum).
 			Str("recvMsg", recvMsg.String()).

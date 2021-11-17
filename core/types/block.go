@@ -20,7 +20,6 @@ package types
 import (
 	"encoding/binary"
 	"fmt"
-	v4 "github.com/harmony-one/harmony/block/v4"
 	"io"
 	"math/big"
 	"reflect"
@@ -28,6 +27,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	v4 "github.com/harmony-one/harmony/block/v4"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -230,6 +231,8 @@ type Block struct {
 
 	// Commit Signatures/Bitmap
 	commitSigAndBitmap []byte
+	// Extra commit Signatures/Bitmap
+	extraCommitSigAndBitmap []byte
 }
 
 func (b *Block) String() string {
@@ -257,7 +260,7 @@ func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
 	b.header.SetLastCommitBitmap(signers)
 }
 
-// SetCurrentCommitSig sets the commit group signature that signed on this block.
+// SetCurrentCommitSig sets the commit signature that signed on this block.
 func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
 	if len(sigAndBitmap) <= 96 {
 		utils.Logger().Warn().
@@ -271,6 +274,22 @@ func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
 // GetCurrentCommitSig get the commit group signature that signed on this block.
 func (b *Block) GetCurrentCommitSig() []byte {
 	return b.commitSigAndBitmap
+}
+
+// SetExtraCommitSig sets the extra commit signature that signed on previous block.
+func (b *Block) SetExtraCommitSig(extraSigAndBitmap []byte) {
+	if len(extraSigAndBitmap) <= 96 {
+		utils.Logger().Warn().
+			Int("srcLen", len(extraSigAndBitmap)).
+			Int("dstLen", len(b.header.ExtraCommitSignature())).
+			Msg("no extra commit in this block")
+	}
+	b.extraCommitSigAndBitmap = extraSigAndBitmap
+}
+
+// GetExtraCommitSig get the extra commit signature that signed on previous block.
+func (b *Block) GetExtraCommitSig() []byte {
+	return b.extraCommitSigAndBitmap
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the

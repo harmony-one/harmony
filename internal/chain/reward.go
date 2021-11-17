@@ -7,6 +7,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -301,6 +304,91 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
+// ConstructCrossLink ...
+func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeader *block.Header) types.CrossLink {
+	if parentHeader == nil {
+		// This shouldn't happen. But just to be protective.
+		return types.NewCrossLink(header, parentHeader)
+	}
+	isExtraCommitEpoch := bc.Config().IsExtraCommit(parentHeader.Epoch())
+
+	if isExtraCommitEpoch {
+		grandParentHeader := bc.GetHeaderByHash(parentHeader.ParentHash())
+		if grandParentHeader != nil {
+			shouldProcessExtraCommit := bc.Config().IsExtraCommit(grandParentHeader.Epoch())
+			if shouldProcessExtraCommit {
+				grandParentBlockNum := big.NewInt(0)
+				grandParentViewID := big.NewInt(0)
+				grandParentEpoch := big.NewInt(0)
+				if grandParentHeader != nil { // Should always happen, default values to be defensive.
+					grandParentBlockNum = grandParentHeader.Number()
+					grandParentViewID = grandParentHeader.ViewID()
+					grandParentEpoch = grandParentHeader.Epoch()
+				}
+				grandParentSig := parentHeader.LastCommitSignature()
+				grandParentBitmap := parentHeader.LastCommitBitmap()
+				grandParentExtraSig := header.ExtraCommitSignature()
+				grandParentExtraBitmap := header.ExtraCommitBitmap()
+
+				sig := &bls.Sign{}
+				bitmap := bls2.Mask{}
+				bitmap.SetMask(grandParentBitmap)
+				err := sig.Deserialize(grandParentSig[:])
+				if err != nil {
+					// This shouldn't happen
+					utils.Logger().Error().Hex("sig", grandParentSig[:]).
+						Msg("Failed to deserialize sig")
+					return types.CrossLink{}
+				}
+
+				if len(grandParentExtraSig) != 0 {
+					extraSig := &bls.Sign{}
+					err = extraSig.Deserialize(grandParentExtraSig[:])
+					if err != nil {
+						// This shouldn't happen
+						utils.Logger().Error().Hex("extra sig", grandParentExtraSig[:]).
+							Msg("Failed to deserialize extra sig")
+						return types.CrossLink{}
+					}
+					sig.Add(extraSig)
+				}
+
+				if len(grandParentExtraBitmap) != 0 {
+					extraBitmap := bls2.Mask{}
+					extraBitmap.SetMask(grandParentExtraBitmap)
+					for i := range extraBitmap.Publics {
+						set, err := extraBitmap.IndexEnabled(i)
+						if err != nil {
+							// This shouldn't happen
+							utils.Logger().Error().Hex("bitmap", bitmap.Mask()).
+								Hex("extraBitmap", extraBitmap.Mask()).
+								Msg("Failed to check bitmap setting")
+							return types.CrossLink{}
+						}
+						if set {
+							bitmap.SetBit(i, true)
+						}
+					}
+				}
+
+				var serializedSig bls2.SerializedSignature
+				copy(serializedSig[:], sig.Serialize())
+
+				return types.CrossLink{
+					HashF:        header.ParentHash(),
+					BlockNumberF: grandParentBlockNum,
+					ViewIDF:      grandParentViewID,
+					SignatureF:   serializedSig,
+					BitmapF:      bitmap.Mask(),
+					ShardIDF:     header.ShardID(),
+					EpochF:       grandParentEpoch,
+				}
+			}
+		}
+	}
+	return types.NewCrossLink(header, parentHeader)
+}
+
 func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
 	defaultReward numeric.Dec) (reward.Reader, error) {
 	newRewards, payouts :=
@@ -314,7 +402,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
-		if i < 0 {
+		if i <= 0 {
 			continue
 		}
 
@@ -327,7 +415,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 
 		// Put shard 0 signatures as a crosslink for easy and consistent processing as other shards' crosslinks
-		allCrossLinks = append(allCrossLinks, *types.NewCrossLink(curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
+		allCrossLinks = append(allCrossLinks, ConstructCrossLink(bc, curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
 
 		// Put the real crosslinks in the list
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {

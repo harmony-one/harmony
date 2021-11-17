@@ -1,8 +1,9 @@
 package blockfactory
 
 import (
-	v4 "github.com/harmony-one/harmony/block/v4"
 	"math/big"
+
+	v4 "github.com/harmony-one/harmony/block/v4"
 
 	"github.com/harmony-one/harmony/block"
 	blockif "github.com/harmony-one/harmony/block/interface"

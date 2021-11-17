@@ -373,6 +373,12 @@ func WriteBlock(db DatabaseWriter, block *types.Block) error {
 			return err
 		}
 	}
+	extraSig := block.GetExtraCommitSig()
+	if len(extraSig) > 96 {
+		if err := WriteBlockExtraCommitSig(db, block.NumberU64(), extraSig); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

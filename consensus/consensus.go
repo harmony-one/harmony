@@ -37,8 +37,9 @@ const (
 )
 
 type CommitSigBitmaps struct {
-	CommitSigBitmap []byte
-	ExtraCommitSigBitmap []byte
+	CommitSigBitmap          []byte
+	ExtraCommitSigBitmap     []byte
+	ShouldProcessExtraCommit bool
 }
 
 // VerifyBlockFunc is a function used to verify the block and keep trace of verified blocks
@@ -46,7 +47,7 @@ type VerifyBlockFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider quorum.Decider
+	Decider          quorum.Decider
 	LastBlockDecider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
@@ -63,7 +64,7 @@ type Consensus struct {
 	aggregatedCommitSig  *bls_core.Sign
 	prepareBitmap        *bls_cosi.Mask
 	commitBitmap         *bls_cosi.Mask
-	extraCommitBitmap         *bls_cosi.Mask
+	extraCommitBitmap    *bls_cosi.Mask
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
 	multiSigMutex  sync.RWMutex
