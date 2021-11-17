@@ -45,7 +45,7 @@ type (
 	// GetVRFFunc returns the nth block vrf in the blockchain
 	// and is used by the precompile VRF contract.
 	GetVRFFunc func(uint64) common.Hash
-	// Below functions are used by staking precompile / state transition
+	// Below functions are used by staking precompile, and state transition
 	CreateValidatorFunc func(db StateDB, stakeMsg *stakingTypes.CreateValidator) error
 	EditValidatorFunc   func(db StateDB, stakeMsg *stakingTypes.EditValidator) error
 	DelegateFunc        func(db StateDB, stakeMsg *stakingTypes.Delegate) error

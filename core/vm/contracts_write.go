@@ -9,12 +9,18 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+// WriteCapablePrecompiledContractsStaking lists out the write capable precompiled contracts
+// which are available after the StakingPrecompileEpoch
+// for now, we have only one contract at 252 or 0xfc - which is the staking precompile
 var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
-// Native Go contracts which are available as a precompile in the EVM
-// These have the capability to alter the state (those in contracts.go do not)
+// WriteCapablePrecompiledContract represents the interface for Native Go contracts
+// which are available as a precompile in the EVM
+// As with (read-only) PrecompiledContracts, these need a RequiredGas function
+// Note that these contracts have the capability to alter the state
+// while those in contracts.go do not
 type WriteCapablePrecompiledContract interface {
 	// RequiredGas calculates the contract gas use
 	RequiredGas(evm *EVM, input []byte) uint64
@@ -22,7 +28,7 @@ type WriteCapablePrecompiledContract interface {
 	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
 }
 
-// RunPrecompiledContract runs and evaluates the output of a precompiled contract.
+// RunWriteCapablePrecompiledContract runs and evaluates the output of a write capable precompiled contract.
 func RunWriteCapablePrecompiledContract(p WriteCapablePrecompiledContract, evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	// immediately error out if readOnly
 	if readOnly {
@@ -53,8 +59,13 @@ func (c *stakingPrecompile) RequiredGas(evm *EVM, input []byte) uint64 {
 	// if err != ErrExecutionReverted {
 	//	contract.UseGas(contract.Gas)
 	// }
+	// which is why the solidity lib passes 0 as first param
+	// instead of the original gas(). if you do so, there will
+	// be no gas left for subsequent calls to the precompile
+	// (if you make multiple precompile calls in the same tx)
 }
 
+// RunWriteCapable runs the actual contract (that is it performs the staking)
 func (c *stakingPrecompile) RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error) {
 	// checks include input, shard, method
 	// readOnly has already been checked by RunWriteCapablePrecompiledContract

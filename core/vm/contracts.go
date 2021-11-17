@@ -115,6 +115,9 @@ var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 }
 
+// PrecompiledContractsStaking contains the default set of pre-compiled Ethereum
+// contracts used in the Istanbul release. plus VRF, SHA3FIPS-202 and staking precompiles
+// These are available in the EVM after the StakingPrecompileEpoch
 var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
 	common.BytesToAddress([]byte{2}): &sha256hash{},
