@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -128,10 +128,10 @@ func StopServers() error {
 }
 
 func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
-	return []rpc.API{
+	return append(getAPIs(hmy, debugEnable, rateLimiterEnable, ratelimit), []rpc.API{
 		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
 		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
-	}
+	}...)
 }
 
 // getAPIs returns all the API methods for the RPC interface
@@ -157,8 +157,6 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelim
 		NewPublicStakingAPI(hmy, V2),
 		NewPublicDebugAPI(hmy, V1),
 		NewPublicDebugAPI(hmy, V2),
-		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
-		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
 		eth.NewPublicEthService(hmy, "eth"),

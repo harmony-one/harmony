@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -292,11 +291,6 @@ func (s *Service) NotifyService(params map[string]interface{}) {}
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
-}
-
-// APIs for the services.
-func (s *Service) APIs() []rpc.API {
-	return nil
 }
 
 func defaultDBPath(ip, port string) string {

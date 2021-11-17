@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -52,7 +51,6 @@ func (t Type) String() string {
 type Service interface {
 	Start() error
 	Stop() error
-	APIs() []rpc.API // the list of RPC descriptors the service provides
 }
 
 // Manager stores all services for service manager.

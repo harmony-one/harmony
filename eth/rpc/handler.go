@@ -367,8 +367,12 @@ func (h *handler) handleSubscribe(cp *callProc, msg *jsonrpcMessage) *jsonrpcMes
 
 // runMethod runs the Go callback for an RPC method.
 func (h *handler) runMethod(ctx context.Context, msg *jsonrpcMessage, callb *callback, args []reflect.Value) *jsonrpcMessage {
+	timer := doMetricRequest(msg.Method)
+	defer doMetricDelayHist(timer)
+
 	result, err := callb.call(ctx, msg.Method, args)
 	if err != nil {
+		doMetricErroredRequest(msg.Method)
 		return msg.errorResponse(err)
 	}
 	return msg.response(result)

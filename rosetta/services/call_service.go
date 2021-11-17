@@ -6,7 +6,7 @@ import (
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
-	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"

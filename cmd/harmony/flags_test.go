@@ -8,9 +8,10 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -30,7 +31,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json --p2p.disc.concurrency 5",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -61,6 +62,7 @@ func TestHarmonyFlags(t *testing.T) {
 					IP:              defaultConfig.P2P.IP,
 					KeyFile:         defaultConfig.P2P.KeyFile,
 					DiscConcurrency: 5,
+					MaxConnsPerIP:   5,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -363,27 +365,30 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:         9001,
-				IP:           nodeconfig.DefaultPublicListenIP,
-				KeyFile:      "./key.file",
-				DHTDataStore: &defDataStore,
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				DHTDataStore:  &defDataStore,
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:    9001,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				KeyFile: "./key.file",
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
-			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5"},
+			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5", "--p2p.security.max-conn-per-ip", "5"},
 			expConfig: harmonyconfig.P2pConfig{
 				Port:            9001,
 				IP:              nodeconfig.DefaultPublicListenIP,
 				KeyFile:         "./.hmykey",
 				DiscConcurrency: 5,
+				MaxConnsPerIP:   5,
 			},
 		},
 	}

@@ -1,9 +1,9 @@
 package node
 
 import (
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/consensus/quorum"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
@@ -69,10 +69,6 @@ func (node *Node) StartRPC() error {
 
 	// Gather all the possible APIs to surface
 	apis := node.APIs(harmony)
-
-	for _, service := range node.serviceManager.GetServices() {
-		apis = append(apis, service.APIs()...)
-	}
 
 	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer)
 }

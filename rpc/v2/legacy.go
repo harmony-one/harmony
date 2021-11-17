@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/harmony-one/harmony/eth/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 )
