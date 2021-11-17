@@ -74,6 +74,7 @@ var (
 		wsEnabledFlag,
 		wsIPFlag,
 		wsPortFlag,
+		wsAuthPortFlag,
 	}
 
 	rpcOptFlags = []cli.Flag{
@@ -653,6 +654,11 @@ var (
 		Usage:    "port for websocket endpoint",
 		DefValue: defaultConfig.WS.Port,
 	}
+	wsAuthPortFlag = cli.IntFlag{
+		Name:     "ws.auth-port",
+		Usage:    "port for websocket auth endpoint",
+		DefValue: defaultConfig.WS.AuthPort,
+	}
 )
 
 func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -664,6 +670,9 @@ func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, wsPortFlag) {
 		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
+	}
+	if cli.IsFlagChanged(cmd, wsAuthPortFlag) {
+		config.WS.AuthPort = cli.GetIntFlagValue(cmd, wsAuthPortFlag)
 	}
 }
 
@@ -1381,6 +1390,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfi
 		config.HTTP.AuthPort = nodeconfig.GetRPCAuthHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
+		config.WS.AuthPort = nodeconfig.GetWSAuthPortFromBase(legacyPort)
 
 		legPortStr := strconv.Itoa(legacyPort)
 		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))

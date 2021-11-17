@@ -39,9 +39,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: harmonyconfig.WsConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultWSPort,
+		Enabled:  true,
+		IP:       "127.0.0.1",
+		Port:     nodeconfig.DefaultWSPort,
+		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
 		DebugEnabled:      false,

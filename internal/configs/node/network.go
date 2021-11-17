@@ -54,6 +54,8 @@ const (
 	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
+	// DefaultAuthWSPort is the default port for web socket auth endpoint. The actual port used is
+	DefaultAuthWSPort = 9801
 	// DefaultPrometheusPort is the default prometheus port. The actual port used is 9000+900
 	DefaultPrometheusPort = 9900
 	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
@@ -78,6 +80,9 @@ const (
 
 	// rpcWSPortOffSet is the port offset for RPC websocket requests
 	rpcWSPortOffSet = 800
+
+	// rpcWSAuthPortOffSet is the port offset for RPC Auth websocket requests
+	rpcWSAuthPortOffSet = 801
 
 	// prometheusHTTPPortOffset is the port offset for prometheus HTTP requests
 	prometheusHTTPPortOffset = 900
@@ -142,6 +147,11 @@ func GetRosettaHTTPPortFromBase(basePort int) int {
 // GetWSPortFromBase return the Websocket port from the base port
 func GetWSPortFromBase(basePort int) int {
 	return basePort + rpcWSPortOffSet
+}
+
+// GetWSAuthPortFromBase return the Websocket port from the base auth port
+func GetWSAuthPortFromBase(basePort int) int {
+	return basePort + rpcWSAuthPortOffSet
 }
 
 // GetPrometheusHTTPPortFromBase return the prometheus HTTP port from base port
