@@ -217,7 +217,7 @@ func init() {
 			confTree.Set("WS.AuthPort", defaultConfig.WS.AuthPort)
 		}
 
-		confTree.Set("Version", "2.3.0")
+		confTree.Set("Version", "2.5.0")
 		return confTree
 	}
 }
