@@ -525,6 +525,7 @@ func (w *Worker) FinalizeNewBlock(
 		case sigs := <-commitSigs:
 			commitSigfailure := false
 			sig, signers, err := bls.SeparateSigAndMask(sigs.CommitSigBitmap)
+
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("Failed to parse commit sigs")
 				commitSigfailure = true

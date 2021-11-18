@@ -331,8 +331,6 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 				grandParentExtraBitmap := header.ExtraCommitBitmap()
 
 				sig := &bls.Sign{}
-				bitmap := bls2.Mask{}
-				bitmap.SetMask(grandParentBitmap)
 				err := sig.Deserialize(grandParentSig[:])
 				if err != nil {
 					// This shouldn't happen
@@ -353,21 +351,18 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 					sig.Add(extraSig)
 				}
 
+				bitmap := append(grandParentBitmap[:0:0], grandParentBitmap...)
 				if len(grandParentExtraBitmap) != 0 {
-					extraBitmap := bls2.Mask{}
-					extraBitmap.SetMask(grandParentExtraBitmap)
-					for i := range extraBitmap.Publics {
-						set, err := extraBitmap.IndexEnabled(i)
-						if err != nil {
-							// This shouldn't happen
-							utils.Logger().Error().Hex("bitmap", bitmap.Mask()).
-								Hex("extraBitmap", extraBitmap.Mask()).
-								Msg("Failed to check bitmap setting")
-							return types.CrossLink{}
-						}
-						if set {
-							bitmap.SetBit(i, true)
-						}
+					if len(bitmap) != len(grandParentExtraBitmap) {
+						// This shouldn't happen
+						utils.Logger().Error().Hex("bitmap", bitmap).
+							Hex("extraBitmap", grandParentExtraBitmap).
+							Msg("extra bitmap length mismatch")
+						return types.CrossLink{}
+					}
+
+					for i := 0; i < len(bitmap); i++ {
+						bitmap[i] = bitmap[i] | grandParentExtraBitmap[i]
 					}
 				}
 
@@ -379,7 +374,7 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 					BlockNumberF: grandParentBlockNum,
 					ViewIDF:      grandParentViewID,
 					SignatureF:   serializedSig,
-					BitmapF:      bitmap.Mask(),
+					BitmapF:      bitmap,
 					ShardIDF:     header.ShardID(),
 					EpochF:       grandParentEpoch,
 				}
@@ -584,7 +579,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	// Take care of my own beacon chain committee, _ is missing, for slashing
 	parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 	if err != nil {
-		return network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
+		return network.EmptyPayout, errors.Wrapf(err, "[distributeRewardBeforeAggregateEpoch] shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
 	}
 	subComm := shard.Committee{shard.BeaconChainShardID, members}
 
@@ -671,7 +666,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
 
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
+		return nil, nil, errors.Wrapf(err, "[processOneCrossLink] shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
 	}
 
 	staked := subComm.StakedValidators()
