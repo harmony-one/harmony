@@ -94,7 +94,7 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 		}
 
 		wsAuthEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSAuthPort)
-		if err := startAuthWS(apis); err != nil {
+		if err := startAuthWS(authApis); err != nil {
 			return err
 		}
 	}
