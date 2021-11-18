@@ -55,6 +55,7 @@ var (
 	httpEndpoint     = ""
 	httpAuthEndpoint = ""
 	wsEndpoint       = ""
+	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
@@ -89,6 +90,11 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 	if config.WSEnabled {
 		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
 		if err := startWS(apis); err != nil {
+			return err
+		}
+
+		wsAuthEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSAuthPort)
+		if err := startAuthWS(apis); err != nil {
 			return err
 		}
 	}
@@ -218,5 +224,18 @@ func startWS(apis []rpc.API) (err error) {
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
 		Msg("WebSocket endpoint opened")
 	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
+	return nil
+}
+
+func startAuthWS(apis []rpc.API) (err error) {
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsAuthEndpoint, apis, WSModules, wsOrigins, true)
+	if err != nil {
+		return err
+	}
+
+	utils.Logger().Info().
+		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
+		Msg("WebSocket endpoint opened")
+	fmt.Printf("Started Auth-WS server at: %v\n", wsAuthEndpoint)
 	return nil
 }

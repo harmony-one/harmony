@@ -78,9 +78,10 @@ func TestHarmonyFlags(t *testing.T) {
 					RequestsPerSecond: 1000,
 				},
 				WS: harmonyconfig.WsConfig{
-					Enabled: true,
-					IP:      "127.0.0.1",
-					Port:    9800,
+					Enabled:  true,
+					IP:       "127.0.0.1",
+					Port:     9800,
+					AuthPort: 9801,
 				},
 				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
@@ -529,25 +530,37 @@ func TestWSFlags(t *testing.T) {
 		{
 			args: []string{"--ws=false"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: false,
-				IP:      defaultConfig.WS.IP,
-				Port:    defaultConfig.WS.Port,
+				Enabled:  false,
+				IP:       defaultConfig.WS.IP,
+				Port:     defaultConfig.WS.Port,
+				AuthPort: defaultConfig.WS.AuthPort,
 			},
 		},
 		{
 			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.port", "9001"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      "8.8.8.8",
-				Port:    9001,
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     9001,
+				AuthPort: defaultConfig.WS.AuthPort,
+			},
+		},
+		{
+			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.auth-port", "9001"},
+			expConfig: harmonyconfig.WsConfig{
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     defaultConfig.WS.Port,
+				AuthPort: 9001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				Port:    9801,
+				Enabled:  true,
+				IP:       nodeconfig.DefaultPublicListenIP,
+				Port:     9801,
+				AuthPort: 9802,
 			},
 		},
 	}

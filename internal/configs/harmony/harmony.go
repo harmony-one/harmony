@@ -145,9 +145,10 @@ type HttpConfig struct {
 }
 
 type WsConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled  bool
+	IP       string
+	Port     int
+	AuthPort int
 }
 
 type RpcOptConfig struct {
