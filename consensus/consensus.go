@@ -36,6 +36,7 @@ const (
 	AsyncProposal
 )
 
+// CommitSigBitmaps ...
 type CommitSigBitmaps struct {
 	CommitSigBitmap          []byte
 	ExtraCommitSigBitmap     []byte

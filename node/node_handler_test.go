@@ -32,14 +32,14 @@ func TestAddNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, testDBFactory, nil, nil, nil)
+	node := New(host, consensusObj, testDBFactory, nil, nil, nil)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -79,16 +79,16 @@ func TestVerifyNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, archiveMode, nil)
+	node := New(host, consensusObj, testDBFactory, nil, archiveMode, nil)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
@@ -125,18 +125,18 @@ func TestVerifyVRF(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, archiveMode, nil)
+	node := New(host, consensusObj, testDBFactory, nil, archiveMode, nil)
 
-	consensus.Blockchain = node.Blockchain()
+	consensusObj.Blockchain = node.Blockchain()
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(

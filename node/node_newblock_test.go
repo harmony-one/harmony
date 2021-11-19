@@ -33,14 +33,14 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	var testDBFactory = &shardchain.MemDBFactory{}
-	node := New(host, consensus, testDBFactory, nil, nil, nil)
+	node := New(host, consensusObj, testDBFactory, nil, nil, nil)
 
 	node.Worker.UpdateCurrent()
 
