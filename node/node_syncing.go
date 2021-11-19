@@ -625,12 +625,17 @@ func (node *Node) calculateRequestWeight(request *downloader_pb.DownloaderReques
 }
 
 const (
-	limiterRate  = 50  // Allow generating tokens of 15 blocks over 3 seconds
-	limiterBurst = 150 // Burst to download 15 blocks, each sync batch is 30 blocks
+	beaconLimiterRate  = 50  // Allow generating tokens of 15 blocks over 3 seconds
+	beaconLimiterBurst = 150 // Burst to download 15 blocks, each sync batch is 30 blocks
+	shardLimiterRate   = 300 // 30 blocks per second
+	shardLimiterBurst  = 300 // Burst to download 30 blocks
 )
 
 func (node *Node) getDNSServerLimiter() rate.IDLimiter {
-	return rate.NewLimiterPerID(limiterRate, limiterBurst, nil)
+	if node.NodeConfig.ShardID == shard.BeaconChainShardID {
+		return rate.NewLimiterPerID(beaconLimiterRate, beaconLimiterBurst, nil)
+	}
+	return rate.NewLimiterPerID(shardLimiterRate, shardLimiterBurst, nil)
 }
 
 const (
