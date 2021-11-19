@@ -27,6 +27,7 @@ type FBFTMessage struct {
 	SenderPubkeyBitmap []byte
 	LeaderPubkey       *bls.PublicKeyWrapper
 	Payload            []byte
+	ExtraData          []byte
 	ViewchangeSig      *bls_core.Sign
 	ViewidSig          *bls_core.Sign
 	M2AggSig           *bls_core.Sign
@@ -345,6 +346,8 @@ func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 	copy(pbftMsg.BlockHash[:], consensusMsg.BlockHash[:])
 	pbftMsg.Payload = make([]byte, len(consensusMsg.Payload))
 	copy(pbftMsg.Payload[:], consensusMsg.Payload[:])
+	pbftMsg.ExtraData = make([]byte, len(consensusMsg.ExtraData))
+	copy(pbftMsg.ExtraData[:], consensusMsg.ExtraData[:])
 	pbftMsg.Block = make([]byte, len(consensusMsg.Block))
 	copy(pbftMsg.Block[:], consensusMsg.Block[:])
 	pbftMsg.SenderPubkeyBitmap = make([]byte, len(consensusMsg.SenderPubkeyBitmap))

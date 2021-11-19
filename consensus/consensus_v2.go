@@ -153,6 +153,7 @@ func (consensus *Consensus) finalCommit() {
 		network.Bytes,
 		network.FBFTMsg
 	commitSigAndBitmap := FBFTMsg.Payload
+	extraCommitSigAndBitmap := FBFTMsg.ExtraData
 
 	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
@@ -170,19 +171,17 @@ func (consensus *Consensus) finalCommit() {
 		return
 	}
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
-	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
+	block.SetCurrentCommitSig(commitSigAndBitmap)
 
 	commitSigBitmap := CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}
 	parentHeader := consensus.Blockchain.GetBlockByHash(block.ParentHash())
 	if consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
 		commitSigBitmap.ShouldProcessExtraCommit = true
 		// Fill in this field when parent block is in the ExtraCommit epoch
-		commitSigBitmap.ExtraCommitSigBitmap = consensus.constructQuorumSigAndBitmap(quorum.ExtraCommit)
+		commitSigBitmap.ExtraCommitSigBitmap = extraCommitSigAndBitmap
 		block.SetExtraCommitSig(commitSigBitmap.ExtraCommitSigBitmap)
 	}
 
-	// TODO set extra commit  in block database
-	block.SetCurrentCommitSig(commitSigAndBitmap)
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.blockNum-beforeCatchupNum != 1 {
@@ -567,6 +566,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	bareMinimumCommit := FBFTMsg.Payload
+	extraCommit := FBFTMsg.ExtraData
 	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
 	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
@@ -575,6 +575,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 
 	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
+		blk.SetExtraCommitSig(extraCommit)
 
 		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
@@ -651,6 +652,7 @@ func (consensus *Consensus) tryCatchup() error {
 			return nil
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
+		blk.SetExtraCommitSig(msg.ExtraData)
 
 		if err := consensus.VerifyBlock(blk); err != nil {
 			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")

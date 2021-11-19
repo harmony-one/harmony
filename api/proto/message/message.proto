@@ -88,6 +88,7 @@ message ConsensusRequest {
   bytes sender_pubkey = 6;
   bytes payload = 7;
   bytes sender_pubkey_bitmap = 8;
+  bytes extra_data = 9;
 }
 
 message DrandRequest {

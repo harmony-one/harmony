@@ -124,6 +124,7 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Prepare)
 	case msg_pb.MessageType_COMMITTED:
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Commit)
+		consensusMsg.ExtraData = consensus.constructQuorumSigAndBitmap(quorum.ExtraCommit)
 	}
 
 	var marshaledMessage []byte
