@@ -46,9 +46,9 @@ func TestAddNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
@@ -95,9 +95,9 @@ func TestVerifyNewBlock(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
@@ -142,9 +142,9 @@ func TestVerifyVRF(t *testing.T) {
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 
 	ecdsaAddr := pubKey.GetAddress()
