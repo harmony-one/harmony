@@ -1,12 +1,15 @@
 package node
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/internal/rate"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -418,11 +421,26 @@ func (node *Node) SendNewBlockToUnsync() {
 	}
 }
 
+const defaultDNSServerTimeout = 3 * time.Second
+
 // CalculateResponse implements DownloadInterface on Node object.
 func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, incomingPeer string) (*downloader_pb.DownloaderResponse, error) {
 	response := &downloader_pb.DownloaderResponse{}
 	if node.NodeConfig.IsOffline {
 		return response, nil
+	}
+
+	ip, _, err := net.SplitHostPort(incomingPeer)
+	if err != nil {
+		return nil, errors.New("invalid ip address")
+	}
+	w := node.calculateRequestWeight(request)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDNSServerTimeout)
+	defer cancel()
+
+	err = node.dnsServerLimiter.WaitN(ctx, ip, w)
+	if err != nil {
+		return nil, errors.New("DNS request exceeding maximum allowance")
 	}
 
 	switch request.Type {
@@ -572,6 +590,47 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	}
 
 	return response, nil
+}
+
+const (
+	blockHashRequestWeight       = 1
+	blockHeaderRequestWeight     = 3
+	blockRequestWeight           = 10
+	blockHeightRequestWeight     = 1
+	newBlockRequestWeight        = 1
+	registerRequestWeight        = 999999 // Disabled for now
+	registerTimeOutRequestWeight = 0
+	defaultRequestWeight         = 0
+)
+
+func (node *Node) calculateRequestWeight(request *downloader_pb.DownloaderRequest) int {
+	switch request.Type {
+	case downloader_pb.DownloaderRequest_BLOCKHASH:
+		return blockHashRequestWeight
+	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+		return blockHeaderRequestWeight * len(request.Hashes)
+	case downloader_pb.DownloaderRequest_BLOCK:
+		return blockRequestWeight * len(request.Hashes)
+	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
+		return blockHeightRequestWeight
+	case downloader_pb.DownloaderRequest_NEWBLOCK:
+		return newBlockRequestWeight
+	case downloader_pb.DownloaderRequest_REGISTER:
+		return registerRequestWeight
+	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
+		return registerTimeOutRequestWeight
+	default:
+	}
+	return defaultRequestWeight
+}
+
+const (
+	limiterRate  = 50  // Allow generating tokens of 15 blocks over 3 seconds
+	limiterBurst = 150 // Burst to download 15 blocks, each sync batch is 30 blocks
+)
+
+func (node *Node) getDNSServerLimiter() rate.IDLimiter {
+	return rate.NewLimiterPerID(limiterRate, limiterBurst, nil)
 }
 
 const (

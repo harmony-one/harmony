@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/rate"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
@@ -134,6 +136,8 @@ type Node struct {
 	// context control for pub-sub handling
 	psCtx    context.Context
 	psCancel func()
+
+	dnsServerLimiter rate.IDLimiter
 }
 
 // Blockchain returns the blockchain for the node's current shard.
@@ -1023,6 +1027,9 @@ func New(
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
+
+		// setup DNS sync rate limiter
+		node.dnsServerLimiter = node.getDNSServerLimiter()
 	}
 
 	utils.Logger().Info().
