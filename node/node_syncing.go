@@ -440,7 +440,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	err = node.dnsServerLimiter.WaitN(ctx, ip, w)
 	if err != nil {
-		return nil, errors.New("DNS request exceeding maximum allowance")
+		return nil, err
 	}
 
 	switch request.Type {

@@ -36,6 +36,9 @@ func (s *Server) Query(ctx context.Context, request *pb.DownloaderRequest) (*pb.
 	}
 	response, err := s.downloadInterface.CalculateResponse(request, pinfo)
 	if err != nil {
+		utils.Logger().Info().Err(err).Str("peer info", pinfo).
+			Int32("request type", int32(request.Type)).
+			Msg("DNS calculate response")
 		return nil, err
 	}
 	return response, nil
