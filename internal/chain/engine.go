@@ -140,7 +140,6 @@ func (e *engineImpl) VerifyShardState(
 		return errors.New("shard state header did not match as expected")
 	}
 
-	utils.Logger().Info().Str("block number", header.Number().String()).Msg("VERIFIED SHARD STATE")
 	return nil
 }
 
@@ -269,15 +268,17 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 		return errors.Wrapf(err, "[VerifySeal] Failed to verify signature for parent %s", parentHash.String())
 	}
 
+	// Verify extra commit sig if any
 	if parentHeader.Number().Uint64() > uint64(1) && chain.Config().IsExtraCommit(parentHeader.Epoch()) {
 		grandParentHeader := chain.GetHeaderByHash(parentHeader.ParentHash())
-		if chain.Config().IsExtraCommit(grandParentHeader.Epoch()) {
+		if grandParentHeader != nil && chain.Config().IsExtraCommit(grandParentHeader.Epoch()) {
 			// Check the validity of the extra commit signature signed on the grand parent block
 			pas := payloadArgsFromHeader(grandParentHeader)
 			sas := sigArgs{
 				sig:    header.ExtraCommitSignature(),
 				bitmap: header.ExtraCommitBitmap(),
 			}
+			// Extra commit sig doesn't have to reach quorum since it's at most 1/3 of the voting power.
 			if err := e.verifySignatureCached(chain, pas, sas, false); err != nil {
 				return errors.Wrapf(err, "[VerifySeal] Failed to verify extra signature for grand parent %s", parentHash.String())
 			}

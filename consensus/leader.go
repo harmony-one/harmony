@@ -210,6 +210,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - Start
 	if !consensus.isCurrentBlockNumAndViewID(recvMsg) {
 		if consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch()) && consensus.isPreviousBlockNumAndViewID(recvMsg) {
+			// If it's the block in extra epoch epoch, accept and process it for the extra commit sig.
 			consensus.processExtraCommit(recvMsg)
 		}
 		return
@@ -348,19 +349,21 @@ func (consensus *Consensus) processExtraCommit(recvMsg *FBFTMessage) {
 
 	// proceed only when the message is not received before
 	for _, signer := range recvMsg.SenderPubkeys {
-		signed1 := consensus.Decider.ReadBallot(quorum.LastCommit, signer.Bytes)
+		signed1 := consensus.Decider.ReadBallot(quorum.CommitInPreviousBlock, signer.Bytes)
 		signed2 := consensus.Decider.ReadBallot(quorum.ExtraCommit, signer.Bytes)
 		if signed1 != nil || signed2 != nil {
 			consensus.getLogger().Debug().
 				Str("validatorPubKey", signer.Bytes.Hex()).
-				Msg("[processExtraCommit] Already Received commit message from the validator")
+				Bool("inLastCommit", signed1 != nil).
+				Bool("inExtraCommit", signed2 != nil).
+				Msg("[processExtraCommit] Already received commit message from the validator")
 			return
 		}
 	}
 
 	extraCommitBitmap := consensus.extraCommitBitmap
 	signerCount :=
-		consensus.Decider.SignersCount(quorum.LastCommit) + consensus.Decider.SignersCount(quorum.ExtraCommit)
+		consensus.Decider.SignersCount(quorum.CommitInPreviousBlock) + consensus.Decider.SignersCount(quorum.ExtraCommit)
 	//// Read - End
 
 	// Verify the signature on commitPayload is correct

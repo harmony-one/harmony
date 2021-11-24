@@ -170,7 +170,6 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
 		return
 	}
-	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 	block.SetCurrentCommitSig(commitSigAndBitmap)
 
 	commitSigBitmap := CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}
@@ -180,6 +179,12 @@ func (consensus *Consensus) finalCommit() {
 		// Fill in this field when parent block is in the ExtraCommit epoch
 		commitSigBitmap.ExtraCommitSigBitmap = extraCommitSigAndBitmap
 		block.SetExtraCommitSig(commitSigBitmap.ExtraCommitSigBitmap)
+	}
+
+	if !commitSigBitmap.ShouldProcessExtraCommit {
+		// Only need to override commit sig before extra commit epoch
+		consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
+		consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 	}
 
 	err = consensus.commitBlock(block, FBFTMsg)
@@ -295,6 +300,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) (*CommitSigBitmaps,
 
 	result := &CommitSigBitmaps{CommitSigBitmap: lastCommits}
 
+	// Try to read and use extra commit stored in DB if any
 	extraCommits, err := consensus.Blockchain.ReadExtraCommitSig(blockNum)
 	if err == nil || len(extraCommits) >= bls.BLSSignatureSizeInBytes {
 		result.ExtraCommitSigBitmap = extraCommits

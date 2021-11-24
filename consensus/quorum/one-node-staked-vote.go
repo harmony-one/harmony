@@ -42,7 +42,7 @@ type VoteTally struct {
 	Commit     *tallyAndQuorum
 	ViewChange *tallyAndQuorum
 	// Record keeping for the voting power of previous block for extra commits received at current block
-	LastCommit *tallyAndQuorum
+	CommitInPreviousBlock *tallyAndQuorum
 }
 
 type stakedVoteWeight struct {
@@ -64,8 +64,8 @@ func (v *stakedVoteWeight) AddNewVote(
 	p SigType, pubKeys []*bls_cosi.PublicKeyWrapper,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
-	if p == LastCommit {
-		return nil, errors.New("Signature type can not be LastCommit.")
+	if p == CommitInPreviousBlock {
+		return nil, errors.New("Signature type can not be CommitInPreviousBlock.")
 	}
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
 	signerAddr := common.Address{}
@@ -113,8 +113,8 @@ func (v *stakedVoteWeight) AddNewVote(
 			return v.voteTally.Commit
 		case ViewChange:
 			return v.voteTally.ViewChange
-		case ExtraCommit: // For ExtraCommit sigs, the voting power is accumulated in LastCommit tally.
-			return v.voteTally.LastCommit
+		case ExtraCommit: // For ExtraCommit sigs, the voting power is accumulated in CommitInPreviousBlock tally.
+			return v.voteTally.CommitInPreviousBlock
 		default:
 			// Should not happen
 			return nil
@@ -151,8 +151,8 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p SigType) bool {
 		return v.voteTally.Commit.quorumAchieved
 	case ViewChange:
 		return v.voteTally.ViewChange.quorumAchieved
-	case LastCommit:
-		return v.voteTally.LastCommit.quorumAchieved
+	case CommitInPreviousBlock:
+		return v.voteTally.CommitInPreviousBlock.quorumAchieved
 	default:
 		// Should not happen
 		return false
@@ -200,7 +200,7 @@ func (v *stakedVoteWeight) IsAllSigsCollected() bool {
 
 // IsAllSigsCollectedInPreviousBlock ..
 func (v *stakedVoteWeight) IsAllSigsCollectedInPreviousBlock() bool {
-	return v.voteTally.LastCommit.tally.Equal(numeric.NewDec(1))
+	return v.voteTally.CommitInPreviousBlock.tally.Equal(numeric.NewDec(1))
 }
 
 func (v *stakedVoteWeight) SetVoters(
@@ -319,10 +319,10 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 
 func newVoteTally() VoteTally {
 	return VoteTally{
-		Prepare:    &tallyAndQuorum{numeric.NewDec(0), false},
-		Commit:     &tallyAndQuorum{numeric.NewDec(0), false},
-		ViewChange: &tallyAndQuorum{numeric.NewDec(0), false},
-		LastCommit: &tallyAndQuorum{numeric.NewDec(0), false},
+		Prepare:               &tallyAndQuorum{numeric.NewDec(0), false},
+		Commit:                &tallyAndQuorum{numeric.NewDec(0), false},
+		ViewChange:            &tallyAndQuorum{numeric.NewDec(0), false},
+		CommitInPreviousBlock: &tallyAndQuorum{numeric.NewDec(0), false},
 	}
 }
 
@@ -331,7 +331,7 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 	v.lastPower[Commit] = v.voteTally.Commit.tally
 
 	v.reset([]SigType{Prepare, Commit, ExtraCommit})
-	v.voteTally.LastCommit = v.voteTally.Commit // Keep the current commit as last commit so we can handle extra commit
+	v.voteTally.CommitInPreviousBlock = v.voteTally.Commit // Keep the current commit as commit in previous block so we can handle extra commit
 	v.voteTally.Prepare = &tallyAndQuorum{numeric.NewDec(0), false}
 	v.voteTally.Commit = &tallyAndQuorum{numeric.NewDec(0), false}
 }

@@ -228,7 +228,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 	}
 
 	var blockObj *types.Block
-	if blockObj, err = consensus.validateNewBlock(recvMsg); err != nil {
+	if blockObj, err = consensus.validateNewBlock(recvMsg); err != nil || blockObj == nil {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MsgViewID", recvMsg.ViewID).

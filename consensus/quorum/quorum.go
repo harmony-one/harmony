@@ -27,19 +27,19 @@ const (
 	Commit
 	// ViewChange ..
 	ViewChange
-	// LastCommit ..
-	LastCommit
+	// CommitInPreviousBlock ..
+	CommitInPreviousBlock
 	// ExtraCommit ..
 	ExtraCommit
 )
 
 var (
 	phaseNames = map[SigType]string{
-		Prepare:     "Prepare",
-		Commit:      "Commit",
-		ViewChange:  "viewChange",
-		LastCommit:  "LastCommit",
-		ExtraCommit: "ExtraCommit",
+		Prepare:               "Prepare",
+		Commit:                "Commit",
+		ViewChange:            "viewChange",
+		CommitInPreviousBlock: "CommitInPreviousBlock",
+		ExtraCommit:           "ExtraCommit",
 	}
 	errPhaseUnknown = errors.New("invariant of known phase violated")
 )
@@ -165,12 +165,12 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys  []bls.PublicKeyWrapper
-	keyIndexMap map[bls.SerializedPublicKey]int
-	prepare     *votepower.Round
-	commit      *votepower.Round
-	lastCommit  *votepower.Round
-	extraCommit *votepower.Round
+	publicKeys            []bls.PublicKeyWrapper
+	keyIndexMap           map[bls.SerializedPublicKey]int
+	prepare               *votepower.Round
+	commit                *votepower.Round
+	commitInPreviousBlock *votepower.Round
+	extraCommit           *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
@@ -285,46 +285,14 @@ func (s *cIdentities) SignersCount(p SigType) int64 {
 		return int64(len(s.commit.BallotBox))
 	case ViewChange:
 		return int64(len(s.viewChange.BallotBox))
-	case LastCommit:
-		return int64(len(s.lastCommit.BallotBox))
+	case CommitInPreviousBlock:
+		return int64(len(s.commitInPreviousBlock.BallotBox))
 	case ExtraCommit:
 		return int64(len(s.extraCommit.BallotBox))
 	default:
 		return 0
 
 	}
-}
-
-func (s *cIdentities) submitExtraCommit(pubkeys []bls.SerializedPublicKey,
-	sig *bls_core.Sign, headerHash common.Hash,
-	height, viewID uint64,
-) (*votepower.Ballot, error) {
-	seenKeys := map[bls.SerializedPublicKey]struct{}{}
-	for _, pubKey := range pubkeys {
-		if _, ok := seenKeys[pubKey]; ok {
-			return nil, errors.Errorf("duplicate key found in votes %x", pubKey)
-		}
-		seenKeys[pubKey] = struct{}{}
-
-		_, ok := s.lastCommit.BallotBox[pubKey]
-		if ok {
-			return nil, errors.Errorf("vote is already submitted in last block %x", pubKey)
-		}
-	}
-
-	ballot := &votepower.Ballot{
-		SignerPubKeys:   pubkeys,
-		BlockHeaderHash: headerHash,
-		Signature:       common.Hex2Bytes(sig.SerializeToHexStr()),
-		Height:          height,
-		ViewID:          viewID,
-	}
-
-	for _, pubKey := range pubkeys {
-		s.extraCommit.BallotBox[pubKey] = ballot
-	}
-
-	return ballot, nil
 }
 
 func (s *cIdentities) submitVote(
@@ -344,8 +312,8 @@ func (s *cIdentities) submitVote(
 		}
 
 		if p == ExtraCommit {
-			// If it's extra commit signatures, also check on lastCommit sigs for dups.
-			if ballet := s.ReadBallot(LastCommit, pubKey); ballet != nil {
+			// If it's extra commit signatures, also check on commitInPreviousBlock sigs for dups.
+			if ballet := s.ReadBallot(CommitInPreviousBlock, pubKey); ballet != nil {
 				return nil, errors.Errorf("vote is already submitted %x", pubKey)
 			}
 		}
@@ -384,10 +352,10 @@ func (s *cIdentities) reset(ps []SigType) {
 		case Prepare:
 			s.prepare = m
 		case Commit:
-			// Move current commit to lastCommit and reset both commit/extraCommit.
-			s.lastCommit = s.commit
-			if s.lastCommit == nil {
-				s.lastCommit = votepower.NewRound()
+			// Move current commit to commitInPreviousBlock and reset both commit/extraCommit.
+			s.commitInPreviousBlock = s.commit
+			if s.commitInPreviousBlock == nil {
+				s.commitInPreviousBlock = votepower.NewRound()
 			}
 			s.commit = m
 		case ExtraCommit:
@@ -412,8 +380,8 @@ func (s *cIdentities) ReadBallot(p SigType, pubkey bls.SerializedPublicKey) *vot
 		ballotBox = s.commit.BallotBox
 	case ViewChange:
 		ballotBox = s.viewChange.BallotBox
-	case LastCommit:
-		ballotBox = s.lastCommit.BallotBox
+	case CommitInPreviousBlock:
+		ballotBox = s.commitInPreviousBlock.BallotBox
 	case ExtraCommit:
 		ballotBox = s.extraCommit.BallotBox
 	}

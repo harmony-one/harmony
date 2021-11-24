@@ -85,7 +85,7 @@ func (v *uniformVoteWeight) IsAllSigsCollected() bool {
 
 // IsAllSigsCollected ..
 func (v *uniformVoteWeight) IsAllSigsCollectedInPreviousBlock() bool {
-	return v.SignersCount(LastCommit) == v.ParticipantsCount()
+	return v.SignersCount(CommitInPreviousBlock) == v.ParticipantsCount()
 }
 
 func (v *uniformVoteWeight) SetVoters(

@@ -305,10 +305,11 @@ func waitForCommitSigs(sigsReady chan bool) error {
 }
 
 // ConstructCrossLink ...
-func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeader *block.Header) types.CrossLink {
+func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeader *block.Header) *types.CrossLink {
 	if parentHeader == nil {
 		// This shouldn't happen. But just to be protective.
-		return types.NewCrossLink(header, parentHeader)
+		utils.Logger().Error().Msg("Nil parent header in crosslink construction")
+		return nil
 	}
 	isExtraCommitEpoch := bc.Config().IsExtraCommit(parentHeader.Epoch())
 
@@ -320,10 +321,13 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 				grandParentBlockNum := big.NewInt(0)
 				grandParentViewID := big.NewInt(0)
 				grandParentEpoch := big.NewInt(0)
-				if grandParentHeader != nil { // Should always happen, default values to be defensive.
+				if grandParentHeader != nil {
 					grandParentBlockNum = grandParentHeader.Number()
 					grandParentViewID = grandParentHeader.ViewID()
 					grandParentEpoch = grandParentHeader.Epoch()
+				} else {
+					// No crosslink is needed if the grand parent block is nil
+					return nil
 				}
 				grandParentSig := parentHeader.LastCommitSignature()
 				grandParentBitmap := parentHeader.LastCommitBitmap()
@@ -336,7 +340,7 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 					// This shouldn't happen
 					utils.Logger().Error().Hex("sig", grandParentSig[:]).
 						Msg("Failed to deserialize sig")
-					return types.CrossLink{}
+					return nil
 				}
 
 				if len(grandParentExtraSig) != 0 {
@@ -346,7 +350,7 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 						// This shouldn't happen
 						utils.Logger().Error().Hex("extra sig", grandParentExtraSig[:]).
 							Msg("Failed to deserialize extra sig")
-						return types.CrossLink{}
+						return nil
 					}
 					sig.Add(extraSig)
 				}
@@ -358,7 +362,7 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 						utils.Logger().Error().Hex("bitmap", bitmap).
 							Hex("extraBitmap", grandParentExtraBitmap).
 							Msg("extra bitmap length mismatch")
-						return types.CrossLink{}
+						return nil
 					}
 
 					for i := 0; i < len(bitmap); i++ {
@@ -369,8 +373,8 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 				var serializedSig bls2.SerializedSignature
 				copy(serializedSig[:], sig.Serialize())
 
-				return types.CrossLink{
-					HashF:        header.ParentHash(),
+				return &types.CrossLink{
+					HashF:        grandParentHeader.Hash(),
 					BlockNumberF: grandParentBlockNum,
 					ViewIDF:      grandParentViewID,
 					SignatureF:   serializedSig,
@@ -378,10 +382,20 @@ func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeade
 					ShardIDF:     header.ShardID(),
 					EpochF:       grandParentEpoch,
 				}
+			} else {
+				// If the grand parent block not in extra commit epoch. The crosslink is skipped
+				// Note this is the only block where the crosslink is skipped due to the change on
+				// crosslink covering parent block (before extra commit) v.s. grand parent block.
+				utils.Logger().Info().Msg("Skipping crosslink for the single block")
+				return nil
 			}
+		} else {
+			utils.Logger().Error().Msg("Nil grant parent header in crosslink construction")
+			return nil
 		}
 	}
-	return types.NewCrossLink(header, parentHeader)
+	newCrossLink := types.NewCrossLink(header, parentHeader)
+	return &newCrossLink
 }
 
 func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
@@ -410,7 +424,10 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 
 		// Put shard 0 signatures as a crosslink for easy and consistent processing as other shards' crosslinks
-		allCrossLinks = append(allCrossLinks, ConstructCrossLink(bc, curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
+		cl := ConstructCrossLink(bc, curHeader, bc.GetHeaderByHash(curHeader.ParentHash()))
+		if cl != nil {
+			allCrossLinks = append(allCrossLinks, *cl)
+		}
 
 		// Put the real crosslinks in the list
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {

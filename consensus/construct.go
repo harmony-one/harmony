@@ -174,6 +174,8 @@ func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.SigType) []byte
 	} else if p == quorum.Commit {
 		buffer.Write(consensus.commitBitmap.Bitmap)
 	} else if p == quorum.ExtraCommit {
+		// If there is no extra commit sig, just return empty bytes which is totally valid
+		// and will be recognized by the validators as no extra commit sig in block.
 		if len(consensus.Decider.ReadAllBallots(p)) == 0 {
 			return []byte{}
 		}

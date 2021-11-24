@@ -48,8 +48,7 @@ type VerifyBlockFunc func(*types.Block) error
 
 // Consensus is the main struct with all states and data related to consensus process.
 type Consensus struct {
-	Decider          quorum.Decider
-	LastBlockDecider quorum.Decider
+	Decider quorum.Decider
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
