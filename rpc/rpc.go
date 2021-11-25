@@ -73,7 +73,7 @@ func (n Version) Namespace() string {
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
 	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
-	authApis := getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)
+	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
@@ -134,10 +134,10 @@ func StopServers() error {
 }
 
 func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
-	return append(getAPIs(hmy, debugEnable, rateLimiterEnable, ratelimit), []rpc.API{
+	return []rpc.API{
 		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
 		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
-	}...)
+	}
 }
 
 // getAPIs returns all the API methods for the RPC interface
