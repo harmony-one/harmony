@@ -663,7 +663,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	return nil, err
 }
 
-// GetHeaderByNumberRLPHex returns block header at given number by first rlp, then hex encoding
+// GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
 func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 	ctx context.Context, blockNumber BlockNumber,
 ) (string, error) {
