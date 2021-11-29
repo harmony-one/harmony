@@ -663,6 +663,38 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	return nil, err
 }
 
+// GetHeaderByNumberRLPHex returns block header at given number by first rlp, then hex encoding
+func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
+	ctx context.Context, blockNumber BlockNumber,
+) (string, error) {
+	timer := DoMetricRPCRequest(GetHeaderByNumber)
+	defer DoRPCRequestDuration(GetHeaderByNumber, timer)
+
+	err := s.wait(ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		return "", err
+	}
+
+	// Process number based on version
+	blockNum := blockNumber.EthBlockNumber()
+
+	// Ensure valid block number
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		return "", ErrRequestedBlockTooHigh
+	}
+
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
+	if header != nil && err == nil {
+		// Response output is the same for all versions
+		val, _ := rlp.EncodeToBytes(header)
+		return hex.EncodeToString(val)
+	}
+	return "", err
+}
+
 // GetCurrentUtilityMetrics ..
 func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
