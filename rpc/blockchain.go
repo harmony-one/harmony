@@ -692,7 +692,7 @@ func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 	if header != nil && err == nil {
 		// Response output is the same for all versions
 		val, _ := rlp.EncodeToBytes(header)
-		return hex.EncodeToString(val)
+		return hex.EncodeToString(val), nil
 	}
 	return "", err
 }
