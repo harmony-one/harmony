@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	lru "github.com/hashicorp/golang-lru"
@@ -666,16 +667,123 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	return nil, err
 }
 
+// Result structs for GetProof
+type AccountResult struct {
+	Address      common.Address  `json:"address"`
+	AccountProof []string        `json:"accountProof"`
+	Balance      *hexutil.Big    `json:"balance"`
+	CodeHash     common.Hash     `json:"codeHash"`
+	Nonce        hexutil.Uint64  `json:"nonce"`
+	StorageHash  common.Hash     `json:"storageHash"`
+	StorageProof []StorageResult `json:"storageProof"`
+}
+
+type StorageResult struct {
+	Key   string       `json:"key"`
+	Value *hexutil.Big `json:"value"`
+	Proof []string     `json:"proof"`
+}
+
+// GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
+func (s *PublicBlockchainService) GetProof(
+	ctx context.Context, address common.Address, storageKeys []string, blockNumber BlockNumber) (ret *AccountResult, err error) {
+	timer := DoMetricRPCRequest(GetProof)
+	defer DoRPCRequestDuration(GetProof, timer)
+
+	defer func() {
+		if ret == nil || err != nil {
+			DoMetricRPCQueryInfo(GetProof, FailedNumber)
+		}
+	}()
+
+	err = s.wait(ctx)
+	if err != nil {
+		return
+	}
+
+	// Process number based on version
+	blockNum := blockNumber.EthBlockNumber()
+
+	// Ensure valid block number
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
+		err = ErrRequestedBlockTooHigh
+		return
+	}
+
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
+	if header == nil && err != nil {
+		return
+	}
+	state, err := s.hmy.BeaconChain.StateAt(header.Root())
+	if state == nil || err != nil {
+		return
+	}
+
+	storageTrie := state.StorageTrie(address)
+	storageHash := types.EmptyRootHash
+	codeHash := state.GetCodeHash(address)
+	storageProof := make([]StorageResult, len(storageKeys))
+
+	// if we have a storageTrie, (which means the account exists), we can update the storagehash
+	if storageTrie != nil {
+		storageHash = storageTrie.Hash()
+	} else {
+		// no storageTrie means the account does not exist, so the codeHash is the hash of an empty bytearray.
+		codeHash = crypto.Keccak256Hash(nil)
+	}
+
+	// create the proof for the storageKeys
+	for i, key := range storageKeys {
+		if storageTrie != nil {
+			proof, storageError := state.GetStorageProof(address, common.HexToHash(key))
+			if storageError != nil {
+				err = storageError
+				return
+			}
+			storageProof[i] = StorageResult{key, (*hexutil.Big)(state.GetState(address, common.HexToHash(key)).Big()), toHexSlice(proof)}
+		} else {
+			storageProof[i] = StorageResult{key, &hexutil.Big{}, []string{}}
+		}
+	}
+
+	// create the accountProof
+	accountProof, err := state.GetProof(address)
+	if err != nil {
+		return
+	}
+
+	ret, err = &AccountResult{
+		Address:      address,
+		AccountProof: toHexSlice(accountProof),
+		Balance:      (*hexutil.Big)(state.GetBalance(address)),
+		CodeHash:     codeHash,
+		Nonce:        hexutil.Uint64(state.GetNonce(address)),
+		StorageHash:  storageHash,
+		StorageProof: storageProof,
+	}, state.Error()
+	return
+}
+
+// toHexSlice creates a slice of hex-strings based on []byte.
+func toHexSlice(b [][]byte) []string {
+	r := make([]string, len(b))
+	for i := range b {
+		r[i] = hexutil.Encode(b[i])
+	}
+	return r
+}
+
 // GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
 func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 	ctx context.Context, blockNumber BlockNumber,
 ) (string, error) {
-	timer := DoMetricRPCRequest(GetHeaderByNumber)
-	defer DoRPCRequestDuration(GetHeaderByNumber, timer)
+	timer := DoMetricRPCRequest(GetHeaderByNumberRLPHex)
+	defer DoRPCRequestDuration(GetHeaderByNumberRLPHex, timer)
 
 	err := s.wait(ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, FailedNumber)
 		return "", err
 	}
 
@@ -684,7 +792,7 @@ func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 
 	// Ensure valid block number
 	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
-		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, FailedNumber)
 		return "", ErrRequestedBlockTooHigh
 	}
 
