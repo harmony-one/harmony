@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/params"
 
@@ -286,20 +287,26 @@ func (e *engineImpl) Finalize(
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
 	if IsCommitteeSelectionBlock(chain, header) {
+		startTime := time.Now()
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, err
 		}
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("PayoutUndelegations")
 
 		// Needs to be after payoutUndelegations because payoutUndelegations
 		// depends on the old LastEpochInCommittee
+
+		startTime = time.Now()
 		if err := setElectionEpochAndMinFee(header, state, chain.Config()); err != nil {
 			return nil, nil, err
 		}
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("SetElectionEpochAndMinFee")
 
 		curShardState, err := chain.ReadShardState(chain.CurrentBlock().Epoch())
 		if err != nil {
 			return nil, nil, err
 		}
+		startTime = time.Now()
 		// Needs to be before AccumulateRewardsAndCountSigs because
 		// ComputeAndMutateEPOSStatus depends on the signing counts that's
 		// consistent with the counts when the new shardState was proposed.
@@ -311,6 +318,7 @@ func (e *engineImpl) Finalize(
 				return nil, nil, err
 			}
 		}
+		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("ComputeAndMutateEPOSStatus")
 	}
 
 	// Accumulate block rewards and commit the final state root

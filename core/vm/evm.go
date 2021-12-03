@@ -42,6 +42,9 @@ type (
 	// GetHashFunc returns the nth block hash in the blockchain
 	// and is used by the BLOCKHASH EVM op code.
 	GetHashFunc func(uint64) common.Hash
+	// GetVRFFunc returns the nth block vrf in the blockchain
+	// and is used by the precompile VRF contract.
+	GetVRFFunc func(uint64) common.Hash
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -57,10 +60,29 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if evm.chainRules.IsVRF {
 			precompiles = PrecompiledContractsVRF
 		}
+		if evm.chainRules.IsSHA3 {
+			precompiles = PrecompiledContractsSHA3FIPS
+		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
-				// Override the input with vrf data of the current block so it can be returned to the contract program.
-				input = evm.Context.VRF.Bytes()
+				if evm.chainRules.IsPrevVRF {
+					requestedBlockNum := big.NewInt(0).SetBytes(input)
+					minBlockNum := big.NewInt(0).Sub(evm.BlockNumber, common.Big257)
+
+					if requestedBlockNum.Cmp(evm.BlockNumber) == 0 {
+						input = evm.Context.VRF.Bytes()
+					} else if requestedBlockNum.Cmp(minBlockNum) > 0 && requestedBlockNum.Cmp(evm.BlockNumber) < 0 {
+						// requested block number is in range
+						input = evm.GetVRF(requestedBlockNum.Uint64()).Bytes()
+					} else {
+						// else default to the current block's VRF
+						input = evm.Context.VRF.Bytes()
+					}
+				} else {
+					// Override the input with vrf data of the requested block so it can be returned to the contract program.
+					input = evm.Context.VRF.Bytes()
+				}
+
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
@@ -74,6 +96,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					evm.interpreter = i
 				}(evm.interpreter)
 				evm.interpreter = interpreter
+			}
+
+			if evm.ChainConfig().IsDataCopyFixEpoch(evm.EpochNumber) {
+				contract.WithDataCopyFix = true
 			}
 			return interpreter.Run(contract, input, readOnly)
 
@@ -92,6 +118,8 @@ type Context struct {
 	Transfer TransferFunc
 	// GetHash returns the hash corresponding to n
 	GetHash GetHashFunc
+	// GetVRF returns the VRF corresponding to n
+	GetVRF GetVRFFunc
 
 	// IsValidator determines whether the address corresponds to a validator or a smart contract
 	// true: is a validator address; false: is smart contract address
@@ -236,6 +264,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		if evm.chainRules.IsVRF {
 			precompiles = PrecompiledContractsVRF
+		}
+		if evm.chainRules.IsSHA3 {
+			precompiles = PrecompiledContractsSHA3FIPS
 		}
 
 		if precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {

@@ -9,8 +9,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/harmony-one/harmony/core/types"
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	internal_common "github.com/harmony-one/harmony/internal/common"
-	rpc_common "github.com/harmony-one/harmony/rpc/common"
 )
 
 // Block represents a basic block which is further amended by BlockWithTxHash or BlockWithFullTx
@@ -29,6 +27,8 @@ type Block struct {
 	Size             hexutil.Uint64      `json:"size"`
 	GasLimit         hexutil.Uint64      `json:"gasLimit"`
 	GasUsed          hexutil.Uint64      `json:"gasUsed"`
+	VRF              common.Hash         `json:"vrf"`
+	VRFProof         hexutil.Bytes       `json:"vrfProof"`
 	Timestamp        hexutil.Uint64      `json:"timestamp"`
 	TransactionsRoot common.Hash         `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash         `json:"receiptsRoot"`
@@ -155,24 +155,16 @@ func NewReceipt(tx *types.EthTransaction, blockHash common.Hash, blockNumber, bl
 	return fields, nil
 }
 
-// NewBlock converts the given block to the RPC output which depends on fullTx. If inclTx is true transactions are
-// returned. When fullTx is true the returned block contains full transaction details, otherwise it will only contain
-// transaction hashes.
-func NewBlock(b *types.Block, blockArgs *rpc_common.BlockArgs, leaderAddress string) (interface{}, error) {
-	leader, err := internal_common.ParseAddr(leaderAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	if blockArgs.FullTx {
-		return NewBlockWithFullTx(b, blockArgs, leader)
-	}
-	return NewBlockWithTxHash(b, blockArgs, leader)
-}
-
-func newBlock(b *types.Block, leader common.Address) *Block {
+func newBlock(b *types.Block) *Block {
 	head := b.Header()
 
+	vrfAndProof := head.Vrf()
+	vrf := common.Hash{}
+	vrfProof := []byte{}
+	if len(vrfAndProof) == 32+96 {
+		copy(vrf[:], vrfAndProof[:32])
+		vrfProof = vrfAndProof[32:]
+	}
 	return &Block{
 		Number:           (*hexutil.Big)(head.Number()),
 		Hash:             b.Hash(),
@@ -182,12 +174,13 @@ func newBlock(b *types.Block, leader common.Address) *Block {
 		UncleHash:        hmytypes.CalcUncleHash(b.Uncles()),
 		LogsBloom:        head.Bloom(),
 		StateRoot:        head.Root(),
-		Miner:            leader,
 		Difficulty:       (*hexutil.Big)(big.NewInt(0)), // Legacy comment from hmy -> eth RPC porting: "Remove this because we don't have it in our header"
 		ExtraData:        hexutil.Bytes(head.Extra()),
 		Size:             hexutil.Uint64(b.Size()),
 		GasLimit:         hexutil.Uint64(head.GasLimit()),
 		GasUsed:          hexutil.Uint64(head.GasUsed()),
+		VRF:              vrf,
+		VRFProof:         vrfProof,
 		Timestamp:        hexutil.Uint64(head.Time().Uint64()),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
@@ -195,13 +188,8 @@ func newBlock(b *types.Block, leader common.Address) *Block {
 	}
 }
 
-// NewBlockWithTxHash ..
-func NewBlockWithTxHash(b *types.Block, blockArgs *rpc_common.BlockArgs, leader common.Address) (*BlockWithTxHash, error) {
-	if blockArgs.FullTx {
-		return nil, fmt.Errorf("block args specifies full tx, but requested RPC block with only tx hash")
-	}
-
-	blk := newBlock(b, leader)
+func blockWithTxHashFromBlock(b *types.Block) *BlockWithTxHash {
+	blk := newBlock(b)
 	blkWithTxs := &BlockWithTxHash{
 		Block:        blk,
 		Transactions: []common.Hash{},
@@ -210,20 +198,11 @@ func NewBlockWithTxHash(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 	for _, tx := range b.Transactions() {
 		blkWithTxs.Transactions = append(blkWithTxs.Transactions, tx.ConvertToEth().Hash())
 	}
-
-	if blockArgs.WithSigners {
-		blkWithTxs.Signers = blockArgs.Signers
-	}
-	return blkWithTxs, nil
+	return blkWithTxs
 }
 
-// NewBlockWithFullTx ..
-func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader common.Address) (*BlockWithFullTx, error) {
-	if !blockArgs.FullTx {
-		return nil, fmt.Errorf("block args specifies NO full tx, but requested RPC block with full tx")
-	}
-
-	blk := newBlock(b, leader)
+func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
+	blk := newBlock(b)
 	blkWithTxs := &BlockWithFullTx{
 		Block:        blk,
 		Transactions: []*Transaction{},
@@ -236,11 +215,6 @@ func NewBlockWithFullTx(b *types.Block, blockArgs *rpc_common.BlockArgs, leader 
 		}
 		blkWithTxs.Transactions = append(blkWithTxs.Transactions, fmtTx)
 	}
-
-	if blockArgs.WithSigners {
-		blkWithTxs.Signers = blockArgs.Signers
-	}
-
 	return blkWithTxs, nil
 }
 

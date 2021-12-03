@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -21,11 +20,13 @@ import (
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/service"
+	"github.com/harmony-one/harmony/api/service/pprof"
 	"github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/harmony-one/harmony/api/service/synchronize"
 	"github.com/harmony-one/harmony/common/fdlimit"
@@ -134,7 +135,6 @@ func runHarmonyNode(cmd *cobra.Command, args []string) {
 	}
 
 	setupNodeLog(cfg)
-	setupPprof(cfg)
 	setupNodeAndRun(cfg)
 }
 
@@ -234,25 +234,16 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
 	rotateSize := config.Log.RotateSize
+	rotateCount := config.Log.RotateCount
+	rotateMaxAge := config.Log.RotateMaxAge
 	verbosity := config.Log.Verbosity
 
-	utils.AddLogFile(logPath, rotateSize)
+	utils.AddLogFile(logPath, rotateSize, rotateCount, rotateMaxAge)
 	utils.SetLogVerbosity(log.Lvl(verbosity))
 	if config.Log.Context != nil {
 		ip := config.Log.Context.IP
 		port := config.Log.Context.Port
 		utils.SetLogContext(ip, strconv.Itoa(port))
-	}
-}
-
-func setupPprof(config harmonyconfig.HarmonyConfig) {
-	enabled := config.Pprof.Enabled
-	addr := config.Pprof.ListenAddr
-
-	if enabled {
-		go func() {
-			http.ListenAndServe(addr, nil)
-		}()
 	}
 }
 
@@ -325,9 +316,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		HTTPEnabled:        hc.HTTP.Enabled,
 		HTTPIp:             hc.HTTP.IP,
 		HTTPPort:           hc.HTTP.Port,
+		HTTPAuthPort:       hc.HTTP.AuthPort,
 		WSEnabled:          hc.WS.Enabled,
 		WSIp:               hc.WS.IP,
 		WSPort:             hc.WS.Port,
+		WSAuthPort:         hc.WS.AuthPort,
 		DebugEnabled:       hc.RPCOpt.DebugEnabled,
 		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
@@ -398,6 +391,9 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
+	}
+	if hc.Pprof.Enabled {
+		setupPprofService(currentNode, hc)
 	}
 	if hc.Prometheus.Enabled {
 		setupPrometheusService(currentNode, hc, nodeConfig.ShardID)
@@ -585,12 +581,13 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
-
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:          &selfPeer,
-		BLSKey:        nodeConfig.P2PPriKey,
-		BootNodes:     hc.Network.BootNodes,
-		DataStoreFile: hc.P2P.DHTDataStore,
+		Self:            &selfPeer,
+		BLSKey:          nodeConfig.P2PPriKey,
+		BootNodes:       hc.Network.BootNodes,
+		DataStoreFile:   hc.P2P.DHTDataStore,
+		DiscConcurrency: hc.P2P.DiscConcurrency,
+		MaxConnPerIP:    hc.P2P.MaxConnsPerIP,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -731,6 +728,19 @@ func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, cur
 			currentConsensus.SetIsBackup(true)
 		}
 	}
+}
+
+func setupPprofService(node *node.Node, hc harmonyconfig.HarmonyConfig) {
+	pprofConfig := pprof.Config{
+		Enabled:            hc.Pprof.Enabled,
+		ListenAddr:         hc.Pprof.ListenAddr,
+		Folder:             hc.Pprof.Folder,
+		ProfileNames:       hc.Pprof.ProfileNames,
+		ProfileIntervals:   hc.Pprof.ProfileIntervals,
+		ProfileDebugValues: hc.Pprof.ProfileDebugValues,
+	}
+	s := pprof.NewService(pprofConfig)
+	node.RegisterService(service.Pprof, s)
 }
 
 func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid uint32) {

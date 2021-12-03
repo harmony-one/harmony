@@ -59,13 +59,16 @@ func (s *PublicHarmonyService) Syncing(
 // GasPrice returns a suggestion for a gas price.
 // Note that the return type is an interface to account for the different versions
 func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error) {
-	// TODO(dm): add SuggestPrice API
+	price, err := s.hmy.SuggestPrice(ctx)
+	if err != nil || price.Cmp(big.NewInt(1e10)) < 0 {
+		price = big.NewInt(1e10)
+	}
 	// Format response according to version
 	switch s.version {
 	case V1, Eth:
-		return (*hexutil.Big)(big.NewInt(1e10)), nil
+		return (*hexutil.Big)(price), nil
 	case V2:
-		return 1e10, nil
+		return price.Uint64(), nil
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
@@ -85,4 +88,14 @@ func (s *PublicHarmonyService) GetPeerInfo(
 ) (StructuredResponse, error) {
 	// Response output is the same for all versions
 	return NewStructuredResponse(s.hmy.GetPeerInfo())
+}
+
+// GetNumPendingCrossLinks returns length of hmy.BlockChain.ReadPendingCrossLinks()
+func (s *PublicHarmonyService) GetNumPendingCrossLinks() (int, error) {
+	links, err := s.hmy.BlockChain.ReadPendingCrossLinks()
+	if err != nil {
+		return 0, err
+	}
+
+	return len(links), nil
 }

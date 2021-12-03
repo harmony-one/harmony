@@ -17,10 +17,12 @@ require (
 	github.com/ethereum/go-ethereum v1.9.25
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
+	github.com/goccy/go-json v0.7.10
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3
 	github.com/golangci/golangci-lint v1.22.2
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/harmony-ek/gencodec v0.0.0-20190215044613-e6740dbdd846
 	github.com/harmony-one/abool v1.0.1
 	github.com/harmony-one/bls v0.0.6
@@ -30,22 +32,22 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/json-iterator/go v1.1.10
-	github.com/libp2p/go-libp2p v0.14.2
-	github.com/libp2p/go-libp2p-core v0.8.5
+	github.com/libp2p/go-libp2p v0.14.0
+	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-kad-dht v0.12.2
-	github.com/libp2p/go-libp2p-pubsub v0.4.1
-	github.com/multiformats/go-multiaddr v0.3.1
+	github.com/libp2p/go-libp2p-kad-dht v0.11.1
+	github.com/libp2p/go-libp2p-pubsub v0.4.0
+	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pborman/uuid v1.2.0
-	github.com/pelletier/go-toml v1.2.0
+	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.8.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rjeczalik/notify v0.9.2
-	github.com/rs/cors v1.7.0 // indirect
+	github.com/rs/cors v1.7.0
 	github.com/rs/zerolog v1.18.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
@@ -55,10 +57,10 @@ require (
 	go.uber.org/ratelimit v0.1.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
-	golang.org/x/tools v0.0.0-20210106214847-113979e3529a
+	golang.org/x/tools v0.1.7
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c

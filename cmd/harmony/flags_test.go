@@ -8,9 +8,10 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -30,7 +31,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -57,14 +58,17 @@ func TestHarmonyFlags(t *testing.T) {
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: harmonyconfig.P2pConfig{
-					Port:    9000,
-					IP:      defaultConfig.P2P.IP,
-					KeyFile: defaultConfig.P2P.KeyFile,
+					Port:            9000,
+					IP:              defaultConfig.P2P.IP,
+					KeyFile:         defaultConfig.P2P.KeyFile,
+					DiscConcurrency: 5,
+					MaxConnsPerIP:   5,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
 					IP:             "127.0.0.1",
 					Port:           9500,
+					AuthPort:       9501,
 					RosettaEnabled: false,
 					RosettaPort:    9700,
 				},
@@ -74,9 +78,10 @@ func TestHarmonyFlags(t *testing.T) {
 					RequestsPerSecond: 1000,
 				},
 				WS: harmonyconfig.WsConfig{
-					Enabled: true,
-					IP:      "127.0.0.1",
-					Port:    9800,
+					Enabled:  true,
+					IP:       "127.0.0.1",
+					Port:     9800,
+					AuthPort: 9801,
 				},
 				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
@@ -98,14 +103,20 @@ func TestHarmonyFlags(t *testing.T) {
 					BlacklistFile: "./.hmy/blacklist.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
-					Enabled:    false,
-					ListenAddr: "127.0.0.1:6060",
+					Enabled:            false,
+					ListenAddr:         "127.0.0.1:6060",
+					Folder:             "./profiles",
+					ProfileNames:       []string{},
+					ProfileIntervals:   []int{600},
+					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
-					Folder:     "./latest",
-					FileName:   "validator-8.8.8.8-9000.log",
-					RotateSize: 100,
-					Verbosity:  3,
+					Folder:       "./latest",
+					FileName:     "validator-8.8.8.8-9000.log",
+					RotateSize:   100,
+					RotateCount:  0,
+					RotateMaxAge: 0,
+					Verbosity:    3,
 					Context: &harmonyconfig.LogContext{
 						IP:   "8.8.8.8",
 						Port: 9000,
@@ -355,18 +366,30 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:         9001,
-				IP:           nodeconfig.DefaultPublicListenIP,
-				KeyFile:      "./key.file",
-				DHTDataStore: &defDataStore,
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				DHTDataStore:  &defDataStore,
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:    9001,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				KeyFile: "./key.file",
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				MaxConnsPerIP: 10,
+			},
+		},
+		{
+			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5", "--p2p.security.max-conn-per-ip", "5"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:            9001,
+				IP:              nodeconfig.DefaultPublicListenIP,
+				KeyFile:         "./.hmykey",
+				DiscConcurrency: 5,
+				MaxConnsPerIP:   5,
 			},
 		},
 	}
@@ -387,7 +410,7 @@ func TestP2PFlags(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(got.P2P, test.expConfig) {
-			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.Network, test.expConfig)
+			t.Errorf("Test %v: unexpected config: \n\t%+v\n\t%+v", i, got.P2P, test.expConfig)
 		}
 		ts.tearDown()
 	}
@@ -410,6 +433,7 @@ func TestRPCFlags(t *testing.T) {
 				RosettaEnabled: false,
 				IP:             defaultConfig.HTTP.IP,
 				Port:           defaultConfig.HTTP.Port,
+				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    defaultConfig.HTTP.RosettaPort,
 			},
 		},
@@ -420,6 +444,18 @@ func TestRPCFlags(t *testing.T) {
 				RosettaEnabled: false,
 				IP:             "8.8.8.8",
 				Port:           9001,
+				AuthPort:       defaultConfig.HTTP.AuthPort,
+				RosettaPort:    defaultConfig.HTTP.RosettaPort,
+			},
+		},
+		{
+			args: []string{"--http.ip", "8.8.8.8", "--http.auth-port", "9001"},
+			expConfig: harmonyconfig.HttpConfig{
+				Enabled:        true,
+				RosettaEnabled: false,
+				IP:             "8.8.8.8",
+				Port:           defaultConfig.HTTP.Port,
+				AuthPort:       9001,
 				RosettaPort:    defaultConfig.HTTP.RosettaPort,
 			},
 		},
@@ -430,6 +466,7 @@ func TestRPCFlags(t *testing.T) {
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
 				Port:           9001,
+				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    10001,
 			},
 		},
@@ -440,6 +477,7 @@ func TestRPCFlags(t *testing.T) {
 				RosettaEnabled: true,
 				IP:             "8.8.8.8",
 				Port:           defaultConfig.HTTP.Port,
+				AuthPort:       defaultConfig.HTTP.AuthPort,
 				RosettaPort:    10001,
 			},
 		},
@@ -450,6 +488,7 @@ func TestRPCFlags(t *testing.T) {
 				RosettaEnabled: false,
 				IP:             nodeconfig.DefaultPublicListenIP,
 				Port:           9501,
+				AuthPort:       9502,
 				RosettaPort:    9701,
 			},
 		},
@@ -491,25 +530,37 @@ func TestWSFlags(t *testing.T) {
 		{
 			args: []string{"--ws=false"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: false,
-				IP:      defaultConfig.WS.IP,
-				Port:    defaultConfig.WS.Port,
+				Enabled:  false,
+				IP:       defaultConfig.WS.IP,
+				Port:     defaultConfig.WS.Port,
+				AuthPort: defaultConfig.WS.AuthPort,
 			},
 		},
 		{
 			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.port", "9001"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      "8.8.8.8",
-				Port:    9001,
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     9001,
+				AuthPort: defaultConfig.WS.AuthPort,
+			},
+		},
+		{
+			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.auth-port", "9001"},
+			expConfig: harmonyconfig.WsConfig{
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     defaultConfig.WS.Port,
+				AuthPort: 9001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				Port:    9801,
+				Enabled:  true,
+				IP:       nodeconfig.DefaultPublicListenIP,
+				Port:     9801,
+				AuthPort: 9802,
 			},
 		},
 	}
@@ -773,22 +824,67 @@ func TestPprofFlags(t *testing.T) {
 		{
 			args: []string{"--pprof"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: defaultConfig.Pprof.ListenAddr,
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    true,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            true,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
 			},
 		},
 		{
 			args: []string{"--pprof=false", "--pprof.addr", "8.8.8.8:9001"},
 			expConfig: harmonyconfig.PprofConfig{
-				Enabled:    false,
-				ListenAddr: "8.8.8.8:9001",
+				Enabled:            false,
+				ListenAddr:         "8.8.8.8:9001",
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.names", "cpu,heap,mutex"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       []string{"cpu", "heap", "mutex"},
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.intervals", "0,1"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   []int{0, 1},
+				ProfileDebugValues: defaultConfig.Pprof.ProfileDebugValues,
+			},
+		},
+		{
+			args: []string{"--pprof.profile.debug", "0,1,0"},
+			expConfig: harmonyconfig.PprofConfig{
+				Enabled:            true,
+				ListenAddr:         defaultConfig.Pprof.ListenAddr,
+				Folder:             defaultConfig.Pprof.Folder,
+				ProfileNames:       defaultConfig.Pprof.ProfileNames,
+				ProfileIntervals:   defaultConfig.Pprof.ProfileIntervals,
+				ProfileDebugValues: []int{0, 1, 0},
 			},
 		},
 	}
@@ -820,13 +916,16 @@ func TestLogFlags(t *testing.T) {
 			expConfig: defaultConfig.Log,
 		},
 		{
-			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.name", "harmony.log",
-				"--log.verb", "5", "--log.verbose-prints", "config"},
+			args: []string{"--log.dir", "latest_log", "--log.max-size", "10", "--log.rotate-count", "3",
+				"--log.rotate-max-age", "0", "--log.name", "harmony.log", "--log.verb", "5",
+				"--log.verbose-prints", "config"},
 			expConfig: harmonyconfig.LogConfig{
-				Folder:     "latest_log",
-				FileName:   "harmony.log",
-				RotateSize: 10,
-				Verbosity:  5,
+				Folder:       "latest_log",
+				FileName:     "harmony.log",
+				RotateSize:   10,
+				RotateCount:  3,
+				RotateMaxAge: 0,
+				Verbosity:    5,
 				VerbosePrints: harmonyconfig.LogVerbosePrints{
 					Config: true,
 				},
@@ -839,6 +938,8 @@ func TestLogFlags(t *testing.T) {
 				Folder:        defaultConfig.Log.Folder,
 				FileName:      defaultConfig.Log.FileName,
 				RotateSize:    defaultConfig.Log.RotateSize,
+				RotateCount:   defaultConfig.Log.RotateCount,
+				RotateMaxAge:  defaultConfig.Log.RotateMaxAge,
 				Verbosity:     defaultConfig.Log.Verbosity,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{
@@ -854,6 +955,8 @@ func TestLogFlags(t *testing.T) {
 				Folder:        "latest_log",
 				FileName:      "validator-8.8.8.8-9001.log",
 				RotateSize:    10,
+				RotateCount:   0,
+				RotateMaxAge:  0,
 				Verbosity:     5,
 				VerbosePrints: defaultConfig.Log.VerbosePrints,
 				Context: &harmonyconfig.LogContext{

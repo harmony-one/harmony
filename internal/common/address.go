@@ -225,6 +225,11 @@ func MustAddressToBech32(addr ethCommon.Address) string {
 // ParseAddr parses the given address, either as bech32 or as hex.
 // Return error if the address is invalid.
 func ParseAddr(s string) (ethCommon.Address, error) {
+	// empty address in 0x format is still a valid address
+	if s == "0x0000000000000000000000000000000000000000" {
+		return ethCommon.Address{}, nil
+	}
+
 	if addr, err := Bech32ToAddress(s); err == nil {
 		return addr, nil
 	}

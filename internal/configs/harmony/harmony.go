@@ -45,10 +45,12 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port         int
-	IP           string
-	KeyFile      string
-	DHTDataStore *string `toml:",omitempty"`
+	Port            int
+	IP              string
+	KeyFile         string
+	DHTDataStore    *string `toml:",omitempty"`
+	DiscConcurrency int     // Discovery Concurrency value
+	MaxConnsPerIP   int
 }
 
 type GeneralConfig struct {
@@ -88,14 +90,20 @@ type TxPoolConfig struct {
 }
 
 type PprofConfig struct {
-	Enabled    bool
-	ListenAddr string
+	Enabled            bool
+	ListenAddr         string
+	Folder             string
+	ProfileNames       []string
+	ProfileIntervals   []int
+	ProfileDebugValues []int
 }
 
 type LogConfig struct {
 	Folder        string
 	FileName      string
 	RotateSize    int
+	RotateCount   int
+	RotateMaxAge  int
 	Verbosity     int
 	VerbosePrints LogVerbosePrints
 	Context       *LogContext `toml:",omitempty"`
@@ -132,14 +140,16 @@ type HttpConfig struct {
 	Enabled        bool
 	IP             string
 	Port           int
+	AuthPort       int
 	RosettaEnabled bool
 	RosettaPort    int
 }
 
 type WsConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled  bool
+	IP       string
+	Port     int
+	AuthPort int
 }
 
 type RpcOptConfig struct {

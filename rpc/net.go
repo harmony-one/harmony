@@ -45,6 +45,8 @@ func NewPublicNetAPI(net p2p.Host, chainID uint64, version Version) rpc.API {
 // PeerCount returns the number of connected peers
 // Note that the return type is an interface to account for the different versions
 func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
+	timer := DoMetricRPCRequest(PeerCount)
+	defer DoRPCRequestDuration(PeerCount, timer)
 	// Format response according to version
 	switch s.version {
 	case V1, Eth:
@@ -60,7 +62,7 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 func (s *PublicNetService) Version(ctx context.Context) interface{} {
 	switch s.version {
 	case Eth:
-		return hexutil.Uint64(nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.Uint64())
+		return nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.String()
 	default:
 		return fmt.Sprintf("%d", s.chainID)
 	}

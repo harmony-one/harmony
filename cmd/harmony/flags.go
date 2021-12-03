@@ -7,10 +7,11 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -57,8 +58,9 @@ var (
 		p2pIPFlag,
 		p2pKeyFileFlag,
 		p2pDHTDataStoreFlag,
-
+		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		maxConnPerIPFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -66,6 +68,7 @@ var (
 		httpRosettaEnabledFlag,
 		httpIPFlag,
 		httpPortFlag,
+		httpAuthPortFlag,
 		httpRosettaPortFlag,
 	}
 
@@ -73,6 +76,7 @@ var (
 		wsEnabledFlag,
 		wsIPFlag,
 		wsPortFlag,
+		wsAuthPortFlag,
 	}
 
 	rpcOptFlags = []cli.Flag{
@@ -128,11 +132,17 @@ var (
 	pprofFlags = []cli.Flag{
 		pprofEnabledFlag,
 		pprofListenAddrFlag,
+		pprofFolderFlag,
+		pprofProfileNamesFlag,
+		pprofProfileIntervalFlag,
+		pprofProfileDebugFlag,
 	}
 
 	logFlags = []cli.Flag{
 		logFolderFlag,
 		logRotateSizeFlag,
+		logRotateCountFlag,
+		logRotateMaxAgeFlag,
 		logFileNameFlag,
 		logContextIPFlag,
 		logContextPortFlag,
@@ -525,6 +535,16 @@ var (
 		DefValue:   defaultConfig.P2P.KeyFile,
 		Deprecated: "use --p2p.keyfile",
 	}
+	p2pDiscoveryConcurrencyFlag = cli.IntFlag{
+		Name:     "p2p.disc.concurrency",
+		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
+		DefValue: defaultConfig.P2P.DiscConcurrency,
+	}
+	maxConnPerIPFlag = cli.IntFlag{
+		Name:     "p2p.security.max-conn-per-ip",
+		Usage:    "maximum number of connections allowed per node",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -548,6 +568,14 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		ds := cli.GetStringFlagValue(cmd, p2pDHTDataStoreFlag)
 		config.P2P.DHTDataStore = &ds
 	}
+
+	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
+		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
+		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
 }
 
 // http flags
@@ -566,6 +594,11 @@ var (
 		Name:     "http.port",
 		Usage:    "rpc port to listen for HTTP requests",
 		DefValue: defaultConfig.HTTP.Port,
+	}
+	httpAuthPortFlag = cli.IntFlag{
+		Name:     "http.auth-port",
+		Usage:    "rpc port to listen for auth HTTP requests",
+		DefValue: defaultConfig.HTTP.AuthPort,
 	}
 	httpRosettaEnabledFlag = cli.BoolFlag{
 		Name:     "http.rosetta",
@@ -589,6 +622,11 @@ func applyHTTPFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, httpPortFlag) {
 		config.HTTP.Port = cli.GetIntFlagValue(cmd, httpPortFlag)
+		isRPCSpecified = true
+	}
+
+	if cli.IsFlagChanged(cmd, httpAuthPortFlag) {
+		config.HTTP.AuthPort = cli.GetIntFlagValue(cmd, httpAuthPortFlag)
 		isRPCSpecified = true
 	}
 
@@ -628,6 +666,11 @@ var (
 		Usage:    "port for websocket endpoint",
 		DefValue: defaultConfig.WS.Port,
 	}
+	wsAuthPortFlag = cli.IntFlag{
+		Name:     "ws.auth-port",
+		Usage:    "port for websocket auth endpoint",
+		DefValue: defaultConfig.WS.AuthPort,
+	}
 )
 
 func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -639,6 +682,9 @@ func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, wsPortFlag) {
 		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
+	}
+	if cli.IsFlagChanged(cmd, wsAuthPortFlag) {
+		config.WS.AuthPort = cli.GetIntFlagValue(cmd, wsAuthPortFlag)
 	}
 }
 
@@ -975,12 +1021,51 @@ var (
 		Usage:    "listen address for pprof",
 		DefValue: defaultConfig.Pprof.ListenAddr,
 	}
+	pprofFolderFlag = cli.StringFlag{
+		Name:     "pprof.folder",
+		Usage:    "folder to put pprof profiles",
+		DefValue: defaultConfig.Pprof.Folder,
+		Hidden:   true,
+	}
+	pprofProfileNamesFlag = cli.StringSliceFlag{
+		Name:     "pprof.profile.names",
+		Usage:    "a list of pprof profile names (separated by ,) e.g. cpu,heap,goroutine",
+		DefValue: defaultConfig.Pprof.ProfileNames,
+	}
+	pprofProfileIntervalFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.intervals",
+		Usage:    "a list of pprof profile interval integer values (separated by ,) e.g. 30 saves all profiles every 30 seconds or 0,10 saves the first profile on shutdown and the second profile every 10 seconds",
+		DefValue: defaultConfig.Pprof.ProfileIntervals,
+		Hidden:   true,
+	}
+	pprofProfileDebugFlag = cli.IntSliceFlag{
+		Name:     "pprof.profile.debug",
+		Usage:    "a list of pprof profile debug integer values (separated by ,) e.g. 0 writes the gzip-compressed protocol buffer and 1 writes the legacy text format. Predefined profiles may assign meaning to other debug values: https://golang.org/pkg/runtime/pprof/",
+		DefValue: defaultConfig.Pprof.ProfileDebugValues,
+		Hidden:   true,
+	}
 )
 
 func applyPprofFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	var pprofSet bool
 	if cli.IsFlagChanged(cmd, pprofListenAddrFlag) {
 		config.Pprof.ListenAddr = cli.GetStringFlagValue(cmd, pprofListenAddrFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofFolderFlag) {
+		config.Pprof.Folder = cli.GetStringFlagValue(cmd, pprofFolderFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileNamesFlag) {
+		config.Pprof.ProfileNames = cli.GetStringSliceFlagValue(cmd, pprofProfileNamesFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileIntervalFlag) {
+		config.Pprof.ProfileIntervals = cli.GetIntSliceFlagValue(cmd, pprofProfileIntervalFlag)
+		pprofSet = true
+	}
+	if cli.IsFlagChanged(cmd, pprofProfileDebugFlag) {
+		config.Pprof.ProfileDebugValues = cli.GetIntSliceFlagValue(cmd, pprofProfileDebugFlag)
 		pprofSet = true
 	}
 	if cli.IsFlagChanged(cmd, pprofEnabledFlag) {
@@ -1001,6 +1086,16 @@ var (
 		Name:     "log.max-size",
 		Usage:    "rotation log size in megabytes",
 		DefValue: defaultConfig.Log.RotateSize,
+	}
+	logRotateCountFlag = cli.IntFlag{
+		Name:     "log.rotate-count",
+		Usage:    "maximum number of old log files to retain",
+		DefValue: defaultConfig.Log.RotateCount,
+	}
+	logRotateMaxAgeFlag = cli.IntFlag{
+		Name:     "log.rotate-max-age",
+		Usage:    "maximum number of days to retain old log files",
+		DefValue: defaultConfig.Log.RotateMaxAge,
 	}
 	logFileNameFlag = cli.StringFlag{
 		Name:     "log.name",
@@ -1062,6 +1157,14 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, logRotateSizeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogRotateSizeFlag) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, legacyLogRotateSizeFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateCountFlag) {
+		config.Log.RotateCount = cli.GetIntFlagValue(cmd, logRotateCountFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateMaxAgeFlag) {
+		config.Log.RotateMaxAge = cli.GetIntFlagValue(cmd, logRotateMaxAgeFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, logFileNameFlag) {
@@ -1296,8 +1399,10 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfi
 		legacyPort := cli.GetIntFlagValue(cmd, legacyPortFlag)
 		config.P2P.Port = legacyPort
 		config.HTTP.Port = nodeconfig.GetRPCHTTPPortFromBase(legacyPort)
+		config.HTTP.AuthPort = nodeconfig.GetRPCAuthHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
+		config.WS.AuthPort = nodeconfig.GetWSAuthPortFromBase(legacyPort)
 
 		legPortStr := strconv.Itoa(legacyPort)
 		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))

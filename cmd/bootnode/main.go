@@ -9,10 +9,11 @@ import (
 	"path"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/p2p"
 	net "github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
+
+	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // ConnLogger ..
@@ -93,10 +94,13 @@ func main() {
 	port := flag.String("port", "9876", "port of the node.")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
+	logRotateCount := flag.Int("log_rotate_count", 0, "the number of rotated logs to keep. If set to 0 rotation is disabled")
+	logRotateMaxAge := flag.Int("log_rotate_max_age", 0, "the maximum number of days to retain old logs. If set to 0 rotation is disabled")
 	keyFile := flag.String("key", "./.bnkey", "the private key file of the bootnode")
 	versionFlag := flag.Bool("version", false, "Output version info")
 	verbosity := flag.Int("verbosity", 5, "Logging verbosity: 0=silent, 1=error, 2=warn, 3=info, 4=debug, 5=detail (default: 5)")
 	logConn := flag.Bool("log_conn", false, "log incoming/outgoing connections")
+	maxConnPerIP := flag.Int("max_conn_per_ip", 10, "max connections number for same ip")
 
 	flag.Parse()
 
@@ -107,7 +111,7 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize)
+	utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
 
 	privKey, _, err := utils.LoadKeyFromFile(*keyFile)
 	if err != nil {
@@ -122,6 +126,7 @@ func main() {
 		BLSKey:        privKey,
 		BootNodes:     nil, // Boot nodes have no boot nodes :) Will be connected when other nodes joined
 		DataStoreFile: &dataStorePath,
+		MaxConnPerIP:  *maxConnPerIP,
 	})
 	if err != nil {
 		utils.FatalErrMsg(err, "cannot initialize network")

@@ -228,31 +228,26 @@ func (bc *BlockChain) CommitOffChainData(
 			); err != nil {
 				return NonStatTy, err
 			}
-			for _, paid := range [...][]reward.Payout{
-				roundResult.BeaconchainAward, roundResult.ShardChainAward,
-			} {
-				for i := range paid {
-					stats, ok := tempValidatorStats[paid[i].Addr]
-					if !ok {
-						stats, err = bc.ReadValidatorStats(paid[i].Addr)
-						if err != nil {
-							utils.Logger().Info().Err(err).
-								Str("addr", paid[i].Addr.Hex()).
-								Str("bls-earning-key", paid[i].EarningKey.Hex()).
-								Msg("could not read validator stats to update for earning per key")
-							continue
-						}
-						tempValidatorStats[paid[i].Addr] = stats
+			for _, paid := range roundResult.Payouts {
+				stats, ok := tempValidatorStats[paid.Addr]
+				if !ok {
+					stats, err = bc.ReadValidatorStats(paid.Addr)
+					if err != nil {
+						utils.Logger().Info().Err(err).
+							Str("addr", paid.Addr.Hex()).
+							Str("bls-earning-key", paid.EarningKey.Hex()).
+							Msg("could not read validator stats to update for earning per key")
+						continue
 					}
-					for j := range stats.MetricsPerShard {
-						if stats.MetricsPerShard[j].Vote.Identity == paid[i].EarningKey {
-							stats.MetricsPerShard[j].Earned.Add(
-								stats.MetricsPerShard[j].Earned,
-								paid[i].NewlyEarned,
-							)
-						}
+					tempValidatorStats[paid.Addr] = stats
+				}
+				for j := range stats.MetricsPerShard {
+					if stats.MetricsPerShard[j].Vote.Identity == paid.EarningKey {
+						stats.MetricsPerShard[j].Earned.Add(
+							stats.MetricsPerShard[j].Earned,
+							paid.NewlyEarned,
+						)
 					}
-
 				}
 			}
 

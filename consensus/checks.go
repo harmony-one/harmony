@@ -118,7 +118,7 @@ func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
 	return true
 }
 
-func (consensus *Consensus) onPreparedSanityChecks(
+func (consensus *Consensus) newBlockSanityChecks(
 	blockObj *types.Block, recvMsg *FBFTMessage,
 ) bool {
 	if blockObj.NumberU64() != recvMsg.BlockNum ||
@@ -126,7 +126,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", blockObj.NumberU64()).
-			Msg("[OnPrepared] BlockNum not match")
+			Msg("[newBlockSanityChecks] BlockNum not match")
 		return false
 	}
 	if blockObj.Header().Hash() != recvMsg.BlockHash {
@@ -134,7 +134,7 @@ func (consensus *Consensus) onPreparedSanityChecks(
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
 			Str("blockObjHash", blockObj.Header().Hash().Hex()).
-			Msg("[OnPrepared] BlockHash not match")
+			Msg("[newBlockSanityChecks] BlockHash not match")
 		return false
 	}
 	return true

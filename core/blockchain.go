@@ -71,8 +71,8 @@ var (
 )
 
 const (
-	bodyCacheLimit                     = 256
-	blockCacheLimit                    = 256
+	bodyCacheLimit                     = 2048
+	blockCacheLimit                    = 2048
 	receiptsCacheLimit                 = 32
 	maxFutureBlocks                    = 256
 	maxTimeFutureBlocks                = 30
@@ -262,15 +262,15 @@ func NewBlockChain(
 // ValidateNewBlock validates new block.
 func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
-
 	if err != nil {
 		return err
 	}
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
-		block, state, bc.vmConfig,
+	// Do not read cache from processor.
+	receipts, cxReceipts, _, usedGas, _, _, err := bc.processor.Process(
+		block, state, bc.vmConfig, false,
 	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -1465,9 +1465,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			events = append(events, ev)
 		}
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
-			block, state, vmConfig,
+		receipts, cxReceipts, logs, usedGas, payout, newState, err := bc.processor.Process(
+			block, state, vmConfig, true,
 		)
+		state = newState // update state in case the new state is cached.
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err

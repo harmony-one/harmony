@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math/big"
 
+	"github.com/pkg/errors"
+
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -20,6 +22,9 @@ type uniformVoteWeight struct {
 	DependencyInjectionWriter
 	DependencyInjectionReader
 	SignatureReader
+
+	lastPowerSignersCountCache map[Phase]int64
+	lastParticipantsCount      int64
 }
 
 // Policy ..
@@ -123,9 +128,29 @@ func (v *uniformVoteWeight) AmIMemberOfCommitee() bool {
 }
 
 func (v *uniformVoteWeight) ResetPrepareAndCommitVotes() {
+	v.lastPowerSignersCountCache[Prepare] = v.SignersCount(Prepare)
+	v.lastPowerSignersCountCache[Commit] = v.SignersCount(Commit)
+	v.lastParticipantsCount = v.ParticipantsCount()
+
 	v.reset([]Phase{Prepare, Commit})
 }
 
 func (v *uniformVoteWeight) ResetViewChangeVotes() {
+	v.lastPowerSignersCountCache[ViewChange] = v.SignersCount(ViewChange)
+	v.lastParticipantsCount = v.ParticipantsCount()
+
 	v.reset([]Phase{ViewChange})
+}
+
+func (v *uniformVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
+	if v.lastParticipantsCount == 0 {
+		return nil, errors.New("uniformVoteWeight not cache last participants count")
+	}
+
+	if lastPowerSignersCount, ok := v.lastPowerSignersCountCache[p]; ok {
+		power := numeric.NewDec(lastPowerSignersCount).Quo(numeric.NewDec(v.lastParticipantsCount))
+		return &power, nil
+	} else {
+		return nil, errors.New("uniformVoteWeight not cache this phase")
+	}
 }

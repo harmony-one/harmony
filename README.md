@@ -37,7 +37,7 @@ sudo yum install glibc-static gmp-devel gmp-static openssl-libs openssl-static g
 
 On macOS: 
 ```bash
-brew cask install docker
+brew install --cask docker
 open /Applications/Docker.app
 ```
 On Linux, reference official documentation [here](https://docs.docker.com/engine/install/).
@@ -69,6 +69,7 @@ cd harmony
 
 3. Build the harmony binary & dependent libs
 ```
+go mod tidy
 make
 ```
 > Run `bash scripts/install_build_tools.sh` to ensure build tools are of correct versions.

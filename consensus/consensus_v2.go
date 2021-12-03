@@ -495,7 +495,7 @@ func (iter *LastMileBlockIter) Next() *types.Block {
 	block := iter.blockCandidates[iter.curIndex]
 	iter.curIndex++
 
-	if !iter.fbftLog.IsBlockVerified(block) {
+	if !iter.fbftLog.IsBlockVerified(block.Hash()) {
 		if err := iter.verify(block); err != nil {
 			iter.logger.Debug().Err(err).Msg("block verification failed in consensus last mile block")
 			return nil
@@ -558,7 +558,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk)); err != nil {
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
 			return
 		}
@@ -658,7 +658,7 @@ func (consensus *Consensus) tryCatchup() error {
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
 	if consensus.Blockchain.CurrentBlock().NumberU64() < blk.NumberU64() {
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk)); err != nil {
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
 			return err
 		}

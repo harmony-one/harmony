@@ -42,6 +42,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(442), // Around Thursday Feb 4th 2020, 10AM PST
 		CrossTxEpoch:               big.NewInt(28),
 		CrossLinkEpoch:             big.NewInt(186),
+		AggregatedRewardEpoch:      big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		StakingEpoch:               big.NewInt(186),
 		PreStakingEpoch:            big.NewInt(185),
 		QuickUnlockEpoch:           big.NewInt(191),
@@ -51,14 +52,18 @@ var (
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		VRFEpoch:                   big.NewInt(631), // Around Wed July 7th 2021
+		PrevVRFEpoch:               big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		MinDelegation100Epoch:      big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionRateEpoch:     big.NewInt(631), // Around Wed July 7th 2021
 		MinCommissionPromoPeriod:   big.NewInt(100),
 		EPoSBound35Epoch:           big.NewInt(631), // Around Wed July 7th 2021
 		EIP155Epoch:                big.NewInt(28),
 		S3Epoch:                    big.NewInt(28),
+		DataCopyFixEpoch:           big.NewInt(689), // Around Wed Sept 15th 2021 with 3.5s block time
 		IstanbulEpoch:              big.NewInt(314),
 		ReceiptLogEpoch:            big.NewInt(101),
+		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
+		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -69,6 +74,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(73290),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(74275),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -78,14 +84,18 @@ var (
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
 		VRFEpoch:                   big.NewInt(73880),
+		PrevVRFEpoch:               big.NewInt(74384),
 		MinDelegation100Epoch:      big.NewInt(73880),
 		MinCommissionRateEpoch:     big.NewInt(73880),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(73880),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(74412),
 		IstanbulEpoch:              big.NewInt(43800),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(74570),
+		HIP6And8Epoch:              big.NewInt(74570),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -97,6 +107,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -106,14 +117,18 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -125,6 +140,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -134,14 +150,18 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -153,6 +173,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(1),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -162,14 +183,18 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -180,6 +205,7 @@ var (
 		EthCompatibleEpoch:         big.NewInt(0),
 		CrossTxEpoch:               big.NewInt(0),
 		CrossLinkEpoch:             big.NewInt(2),
+		AggregatedRewardEpoch:      big.NewInt(3),
 		StakingEpoch:               big.NewInt(2),
 		PreStakingEpoch:            big.NewInt(0),
 		QuickUnlockEpoch:           big.NewInt(0),
@@ -189,14 +215,18 @@ var (
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
+		PrevVRFEpoch:               big.NewInt(0),
 		MinDelegation100Epoch:      big.NewInt(0),
 		MinCommissionRateEpoch:     big.NewInt(0),
 		MinCommissionPromoPeriod:   big.NewInt(10),
 		EPoSBound35Epoch:           big.NewInt(0),
 		EIP155Epoch:                big.NewInt(0),
 		S3Epoch:                    big.NewInt(0),
+		DataCopyFixEpoch:           big.NewInt(0),
 		IstanbulEpoch:              big.NewInt(0),
 		ReceiptLogEpoch:            big.NewInt(0),
+		SHA3Epoch:                  big.NewInt(0),
+		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 	}
 
 	// AllProtocolChanges ...
@@ -209,6 +239,7 @@ var (
 		big.NewInt(0),                      // EthCompatibleEpoch
 		big.NewInt(0),                      // CrossTxEpoch
 		big.NewInt(0),                      // CrossLinkEpoch
+		big.NewInt(0),                      // AggregatedRewardEpoch
 		big.NewInt(0),                      // StakingEpoch
 		big.NewInt(0),                      // PreStakingEpoch
 		big.NewInt(0),                      // QuickUnlockEpoch
@@ -218,14 +249,18 @@ var (
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
 		big.NewInt(0),                      // VRFEpoch
+		big.NewInt(0),                      // PrevVRFEpoch
 		big.NewInt(0),                      // MinDelegation100Epoch
 		big.NewInt(0),                      // MinCommissionRateEpoch
 		big.NewInt(10),                     // MinCommissionPromoPeriod
 		big.NewInt(0),                      // EPoSBound35Epoch
 		big.NewInt(0),                      // EIP155Epoch
 		big.NewInt(0),                      // S3Epoch
+		big.NewInt(0),                      // DataCopyFixEpoch
 		big.NewInt(0),                      // IstanbulEpoch
 		big.NewInt(0),                      // ReceiptLogEpoch
+		big.NewInt(0),                      // SHA3Epoch
+		big.NewInt(0),                      // HIP6And8Epoch
 	}
 
 	// TestChainConfig ...
@@ -238,6 +273,7 @@ var (
 		big.NewInt(0),        // EthCompatibleEpoch
 		big.NewInt(0),        // CrossTxEpoch
 		big.NewInt(0),        // CrossLinkEpoch
+		big.NewInt(0),        // AggregatedRewardEpoch
 		big.NewInt(0),        // StakingEpoch
 		big.NewInt(0),        // PreStakingEpoch
 		big.NewInt(0),        // QuickUnlockEpoch
@@ -247,14 +283,18 @@ var (
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
 		big.NewInt(0),        // VRFEpoch
+		big.NewInt(0),        // PrevVRFEpoch
 		big.NewInt(0),        // MinDelegation100Epoch
 		big.NewInt(0),        // MinCommissionRateEpoch
 		big.NewInt(10),       // MinCommissionPromoPeriod
 		big.NewInt(0),        // EPoSBound35Epoch
 		big.NewInt(0),        // EIP155Epoch
 		big.NewInt(0),        // S3Epoch
+		big.NewInt(0),        // DataCopyFixEpoch
 		big.NewInt(0),        // IstanbulEpoch
 		big.NewInt(0),        // ReceiptLogEpoch
+		big.NewInt(0),        // SHA3Epoch
+		big.NewInt(0),        // HIP6And8Epoch
 	}
 
 	// TestRules ...
@@ -300,6 +340,9 @@ type ChainConfig struct {
 	// cross-shard links.
 	CrossLinkEpoch *big.Int `json:"cross-link-epoch,omitempty"`
 
+	// AggregatedRewardEpoch is the epoch when block rewards are distributed every 64 blocks
+	AggregatedRewardEpoch *big.Int `json:"aggregated-reward-epoch,omitempty"`
+
 	// StakingEpoch is the epoch when shard assign takes staking into account
 	StakingEpoch *big.Int `json:"staking-epoch,omitempty"`
 
@@ -331,6 +374,9 @@ type ChainConfig struct {
 	// VRFEpoch is the epoch when VRF randomness is enabled
 	VRFEpoch *big.Int `json:"vrf-epoch,omitempty"`
 
+	// PrevVRFEpoch is the epoch when previous VRF randomness can be fetched
+	PrevVRFEpoch *big.Int `json:"prev-vrf-epoch,omitempty"`
+
 	// MinDelegation100Epoch is the epoch when min delegation is reduced from 1000 ONE to 100 ONE
 	MinDelegation100Epoch *big.Int `json:"min-delegation-100-epoch,omitempty"`
 
@@ -349,16 +395,25 @@ type ChainConfig struct {
 	// S3 epoch is the first epoch containing S3 mainnet and all ethereum update up to Constantinople
 	S3Epoch *big.Int `json:"s3-epoch,omitempty"`
 
+	// DataCopyFix epoch is the first epoch containing fix for evm datacopy bug.
+	DataCopyFixEpoch *big.Int `json:"data-copy-fix-epoch,omitempty"`
+
 	// Istanbul epoch
 	IstanbulEpoch *big.Int `json:"istanbul-epoch,omitempty"`
 
 	// ReceiptLogEpoch is the first epoch support receiptlog
 	ReceiptLogEpoch *big.Int `json:"receipt-log-epoch,omitempty"`
+
+	// IsSHA3Epoch is the first epoch in supporting SHA3 FIPS-202 standard
+	SHA3Epoch *big.Int `json:"sha3-epoch,omitempty"`
+
+	// IsHIP6And8Epoch is the first epoch to support HIP-6 and HIP-8
+	HIP6And8Epoch *big.Int `json:"hip6_8-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch:%v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -366,6 +421,7 @@ func (c *ChainConfig) String() string {
 		c.StakingEpoch,
 		c.CrossLinkEpoch,
 		c.ReceiptLogEpoch,
+		c.SHA3Epoch,
 	)
 }
 
@@ -397,6 +453,11 @@ func (c *ChainConfig) HasCrossTxFields(epoch *big.Int) bool {
 // IsEthCompatible determines whether it is ethereum compatible epoch
 func (c *ChainConfig) IsEthCompatible(epoch *big.Int) bool {
 	return isForked(c.EthCompatibleEpoch, epoch)
+}
+
+// IsAggregatedRewardEpoch determines whether it is the epoch when rewards are distributed every 64 blocks
+func (c *ChainConfig) IsAggregatedRewardEpoch(epoch *big.Int) bool {
+	return isForked(c.AggregatedRewardEpoch, epoch)
 }
 
 // IsStaking determines whether it is staking epoch
@@ -434,6 +495,11 @@ func (c *ChainConfig) IsVRF(epoch *big.Int) bool {
 	return isForked(c.VRFEpoch, epoch)
 }
 
+// IsPrevVRF determines whether it is the epoch to enable previous vrf
+func (c *ChainConfig) IsPrevVRF(epoch *big.Int) bool {
+	return isForked(c.PrevVRFEpoch, epoch)
+}
+
 // IsMinDelegation100 determines whether it is the epoch to reduce min delegation to 100
 func (c *ChainConfig) IsMinDelegation100(epoch *big.Int) bool {
 	return isForked(c.MinDelegation100Epoch, epoch)
@@ -469,6 +535,11 @@ func (c *ChainConfig) IsS3(epoch *big.Int) bool {
 	return isForked(c.S3Epoch, epoch)
 }
 
+// IsDataCopyFixEpoch returns whether epoch has the fix for DataCopy evm bug.
+func (c *ChainConfig) IsDataCopyFixEpoch(epoch *big.Int) bool {
+	return isForked(c.DataCopyFixEpoch, epoch)
+}
+
 // IsIstanbul returns whether epoch is either equal to the Istanbul fork epoch or greater.
 func (c *ChainConfig) IsIstanbul(epoch *big.Int) bool {
 	return isForked(c.IstanbulEpoch, epoch)
@@ -477,6 +548,18 @@ func (c *ChainConfig) IsIstanbul(epoch *big.Int) bool {
 // IsReceiptLog returns whether epoch is either equal to the ReceiptLog fork epoch or greater.
 func (c *ChainConfig) IsReceiptLog(epoch *big.Int) bool {
 	return isForked(c.ReceiptLogEpoch, epoch)
+}
+
+// IsSHA3 returns whether epoch is either equal to the IsSHA3 fork epoch or greater.
+func (c *ChainConfig) IsSHA3(epoch *big.Int) bool {
+	return isForked(c.SHA3Epoch, epoch)
+}
+
+// IsHIP6And8Epoch determines whether it is the epoch to support
+// HIP-6: reduce the internal voting power from 60% to 49%
+// HIP-8: increase external nodes from 800 to 900
+func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
+	return isForked(c.HIP6And8Epoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
@@ -527,9 +610,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                      *big.Int
-	EthChainID                                                   *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF bool
+	ChainID                                                                         *big.Int
+	EthChainID                                                                      *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -551,5 +634,7 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsReceiptLog: c.IsReceiptLog(epoch),
 		IsIstanbul:   c.IsIstanbul(epoch),
 		IsVRF:        c.IsVRF(epoch),
+		IsPrevVRF:    c.IsPrevVRF(epoch),
+		IsSHA3:       c.IsSHA3(epoch),
 	}
 }

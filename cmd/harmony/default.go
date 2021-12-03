@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.1.0"
+const tomlConfigVersion = "2.5.0"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -25,21 +25,25 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:    nodeconfig.DefaultP2PPort,
-		IP:      nodeconfig.DefaultPublicListenIP,
-		KeyFile: "./.hmykey",
+		Port:            nodeconfig.DefaultP2PPort,
+		IP:              nodeconfig.DefaultPublicListenIP,
+		KeyFile:         "./.hmykey",
+		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
 		RosettaEnabled: false,
 		IP:             "127.0.0.1",
 		Port:           nodeconfig.DefaultRPCPort,
+		AuthPort:       nodeconfig.DefaultAuthRPCPort,
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: harmonyconfig.WsConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultWSPort,
+		Enabled:  true,
+		IP:       "127.0.0.1",
+		Port:     nodeconfig.DefaultWSPort,
+		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
 		DebugEnabled:      false,
@@ -64,14 +68,20 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
-		Enabled:    false,
-		ListenAddr: "127.0.0.1:6060",
+		Enabled:            false,
+		ListenAddr:         "127.0.0.1:6060",
+		Folder:             "./profiles",
+		ProfileNames:       []string{},
+		ProfileIntervals:   []int{600},
+		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
-		Folder:     "./latest",
-		FileName:   "harmony.log",
-		RotateSize: 100,
-		Verbosity:  3,
+		Folder:       "./latest",
+		FileName:     "harmony.log",
+		RotateSize:   100,
+		RotateCount:  0,
+		RotateMaxAge: 0,
+		Verbosity:    3,
 		VerbosePrints: harmonyconfig.LogVerbosePrints{
 			Config: true,
 		},
