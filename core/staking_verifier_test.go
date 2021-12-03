@@ -134,7 +134,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			bc: makeFakeChainContextForStake(),
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeStateDBForStake(t)
-				vw, err := sdb.ValidatorWrapper(makeTestAddr(0))
+				vw, err := sdb.ValidatorWrapper(makeTestAddr(0), false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -640,7 +640,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			// 13: cannot update a banned validator
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeStateDBForStake(t)
-				vw, err := sdb.ValidatorWrapper(validatorAddr)
+				vw, err := sdb.ValidatorWrapper(validatorAddr, false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1140,7 +1140,7 @@ func makeStateForRedelegate(t *testing.T) *state.DB {
 }
 
 func addStateUndelegationForAddr(sdb *state.DB, addr common.Address, epoch *big.Int) error {
-	w, err := sdb.ValidatorWrapper(addr)
+	w, err := sdb.ValidatorWrapper(addr, false, true)
 	if err != nil {
 		return err
 	}
@@ -1253,7 +1253,7 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 			// 4: Extract tokens from banned validator
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeDefaultStateForUndelegate(t)
-				w, err := sdb.ValidatorWrapper(validatorAddr)
+				w, err := sdb.ValidatorWrapper(validatorAddr, false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1574,7 +1574,7 @@ func makeStateForReward(t *testing.T) *state.DB {
 }
 
 func addStateRewardForAddr(sdb *state.DB, addr common.Address, rewards []*big.Int) error {
-	w, err := sdb.ValidatorWrapper(addr)
+	w, err := sdb.ValidatorWrapper(addr, false, true)
 	if err != nil {
 		return err
 	}

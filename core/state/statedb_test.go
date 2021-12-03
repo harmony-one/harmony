@@ -38,6 +38,10 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
 	stk "github.com/harmony-one/harmony/staking/types"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/common/denominations"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -191,15 +195,15 @@ func TestCopy(t *testing.T) {
 		copy.updateStateObject(copyObj)
 		ccopy.updateStateObject(copyObj)
 
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
@@ -300,15 +304,15 @@ func TestCopy(t *testing.T) {
 			t.Errorf("copy obj %d: balance mismatch: have %v, want %v", i, ccopyObj.Balance(), want)
 		}
 
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
@@ -983,4 +987,73 @@ func makeBLSPubSigPair() blsPubSigPair {
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}
+}
+
+func TestValidatorRevert(t *testing.T) {
+	// initialize empty state
+	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	snapshot := state.Snapshot()
+	key, _ := crypto.GenerateKey()
+	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
+	// add it
+	if err := state.UpdateValidatorWrapperWithRevert(wrapper.Address, &wrapper); err != nil {
+		t.Error(err)
+	}
+	// check that it is stored
+	loadedWrapper, _ := state.ValidatorWrapper(wrapper.Address, true, false)
+	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
+		t.Errorf("Loaded wrapper not equal to saved wrapper")
+	}
+	// now revert
+	state.RevertToSnapshot(snapshot)
+	loadedWrapper, _ = state.ValidatorWrapper(wrapper.Address, true, false)
+	if loadedWrapper != nil {
+		fmt.Printf("Wrapper: %v\n", wrapper)
+		fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
+		t.Errorf("Loaded wrapper not empty after revert")
+	}
+	// do a check against empty state and this state
+	emptyState, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	st := &snapshotTest{addrs: []common.Address{wrapper.Address}}
+	if err := st.checkEqual(state, emptyState); err != nil {
+		t.Error(err)
+		t.Errorf("State is not empty after revert")
+	}
+
+	// add back the validator
+	state.UpdateValidatorWrapperWithRevert(wrapper.Address, &wrapper)
+	snapshot = state.Snapshot()
+	stateWithValidatorAndNoDelegation := state.Copy()
+	// add a delegation
+	delegatorKey, _ := crypto.GenerateKey()
+	wrapper.Delegations = append(wrapper.Delegations, stk.NewDelegation(
+		crypto.PubkeyToAddress(delegatorKey.PublicKey),
+		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
+	)
+	if err := state.UpdateValidatorWrapperWithRevert(wrapper.Address, &wrapper); err != nil {
+		t.Error(err)
+	}
+	// check that it is stored
+	loadedWrapper, _ = state.ValidatorWrapper(wrapper.Address, true, false)
+	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
+		fmt.Printf("Wrapper: %v\n", wrapper)
+		fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
+		t.Errorf("Loaded wrapper not equal to saved wrapper")
+	}
+	// now revert
+	state.RevertToSnapshot(snapshot)
+	// drop the new delegation
+	wrapper.Delegations = wrapper.Delegations[:1]
+	loadedWrapper, _ = state.ValidatorWrapper(wrapper.Address, true, false)
+	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
+		fmt.Printf("Wrapper: %v\n", wrapper)
+		fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
+		t.Errorf("Loaded wrapper not equal to wrapper without delegation")
+	}
+	// make sure to add the delegation address to snapshotTest
+	st = &snapshotTest{addrs: []common.Address{wrapper.Address, crypto.PubkeyToAddress(delegatorKey.PublicKey)}}
+	if err := st.checkEqual(state, stateWithValidatorAndNoDelegation); err != nil {
+		t.Error(err)
+		t.Errorf("State does not match after delegation revert")
+	}
 }

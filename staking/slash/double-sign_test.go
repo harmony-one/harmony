@@ -662,7 +662,7 @@ func (tc *applyTestCase) checkResult() error {
 // checkState checks whether the state has been banned and whether the delegations
 // are different from the original
 func (tc *applyTestCase) checkState() error {
-	vw, err := tc.state.ValidatorWrapper(offAddr)
+	vw, err := tc.state.ValidatorWrapper(offAddr, true, false)
 	if err != nil {
 		return err
 	}
@@ -670,7 +670,7 @@ func (tc *applyTestCase) checkState() error {
 		return fmt.Errorf("status not banned")
 	}
 
-	vwSnap, err := tc.stateSnap.ValidatorWrapperCopy(offAddr)
+	vwSnap, err := tc.stateSnap.ValidatorWrapper(offAddr, true, false)
 	if err != nil {
 		return err
 	}
