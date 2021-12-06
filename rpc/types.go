@@ -140,7 +140,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		if len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"' {
 			input = input[1 : len(input)-1]
 		}
-		input = strings.TrimPrefix(input, "0x")
+		input = strings.TrimPrefix(strings.ToLower(input), "0x")
 		num, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {
 			return err
