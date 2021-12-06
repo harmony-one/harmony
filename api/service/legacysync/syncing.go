@@ -873,7 +873,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC]  bloUpdateBlockAndStatus: Error adding newck to blockchain %d %d",
+				"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
