@@ -13,9 +13,8 @@ import (
 // BlockArgs is struct to include optional block formatting params.
 type BlockArgs struct {
 	WithSigners bool     `json:"withSigners"`
-	InclTx      bool     `json:"inclTx"`
 	FullTx      bool     `json:"fullTx"`
-	Signers     []string `json:"signers"`
+	Signers     []string `json:"-"`
 	InclStaking bool     `json:"inclStaking"`
 }
 

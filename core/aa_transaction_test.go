@@ -18,6 +18,7 @@ package core
 
 import (
 	"encoding/binary"
+	"errors"
 	"math/big"
 	"testing"
 
@@ -84,7 +85,7 @@ func testValidate(blockchain *BlockChain, statedb *state.DB, transaction *types.
 		vmenv              = vm.NewEVM(context, statedb, blockchain.Config(), vm.Config{})
 		err                = Validate(transaction, types.HomesteadSigner{}, vmenv, validationGasLimit)
 	)
-	if err != expectedErr {
+	if !errors.Is(err, expectedErr) {
 		t.Error("\n\texpected:", expectedErr, "\n\tgot:", err)
 	}
 	statedb.RevertToSnapshot(snapshotRevisionId)

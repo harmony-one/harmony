@@ -399,7 +399,7 @@ var blake2FTests = []precompiledTest{
 }
 
 func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
-	p := PrecompiledContractsIstanbul[common.HexToAddress(addr)]
+	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in))
@@ -418,7 +418,7 @@ func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
-	p := PrecompiledContractsIstanbul[common.HexToAddress(addr)]
+	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in)-1)
@@ -436,7 +436,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 }
 
 func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
-	p := PrecompiledContractsIstanbul[common.HexToAddress(addr)]
+	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("31337")),
 		nil, new(big.Int), p.RequiredGas(in))
@@ -458,7 +458,7 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 	if test.noBenchmark {
 		return
 	}
-	p := PrecompiledContractsIstanbul[common.HexToAddress(addr)]
+	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	reqGas := p.RequiredGas(in)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
@@ -658,6 +658,62 @@ var ecRecoverTests = []precompiledTest{
 func TestPrecompiledEcrecover(t *testing.T) {
 	for _, test := range ecRecoverTests {
 		testPrecompiled("01", test, t)
+	}
+
+}
+
+// sha3fip  test vectors
+var sha3fipTests = []precompiledTest{
+	{
+		input:    "0448250ebe88d77e0a12bcf530fe6a2cf1ac176945638d309b840d631940c93b78c2bd6d16f227a8877e3f1604cd75b9c5a8ab0cac95174a8a0a0f8ea9e4c10bca",
+		expected: "c7647f7e251bf1bd70863c8693e93a4e77dd0c9a689073e987d51254317dc704",
+		name:     "sha3fip",
+	},
+	{
+		input:    "1234",
+		expected: "19becdc0e8d6dd4aa2c9c2983dbb9c61956a8ade69b360d3e6019f0bcd5557a9",
+		name:     "sha3fip",
+	},
+}
+
+func TestPrecompiledSHA3fip(t *testing.T) {
+
+	for _, test := range sha3fipTests {
+		testPrecompiled("FD", test, t)
+	}
+
+}
+
+// EcRecover test vectors
+var ecRecoverPublicKeyTests = []precompiledTest{
+	{
+		input: "c5d6c454e4d7a8e8a654f5ef96e8efe41d21a65b171b298925414aa3dc061e37" +
+			"0000000000000000000000000000000000000000000000000000000000000000" +
+			"4011de30c04302a2352400df3d1459d6d8799580dceb259f45db1d99243a8d0c" +
+			"64f548b7776cb93e37579b830fc3efce41e12e0958cda9f8c5fcad682c610795",
+		expected: "0448250ebe88d77e0a12bcf530fe6a2cf1ac176945638d309b840d631940c93b78c2bd6d16f227a8877e3f1604cd75b9c5a8ab0cac95174a8a0a0f8ea9e4c10bca",
+		name:     "CallEcrecoverrecoverable Key",
+	},
+	{
+		input: "c5d6c454e4d7a8e8a654f5ef96e8efe41d21a65b171b298925414aa3dc061e37" +
+			"000000000000000000000000000000000000000000000000000000000000001b" +
+			"4011de30c04302a2352400df3d1459d6d8799580dceb259f45db1d99243a8d0c" +
+			"64f548b7776cb93e37579b830fc3efce41e12e0958cda9f8c5fcad682c610795",
+		expected: "",
+		name:     "InvalidLowV-bits-1",
+	}, {
+		input: "c5d6c454e4d7a8e8a654f5ef96e8efe41d21a65b171b298925414aa3dc061e37" +
+			"000000000000000000000000000000000000000000000000000000000000001c" +
+			"4011de30c04302a2352400df3d1459d6d8799580dceb259f45db1d99243a8d0c" +
+			"64f548b7776cb93e37579b830fc3efce41e12e0958cda9f8c5fcad682c610795",
+		expected: "",
+		name:     "InvalidLowV-bits-1",
+	},
+}
+
+func TestPrecompiledEcrecoverPublicKey(t *testing.T) {
+	for _, test := range ecRecoverPublicKeyTests {
+		testPrecompiled("FE", test, t)
 	}
 
 }

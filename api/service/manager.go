@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -20,6 +19,7 @@ const (
 	Consensus
 	BlockProposal
 	NetworkInfo
+	Pprof
 	Prometheus
 	Synchronize
 )
@@ -36,6 +36,8 @@ func (t Type) String() string {
 		return "BlockProposal"
 	case NetworkInfo:
 		return "NetworkInfo"
+	case Pprof:
+		return "Pprof"
 	case Prometheus:
 		return "Prometheus"
 	case Synchronize:
@@ -49,7 +51,6 @@ func (t Type) String() string {
 type Service interface {
 	Start() error
 	Stop() error
-	APIs() []rpc.API // the list of RPC descriptors the service provides
 }
 
 // Manager stores all services for service manager.

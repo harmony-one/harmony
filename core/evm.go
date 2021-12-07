@@ -57,7 +57,7 @@ type ChainContext interface {
 }
 
 // NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, header *block.Header, chain headerGetter, author *common.Address) vm.Context {
+func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
 	if author == nil {
@@ -79,6 +79,7 @@ func NewEVMContext(msg Message, header *block.Header, chain headerGetter, author
 		Transfer:    Transfer,
 		IsValidator: IsValidator,
 		GetHash:     GetHashFn(header, chain),
+		GetVRF:      GetVRFFn(header, chain),
 		Origin:      msg.From(),
 		Coinbase:    beneficiary,
 		BlockNumber: header.Number(),
@@ -112,6 +113,46 @@ func GetHashFn(ref *block.Header, chain headerGetter) func(n uint64) common.Hash
 			cache[header.Number().Uint64()-1] = header.ParentHash()
 			if n == header.Number().Uint64()-1 {
 				return header.ParentHash()
+			}
+		}
+		return common.Hash{}
+	}
+}
+
+// GetVRFFn returns a GetVRFFn which retrieves header vrf by number
+func GetVRFFn(ref *block.Header, chain ChainContext) func(n uint64) common.Hash {
+	var cache map[uint64]common.Hash
+
+	return func(n uint64) common.Hash {
+		// If there's no hash cache yet, make one
+		if cache == nil {
+			curVRF := common.Hash{}
+			if len(ref.Vrf()) >= 32 {
+				vrfAndProof := ref.Vrf()
+				copy(curVRF[:], vrfAndProof[:32])
+			}
+
+			cache = map[uint64]common.Hash{
+				ref.Number().Uint64(): curVRF,
+			}
+		}
+		// Try to fulfill the request from the cache
+		if hash, ok := cache[n]; ok {
+			return hash
+		}
+		// Not cached, iterate the blocks and cache the hashes
+		for header := chain.GetHeader(ref.ParentHash(), ref.Number().Uint64()-1); header != nil; header = chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1) {
+
+			curVRF := common.Hash{}
+			if len(header.Vrf()) >= 32 {
+				vrfAndProof := header.Vrf()
+				copy(curVRF[:], vrfAndProof[:32])
+			}
+
+			cache[header.Number().Uint64()] = curVRF
+
+			if n == header.Number().Uint64() {
+				return curVRF
 			}
 		}
 		return common.Hash{}

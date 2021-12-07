@@ -168,13 +168,23 @@ func (s *PublicTransactionService) EstimateGas(
 func (s *PublicTransactionService) GetTransactionByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionByHash)
+	defer DoRPCRequestDuration(GetTransactionByHash, timer)
 	// Try to return an already finalized transaction
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	if tx == nil {
+		// Try to return a pending transaction
+		if tx := s.hmy.TxPool.Get(hash); tx != nil {
+			if plainTx, ok := tx.(*types.Transaction); ok {
+				return s.newRPCTransaction(plainTx, common.Hash{}, 0, 0, 0)
+			}
+		}
+
 		utils.Logger().Debug().
 			Err(errors.Wrapf(ErrTransactionNotFound, "hash %v", hash.String())).
 			Msgf("%v error at %v", LogTag, "GetTransactionByHash")
 		// Legacy behavior is to not return RPC errors
+		DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 		return nil, nil
 	}
 	block, err := s.hmy.GetBlock(ctx, blockHash)
@@ -183,26 +193,36 @@ func (s *PublicTransactionService) GetTransactionByHash(
 			Err(err).
 			Msgf("%v error at %v", LogTag, "GetTransactionByHash")
 		// Legacy behavior is to not return RPC errors
+		DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 		return nil, nil
 	}
+
+	return s.newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+}
+
+func (s *PublicTransactionService) newRPCTransaction(tx *types.Transaction, blockHash common.Hash,
+	blockNumber uint64, timestamp uint64, index uint64) (StructuredResponse, error) {
 
 	// Format the response according to the version
 	switch s.version {
 	case V1:
-		tx, err := v1.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v1.NewTransaction(tx, blockHash, blockNumber, timestamp, index)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v2.NewTransaction(tx, blockHash, blockNumber, timestamp, index)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case Eth:
-		tx, err := eth.NewTransaction(tx.ConvertToEth(), blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := eth.NewTransaction(tx.ConvertToEth(), blockHash, blockNumber, timestamp, index)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
@@ -215,13 +235,24 @@ func (s *PublicTransactionService) GetTransactionByHash(
 func (s *PublicTransactionService) GetStakingTransactionByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionByHash)
+	defer DoRPCRequestDuration(GetStakingTransactionByHash, timer)
+
 	// Try to return an already finalized transaction
 	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
 	if stx == nil {
+		// Try to return a pending transaction
+		if tx := s.hmy.TxPool.Get(hash); tx != nil {
+			if stx, ok := tx.(*staking.StakingTransaction); ok {
+				return s.newRPCStakingTransaction(stx, common.Hash{}, 0, 0, 0)
+			}
+		}
+
 		utils.Logger().Debug().
 			Err(errors.Wrapf(ErrTransactionNotFound, "hash %v", hash.String())).
 			Msgf("%v error at %v", LogTag, "GetStakingTransactionByHash")
 		// Legacy behavior is to not return RPC errors
+		DoMetricRPCQueryInfo(GetStakingTransactionByHash, FailedNumber)
 		return nil, nil
 	}
 	block, err := s.hmy.GetBlock(ctx, blockHash)
@@ -230,19 +261,28 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 			Err(err).
 			Msgf("%v error at %v", LogTag, "GetStakingTransactionByHash")
 		// Legacy behavior is to not return RPC errors
+		DoMetricRPCQueryInfo(GetStakingTransactionByHash, FailedNumber)
 		return nil, nil
 	}
 
+	return s.newRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+}
+
+func (s *PublicTransactionService) newRPCStakingTransaction(stx *staking.StakingTransaction, blockHash common.Hash,
+	blockNumber uint64, timestamp uint64, index uint64) (StructuredResponse, error) {
+
 	switch s.version {
 	case V1:
-		tx, err := v1.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+		tx, err := v1.NewStakingTransaction(stx, blockHash, blockNumber, timestamp, index)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetStakingTransactionByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
 	case V2:
-		tx, err := v2.NewStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index, true)
+		tx, err := v2.NewStakingTransaction(stx, blockHash, blockNumber, timestamp, index, true)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetStakingTransactionByHash, FailedNumber)
 			return nil, err
 		}
 		return NewStructuredResponse(tx)
@@ -255,6 +295,8 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 func (s *PublicTransactionService) GetTransactionsHistory(
 	ctx context.Context, args TxHistoryArgs,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionsHistory)
+	defer DoRPCRequestDuration(GetTransactionsHistory, timer)
 	// Fetch transaction history
 	var address string
 	var result []common.Hash
@@ -264,15 +306,18 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 	} else {
 		addr, err := internal_common.ParseAddr(args.Address)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionsHistory, FailedNumber)
 			return nil, err
 		}
 		address, err = internal_common.AddressToBech32(addr)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetTransactionsHistory, FailedNumber)
 			return nil, err
 		}
 	}
 	hashes, err := s.hmy.GetTransactionsHistory(address, args.TxType, args.Order)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetTransactionsHistory, FailedNumber)
 		return nil, err
 	}
 
@@ -303,6 +348,9 @@ func (s *PublicTransactionService) GetTransactionsHistory(
 func (s *PublicTransactionService) GetStakingTransactionsHistory(
 	ctx context.Context, args TxHistoryArgs,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionsHistory)
+	defer DoRPCRequestDuration(GetStakingTransactionsHistory, timer)
+
 	// Fetch transaction history
 	var address string
 	var result []common.Hash
@@ -312,6 +360,7 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 	} else {
 		addr, err := internal_common.ParseAddr(args.Address)
 		if err != nil {
+			DoMetricRPCQueryInfo(GetStakingTransactionsHistory, FailedNumber)
 			return nil, err
 		}
 		address, err = internal_common.AddressToBech32(addr)
@@ -320,6 +369,7 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 				Err(err).
 				Msgf("%v error at %v", LogTag, "GetStakingTransactionsHistory")
 			// Legacy behavior is to not return RPC errors
+			DoMetricRPCQueryInfo(GetStakingTransactionsHistory, FailedNumber)
 			return nil, nil
 		}
 	}
@@ -329,6 +379,7 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 			Err(err).
 			Msgf("%v error at %v", LogTag, "GetStakingTransactionsHistory")
 		// Legacy behavior is to not return RPC errors
+		DoMetricRPCQueryInfo(GetStakingTransactionsHistory, FailedNumber)
 		return nil, nil
 	}
 

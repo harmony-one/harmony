@@ -103,7 +103,8 @@ type topLevelRegistry struct {
 type Roster struct {
 	Voters map[bls.SerializedPublicKey]*AccommodateHarmonyVote
 	topLevelRegistry
-	ShardID uint32
+	ShardID      uint32
+	OrderedSlots []bls.SerializedPublicKey
 }
 
 func (r Roster) String() string {
@@ -245,6 +246,9 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 
 	roster.OurVotingPowerTotalPercentage = ourPercentage
 	roster.TheirVotingPowerTotalPercentage = theirPercentage
+	for _, slot := range subComm.Slots {
+		roster.OrderedSlots = append(roster.OrderedSlots, slot.BLSPublicKey)
+	}
 	return roster, nil
 }
 

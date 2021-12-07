@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"github.com/ethereum/go-ethereum/rpc"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core/types"
@@ -40,9 +39,4 @@ func (s *Service) Stop() error {
 	<-s.stoppedChan
 	utils.Logger().Info().Msg("Consensus service stopped.")
 	return s.consensus.Close()
-}
-
-// APIs for the services.
-func (s *Service) APIs() []rpc.API {
-	return nil
 }

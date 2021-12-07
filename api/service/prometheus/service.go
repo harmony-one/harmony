@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -178,11 +177,6 @@ func (s *Service) Status() error {
 	if s.failStatus != nil {
 		return s.failStatus
 	}
-	return nil
-}
-
-// APIs returns the RPC apis of the prometheus service
-func (s *Service) APIs() []rpc.API {
 	return nil
 }
 

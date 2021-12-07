@@ -102,6 +102,18 @@ func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) even
 	return bc.chainHeadFeed.Subscribe(ch)
 }
 
+func (bc *testBlockChain) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
+	return nil, nil
+}
+
+func (bc *testBlockChain) ReadValidatorList() ([]common.Address, error) {
+	return nil, nil
+}
+
+func (bc *testBlockChain) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
+	return nil, nil
+}
+
 // TODO: more staking tests in tx pool & testing lib
 func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingTransaction, error) {
 	stakePayloadMaker := func() (staking.Directive, interface{}) {

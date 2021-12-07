@@ -33,6 +33,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
+
+	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/crypto/hash"
+	"github.com/harmony-one/harmony/numeric"
+	stk "github.com/harmony-one/harmony/staking/types"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -156,6 +161,13 @@ func TestCopy(t *testing.T) {
 		obj := orig.GetOrNewStateObject(common.BytesToAddress([]byte{i}))
 		obj.AddBalance(big.NewInt(int64(i)))
 		orig.updateStateObject(obj)
+
+		validatorWrapper := makeValidValidatorWrapper(common.BytesToAddress([]byte{i}))
+		validatorWrapper.Description.Name = "Original"
+		err := orig.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), &validatorWrapper)
+		if err != nil {
+			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
+		}
 	}
 	orig.Finalise(false)
 
@@ -178,6 +190,85 @@ func TestCopy(t *testing.T) {
 		orig.updateStateObject(origObj)
 		copy.updateStateObject(copyObj)
 		ccopy.updateStateObject(copyObj)
+
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
+		}
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
+		}
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
+		}
+
+		origValWrap.LastEpochInCommittee.SetInt64(1)
+		copyValWrap.LastEpochInCommittee.SetInt64(2)
+		ccopyValWrap.LastEpochInCommittee.SetInt64(3)
+
+		origValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(10000))
+		copyValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(20000))
+		ccopyValWrap.MinSelfDelegation.Mul(big.NewInt(1e18), big.NewInt(30000))
+
+		origValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(10000))
+		copyValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(20000))
+		ccopyValWrap.MaxTotalDelegation.Mul(big.NewInt(1e18), big.NewInt(30000))
+
+		origValWrap.CreationHeight.SetInt64(1)
+		copyValWrap.CreationHeight.SetInt64(2)
+		ccopyValWrap.CreationHeight.SetInt64(3)
+
+		origValWrap.UpdateHeight.SetInt64(1)
+		copyValWrap.UpdateHeight.SetInt64(2)
+		ccopyValWrap.UpdateHeight.SetInt64(3)
+
+		origValWrap.Description.Name = "UpdatedOriginal" + string(i)
+		copyValWrap.Description.Name = "UpdatedCopy" + string(i)
+		ccopyValWrap.Description.Name = "UpdatedCCopy" + string(i)
+
+		origValWrap.Delegations[0].Amount.SetInt64(1)
+		copyValWrap.Delegations[0].Amount.SetInt64(2)
+		ccopyValWrap.Delegations[0].Amount.SetInt64(3)
+
+		origValWrap.Delegations[0].Reward.SetInt64(1)
+		copyValWrap.Delegations[0].Reward.SetInt64(2)
+		ccopyValWrap.Delegations[0].Reward.SetInt64(3)
+
+		origValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(1)
+		copyValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(2)
+		ccopyValWrap.Delegations[0].Undelegations[0].Amount.SetInt64(3)
+
+		origValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(1)
+		copyValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(2)
+		ccopyValWrap.Delegations[0].Undelegations[0].Epoch.SetInt64(3)
+
+		origValWrap.Counters.NumBlocksToSign.SetInt64(1)
+		copyValWrap.Counters.NumBlocksToSign.SetInt64(2)
+		ccopyValWrap.Counters.NumBlocksToSign.SetInt64(3)
+
+		origValWrap.Counters.NumBlocksSigned.SetInt64(1)
+		copyValWrap.Counters.NumBlocksSigned.SetInt64(2)
+		ccopyValWrap.Counters.NumBlocksSigned.SetInt64(3)
+
+		origValWrap.BlockReward.SetInt64(1)
+		copyValWrap.BlockReward.SetInt64(2)
+		ccopyValWrap.BlockReward.SetInt64(3)
+
+		err = orig.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), origValWrap)
+		if err != nil {
+			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
+		}
+		err = copy.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), copyValWrap)
+		if err != nil {
+			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
+		}
+		err = ccopy.UpdateValidatorWrapper(common.BytesToAddress([]byte{i}), ccopyValWrap)
+		if err != nil {
+			t.Errorf("Couldn't update ValidatorWrapper %d with error %s", i, err)
+		}
+
 	}
 
 	// Finalise the changes on all concurrently
@@ -207,6 +298,149 @@ func TestCopy(t *testing.T) {
 		}
 		if want := big.NewInt(5 * int64(i)); ccopyObj.Balance().Cmp(want) != 0 {
 			t.Errorf("copy obj %d: balance mismatch: have %v, want %v", i, ccopyObj.Balance(), want)
+		}
+
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
+		}
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
+		}
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		if err != nil {
+			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
+		}
+
+		if origValWrap.LastEpochInCommittee.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, origValWrap.LastEpochInCommittee, big.NewInt(1))
+		}
+		if copyValWrap.LastEpochInCommittee.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, copyValWrap.LastEpochInCommittee, big.NewInt(2))
+		}
+		if ccopyValWrap.LastEpochInCommittee.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("LastEpochInCommittee %d: balance mismatch: have %v, want %v", i, ccopyValWrap.LastEpochInCommittee, big.NewInt(3))
+		}
+
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)); origValWrap.MinSelfDelegation.Cmp(want) != 0 {
+			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, origValWrap.MinSelfDelegation, want)
+		}
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20000)); copyValWrap.MinSelfDelegation.Cmp(want) != 0 {
+			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, copyValWrap.MinSelfDelegation, want)
+		}
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(30000)); ccopyValWrap.MinSelfDelegation.Cmp(want) != 0 {
+			t.Errorf("MinSelfDelegation %d: balance mismatch: have %v, want %v", i, ccopyValWrap.MinSelfDelegation, want)
+		}
+
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)); origValWrap.MaxTotalDelegation.Cmp(want) != 0 {
+			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, origValWrap.MaxTotalDelegation, want)
+		}
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20000)); copyValWrap.MaxTotalDelegation.Cmp(want) != 0 {
+			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, copyValWrap.MaxTotalDelegation, want)
+		}
+		if want := new(big.Int).Mul(big.NewInt(1e18), big.NewInt(30000)); ccopyValWrap.MaxTotalDelegation.Cmp(want) != 0 {
+			t.Errorf("MaxTotalDelegation %d: balance mismatch: have %v, want %v", i, ccopyValWrap.MaxTotalDelegation, want)
+		}
+
+		if origValWrap.CreationHeight.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, origValWrap.CreationHeight, big.NewInt(1))
+		}
+		if copyValWrap.CreationHeight.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.CreationHeight, big.NewInt(2))
+		}
+		if ccopyValWrap.CreationHeight.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.CreationHeight, big.NewInt(3))
+		}
+
+		if origValWrap.UpdateHeight.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, origValWrap.UpdateHeight, big.NewInt(1))
+		}
+		if copyValWrap.UpdateHeight.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.UpdateHeight, big.NewInt(2))
+		}
+		if ccopyValWrap.UpdateHeight.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("UpdateHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.UpdateHeight, big.NewInt(3))
+		}
+
+		if want := "UpdatedOriginal" + string(i); origValWrap.Description.Name != want {
+			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, origValWrap.Description.Name, want)
+		}
+		if want := "UpdatedCopy" + string(i); copyValWrap.Description.Name != want {
+			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, copyValWrap.Description.Name, want)
+		}
+		if want := "UpdatedCCopy" + string(i); ccopyValWrap.Description.Name != want {
+			t.Errorf("originalValWrap %d: Incorrect Name: have %s, want %s", i, ccopyValWrap.Description.Name, want)
+		}
+
+		if origValWrap.Delegations[0].Amount.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Amount, big.NewInt(1))
+		}
+		if copyValWrap.Delegations[0].Amount.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Amount, big.NewInt(2))
+		}
+		if ccopyValWrap.Delegations[0].Amount.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Delegations[0].Amount %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Amount, big.NewInt(3))
+		}
+
+		if origValWrap.Delegations[0].Reward.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Reward, big.NewInt(1))
+		}
+		if copyValWrap.Delegations[0].Reward.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Reward, big.NewInt(2))
+		}
+		if ccopyValWrap.Delegations[0].Reward.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Delegations[0].Reward %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Reward, big.NewInt(3))
+		}
+
+		if origValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(1))
+		}
+		if copyValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(2))
+		}
+		if ccopyValWrap.Delegations[0].Undelegations[0].Amount.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Delegations[0].Undelegations[0].Amount %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Undelegations[0].Amount, big.NewInt(3))
+		}
+
+		if origValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, origValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(1))
+		}
+		if copyValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, copyValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(2))
+		}
+		if ccopyValWrap.Delegations[0].Undelegations[0].Epoch.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("CreationHeight %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Delegations[0].Undelegations[0].Epoch, big.NewInt(3))
+		}
+
+		if origValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, origValWrap.Counters.NumBlocksToSign, big.NewInt(1))
+		}
+		if copyValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, copyValWrap.Counters.NumBlocksToSign, big.NewInt(2))
+		}
+		if ccopyValWrap.Counters.NumBlocksToSign.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Counters.NumBlocksToSign %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Counters.NumBlocksToSign, big.NewInt(3))
+		}
+
+		if origValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, origValWrap.Counters.NumBlocksSigned, big.NewInt(1))
+		}
+		if copyValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, copyValWrap.Counters.NumBlocksSigned, big.NewInt(2))
+		}
+		if ccopyValWrap.Counters.NumBlocksSigned.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Counters.NumBlocksSigned %d: balance mismatch: have %v, want %v", i, ccopyValWrap.Counters.NumBlocksSigned, big.NewInt(3))
+		}
+
+		if origValWrap.BlockReward.Cmp(big.NewInt(1)) != 0 {
+			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, origValWrap.BlockReward, big.NewInt(1))
+		}
+		if copyValWrap.BlockReward.Cmp(big.NewInt(2)) != 0 {
+			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, copyValWrap.BlockReward, big.NewInt(2))
+		}
+		if ccopyValWrap.BlockReward.Cmp(big.NewInt(3)) != 0 {
+			t.Errorf("Block Reward %d: balance mismatch: have %v, want %v", i, ccopyValWrap.BlockReward, big.NewInt(3))
 		}
 	}
 }
@@ -680,4 +914,73 @@ func TestDeleteCreateRevert(t *testing.T) {
 	if state.getStateObject(addr) != nil {
 		t.Fatalf("self-destructed contract came alive")
 	}
+}
+
+func makeValidValidatorWrapper(addr common.Address) stk.ValidatorWrapper {
+	cr := stk.CommissionRates{
+		Rate:          numeric.ZeroDec(),
+		MaxRate:       numeric.ZeroDec(),
+		MaxChangeRate: numeric.ZeroDec(),
+	}
+	c := stk.Commission{cr, big.NewInt(300)}
+	d := stk.Description{
+		Name:     "Wayne",
+		Identity: "wen",
+		Website:  "harmony.one.wen",
+		Details:  "best",
+	}
+
+	v := stk.Validator{
+		Address:              addr,
+		SlotPubKeys:          []bls.SerializedPublicKey{makeBLSPubSigPair().pub},
+		LastEpochInCommittee: big.NewInt(20),
+		MinSelfDelegation:    new(big.Int).Mul(big.NewInt(10000), big.NewInt(1e18)),
+		MaxTotalDelegation:   new(big.Int).Mul(big.NewInt(12000), big.NewInt(1e18)),
+		Commission:           c,
+		Description:          d,
+		CreationHeight:       big.NewInt(12306),
+	}
+	ds := stk.Delegations{
+		stk.Delegation{
+			DelegatorAddress: v.Address,
+			Amount:           big.NewInt(0),
+			Reward:           big.NewInt(0),
+			Undelegations: stk.Undelegations{
+				stk.Undelegation{
+					Amount: big.NewInt(0),
+					Epoch:  big.NewInt(0),
+				},
+			},
+		},
+	}
+	br := big.NewInt(1)
+
+	w := stk.ValidatorWrapper{
+		Validator:   v,
+		Delegations: ds,
+		BlockReward: br,
+	}
+	w.Counters.NumBlocksSigned = big.NewInt(0)
+	w.Counters.NumBlocksToSign = big.NewInt(0)
+	return w
+}
+
+type blsPubSigPair struct {
+	pub bls.SerializedPublicKey
+	sig bls.SerializedSignature
+}
+
+func makeBLSPubSigPair() blsPubSigPair {
+	blsPriv := bls.RandPrivateKey()
+	blsPub := blsPriv.GetPublicKey()
+	msgHash := hash.Keccak256([]byte(stk.BLSVerificationStr))
+	sig := blsPriv.SignHash(msgHash)
+
+	var shardPub bls.SerializedPublicKey
+	copy(shardPub[:], blsPub.Serialize())
+
+	var shardSig bls.SerializedSignature
+	copy(shardSig[:], sig.Serialize())
+
+	return blsPubSigPair{shardPub, shardSig}
 }

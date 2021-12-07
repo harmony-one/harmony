@@ -48,12 +48,19 @@ const (
 	DefaultDNSPort = 6000
 	// DefaultRPCPort is the default rpc port. The actual port used is 9000+500
 	DefaultRPCPort = 9500
+	// DefaultAuthRPCPort is the default rpc auth port. The actual port used is 9000+501
+	DefaultAuthRPCPort = 9501
 	// DefaultRosettaPort is the default rosetta port. The actual port used is 9000+700
 	DefaultRosettaPort = 9700
 	// DefaultWSPort is the default port for web socket endpoint. The actual port used is
 	DefaultWSPort = 9800
+	// DefaultAuthWSPort is the default port for web socket auth endpoint. The actual port used is
+	DefaultAuthWSPort = 9801
 	// DefaultPrometheusPort is the default prometheus port. The actual port used is 9000+900
 	DefaultPrometheusPort = 9900
+	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
+	DefaultP2PConcurrency = 0
+	DefaultMaxConnPerIP   = 10
 )
 
 const (
@@ -65,11 +72,17 @@ const (
 	// rpcHTTPPortOffset is the port offset for RPC HTTP requests
 	rpcHTTPPortOffset = 500
 
+	// rpcHTTPAuthPortOffset is the port offset for RPC Auth HTTP requests
+	rpcHTTPAuthPortOffset = 501
+
 	// rpcHTTPPortOffset is the port offset for rosetta HTTP requests
 	rosettaHTTPPortOffset = 700
 
 	// rpcWSPortOffSet is the port offset for RPC websocket requests
 	rpcWSPortOffSet = 800
+
+	// rpcWSAuthPortOffSet is the port offset for RPC Auth websocket requests
+	rpcWSAuthPortOffSet = 801
 
 	// prometheusHTTPPortOffset is the port offset for prometheus HTTP requests
 	prometheusHTTPPortOffset = 900
@@ -121,6 +134,11 @@ func GetRPCHTTPPortFromBase(basePort int) int {
 	return basePort + rpcHTTPPortOffset
 }
 
+// GetRPCAuthHTTPPortFromBase return the rpc HTTP port from base port
+func GetRPCAuthHTTPPortFromBase(basePort int) int {
+	return basePort + rpcHTTPAuthPortOffset
+}
+
 // GetRosettaHTTPPortFromBase return the rosetta HTTP port from base port
 func GetRosettaHTTPPortFromBase(basePort int) int {
 	return basePort + rosettaHTTPPortOffset
@@ -129,6 +147,11 @@ func GetRosettaHTTPPortFromBase(basePort int) int {
 // GetWSPortFromBase return the Websocket port from the base port
 func GetWSPortFromBase(basePort int) int {
 	return basePort + rpcWSPortOffSet
+}
+
+// GetWSAuthPortFromBase return the Websocket port from the base auth port
+func GetWSAuthPortFromBase(basePort int) int {
+	return basePort + rpcWSAuthPortOffSet
 }
 
 // GetPrometheusHTTPPortFromBase return the prometheus HTTP port from base port
