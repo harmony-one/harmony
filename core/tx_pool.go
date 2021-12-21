@@ -170,7 +170,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit: 5e10, // 100 Gwei/Nano
+	PriceLimit: 5e10, // 50 Gwei/Nano
 	PriceBump:  10,
 
 	AccountSlots: 16,
