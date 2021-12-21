@@ -153,7 +153,7 @@ func New(
 	gpoParams := GasPriceConfig{
 		Blocks:     20,
 		Percentile: 60,
-		Default:    big.NewInt(1e11),
+		Default:    big.NewInt(5e10),
 	}
 	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo

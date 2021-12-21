@@ -60,8 +60,8 @@ func (s *PublicHarmonyService) Syncing(
 // Note that the return type is an interface to account for the different versions
 func (s *PublicHarmonyService) GasPrice(ctx context.Context) (interface{}, error) {
 	price, err := s.hmy.SuggestPrice(ctx)
-	if err != nil || price.Cmp(big.NewInt(1e11)) < 0 {
-		price = big.NewInt(1e11)
+	if err != nil || price.Cmp(big.NewInt(5e10)) < 0 {
+		price = big.NewInt(5e10)
 	}
 	// Format response according to version
 	switch s.version {
