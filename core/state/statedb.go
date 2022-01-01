@@ -90,7 +90,8 @@ type DB struct {
 	// The refund counter, also used by state transitioning.
 	refund uint64
 
-	thash, bhash common.Hash
+	thash, bhash common.Hash // thash means hmy tx hash
+	ethTxHash    common.Hash // ethTxHash is eth tx hash, use by tracer
 	txIndex      int
 	logs         map[common.Hash][]*types.Log
 	logSize      uint
@@ -158,6 +159,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
+	db.ethTxHash = common.Hash{}
 	db.txIndex = 0
 	db.logs = make(map[common.Hash][]*types.Log)
 	db.logSize = 0
@@ -262,6 +264,10 @@ func (db *DB) TxIndex() int {
 
 func (s *DB) TxHash() common.Hash {
 	return s.thash
+}
+
+func (s *DB) TxHashETH() common.Hash {
+	return s.ethTxHash
 }
 
 // BlockHash returns the current block hash set by Prepare.
@@ -745,6 +751,10 @@ func (db *DB) Prepare(thash, bhash common.Hash, ti int) {
 	db.thash = thash
 	db.bhash = bhash
 	db.txIndex = ti
+}
+
+func (db *DB) SetTxHashETH(ethTxHash common.Hash) {
+	db.ethTxHash = ethTxHash
 }
 
 func (db *DB) clearJournalAndRefund() {

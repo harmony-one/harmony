@@ -119,6 +119,9 @@ func (p *StateProcessor) Process(
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
+		if tx.IsEthCompatible() {
+			statedb.SetTxHashETH(tx.ConvertToEth().Hash())
+		}
 		receipt, cxReceipt, _, err := ApplyTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
