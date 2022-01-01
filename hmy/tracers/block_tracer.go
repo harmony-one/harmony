@@ -425,7 +425,7 @@ func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
 	for _, curTx := range jst.tracers {
 		root := &curTx.action
 		txStorage.Hash = curTx.transactionHash
-		txStorage.Storages = txStorage.Storages[:]
+		txStorage.Storages = txStorage.Storages[:0]
 		finalize(root, make([]uint, 0))
 		b, _ := rlp.EncodeToBytes(txStorage)
 		blockStorage.TraceStorages = append(blockStorage.TraceStorages, b)
