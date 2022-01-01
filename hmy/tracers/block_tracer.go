@@ -402,6 +402,7 @@ func (jst *ParityBlockTracer) CaptureEnd(output []byte, gasUsed uint64, t time.D
 	return nil
 }
 
+// get TraceBlockStorage from tracer, then store it to db
 func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
 	blockStorage := &TraceBlockStorage{
 		Hash:         jst.Hash,
@@ -416,7 +417,8 @@ func (jst *ParityBlockTracer) GetStorage() *TraceBlockStorage {
 	finalize = func(ac *action, traceAddress []uint) {
 		acStorage := ac.toStorage(blockStorage)
 		acStorage.Subtraces = uint(len(ac.subCalls))
-		acStorage.TraceAddress = traceAddress
+		acStorage.TraceAddress = make([]uint, len(traceAddress))
+		copy(acStorage.TraceAddress, traceAddress)
 		txStorage.Storages = append(txStorage.Storages, acStorage)
 		for i, subAc := range ac.subCalls {
 			finalize(subAc, append(traceAddress[:], uint(i)))
