@@ -710,7 +710,7 @@ func TestTransactionDropping(t *testing.T) {
 	defer pool.Stop()
 
 	account, _ := deriveSender(transaction(0, 0, 0, key))
-	pool.currentState.AddBalance(account, big.NewInt(100000000000000))
+	pool.currentState.AddBalance(account, big.NewInt(30000000000000))
 
 	// Add some pending and some queued transactions
 	var (
@@ -749,7 +749,7 @@ func TestTransactionDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
 	// Reduce the balance of the account, and check that invalidated transactions are dropped
-	pool.currentState.AddBalance(account, big.NewInt(-650000000000))
+	pool.currentState.AddBalance(account, big.NewInt(-19500000000000))
 	pool.lockedReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
@@ -858,7 +858,7 @@ func TestTransactionPostponing(t *testing.T) {
 	}
 	// Reduce the balance of the account, and check that transactions are reorganised
 	for _, addr := range accs {
-		pool.currentState.AddBalance(addr, big.NewInt(-1))
+		pool.currentState.AddBalance(addr, big.NewInt(-30))
 	}
 	pool.lockedReset(nil, nil)
 
