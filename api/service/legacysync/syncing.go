@@ -744,19 +744,26 @@ func GetHowManyMaxConsensus(blocks []*types.Block) (int, int) {
 }
 
 func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
-	candidateBlocks := []*types.Block{}
-	ss.syncMux.Lock()
+	var (
+		candidateBlocks []*types.Block
+		candidateLock   sync.Mutex
+	)
+
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		peerConfig.mux.Lock()
+		defer peerConfig.mux.Unlock()
+
 		for _, block := range peerConfig.newBlocks {
 			ph := block.ParentHash()
 			if bytes.Equal(ph[:], parentHash[:]) {
+				candidateLock.Lock()
 				candidateBlocks = append(candidateBlocks, block)
+				candidateLock.Unlock()
 				break
 			}
 		}
 		return
 	})
-	ss.syncMux.Unlock()
 	if len(candidateBlocks) == 0 {
 		return nil
 	}
@@ -1027,7 +1034,10 @@ func (ss *StateSync) RegisterNodeInfo() int {
 // getMaxPeerHeight gets the maximum blockchain heights from peers
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
-	var wg sync.WaitGroup
+	var (
+		wg   sync.WaitGroup
+		lock sync.Mutex
+	)
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
@@ -1043,11 +1053,12 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
 				Msg("[SYNC] getMaxPeerHeight")
-			ss.syncMux.Lock()
+
+			lock.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
 				maxHeight = response.BlockHeight
 			}
-			ss.syncMux.Unlock()
+			lock.Unlock()
 		}()
 		return
 	})
