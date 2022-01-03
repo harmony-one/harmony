@@ -127,13 +127,13 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 		}
 	}
 
-	gasPrice := big.NewInt(100000000000)
+	gasPrice := big.NewInt(30000000000)
 	tx, _ := staking.NewStakingTransaction(0, 1e10, gasPrice, stakePayloadMaker)
 	return staking.Sign(tx, staking.NewEIP155Signer(tx.ChainID()), key)
 }
 
 func transaction(shardID uint32, nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) types.PoolTransaction {
-	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(100000000000), key)
+	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(30000000000), key)
 }
 
 func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) types.PoolTransaction {
@@ -307,7 +307,7 @@ func TestInvalidTransactions(t *testing.T) {
 	}
 
 	tx = transaction(0, 1, 100000, key)
-	pool.gasPrice = big.NewInt(1000000000000)
+	pool.gasPrice = big.NewInt(300000000000)
 	if err := pool.AddRemote(tx); err != ErrUnderpriced {
 		t.Error("expected", ErrUnderpriced, "got", err)
 	}
@@ -615,13 +615,13 @@ func TestTransactionDoubleNonce(t *testing.T) {
 
 	signer := types.HomesteadSigner{}
 	tx1, _ := types.SignTx(
-		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 100000, big.NewInt(1000000000), nil),
+		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 100000, big.NewInt(30000000000), nil),
 		signer, key)
 	tx2, _ := types.SignTx(
-		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 1000000, big.NewInt(2000000000), nil),
+		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 1000000, big.NewInt(31000000000), nil),
 		signer, key)
 	tx3, _ := types.SignTx(
-		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 1000000, big.NewInt(1000000000), nil),
+		types.NewTransaction(0, common.Address{}, 0, big.NewInt(100), 1000000, big.NewInt(30000000000), nil),
 		signer, key)
 
 	// Add the first two transaction, ensure higher priced stays only
@@ -1308,12 +1308,12 @@ func TestTransactionPoolRepricingKeepsLocals(t *testing.T) {
 	// Create transaction (both pending and queued) with a linearly growing gasprice
 	for i := uint64(0); i < 500; i++ {
 		// Add pending
-		pTx := pricedTransaction(0, i, 100000, big.NewInt(int64(i*1000000000)), keys[2])
+		pTx := pricedTransaction(0, i, 100000, big.NewInt(int64(30000000000+i*1000000000)), keys[2])
 		if err := pool.AddLocal(pTx); err != nil {
 			t.Fatal(err)
 		}
 		// Add queued
-		qTx := pricedTransaction(0, i+501, 100000, big.NewInt(int64(i*1000000000)), keys[2])
+		qTx := pricedTransaction(0, i+501, 100000, big.NewInt(int64(30000000000+i*1000000000)), keys[2])
 		if err := pool.AddLocal(qTx); err != nil {
 			t.Fatal(err)
 		}
@@ -1385,16 +1385,16 @@ func testTransactionJournaling(t *testing.T, nolocals bool) {
 	pool.currentState.AddBalance(crypto.PubkeyToAddress(remote.PublicKey), big.NewInt(9000000000000000000))
 
 	// Add three local and a remote transactions and ensure they are queued up
-	if err := pool.AddLocal(pricedTransaction(0, 0, 100000, big.NewInt(1000000000), local)); err != nil {
+	if err := pool.AddLocal(pricedTransaction(0, 0, 100000, big.NewInt(30000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(1000000000), local)); err != nil {
+	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(30000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddLocal(pricedTransaction(0, 2, 100000, big.NewInt(1000000000), local)); err != nil {
+	if err := pool.AddLocal(pricedTransaction(0, 2, 100000, big.NewInt(30000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 0, 100000, big.NewInt(1000000000), remote)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(0, 0, 100000, big.NewInt(30000000000), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	pending, queued := pool.Stats()
@@ -1480,10 +1480,10 @@ func TestTransactionStatusCheck(t *testing.T) {
 	// Generate and queue a batch of transactions, both pending and queued
 	txs := types.PoolTransactions{}
 
-	txs = append(txs, pricedTransaction(0, 0, 100000, big.NewInt(1000000000), keys[0])) // Pending only
-	txs = append(txs, pricedTransaction(0, 0, 100000, big.NewInt(1000000000), keys[1])) // Pending and queued
-	txs = append(txs, pricedTransaction(0, 2, 100000, big.NewInt(1000000000), keys[1]))
-	txs = append(txs, pricedTransaction(0, 2, 100000, big.NewInt(1000000000), keys[2])) // Queued only
+	txs = append(txs, pricedTransaction(0, 0, 100000, big.NewInt(30000000000), keys[0])) // Pending only
+	txs = append(txs, pricedTransaction(0, 0, 100000, big.NewInt(30000000000), keys[1])) // Pending and queued
+	txs = append(txs, pricedTransaction(0, 2, 100000, big.NewInt(30000000000), keys[1]))
+	txs = append(txs, pricedTransaction(0, 2, 100000, big.NewInt(30000000000), keys[2])) // Queued only
 
 	// Import the transaction and ensure they are correctly added
 	pool.AddRemotes(txs)
