@@ -1202,7 +1202,6 @@ func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 // isInSync query the remote DNS node for the latest height to check what is the current
 // sync status
 func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
-	fmt.Println("call", doubleCheck)
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
