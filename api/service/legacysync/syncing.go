@@ -1027,7 +1027,10 @@ func (ss *StateSync) RegisterNodeInfo() int {
 // getMaxPeerHeight gets the maximum blockchain heights from peers
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(0)
-	var wg sync.WaitGroup
+	var (
+		wg   sync.WaitGroup
+		lock sync.Mutex
+	)
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
@@ -1043,11 +1046,12 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
 				Msg("[SYNC] getMaxPeerHeight")
-			ss.syncMux.Lock()
+
+			lock.Lock()
 			if response != nil && maxHeight < response.BlockHeight {
 				maxHeight = response.BlockHeight
 			}
-			ss.syncMux.Unlock()
+			lock.Unlock()
 		}()
 		return
 	})
