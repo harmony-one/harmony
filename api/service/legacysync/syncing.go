@@ -1157,46 +1157,44 @@ func newSyncStatus() syncStatus {
 	return syncStatus{}
 }
 
-func (status *syncStatus) expired() bool {
+func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	status.lock.RLock()
-	defer status.lock.RUnlock()
+	if !status.expired() {
+		return status.lastResult
+	}
+	status.lock.RUnlock()
 
+	status.lock.Lock()
+	defer status.lock.Unlock()
+	if status.expired() {
+		result := fallback()
+		status.update(result)
+	}
+	return status.lastResult
+}
+
+func (status *syncStatus) expired() bool {
 	return time.Since(status.lastUpdateTime) > syncStatusExpiration
 }
 
 func (status *syncStatus) update(result SyncCheckResult) {
-	status.lock.Lock()
-	defer status.lock.Unlock()
-
 	status.lastUpdateTime = time.Now()
 	status.lastResult = result
-}
-
-func (status *syncStatus) get() SyncCheckResult {
-	status.lock.RLock()
-	defer status.lock.RUnlock()
-
-	return status.lastResult
 }
 
 // GetSyncStatus get the last sync status for other modules (E.g. RPC, explorer).
 // If the last sync result is not expired, return the sync result immediately.
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *StateSync) GetSyncStatus() SyncCheckResult {
-	if !ss.syncStatus.expired() {
-		return ss.syncStatus.get()
-	}
-	// If the result is expired, query the latest sync result
-	result := ss.isInSync(false)
-	ss.syncStatus.update(result)
-	return result
+	return ss.syncStatus.Get(func() SyncCheckResult {
+		return ss.isInSync(false)
+	})
 }
 
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 	result := ss.isInSync(true)
-	ss.syncStatus.update(result)
 	return result
 }
 
