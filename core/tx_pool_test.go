@@ -127,13 +127,13 @@ func stakingCreateValidatorTransaction(key *ecdsa.PrivateKey) (*staking.StakingT
 		}
 	}
 
-	gasPrice := big.NewInt(1000000000)
+	gasPrice := big.NewInt(100000000000)
 	tx, _ := staking.NewStakingTransaction(0, 1e10, gasPrice, stakePayloadMaker)
 	return staking.Sign(tx, staking.NewEIP155Signer(tx.ChainID()), key)
 }
 
 func transaction(shardID uint32, nonce uint64, gaslimit uint64, key *ecdsa.PrivateKey) types.PoolTransaction {
-	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(1000000000), key)
+	return pricedTransaction(shardID, nonce, gaslimit, big.NewInt(100000000000), key)
 }
 
 func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey) types.PoolTransaction {
@@ -1071,10 +1071,10 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	pool.currentState.AddBalance(crypto.PubkeyToAddress(remote.PublicKey), big.NewInt(900000000000000))
 
 	// Add the two transactions and ensure they both are queued up
-	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(1000000000), local)); err != nil {
+	if err := pool.AddLocal(pricedTransaction(0, 1, 100000, big.NewInt(100000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 1, 100000, big.NewInt(1000000000), remote)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(0, 1, 100000, big.NewInt(100000000000), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	pending, queued := pool.Stats()
