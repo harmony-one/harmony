@@ -705,7 +705,7 @@ func (s *PublicBlockchainService) GetProof(
 		}
 	}()
 
-	err = s.wait(ctx)
+	err = s.wait(s.limiter, ctx)
 	if err != nil {
 		return
 	}
@@ -790,7 +790,7 @@ func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 	timer := DoMetricRPCRequest(GetHeaderByNumberRLPHex)
 	defer DoRPCRequestDuration(GetHeaderByNumberRLPHex, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
 		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, FailedNumber)
 		return "", err
