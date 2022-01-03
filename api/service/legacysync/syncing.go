@@ -1160,6 +1160,7 @@ func newSyncStatus() syncStatus {
 func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	status.lock.RLock()
 	if !status.expired() {
+		status.lock.RUnlock()
 		return status.lastResult
 	}
 	status.lock.RUnlock()
@@ -1201,6 +1202,7 @@ func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 // isInSync query the remote DNS node for the latest height to check what is the current
 // sync status
 func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
+	fmt.Println("call", doubleCheck)
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
