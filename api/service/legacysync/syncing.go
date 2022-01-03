@@ -1157,7 +1157,7 @@ func newSyncStatus() syncStatus {
 	return syncStatus{}
 }
 
-func (status *syncStatus) isStatusExpired() bool {
+func (status *syncStatus) expired() bool {
 	status.lock.RLock()
 	defer status.lock.RUnlock()
 
@@ -1183,7 +1183,7 @@ func (status *syncStatus) get() SyncCheckResult {
 // If the last sync result is not expired, return the sync result immediately.
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *StateSync) GetSyncStatus() SyncCheckResult {
-	if !ss.syncStatus.isStatusExpired() {
+	if !ss.syncStatus.expired() {
 		return ss.syncStatus.get()
 	}
 	// If the result is expired, query the latest sync result
