@@ -749,26 +749,26 @@ func TestTransactionDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
 	// Reduce the balance of the account, and check that invalidated transactions are dropped
-	pool.currentState.AddBalance(account, big.NewInt(-19500000000000))
+	pool.currentState.AddBalance(account, big.NewInt(-23000000000000))
 	pool.lockedReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
 		t.Errorf("funded pending transaction missing: %v", tx0)
 	}
 	if _, ok := pool.pending[account].txs.items[tx1.Nonce()]; !ok {
-		t.Errorf("funded pending transaction missing: %v", tx0)
+		t.Errorf("funded pending transaction missing: %v", tx1)
 	}
 	if _, ok := pool.pending[account].txs.items[tx2.Nonce()]; ok {
-		t.Errorf("out-of-fund pending transaction present: %v", tx1)
+		t.Errorf("out-of-fund pending transaction present: %v", tx2)
 	}
 	if _, ok := pool.queue[account].txs.items[tx10.Nonce()]; !ok {
 		t.Errorf("funded queued transaction missing: %v", tx10)
 	}
 	if _, ok := pool.queue[account].txs.items[tx11.Nonce()]; !ok {
-		t.Errorf("funded queued transaction missing: %v", tx10)
+		t.Errorf("funded queued transaction missing: %v", tx11)
 	}
 	if _, ok := pool.queue[account].txs.items[tx12.Nonce()]; ok {
-		t.Errorf("out-of-fund queued transaction present: %v", tx11)
+		t.Errorf("out-of-fund queued transaction present: %v", tx12)
 	}
 	if pool.all.Count() != 4 {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
@@ -815,7 +815,7 @@ func TestTransactionPostponing(t *testing.T) {
 		keys[i], _ = crypto.GenerateKey()
 		accs[i] = crypto.PubkeyToAddress(keys[i].PublicKey)
 
-		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1503000000000000))
+		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1500100000000000))
 	}
 	// Add a batch consecutive pending transactions for validation
 	txs := types.PoolTransactions{}
