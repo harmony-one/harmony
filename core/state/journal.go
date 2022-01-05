@@ -199,7 +199,7 @@ func (ch codeChange) dirtied() *common.Address {
 }
 
 func (ch validatorWrapperChange) revert(s *DB) {
-	s.stateValidators.Add(ch.address.Hex(), ch.prev)
+	s.stateValidators[*(ch.address)] = ch.prev
 }
 
 func (ch validatorWrapperChange) dirtied() *common.Address {

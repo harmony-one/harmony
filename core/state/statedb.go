@@ -23,8 +23,6 @@ import (
 	"sort"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-
 	"github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -54,9 +52,6 @@ var (
 
 	// emptyCode is the known hash of the empty EVM bytecode.
 	emptyCode = crypto.Keccak256Hash(nil)
-
-	// number of validators stored in the LRU cache
-	validatorWrapperCacheLimit = 1000
 )
 
 type proofList [][]byte
@@ -83,7 +78,7 @@ type DB struct {
 	stateObjects        map[common.Address]*Object
 	stateObjectsPending map[common.Address]struct{} // State objects finalized but not yet written to the trie
 	stateObjectsDirty   map[common.Address]struct{}
-	stateValidators     *lru.Cache
+	stateValidators     map[common.Address]*stk.ValidatorWrapper
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -125,14 +120,13 @@ func New(root common.Hash, db Database) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	stateValidators, _ := lru.New(validatorWrapperCacheLimit)
 	return &DB{
 		db:                  db,
 		trie:                tr,
 		stateObjects:        make(map[common.Address]*Object),
 		stateObjectsPending: make(map[common.Address]struct{}),
 		stateObjectsDirty:   make(map[common.Address]struct{}),
-		stateValidators:     stateValidators,
+		stateValidators:     make(map[common.Address]*stk.ValidatorWrapper),
 		logs:                make(map[common.Hash][]*types.Log),
 		preimages:           make(map[common.Hash][]byte),
 		journal:             newJournal(),
@@ -161,7 +155,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.stateObjects = make(map[common.Address]*Object)
 	db.stateObjectsPending = make(map[common.Address]struct{})
 	db.stateObjectsDirty = make(map[common.Address]struct{})
-	db.stateValidators.Purge()
+	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
 	db.txIndex = 0
@@ -596,14 +590,13 @@ func (db *DB) ForEachStorage(addr common.Address, cb func(key, value common.Hash
 // Snapshots of the copied state cannot be applied to the copy.
 func (db *DB) Copy() *DB {
 	// Copy all the basic fields, initialize the memory ones
-	stateValidators, _ := lru.New(validatorWrapperCacheLimit)
 	state := &DB{
 		db:                  db.db,
 		trie:                db.db.CopyTrie(db.trie),
 		stateObjects:        make(map[common.Address]*Object, len(db.journal.dirties)),
 		stateObjectsPending: make(map[common.Address]struct{}, len(db.stateObjectsPending)),
 		stateObjectsDirty:   make(map[common.Address]struct{}, len(db.journal.dirties)),
-		stateValidators:     stateValidators,
+		stateValidators:     make(map[common.Address]*stk.ValidatorWrapper),
 		refund:              db.refund,
 		logs:                make(map[common.Hash][]*types.Log, len(db.logs)),
 		logSize:             db.logSize,
@@ -641,15 +634,9 @@ func (db *DB) Copy() *DB {
 		}
 		state.stateObjectsDirty[addr] = struct{}{}
 	}
-	for _, addr := range db.stateValidators.Keys() {
-		addr, _ := addr.(common.Address)
-		wrapper, _ := db.stateValidators.Get(addr.Hex())
-		if wrapper == nil {
-			continue
-		}
-		assertedWrapper, _ := wrapper.(*stk.ValidatorWrapper)
-		copied := staketest.CopyValidatorWrapper(*assertedWrapper)
-		state.stateValidators.Add(addr.Hex(), &copied)
+	for addr, wrapper := range db.stateValidators {
+		copied := staketest.CopyValidatorWrapper(*wrapper)
+		state.stateValidators[addr] = &copied
 	}
 	for hash, logs := range db.logs {
 		cpy := make([]*types.Log, len(logs))
@@ -699,14 +686,8 @@ func (db *DB) GetRefund() uint64 {
 func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// Commit validator changes in cache to stateObjects
 	// TODO: remove validator cache after commit
-	for _, addr := range db.stateValidators.Keys() {
-		addr, _ := addr.(common.Address)
-		wrapper, _ := db.stateValidators.Get(addr.Hex())
-		if wrapper == nil {
-			continue
-		}
-		assertedWrapper, _ := wrapper.(*stk.ValidatorWrapper)
-		db.UpdateValidatorWrapper(addr, assertedWrapper)
+	for addr, wrapper := range db.stateValidators {
+		db.UpdateValidatorWrapper(addr, wrapper)
 	}
 
 	for addr := range db.journal.dirties {
@@ -836,12 +817,9 @@ func (db *DB) ValidatorWrapper(
 	}
 
 	// Read cache first
-	var cached interface{}
-	var ok bool
-	cached, ok = db.stateValidators.Get(addr.Hex())
+	cached, ok := db.stateValidators[addr]
 	if ok {
-		assertedCached, _ := cached.(*stk.ValidatorWrapper)
-		return copyValidatorWrapperIfNeeded(assertedCached, sendOriginal, copyDelegations), nil
+		return copyValidatorWrapperIfNeeded(cached, sendOriginal, copyDelegations), nil
 	}
 
 	by := db.GetCode(addr)
@@ -857,7 +835,7 @@ func (db *DB) ValidatorWrapper(
 		)
 	}
 	// populate cache because the validator is not in it
-	db.stateValidators.Add(addr.Hex(), &val)
+	db.stateValidators[addr] = &val
 	return copyValidatorWrapperIfNeeded(&val, sendOriginal, copyDelegations), nil
 }
 
@@ -894,7 +872,7 @@ func (db *DB) UpdateValidatorWrapper(
 	// has revert in-built for the code field
 	db.SetCode(addr, by)
 	// update cache
-	db.stateValidators.Add(addr.Hex(), val)
+	db.stateValidators[addr] = val
 	return nil
 }
 
