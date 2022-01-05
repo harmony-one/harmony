@@ -3,9 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"reflect"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/time/rate"
-	"reflect"
 
 	"github.com/pkg/errors"
 
