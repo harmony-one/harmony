@@ -2,6 +2,10 @@ package rpc
 
 import (
 	"context"
+	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
+	"reflect"
 
 	"github.com/pkg/errors"
 
@@ -27,6 +31,9 @@ import (
 type PublicPoolService struct {
 	hmy     *hmy.Harmony
 	version Version
+
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterPendingTransactions *rate.Limiter
 }
 
 // NewPublicPoolAPI creates a new API for the RPC interface
@@ -34,9 +41,26 @@ func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicPoolService{hmy, version},
+		Service:   &PublicPoolService{hmy, version, rate.NewLimiter(5, 10)},
 		Public:    true,
 	}
+}
+
+func (s *PublicPoolService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !limiter.Allow() {
+			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				name: strLimit,
+			}).Inc()
+		}
+
+		return limiter.Wait(deadlineCtx)
+	}
+	return nil
 }
 
 // SendRawTransaction will add the signed transaction to the transaction pool.
@@ -189,6 +213,12 @@ func (s *PublicPoolService) PendingTransactions(
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(PendingTransactions)
 	defer DoRPCRequestDuration(PendingTransactions, timer)
+
+	err := s.wait(s.limiterPendingTransactions, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(PendingTransactions, FailedNumber)
+		return nil, err
+	}
 
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
