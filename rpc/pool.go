@@ -41,7 +41,7 @@ func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicPoolService{hmy, version, rate.NewLimiter(5, 10)},
+		Service:   &PublicPoolService{hmy, version, rate.NewLimiter(2, 5)},
 		Public:    true,
 	}
 }
