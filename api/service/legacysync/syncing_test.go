@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/block"
@@ -100,7 +102,7 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 }
 
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync(nil, "127.0.0.1", "8000", [20]byte{}, false)
+	stateSync := CreateStateSync(nil, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")

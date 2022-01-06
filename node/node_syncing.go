@@ -104,8 +104,9 @@ func (node *Node) createStateSync(bc *core.BlockChain) *legacysync.StateSync {
 		mySyncPort = nodeconfig.DefaultDNSPort
 	}
 	mutatedPort := strconv.Itoa(mySyncPort + legacysync.SyncingPortDifference)
+	role := node.NodeConfig.Role()
 	return legacysync.CreateStateSync(bc, node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode)
+		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
