@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -153,7 +155,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool) *StateSync {
+func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -164,7 +166,7 @@ func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]b
 	stateSync.isExplorer = isExplorer
 	stateSync.syncConfig = &SyncConfig{}
 
-	stateSync.syncStatus = newSyncStatus()
+	stateSync.syncStatus = newSyncStatus(role)
 	return stateSync
 }
 
@@ -1145,16 +1147,24 @@ func GetSyncingPort(nodePort string) string {
 	return ""
 }
 
-// syncStatusExpiration is the expiration time out of a sync status.
-// If last sync result in memory is before the expiration, the sync status
-// will be updated.
-const syncStatusExpiration = 6 * time.Second
+const (
+	// syncStatusExpiration is the expiration time out of a sync status.
+	// If last sync result in memory is before the expiration, the sync status
+	// will be updated.
+	syncStatusExpiration = 6 * time.Second
+
+	// syncStatusExpirationNonValidator is the expiration of sync cache for non-validators.
+	// Compared with non-validator, the sync check is not as strict as validator nodes.
+	// TODO: add this field to harmony config
+	syncStatusExpirationNonValidator = 12 * time.Second
+)
 
 type (
 	syncStatus struct {
 		lastResult     SyncCheckResult
 		lastUpdateTime time.Time
 		lock           sync.RWMutex
+		expiration     time.Duration
 	}
 
 	SyncCheckResult struct {
@@ -1164,8 +1174,22 @@ type (
 	}
 )
 
-func newSyncStatus() syncStatus {
-	return syncStatus{}
+func newSyncStatus(role nodeconfig.Role) syncStatus {
+	expiration := getSyncStatusExpiration(role)
+	return syncStatus{
+		expiration: expiration,
+	}
+}
+
+func getSyncStatusExpiration(role nodeconfig.Role) time.Duration {
+	switch role {
+	case nodeconfig.Validator:
+		return syncStatusExpiration
+	case nodeconfig.ExplorerNode:
+		return syncStatusExpirationNonValidator
+	default:
+		return syncStatusExpirationNonValidator
+	}
 }
 
 func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
@@ -1186,7 +1210,7 @@ func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 }
 
 func (status *syncStatus) expired() bool {
-	return time.Since(status.lastUpdateTime) > syncStatusExpiration
+	return time.Since(status.lastUpdateTime) > status.expiration
 }
 
 func (status *syncStatus) update(result SyncCheckResult) {
