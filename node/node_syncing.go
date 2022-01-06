@@ -511,7 +511,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
-		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block height")).Inc()
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block_height")).Inc()
 		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
 	// this is the out of sync node acts as grpc server side
