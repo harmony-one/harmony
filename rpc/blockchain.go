@@ -969,15 +969,26 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	})
 }
 
+const (
+	// If peer have block height difference smaller or equal to 10 blocks, the node is considered inSync
+	inSyncTolerance = 10
+)
+
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	if !inSync && diff <= inSyncTolerance {
+		inSync = true
+	}
 	return inSync, nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	if !inSync && diff <= inSyncTolerance {
+		inSync = true
+	}
 	return inSync, nil
 }
 
