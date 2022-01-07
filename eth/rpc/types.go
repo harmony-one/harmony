@@ -18,11 +18,11 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
-
-	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -93,7 +93,8 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	blckNum, err := hexutil.DecodeUint64(input)
+	input = strings.TrimPrefix(strings.ToLower(input), "0x")
+	blckNum, err := strconv.ParseInt(input, 10, 64)
 	if err != nil {
 		return err
 	}
