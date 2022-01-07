@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	prom "github.com/harmony-one/harmony/api/service/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	lru "github.com/hashicorp/golang-lru"
@@ -428,6 +431,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 	switch request.Type {
 	case downloader_pb.DownloaderRequest_BLOCKHASH:
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block_hash")).Inc()
 		if request.BlockHash == nil {
 			return response, fmt.Errorf("[SYNC] GetBlockHashes Request BlockHash is NIL")
 		}
@@ -465,6 +469,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEADER:
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block_header")).Inc()
 		var hash common.Hash
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
@@ -476,6 +481,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCK:
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block")).Inc()
 		var hash common.Hash
 
 		payloadSize := 0
@@ -506,10 +512,12 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_BLOCKHEIGHT:
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("block_height")).Inc()
 		response.BlockHeight = node.Blockchain().CurrentBlock().NumberU64()
 
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
+		dnsServerRequestCounterVec.With(dnsReqMetricLabel("new block")).Inc()
 		if node.IsInSync.IsSet() {
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
@@ -573,6 +581,30 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	}
 
 	return response, nil
+}
+
+func init() {
+	prom.PromRegistry().MustRegister(
+		dnsServerRequestCounterVec,
+	)
+}
+
+var (
+	dnsServerRequestCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "dns_server",
+			Name:      "request_count",
+			Help:      "request count for each dns request",
+		},
+		[]string{"method"},
+	)
+)
+
+func dnsReqMetricLabel(method string) prometheus.Labels {
+	return prometheus.Labels{
+		"method": method,
+	}
 }
 
 const (
