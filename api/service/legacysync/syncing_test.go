@@ -255,6 +255,8 @@ func makeTestBlock(bn uint64, parentHash common.Hash) *types.Block {
 }
 
 func TestSyncStatus_Get_Concurrency(t *testing.T) {
+	t.Skip()
+
 	ss := newSyncStatus(nodeconfig.Validator)
 	ss.expiration = 2 * time.Second
 	var (
