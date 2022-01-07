@@ -432,6 +432,9 @@ func (st *StateTransition) verifyAndApplyCreateValidatorTx(
 	if err != nil {
 		return err
 	}
+	// since createValidator is not accessible to smart contracts
+	// it should not be reversible (to save resources)
+	// but it would be trivial to enable it later
 	if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
 		return err
 	}
@@ -449,6 +452,9 @@ func (st *StateTransition) verifyAndApplyEditValidatorTx(
 	if err != nil {
 		return err
 	}
+	// since editValidator is not accessible to smart contracts
+	// it should not be reversible (to save resources)
+	// but it would be trivial to enable it later
 	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
 }
 
@@ -464,7 +470,7 @@ func (st *StateTransition) verifyAndApplyDelegateTx(delegate *staking.Delegate) 
 	}
 
 	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+		if err := st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
 			return err
 		}
 	}
@@ -510,7 +516,7 @@ func (st *StateTransition) verifyAndApplyUndelegateTx(
 	if err != nil {
 		return err
 	}
-	return st.state.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	return st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
 }
 
 func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.CollectRewards) (*big.Int, error) {
@@ -528,7 +534,7 @@ func (st *StateTransition) verifyAndApplyCollectRewards(collectRewards *staking.
 		return stakingReward.None, err
 	}
 	for _, wrapper := range updatedValidatorWrappers {
-		if err := st.state.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+		if err := st.state.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
 			return stakingReward.None, err
 		}
 	}

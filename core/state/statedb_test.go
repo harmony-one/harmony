@@ -38,6 +38,10 @@ import (
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
 	stk "github.com/harmony-one/harmony/staking/types"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/common/denominations"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -191,15 +195,15 @@ func TestCopy(t *testing.T) {
 		copy.updateStateObject(copyObj)
 		ccopy.updateStateObject(copyObj)
 
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), false, true)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper with error: %s", err)
 		}
@@ -300,15 +304,15 @@ func TestCopy(t *testing.T) {
 			t.Errorf("copy obj %d: balance mismatch: have %v, want %v", i, ccopyObj.Balance(), want)
 		}
 
-		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		origValWrap, err := orig.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
-		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		copyValWrap, err := copy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
-		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}))
+		ccopyValWrap, err := ccopy.ValidatorWrapper(common.BytesToAddress([]byte{i}), true, false)
 		if err != nil {
 			t.Errorf("Couldn't get validatorWrapper %d with error: %s", i, err)
 		}
@@ -983,4 +987,241 @@ func makeBLSPubSigPair() blsPubSigPair {
 	copy(shardSig[:], sig.Serialize())
 
 	return blsPubSigPair{shardPub, shardSig}
+}
+
+func updateAndCheckValidator(t *testing.T, state *DB, wrapper stk.ValidatorWrapper) {
+	// do not modify / link the original into the state object
+	copied := staketest.CopyValidatorWrapper(wrapper)
+	if err := state.UpdateValidatorWrapperWithRevert(copied.Address, &copied); err != nil {
+		t.Fatalf("Could not update wrapper with revert %v\n", err)
+	}
+
+	// load a copy here to be safe
+	loadedWrapper, err := state.ValidatorWrapper(copied.Address, false, true)
+	if err != nil {
+		t.Fatalf("Could not load wrapper %v\n", err)
+	}
+
+	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
+		t.Fatalf("Wrappers are unequal %v\n", err)
+	}
+}
+
+func verifyValidatorWrapperRevert(
+	t *testing.T,
+	state *DB,
+	snapshot int,
+	wrapperAddress common.Address, // if expectedWrapper is nil, this is needed
+	allowErrAddressNotPresent bool,
+	expectedWrapper *stk.ValidatorWrapper,
+	stateToCompare *DB,
+	modifiedAddresses []common.Address,
+) {
+	state.RevertToSnapshot(snapshot)
+	loadedWrapper, err := state.ValidatorWrapper(wrapperAddress, true, false)
+	if err != nil && !(err == errAddressNotPresent && allowErrAddressNotPresent) {
+		t.Fatalf("Could not load wrapper %v\n", err)
+	}
+	if expectedWrapper != nil {
+		if err := staketest.CheckValidatorWrapperEqual(*expectedWrapper, *loadedWrapper); err != nil {
+			fmt.Printf("ExpectWrapper: %v\n", expectedWrapper)
+			fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
+			fmt.Printf("ExpectCounters: %v\n", expectedWrapper.Counters)
+			fmt.Printf("LoadedCounters: %v\n", loadedWrapper.Counters)
+			t.Fatalf("Loaded wrapper not equal to expected wrapper after revert %v\n", err)
+		}
+	} else if loadedWrapper != nil {
+		t.Fatalf("Expected wrapper is nil but got loaded wrapper %v\n", loadedWrapper)
+	}
+
+	st := &snapshotTest{addrs: modifiedAddresses}
+	if err := st.checkEqual(state, stateToCompare); err != nil {
+		t.Fatalf("State not as expected after revert %v\n", err)
+	}
+}
+
+func TestValidatorCreationRevert(t *testing.T) {
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	emptyState := state.Copy()
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	snapshot := state.Snapshot()
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
+	// step 1 is adding the validator, and checking that is it successfully added
+	updateAndCheckValidator(t, state, wrapper)
+	// step 2 is the revert check, the meat of the test
+	verifyValidatorWrapperRevert(t,
+		state,
+		snapshot,
+		wrapper.Address,
+		true,
+		nil,
+		emptyState,
+		[]common.Address{wrapper.Address},
+	)
+}
+
+func TestValidatorAddDelegationRevert(t *testing.T) {
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	delegatorKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
+	// always, step 1 is adding the validator, and checking that is it successfully added
+	updateAndCheckValidator(t, state, wrapper)
+	wrapperWithoutDelegation := staketest.CopyValidatorWrapper(wrapper) // for comparison later
+	stateWithoutDelegation := state.Copy()
+	// we will revert to the state without the delegation
+	snapshot := state.Snapshot()
+	// which is added here
+	wrapper.Delegations = append(wrapper.Delegations, stk.NewDelegation(
+		crypto.PubkeyToAddress(delegatorKey.PublicKey),
+		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
+	)
+	// again, add and make sure added == sent
+	updateAndCheckValidator(t, state, wrapper)
+	// now the meat of the test
+	verifyValidatorWrapperRevert(t,
+		state,
+		snapshot,
+		wrapper.Address,
+		false,
+		&wrapperWithoutDelegation,
+		stateWithoutDelegation,
+		[]common.Address{wrapper.Address, wrapper.Delegations[1].DelegatorAddress},
+	)
+}
+
+type expectedRevertItem struct {
+	snapshot                   int
+	expectedWrapperAfterRevert *stk.ValidatorWrapper
+	expectedStateAfterRevert   *DB
+	modifiedAddresses          []common.Address
+}
+
+func makeExpectedRevertItem(state *DB,
+	wrapper *stk.ValidatorWrapper,
+	modifiedAddresses []common.Address,
+) expectedRevertItem {
+	x := expectedRevertItem{
+		snapshot:                 state.Snapshot(),
+		expectedStateAfterRevert: state.Copy(),
+		modifiedAddresses:        modifiedAddresses,
+	}
+	if wrapper != nil {
+		copied := staketest.CopyValidatorWrapper(*wrapper)
+		x.expectedWrapperAfterRevert = &copied
+	}
+	return x
+}
+
+func TestValidatorMultipleReverts(t *testing.T) {
+	var expectedRevertItems []expectedRevertItem
+
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	delegatorKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	validatorAddress := crypto.PubkeyToAddress(key.PublicKey)
+	delegatorAddress := crypto.PubkeyToAddress(delegatorKey.PublicKey)
+	modifiedAddresses := []common.Address{validatorAddress, delegatorAddress}
+	// first we add a validator
+	expectedRevertItems = append(expectedRevertItems,
+		makeExpectedRevertItem(state, nil, modifiedAddresses))
+	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
+	updateAndCheckValidator(t, state, wrapper)
+	// then we add a delegation
+	expectedRevertItems = append(expectedRevertItems,
+		makeExpectedRevertItem(state, &wrapper, modifiedAddresses))
+	wrapper.Delegations = append(wrapper.Delegations, stk.NewDelegation(
+		crypto.PubkeyToAddress(delegatorKey.PublicKey),
+		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
+	)
+	updateAndCheckValidator(t, state, wrapper)
+	// then we have it sign blocks
+	wrapper.Counters.NumBlocksToSign.Add(
+		wrapper.Counters.NumBlocksToSign, common.Big1,
+	)
+	wrapper.Counters.NumBlocksSigned.Add(
+		wrapper.Counters.NumBlocksSigned, common.Big1,
+	)
+	updateAndCheckValidator(t, state, wrapper)
+	// then modify the name and the block reward
+	expectedRevertItems = append(expectedRevertItems,
+		makeExpectedRevertItem(state, &wrapper, modifiedAddresses))
+	wrapper.BlockReward.SetInt64(1)
+	wrapper.Validator.Description.Name = "Name"
+	for i := len(expectedRevertItems) - 1; i >= 0; i-- {
+		item := expectedRevertItems[i]
+		verifyValidatorWrapperRevert(t,
+			state,
+			item.snapshot,
+			wrapper.Address,
+			i == 0,
+			item.expectedWrapperAfterRevert,
+			item.expectedStateAfterRevert,
+			[]common.Address{wrapper.Address},
+		)
+	}
+}
+
+func TestValidatorWrapperPanic(t *testing.T) {
+	defer func() { recover() }()
+
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	validatorAddress := crypto.PubkeyToAddress(key.PublicKey)
+	// will panic because we are asking for Original with copy of delegations
+	_, _ = state.ValidatorWrapper(validatorAddress, true, true)
+	t.Fatalf("Did not panic")
+}
+
+func TestValidatorWrapperGetCode(t *testing.T) {
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Could not generate key %v\n", err)
+	}
+	wrapper := makeValidValidatorWrapper(crypto.PubkeyToAddress(key.PublicKey))
+	updateAndCheckValidator(t, state, wrapper)
+	// delete it from the cache so we can force it to use GetCode
+	delete(state.stateValidators, wrapper.Address)
+	loadedWrapper, err := state.ValidatorWrapper(wrapper.Address, false, false)
+	if err := staketest.CheckValidatorWrapperEqual(wrapper, *loadedWrapper); err != nil {
+		fmt.Printf("ExpectWrapper: %v\n", wrapper)
+		fmt.Printf("LoadedWrapper: %v\n", loadedWrapper)
+		fmt.Printf("ExpectCounters: %v\n", wrapper.Counters)
+		fmt.Printf("LoadedCounters: %v\n", loadedWrapper.Counters)
+		t.Fatalf("Loaded wrapper not equal to expected wrapper%v\n", err)
+	}
 }

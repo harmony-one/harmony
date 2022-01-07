@@ -2312,7 +2312,7 @@ func (bc *BlockChain) ReadValidatorInformationAtState(
 	if state == nil {
 		return nil, errors.New("empty state")
 	}
-	wrapper, err := state.ValidatorWrapper(addr)
+	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -2408,7 +2408,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 			// This means it's already in staking epoch
 			if currentEpochSuperCommittee.Epoch != nil {
-				wrapper, err := state.ValidatorWrapper(currentValidator)
+				wrapper, err := state.ValidatorWrapper(currentValidator, true, false)
 				if err != nil {
 					return nil, err
 				}
@@ -2489,7 +2489,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		// compute APR for validators in current committee only
 		if currentEpochSuperCommittee.Epoch != nil {
 			if _, ok := existing.LookupSet[key]; ok {
-				wrapper, err := state.ValidatorWrapper(key)
+				wrapper, err := state.ValidatorWrapper(key, true, false)
 				if err != nil {
 					return nil, err
 				}
@@ -2555,7 +2555,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	// Read all validator's current data and snapshot them
 	for i := range allValidators {
 		// The snapshot will be captured in the state after the last epoch block is finalized
-		validator, err := state.ValidatorWrapper(allValidators[i])
+		validator, err := state.ValidatorWrapper(allValidators[i], true, false)
 		if err != nil {
 			return err
 		}
@@ -2701,7 +2701,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			}
 
 			// Update validator snapshot for the new validator
-			validator, err := state.ValidatorWrapper(addr)
+			validator, err := state.ValidatorWrapper(addr, true, false)
 			if err != nil {
 				return newValidators, err
 			}
@@ -2868,7 +2868,7 @@ func (bc *BlockChain) addDelegationIndex(
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := state.ValidatorWrapper(validatorAddress)
+	wrapper, err := state.ValidatorWrapper(validatorAddress, true, false)
 	if err != nil {
 		return delegations, err
 	}

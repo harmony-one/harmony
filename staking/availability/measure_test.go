@@ -447,11 +447,11 @@ func (ctx *incStateTestCtx) checkHmyNodeStateChangeByAddr(addr common.Address) e
 func (ctx *incStateTestCtx) checkWrapperChangeByAddr(addr common.Address,
 	f func(w1, w2 *staking.ValidatorWrapper) bool) error {
 
-	snapWrapper, err := ctx.snapState.ValidatorWrapper(addr)
+	snapWrapper, err := ctx.snapState.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return err
 	}
-	curWrapper, err := ctx.state.ValidatorWrapper(addr)
+	curWrapper, err := ctx.state.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func (ctx *computeEPOSTestCtx) makeStateAndReader() {
 }
 
 func (ctx *computeEPOSTestCtx) checkWrapperStatus(expStatus effective.Eligibility) error {
-	wrapper, err := ctx.state.ValidatorWrapper(ctx.addr)
+	wrapper, err := ctx.state.ValidatorWrapper(ctx.addr, true, false)
 	if err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func (state testStateDB) snapshot() testStateDB {
 	return res
 }
 
-func (state testStateDB) ValidatorWrapper(addr common.Address) (*staking.ValidatorWrapper, error) {
+func (state testStateDB) ValidatorWrapper(addr common.Address, readOnly bool, copyDelegations bool) (*staking.ValidatorWrapper, error) {
 	wrapper, ok := state[addr]
 	if !ok {
 		return nil, fmt.Errorf("addr not exist in validator wrapper: %v", addr.String())
