@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common/math"
+
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -115,8 +117,10 @@ func (s *NetworkAPI) NetworkStatus(
 			}
 		}
 	}
-
 	targetInt := int64(targetHeight)
+	if targetHeight == math.MaxInt64 {
+		targetInt = 0
+	}
 	currentIndex := currentHeader.Number().Int64()
 	ss := &types.SyncStatus{
 		CurrentIndex: &currentIndex,
