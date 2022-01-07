@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/math"
+
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/Workiva/go-datastructures/queue"
@@ -130,8 +132,11 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 // It breaks the iteration iff the function returns true.
 func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 	sc.mtx.RLock()
-	defer sc.mtx.RUnlock()
-	for _, peer := range sc.peers {
+	peers := make([]*SyncPeerConfig, len(sc.peers))
+	copy(peers, sc.peers)
+	sc.mtx.RUnlock()
+
+	for _, peer := range peers {
 		if f(peer) {
 			break
 		}
@@ -1031,7 +1036,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
 func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
-	maxHeight := uint64(0)
+	maxHeight := uint64(math.MaxUint64)
 	var (
 		wg   sync.WaitGroup
 		lock sync.Mutex
@@ -1053,8 +1058,10 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 				Msg("[SYNC] getMaxPeerHeight")
 
 			lock.Lock()
-			if response != nil && maxHeight < response.BlockHeight {
-				maxHeight = response.BlockHeight
+			if response != nil {
+				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
+					maxHeight = response.BlockHeight
+				}
 			}
 			lock.Unlock()
 		}()
