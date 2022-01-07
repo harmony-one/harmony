@@ -29,6 +29,7 @@ const (
 	// contract
 	GetCode      = "GetCode"
 	GetStorageAt = "GetStorageAt"
+	Call         = "Call"
 	DoEvmCall    = "DoEVMCall"
 
 	// net
@@ -75,8 +76,9 @@ const (
 
 // info type const
 const (
-	QueryNumber  = "query_number"
-	FailedNumber = "failed_number"
+	QueryNumber       = "query_number"
+	FailedNumber      = "failed_number"
+	RateLimitedNumber = "rate_limited_number"
 )
 
 func init() {
@@ -96,7 +98,7 @@ var (
 			Name:      "over_ratelimit",
 			Help:      "number of times triggered rpc rate limit",
 		},
-		[]string{"rate_limit"},
+		[]string{"limiter_name"},
 	)
 
 	rpcQueryInfoCounterVec = prometheus.NewCounterVec(

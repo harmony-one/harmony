@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -52,10 +51,9 @@ func (s *PublicPoolService) wait(limiter *rate.Limiter, ctx context.Context) err
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
 		if !limiter.Allow() {
-			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
 			name := reflect.TypeOf(limiter).Elem().Name()
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				name: strLimit,
+				"limiter_name": name,
 			}).Inc()
 		}
 
@@ -217,7 +215,7 @@ func (s *PublicPoolService) PendingTransactions(
 
 	err := s.wait(s.limiterPendingTransactions, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(PendingTransactions, FailedNumber)
+		DoMetricRPCQueryInfo(PendingTransactions, RateLimitedNumber)
 		return nil, err
 	}
 

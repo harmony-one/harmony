@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"reflect"
 
@@ -63,11 +62,9 @@ func (s *PublicStakingService) wait(limiter *rate.Limiter, ctx context.Context) 
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
 		if !limiter.Allow() {
-			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
-
 			name := reflect.TypeOf(limiter).Elem().Name()
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				name: strLimit,
+				"limiter_name": name,
 			}).Inc()
 		}
 
@@ -240,7 +237,7 @@ func (s *PublicStakingService) GetAllValidatorInformation(
 
 	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
+		DoMetricRPCQueryInfo(GetAllValidatorInformation, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -269,7 +266,7 @@ func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 
 	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetAllValidatorInformationByBlockNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetAllValidatorInformationByBlockNumber, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -510,7 +507,7 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 
 	err := s.wait(s.limiterGetAllDelegationInformation, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
+		DoMetricRPCQueryInfo(GetAllDelegationInformation, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -691,7 +688,7 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 
 	err := s.wait(s.limiterGetDelegationsByValidator, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetDelegationsByValidator, FailedNumber)
+		DoMetricRPCQueryInfo(GetDelegationsByValidator, RateLimitedNumber)
 		return nil, err
 	}
 	return s.getDelegationByValidatorHelper(address)
