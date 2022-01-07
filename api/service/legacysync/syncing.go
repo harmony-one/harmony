@@ -1195,8 +1195,9 @@ func getSyncStatusExpiration(role nodeconfig.Role) time.Duration {
 func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 	status.lock.RLock()
 	if !status.expired() {
+		result := status.lastResult
 		status.lock.RUnlock()
-		return status.lastResult
+		return result
 	}
 	status.lock.RUnlock()
 
