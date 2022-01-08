@@ -141,7 +141,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 			return err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
-			if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
 				return err
 			}
 		}
@@ -188,7 +188,7 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 		if err != nil {
 			return err
 		}
-		return db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+		return db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
 	}
 }
 
@@ -208,7 +208,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			return err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
-			if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
 				return err
 			}
 		}
