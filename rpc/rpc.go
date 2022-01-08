@@ -55,6 +55,7 @@ var (
 	httpEndpoint     = ""
 	httpAuthEndpoint = ""
 	wsEndpoint       = ""
+	wsAuthEndpoint   = ""
 	httpVirtualHosts = []string{"*"}
 	httpTimeouts     = rpc.DefaultHTTPTimeouts
 	httpOrigins      = []string{"*"}
@@ -72,7 +73,7 @@ func (n Version) Namespace() string {
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
 	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
-	authApis := getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)
+	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
@@ -89,6 +90,11 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 	if config.WSEnabled {
 		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
 		if err := startWS(apis); err != nil {
+			return err
+		}
+
+		wsAuthEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSAuthPort)
+		if err := startAuthWS(authApis); err != nil {
 			return err
 		}
 	}
@@ -128,10 +134,10 @@ func StopServers() error {
 }
 
 func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
-	return append(getAPIs(hmy, debugEnable, rateLimiterEnable, ratelimit), []rpc.API{
+	return []rpc.API{
 		NewPublicTraceAPI(hmy, Debug), // Debug version means geth trace rpc
 		NewPublicTraceAPI(hmy, Trace), // Trace version means parity trace rpc
-	}...)
+	}
 }
 
 // getAPIs returns all the API methods for the RPC interface
@@ -218,5 +224,18 @@ func startWS(apis []rpc.API) (err error) {
 		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
 		Msg("WebSocket endpoint opened")
 	fmt.Printf("Started WS server at: %v\n", wsEndpoint)
+	return nil
+}
+
+func startAuthWS(apis []rpc.API) (err error) {
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsAuthEndpoint, apis, WSModules, wsOrigins, true)
+	if err != nil {
+		return err
+	}
+
+	utils.Logger().Info().
+		Str("url", fmt.Sprintf("ws://%s", wsListener.Addr())).
+		Msg("WebSocket endpoint opened")
+	fmt.Printf("Started Auth-WS server at: %v\n", wsAuthEndpoint)
 	return nil
 }

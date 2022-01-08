@@ -46,7 +46,7 @@ func checkDuplicateFields(
 
 	for _, addr := range addrs {
 		if !bytes.Equal(validator.Bytes(), addr.Bytes()) {
-			wrapper, err := state.ValidatorWrapperCopy(addr)
+			wrapper, err := state.ValidatorWrapper(addr, true, false)
 
 			if err != nil {
 				return err
@@ -156,7 +156,8 @@ func VerifyAndEditValidatorFromMsg(
 		newBlsKeys); err != nil {
 		return nil, err
 	}
-	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
+	// request a copy, but delegations are not being changed so do not deep copy them
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +246,8 @@ func VerifyAndDelegateFromMsg(
 		// Check if we can use tokens in undelegation to delegate (redelegate)
 		for i := range delegations {
 			delegationIndex := &delegations[i]
-			wrapper, err := stateDB.ValidatorWrapperCopy(delegationIndex.ValidatorAddress)
+			// request a copy, and since delegations will be changed, copy them too
+			wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -296,7 +298,8 @@ func VerifyAndDelegateFromMsg(
 
 	if delegateeWrapper == nil {
 		var err error
-		delegateeWrapper, err = stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
+		// request a copy, and since delegations will be changed, copy them too
+		delegateeWrapper, err = stateDB.ValidatorWrapper(msg.ValidatorAddress, false, true)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -367,7 +370,7 @@ func VerifyAndUndelegateFromMsg(
 		return nil, errValidatorNotExist
 	}
 
-	wrapper, err := stateDB.ValidatorWrapperCopy(msg.ValidatorAddress)
+	wrapper, err := stateDB.ValidatorWrapper(msg.ValidatorAddress, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +411,8 @@ func VerifyAndCollectRewardsFromDelegation(
 	totalRewards := big.NewInt(0)
 	for i := range delegations {
 		delegation := &delegations[i]
-		wrapper, err := stateDB.ValidatorWrapperCopy(delegation.ValidatorAddress)
+		// request a copy, and since delegations will be changed (.Reward.Set), copy them too
+		wrapper, err := stateDB.ValidatorWrapper(delegation.ValidatorAddress, false, true)
 		if err != nil {
 			return nil, nil, err
 		}

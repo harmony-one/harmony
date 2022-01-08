@@ -6,7 +6,12 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -100,7 +105,7 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 }
 
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync("127.0.0.1", "8000", [20]byte{}, false)
+	stateSync := CreateStateSync(nil, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")
@@ -247,4 +252,48 @@ func makeTestBlock(bn uint64, parentHash common.Hash) *types.Block {
 	testHeader.SetParentHash(parentHash)
 	block := types.NewBlockWithHeader(testHeader)
 	return block
+}
+
+func TestSyncStatus_Get_Concurrency(t *testing.T) {
+	t.Skip()
+
+	ss := newSyncStatus(nodeconfig.Validator)
+	ss.expiration = 2 * time.Second
+	var (
+		total   int32
+		updated int32
+		wg      sync.WaitGroup
+		stop    = make(chan struct{})
+	)
+
+	fb := func() SyncCheckResult {
+		time.Sleep(1 * time.Second)
+		atomic.AddInt32(&updated, 1)
+		return SyncCheckResult{IsInSync: true}
+	}
+	for i := 0; i != 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			t := time.NewTicker(20 * time.Millisecond)
+			defer t.Stop()
+			for {
+				select {
+				case <-stop:
+					return
+				case <-t.C:
+					atomic.AddInt32(&total, 1)
+					ss.Get(fb)
+				}
+			}
+		}()
+	}
+
+	time.Sleep(10 * time.Second)
+	close(stop)
+	wg.Wait()
+
+	fmt.Printf("updated %v times\n", updated)
+	fmt.Printf("total %v times\n", total)
 }

@@ -18,13 +18,12 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/goccy/go-json"
 
 	"github.com/ethereum/go-ethereum/log"
 )

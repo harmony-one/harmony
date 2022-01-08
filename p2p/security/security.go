@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/harmony-one/harmony/internal/utils"
 	libp2p_network "github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
@@ -54,6 +55,8 @@ func (m *Manager) OnConnectCheck(net libp2p_network.Network, conn libp2p_network
 	}
 
 	if len(peers) > m.maxConnPerIP {
+		utils.Logger().Warn().Int("len(peers)", len(peers)).Int("maxConnPerIP", m.maxConnPerIP).
+			Msg("Too much peers, closing")
 		return net.ClosePeer(conn.RemotePeer())
 	}
 

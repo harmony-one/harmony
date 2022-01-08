@@ -19,6 +19,7 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	std_json "encoding/json"
 	"errors"
 	"fmt"
@@ -27,8 +28,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/goccy/go-json"
 )
 
 const (

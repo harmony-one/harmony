@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	stk "github.com/harmony-one/harmony/staking/types"
 )
 
 // journalEntry is a modification entry in the state change journal that can be
@@ -115,6 +116,10 @@ type (
 		account            *common.Address
 		prevcode, prevhash []byte
 	}
+	validatorWrapperChange struct {
+		address *common.Address
+		prev    *stk.ValidatorWrapper
+	}
 
 	// Changes to other state values.
 	refundChange struct {
@@ -191,6 +196,14 @@ func (ch codeChange) revert(s *DB) {
 
 func (ch codeChange) dirtied() *common.Address {
 	return ch.account
+}
+
+func (ch validatorWrapperChange) revert(s *DB) {
+	s.stateValidators[*(ch.address)] = ch.prev
+}
+
+func (ch validatorWrapperChange) dirtied() *common.Address {
+	return ch.address
 }
 
 func (ch storageChange) revert(s *DB) {

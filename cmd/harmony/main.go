@@ -320,6 +320,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		WSEnabled:          hc.WS.Enabled,
 		WSIp:               hc.WS.IP,
 		WSPort:             hc.WS.Port,
+		WSAuthPort:         hc.WS.AuthPort,
 		DebugEnabled:       hc.RPCOpt.DebugEnabled,
 		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,

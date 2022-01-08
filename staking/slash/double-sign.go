@@ -151,7 +151,7 @@ func Verify(
 	state *state.DB,
 	candidate *Record,
 ) error {
-	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender)
+	wrapper, err := state.ValidatorWrapper(candidate.Evidence.Offender, true, false)
 	if err != nil {
 		return err
 	}
@@ -492,7 +492,7 @@ func Apply(
 			)
 		}
 
-		current, err := state.ValidatorWrapper(slash.Evidence.Offender)
+		current, err := state.ValidatorWrapper(slash.Evidence.Offender, true, false)
 		if err != nil {
 			return nil, errors.Wrapf(
 				errValidatorNotFoundDuringSlash, " %s ", err.Error(),

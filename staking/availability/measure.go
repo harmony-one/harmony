@@ -96,7 +96,7 @@ func bumpCount(
 				continue
 			}
 
-			wrapper, err := state.ValidatorWrapper(addr)
+			wrapper, err := state.ValidatorWrapper(addr, true, false)
 			if err != nil {
 				return err
 			}
@@ -183,7 +183,7 @@ func ComputeAndMutateEPOSStatus(
 ) error {
 	utils.Logger().Info().Msg("begin compute for availability")
 
-	wrapper, err := state.ValidatorWrapper(addr)
+	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func UpdateMinimumCommissionFee(
 ) error {
 	utils.Logger().Info().Msg("begin update min commission fee")
 
-	wrapper, err := state.ValidatorWrapper(addr)
+	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return err
 	}
