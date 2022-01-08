@@ -74,7 +74,8 @@ func TestEVMStaking(t *testing.T) {
 		t.Errorf("Got error %v in CreateValidator", err)
 	}
 	// write it to snapshot so that we can use it in edit
-	wrapper, err := db.ValidatorWrapper(createValidator.ValidatorAddress)
+	// use a copy because we are editing below (wrapper.Delegations)
+	wrapper, err := db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
 	err = chain.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{wrapper, header.Epoch()})
 	// also write the delegation so we can use it in CollectRewards
 	selfIndex := staking.DelegationIndex{
