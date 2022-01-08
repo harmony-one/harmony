@@ -50,7 +50,7 @@ type PublicBlockchainService struct {
 }
 
 const (
-	DefaultRateLimiterWaitTimeout = 5 * time.Second
+	DefaultRateLimiterWaitTimeout = 2 * time.Second
 	rpcGetBlocksLimit             = 1024
 )
 
@@ -59,9 +59,9 @@ func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable boo
 	var limiter *rate.Limiter
 	if limiterEnable {
 		limiter = rate.NewLimiter(rate.Limit(limit), limit)
-		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+		name := reflect.TypeOf(limiter).Elem().Name()
 		rpcRateLimitCounterVec.With(prometheus.Labels{
-			"rate_limit": strLimit,
+			"limiter_name": name,
 		}).Add(float64(0))
 	}
 
@@ -157,10 +157,9 @@ func (s *PublicBlockchainService) wait(limiter *rate.Limiter, ctx context.Contex
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
 		if !limiter.Allow() {
-			strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
 			name := reflect.TypeOf(limiter).Elem().Name()
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				name: strLimit,
+				"limiter_name": name,
 			}).Inc()
 		}
 
@@ -180,7 +179,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 
 	err = s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetBlockByNumber, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -233,7 +232,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 
 	err = s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
+		DoMetricRPCQueryInfo(GetBlockByHash, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -523,7 +522,7 @@ func (s *PublicBlockchainService) GetShardingStructure(
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetShardingStructure, FailedNumber)
+		DoMetricRPCQueryInfo(GetShardingStructure, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -580,7 +579,7 @@ func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredR
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(LatestHeader, FailedNumber)
+		DoMetricRPCQueryInfo(LatestHeader, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -615,7 +614,7 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
+		DoMetricRPCQueryInfo(GetLastCrossLinks, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -653,7 +652,7 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetHeaderByNumber, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -707,6 +706,7 @@ func (s *PublicBlockchainService) GetProof(
 
 	err = s.wait(s.limiter, ctx)
 	if err != nil {
+		DoMetricRPCQueryInfo(GetProof, RateLimitedNumber)
 		return
 	}
 
@@ -792,7 +792,7 @@ func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, FailedNumber)
+		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, RateLimitedNumber)
 		return "", err
 	}
 
@@ -824,7 +824,7 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 
 	err := s.wait(s.limiterGetCurrentUtilityMetrics, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
+		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -853,7 +853,7 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 
 	err := s.wait(s.limiterGetSuperCommittees, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
+		DoMetricRPCQueryInfo(GetSuperCommittees, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -882,7 +882,7 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 
 	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetCurrentBadBlocks, FailedNumber)
+		DoMetricRPCQueryInfo(GetCurrentBadBlocks, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -924,7 +924,7 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 
 	err := s.wait(s.limiterGetStakingNetworkInfo, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, RateLimitedNumber)
 		return nil, err
 	}
 
