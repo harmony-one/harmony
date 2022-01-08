@@ -39,7 +39,7 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version, rate.NewLimiter(100, 1000)},
+		Service:   &PublicContractService{hmy, version, rate.NewLimiter(200, 1500)},
 		Public:    true,
 	}
 }

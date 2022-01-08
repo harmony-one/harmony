@@ -50,7 +50,7 @@ type PublicBlockchainService struct {
 }
 
 const (
-	DefaultRateLimiterWaitTimeout = 2 * time.Second
+	DefaultRateLimiterWaitTimeout = 5 * time.Second
 	rpcGetBlocksLimit             = 1024
 )
 
