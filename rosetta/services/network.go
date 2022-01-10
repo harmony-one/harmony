@@ -118,7 +118,7 @@ func (s *NetworkAPI) NetworkStatus(
 		}
 	}
 	targetInt := int64(targetHeight)
-	if targetHeight == math.MaxInt64 {
+	if targetHeight == math.MaxUint64 {
 		targetInt = 0
 	}
 	currentIndex := currentHeader.Number().Int64()
