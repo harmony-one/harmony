@@ -127,7 +127,7 @@ func newTestLimiter() *limiterPerID {
 }
 
 var testConfig = configInt{
-	limit:       rate.Every(100 * time.Second),
+	limit:       Limit(rate.Every(100 * time.Second)),
 	burst:       2,
 	capacity:    1,
 	checkInt:    time.Second,
