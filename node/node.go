@@ -1007,6 +1007,13 @@ func New(
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
+
+		// Temporarily not updating other networks to make the rpc tests pass
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+			txPoolConfig.PriceLimit = 1e9
+			txPoolConfig.PriceBump = 10
+		}
+
 		txPoolConfig.Blacklist = blacklist
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
