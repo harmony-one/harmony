@@ -297,12 +297,12 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 // handleCallMsg executes a call message and returns the answer.
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
 	if h.limiter != nil {
-		ctx, _ := context.WithTimeout(h.rootCtx, handleCallLimitTimeout)
-		if err := h.limiter.waitN(ctx); err != nil {
+		rlCtx, _ := context.WithTimeout(h.rootCtx, handleCallLimitTimeout)
+		if err := h.limiter.waitN(rlCtx); err != nil {
 			if err != context.Canceled && err != context.DeadlineExceeded {
 				utils.Logger().Error().Err(err).Msg("RPC handleCallMsg")
 			}
-			if err == context.DeadlineExceeded {
+			if isContextExpiredError(err) {
 				rateLimiterHitCounter.Inc()
 				err = &tooManyRequestsError{}
 			}
@@ -329,6 +329,10 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 	default:
 		return errorMessage(&invalidRequestError{"invalid request"})
 	}
+}
+
+func isContextExpiredError(e error) bool {
+	return strings.Contains(e.Error(), "would exceed context deadline")
 }
 
 // handleCall processes method calls.
