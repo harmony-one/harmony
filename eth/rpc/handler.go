@@ -297,7 +297,6 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 			if err != context.Canceled && err != context.DeadlineExceeded {
 				utils.Logger().Error().Err(err).Msg("RPC handleCallMsg")
 			}
-			limiterHitCounter.Inc()
 			return msg.errorResponse(&rateLimitedError{e: err})
 		}
 	}
