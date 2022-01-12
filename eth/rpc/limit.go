@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	defaultRate      rate.Limit = 100  // 100 requests per second
-	defaultBurst                = 1000 // Burst to 1000 request
+	defaultRate      rate.Limit = 10  // 100 requests per second
+	defaultBurst                = 100 // Burst to 1000 request
 	weightPerRequest            = 1
 )
 
