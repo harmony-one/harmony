@@ -51,5 +51,10 @@ func toConfigInt(limit Limit, burst int, c *Config) configInt {
 	if c.MinEvictDur != nil {
 		ci.minEvictDur = *c.MinEvictDur
 	}
+	if c.Whitelist != nil {
+		for _, ip := range c.Whitelist {
+			ci.whitelist[ip] = struct{}{}
+		}
+	}
 	return ci
 }

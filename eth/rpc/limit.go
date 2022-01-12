@@ -9,8 +9,8 @@ import (
 
 const (
 	// TODO: decide these parameters
-	defaultRate      rate.Limit = 2  // 2 requests per second
-	defaultBurst                = 10 // Burst to 10 request
+	defaultRate      rate.Limit = 5  // 2 requests per second
+	defaultBurst                = 50 // Burst to 10 request
 	weightPerRequest            = 1
 )
 
