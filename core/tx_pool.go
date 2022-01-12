@@ -34,6 +34,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/core/vm"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -747,9 +748,9 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	}
 	intrGas := uint64(0)
 	if isStakingTx {
-		intrGas, err = IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
+		intrGas, err = vm.IntrinsicGas(tx.Data(), false, pool.homestead, pool.istanbul, stakingTx.StakingType() == staking.DirectiveCreateValidator)
 	} else {
-		intrGas, err = IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false)
+		intrGas, err = vm.IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead, pool.istanbul, false)
 	}
 	if err != nil {
 		return err

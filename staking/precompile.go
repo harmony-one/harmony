@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/accounts/abi"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
 
@@ -84,6 +85,89 @@ func ParseStakingMethod(input []byte) (*abi.Method, error) {
 	return abiStaking.MethodById(input)
 }
 
+// contractCaller (and not Contract) is used here to avoid import cycle
+func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, error) {
+	if len(input) < 4 {
+		return nil, errors.New("Input is malformed")
+	}
+	method, err := ParseStakingMethod(input)
+	if err != nil {
+		return nil, stakingTypes.ErrInvalidStakingKind
+	}
+	input = input[4:]                // drop the method selector
+	args := map[string]interface{}{} // store into map
+	if err = method.Inputs.UnpackIntoMap(args, input); err != nil {
+		return nil, err
+	}
+	switch method.Name {
+	case "Delegate":
+		{
+			// in case of assembly call, a contract will delegate its own balance
+			// in case of assembly delegatecall, contract.Caller() is msg.sender
+			// which means an EOA can
+			// (1) deploy a contract which receives delegations and amounts
+			// (2) call the contract, which then performs the tx on behalf of the EOA
+			address, err := ValidateContractAddress(contractCaller, args, "delegatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			validatorAddress, err := ParseAddressFromKey(args, "validatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			amount, err := ParseBigIntFromKey(args, "amount")
+			if err != nil {
+				return nil, err
+			}
+			stakeMsg := &stakingTypes.Delegate{
+				DelegatorAddress: address,
+				ValidatorAddress: validatorAddress,
+				Amount:           amount,
+			}
+			return stakeMsg, nil
+		}
+	case "Undelegate":
+		{
+			// same validation as above
+			address, err := ValidateContractAddress(contractCaller, args, "delegatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			validatorAddress, err := ParseAddressFromKey(args, "validatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			// this type assertion is needed by Golang
+			amount, err := ParseBigIntFromKey(args, "amount")
+			if err != nil {
+				return nil, err
+			}
+			stakeMsg := &stakingTypes.Undelegate{
+				DelegatorAddress: address,
+				ValidatorAddress: validatorAddress,
+				Amount:           amount,
+			}
+			return stakeMsg, nil
+		}
+	case "CollectRewards":
+		{
+			// same validation as above
+			address, err := ValidateContractAddress(contractCaller, args, "delegatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			stakeMsg := &stakingTypes.CollectRewards{
+				DelegatorAddress: address,
+			}
+			return stakeMsg, nil
+		}
+	default:
+		{
+			return nil, stakingTypes.ErrInvalidStakingKind
+		}
+	}
+}
+
 // used to ensure caller == delegatorAddress
 func ValidateContractAddress(contractCaller common.Address, args map[string]interface{}, key string) (common.Address, error) {
 	address, err := ParseAddressFromKey(args, key)
@@ -102,10 +186,7 @@ func ValidateContractAddress(contractCaller common.Address, args map[string]inte
 
 // used for both delegatorAddress and validatorAddress
 func ParseAddressFromKey(args map[string]interface{}, key string) (common.Address, error) {
-	if byteAddress, ok := args[key].([]byte); ok {
-		address := common.BytesToAddress(byteAddress)
-		return address, nil
-	} else if address, ok := args[key].(common.Address); ok {
+	if address, ok := args[key].(common.Address); ok {
 		return address, nil
 	} else {
 		return common.Address{}, errors.Errorf("Cannot parse address from %v", args[key])

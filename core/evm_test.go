@@ -237,7 +237,7 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 	address := common.BytesToAddress([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 252})
 	// caller ContractRef, addr common.Address, input []byte, gas uint64, value *big.Int)
 	_, _, err := evm.Call(vm.AccountRef(common.Address{}), address,
-		[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
+		[]byte{109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
 		math.MaxUint64, new(big.Int))
 	expectedError := errors.New("abi: cannot marshal in to go type: length insufficient 31 require 32")
 	if err != nil {

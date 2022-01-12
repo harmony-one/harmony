@@ -18,14 +18,12 @@ package core
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -117,45 +115,6 @@ func (result *ExecutionResult) Return() []byte {
 		return nil
 	}
 	return common.CopyBytes(result.ReturnData)
-}
-
-// IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, contractCreation, homestead, istanbul, isValidatorCreation bool) (uint64, error) {
-	// Set the starting gas for the raw transaction
-	var gas uint64
-	if contractCreation && homestead {
-		gas = params.TxGasContractCreation
-	} else if isValidatorCreation {
-		gas = params.TxGasValidatorCreation
-	} else {
-		gas = params.TxGas
-	}
-	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
-		// Zero and non-zero bytes are priced differently
-		var nz uint64
-		for _, byt := range data {
-			if byt != 0 {
-				nz++
-			}
-		}
-		// Make sure we don't exceed uint64 for all data combinations
-		nonZeroGas := params.TxDataNonZeroGasFrontier
-		if istanbul {
-			nonZeroGas = params.TxDataNonZeroGasEIP2028
-		}
-		if (math.MaxUint64-gas)/nonZeroGas < nz {
-			return 0, vm.ErrOutOfGas
-		}
-		gas += nz * nonZeroGas
-
-		z := uint64(len(data)) - nz
-		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
-			return 0, vm.ErrOutOfGas
-		}
-		gas += z * params.TxDataZeroGas
-	}
-	return gas, nil
 }
 
 // Revert returns the concrete revert reason if the execution is aborted by `REVERT`
@@ -260,7 +219,7 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
+	gas, err := vm.IntrinsicGas(st.data, contractCreation, homestead, istanbul, false)
 	if err != nil {
 		return ExecutionResult{}, err
 	}
@@ -342,7 +301,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	istanbul := st.evm.ChainConfig().IsIstanbul(st.evm.EpochNumber)
 
 	// Pay intrinsic gas
-	gas, err := IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
+	gas, err := vm.IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
 		return 0, err

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/vm"
 	ethRpc "github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -239,7 +239,7 @@ func (s *ConstructAPI) ConstructionMetadata(
 			)
 		}
 	} else {
-		estGasUsed, err = core.IntrinsicGas(data, false, false,
+		estGasUsed, err = vm.IntrinsicGas(data, false, false,
 			false, options.OperationType == common.CreateValidatorOperation)
 		estGasUsed *= 2
 

@@ -172,6 +172,20 @@ func (v Delegate) Copy() StakeMsg {
 	return cp
 }
 
+// Equals returns if v and s are equal
+func (v Delegate) Equals(s Delegate) bool {
+	if v.DelegatorAddress != s.DelegatorAddress {
+		return false
+	}
+	if v.ValidatorAddress != v.ValidatorAddress {
+		return false
+	}
+	if v.Amount == nil {
+		return s.Amount == nil
+	}
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0	// pointer
+}
+
 // Undelegate - type for removing delegation responsibility
 type Undelegate struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
@@ -196,6 +210,20 @@ func (v Undelegate) Copy() StakeMsg {
 	return cp
 }
 
+// Equals returns if v and s are equal
+func (v Undelegate) Equals(s Undelegate) bool {
+	if v.DelegatorAddress != s.DelegatorAddress {
+		return false
+	}
+	if v.ValidatorAddress != v.ValidatorAddress {
+		return false
+	}
+	if v.Amount == nil {
+		return s.Amount == nil
+	}
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0	// pointer
+}
+
 // CollectRewards - type for collecting token rewards
 type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
@@ -211,4 +239,9 @@ func (v CollectRewards) Copy() StakeMsg {
 	return CollectRewards{
 		DelegatorAddress: v.DelegatorAddress,
 	}
+}
+
+// Equals returns if v and s are equal
+func (v CollectRewards) Equals(s CollectRewards) bool {
+	return v.DelegatorAddress == s.DelegatorAddress
 }
