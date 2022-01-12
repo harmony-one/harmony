@@ -67,6 +67,6 @@ func (e *invalidParamsError) Error() string { return e.message }
 // hit the rate limiter
 type rateLimitedError struct{ e error }
 
-func (e *rateLimitedError) eErrorCode() int { return -32700 }
+func (e *rateLimitedError) ErrorCode() int { return -32700 }
 
 func (e *rateLimitedError) Error() string { return e.e.Error() }
