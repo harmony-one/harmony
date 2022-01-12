@@ -30,6 +30,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// handleCallLimitTimeOut is the timeout duration for rate limit.
+// If user hit the timeout at rate limiter, a too many request error will be returned
+const handleCallLimitTimeout = 2 * time.Second
+
 // handler handles JSON-RPC messages. There is one handler per connection. Note that
 // handler is not safe for concurrent use. Message handling never blocks indefinitely
 // because RPCs are processed on background goroutines launched by handler.
@@ -293,9 +297,14 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 // handleCallMsg executes a call message and returns the answer.
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
 	if h.limiter != nil {
-		if err := h.limiter.waitN(h.rootCtx); err != nil {
+		ctx, _ := context.WithTimeout(h.rootCtx, handleCallLimitTimeout)
+		if err := h.limiter.waitN(ctx); err != nil {
 			if err != context.Canceled && err != context.DeadlineExceeded {
 				utils.Logger().Error().Err(err).Msg("RPC handleCallMsg")
+			}
+			if err == context.DeadlineExceeded {
+				rateLimiterHitCounter.Inc()
+				err = &tooManyRequestsError{}
 			}
 			return msg.errorResponse(&rateLimitedError{e: err})
 		}

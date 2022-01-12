@@ -70,3 +70,8 @@ type rateLimitedError struct{ e error }
 func (e *rateLimitedError) ErrorCode() int { return -32700 }
 
 func (e *rateLimitedError) Error() string { return e.e.Error() }
+
+// Rate limiter is hit
+type tooManyRequestsError struct{}
+
+func (e *tooManyRequestsError) Error() string { return "too many requests" }
