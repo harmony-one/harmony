@@ -24,10 +24,13 @@ type (
 		limiter  *rate.Limiter
 		lastCall time.Time
 	}
+
+	// Limit is an alias to rate.Limit which is internally an float64
+	Limit rate.Limit
 )
 
 // NewLimiterPerID creates a limit limiter based on ID
-func NewLimiterPerID(rate rate.Limit, burst int, c *Config) *limiterPerID {
+func NewLimiterPerID(rate Limit, burst int, c *Config) *limiterPerID {
 	lpi := &limiterPerID{
 		evictList: list.New(),
 		items:     make(map[string]*list.Element),
@@ -62,7 +65,7 @@ func (lpi *limiterPerID) getLimiterByID(id string) *rate.Limiter {
 
 	elem, ok := lpi.items[id]
 	if !ok || elem == nil {
-		lmt := rate.NewLimiter(lpi.c.limit, lpi.c.burst)
+		lmt := rate.NewLimiter(rate.Limit(lpi.c.limit), lpi.c.burst)
 		ent := &entry{id: id, limiter: lmt, lastCall: lpi.t.now()}
 		elem := lpi.evictList.PushFront(ent)
 		lpi.items[id] = elem

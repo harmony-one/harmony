@@ -2,8 +2,6 @@ package rate
 
 import (
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -23,7 +21,7 @@ type (
 
 	// internal config
 	configInt struct {
-		limit       rate.Limit
+		limit       Limit
 		burst       int
 		capacity    int
 		checkInt    time.Duration
@@ -32,7 +30,7 @@ type (
 	}
 )
 
-func toConfigInt(limit rate.Limit, burst int, c *Config) configInt {
+func toConfigInt(limit Limit, burst int, c *Config) configInt {
 	ci := configInt{
 		limit:       limit,
 		burst:       burst,
