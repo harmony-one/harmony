@@ -183,7 +183,7 @@ func (v Delegate) Equals(s Delegate) bool {
 	if v.Amount == nil {
 		return s.Amount == nil
 	}
-	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0	// pointer
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0 // pointer
 }
 
 // Undelegate - type for removing delegation responsibility
@@ -221,7 +221,7 @@ func (v Undelegate) Equals(s Undelegate) bool {
 	if v.Amount == nil {
 		return s.Amount == nil
 	}
-	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0	// pointer
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0 // pointer
 }
 
 // CollectRewards - type for collecting token rewards

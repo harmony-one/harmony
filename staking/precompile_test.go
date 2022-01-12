@@ -2,9 +2,9 @@ package staking
 
 import (
 	"errors"
-	"testing"
-	"math/big"
 	"fmt"
+	"math/big"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/common/denominations"
@@ -48,10 +48,10 @@ func TestParseBigIntFromKey(t *testing.T) {
 }
 
 type parseStakeMsgTest struct {
-	input						[]byte
-	name            string
-	expectedError   error
-	expected				interface{}
+	input         []byte
+	name          string
+	expectedError error
+	expected      interface{}
 }
 
 var ParseStakeMsgTests = []parseStakeMsgTest{
@@ -81,13 +81,13 @@ var ParseStakeMsgTests = []parseStakeMsgTest{
 		name:          "collectRewardsInvalidABI",
 	},
 	{
-		input:    []byte{81, 11, 17, 187, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
+		input: []byte{81, 11, 17, 187, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
 		expected: &stakingTypes.Delegate{
-								DelegatorAddress: common.HexToAddress("0x1337"),
-								ValidatorAddress: common.HexToAddress("0x1338"),
-								Amount:						new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)),
-							},
-		name:     "delegateSuccess",
+			DelegatorAddress: common.HexToAddress("0x1337"),
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			Amount:           new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)),
+		},
+		name: "delegateSuccess",
 	},
 	{
 		input:         []byte{81, 11, 17, 187, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0},
@@ -101,13 +101,13 @@ var ParseStakeMsgTests = []parseStakeMsgTest{
 	},
 
 	{
-		input:    []byte{189, 168, 192, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
+		input: []byte{189, 168, 192, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
 		expected: &stakingTypes.Undelegate{
-								DelegatorAddress: common.HexToAddress("0x1337"),
-								ValidatorAddress: common.HexToAddress("0x1338"),
-								Amount:						new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)),
-							},
-		name:     "undelegateSuccess",
+			DelegatorAddress: common.HexToAddress("0x1337"),
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			Amount:           new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)),
+		},
+		name: "undelegateSuccess",
 	},
 	{
 		input:         []byte{189, 168, 192, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0},
@@ -140,7 +140,7 @@ func testParseStakeMsg(test parseStakeMsgTest, t *testing.T) {
 					convertedExp, ok := test.expected.(*stakingTypes.Delegate)
 					if !ok {
 						t.Errorf("Could not converted test.expected to *stakingTypes.Delegate")
-					}	else if !converted.Equals(*convertedExp) {
+					} else if !converted.Equals(*convertedExp) {
 						t.Errorf("Expected %+v but got %+v", test.expected, converted)
 					}
 				} else if converted, ok := res.(*stakingTypes.Undelegate); ok {
@@ -158,7 +158,7 @@ func testParseStakeMsg(test parseStakeMsgTest, t *testing.T) {
 						t.Errorf("Expected %+v but got %+v", test.expected, converted)
 					}
 				}
-			}	else if res != nil {
+			} else if res != nil {
 				t.Errorf("Expected nil, got %v", res)
 			}
 		}
