@@ -113,7 +113,7 @@ type clientConn struct {
 
 func (c *Client) newClientConn(conn ServerCodec) *clientConn {
 	ctx := context.WithValue(context.Background(), clientContextKey{}, c)
-	handler := newHandler(ctx, conn, c.idgen, c.services)
+	handler := newHandler(ctx, conn, c.idgen, c.services, nil)
 	return &clientConn{conn, handler}
 }
 
@@ -199,7 +199,7 @@ func newClient(initctx context.Context, connect reconnectFunc) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	c := initClient(conn, randomIDGenerator(), new(serviceRegistry))
+	c := initClient(conn, randomIDGenerator(), new(serviceRegistry), nil)
 	c.reconnectFunc = connect
 	return c, nil
 }
