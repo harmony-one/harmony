@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 )
 
 // SendTx ...
