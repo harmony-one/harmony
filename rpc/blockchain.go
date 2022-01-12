@@ -1020,6 +1020,42 @@ func (s *PublicBlockchainService) getBlockOptions(opts interface{}) (*rpc_common
 	}
 }
 
+func (s *PublicBlockchainService) GetFullHeader(
+	ctx context.Context, blockNumber BlockNumber,
+) (response StructuredResponse, err error) {
+	// Process number based on version
+	blockNum := blockNumber.EthBlockNumber()
+
+	// Ensure valid block number
+	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+		return nil, ErrRequestedBlockTooHigh
+	}
+
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
+	if err != nil {
+		return nil, err
+	}
+
+	var rpcHeader interface{}
+	switch s.version {
+	case V2:
+		rpcHeader, err = v2.NewBlockHeader(header)
+	default:
+		return nil, ErrUnknownRPCVersion
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	response, err = NewStructuredResponse(rpcHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 	// rpc.BlockNumber is int64 (latest = -1. pending = -2) and currentBlockNum is uint64.
 	if blockNum == rpc.PendingBlockNumber {
