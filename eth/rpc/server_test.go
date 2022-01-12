@@ -77,7 +77,7 @@ func runTestScript(t *testing.T, file string) {
 
 	clientConn, serverConn := net.Pipe()
 	defer clientConn.Close()
-	go server.ServeCodec(NewCodec(serverConn), 0)
+	go server.ServeCodec(NewCodec(serverConn), 0, false)
 	readbuf := bufio.NewReader(clientConn)
 	for _, line := range strings.Split(string(content), "\n") {
 		line = strings.TrimSpace(line)

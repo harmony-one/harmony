@@ -98,6 +98,8 @@ type Client struct {
 	reqInit     chan *requestOp  // register response IDs, takes write lock
 	reqSent     chan error       // signals write completion, releases write lock
 	reqTimeout  chan *requestOp  // removes response IDs when call timeout expires
+
+	limiter *rateLimiter // limit the request if the connection serves as a server
 }
 
 type reconnectFunc func(ctx context.Context) (ServerCodec, error)
@@ -202,7 +204,7 @@ func newClient(initctx context.Context, connect reconnectFunc) (*Client, error) 
 	return c, nil
 }
 
-func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry) *Client {
+func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry, limiter *rateLimiter) *Client {
 	_, isHTTP := conn.(*httpConn)
 	c := &Client{
 		idgen:       idgen,
@@ -218,6 +220,7 @@ func initClient(conn ServerCodec, idgen func() ID, services *serviceRegistry) *C
 		reqInit:     make(chan *requestOp),
 		reqSent:     make(chan error, 1),
 		reqTimeout:  make(chan *requestOp),
+		limiter:     limiter,
 	}
 	if !isHTTP {
 		go c.dispatch(conn)

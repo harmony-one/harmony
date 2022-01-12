@@ -46,11 +46,13 @@ type Server struct {
 	idgen    func() ID
 	run      int32
 	codecs   mapset.Set
+	limiter  *rateLimiter
 }
 
 // NewServer creates a new server instance with no registered handlers.
 func NewServer() *Server {
-	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1}
+	limiter := newRateLimiter()
+	server := &Server{idgen: randomIDGenerator(), codecs: mapset.NewSet(), run: 1, limiter: limiter}
 	// Register the default service providing meta information about the RPC service such
 	// as the services and methods it offers.
 	rpcService := &RPCService{server}
@@ -69,9 +71,11 @@ func (s *Server) RegisterName(name string, receiver interface{}) error {
 // ServeCodec reads incoming requests from codec, calls the appropriate callback and writes
 // the response back using the given codec. It will block until the codec is closed or the
 // server is stopped. In either case the codec is closed.
+// isLimited is the boolean to set whether the connection is using rate limiter for handling
+// requests. Currently, only the websocket connections is using rate limiter
 //
 // Note that codec options are no longer supported.
-func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
+func (s *Server) ServeCodec(codec ServerCodec, options CodecOption, isLimited bool) {
 	defer codec.close()
 
 	// Don't serve if server is stopped.
@@ -83,7 +87,11 @@ func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
 	s.codecs.Add(codec)
 	defer s.codecs.Remove(codec)
 
-	c := initClient(codec, s.idgen, &s.services)
+	limiter := s.limiter
+	if !isLimited {
+		limiter = nil
+	}
+	c := initClient(codec, s.idgen, &s.services, limiter)
 	<-codec.closed()
 	c.Close()
 }
@@ -97,7 +105,7 @@ func (s *Server) serveSingleRequest(ctx context.Context, codec ServerCodec) {
 		return
 	}
 
-	h := newHandler(ctx, codec, s.idgen, &s.services)
+	h := newHandler(ctx, codec, s.idgen, &s.services, s.limiter)
 	h.allowSubscribe = false
 	defer h.close(io.EOF, nil)
 

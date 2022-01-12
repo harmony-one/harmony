@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -61,6 +63,7 @@ type handler struct {
 	conn           jsonWriter                     // where responses will be sent
 	log            log.Logger
 	allowSubscribe bool
+	limiter        *rateLimiter // limit incoming requests
 
 	subLock    sync.Mutex
 	serverSubs map[ID]*Subscription
@@ -71,7 +74,7 @@ type callProc struct {
 	notifiers []*Notifier
 }
 
-func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *serviceRegistry) *handler {
+func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *serviceRegistry, limiter *rateLimiter) *handler {
 	rootCtx, cancelRoot := context.WithCancel(connCtx)
 	h := &handler{
 		reg:            reg,
@@ -84,6 +87,7 @@ func newHandler(connCtx context.Context, conn jsonWriter, idgen func() ID, reg *
 		allowSubscribe: true,
 		serverSubs:     make(map[ID]*Subscription),
 		log:            log.Root(),
+		limiter:        limiter,
 	}
 	if conn.remoteAddr() != "" {
 		h.log = h.log.New("conn", conn.remoteAddr())
@@ -288,6 +292,16 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 
 // handleCallMsg executes a call message and returns the answer.
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
+	if h.limiter != nil {
+		if err := h.limiter.waitN(h.rootCtx); err != nil {
+			if err != context.Canceled && err != context.DeadlineExceeded {
+				utils.Logger().Error().Err(err).Msg("RPC handleCallMsg")
+			}
+			limiterHitCounter.Inc()
+			return msg.errorResponse(&rateLimitedError{e: err})
+		}
+	}
+
 	start := time.Now()
 	switch {
 	case msg.isNotification():

@@ -10,6 +10,7 @@ func init() {
 		requestCounterVec,
 		requestErroredCounterVec,
 		requestDurationHistVec,
+		limiterHitCounter,
 	)
 }
 
@@ -44,6 +45,15 @@ var (
 			Buckets: prometheus.ExponentialBuckets(0.05, 2, 8),
 		},
 		[]string{"method"},
+	)
+
+	limiterHitCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "rpc2",
+			Name:      "limiter_hit",
+			Help:      "counter of limiter being hit",
+		},
 	)
 )
 
