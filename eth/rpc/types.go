@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -93,8 +92,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	input = strings.TrimPrefix(strings.ToLower(input), "0x")
-	blckNum, err := strconv.ParseInt(input, 10, 64)
+	blckNum, err := hexutil.DecodeUint64(input)
 	if err != nil {
 		return err
 	}
