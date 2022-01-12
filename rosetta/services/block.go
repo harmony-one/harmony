@@ -14,9 +14,9 @@ import (
 	"github.com/harmony-one/harmony/core/rawdb"
 	hmytypes "github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
-	"github.com/harmony-one/harmony/rpc"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -67,7 +67,7 @@ func (s *BlockAPI) Block(
 	if blk.NumberU64() == 0 {
 		prevBlockID = currBlockID
 	} else {
-		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1).EthBlockNumber())
+		prevBlock, err := s.hmy.BlockByNumber(ctx, rpc.BlockNumber(blk.Number().Int64()-1))
 		if err != nil {
 			return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 				"message": err.Error(),
@@ -157,7 +157,7 @@ func (s *BlockAPI) BlockTransaction(
 		}
 		return response, rosettaError2
 	}
-	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(request.BlockIdentifier.Index).EthBlockNumber())
+	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(request.BlockIdentifier.Index))
 	if state == nil || err != nil {
 		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
 			"message": fmt.Sprintf("block state not found for block %v", request.BlockIdentifier.Index),
@@ -320,7 +320,7 @@ func getBlock(
 		requestBlockHash := ethcommon.HexToHash(*blockID.Hash)
 		blk, err = hmy.GetBlock(ctx, requestBlockHash)
 	} else if blockID.Index != nil {
-		blk, err = hmy.BlockByNumber(ctx, rpc.BlockNumber(*blockID.Index).EthBlockNumber())
+		blk, err = hmy.BlockByNumber(ctx, rpc.BlockNumber(*blockID.Index))
 	} else {
 		return nil, &common.BlockNotFoundError
 	}
