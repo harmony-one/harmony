@@ -145,6 +145,11 @@ func init() {
 			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))
 		}
 	}
+	for address, writeCapableContract := range writeCapableContracts {
+		if writeCapableContract != nil && readOnlyContracts[address] != nil {
+			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))
+		}
+	}
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
