@@ -1009,7 +1009,7 @@ func New(
 		txPoolConfig := core.DefaultTxPoolConfig
 
 		// Temporarily not updating other networks to make the rpc tests pass
-		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet {
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet && node.NodeConfig.GetNetworkType() != nodeconfig.Testnet {
 			txPoolConfig.PriceLimit = 1e9
 			txPoolConfig.PriceBump = 10
 		}
