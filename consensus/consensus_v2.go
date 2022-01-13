@@ -558,12 +558,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
 
-		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
-			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
-			return
-		}
-
-		// if leader successfully finalizes the block, send committed message to validators
+		// Send committed message to validators since 2/3 commit is already collected
 		if err := consensus.msgSender.SendWithRetry(
 			blk.NumberU64(),
 			msg_pb.MessageType_COMMITTED, []nodeconfig.GroupID{
@@ -578,6 +573,12 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 				Hex("lastCommitSig", bareMinimumCommit).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
+
+		if _, err := consensus.Blockchain.InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
+			consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] Failed to add block to chain")
+			return
+		}
+
 		consensus.getLogger().Info().Msg("[preCommitAndPropose] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 
