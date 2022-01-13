@@ -26,6 +26,7 @@ import (
 
 func newTestServer() *Server {
 	server := NewServer()
+	server.limiter = getTestRateLimiter()
 	server.idgen = sequentialIDGenerator()
 	if err := server.RegisterName("test", new(testService)); err != nil {
 		panic(err)
