@@ -608,6 +608,7 @@ func (node *Node) StartPubSub() error {
 	var (
 		rateLimiter = newRateLimiter()
 		blacklist   = newBlackList()
+		rateLock    sync.Mutex
 	)
 
 	// groupID and whether this topic is used for consensus
@@ -705,6 +706,7 @@ func (node *Node) StartPubSub() error {
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
 				nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
 
+				rateLock.Lock()
 				// blacklist is already registered in pub-sub. This is used for more customized blacklist logic.
 				if blacklist.Contains(peer) {
 					blacklistRejectedCounterVec.With(prometheus.Labels{"topic": topicNamed}).Inc()
@@ -720,6 +722,7 @@ func (node *Node) StartPubSub() error {
 					blacklist.Add(peer)
 					return libp2p_pubsub.ValidationReject
 				}
+				rateLock.Unlock()
 
 				hmyMsg := msg.GetData()
 
