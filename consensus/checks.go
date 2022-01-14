@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	protobuf "github.com/golang/protobuf/proto"
 	libbls "github.com/harmony-one/bls/ffi/go/bls"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -13,16 +15,35 @@ import (
 	"github.com/pkg/errors"
 )
 
+const MessageSigCacheSize = 1024
+
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
 
+var (
+	// BLSPubKeyCache is the Cache of the Deserialized BLS PubKey
+	MessageSigCache, _ = lru.New(MessageSigCacheSize)
+)
+
 // verifyMessageSig verify the signature of the message are valid from the signer's public key.
-func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) error {
+func verifyMessageSig(senderKey *bls.SerializedPublicKey, message *msg_pb.Message) error {
 	signature := message.Signature
 	message.Signature = nil
 	messageBytes, err := protobuf.Marshal(message)
 	if err != nil {
 		return err
+	}
+
+	// Look up cache first
+	MessageSigKey := append(senderKey[:], messageBytes[:]...)
+	kkey := string(MessageSigKey)
+	if _, ok := MessageSigCache.Get(kkey); ok {
+		return nil
+	}
+
+	pubkey, err := bls.BytesToBLSPublicKey(senderKey[:])
+	if err != nil {
+		return errors.New("failed to deserialize the senderKey")
 	}
 
 	msgSig := libbls.Sign{}
@@ -31,20 +52,18 @@ func verifyMessageSig(signerPubKey *libbls.PublicKey, message *msg_pb.Message) e
 		return err
 	}
 	msgHash := hash.Keccak256(messageBytes)
-	if !msgSig.VerifyHash(signerPubKey, msgHash[:]) {
+	if !msgSig.VerifyHash(pubkey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
 	message.Signature = signature
+
+	// Successfully verified, add to cache
+	MessageSigCache.Add(kkey, struct{}{})
 	return nil
 }
 
 func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) bool {
-	pubkey, err := bls.BytesToBLSPublicKey(senderKey[:])
-	if err != nil {
-		return false
-	}
-
-	if err := verifyMessageSig(pubkey, msg); err != nil {
+	if err := verifyMessageSig(senderKey, msg); err != nil {
 		consensus.getLogger().Error().Err(err).Msgf(
 			"[%s] Failed to verify sender's signature",
 			msg.GetType().String(),
