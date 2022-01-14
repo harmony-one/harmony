@@ -131,7 +131,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		StakingPrecompileEpoch:     big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -165,7 +165,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		StakingPrecompileEpoch:     big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -199,7 +199,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		StakingPrecompileEpoch:     big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -232,7 +232,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		StakingPrecompileEpoch:     big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
