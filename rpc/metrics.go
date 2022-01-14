@@ -19,8 +19,6 @@ const (
 	GetLatestChainHeaders    = "GetLatestChainHeaders"
 	GetLastCrossLinks        = "GetLastCrossLinks"
 	GetHeaderByNumber        = "GetHeaderByNumber"
-	GetHeaderByNumberRLPHex  = "GetHeaderByNumberRLPHex"
-	GetProof                 = "GetProof"
 	GetCurrentUtilityMetrics = "GetCurrentUtilityMetrics"
 	GetSuperCommittees       = "GetSuperCommittees"
 	GetCurrentBadBlocks      = "GetCurrentBadBlocks"
