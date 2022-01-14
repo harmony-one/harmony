@@ -91,7 +91,6 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
 							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
 								Msg("Block with the same number was already proposed, abort.")
-							break
 						}
 						utils.Logger().Info().
 							Uint64("blockNum", newBlock.NumberU64()).
