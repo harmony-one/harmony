@@ -352,6 +352,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
 				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
 			}
+			fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
+			utils.Logger().Warn().
+				Uint64("Current Block", chain.CurrentBlock().NumberU64()).
+				Msg("Revert finished.")
+			os.Exit(1)
 		}
 	}
 
