@@ -369,6 +369,7 @@ type withError struct {
 var (
 	errNotRightKeySize   = errors.New("key received over wire is wrong size")
 	errNoSenderPubKey    = errors.New("no sender public BLS key in message")
+	errViewIDTooOld      = errors.New("view id too old")
 	errWrongSizeOfBitmap = errors.New("wrong size of sender bitmap")
 	errWrongShardID      = errors.New("wrong shard id")
 	errInvalidNodeMsg    = errors.New("invalid node message")
@@ -419,6 +420,10 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
 					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
+				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
+					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
+						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
+					return nil, 0, errors.New("beacon block height too much higher than current height beyond tolerance")
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
@@ -529,12 +534,20 @@ func (node *Node) validateShardBoundMessage(
 		if len(maybeCon.SenderPubkeyBitmap) > 0 {
 			senderBitmap = maybeCon.SenderPubkeyBitmap
 		}
+		// If the viewID is too old, reject the message.
+		if maybeCon.ViewId+5 < node.Consensus.GetCurBlockViewID() {
+			return nil, nil, true, errors.WithStack(errViewIDTooOld)
+		}
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
+		// If the viewID is too old, reject the message.
+		if maybeVC.ViewId+5 < node.Consensus.GetViewChangingID() {
+			return nil, nil, true, errors.WithStack(errViewIDTooOld)
+		}
 	} else {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
