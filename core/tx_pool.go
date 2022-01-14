@@ -925,12 +925,12 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
-		logger.Info().Str("hash", hash.Hex()).Msg("Discarding already known transaction")
+		logger.Debug().Str("hash", hash.Hex()).Msg("Discarding already known transaction")
 		return false, errors.WithMessagef(ErrKnownTransaction, "transaction hash %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
-		logger.Warn().Err(err).Str("hash", hash.Hex()).Msg("Discarding invalid transaction")
+		logger.Debug().Err(err).Str("hash", hash.Hex()).Msg("Discarding invalid transaction")
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
@@ -940,7 +940,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		if !local && pool.priced.Underpriced(tx, pool.locals) {
 			gasPrice := new(big.Float).SetInt64(tx.GasPrice().Int64())
 			gasPrice = gasPrice.Mul(gasPrice, new(big.Float).SetFloat64(1e-9)) // Gas-price is in Nano
-			logger.Warn().
+			logger.Debug().
 				Str("hash", hash.Hex()).
 				Str("price", tx.GasPrice().String()).
 				Msg("Discarding underpriced transaction")
@@ -956,7 +956,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 			underpricedTxCounter.Inc(1)
 			pool.txErrorSink.Add(tx,
 				errors.WithMessagef(ErrUnderpriced, "transaction gas-price is %.18f ONE in full transaction pool", gasPrice))
-			logger.Warn().
+			logger.Debug().
 				Str("hash", tx.Hash().Hex()).
 				Str("price", tx.GasPrice().String()).
 				Msg("Discarding freshly underpriced transaction")
@@ -978,7 +978,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 			pendingReplaceCounter.Inc(1)
 			pool.txErrorSink.Add(old,
 				fmt.Errorf("replaced transaction, new transaction %v has same nonce & higher price", tx.Hash().String()))
-			logger.Info().
+			logger.Debug().
 				Str("hash", old.Hash().String()).
 				Str("new-tx-hash", tx.Hash().String()).
 				Str("price", old.GasPrice().String()).
@@ -991,7 +991,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 		// Set or refresh beat for account timeout eviction
 		pool.beats[from] = time.Now()
 
-		logger.Info().
+		logger.Debug().
 			Str("hash", tx.Hash().Hex()).
 			Interface("from", from).
 			Interface("to", tx.To()).
@@ -1020,7 +1020,7 @@ func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
 	// Set or refresh beat for account timeout eviction
 	pool.beats[from] = time.Now()
 
-	logger.Info().
+	logger.Debug().
 		Str("hash", hash.Hex()).
 		Interface("from", from).
 		Interface("to", tx.To()).
