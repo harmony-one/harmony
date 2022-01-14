@@ -10,8 +10,8 @@ import (
 
 const (
 	// TODO: make these parameters configurable
-	pubSubRateLimit  = 4
-	pubSubBurstLimit = 40
+	pubSubRateLimit  = 5
+	pubSubBurstLimit = 50
 
 	// When a node is bootstrapped, it will be flooded with some pub-sub message from the past.
 	// Ease the rate limit at the initial bootstrap.
