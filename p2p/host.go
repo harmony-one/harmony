@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	libp2p_crypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -152,6 +153,18 @@ func NewHost(cfg HostConfig) (Host, error) {
 				Msg("can't add event tracer from P2P_TRACEFILE")
 		}
 	}
+
+	libp2p_pubsub.GossipSubDlazy = 4
+	libp2p_pubsub.GossipSubGossipFactor = 0.15
+	libp2p_pubsub.GossipSubD = 5
+	libp2p_pubsub.GossipSubDlo = 4
+	libp2p_pubsub.GossipSubDhi = 8
+	libp2p_pubsub.GossipSubHistoryLength = 2
+	libp2p_pubsub.GossipSubHistoryGossip = 2
+	libp2p_pubsub.GossipSubGossipRetransmission = 2
+	libp2p_pubsub.GossipSubFanoutTTL = 10 * time.Second
+	libp2p_pubsub.GossipSubMaxPendingConnections = 32
+	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
