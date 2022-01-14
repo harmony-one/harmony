@@ -289,9 +289,7 @@ func (consensus *Consensus) startViewChange() {
 			continue
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
-		if err := consensus.msgSender.SendWithRetry(
-			consensus.blockNum,
-			msg_pb.MessageType_VIEWCHANGE,
+		if err := consensus.msgSender.SendWithoutRetry(
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
 			p2p.ConstructMessage(msgToSend),
