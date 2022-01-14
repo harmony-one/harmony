@@ -598,6 +598,10 @@ var (
 func (node *Node) StartPubSub() error {
 	node.psCtx, node.psCancel = context.WithCancel(context.Background())
 
+	timeStart := time.Now()
+	var (
+		rateLimiter = newRateLimiter()
+	)
 	// groupID and whether this topic is used for consensus
 	type t struct {
 		tp    nodeconfig.GroupID
@@ -692,6 +696,16 @@ func (node *Node) StartPubSub() error {
 			// this is the validation function called to quickly validate every p2p message
 			func(ctx context.Context, peer libp2p_peer.ID, msg *libp2p_pubsub.Message) libp2p_pubsub.ValidationResult {
 				nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "total"}).Inc()
+				if time.Since(timeStart) > rateLimiterEasyPeriod && !rateLimiter.AllowN(peer.String(), 1) {
+					// TODO: it would be better to have a cool down and ignored before directly go to blacklist
+					rateLimitRejectedCounterVec.With(prometheus.Labels{"topic": topicNamed}).Inc()
+					peerInfo := node.host.GetP2PHost().Peerstore().PeerInfo(peer)
+					utils.Logger().Debug().Str("peerInfo", peerInfo.String()).
+						Msg("peer banned from pub-sub for exceeding rate limit")
+
+					return libp2p_pubsub.ValidationReject
+				}
+
 				hmyMsg := msg.GetData()
 
 				// first to validate the size of the p2p message

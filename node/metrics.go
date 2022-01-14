@@ -70,6 +70,18 @@ var (
 		},
 	)
 
+	rateLimitRejectedCounterVec = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "hmy",
+			Subsystem: "p2p",
+			Name:      "rate_limited_msg",
+			Help:      "number of pub-sub message rejected and dropped due to rate limit",
+		},
+		[]string{
+			"topic",
+		},
+	)
+
 	onceMetrics sync.Once
 )
 
@@ -81,6 +93,7 @@ func initMetrics() {
 			nodeConsensusMessageCounterVec,
 			nodeNodeMessageCounterVec,
 			nodeCrossLinkMessageCounterVec,
+			rateLimitRejectedCounterVec,
 		)
 	})
 }
