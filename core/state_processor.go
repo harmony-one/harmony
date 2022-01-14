@@ -109,7 +109,7 @@ func (p *StateProcessor) Process(
 		usedGas        = new(uint64)
 		header         = block.Header()
 		allLogs        []*types.Log
-		gp             = new(GasPool).AddGas(block.GasLimit())
+		gp                                = new(GasPool).AddGas(block.GasLimit())
 		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
 	)
 

@@ -48,7 +48,7 @@ type environment struct {
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 	slashes    slash.Records
-	stakeMsgs	 []staking.StakeMsg
+	stakeMsgs  []staking.StakeMsg
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
