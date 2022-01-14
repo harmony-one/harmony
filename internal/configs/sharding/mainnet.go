@@ -3,6 +3,8 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/utils"
+
 	"github.com/harmony-one/harmony/internal/params"
 
 	"github.com/harmony-one/harmony/numeric"
@@ -47,15 +49,37 @@ var (
 )
 
 // MainnetSchedule is the mainnet sharding configuration schedule.
-var MainnetSchedule mainnetSchedule
+var MainnetSchedule MainnetScheduleType
 
-type mainnetSchedule struct{}
+// MainnetScheduleType ...
+type MainnetScheduleType struct {
+	ShardID         uint64
+	CurrentBlockNum func() uint64
+}
 
-func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
+func (ms MainnetScheduleType) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
 	case params.MainnetChainConfig.IsJan13HardFork(epoch):
 		// Increase internal voting power from 49% to 85%
-		return mainnetV3_3
+		utils.Logger().Info().Uint64("epoch", epoch.Uint64()).Uint64("curBlock", ms.CurrentBlockNum()).Msg("I am at Jan13HardFork epoch")
+		if ms.ShardID == 0 && ms.CurrentBlockNum() > 21705526 {
+			// shard 0 stuck at epoch 835 and block 21705526
+			// enable after block 21705526
+			return mainnetV3_3
+		}
+		if ms.ShardID == 1 && ms.CurrentBlockNum() > 23604890 {
+			// shard 1 stuck at epoch 834 and block 23604890
+			// enable after block 23604890
+			return mainnetV3_3
+		}
+		if ms.ShardID == 2 || ms.ShardID == 3 {
+			// shard 2, 3 live at epoch 835, will enable at next epoch 834 + 2 = 836
+			if params.MainnetChainConfig.Jan13HardForkEpoch.Uint64()+2 <= epoch.Uint64() {
+				return mainnetV3_3
+			}
+		}
+		// Else, return previous setting
+		return mainnetV3_2
 	case params.MainnetChainConfig.IsHIP6And8Epoch(epoch):
 		// Decrease internal voting power from 60% to 49%
 		// Increase external nodes from 800 to 900
@@ -111,22 +135,22 @@ func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	}
 }
 
-func (ms mainnetSchedule) BlocksPerEpochOld() uint64 {
+func (ms MainnetScheduleType) BlocksPerEpochOld() uint64 {
 	return blocksPerEpoch
 }
 
-func (ms mainnetSchedule) BlocksPerEpoch() uint64 {
+func (ms MainnetScheduleType) BlocksPerEpoch() uint64 {
 	return blocksPerEpochV2
 }
 
-func (ms mainnetSchedule) twoSecondsFirstBlock() uint64 {
+func (ms MainnetScheduleType) twoSecondsFirstBlock() uint64 {
 	if params.MainnetChainConfig.TwoSecondsEpoch.Uint64() == 0 {
 		return 0
 	}
 	return (params.MainnetChainConfig.TwoSecondsEpoch.Uint64()-1)*ms.BlocksPerEpochOld() + mainnetEpochBlock1
 }
 
-func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
+func (ms MainnetScheduleType) CalcEpochNumber(blockNum uint64) *big.Int {
 	var oldEpochNumber int64
 	switch {
 	case blockNum >= mainnetEpochBlock1:
@@ -145,7 +169,7 @@ func (ms mainnetSchedule) CalcEpochNumber(blockNum uint64) *big.Int {
 	}
 }
 
-func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
+func (ms MainnetScheduleType) IsLastBlock(blockNum uint64) bool {
 	switch {
 	case blockNum < mainnetEpochBlock1-1:
 		return false
@@ -162,7 +186,7 @@ func (ms mainnetSchedule) IsLastBlock(blockNum uint64) bool {
 	}
 }
 
-func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
+func (ms MainnetScheduleType) EpochLastBlock(epochNum uint64) uint64 {
 	switch {
 	case epochNum == 0:
 		return mainnetEpochBlock1 - 1
@@ -177,21 +201,21 @@ func (ms mainnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	}
 }
 
-func (ms mainnetSchedule) VdfDifficulty() int {
+func (ms MainnetScheduleType) VdfDifficulty() int {
 	return mainnetVdfDifficulty
 }
 
-func (ms mainnetSchedule) GetNetworkID() NetworkID {
+func (ms MainnetScheduleType) GetNetworkID() NetworkID {
 	return MainNet
 }
 
 // GetShardingStructure is the sharding structure for mainnet.
-func (ms mainnetSchedule) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
+func (ms MainnetScheduleType) GetShardingStructure(numShard, shardID int) []map[string]interface{} {
 	return genShardingStructure(numShard, shardID, MainNetHTTPPattern, MainNetWSPattern)
 }
 
 // IsSkippedEpoch returns if an epoch was skipped on shard due to staking epoch
-func (ms mainnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
+func (ms MainnetScheduleType) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 	if skipped, exists := skippedEpochs[shardID]; exists {
 		for _, e := range skipped {
 			if epoch.Cmp(e) == 0 {

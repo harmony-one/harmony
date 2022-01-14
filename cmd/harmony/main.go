@@ -458,6 +458,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 	switch config.Network.NetworkType {
 	case nodeconfig.Mainnet:
+		shardingconfig.MainnetSchedule.ShardID = uint64(config.General.ShardID)
 		shard.Schedule = shardingconfig.MainnetSchedule
 	case nodeconfig.Testnet:
 		shard.Schedule = shardingconfig.TestnetSchedule
@@ -663,6 +664,12 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		currentNode.BroadcastInvalidTx = defaultBroadcastInvalidTx
 	}
 
+	if currentNode.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+		mainnetSchedule := shard.Schedule.(shardingconfig.MainnetScheduleType)
+		mainnetSchedule.CurrentBlockNum = func() uint64 { return currentNode.Blockchain().CurrentBlock().NumberU64() }
+	}
+
+	currentNode.Blockchain()
 	// Syncing provider is provided by following rules:
 	//   1. If starting with a localnet or offline, use local sync peers.
 	//   2. If specified with --dns=false, use legacy syncing which is syncing through self-
