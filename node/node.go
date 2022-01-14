@@ -710,7 +710,7 @@ func (node *Node) StartPubSub() error {
 					blacklistRejectedCounterVec.With(prometheus.Labels{"topic": topicNamed}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-				if time.Since(timeStart) < rateLimiterEasyPeriod && !rateLimiter.AllowN(peer.String(), 1) {
+				if time.Since(timeStart) > rateLimiterEasyPeriod && !rateLimiter.AllowN(peer.String(), 1) {
 					// TODO: it would be better to have a cool down and ignored before directly go to blacklist
 					rateLimitRejectedCounterVec.With(prometheus.Labels{"topic": topicNamed}).Inc()
 					peerInfo := node.host.GetP2PHost().Peerstore().PeerInfo(peer)
