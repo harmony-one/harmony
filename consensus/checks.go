@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const MessageSigCacheSize = 1024
+const MessageSigCacheSize = 2048
 
 // MaxBlockNumDiff limits the received block number to only 100 further from the current block number
 const MaxBlockNumDiff = 100
@@ -34,8 +34,9 @@ func verifyMessageSig(senderKey *bls.SerializedPublicKey, message *msg_pb.Messag
 		return err
 	}
 
+	msgHash := hash.Keccak256(messageBytes)
 	// Look up cache first
-	MessageSigKey := append(senderKey[:], messageBytes[:]...)
+	MessageSigKey := append(senderKey[:], msgHash[:]...)
 	kkey := string(MessageSigKey)
 	if _, ok := MessageSigCache.Get(kkey); ok {
 		return nil
@@ -51,7 +52,6 @@ func verifyMessageSig(senderKey *bls.SerializedPublicKey, message *msg_pb.Messag
 	if err != nil {
 		return err
 	}
-	msgHash := hash.Keccak256(messageBytes)
 	if !msgSig.VerifyHash(pubkey, msgHash[:]) {
 		return errors.New("failed to verify the signature")
 	}
