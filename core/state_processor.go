@@ -110,7 +110,7 @@ func (p *StateProcessor) Process(
 		header         = block.Header()
 		allLogs        []*types.Log
 		gp             = new(GasPool).AddGas(block.GasLimit())
-		blockStakeMsgs []staking.StakeMsg
+		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
 	)
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
@@ -132,7 +132,7 @@ func (p *StateProcessor) Process(
 		if cxReceipt != nil {
 			outcxs = append(outcxs, cxReceipt)
 		}
-		if stakeMsgs != nil {
+		if len(stakeMsgs) > 0 {
 			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
