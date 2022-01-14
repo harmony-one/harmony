@@ -10,7 +10,7 @@ import (
 
 const (
 	// TODO: make these parameters configurable
-	pubSubRateLimit  = 10
+	pubSubRateLimit  = 5
 	pubSubBurstLimit = 50
 
 	// When a node is bootstrapped, it will be flooded with some pub-sub message from the past.
