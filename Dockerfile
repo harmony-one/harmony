@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 SHELL ["/bin/bash", "-c"]
 
@@ -13,13 +13,13 @@ ENV BLS_DIR=${HMY_PATH}/bls
 ENV CGO_CFLAGS="-I${BLS_DIR}/include -I${MCL_DIR}/include"
 ENV CGO_LDFLAGS="-L${BLS_DIR}/lib"
 ENV LD_LIBRARY_PATH=${BLS_DIR}/lib:${MCL_DIR}/lib
-ENV GIMME_GO_VERSION="1.16.3"
+ENV GIMME_GO_VERSION="1.17.6"
 ENV PATH="/root/bin:${PATH}"
 
 RUN apt-get update -y
-RUN apt install libgmp-dev libssl-dev curl git \
-psmisc dnsutils jq make gcc g++ bash tig tree sudo vim \
-silversearcher-ag unzip emacs-nox nano bash-completion -y
+RUN DEBIAN_FRONTEND=noninteractive TZ=America/Los_Angeles apt install libgmp-dev libssl-dev curl git \
+psmisc dnsutils jq make gcc g++ bash sudo vim \
+silversearcher-ag unzip bash-completion -y
 
 RUN mkdir ~/bin && \
 	curl -sL -o ~/bin/gimme \
