@@ -94,6 +94,8 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					// Override the input with vrf data of the requested block so it can be returned to the contract program.
 					input = evm.Context.VRF.Bytes()
 				}
+			} else if _, ok := p.(*epoch); ok {
+				input = evm.EpochNumber.Bytes()
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}

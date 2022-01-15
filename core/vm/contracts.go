@@ -129,6 +129,7 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
 	common.BytesToAddress([]byte{9}): &blake2F{},
 
+	common.BytesToAddress([]byte{251}): &epoch{},
 	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
 	// marked nil to ensure no overwrite
 	common.BytesToAddress([]byte{253}): &sha3fip{},
@@ -576,6 +577,23 @@ func (c *blake2F) Run(input []byte) ([]byte, error) {
 		binary.LittleEndian.PutUint64(output[offset:offset+8], h[i])
 	}
 	return output, nil
+}
+
+// epoch returns the current epoch, implemented as a native contract
+type epoch struct{}
+
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+//
+// This method does not require any overflow checking as the input size gas costs
+// required for anything significant is so high it's impossible to pay for.
+func (c *epoch) RequiredGas(input []byte) uint64 {
+	return GasQuickStep
+}
+
+func (c *epoch) Run(input []byte) ([]byte, error) {
+	// Note the input was overwritten with the epoch of the current block
+	// So here we simply return it (append for a copy)
+	return append([]byte{}, input...), nil
 }
 
 // VRF implemented as a native contract.
