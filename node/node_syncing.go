@@ -486,6 +486,12 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 
 		payloadSize := 0
 		withSig := request.GetBlocksWithSig
+
+		responseSizeCap := getBlocksRequestHardCap
+		if int(request.SoftSizeCap) > 0 && request.SoftSizeCap < getBlocksRequestHardCap {
+			responseSizeCap = int(request.SoftSizeCap)
+		}
+
 		for _, bytes := range request.Hashes {
 			hash.SetBytes(bytes)
 			var (
@@ -500,14 +506,40 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 			if err != nil {
 				continue
 			}
-			payloadSize += len(encoded)
-			if payloadSize > getBlocksRequestHardCap {
-				utils.Logger().Warn().Err(err).
-					Int("req size", len(request.Hashes)).
-					Int("cur size", len(response.Payload)).
-					Msg("[SYNC] Max blocks response size reached, ignoring the rest.")
+
+			var (
+				blockSize    = len(encoded)
+				curNumBlocks = len(response.Payload)
+			)
+			if curNumBlocks == 0 {
+				if blockSize > getBlocksRequestHardCap {
+					// Redundancy. Because of the block gas limit plus transaction size cap settings,
+					// this is not likely to happen
+					utils.Logger().Error().Str("hash", hash.String()).
+						Msg("block size large than message hard cap!!!!")
+				}
+				// Since this is the starting block to send, we send it regardless of soft cap to
+				// avoid sync service stuck.
+				response.Payload = append(response.Payload, encoded)
+				utils.Logger().Warn().
+					Str("block hash", hash.String()).
+					Int("target cap", responseSizeCap).
+					Int("current size", blockSize).
+					Msg("[SYNC] The starting block size exceed cap. Send the block anyway.")
 				break
+			} else {
+				payloadSize += blockSize
+				if payloadSize > responseSizeCap {
+					utils.Logger().Warn().Err(err).
+						Int("req count", len(request.Hashes)).
+						Int("cur count", len(response.Payload)).
+						Int("target size cap", responseSizeCap).
+						Int("current size", payloadSize-blockSize).
+						Msg("[SYNC] Max blocks response size reached, ignoring the rest.")
+					break
+				}
 			}
+
 			response.Payload = append(response.Payload, encoded)
 		}
 
