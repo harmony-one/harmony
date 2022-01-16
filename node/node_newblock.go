@@ -171,37 +171,39 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
-	// Prepare normal and staking transactions retrieved from transaction pool
-	utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
+	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
+		// Prepare normal and staking transactions retrieved from transaction pool
+		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
-	pendingPoolTxs, err := node.TxPool.Pending()
-	if err != nil {
-		utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
-		return nil, err
-	}
-	pendingPlainTxs := map[common.Address]types.Transactions{}
-	pendingStakingTxs := staking.StakingTransactions{}
-	for addr, poolTxs := range pendingPoolTxs {
-		plainTxsPerAcc := types.Transactions{}
-		for _, tx := range poolTxs {
-			if plainTx, ok := tx.(*types.Transaction); ok {
-				plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
-			} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
-				// Only process staking transactions after pre-staking epoch happened.
-				if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
-					pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+		pendingPoolTxs, err := node.TxPool.Pending()
+		if err != nil {
+			utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
+			return nil, err
+		}
+		pendingPlainTxs := map[common.Address]types.Transactions{}
+		pendingStakingTxs := staking.StakingTransactions{}
+		for addr, poolTxs := range pendingPoolTxs {
+			plainTxsPerAcc := types.Transactions{}
+			for _, tx := range poolTxs {
+				if plainTx, ok := tx.(*types.Transaction); ok {
+					plainTxsPerAcc = append(plainTxsPerAcc, plainTx)
+				} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
+					// Only process staking transactions after pre-staking epoch happened.
+					if node.Blockchain().Config().IsPreStaking(node.Worker.GetCurrentHeader().Epoch()) {
+						pendingStakingTxs = append(pendingStakingTxs, stakingTx)
+					}
+				} else {
+					utils.Logger().Err(types.ErrUnknownPoolTxType).
+						Msg("Failed to parse pending transactions")
+					return nil, types.ErrUnknownPoolTxType
 				}
-			} else {
-				utils.Logger().Err(types.ErrUnknownPoolTxType).
-					Msg("Failed to parse pending transactions")
-				return nil, types.ErrUnknownPoolTxType
+			}
+			if plainTxsPerAcc.Len() > 0 {
+				pendingPlainTxs[addr] = plainTxsPerAcc
 			}
 		}
-		if plainTxsPerAcc.Len() > 0 {
-			pendingPlainTxs[addr] = plainTxsPerAcc
-		}
+		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
-	utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 
 	// Try commit normal and staking transactions based on the current state
 	// The successfully committed transactions will be put in the proposed block
