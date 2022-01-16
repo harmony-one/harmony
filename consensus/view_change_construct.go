@@ -403,7 +403,6 @@ func (vc *viewChange) InitPayload(
 	if !inited {
 		preparedMsgs := fbftlog.GetMessagesByTypeSeq(msg_pb.MessageType_PREPARED, blockNum)
 		preparedMsg := fbftlog.FindMessageByMaxViewID(preparedMsgs)
-		preparedMsg = nil //FIXME: disable m1 payload to reach consensus on view change
 		hasBlock := false
 		if preparedMsg != nil {
 			if preparedBlock := fbftlog.GetBlockByHash(preparedMsg.BlockHash); preparedBlock != nil {
