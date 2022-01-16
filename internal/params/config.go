@@ -635,6 +635,11 @@ type Rules struct {
 
 // Rules ensures c's ChainID is not nil.
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
+	if c.IsStakingPrecompile(epoch) {
+		if !c.IsPreStaking(epoch) {
+			panic("Cannot have staking precompile epoch if not prestaking epoch")
+		}
+	}
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
