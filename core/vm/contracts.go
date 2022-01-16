@@ -592,8 +592,8 @@ func (c *epoch) RequiredGas(input []byte) uint64 {
 
 func (c *epoch) Run(input []byte) ([]byte, error) {
 	// Note the input was overwritten with the epoch of the current block
-	// So here we simply return it (append for a copy)
-	return append([]byte{}, input...), nil
+	// So just format and return
+	return common.LeftPadBytes(input, 32), nil
 }
 
 // VRF implemented as a native contract.
