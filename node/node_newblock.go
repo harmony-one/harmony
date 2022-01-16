@@ -202,16 +202,16 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 				pendingPlainTxs[addr] = plainTxsPerAcc
 			}
 		}
-		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
-	}
 
-	// Try commit normal and staking transactions based on the current state
-	// The successfully committed transactions will be put in the proposed block
-	if err := node.Worker.CommitTransactions(
-		pendingPlainTxs, pendingStakingTxs, beneficiary,
-	); err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot commit transactions")
-		return nil, err
+		// Try commit normal and staking transactions based on the current state
+		// The successfully committed transactions will be put in the proposed block
+		if err := node.Worker.CommitTransactions(
+			pendingPlainTxs, pendingStakingTxs, beneficiary,
+		); err != nil {
+			utils.Logger().Error().Err(err).Msg("cannot commit transactions")
+			return nil, err
+		}
+		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
 	// Prepare cross shard transaction receipts
