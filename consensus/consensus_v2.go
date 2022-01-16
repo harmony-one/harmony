@@ -171,15 +171,7 @@ func (consensus *Consensus) finalCommit() {
 	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
 	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
-	block.SetCurrentCommitSig(commitSigAndBitmap)
-	err = consensus.commitBlock(block, FBFTMsg)
-
-	if err != nil || consensus.blockNum-beforeCatchupNum != 1 {
-		consensus.getLogger().Err(err).
-			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
-			Msg("[finalCommit] Leader failed to commit the confirmed block")
-	}
-
+	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
@@ -214,6 +206,15 @@ func (consensus *Consensus) finalCommit() {
 			Uint64("blockNum", consensus.blockNum).
 			Hex("lastCommitSig", commitSigAndBitmap).
 			Msg("[finalCommit] Queued Committed Message")
+	}
+
+	block.SetCurrentCommitSig(commitSigAndBitmap)
+	err = consensus.commitBlock(block, FBFTMsg)
+
+	if err != nil || consensus.blockNum-beforeCatchupNum != 1 {
+		consensus.getLogger().Err(err).
+			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
+			Msg("[finalCommit] Leader failed to commit the confirmed block")
 	}
 
 	// Dump new block into level db
