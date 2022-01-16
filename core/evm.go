@@ -71,25 +71,26 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		copy(vrf[:], vrfAndProof[:32])
 	}
 	return vm.Context{
-		CanTransfer:     CanTransfer,
-		Transfer:        Transfer,
-		IsValidator:     IsValidator,
-		GetHash:         GetHashFn(header, chain),
-		GetVRF:          GetVRFFn(header, chain),
-		CreateValidator: CreateValidatorFn(header, chain),
-		EditValidator:   EditValidatorFn(header, chain),
-		Delegate:        DelegateFn(header, chain),
-		Undelegate:      UndelegateFn(header, chain),
-		CollectRewards:  CollectRewardsFn(header, chain),
-		Origin:          msg.From(),
-		Coinbase:        beneficiary,
-		BlockNumber:     header.Number(),
-		EpochNumber:     header.Epoch(),
-		VRF:             vrf,
-		Time:            header.Time(),
-		GasLimit:        header.GasLimit(),
-		GasPrice:        new(big.Int).Set(msg.GasPrice()),
-		ShardID:         chain.ShardID(),
+		CanTransfer:        CanTransfer,
+		Transfer:           Transfer,
+		IsValidator:        IsValidator,
+		GetHash:            GetHashFn(header, chain),
+		GetVRF:             GetVRFFn(header, chain),
+		CreateValidator:    CreateValidatorFn(header, chain),
+		EditValidator:      EditValidatorFn(header, chain),
+		Delegate:           DelegateFn(header, chain),
+		Undelegate:         UndelegateFn(header, chain),
+		CollectRewards:     CollectRewardsFn(header, chain),
+		MigrateDelegations: MigrateDelegationsFn(header, chain),
+		Origin:             msg.From(),
+		Coinbase:           beneficiary,
+		BlockNumber:        header.Number(),
+		EpochNumber:        header.Epoch(),
+		VRF:                vrf,
+		Time:               header.Time(),
+		GasLimit:           header.GasLimit(),
+		GasPrice:           new(big.Int).Set(msg.GasPrice()),
+		ShardID:            chain.ShardID(),
 	}
 }
 
@@ -223,6 +224,28 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		})
 
 		return nil
+	}
+}
+
+func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDelegationsFunc {
+	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+		// get existing delegations
+		fromDelegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
+		if err != nil {
+			return nil, err
+		}
+		// get list of modified wrappers
+		wrappers, delegates, err := VerifyAndMigrateFromMsg(db, migrationMsg, fromDelegations)
+		if err != nil {
+			return nil, err
+		}
+		// add to state db
+		for _, wrapper := range wrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return nil, err
+			}
+		}
+		return delegates, nil
 	}
 }
 

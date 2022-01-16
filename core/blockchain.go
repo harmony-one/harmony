@@ -2755,13 +2755,14 @@ func (bc *BlockChain) prepareStakingMetaData(
 	for _, stakeMsg := range stakeMsgs {
 		if delegate, ok := stakeMsg.(*staking.Delegate); ok {
 			if err := processDelegateMetadata(delegate,
-				newValidators,
 				newDelegations,
 				state,
 				bc,
 				blockNum); err != nil {
 				return nil, nil, err
 			}
+		} else {
+			panic("Only *staking.Delegate stakeMsgs are supported at the moment")
 		}
 	}
 	for _, txn := range block.StakingTransactions() {
@@ -2777,18 +2778,34 @@ func (bc *BlockChain) prepareStakingMetaData(
 		switch txn.StakingType() {
 		case staking.DirectiveCreateValidator:
 			createValidator := decodePayload.(*staking.CreateValidator)
-			if err := processCreateValidatorMetadata(createValidator,
-				&newValidators,
-				newDelegations,
-				bc,
-				blockNum); err != nil {
-				return nil, nil, err
+			newList, appended := utils.AppendIfMissing(
+				newValidators, createValidator.ValidatorAddress,
+			)
+			if !appended {
+				return nil, nil, errValidatorExist
 			}
+			newValidators = newList
+
+			// Add self delegation into the index
+			selfIndex := staking.DelegationIndex{
+				createValidator.ValidatorAddress,
+				uint64(0),
+				blockNum,
+			}
+			delegations, ok := newDelegations[createValidator.ValidatorAddress]
+			if !ok {
+				// If the cache doesn't have it, load it from DB for the first time.
+				delegations, err = bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			delegations = append(delegations, selfIndex)
+			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:
 			delegate := decodePayload.(*staking.Delegate)
 			if err := processDelegateMetadata(delegate,
-				newValidators,
 				newDelegations,
 				state,
 				bc,
@@ -2805,41 +2822,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 	return newValidators, newDelegations, nil
 }
 
-func processCreateValidatorMetadata(createValidator *staking.CreateValidator,
-	newValidators *[]common.Address,
-	newDelegations map[common.Address]staking.DelegationIndexes,
-	bc *BlockChain, blockNum *big.Int,
-) (err error) {
-	newList, appended := utils.AppendIfMissing(
-		*newValidators, createValidator.ValidatorAddress,
-	)
-	if !appended {
-		return errValidatorExist
-	}
-	*newValidators = newList
-
-	// Add self delegation into the index
-	selfIndex := staking.DelegationIndex{
-		createValidator.ValidatorAddress,
-		uint64(0),
-		blockNum,
-	}
-	delegations, ok := newDelegations[createValidator.ValidatorAddress]
-	if !ok {
-		// If the cache doesn't have it, load it from DB for the first time.
-		delegations, err = bc.ReadDelegationsByDelegator(createValidator.ValidatorAddress)
-		if err != nil {
-			return err
-		}
-	}
-
-	delegations = append(delegations, selfIndex)
-	newDelegations[createValidator.ValidatorAddress] = delegations
-	return nil
-}
-
 func processDelegateMetadata(delegate *staking.Delegate,
-	newValidators []common.Address,
 	newDelegations map[common.Address]staking.DelegationIndexes,
 	state *state.DB, bc *BlockChain, blockNum *big.Int,
 ) (err error) {

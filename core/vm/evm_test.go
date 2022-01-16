@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 )
 
+// this test is here so we can cover the input = epoch.bytes() line as well
 func TestEpochPrecompile(t *testing.T) {
 	targetEpoch := big.NewInt(1)
 	evm := NewEVM(Context{

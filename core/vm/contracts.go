@@ -130,6 +130,7 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}): &blake2F{},
 
 	common.BytesToAddress([]byte{250}): &epoch{},
+	common.BytesToAddress([]byte{251}): nil,
 	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
 	// marked nil to ensure no overwrite
 	common.BytesToAddress([]byte{253}): &sha3fip{},

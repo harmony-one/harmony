@@ -24,6 +24,7 @@ import (
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -128,6 +129,94 @@ func TestEVMStaking(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error %v in CollectRewards", err)
 	}
+
+	// migration test - when from has no delegations
+	toKey, _ := crypto.GenerateKey()
+	migration := sampleMigrationMsg(*toKey, *key)
+	delegates, err := ctx.MigrateDelegations(db, &migration)
+	if err != nil {
+		t.Errorf("Got error %v in MigrateDelegations", err)
+	}
+	if len(delegates) > 0 {
+		t.Errorf("Got delegates to migrate when none were expected")
+	}
+	// migration test - when from == to
+	migration = sampleMigrationMsg(*toKey, *toKey)
+	delegates, err = ctx.MigrateDelegations(db, &migration)
+	if err != nil {
+		t.Errorf("Got error %v in MigrateDelegations", err)
+	}
+	if len(delegates) > 0 {
+		t.Errorf("Got delegates to migrate when none were expected")
+	}
+	// migration test - when to has no delegations
+	snapshot := db.Snapshot()
+	migration = sampleMigrationMsg(*key, *toKey)
+	wrapper, _ = db.ValidatorWrapper(wrapper.Address, true, false)
+	expectedAmount := wrapper.Delegations[0].Amount
+	delegates, err = ctx.MigrateDelegations(db, &migration)
+	if err != nil {
+		t.Errorf("Got error %v in MigrateDelegations", err)
+	}
+	if len(delegates) != 1 {
+		t.Errorf("Got %d delegations to migrate, expected just 1", len(delegates))
+	}
+	wrapper, _ = db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
+	if wrapper.Delegations[0].Amount.Cmp(common.Big0) != 0 {
+		t.Errorf("Expected delegation at index 0 to have amount 0, but it has amount %d",
+			wrapper.Delegations[0].Amount)
+	}
+	if wrapper.Delegations[1].Amount.Cmp(expectedAmount) != 0 {
+		t.Errorf("Expected delegation at index 1 to have amount %d, but it has amount %d",
+			expectedAmount, wrapper.Delegations[1].Amount)
+	}
+	db.RevertToSnapshot(snapshot)
+	snapshot = db.Snapshot()
+	// migration test - when from delegation amount = 0 and no undelegations
+	wrapper, _ = db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
+	wrapper.Delegations[0].Undelegations = make([]staking.Undelegation, 0)
+	wrapper.Delegations[0].Amount = common.Big0
+	wrapper.Status = effective.Inactive
+	err = db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
+	if err != nil {
+		t.Errorf("Got error %v in UpdateValidatorWrapperWithRevert", err)
+	}
+	delegates, err = ctx.MigrateDelegations(db, &migration)
+	if err != nil {
+		t.Errorf("Got error %v in MigrateDelegations", err)
+	}
+	if len(delegates) != 0 {
+		t.Errorf("Got %d delegations to migrate, expected none", len(delegates))
+	}
+	db.RevertToSnapshot(snapshot)
+	// migration test - when `to` has one delegation
+	wrapper, _ = db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
+	wrapper.Delegations = append(wrapper.Delegations, staking.NewDelegation(
+		migration.To, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))))
+	expectedAmount = big.NewInt(0).Add(
+		wrapper.Delegations[0].Amount, wrapper.Delegations[1].Amount,
+	)
+	err = db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
+	if err != nil {
+		t.Errorf("Got error %v in UpdateValidatorWrapperWithRevert", err)
+	}
+	delegates, err = ctx.MigrateDelegations(db, &migration)
+	if err != nil {
+		t.Errorf("Got error %v in MigrateDelegations", err)
+	}
+	if len(delegates) != 1 {
+		t.Errorf("Got %d delegations to migrate, expected just 1", len(delegates))
+	}
+	// read from updated wrapper
+	wrapper, _ = db.ValidatorWrapper(createValidator.ValidatorAddress, true, false)
+	if wrapper.Delegations[0].Amount.Cmp(common.Big0) != 0 {
+		t.Errorf("Expected delegation at index 0 to have amount 0, but it has amount %d",
+			wrapper.Delegations[0].Amount)
+	}
+	if wrapper.Delegations[1].Amount.Cmp(expectedAmount) != 0 {
+		t.Errorf("Expected delegation at index 1 to have amount %d, but it has amount %d",
+			expectedAmount, wrapper.Delegations[1].Amount)
+	}
 }
 
 func generateBLSKeyAndSig() (bls.SerializedPublicKey, bls.SerializedSignature) {
@@ -222,6 +311,15 @@ func sampleCollectRewards(key ecdsa.PrivateKey) staking.CollectRewards {
 	address := crypto.PubkeyToAddress(key.PublicKey)
 	return staking.CollectRewards{
 		DelegatorAddress: address,
+	}
+}
+
+func sampleMigrationMsg(from ecdsa.PrivateKey, to ecdsa.PrivateKey) staking.MigrationMsg {
+	fromAddress := crypto.PubkeyToAddress(from.PublicKey)
+	toAddress := crypto.PubkeyToAddress(to.PublicKey)
+	return staking.MigrationMsg{
+		From: fromAddress,
+		To:   toAddress,
 	}
 }
 

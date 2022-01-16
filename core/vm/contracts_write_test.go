@@ -16,6 +16,7 @@ type writeCapablePrecompileTest struct {
 	input, expected []byte
 	name            string
 	expectedError   error
+	p               *WriteCapablePrecompiledContract
 }
 
 func CollectRewardsFn() CollectRewardsFunc {
@@ -48,7 +49,13 @@ func EditValidatorFn() EditValidatorFunc {
 	}
 }
 
-func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
+func MigrateDelegationsFn() MigrateDelegationsFunc {
+	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+		return nil, nil
+	}
+}
+
+func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
 		Delegate:        DelegateFn(),
 		Undelegate:      UndelegateFn(),
@@ -84,9 +91,52 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	})
 }
 
-func TestWriteCapablePrecompiles(t *testing.T) {
-	for _, test := range WriteCapablePrecompileTests {
-		testWriteCapablePrecompile(test, t)
+func TestStakingPrecompiles(t *testing.T) {
+	for _, test := range StakingPrecompileTests {
+		testStakingPrecompile(test, t)
+	}
+}
+
+func testMigrationPrecompile(test writeCapablePrecompileTest, t *testing.T) {
+	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
+		Delegate:           DelegateFn(),
+		Undelegate:         UndelegateFn(),
+		CreateValidator:    CreateValidatorFn(),
+		EditValidator:      EditValidatorFn(),
+		ShardID:            0,
+		MigrateDelegations: MigrateDelegationsFn(),
+	}, nil, params.TestChainConfig, Config{})
+	// use required gas to avoid out of gas errors
+	p := &migrationPrecompile{}
+	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
+		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), 0)
+		gas, err := p.RequiredGas(env, contract, test.input)
+		if err != nil {
+			t.Error(err)
+		}
+		contract.Gas = gas
+		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
+			if test.expectedError != nil {
+				if test.expectedError.Error() != err.Error() {
+					t.Errorf("Expected error %v, got %v", test.expectedError, err)
+				}
+			} else {
+				t.Error(err)
+			}
+		} else {
+			if test.expectedError != nil {
+				t.Errorf("Expected an error %v but instead got result %v", test.expectedError, res)
+			}
+			if bytes.Compare(res, test.expected) != 0 {
+				t.Errorf("Expected %v, got %v", test.expected, res)
+			}
+		}
+	})
+}
+
+func TestMigrationPrecompile(t *testing.T) {
+	for _, test := range MigrationPrecompileTests {
+		testMigrationPrecompile(test, t)
 	}
 }
 
@@ -103,15 +153,15 @@ func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
 	}
 }
 
-var WriteCapablePrecompileTests = []writeCapablePrecompileTest{
+var StakingPrecompileTests = []writeCapablePrecompileTest{
 	{
 		input:         []byte{109, 107, 47, 120},
-		expectedError: errors.New("bad staking kind"),
+		expectedError: errors.New("no method with id: 0x6d6b2f78"),
 		name:          "badStakingKind",
 	},
 	{
 		input:         []byte{0, 0},
-		expectedError: errors.New("Input is malformed"),
+		expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
 		name:          "malformedInput",
 	},
 	{
@@ -121,7 +171,7 @@ var WriteCapablePrecompileTests = []writeCapablePrecompileTest{
 	},
 	{
 		input:         []byte{109, 107, 47, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
-		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+		expectedError: errors.New("[StakingPrecompiles] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "collectRewardsAddressMismatch",
 	},
 	{
@@ -141,7 +191,7 @@ var WriteCapablePrecompileTests = []writeCapablePrecompileTest{
 	},
 	{
 		input:         []byte{81, 11, 17, 187, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
-		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+		expectedError: errors.New("[StakingPrecompiles] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "delegateAddressMismatch",
 	},
 
@@ -157,7 +207,45 @@ var WriteCapablePrecompileTests = []writeCapablePrecompileTest{
 	},
 	{
 		input:         []byte{189, 168, 192, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
-		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+		expectedError: errors.New("[StakingPrecompiles] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "undelegateAddressMismatch",
+	},
+	{
+		input:         []byte{189, 168, 192, 233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0},
+		expectedError: errors.New("[StakingPrecompiles] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+		name:          "undelegateAddressMismatch",
+	},
+}
+
+var MigrationPrecompileTests = []writeCapablePrecompileTest{
+	{
+		input:         []byte{42, 5, 187, 113},
+		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
+		name:          "yesMethodNoData",
+	},
+	{
+		input:         []byte{0, 0},
+		expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
+		name:          "malformedInput",
+	},
+	{
+		input:    []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+		expected: nil,
+		name:     "migrationSuccess",
+	},
+	{
+		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+		expectedError: errors.New("[StakingPrecompiles] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+		name:          "migrationAddressMismatch",
+	},
+	{
+		input:         []byte{42, 6, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+		expectedError: errors.New("no method with id: 0x2a06bb71"),
+		name:          "migrationNoMatchingMethod",
+	},
+	{
+		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
+		expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
+		name:          "migrationAddressMismatch",
 	},
 }

@@ -1,6 +1,7 @@
 package staking
 
 import (
+	"bytes"
 	"math/big"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var abiStaking abi.ABI
+var abiMigration abi.ABI
 
 func init() {
 	// for commission rates => solidity does not support floats directly
@@ -78,21 +80,37 @@ func init() {
 	  }
 	]
 	`
+	MigrationABIJSON := `
+	[
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "from",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "address",
+	        "name": "to",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "Migrate",
+	    "outputs": [],
+	    "stateMutability": "nonpayable",
+	    "type": "function"
+	  }
+	]
+	`
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
-}
-
-func ParseStakingMethod(input []byte) (*abi.Method, error) {
-	return abiStaking.MethodById(input)
+	abiMigration, _ = abi.JSON(strings.NewReader(MigrationABIJSON))
 }
 
 // contractCaller (and not Contract) is used here to avoid import cycle
 func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, error) {
-	if len(input) < 4 {
-		return nil, errors.New("Input is malformed")
-	}
-	method, err := ParseStakingMethod(input)
+	method, err := abiStaking.MethodById(input)
 	if err != nil {
-		return nil, stakingTypes.ErrInvalidStakingKind
+		return nil, err
 	}
 	input = input[4:]                // drop the method selector
 	args := map[string]interface{}{} // store into map
@@ -163,7 +181,41 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 		}
 	default:
 		{
-			return nil, stakingTypes.ErrInvalidStakingKind
+			panic("[StakingPrecompiles] Cannot reach here")
+		}
+	}
+}
+
+func ParseMigrationMsg(contractCaller common.Address, input []byte) (*stakingTypes.MigrationMsg, error) {
+	method, err := abiMigration.MethodById(input)
+	if err != nil {
+		return nil, err
+	}
+	input = input[4:]                // drop the method selector
+	args := map[string]interface{}{} // store into map
+	if err = method.Inputs.UnpackIntoMap(args, input); err != nil {
+		return nil, err
+	}
+	switch method.Name {
+	case "Migrate":
+		{
+			from, err := ValidateContractAddress(contractCaller, args, "from")
+			if err != nil {
+				return nil, err
+			}
+			to, err := ParseAddressFromKey(args, "to")
+			if err != nil {
+				return nil, err
+			}
+			// no sanity check for migrating to same address, just do nothing
+			return &stakingTypes.MigrationMsg{
+				From: from,
+				To:   to,
+			}, nil
+		}
+	default:
+		{
+			panic("[StakingPrecompiles] Cannot reach here")
 		}
 	}
 }
@@ -174,9 +226,9 @@ func ValidateContractAddress(contractCaller common.Address, args map[string]inte
 	if err != nil {
 		return common.Address{}, err
 	}
-	if contractCaller != address {
+	if !bytes.Equal(contractCaller.Bytes(), address.Bytes()) {
 		return common.Address{}, errors.Errorf(
-			"[StakingPrecompile] Address mismatch, expected %s have %s",
+			"[StakingPrecompiles] Address mismatch, expected %s have %s",
 			contractCaller.String(), address.String(),
 		)
 	} else {
