@@ -84,13 +84,15 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 
 		blockObj = consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 		if blockObj == nil {
-			if err := rlp.DecodeBytes(recvMsg.Block, blockObj); err != nil {
+			var blockObj2 types.Block
+			if err := rlp.DecodeBytes(recvMsg.Block, &blockObj2); err != nil {
 				consensus.getLogger().Warn().
 					Err(err).
 					Uint64("MsgBlockNum", recvMsg.BlockNum).
 					Msg("[validateNewBlock] Unparseable block header data")
 				return nil, errors.New("Failed parsing new block")
 			}
+			blockObj = &blockObj2
 		}
 		consensus.getLogger().Info().
 			Msg("[validateNewBlock] Block Already verified")

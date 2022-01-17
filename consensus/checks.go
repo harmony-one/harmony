@@ -145,7 +145,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	// TODO: if difference is only one, new leader can still propose the same committed block to avoid another view change
 	// TODO: new leader catchup without ignore view change message
 
-	consensus.getLogger().Info().
+	consensus.getLogger().Debug().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MyViewChangingID", consensus.GetViewChangingID()).
 		Uint64("MsgViewChangingID", recvMsg.ViewID).
@@ -164,7 +164,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 	}
 	if consensus.IsViewChangingMode() &&
 		consensus.GetCurBlockViewID() > recvMsg.ViewID {
-		consensus.getLogger().Warn().Uint64("curBlockViewID", consensus.GetCurBlockViewID()).
+		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.GetCurBlockViewID()).
 			Uint64("msgViewID", recvMsg.ViewID).
 			Msg("[onViewChangeSanityCheck] ViewChanging ID Is Low")
 		return false
