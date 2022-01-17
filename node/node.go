@@ -218,7 +218,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
 
 	pendingCount, queueCount := node.TxPool.Stats()
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
 		Int("totalPending", pendingCount).
