@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -253,6 +254,11 @@ func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDeleg
 }
 
 // calculate the gas for migration; no checks done here similar to other functions
+// the checks are handled by staking_verifier.go, ex, if you try to delegate to an address
+// who is not a validator - you will be charged all gas passed in two steps
+// - 22k initially when gas is calculated
+// - remainder when the tx inevitably is a no-op
+// i have followed the same logic here, this only produces an error if can't read from db
 func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
 		var gas uint64 = 0
@@ -265,6 +271,14 @@ func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 			wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, true, false)
 			if err != nil {
 				return 0, err
+			}
+			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+				utils.Logger().Warn().
+					Str("validator", delegationIndex.ValidatorAddress.String()).
+					Uint64("delegation index", delegationIndex.Index).
+					Int("delegations length", len(wrapper.Delegations)).
+					Msg("Delegation index out of bound")
+				return 0, errors.New("Delegation index out of bound")
 			}
 			foundDelegation := &wrapper.Delegations[delegationIndex.Index]
 			// no need to migrate if amount and undelegations are 0
@@ -298,7 +312,19 @@ func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
 			}
 			gas += thisGas
 		}
-		return gas, nil
+		if gas != 0 {
+			return gas, nil
+		} else {
+			// base gas fee if nothing to do, for example, when
+			// there are no delegations to migrate
+			return vm.IntrinsicGas(
+				[]byte{},
+				false,
+				homestead,
+				istanbul,
+				false, // isValidatorCreation
+			)
+		}
 	}
 }
 

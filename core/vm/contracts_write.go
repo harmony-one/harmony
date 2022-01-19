@@ -135,11 +135,11 @@ func (c *stakingPrecompile) RunWriteCapable(
 				if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
 					evm.StakeMsgs = append(evm.StakeMsgs, delegate)
 				} else {
-					panic("Received incompatible stakeMsg")
+					return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from evm.MigrateDelegations")
 				}
 			}
 			return nil, nil
 		}
 	}
-	panic("Must not reach here")
+	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
 }

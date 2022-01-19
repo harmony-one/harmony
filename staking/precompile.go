@@ -191,7 +191,7 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 		}
 	default:
 		{
-			panic("[StakingPrecompile] Cannot reach here")
+			return nil, errors.New("[StakingPrecompile] Invalid method name from ABI selector")
 		}
 	}
 }

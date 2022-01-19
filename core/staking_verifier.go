@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/staking/availability"
 
@@ -408,13 +409,11 @@ func VerifyAndMigrateFromMsg(
 ) ([]*staking.ValidatorWrapper,
 	[]interface{},
 	error) {
-	if len(fromDelegations) == 0 {
-		// we are already done
-		return nil, nil, nil
-	}
 	if bytes.Equal(msg.From.Bytes(), msg.To.Bytes()) {
-		// we are already done
-		return nil, nil, nil
+		return nil, nil, errors.New("From and To are the same address")
+	}
+	if len(fromDelegations) == 0 {
+		return nil, nil, errors.New("No delegations to migrate")
 	}
 	modifiedWrappers := make([]*staking.ValidatorWrapper, 0)
 	stakeMsgs := make([]interface{}, 0)
@@ -474,6 +473,13 @@ func VerifyAndMigrateFromMsg(
 					if !exist {
 						delegation.Undelegations = append(delegation.Undelegations,
 							undelegationToMigrate)
+						// Always sort the undelegate by epoch in increasing order
+						sort.SliceStable(
+							delegation.Undelegations,
+							func(i, j int) bool {
+								return delegation.Undelegations[i].Epoch.Cmp(delegation.Undelegations[j].Epoch) < 0
+							},
+						)
 					}
 				}
 				break
