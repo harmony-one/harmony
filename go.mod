@@ -9,9 +9,9 @@ require (
 	github.com/aristanetworks/goarista v0.0.0-20190607111240-52c2a7864a08 // indirect
 	github.com/aws/aws-sdk-go v1.30.1
 	github.com/beevik/ntp v0.3.0
-	github.com/btcsuite/btcutil v1.0.2
+	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cespare/cp v1.1.1
-	github.com/coinbase/rosetta-sdk-go v0.6.10
+	github.com/coinbase/rosetta-sdk-go v0.7.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.9.25
