@@ -473,15 +473,15 @@ func VerifyAndMigrateFromMsg(
 					if !exist {
 						delegation.Undelegations = append(delegation.Undelegations,
 							undelegationToMigrate)
-						// Always sort the undelegate by epoch in increasing order
-						sort.SliceStable(
-							delegation.Undelegations,
-							func(i, j int) bool {
-								return delegation.Undelegations[i].Epoch.Cmp(delegation.Undelegations[j].Epoch) < 0
-							},
-						)
 					}
 				}
+				// Always sort the undelegate by epoch in increasing order
+				sort.SliceStable(
+					delegation.Undelegations,
+					func(i, j int) bool {
+						return delegation.Undelegations[i].Epoch.Cmp(delegation.Undelegations[j].Epoch) < 0
+					},
+				)
 				break
 			}
 		}
