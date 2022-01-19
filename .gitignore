@@ -62,7 +62,7 @@ node_modules/
 .txgenkey
 
 # go mod summary file
-go.sum
+# go.sum
 
 # bnkey
 test/.bnkey
