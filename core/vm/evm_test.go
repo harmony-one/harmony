@@ -15,7 +15,7 @@ func TestEpochPrecompile(t *testing.T) {
 		EpochNumber: targetEpoch,
 	}, nil, params.TestChainConfig, Config{})
 	input := []byte{}
-	precompileAddr := common.BytesToAddress([]byte{250})
+	precompileAddr := common.BytesToAddress([]byte{251})
 	contract := Contract{
 		CodeAddr: &precompileAddr,
 		Gas:      GasQuickStep,

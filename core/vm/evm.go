@@ -51,8 +51,9 @@ type (
 	DelegateFunc        func(db StateDB, stakeMsg *stakingTypes.Delegate) error
 	UndelegateFunc      func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
 	CollectRewardsFunc  func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
-	// Used for migrating delegations via the migration precompile
-	MigrateDelegationsFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	// Used for migrating delegations via the staking precompile
+	MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -157,12 +158,13 @@ type Context struct {
 
 	TxType types.TransactionType
 
-	CreateValidator    CreateValidatorFunc
-	EditValidator      EditValidatorFunc
-	Delegate           DelegateFunc
-	Undelegate         UndelegateFunc
-	CollectRewards     CollectRewardsFunc
-	MigrateDelegations MigrateDelegationsFunc
+	CreateValidator       CreateValidatorFunc
+	EditValidator         EditValidatorFunc
+	Delegate              DelegateFunc
+	Undelegate            UndelegateFunc
+	CollectRewards        CollectRewardsFunc
+	MigrateDelegations    MigrateDelegationsFunc
+	CalculateMigrationGas CalculateMigrationGasFunc
 
 	// staking precompile checks this before proceeding forward
 	ShardID uint32

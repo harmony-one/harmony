@@ -12,7 +12,6 @@ import (
 )
 
 var abiStaking abi.ABI
-var abiMigration abi.ABI
 
 func init() {
 	// for commission rates => solidity does not support floats directly
@@ -77,11 +76,7 @@ func init() {
 	    "outputs": [],
 	    "stateMutability": "nonpayable",
 	    "type": "function"
-	  }
-	]
-	`
-	MigrationABIJSON := `
-	[
+	  },
 	  {
 	    "inputs": [
 	      {
@@ -103,7 +98,6 @@ func init() {
 	]
 	`
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
-	abiMigration, _ = abi.JSON(strings.NewReader(MigrationABIJSON))
 }
 
 // contractCaller (and not Contract) is used here to avoid import cycle
@@ -179,24 +173,6 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 			}
 			return stakeMsg, nil
 		}
-	default:
-		{
-			panic("[StakingPrecompiles] Cannot reach here")
-		}
-	}
-}
-
-func ParseMigrationMsg(contractCaller common.Address, input []byte) (*stakingTypes.MigrationMsg, error) {
-	method, err := abiMigration.MethodById(input)
-	if err != nil {
-		return nil, err
-	}
-	input = input[4:]                // drop the method selector
-	args := map[string]interface{}{} // store into map
-	if err = method.Inputs.UnpackIntoMap(args, input); err != nil {
-		return nil, err
-	}
-	switch method.Name {
 	case "Migrate":
 		{
 			from, err := ValidateContractAddress(contractCaller, args, "from")
@@ -215,7 +191,7 @@ func ParseMigrationMsg(contractCaller common.Address, input []byte) (*stakingTyp
 		}
 	default:
 		{
-			panic("[StakingPrecompiles] Cannot reach here")
+			panic("[StakingPrecompile] Cannot reach here")
 		}
 	}
 }
@@ -228,7 +204,7 @@ func ValidateContractAddress(contractCaller common.Address, args map[string]inte
 	}
 	if !bytes.Equal(contractCaller.Bytes(), address.Bytes()) {
 		return common.Address{}, errors.Errorf(
-			"[StakingPrecompiles] Address mismatch, expected %s have %s",
+			"[StakingPrecompile] Address mismatch, expected %s have %s",
 			contractCaller.String(), address.String(),
 		)
 	} else {

@@ -19,10 +19,12 @@ package core
 import (
 	"bytes"
 	"errors"
+	"math"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
@@ -71,26 +73,27 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		copy(vrf[:], vrfAndProof[:32])
 	}
 	return vm.Context{
-		CanTransfer:        CanTransfer,
-		Transfer:           Transfer,
-		IsValidator:        IsValidator,
-		GetHash:            GetHashFn(header, chain),
-		GetVRF:             GetVRFFn(header, chain),
-		CreateValidator:    CreateValidatorFn(header, chain),
-		EditValidator:      EditValidatorFn(header, chain),
-		Delegate:           DelegateFn(header, chain),
-		Undelegate:         UndelegateFn(header, chain),
-		CollectRewards:     CollectRewardsFn(header, chain),
-		MigrateDelegations: MigrateDelegationsFn(header, chain),
-		Origin:             msg.From(),
-		Coinbase:           beneficiary,
-		BlockNumber:        header.Number(),
-		EpochNumber:        header.Epoch(),
-		VRF:                vrf,
-		Time:               header.Time(),
-		GasLimit:           header.GasLimit(),
-		GasPrice:           new(big.Int).Set(msg.GasPrice()),
-		ShardID:            chain.ShardID(),
+		CanTransfer:           CanTransfer,
+		Transfer:              Transfer,
+		IsValidator:           IsValidator,
+		GetHash:               GetHashFn(header, chain),
+		GetVRF:                GetVRFFn(header, chain),
+		CreateValidator:       CreateValidatorFn(header, chain),
+		EditValidator:         EditValidatorFn(header, chain),
+		Delegate:              DelegateFn(header, chain),
+		Undelegate:            UndelegateFn(header, chain),
+		CollectRewards:        CollectRewardsFn(header, chain),
+		MigrateDelegations:    MigrateDelegationsFn(header, chain),
+		CalculateMigrationGas: CalculateMigrationGasFn(chain),
+		Origin:                msg.From(),
+		Coinbase:              beneficiary,
+		BlockNumber:           header.Number(),
+		EpochNumber:           header.Epoch(),
+		VRF:                   vrf,
+		Time:                  header.Time(),
+		GasLimit:              header.GasLimit(),
+		GasPrice:              new(big.Int).Set(msg.GasPrice()),
+		ShardID:               chain.ShardID(),
 	}
 }
 
@@ -246,6 +249,56 @@ func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDeleg
 			}
 		}
 		return delegates, nil
+	}
+}
+
+// calculate the gas for migration; no checks done here similar to other functions
+func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
+	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
+		var gas uint64 = 0
+		delegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
+		if err != nil {
+			return 0, err
+		}
+		for i := range delegations {
+			delegationIndex := &delegations[i]
+			wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, true, false)
+			if err != nil {
+				return 0, err
+			}
+			foundDelegation := &wrapper.Delegations[delegationIndex.Index]
+			// no need to migrate if amount and undelegations are 0
+			if foundDelegation.Amount.Cmp(common.Big0) == 0 && len(foundDelegation.Undelegations) == 0 {
+				continue
+			}
+			delegate := stakingTypes.Delegate{
+				DelegatorAddress: migrationMsg.From,
+				ValidatorAddress: delegationIndex.ValidatorAddress,
+				Amount:           foundDelegation.Amount,
+			}
+			encoded, err := rlp.EncodeToBytes(delegate)
+			if err != nil {
+				return 0, err
+			}
+			thisGas, err := vm.IntrinsicGas(
+				encoded,
+				false,
+				homestead,
+				istanbul,
+				false, // isValidatorCreation
+			)
+			if err != nil {
+				return 0, err
+			}
+			// overflow when gas + thisGas > Math.MaxUint64
+			// or Math.MaxUint64 < gas + thisGas
+			// or Math.MaxUint64 - gas < thisGas
+			if (math.MaxUint64 - gas) < thisGas {
+				return 0, vm.ErrOutOfGas
+			}
+			gas += thisGas
+		}
+		return gas, nil
 	}
 }
 

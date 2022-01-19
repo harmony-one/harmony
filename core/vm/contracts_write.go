@@ -14,7 +14,6 @@ import (
 // which are available after the StakingPrecompileEpoch
 // for now, we have only one contract at 252 or 0xfc - which is the staking precompile
 var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
-	common.BytesToAddress([]byte{251}): &migrationPrecompile{},
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
@@ -75,7 +74,14 @@ func (c *stakingPrecompile) RequiredGas(
 		stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
 		if err == nil {
 			// otherwise charge similar to a regular staking tx
-			if encoded, err := rlp.EncodeToBytes(stakeMsg); err == nil {
+			if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
+				// charge per delegation to migrate
+				return evm.CalculateMigrationGas(evm.StateDB,
+					migrationMsg,
+					evm.ChainConfig().IsS3(evm.EpochNumber),
+					evm.ChainConfig().IsIstanbul(evm.EpochNumber),
+				)
+			} else if encoded, err := rlp.EncodeToBytes(stakeMsg); err == nil {
 				payload = encoded
 			}
 		}
@@ -120,73 +126,20 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
 		return nil, evm.CollectRewards(evm.StateDB, collectRewards)
 	}
-	return nil, stakingTypes.ErrInvalidStakingKind
-}
-
-type migrationPrecompile struct{}
-
-// RequiredGas returns the gas required to execute the pre-compiled contract.
-//
-// This method does not require any overflow checking as the input size gas costs
-// required for anything significant is so high it's impossible to pay for.
-func (c *migrationPrecompile) RequiredGas(
-	evm *EVM,
-	contract *Contract,
-	input []byte,
-) (uint64, error) {
-	// if invalid data or invalid shard
-	// set payload to blank and charge minimum gas
-	var payload []byte = make([]byte, 0)
-	// availability of staking and precompile has already been checked
-	if evm.Context.ShardID == shard.BeaconChainShardID {
-		// check that input is well formed
-		// meaning all the expected parameters are available
-		// and that we are only trying to perform staking tx
-		// on behalf of the correct entity
-		migrationMsg, err := staking.ParseMigrationMsg(contract.Caller(), input)
-		if err == nil {
-			// otherwise charge based on the data
-			if encoded, err := rlp.EncodeToBytes(migrationMsg); err == nil {
-				payload = encoded
+	if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
+		stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
+		if err != nil {
+			return nil, err
+		} else {
+			for _, stakeMsg := range stakeMsgs {
+				if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
+					evm.StakeMsgs = append(evm.StakeMsgs, delegate)
+				} else {
+					panic("Received incompatible stakeMsg")
+				}
 			}
+			return nil, nil
 		}
 	}
-	if gas, err := IntrinsicGas(
-		payload,
-		false,                                   // contractCreation
-		evm.ChainConfig().IsS3(evm.EpochNumber), // homestead
-		evm.ChainConfig().IsIstanbul(evm.EpochNumber), // istanbul
-		false, // isValidatorCreation
-	); err != nil {
-		return 0, err // ErrOutOfGas occurs when gas payable > uint64
-	} else {
-		return gas, nil
-	}
-}
-
-func (c *migrationPrecompile) RunWriteCapable(
-	evm *EVM,
-	contract *Contract,
-	input []byte,
-) ([]byte, error) {
-	if evm.Context.ShardID != shard.BeaconChainShardID {
-		return nil, errors.New("Staking not supported on this shard")
-	}
-	migrationMsg, err := staking.ParseMigrationMsg(contract.Caller(), input)
-	if err != nil {
-		return nil, err
-	}
-	stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
-	if err != nil {
-		return nil, err
-	} else {
-		for _, stakeMsg := range stakeMsgs {
-			if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-				evm.StakeMsgs = append(evm.StakeMsgs, delegate)
-			} else {
-				panic("Received incompatible stakeMsg")
-			}
-		}
-		return nil, nil
-	}
+	panic("Must not reach here")
 }
