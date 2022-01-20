@@ -4,8 +4,6 @@ import (
 	"context"
 	"net"
 
-	"github.com/harmony-one/harmony/internal/utils"
-
 	"github.com/harmony-one/harmony/internal/rate"
 )
 
@@ -32,8 +30,11 @@ func newRateLimiter() *rateLimiter {
 }
 
 func (rl *rateLimiter) waitN(ctx context.Context) (string, error) {
-	hostPort := ctx.Value("X-Forwarded-For").(string)
-	utils.Logger().Info().Str("host", hostPort).Msg("x forwarded for")
+	hostPortObj := ctx.Value("X-Forwarded-For")
+	if hostPortObj == nil {
+		hostPortObj = ctx.Value("remote")
+	}
+	hostPort := hostPortObj.(string)
 	ip, _, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return ip, err
