@@ -30,7 +30,7 @@ func newRateLimiter() *rateLimiter {
 }
 
 func (rl *rateLimiter) waitN(ctx context.Context) (string, error) {
-	hostPort := ctx.Value("remote").(string)
+	hostPort := ctx.Value("X-Forwarded-For").(string)
 	ip, _, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		return ip, err
