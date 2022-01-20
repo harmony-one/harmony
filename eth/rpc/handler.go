@@ -32,7 +32,7 @@ import (
 
 // handleCallLimitTimeOut is the timeout duration for rate limit.
 // If user hit the timeout at rate limiter, a too many request error will be returned
-const handleCallLimitTimeout = 2 * time.Second
+const handleCallLimitTimeout = 5 * time.Second
 
 // handler handles JSON-RPC messages. There is one handler per connection. Note that
 // handler is not safe for concurrent use. Message handling never blocks indefinitely
