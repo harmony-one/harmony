@@ -298,12 +298,14 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
 	if h.limiter != nil {
 		rlCtx, _ := context.WithTimeout(h.rootCtx, handleCallLimitTimeout)
-		if err := h.limiter.waitN(rlCtx); err != nil {
-			if err != context.Canceled && err != context.DeadlineExceeded {
-				utils.Logger().Error().Err(err).Msg("RPC handleCallMsg")
+		ip, err := h.limiter.waitN(rlCtx)
+		if err != nil {
+			if err != context.Canceled && !isContextExpiredError(err) {
+				utils.Logger().Error().Err(err).Str("ip", ip).Msg("[RPC] handleCallMsg")
 			}
 			if isContextExpiredError(err) {
 				rateLimiterHitCounter.Inc()
+				utils.Logger().Error().Str("ip", ip).Msg("[RPC] rate limited")
 				err = &tooManyRequestsError{}
 			}
 			return msg.errorResponse(&rateLimitedError{e: err})

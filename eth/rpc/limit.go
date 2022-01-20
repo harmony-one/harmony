@@ -29,11 +29,11 @@ func newRateLimiter() *rateLimiter {
 	}
 }
 
-func (rl *rateLimiter) waitN(ctx context.Context) error {
+func (rl *rateLimiter) waitN(ctx context.Context) (string, error) {
 	hostPort := ctx.Value("remote").(string)
 	ip, _, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		return err
+		return ip, err
 	}
-	return rl.il.WaitN(ctx, ip, weightPerRequest)
+	return ip, rl.il.WaitN(ctx, ip, weightPerRequest)
 }
