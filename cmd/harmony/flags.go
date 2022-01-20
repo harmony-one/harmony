@@ -123,6 +123,7 @@ var (
 	}
 
 	txPoolFlags = []cli.Flag{
+		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
 	}
@@ -981,6 +982,11 @@ var (
 		Usage:    "file of blacklisted wallet addresses",
 		DefValue: defaultConfig.TxPool.BlacklistFile,
 	}
+	rosettaFixFileFlag = cli.StringFlag{
+		Name:     "txpool.rosettafixfile",
+		Usage:    "file of rosetta fix file",
+		DefValue: defaultConfig.TxPool.RosettaFixFile,
+	}
 	legacyTPBlacklistFileFlag = cli.StringFlag{
 		Name:       "blacklist",
 		Usage:      "Path to newline delimited file of blacklisted wallet addresses",
@@ -990,6 +996,10 @@ var (
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
+		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
+	}
+
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {

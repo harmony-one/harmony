@@ -9,6 +9,7 @@ const (
 	isValidatorStr        = "Harmony/IsValidator/Value/v1"
 	collectRewardsStr     = "Harmony/CollectRewards"
 	delegateStr           = "Harmony/Delegate"
+	unDelegateStr         = "Harmony/UnDelegate"
 	firstElectionEpochStr = "Harmony/FirstElectionEpoch/Key/v1"
 )
 
@@ -18,5 +19,6 @@ var (
 	IsValidator           = crypto.Keccak256Hash([]byte(isValidatorStr))
 	CollectRewardsTopic   = crypto.Keccak256Hash([]byte(collectRewardsStr))
 	DelegateTopic         = crypto.Keccak256Hash([]byte(delegateStr))
+	UnDelegateTopic       = crypto.Keccak256Hash([]byte(unDelegateStr))
 	FirstElectionEpochKey = crypto.Keccak256Hash([]byte(firstElectionEpochStr))
 )
