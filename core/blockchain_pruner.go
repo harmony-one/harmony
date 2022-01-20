@@ -148,6 +148,10 @@ func (bp *blockchainPruner) pruneBeaconChainBlock(maxBlockNum uint64) (minKey []
 		}
 
 		blockInfo := rawdb.ReadBlock(bp.db, hash, blockNum)
+		if blockInfo == nil {
+			return true
+		}
+
 		err := bp.deleteBlockInfo(blockInfo)
 		if err != nil {
 			utils.Logger().Error().
