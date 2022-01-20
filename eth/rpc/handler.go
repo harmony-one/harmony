@@ -305,7 +305,7 @@ func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMess
 			}
 			if isContextExpiredError(err) {
 				rateLimiterHitCounter.Inc()
-				utils.Logger().Info().Str("ip", ip).Msg("[RPC] rate limited")
+				utils.Logger().Debug().Str("ip", ip).Msg("[RPC] rate limited")
 				err = &tooManyRequestsError{}
 			}
 			return msg.errorResponse(&rateLimitedError{e: err})
