@@ -160,6 +160,8 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	isNotBeaconChainValidator := node.NodeConfig.Role() == nodeconfig.Validator && node.NodeConfig.ShardID != shard.BeaconChainShardID
 	if isEnablePruneBeaconChain && isNotBeaconChainValidator {
 		bc.EnablePruneBeaconChainFeature()
+	} else if isEnablePruneBeaconChain && !isNotBeaconChainValidator {
+		utils.Logger().Info().Msg("`IsEnablePruneBeaconChain` only available in validator node and shard 1-3")
 	}
 	return bc
 }
