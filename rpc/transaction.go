@@ -30,7 +30,7 @@ import (
 
 const (
 	defaultPageSize = uint32(100)
-	txnCacheSize    = 8192
+	txnCacheSize    = 2048
 )
 
 // PublicTransactionService provides an API to access Harmony's transaction service.
