@@ -1066,10 +1066,10 @@ func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBac
 }
 
 const (
-	blockCacheSize      = 2048
-	signersCacheSize    = blockCacheSize
-	stakingTxsCacheSize = blockCacheSize
-	leaderCacheSize     = blockCacheSize
+	blockCacheSize      = 512
+	signersCacheSize    = 2048
+	stakingTxsCacheSize = 2048
+	leaderCacheSize     = 2048
 )
 
 type (
