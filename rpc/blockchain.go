@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/harmony-one/harmony/crypto/hash"
+
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -53,7 +55,7 @@ type PublicBlockchainService struct {
 
 const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
-	rpcGetBlocksLimit             = 1024
+	rpcGetBlocksLimit             = 64
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
@@ -209,7 +211,9 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, blockNum)
-	key := append(b, dat...)
+	data := append(b, dat...)
+	key := hash.Keccak256(data)
+
 	block, ok := s.helper.cache.blockCache.Get(key)
 	if ok {
 		return block, nil
@@ -265,7 +269,8 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	if err != nil {
 		return nil, err
 	}
-	key := append(blockHash[:], dat...)
+	data := append(blockHash[:], dat...)
+	key := hash.Keccak256(data)
 	block, ok := s.helper.cache.blockCache.Get(key)
 	if ok {
 		return block, nil
