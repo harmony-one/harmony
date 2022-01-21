@@ -19,11 +19,15 @@ package rpc
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -286,8 +290,84 @@ func (h *handler) handleResponse(msg *jsonrpcMessage) {
 	}
 }
 
+var (
+	reqCounts  = make(map[string]int)
+	timePassed time.Duration
+	rateLock   sync.Mutex
+)
+
+const (
+	interval = 10 * time.Second
+)
+
+func requestReceived(ip string) {
+	rateLock.Lock()
+	defer rateLock.Unlock()
+
+	reqCounts[ip]++
+}
+
+type ratePair struct {
+	ip  string
+	cnt int
+}
+
+type ratePairList []ratePair
+
+func (l ratePairList) Len() int           { return len(l) }
+func (l ratePairList) Swap(i, j int)      { l[i], l[j] = l[j], l[i] }
+func (l ratePairList) Less(i, j int) bool { return l[i].cnt > l[j].cnt }
+
+func init() {
+	go func() {
+		t := time.NewTicker(interval)
+		for range t.C {
+			printRates()
+		}
+	}()
+}
+
+func printRates() {
+	rateLock.Lock()
+	defer rateLock.Unlock()
+
+	sortRate := make(ratePairList, 0, len(reqCounts))
+	for ip, rate := range reqCounts {
+		sortRate = append(sortRate, ratePair{ip, rate})
+	}
+	sort.Sort(sortRate)
+
+	for _, p := range sortRate {
+		utils.Logger().Info().Str("ip", p.ip).Float32("rate", float32(p.cnt)/float32(timePassed/time.Second)).Msg("[RPC] rate stats")
+	}
+
+	timePassed += interval
+}
+
+func getSourceIP(ctx context.Context) (string, error) {
+	var (
+		ip  string
+		err error
+	)
+	v := ctx.Value("X-Forwarded-For")
+	if v != nil {
+		ip = v.(string)
+	} else {
+		hostPort := ctx.Value("remote").(string)
+		ip, _, err = net.SplitHostPort(hostPort)
+	}
+	return ip, err
+}
+
 // handleCallMsg executes a call message and returns the answer.
 func (h *handler) handleCallMsg(ctx *callProc, msg *jsonrpcMessage) *jsonrpcMessage {
+	ip, err := getSourceIP(ctx.ctx)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[RPC] Failed to find remote ip")
+	} else {
+		requestReceived(ip)
+	}
+
 	start := time.Now()
 	switch {
 	case msg.isNotification():
