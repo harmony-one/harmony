@@ -67,6 +67,8 @@ const (
 	GetStakingTransactionByHash   = "GetStakingTransactionByHash"
 	GetTransactionsHistory        = "GetTransactionsHistory"
 	GetStakingTransactionsHistory = "GetStakingTransactionsHistory"
+	GetTransactionReceipt         = "GetTransactionReceipt"
+	EstimateGasKey                = "EstimateGasKey"
 
 	// filters
 	GetLogs         = "GetLogs"

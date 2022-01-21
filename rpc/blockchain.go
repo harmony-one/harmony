@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -200,6 +202,19 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		blockNum = uint64(blockNumber.EthBlockNumber().Int64())
 	}
 
+	// Look up cache
+	dat, err := json.Marshal(blockArgs)
+	if err != nil {
+		return nil, err
+	}
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, blockNum)
+	key := append(b, dat...)
+	block, ok := s.helper.cache.blockCache.Get(key)
+	if ok {
+		return block, nil
+	}
+
 	blk := s.hmy.BlockChain.GetBlockByNumber(blockNum)
 	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
 	// These tools implement retry mechanisms that will query & retry for a given block until it has been finalized.
@@ -218,6 +233,8 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, err
 	}
+
+	s.helper.cache.blockCache.Add(key, rpcBlock)
 	return rpcBlock, err
 }
 
@@ -243,6 +260,17 @@ func (s *PublicBlockchainService) GetBlockByHash(
 		return nil, err
 	}
 
+	// Look up cache
+	dat, err := json.Marshal(blockArgs)
+	if err != nil {
+		return nil, err
+	}
+	key := append(blockHash[:], dat...)
+	block, ok := s.helper.cache.blockCache.Get(key)
+	if ok {
+		return block, nil
+	}
+
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil || blk == nil {
@@ -256,6 +284,8 @@ func (s *PublicBlockchainService) GetBlockByHash(
 		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
 		return nil, err
 	}
+
+	s.helper.cache.blockCache.Add(key, rpcBlock)
 	return rpcBlock, err
 }
 
@@ -1055,6 +1085,7 @@ type (
 		signersCache    *lru.Cache // numberU64 -> []string
 		stakingTxsCache *lru.Cache // numberU64 -> interface{} (v1.StakingTransactions / v2.StakingTransactions)
 		leaderCache     *lru.Cache // numberUint64 -> string
+		blockCache      *lru.Cache
 	}
 )
 
@@ -1062,10 +1093,12 @@ func (s *PublicBlockchainService) newHelper() *bcServiceHelper {
 	signerCache, _ := lru.New(signersCacheSize)
 	stakingTxsCache, _ := lru.New(stakingTxsCacheSize)
 	leaderCache, _ := lru.New(leaderCacheSize)
+	blockCache, _ := lru.New(blockCacheSize)
 	cache := &bcServiceCache{
 		signersCache:    signerCache,
 		stakingTxsCache: stakingTxsCache,
 		leaderCache:     leaderCache,
+		blockCache:      blockCache,
 	}
 	return &bcServiceHelper{
 		version: s.version,

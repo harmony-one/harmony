@@ -39,7 +39,7 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version, rate.NewLimiter(200, 1500)},
+		Service:   &PublicContractService{hmy, version, rate.NewLimiter(300, 1500)},
 		Public:    true,
 	}
 }
@@ -65,6 +65,8 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	timer := DoMetricRPCRequest(Call)
+	defer DoRPCRequestDuration(Call, timer)
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 

@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"strings"
 
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -28,21 +30,24 @@ import (
 
 const (
 	defaultPageSize = uint32(100)
+	txnCacheSize    = 8192
 )
 
 // PublicTransactionService provides an API to access Harmony's transaction service.
 // It offers only methods that operate on public data that is freely available to anyone.
 type PublicTransactionService struct {
-	hmy     *hmy.Harmony
-	version Version
+	hmy      *hmy.Harmony
+	version  Version
+	txnCache *lru.Cache
 }
 
 // NewPublicTransactionAPI creates a new API for the RPC interface
 func NewPublicTransactionAPI(hmy *hmy.Harmony, version Version) rpc.API {
+	blockCache, _ := lru.New(txnCacheSize)
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicTransactionService{hmy, version},
+		Service:   &PublicTransactionService{hmy, version, blockCache},
 		Public:    true,
 	}
 }
@@ -170,6 +175,13 @@ func (s *PublicTransactionService) GetTransactionByHash(
 ) (StructuredResponse, error) {
 	timer := DoMetricRPCRequest(GetTransactionByHash)
 	defer DoRPCRequestDuration(GetTransactionByHash, timer)
+
+	// Look up cache
+	txn, ok := s.txnCache.Get(hash)
+	if ok {
+		return txn.(StructuredResponse), nil
+	}
+
 	// Try to return an already finalized transaction
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
 	if tx == nil {
@@ -197,7 +209,11 @@ func (s *PublicTransactionService) GetTransactionByHash(
 		return nil, nil
 	}
 
-	return s.newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+	result, err := s.newRPCTransaction(tx, blockHash, blockNumber, block.Time().Uint64(), index)
+	if err == nil {
+		s.txnCache.Add(hash, result)
+	}
+	return result, err
 }
 
 func (s *PublicTransactionService) newRPCTransaction(tx *types.Transaction, blockHash common.Hash,
@@ -238,6 +254,12 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 	timer := DoMetricRPCRequest(GetStakingTransactionByHash)
 	defer DoRPCRequestDuration(GetStakingTransactionByHash, timer)
 
+	// Look up cache
+	txn, ok := s.txnCache.Get(hash)
+	if ok {
+		return txn.(StructuredResponse), nil
+	}
+
 	// Try to return an already finalized transaction
 	stx, blockHash, blockNumber, index := rawdb.ReadStakingTransaction(s.hmy.ChainDb(), hash)
 	if stx == nil {
@@ -265,7 +287,11 @@ func (s *PublicTransactionService) GetStakingTransactionByHash(
 		return nil, nil
 	}
 
-	return s.newRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+	result, err := s.newRPCStakingTransaction(stx, blockHash, blockNumber, block.Time().Uint64(), index)
+	if err == nil {
+		s.txnCache.Add(hash, result)
+	}
+	return result, err
 }
 
 func (s *PublicTransactionService) newRPCStakingTransaction(stx *staking.StakingTransaction, blockHash common.Hash,
@@ -670,6 +696,9 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 func (s *PublicTransactionService) GetTransactionReceipt(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionReceipt)
+	defer DoRPCRequestDuration(GetTransactionReceipt, timer)
+
 	// Fetch receipt for plain & staking transaction
 	var tx *types.Transaction
 	var stx *staking.StakingTransaction
@@ -789,6 +818,9 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 
 // EstimateGas - estimate gas cost for a given operation
 func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int) (uint64, error) {
+	timer := DoMetricRPCRequest(EstimateGasKey)
+	defer DoRPCRequestDuration(EstimateGasKey, timer)
+
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
