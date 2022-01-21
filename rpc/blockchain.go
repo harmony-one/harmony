@@ -2,14 +2,10 @@ package rpc
 
 import (
 	"context"
-	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"reflect"
 	"time"
-
-	"github.com/harmony-one/harmony/crypto/hash"
 
 	"encoding/hex"
 
@@ -205,19 +201,19 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	}
 
 	// Look up cache
-	dat, err := json.Marshal(blockArgs)
-	if err != nil {
-		return nil, err
-	}
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, blockNum)
-	data := append(b, dat...)
-	key := hash.Keccak256(data)
-
-	block, ok := s.helper.cache.blockCache.Get(key)
-	if ok {
-		return block, nil
-	}
+	//dat, err := json.Marshal(blockArgs)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//b := make([]byte, 8)
+	//binary.LittleEndian.PutUint64(b, blockNum)
+	//data := append(b, dat...)
+	//key := hash.Keccak256(data)
+	//
+	//block, ok := s.helper.cache.blockCache.Get(key)
+	//if ok {
+	//	return block, nil
+	//}
 
 	blk := s.hmy.BlockChain.GetBlockByNumber(blockNum)
 	// Some Ethereum tools (such as Truffle) rely on being able to query for future blocks without the chain returning errors.
@@ -238,7 +234,7 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 		return nil, err
 	}
 
-	s.helper.cache.blockCache.Add(key, rpcBlock)
+	//s.helper.cache.blockCache.Add(key, rpcBlock)
 	return rpcBlock, err
 }
 
@@ -265,16 +261,16 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	}
 
 	// Look up cache
-	dat, err := json.Marshal(blockArgs)
-	if err != nil {
-		return nil, err
-	}
-	data := append(blockHash[:], dat...)
-	key := hash.Keccak256(data)
-	block, ok := s.helper.cache.blockCache.Get(key)
-	if ok {
-		return block, nil
-	}
+	//dat, err := json.Marshal(blockArgs)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//data := append(blockHash[:], dat...)
+	//key := hash.Keccak256(data)
+	//block, ok := s.helper.cache.blockCache.Get(key)
+	//if ok {
+	//	return block, nil
+	//}
 
 	// Fetch the block
 	blk, err := s.hmy.GetBlock(ctx, blockHash)
@@ -290,7 +286,7 @@ func (s *PublicBlockchainService) GetBlockByHash(
 		return nil, err
 	}
 
-	s.helper.cache.blockCache.Add(key, rpcBlock)
+	//s.helper.cache.blockCache.Add(key, rpcBlock)
 	return rpcBlock, err
 }
 
