@@ -210,6 +210,11 @@ func (hmy *Harmony) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(hmy.BlockChain.CurrentHeader())
 }
 
+// CurrentBlock ...
+func (hmy *Harmony) CurrentBlockNumber() uint64 {
+	return hmy.BlockChain.CurrentBlockNumber()
+}
+
 // GetBlock ...
 func (hmy *Harmony) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return hmy.BlockChain.GetBlockByHash(hash), nil
