@@ -333,6 +333,9 @@ func (s *PublicBlockchainService) GetBlocks(
 
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockchainService) IsLastBlock(ctx context.Context, blockNum uint64) (bool, error) {
+	timer := DoMetricRPCRequest(IsLastBlock)
+	defer DoRPCRequestDuration(IsLastBlock, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return false, ErrNotBeaconShard
 	}
@@ -341,6 +344,9 @@ func (s *PublicBlockchainService) IsLastBlock(ctx context.Context, blockNum uint
 
 // EpochLastBlock returns epoch last block.
 func (s *PublicBlockchainService) EpochLastBlock(ctx context.Context, epoch uint64) (uint64, error) {
+	timer := DoMetricRPCRequest(EpochLastBlock)
+	defer DoRPCRequestDuration(EpochLastBlock, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return 0, ErrNotBeaconShard
 	}
@@ -351,6 +357,9 @@ func (s *PublicBlockchainService) EpochLastBlock(ctx context.Context, epoch uint
 func (s *PublicBlockchainService) GetBlockSigners(
 	ctx context.Context, blockNumber BlockNumber,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetBlockSigners)
+	defer DoRPCRequestDuration(GetBlockSigners, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum == rpc.PendingBlockNumber {
@@ -381,6 +390,9 @@ func (s *PublicBlockchainService) GetBlockSigners(
 func (s *PublicBlockchainService) GetBlockSignerKeys(
 	ctx context.Context, blockNumber BlockNumber,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetBlockSignerKeys)
+	defer DoRPCRequestDuration(GetBlockSignerKeys, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum == rpc.PendingBlockNumber {
@@ -407,6 +419,9 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 func (s *PublicBlockchainService) IsBlockSigner(
 	ctx context.Context, blockNumber BlockNumber, address string,
 ) (bool, error) {
+	timer := DoMetricRPCRequest(IsBlockSigner)
+	defer DoRPCRequestDuration(IsBlockSigner, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -435,6 +450,9 @@ func (s *PublicBlockchainService) IsBlockSigner(
 func (s *PublicBlockchainService) GetSignedBlocks(
 	ctx context.Context, address string,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetSignedBlocks)
+	defer DoRPCRequestDuration(GetSignedBlocks, timer)
+
 	// Fetch the number of signed blocks within default period
 	curEpoch := s.hmy.CurrentBlock().Epoch()
 	var totalSigned uint64
@@ -486,6 +504,9 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 
 // GetEpoch returns current epoch.
 func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetEpoch)
+	defer DoRPCRequestDuration(GetEpoch, timer)
+
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
@@ -506,6 +527,9 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 
 // GetLeader returns current shard leader.
 func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error) {
+	timer := DoMetricRPCRequest(GetLeader)
+	defer DoRPCRequestDuration(GetLeader, timer)
+
 	// Fetch Header
 	blk := s.hmy.BlockChain.CurrentBlock()
 	// Response output is the same for all versions
@@ -905,6 +929,8 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 func (s *PublicBlockchainService) GetTotalSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
+	timer := DoMetricRPCRequest(GetTotalSupply)
+	defer DoRPCRequestDuration(GetTotalSupply, timer)
 	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
@@ -912,6 +938,8 @@ func (s *PublicBlockchainService) GetTotalSupply(
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
+	timer := DoMetricRPCRequest(GetCirculatingSupply)
+	defer DoRPCRequestDuration(GetCirculatingSupply, timer)
 	return chain.GetCirculatingSupply(s.hmy.BlockChain)
 }
 
@@ -976,6 +1004,8 @@ const (
 
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
+	timer := DoMetricRPCRequest(InSync)
+	defer DoRPCRequestDuration(InSync, timer)
 	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
 	if !inSync && diff <= inSyncTolerance {
 		inSync = true
@@ -985,6 +1015,8 @@ func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
+	timer := DoMetricRPCRequest(BeaconInSync)
+	defer DoRPCRequestDuration(BeaconInSync, timer)
 	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
 	if !inSync && diff <= inSyncTolerance {
 		inSync = true
@@ -1068,6 +1100,8 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 }
 
 func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
+	timer := DoMetricRPCRequest(SetNodeToBackupMode)
+	defer DoRPCRequestDuration(SetNodeToBackupMode, timer)
 	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
 }
 

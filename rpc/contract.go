@@ -65,6 +65,9 @@ func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context)
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	timer := DoMetricRPCRequest(Call)
+	defer DoRPCRequestDuration(Call, timer)
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -144,9 +147,6 @@ func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
-	timer := DoMetricRPCRequest(DoEvmCall)
-	defer DoRPCRequestDuration(DoEvmCall, timer)
-
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).
