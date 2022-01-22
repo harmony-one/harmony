@@ -22,5 +22,7 @@ func NewPublicWeb3API() rpc.API {
 
 // ClientVersion - returns the current client version of the running node
 func (s *PublicWeb3Service) ClientVersion(ctx context.Context) interface{} {
+	timer := DoMetricRPCRequest(ClientVersion)
+	defer DoRPCRequestDuration(ClientVersion, timer)
 	return nodeconfig.GetVersion()
 }
