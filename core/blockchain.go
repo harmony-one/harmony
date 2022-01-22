@@ -139,6 +139,7 @@ type BlockChain struct {
 	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
 	currentBlock     atomic.Value // Current head of the block chain
+	currentBlockNum  uint64       // Current head of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
 	stateCache                    state.Database // State database to reuse between imports (contains state cache)
@@ -248,7 +249,7 @@ func NewBlockChain(
 		return nil, ErrNoGenesis
 	}
 	var nilBlock *types.Block
-	bc.currentBlock.Store(nilBlock)
+	bc.SetCurrentBlock(nilBlock)
 	bc.currentFastBlock.Store(nilBlock)
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
@@ -256,6 +257,15 @@ func NewBlockChain(
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
+}
+
+func (bc *BlockChain) SetCurrentBlock(block *types.Block) {
+	bc.currentBlock.Store(block)
+	if block == nil {
+		atomic.StoreUint64(&bc.currentBlockNum, uint64(0))
+	}
+
+	atomic.StoreUint64(&bc.currentBlockNum, block.NumberU64())
 }
 
 // ValidateNewBlock validates new block.
@@ -329,7 +339,7 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 	// Everything seems to be fine, set as the head block
-	bc.currentBlock.Store(currentBlock)
+	bc.SetCurrentBlock(currentBlock)
 
 	// We don't need the following as we want the current header and block to be consistent
 	// Restore the last known head header
@@ -410,12 +420,12 @@ func (bc *BlockChain) SetHead(head uint64) error {
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number().Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
+		bc.SetCurrentBlock(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 			// Rewound state missing, rolled back to before pivot, reset to genesis
-			bc.currentBlock.Store(bc.genesisBlock)
+			bc.SetCurrentBlock(bc.genesisBlock)
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
@@ -424,7 +434,7 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	}
 	// If either blocks reached nil, reset to the genesis state
 	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
-		bc.currentBlock.Store(bc.genesisBlock)
+		bc.SetCurrentBlock(bc.genesisBlock)
 	}
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock == nil {
 		bc.currentFastBlock.Store(bc.genesisBlock)
@@ -457,6 +467,11 @@ func (bc *BlockChain) GasLimit() uint64 {
 // block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentBlock() *types.Block {
 	return bc.currentBlock.Load().(*types.Block)
+}
+
+// CurrentBlock retrieves the current head block number of the canonical chain.
+func (bc *BlockChain) CurrentBlockNumber() uint64 {
+	return atomic.LoadUint64(&bc.currentBlockNum)
 }
 
 // CurrentFastBlock retrieves the current fast-sync head block of the canonical
@@ -531,7 +546,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	if err := bc.hc.SetCurrentHeader(bc.genesisBlock.Header()); err != nil {
 		return err
 	}
-	bc.currentBlock.Store(bc.genesisBlock)
+	bc.SetCurrentBlock(bc.genesisBlock)
 	bc.currentFastBlock.Store(bc.genesisBlock)
 
 	return nil
@@ -652,7 +667,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 		return err
 	}
 
-	bc.currentBlock.Store(block)
+	bc.SetCurrentBlock(block)
 
 	// If the block is better than our head or is on a different chain, force update heads
 	if updateHeads {
@@ -943,7 +958,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 		if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentBlock.Hash() == hash {
 			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
 			if newBlock != nil {
-				bc.currentBlock.Store(newBlock)
+				bc.SetCurrentBlock(newBlock)
 				if err := rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash()); err != nil {
 					return err
 				}
