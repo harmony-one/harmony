@@ -21,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 // Validator is an interface which defines the standard for block validation. It
@@ -58,7 +59,7 @@ type Validator interface {
 // readCache decides whether the method will try reading from result cache.
 type Processor interface {
 	Process(block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool) (
-		types.Receipts, types.CXReceipts,
+		types.Receipts, types.CXReceipts, []stakingTypes.StakeMsg,
 		[]*types.Log, uint64, reward.Reader, *state.DB, error,
 	)
 	CacheProcessorResult(cacheKey interface{}, result *ProcessorResult)

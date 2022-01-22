@@ -268,7 +268,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
 	// Do not read cache from processor.
-	receipts, cxReceipts, _, usedGas, _, _, err := bc.processor.Process(
+	receipts, cxReceipts, _, _, usedGas, _, _, err := bc.processor.Process(
 		block, state, bc.vmConfig, false,
 	)
 	if err != nil {
@@ -1148,6 +1148,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
+	stakeMsgs []staking.StakeMsg,
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -1239,7 +1240,8 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, paid, state,
+		cxReceipts, stakeMsgs,
+		paid, state,
 	); err != nil {
 		return status, err
 	}
@@ -1465,7 +1467,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, newState, err := bc.processor.Process(
+		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
 			block, state, bc.vmConfig, true,
 		)
 		state = newState // update state in case the new state is cached.
@@ -1485,7 +1487,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 		// Write the block to the chain and get the status.
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, payout, state,
+			block, receipts, cxReceipts, stakeMsgs, payout, state,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
@@ -2692,9 +2694,10 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, block *types.Block,
+	stakeMsgs []staking.StakeMsg,
 	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
-	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, state)
+	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, stakeMsgs, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
 		return newValidators, err
@@ -2758,13 +2761,27 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // newValidators - the addresses of the newly created validators
 // newDelegations - the map of delegator address and their updated delegation indexes
 func (bc *BlockChain) prepareStakingMetaData(
-	block *types.Block, state *state.DB,
-) (newValidators []common.Address,
-	newDelegations map[common.Address]staking.DelegationIndexes,
-	err error,
+	block *types.Block, stakeMsgs []staking.StakeMsg, state *state.DB,
+) ([]common.Address,
+	map[common.Address]staking.DelegationIndexes,
+	error,
 ) {
-	newDelegations = map[common.Address]staking.DelegationIndexes{}
+	var newValidators []common.Address
+	newDelegations := map[common.Address]staking.DelegationIndexes{}
 	blockNum := block.Number()
+	for _, stakeMsg := range stakeMsgs {
+		if delegate, ok := stakeMsg.(*staking.Delegate); ok {
+			if err := processDelegateMetadata(delegate,
+				newDelegations,
+				state,
+				bc,
+				blockNum); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			panic("Only *staking.Delegate stakeMsgs are supported at the moment")
+		}
+	}
 	for _, txn := range block.StakingTransactions() {
 		payload, err := txn.RLPEncodeStakeMsg()
 		if err != nil {
@@ -2800,27 +2817,19 @@ func (bc *BlockChain) prepareStakingMetaData(
 					return nil, nil, err
 				}
 			}
-
 			delegations = append(delegations, selfIndex)
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:
 			delegate := decodePayload.(*staking.Delegate)
-
-			delegations, ok := newDelegations[delegate.DelegatorAddress]
-			if !ok {
-				// If the cache doesn't have it, load it from DB for the first time.
-				delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-			if delegations, err = bc.addDelegationIndex(
-				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
-			); err != nil {
+			if err := processDelegateMetadata(delegate,
+				newDelegations,
+				state,
+				bc,
+				blockNum); err != nil {
 				return nil, nil, err
 			}
-			newDelegations[delegate.DelegatorAddress] = delegations
+
 		case staking.DirectiveUndelegate:
 		case staking.DirectiveCollectRewards:
 		default:
@@ -2828,6 +2837,27 @@ func (bc *BlockChain) prepareStakingMetaData(
 	}
 
 	return newValidators, newDelegations, nil
+}
+
+func processDelegateMetadata(delegate *staking.Delegate,
+	newDelegations map[common.Address]staking.DelegationIndexes,
+	state *state.DB, bc *BlockChain, blockNum *big.Int,
+) (err error) {
+	delegations, ok := newDelegations[delegate.DelegatorAddress]
+	if !ok {
+		// If the cache doesn't have it, load it from DB for the first time.
+		delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+	}
+	if delegations, err = bc.addDelegationIndex(
+		delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
+	); err != nil {
+		return err
+	}
+	newDelegations[delegate.DelegatorAddress] = delegations
+	return nil
 }
 
 // ReadBlockRewardAccumulator must only be called on beaconchain

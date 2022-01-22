@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
@@ -172,6 +173,20 @@ func (v Delegate) Copy() StakeMsg {
 	return cp
 }
 
+// Equals returns if v and s are equal
+func (v Delegate) Equals(s Delegate) bool {
+	if !bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes()) {
+		return false
+	}
+	if !bytes.Equal(v.ValidatorAddress.Bytes(), s.ValidatorAddress.Bytes()) {
+		return false
+	}
+	if v.Amount == nil {
+		return s.Amount == nil
+	}
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0 // pointer
+}
+
 // Undelegate - type for removing delegation responsibility
 type Undelegate struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
@@ -196,6 +211,20 @@ func (v Undelegate) Copy() StakeMsg {
 	return cp
 }
 
+// Equals returns if v and s are equal
+func (v Undelegate) Equals(s Undelegate) bool {
+	if !bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes()) {
+		return false
+	}
+	if !bytes.Equal(v.ValidatorAddress.Bytes(), s.ValidatorAddress.Bytes()) {
+		return false
+	}
+	if v.Amount == nil {
+		return s.Amount == nil
+	}
+	return s.Amount != nil && v.Amount.Cmp(s.Amount) == 0 // pointer
+}
+
 // CollectRewards - type for collecting token rewards
 type CollectRewards struct {
 	DelegatorAddress common.Address `json:"delegator_address"`
@@ -211,4 +240,26 @@ func (v CollectRewards) Copy() StakeMsg {
 	return CollectRewards{
 		DelegatorAddress: v.DelegatorAddress,
 	}
+}
+
+// Equals returns if v and s are equal
+func (v CollectRewards) Equals(s CollectRewards) bool {
+	return bytes.Equal(v.DelegatorAddress.Bytes(), s.DelegatorAddress.Bytes())
+}
+
+// Migration Msg - type for switching delegation from one user to next
+type MigrationMsg struct {
+	From common.Address `json:"from" rlp:"nil"`
+	To   common.Address `json:"to" rlp:"nil"`
+}
+
+func (v MigrationMsg) Copy() MigrationMsg {
+	return MigrationMsg{
+		From: v.From,
+		To:   v.To,
+	}
+}
+
+func (v MigrationMsg) Equals(s MigrationMsg) bool {
+	return v.From == s.From && v.To == s.To
 }
