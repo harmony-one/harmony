@@ -51,7 +51,7 @@ type PublicBlockchainService struct {
 
 const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
-	rpcGetBlocksLimit             = 1024
+	rpcGetBlocksLimit             = 64
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
