@@ -139,7 +139,7 @@ type BlockChain struct {
 	pendingSlashingCandidatesMU sync.RWMutex // pending slashing candidates
 
 	currentBlock     atomic.Value // Current head of the block chain
-	currentBlockNum  uint64       // Current head of the block chain
+	currentBlockNum  uint64       // Current head block number of the block chain
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!)
 
 	stateCache                    state.Database // State database to reuse between imports (contains state cache)
@@ -263,9 +263,9 @@ func (bc *BlockChain) SetCurrentBlock(block *types.Block) {
 	bc.currentBlock.Store(block)
 	if block == nil {
 		atomic.StoreUint64(&bc.currentBlockNum, uint64(0))
+	} else {
+		atomic.StoreUint64(&bc.currentBlockNum, block.NumberU64())
 	}
-
-	atomic.StoreUint64(&bc.currentBlockNum, block.NumberU64())
 }
 
 // ValidateNewBlock validates new block.
