@@ -96,6 +96,9 @@ func (api *PublicFilterAPI) timeoutLoop() {
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newpendingtransactionfilter
 func (api *PublicFilterAPI) NewPendingTransactionFilter() rpc.ID {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewPendingTransactionFilter)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewPendingTransactionFilter, timer)
+
 	var (
 		pendingTxs   = make(chan []common.Hash)
 		pendingTxSub = api.events.SubscribePendingTxs(pendingTxs)
@@ -129,6 +132,9 @@ func (api *PublicFilterAPI) NewPendingTransactionFilter() rpc.ID {
 // NewPendingTransactions creates a subscription that is triggered each time a transaction
 // enters the transaction pool and was signed from one of the transactions this nodes manages.
 func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Subscription, error) {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewPendingTransactions)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewPendingTransactions, timer)
+
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -166,6 +172,9 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newblockfilter
 func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewBlockFilter)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewBlockFilter, timer)
+
 	var (
 		headers   = make(chan *block.Header)
 		headerSub = api.events.SubscribeNewHeads(headers)
@@ -198,6 +207,8 @@ func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 
 // NewHeads send a notification each time a new (header) block is appended to the chain.
 func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, error) {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewHeads)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewHeads, timer)
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -234,6 +245,9 @@ func (api *PublicFilterAPI) NewHeads(ctx context.Context) (*rpc.Subscription, er
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterchanges
 func (api *PublicFilterAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.GetFilterChanges)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.GetFilterChanges, timer)
+
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
@@ -280,6 +294,8 @@ func returnLogs(logs []*types.Log) []*types.Log {
 
 // Logs creates a subscription that fires for all new log that match the given filter criteria.
 func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc.Subscription, error) {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.Logs)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.Logs, timer)
 	notifier, supported := rpc.NotifierFromContext(ctx)
 	if !supported {
 		return &rpc.Subscription{}, rpc.ErrNotificationsUnsupported
@@ -330,6 +346,9 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
 func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
+	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewFilter)
+	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewFilter, timer)
+
 	logs := make(chan []*types.Log)
 	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
 	if err != nil {

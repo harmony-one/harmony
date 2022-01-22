@@ -60,6 +60,8 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 
 // Version returns the network version, i.e. ChainID identifying which network we are using
 func (s *PublicNetService) Version(ctx context.Context) interface{} {
+	timer := DoMetricRPCRequest(NetVersion)
+	defer DoRPCRequestDuration(NetVersion, timer)
 	switch s.version {
 	case Eth:
 		return nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.String()
