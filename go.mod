@@ -29,6 +29,7 @@ require (
 	github.com/harmony-one/vdf v0.0.0-20190924175951-620379da8849
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
+	github.com/hdevalence/ed25519consensus v0.0.0-20201207055737-7fde80a9d5ff
 	github.com/ipfs/go-ds-badger v0.2.7
 	github.com/json-iterator/go v1.1.10
 	github.com/libp2p/go-libp2p v0.14.4
