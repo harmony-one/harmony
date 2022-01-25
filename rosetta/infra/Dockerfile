@@ -26,6 +26,9 @@ RUN make linux_static && \
     cp ./bin/harmony /root/harmony && \
     cp ./rosetta/infra/run.sh /root/run.sh
 
+RUN cp ./rosetta/infra/harmony-pstn.conf /root/harmony-pstn.conf && \
+    cp ./rosetta/infra/harmony-mainnet.conf /root/harmony-mainnet.conf
+
 # Execution
 FROM ubuntu:latest
 
