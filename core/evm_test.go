@@ -278,54 +278,54 @@ func TestEVMStaking(t *testing.T) {
 		t.Errorf("Got error %s in CheckDelegationsEqual", err)
 	}
 
-	// test for migration gas
-	db.RevertToSnapshot(snapshot)
-	// to calculate gas we need to test 0 / 1 / 2 delegations to migrate as per ReadDelegationsByDelegator
-	// case 0
-	evm := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
-	gas, err := ctx.CalculateMigrationGas(db, &staking.MigrationMsg{
-		From: crypto.PubkeyToAddress(toKey.PublicKey),
-		To:   crypto.PubkeyToAddress(key.PublicKey),
-	}, evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
-	var expectedGasMin uint64 = params.TxGas
-	if err != nil {
-		t.Errorf("Gas error %s", err)
-	}
-	if gas < expectedGasMin {
-		t.Errorf("Gas for 0 migration was expected to be at least %d but got %d", expectedGasMin, gas)
-	}
-	// case 1
-	gas, err = ctx.CalculateMigrationGas(db, &migration,
-		evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
-	expectedGasMin = params.TxGas
-	if err != nil {
-		t.Errorf("Gas error %s", err)
-	}
-	if gas < expectedGasMin {
-		t.Errorf("Gas for 1 migration was expected to be at least %d but got %d", expectedGasMin, gas)
-	}
-	// case 2
-	createValidator = sampleCreateValidator(*toKey)
-	db.AddBalance(createValidator.ValidatorAddress, createValidator.Amount)
-	err = ctx.CreateValidator(db, &createValidator)
-	delegate = sampleDelegate(*toKey)
-	delegate.DelegatorAddress = crypto.PubkeyToAddress(key.PublicKey)
-	_ = ctx.Delegate(db, &delegate)
-	delegationIndex := staking.DelegationIndex{
-		ValidatorAddress: crypto.PubkeyToAddress(toKey.PublicKey),
-		Index:            uint64(1),
-		BlockNum:         common.Big0,
-	}
-	err = chain.writeDelegationsByDelegator(batch, migration.From, []staking.DelegationIndex{selfIndex, delegationIndex})
-	gas, err = ctx.CalculateMigrationGas(db, &migration,
-		evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
-	expectedGasMin = 2 * params.TxGas
-	if err != nil {
-		t.Errorf("Gas error %s", err)
-	}
-	if gas < expectedGasMin {
-		t.Errorf("Gas for 2 migrations was expected to be at least %d but got %d", expectedGasMin, gas)
-	}
+	//// test for migration gas
+	//db.RevertToSnapshot(snapshot)
+	//// to calculate gas we need to test 0 / 1 / 2 delegations to migrate as per ReadDelegationsByDelegator
+	//// case 0
+	//evm := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
+	//gas, err := ctx.CalculateMigrationGas(db, &staking.MigrationMsg{
+	//	From: crypto.PubkeyToAddress(toKey.PublicKey),
+	//	To:   crypto.PubkeyToAddress(key.PublicKey),
+	//}, evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
+	//var expectedGasMin uint64 = params.TxGas
+	//if err != nil {
+	//	t.Errorf("Gas error %s", err)
+	//}
+	//if gas < expectedGasMin {
+	//	t.Errorf("Gas for 0 migration was expected to be at least %d but got %d", expectedGasMin, gas)
+	//}
+	//// case 1
+	//gas, err = ctx.CalculateMigrationGas(db, &migration,
+	//	evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
+	//expectedGasMin = params.TxGas
+	//if err != nil {
+	//	t.Errorf("Gas error %s", err)
+	//}
+	//if gas < expectedGasMin {
+	//	t.Errorf("Gas for 1 migration was expected to be at least %d but got %d", expectedGasMin, gas)
+	//}
+	//// case 2
+	//createValidator = sampleCreateValidator(*toKey)
+	//db.AddBalance(createValidator.ValidatorAddress, createValidator.Amount)
+	//err = ctx.CreateValidator(db, &createValidator)
+	//delegate = sampleDelegate(*toKey)
+	//delegate.DelegatorAddress = crypto.PubkeyToAddress(key.PublicKey)
+	//_ = ctx.Delegate(db, &delegate)
+	//delegationIndex := staking.DelegationIndex{
+	//	ValidatorAddress: crypto.PubkeyToAddress(toKey.PublicKey),
+	//	Index:            uint64(1),
+	//	BlockNum:         common.Big0,
+	//}
+	//err = chain.writeDelegationsByDelegator(batch, migration.From, []staking.DelegationIndex{selfIndex, delegationIndex})
+	//gas, err = ctx.CalculateMigrationGas(db, &migration,
+	//	evm.ChainConfig().IsS3(evm.EpochNumber), evm.ChainConfig().IsS3(evm.EpochNumber))
+	//expectedGasMin = 2 * params.TxGas
+	//if err != nil {
+	//	t.Errorf("Gas error %s", err)
+	//}
+	//if gas < expectedGasMin {
+	//	t.Errorf("Gas for 2 migrations was expected to be at least %d but got %d", expectedGasMin, gas)
+	//}
 }
 
 func generateBLSKeyAndSig() (bls.SerializedPublicKey, bls.SerializedSignature) {
