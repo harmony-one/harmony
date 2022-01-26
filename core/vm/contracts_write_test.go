@@ -49,11 +49,11 @@ func EditValidatorFn() EditValidatorFunc {
 	}
 }
 
-func MigrateDelegationsFn() MigrateDelegationsFunc {
-	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
-		return nil, nil
-	}
-}
+//func MigrateDelegationsFn() MigrateDelegationsFunc {
+//	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+//		return nil, nil
+//	}
+//}
 
 func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
@@ -63,12 +63,12 @@ func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 
 func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
-		Delegate:              DelegateFn(),
-		Undelegate:            UndelegateFn(),
-		CreateValidator:       CreateValidatorFn(),
-		EditValidator:         EditValidatorFn(),
-		ShardID:               0,
-		MigrateDelegations:    MigrateDelegationsFn(),
+		Delegate:        DelegateFn(),
+		Undelegate:      UndelegateFn(),
+		CreateValidator: CreateValidatorFn(),
+		EditValidator:   EditValidatorFn(),
+		ShardID:         0,
+		//MigrateDelegations:    MigrateDelegationsFn(),
 		CalculateMigrationGas: CalculateMigrationGasFn(),
 	}, nil, params.TestChainConfig, Config{})
 	// use required gas to avoid out of gas errors
