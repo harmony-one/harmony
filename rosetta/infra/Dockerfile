@@ -40,6 +40,8 @@ WORKDIR /root
 
 COPY --from=build /root/harmony /root/harmony
 COPY --from=build /root/run.sh /root/run.sh
+COPY --from=build /root/harmony-pstn.conf /root/harmony-pstn.conf
+COPY --from=build /root/harmony-mainnet.conf /root/harmony-mainnet.conf
 
 EXPOSE 9500/tcp
 EXPOSE 9700/tcp
