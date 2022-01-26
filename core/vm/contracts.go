@@ -112,6 +112,7 @@ var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{9}):   &blake2F{},
 	common.BytesToAddress([]byte{255}): &vrf{},
 
+	common.BytesToAddress([]byte{252}): &ed25519Verify{},
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
 }
