@@ -76,27 +76,30 @@ func init() {
 	    "outputs": [],
 	    "stateMutability": "nonpayable",
 	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "from",
-	        "type": "address"
-	      },
-	      {
-	        "internalType": "address",
-	        "name": "to",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "Migrate",
-	    "outputs": [],
-	    "stateMutability": "nonpayable",
-	    "type": "function"
 	  }
 	]
 	`
+
+	// ABI for migrate which is not enabled for precompile
+	//,
+	//{
+	//	"inputs": [
+	//{
+	//"internalType": "address",
+	//"name": "from",
+	//"type": "address"
+	//},
+	//{
+	//"internalType": "address",
+	//"name": "to",
+	//"type": "address"
+	//}
+	//],
+	//"name": "Migrate",
+	//"outputs": [],
+	//"stateMutability": "nonpayable",
+	//"type": "function"
+	//}
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
 }
 
@@ -173,22 +176,22 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 			}
 			return stakeMsg, nil
 		}
-	case "Migrate":
-		{
-			from, err := ValidateContractAddress(contractCaller, args, "from")
-			if err != nil {
-				return nil, err
-			}
-			to, err := ParseAddressFromKey(args, "to")
-			if err != nil {
-				return nil, err
-			}
-			// no sanity check for migrating to same address, just do nothing
-			return &stakingTypes.MigrationMsg{
-				From: from,
-				To:   to,
-			}, nil
-		}
+	//case "Migrate":
+	//	{
+	//		from, err := ValidateContractAddress(contractCaller, args, "from")
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//		to, err := ParseAddressFromKey(args, "to")
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//		// no sanity check for migrating to same address, just do nothing
+	//		return &stakingTypes.MigrationMsg{
+	//			From: from,
+	//			To:   to,
+	//		}, nil
+	//	}
 	default:
 		{
 			return nil, errors.New("[StakingPrecompile] Invalid method name from ABI selector")

@@ -52,7 +52,7 @@ type (
 	UndelegateFunc      func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
 	CollectRewardsFunc  func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
 	// Used for migrating delegations via the staking precompile
-	MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 )
 
@@ -163,7 +163,6 @@ type Context struct {
 	Delegate              DelegateFunc
 	Undelegate            UndelegateFunc
 	CollectRewards        CollectRewardsFunc
-	MigrateDelegations    MigrateDelegationsFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
 	// staking precompile checks this before proceeding forward
