@@ -49,11 +49,11 @@ func EditValidatorFn() EditValidatorFunc {
 	}
 }
 
-func MigrateDelegationsFn() MigrateDelegationsFunc {
-	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
-		return nil, nil
-	}
-}
+//func MigrateDelegationsFn() MigrateDelegationsFunc {
+//	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+//		return nil, nil
+//	}
+//}
 
 func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 	return func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
@@ -63,12 +63,12 @@ func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 
 func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
-		Delegate:              DelegateFn(),
-		Undelegate:            UndelegateFn(),
-		CreateValidator:       CreateValidatorFn(),
-		EditValidator:         EditValidatorFn(),
-		ShardID:               0,
-		MigrateDelegations:    MigrateDelegationsFn(),
+		Delegate:        DelegateFn(),
+		Undelegate:      UndelegateFn(),
+		CreateValidator: CreateValidatorFn(),
+		EditValidator:   EditValidatorFn(),
+		ShardID:         0,
+		//MigrateDelegations:    MigrateDelegationsFn(),
 		CalculateMigrationGas: CalculateMigrationGasFn(),
 	}, nil, params.TestChainConfig, Config{})
 	// use required gas to avoid out of gas errors
@@ -180,34 +180,34 @@ var StakingPrecompileTests = []writeCapablePrecompileTest{
 		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "undelegateAddressMismatch",
 	},
-	{
-		input:         []byte{42, 5, 187, 113},
-		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
-		name:          "yesMethodNoData",
-	},
-	{
-		input:         []byte{0, 0},
-		expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
-		name:          "malformedInput",
-	},
-	{
-		input:    []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
-		expected: nil,
-		name:     "migrationSuccess",
-	},
-	{
-		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
-		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
-		name:          "migrationAddressMismatch",
-	},
-	{
-		input:         []byte{42, 6, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
-		expectedError: errors.New("no method with id: 0x2a06bb71"),
-		name:          "migrationNoMatchingMethod",
-	},
-	{
-		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
-		expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
-		name:          "migrationAddressMismatch",
-	},
+	//{
+	//	input:         []byte{42, 5, 187, 113},
+	//	expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
+	//	name:          "yesMethodNoData",
+	//},
+	//{
+	//	input:         []byte{0, 0},
+	//	expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
+	//	name:          "malformedInput",
+	//},
+	//{
+	//	input:    []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+	//	expected: nil,
+	//	name:     "migrationSuccess",
+	//},
+	//{
+	//	input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+	//	expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+	//	name:          "migrationAddressMismatch",
+	//},
+	//{
+	//	input:         []byte{42, 6, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+	//	expectedError: errors.New("no method with id: 0x2a06bb71"),
+	//	name:          "migrationNoMatchingMethod",
+	//},
+	//{
+	//	input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
+	//	expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
+	//	name:          "migrationAddressMismatch",
+	//},
 }

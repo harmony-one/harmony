@@ -108,39 +108,39 @@ var ParseStakeMsgTests = []parseTest{
 		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "undelegateAddressMismatch",
 	},
-	{
-		input:         []byte{42, 5, 187, 113},
-		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
-		name:          "yesMethodNoData",
-	},
-	{
-		input:         []byte{0, 0},
-		expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
-		name:          "malformedInput",
-	},
-	{
-		input: []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
-		expected: &stakingTypes.MigrationMsg{
-			From: common.HexToAddress("0x1337"),
-			To:   common.HexToAddress("0x1338"),
-		},
-		name: "migrationSuccess",
-	},
-	{
-		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
-		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
-		name:          "migrationAddressMismatch",
-	},
-	{
-		input:         []byte{42, 6, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
-		expectedError: errors.New("no method with id: 0x2a06bb71"),
-		name:          "migrationNoMatchingMethod",
-	},
-	{
-		input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
-		expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
-		name:          "migrationAddressMismatch",
-	},
+	//{
+	//	input:         []byte{42, 5, 187, 113},
+	//	expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
+	//	name:          "yesMethodNoData",
+	//},
+	//{
+	//	input:         []byte{0, 0},
+	//	expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
+	//	name:          "malformedInput",
+	//},
+	//{
+	//	input: []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+	//	expected: &stakingTypes.MigrationMsg{
+	//		From: common.HexToAddress("0x1337"),
+	//		To:   common.HexToAddress("0x1338"),
+	//	},
+	//	name: "migrationSuccess",
+	//},
+	//{
+	//	input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+	//	expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
+	//	name:          "migrationAddressMismatch",
+	//},
+	//{
+	//	input:         []byte{42, 6, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+	//	expectedError: errors.New("no method with id: 0x2a06bb71"),
+	//	name:          "migrationNoMatchingMethod",
+	//},
+	//{
+	//	input:         []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19},
+	//	expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
+	//	name:          "migrationAddressMismatch",
+	//},
 }
 
 func testParseStakeMsg(test parseTest, t *testing.T) {
