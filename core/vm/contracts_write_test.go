@@ -185,11 +185,11 @@ var StakingPrecompileTests = []writeCapablePrecompileTest{
 		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
 		name:          "yesMethodNoData",
 	},
-	{
-		input:         []byte{0, 0},
-		expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
-		name:          "malformedInput",
-	},
+	//{
+	//	input:         []byte{0, 0},
+	//	expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
+	//	name:          "malformedInput",
+	//},
 	//{
 	//	input:    []byte{42, 5, 187, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
 	//	expected: nil,
