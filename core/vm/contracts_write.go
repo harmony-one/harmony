@@ -126,20 +126,21 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
 		return nil, evm.CollectRewards(evm.StateDB, collectRewards)
 	}
-	if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
-		stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
-		if err != nil {
-			return nil, err
-		} else {
-			for _, stakeMsg := range stakeMsgs {
-				if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-					evm.StakeMsgs = append(evm.StakeMsgs, delegate)
-				} else {
-					return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from evm.MigrateDelegations")
-				}
-			}
-			return nil, nil
-		}
-	}
+	// Migrate is not supported in precompile and will be done in a batch hard fork
+	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
+	//	stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
+	//	if err != nil {
+	//		return nil, err
+	//	} else {
+	//		for _, stakeMsg := range stakeMsgs {
+	//			if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
+	//				evm.StakeMsgs = append(evm.StakeMsgs, delegate)
+	//			} else {
+	//				return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from evm.MigrateDelegations")
+	//			}
+	//		}
+	//		return nil, nil
+	//	}
+	//}
 	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
 }
