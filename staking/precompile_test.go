@@ -108,11 +108,11 @@ var ParseStakeMsgTests = []parseTest{
 		expectedError: errors.New("[StakingPrecompile] Address mismatch, expected 0x0000000000000000000000000000000000001337 have 0x0000000000000000000000000000000000001338"),
 		name:          "undelegateAddressMismatch",
 	},
-	{
-		input:         []byte{42, 5, 187, 113},
-		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
-		name:          "yesMethodNoData",
-	},
+	//{
+	//	input:         []byte{42, 5, 187, 113},
+	//	expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
+	//	name:          "yesMethodNoData",
+	//},
 	//{
 	//	input:         []byte{0, 0},
 	//	expectedError: errors.New("data too short (2 bytes) for abi method lookup"),
