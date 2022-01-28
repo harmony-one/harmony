@@ -17,7 +17,6 @@ const (
 var (
 	ingressTrafficMeter = eth_metrics.NewRegisteredMeter(ingressMeterName, nil)
 	egressTrafficMeter  = eth_metrics.NewRegisteredMeter(egressMeterName, nil)
-	activePeerGauge     = eth_metrics.NewRegisteredGauge("p2p/peers", nil)
 )
 
 // Counter is a wrapper around a metrics.BandwidthCounter that meters both the
