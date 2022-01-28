@@ -68,11 +68,11 @@ func (s *PublicContractService) Call(
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
-	err := s.wait(s.limiterCall, ctx)
-	if err != nil {
-		DoMetricRPCQueryInfo(Call, RateLimitedNumber)
-		return nil, err
-	}
+	//err := s.wait(s.limiterCall, ctx)
+	//if err != nil {
+	//	DoMetricRPCQueryInfo(Call, RateLimitedNumber)
+	//	return nil, err
+	//}
 
 	// Execute call
 	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, CallTimeout)
