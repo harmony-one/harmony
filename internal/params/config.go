@@ -64,7 +64,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(101),
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
-		StakingPrecompileEpoch:     EpochTBD,
+		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
