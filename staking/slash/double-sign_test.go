@@ -16,7 +16,6 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
@@ -506,8 +505,7 @@ func (tc *slashApplyTestCase) makeData() {
 }
 
 func (tc *slashApplyTestCase) apply() {
-	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.rate, tc.state, tc.beneficiary,
-		big.NewInt(doubleSignEpoch), tc.slashTrack)
+	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.state, tc.beneficiary, big.NewInt(doubleSignEpoch), tc.slashTrack)
 }
 
 func (tc *slashApplyTestCase) checkResult() error {
@@ -540,6 +538,13 @@ func (tc *slashApplyTestCase) checkResult() error {
 type expDelegation struct {
 	expAmt, expReward *big.Int
 	expUndelAmt       []*big.Int
+}
+
+type testDelegation struct {
+	address        string
+	amount         *big.Int
+	historyUndel   *big.Int
+	afterSignUndel *big.Int
 }
 
 func (ed expDelegation) checkDelegation(d staking.Delegation) error {
@@ -636,7 +641,7 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 }
 
 func (tc *applyTestCase) apply() {
-	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, tc.rate, leaderAddr)
+	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, leaderAddr)
 }
 
 func (tc *applyTestCase) checkResult() error {
@@ -679,81 +684,6 @@ func (tc *applyTestCase) checkState() error {
 		return fmt.Errorf("status still unchanged")
 	}
 	return nil
-}
-
-func TestRate(t *testing.T) {
-	tests := []struct {
-		votingPower *votepower.Roster
-		records     Records
-		expRate     numeric.Dec
-	}{
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
-				keyPairs[2].Pub(): numeric.NewDecWithPrec(3, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
-			},
-			expRate: numeric.NewDecWithPrec(6, 2),
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-			},
-			expRate: oneDoubleSignerRate,
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{}),
-			records:     Records{},
-			expRate:     oneDoubleSignerRate,
-		},
-		{
-			votingPower: makeVotingPower(map[bls.SerializedPublicKey]numeric.Dec{
-				keyPairs[0].Pub(): numeric.NewDecWithPrec(1, 2),
-				keyPairs[1].Pub(): numeric.NewDecWithPrec(2, 2),
-				keyPairs[3].Pub(): numeric.NewDecWithPrec(3, 2),
-			}),
-			records: Records{
-				makeEmptyRecordWithSignerKey(keyPairs[0].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[1].Pub()),
-				makeEmptyRecordWithSignerKey(keyPairs[2].Pub()),
-			},
-			expRate: numeric.NewDecWithPrec(3, 2),
-		},
-	}
-	for i, test := range tests {
-		rate := Rate(test.votingPower, test.records)
-		if rate.IsNil() || !rate.Equal(test.expRate) {
-			t.Errorf("Test %v: unexpected rate %v / %v", i, rate, test.expRate)
-		}
-	}
-
-}
-
-func makeEmptyRecordWithSignerKey(pub bls.SerializedPublicKey) Record {
-	var r Record
-	r.Evidence.SecondVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
-	r.Evidence.FirstVote.SignerPubKeys = []bls.SerializedPublicKey{pub}
-	return r
-}
-
-func makeVotingPower(m map[bls.SerializedPublicKey]numeric.Dec) *votepower.Roster {
-	r := &votepower.Roster{
-		Voters: make(map[bls.SerializedPublicKey]*votepower.AccommodateHarmonyVote),
-	}
-	for pub, pct := range m {
-		r.Voters[pub] = &votepower.AccommodateHarmonyVote{
-			PureStakedVote: votepower.PureStakedVote{GroupPercent: pct},
-		}
-	}
-	return r
 }
 
 func defaultSlashRecord() Record {
