@@ -454,11 +454,11 @@ func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing
 	})
 }
 
-func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
+func benchmarkPrecompiled(addr string, test precompiledTest, ps map[common.Address]PrecompiledContract, bench *testing.B) {
 	if test.noBenchmark {
 		return
 	}
-	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
+	p := ps[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	reqGas := p.RequiredGas(in)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
@@ -497,7 +497,7 @@ func BenchmarkPrecompiledEcrecover(bench *testing.B) {
 		expected: "000000000000000000000000ceaccac640adf55b2028469bd36ba501f28b699d",
 		name:     "",
 	}
-	benchmarkPrecompiled("01", t, bench)
+	benchmarkPrecompiled("01", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the SHA256 precompile.
@@ -507,7 +507,7 @@ func BenchmarkPrecompiledSha256(bench *testing.B) {
 		expected: "811c7003375852fabd0d362e40e68607a12bdabae61a7d068fe5fdd1dbbf2a5d",
 		name:     "128",
 	}
-	benchmarkPrecompiled("02", t, bench)
+	benchmarkPrecompiled("02", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the RIPEMD precompile.
@@ -517,7 +517,7 @@ func BenchmarkPrecompiledRipeMD(bench *testing.B) {
 		expected: "0000000000000000000000009215b8d9882ff46f0dfde6684d78e831467f65e6",
 		name:     "128",
 	}
-	benchmarkPrecompiled("03", t, bench)
+	benchmarkPrecompiled("03", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the identiy precompile.
@@ -527,7 +527,7 @@ func BenchmarkPrecompiledIdentity(bench *testing.B) {
 		expected: "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
 		name:     "128",
 	}
-	benchmarkPrecompiled("04", t, bench)
+	benchmarkPrecompiled("04", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Tests the sample inputs from the ModExp EIP 198.
@@ -540,7 +540,7 @@ func TestPrecompiledModExp(t *testing.T) {
 // Benchmarks the sample inputs from the ModExp EIP 198.
 func BenchmarkPrecompiledModExp(bench *testing.B) {
 	for _, test := range modexpTests {
-		benchmarkPrecompiled("05", test, bench)
+		benchmarkPrecompiled("05", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -554,7 +554,7 @@ func TestPrecompiledBn256Add(t *testing.T) {
 // Benchmarks the sample inputs from the elliptic curve addition EIP 213.
 func BenchmarkPrecompiledBn256Add(bench *testing.B) {
 	for _, test := range bn256AddTests {
-		benchmarkPrecompiled("06", test, bench)
+		benchmarkPrecompiled("06", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -575,7 +575,7 @@ func TestPrecompiledBn256ScalarMul(t *testing.T) {
 // Benchmarks the sample inputs from the elliptic curve scalar multiplication EIP 213.
 func BenchmarkPrecompiledBn256ScalarMul(bench *testing.B) {
 	for _, test := range bn256ScalarMulTests {
-		benchmarkPrecompiled("07", test, bench)
+		benchmarkPrecompiled("07", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -589,7 +589,7 @@ func TestPrecompiledBn256Pairing(t *testing.T) {
 // Behcnmarks the sample inputs from the elliptic curve pairing check EIP 197.
 func BenchmarkPrecompiledBn256Pairing(bench *testing.B) {
 	for _, test := range bn256PairingTests {
-		benchmarkPrecompiled("08", test, bench)
+		benchmarkPrecompiled("08", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 func TestPrecompiledBlake2F(t *testing.T) {
@@ -600,7 +600,7 @@ func TestPrecompiledBlake2F(t *testing.T) {
 
 func BenchmarkPrecompiledBlake2F(bench *testing.B) {
 	for _, test := range blake2FTests {
-		benchmarkPrecompiled("09", test, bench)
+		benchmarkPrecompiled("09", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -766,5 +766,11 @@ var ed25519VerifyTests = []precompiledTest{
 func TestPrecompiledEd25519Verify(t *testing.T) {
 	for _, test := range ed25519VerifyTests {
 		testPrecompiled("FA", test, PrecompiledContractsStaking, t)
+	}
+}
+
+func BenchmarkPrecompiledEd25519Verify(bench *testing.B) {
+	for _, test := range ed25519VerifyTests {
+		benchmarkPrecompiled("FA", test, PrecompiledContractsStaking, bench)
 	}
 }
