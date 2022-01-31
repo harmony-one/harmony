@@ -151,3 +151,4 @@ rpmpub_dev: rpm
 
 rpmpub_prod: rpm
 	./scripts/package/publish-repo.sh -p prod -n rpm -s $(RPMBUILD)
+
