@@ -398,7 +398,7 @@ func delegatorSlashApply(
 }
 
 // applySlashingToDelegator applies slashing to a delegator, given the amount that should be slashed.
-// Also, rewards the snitch half of the amount that was successfully slashed.
+// Also, rewards the beneficiary half of the amount that was successfully slashed.
 func applySlashingToDelegator(snapshot, current *staking.ValidatorWrapper, state *state.DB, rewardBeneficiary common.Address, doubleSignEpoch *big.Int, slashTrack *Application, slashDebt *big.Int, delegationSnapshot staking.Delegation) (*big.Int, error) {
 	snapshotAddr := delegationSnapshot.DelegatorAddress
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
@@ -466,7 +466,7 @@ func applySlashingToDelegator(snapshot, current *staking.ValidatorWrapper, state
 				}
 			}
 
-			// NOTE only need to pay snitch here,
+			// NOTE only need to pay beneficiary here,
 			// they only get half of what was actually dispersed
 			halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
 			slashDiff.TotalBeneficiaryReward.Add(slashDiff.TotalBeneficiaryReward, halfOfSlashDebt)
