@@ -101,7 +101,7 @@ func TestHarmonyFlags(t *testing.T) {
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
 					BlacklistFile:  "./.hmy/blacklist.txt",
-					RosettaFixFile: "./.hmy/rosettaFixFile.csv",
+					RosettaFixFile: "",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
