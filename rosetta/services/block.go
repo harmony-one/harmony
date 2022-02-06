@@ -4,7 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/state"
+	coreTypes "github.com/harmony-one/harmony/core/types"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
@@ -178,7 +183,14 @@ func (s *BlockAPI) BlockTransaction(
 				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
 				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
 			}
-			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
+			logFilter := func(pc uint64, op vm.OpCode) bool {
+				if _, ok := internalNativeTransferEvmOps[op.String()]; ok {
+					return true
+				} else {
+					return false
+				}
+			}
+			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo, logFilter)
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
@@ -275,40 +287,94 @@ var (
 	}
 )
 
+var ttLock *lru.Cache
+
+func init() {
+	ttLock, _ = lru.New(10000)
+}
+
 // getTransactionTrace for the given txInfo.
 func (s *BlockAPI) getTransactionTrace(
-	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
+	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo, logFilter vm.LogFilter,
 ) (*hmy.ExecutionResult, *types.Error) {
-	cacheKey := types.Hash(blk) + types.Hash(txInfo)
+	cacheKey := blk.Hash().String() + txInfo.tx.Hash().String()
 	if value, ok := s.txTraceCache.Get(cacheKey); ok {
 		return value.(*hmy.ExecutionResult), nil
 	}
 
-	msg, vmctx, statedb, err := s.hmy.ComputeTxEnv(blk, int(txInfo.txIndex), defaultTraceReExec)
-	if err != nil {
-		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": err.Error(),
-		})
+	lock := &sync.Mutex{}
+	if ok, _ := ttLock.ContainsOrAdd(blk.Hash().String(), lock); ok {
+		if lockTmp, ok := ttLock.Get(blk.Hash().String()); ok {
+			lock = lockTmp.(*sync.Mutex)
+		} else {
+			lock = nil
+		}
 	}
-	execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
-		LogConfig: &defaultTraceLogConfig,
-		Timeout:   &defaultTraceTimeout,
-		Reexec:    &defaultTraceReExec,
+
+	if lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
+	}
+
+	if value, ok := s.txTraceCache.Get(cacheKey); ok {
+		return value.(*hmy.ExecutionResult), nil
+	}
+
+	var blockError *types.Error
+	var foundResult *hmy.ExecutionResult
+	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.Context, statedb *state.DB) bool {
+		execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+			LogConfig: &vm.LogConfig{
+				DisableMemory:  true,
+				DisableStack:   false,
+				DisableStorage: true,
+				Debug:          false,
+				Limit:          0,
+				LogFilter:      logFilter,
+			},
+			Timeout: &defaultTraceTimeout,
+			Reexec:  &defaultTraceReExec,
+		})
+		if err != nil {
+			blockError = common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": err.Error(),
+			})
+			return false
+		}
+
+		execResult, ok := execResultInterface.(*hmy.ExecutionResult)
+		if !ok {
+			blockError = common.NewError(common.CatchAllError, map[string]interface{}{
+				"message": "unknown tracer exec result type",
+			})
+			return false
+		}
+
+		if txInfo.tx.Hash().String() == tx.Hash().String() {
+			foundResult = execResult
+		}
+
+		cacheKey := blk.Hash().String() + tx.Hash().String()
+		s.txTraceCache.Add(cacheKey, execResult)
+		return true
 	})
 	if err != nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": err.Error(),
 		})
 	}
-	execResult, ok := execResultInterface.(*hmy.ExecutionResult)
-	if !ok {
+
+	if blockError != nil {
+		return nil, blockError
+	}
+
+	if foundResult == nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-			"message": "unknown tracer exec result type",
+			"message": fmt.Errorf("transaction not found for block %#x", blk.Hash()),
 		})
 	}
-	s.txTraceCache.Add(cacheKey, execResult)
 
-	return execResult, nil
+	return foundResult, nil
 }
 
 // getBlock ..

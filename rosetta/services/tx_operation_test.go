@@ -352,7 +352,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("0"),
+			Value:    fmt.Sprintf("%v", negativeBigValue(tenOnes)),
 			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
@@ -363,7 +363,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:              &common.SuccessOperationStatus.Status,
 		Account:             receiverAccId,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("0"),
+			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
 			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
@@ -609,6 +609,12 @@ func TestGetCrossShardSenderTransferNativeOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	refReceipt := &hmytypes.Receipt{
+		PostState: nil,
+		Status:    1,
+		GasUsed:   params.TxGas * 3, // somme arb number > TxGas
+	}
+
 	refOperations := []*types.Operation{
 		{
 			OperationIdentifier: &types.OperationIdentifier{
@@ -625,7 +631,7 @@ func TestGetCrossShardSenderTransferNativeOperations(t *testing.T) {
 		},
 	}
 	opIndex := startingOpID.Index + 1
-	operations, rosettaError := getCrossShardSenderTransferNativeOperations(tx, senderAddr, &opIndex)
+	operations, rosettaError := getCrossShardSenderTransferNativeOperations(tx, refReceipt, senderAddr, &opIndex)
 	if rosettaError != nil {
 		t.Fatal(rosettaError)
 	}
