@@ -364,6 +364,10 @@ func (s *BlockAPI) getTransactionTrace(
 		})
 	}
 
+	if blockError != nil {
+		return nil, blockError
+	}
+
 	if foundResult == nil {
 		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
 			"message": fmt.Errorf("transaction not found for block %#x", blk.Hash()),

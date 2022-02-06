@@ -64,7 +64,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
 		BlacklistFile:  "./.hmy/blacklist.txt",
-		RosettaFixFile: "./.hmy/rosettaFixFile.csv",
+		RosettaFixFile: "",
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
