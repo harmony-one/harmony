@@ -139,7 +139,7 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 }
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
-func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
+func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
 	//if op < vm.CREATE && !jst.descended {
 	//	return nil
 	//}
@@ -171,7 +171,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			value:   (&big.Int{}).Set(stackPeek(0)),
 		})
 		jst.descended = true
-		return retErr
+		return nil, retErr
 	}
 	if op == vm.SELFDESTRUCT {
 		ac := jst.last()
@@ -183,13 +183,13 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			gasCost: cost,
 			value:   env.StateDB.GetBalance(contract.Address()),
 		})
-		return retErr
+		return nil, retErr
 	}
 	if op == vm.CALL || op == vm.CALLCODE || op == vm.DELEGATECALL || op == vm.STATICCALL {
 		to := common.BigToAddress(stackPeek(1))
 		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
-			return nil
+			return nil, nil
 		}
 		off := 1
 		if op == vm.DELEGATECALL || op == vm.STATICCALL {
@@ -212,7 +212,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		}
 		jst.push(callObj)
 		jst.descended = true
-		return retErr
+		return nil, retErr
 	}
 	if jst.descended {
 		jst.descended = false
@@ -226,7 +226,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		revertOff := stackPeek(0).Int64()
 		revertLen := stackPeek(1).Int64()
 		last.revert = memoryCopy(revertOff, revertLen)
-		return retErr
+		return nil, retErr
 	}
 	if depth == jst.len()-1 { // depth == len - 1
 		call := jst.pop()
@@ -253,7 +253,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		}
 		jst.last().push(call)
 	}
-	return retErr
+	return nil, retErr
 }
 
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault

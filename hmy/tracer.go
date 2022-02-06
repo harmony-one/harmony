@@ -19,9 +19,11 @@ package hmy
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"runtime"
 	"sync"
@@ -757,7 +759,7 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 			Gas:         result.UsedGas,
 			Failed:      result.VMErr != nil,
 			ReturnValue: fmt.Sprintf("%x", result.ReturnData),
-			StructLogs:  FormatLogs(tracer.StructLogs()),
+			StructLogs:  FormatLogs(tracer.StructLogs(), config),
 		}, nil
 
 	case *tracers.Tracer:
@@ -813,6 +815,40 @@ func (hmy *Harmony) ComputeTxEnv(block *types.Block, txIndex int, reexec uint64)
 	return nil, vm.Context{}, nil, fmt.Errorf("transaction index %d out of range for block %#x", txIndex, block.Hash())
 }
 
+// ComputeTxEnvEachBlockWithoutApply returns the execution environment of a certain transaction.
+func (hmy *Harmony) ComputeTxEnvEachBlockWithoutApply(block *types.Block, reexec uint64, cb func(int, *types.Transaction, core.Message, vm.Context, *state.DB) bool) error {
+	// Create the parent state database
+	parent := hmy.BlockChain.GetBlock(block.ParentHash(), block.NumberU64()-1)
+	if parent == nil {
+		return fmt.Errorf("parent %#x not found", block.ParentHash())
+	}
+	statedb, err := hmy.ComputeStateDB(parent, reexec)
+	if err != nil {
+		return err
+	}
+
+	// Recompute transactions up to the target index.
+	hmySigner := types.MakeSigner(hmy.BlockChain.Config(), block.Number())
+	ethSigner := types.NewEIP155Signer(hmy.BlockChain.Config().EthCompatibleChainID)
+
+	for idx, tx := range block.Transactions() {
+		signer := hmySigner
+		if tx.IsEthCompatible() {
+			signer = ethSigner
+		}
+
+		// Assemble the transaction call message and return if the requested offset
+		msg, _ := tx.AsMessage(signer)
+		context := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
+		if !cb(idx, tx, msg, context, statedb) {
+			return nil
+		}
+		// Ensure any modifications are committed to the state
+		statedb.Finalise(true)
+	}
+	return nil
+}
+
 // ExecutionResult groups all structured logs emitted by the EVM
 // while replaying a transaction in debug mode as well as transaction
 // execution status, the amount of gas used and the return value
@@ -836,12 +872,93 @@ type StructLogRes struct {
 	Depth           int               `json:"depth"`
 	Error           error             `json:"error,omitempty"`
 	Stack           []string          `json:"stack,omitempty"`
+	AfterStack      []string          `json:"afterStack,omitempty"`
 	Memory          []string          `json:"memory,omitempty"`
 	Storage         map[string]string `json:"storage,omitempty"`
+
+	rawStack         []*big.Int
+	rawAfterStack    []*big.Int
+	rawMemory        []byte
+	rawStorage       map[common.Hash]common.Hash
+	rawOperatorEvent map[string]string
+}
+
+func (r *StructLogRes) FormatStack() []string {
+	if r.Stack != nil {
+		return r.Stack
+	}
+
+	if r.rawStack != nil {
+		stack := make([]string, len(r.rawStack))
+		for i, stackValue := range r.rawStack {
+			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue, 32))
+		}
+		r.Stack = stack
+	}
+
+	return r.Stack
+}
+
+func (r *StructLogRes) FormatAfterStack() []string {
+	if r.AfterStack != nil {
+		return r.AfterStack
+	}
+
+	if r.rawAfterStack != nil {
+		stack := make([]string, len(r.rawAfterStack))
+		for i, stackValue := range r.rawAfterStack {
+			stack[i] = hex.EncodeToString(math.PaddedBigBytes(stackValue, 32))
+		}
+		r.AfterStack = stack
+	}
+
+	return r.AfterStack
+}
+
+func (r *StructLogRes) FormatMemory() []string {
+	if r.Memory != nil {
+		return r.Memory
+	}
+
+	if r.rawMemory != nil {
+		memory := make([]string, 0, (len(r.rawMemory)+31)/32)
+		for i := 0; i+32 <= len(r.rawMemory); i += 32 {
+			memory = append(memory, fmt.Sprintf("%x", r.rawMemory[i:i+32]))
+		}
+		r.Memory = memory
+	}
+
+	return r.Memory
+}
+
+func (r *StructLogRes) FormatStorage() map[string]string {
+	if r.Storage != nil {
+		return r.Storage
+	}
+
+	if r.rawStorage != nil {
+		storage := make(map[string]string)
+		for i, storageValue := range r.rawStorage {
+			storage[hex.EncodeToString(i.Bytes())] = hex.EncodeToString(storageValue.Bytes())
+		}
+		r.Storage = storage
+	}
+
+	return r.Storage
+}
+
+func (r *StructLogRes) GetOperatorEvent(key string) string {
+	if r.rawOperatorEvent == nil {
+		return ""
+	} else if val, ok := r.rawOperatorEvent[key]; ok {
+		return val
+	} else {
+		return ""
+	}
 }
 
 // FormatLogs formats EVM returned structured logs for json output
-func FormatLogs(logs []vm.StructLog) []StructLogRes {
+func FormatLogs(logs []*vm.StructLog, conf *TraceConfig) []StructLogRes {
 	formatted := make([]StructLogRes, len(logs))
 	for index, trace := range logs {
 		formatted[index] = StructLogRes{
@@ -853,27 +970,12 @@ func FormatLogs(logs []vm.StructLog) []StructLogRes {
 			GasCost:         trace.GasCost,
 			Depth:           trace.Depth,
 			Error:           trace.Err,
-		}
-		if trace.Stack != nil {
-			stack := make([]string, len(trace.Stack))
-			for i, stackValue := range trace.Stack {
-				stack[i] = fmt.Sprintf("%x", math.PaddedBigBytes(stackValue, 32))
-			}
-			formatted[index].Stack = stack
-		}
-		if trace.Memory != nil {
-			memory := make([]string, 0, (len(trace.Memory)+31)/32)
-			for i := 0; i+32 <= len(trace.Memory); i += 32 {
-				memory = append(memory, fmt.Sprintf("%x", trace.Memory[i:i+32]))
-			}
-			formatted[index].Memory = memory
-		}
-		if trace.Storage != nil {
-			storage := make(map[string]string)
-			for i, storageValue := range trace.Storage {
-				storage[fmt.Sprintf("%x", i)] = fmt.Sprintf("%x", storageValue)
-			}
-			formatted[index].Storage = storage
+
+			rawStack:         trace.Stack,
+			rawAfterStack:    trace.AfterStack,
+			rawMemory:        trace.Memory,
+			rawStorage:       trace.Storage,
+			rawOperatorEvent: trace.OperatorEvent,
 		}
 	}
 	return formatted
