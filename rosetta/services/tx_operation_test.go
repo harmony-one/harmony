@@ -352,7 +352,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:              &common.SuccessOperationStatus.Status,
 		Account:             senderAccID,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("0"),
+			Value:    fmt.Sprintf("%v", negativeBigValue(tenOnes)),
 			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
@@ -363,7 +363,7 @@ func TestGetStakingOperationsFromUndelegate(t *testing.T) {
 		Status:              &common.SuccessOperationStatus.Status,
 		Account:             receiverAccId,
 		Amount: &types.Amount{
-			Value:    fmt.Sprintf("0"),
+			Value:    fmt.Sprintf("%v", tenOnes.Uint64()),
 			Currency: &common.NativeCurrency,
 		},
 		Metadata: metadata,
