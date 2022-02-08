@@ -1,0 +1,111 @@
+package local_cache
+
+import (
+	"bytes"
+	"github.com/allegro/bigcache"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"log"
+	"time"
+)
+
+type cacheWrapper struct {
+	*bigcache.BigCache
+}
+
+func (c *cacheWrapper) Put(key []byte, value []byte) error {
+	return c.BigCache.Set(String(key), value)
+}
+
+func (c *cacheWrapper) Delete(key []byte) error {
+	return c.BigCache.Delete(String(key))
+}
+
+type LocalCacheDatabase struct {
+	ethdb.KeyValueStore
+
+	enableReadCache bool
+
+	deleteMap map[string]bool
+	readCache *cacheWrapper
+}
+
+func NewLocalCacheDatabase(remoteDB ethdb.KeyValueStore) *LocalCacheDatabase {
+	config := bigcache.DefaultConfig(10 * time.Minute)
+	config.HardMaxCacheSize = 512
+	config.MaxEntriesInWindow = 2000 * 10 * 60
+	cache, _ := bigcache.NewBigCache(config)
+
+	db := &LocalCacheDatabase{
+		KeyValueStore: remoteDB,
+
+		enableReadCache: true,
+		deleteMap:       make(map[string]bool),
+		readCache:       &cacheWrapper{cache},
+	}
+
+	go func() {
+		for range time.Tick(time.Second) {
+			log.Printf("cache: %#v %d (%d)", cache.Stats(), cache.Len(), cache.Capacity())
+		}
+	}()
+
+	return db
+}
+
+func (c *LocalCacheDatabase) Has(key []byte) (bool, error) {
+	return c.KeyValueStore.Has(key)
+}
+
+func (c *LocalCacheDatabase) Get(key []byte) (ret []byte, err error) {
+	if c.enableReadCache {
+		if bytes.Compare(key, []byte("LastBlock")) != 0 {
+			strKey := String(key)
+			ret, err = c.readCache.Get(strKey)
+			if err == nil {
+				return ret, nil
+			}
+
+			defer func() {
+				if err == nil {
+					_ = c.readCache.Set(strKey, ret)
+				}
+			}()
+		}
+	}
+
+	return c.KeyValueStore.Get(key)
+}
+
+func (c *LocalCacheDatabase) Put(key []byte, value []byte) error {
+	if c.enableReadCache {
+		_ = c.readCache.Put(key, value)
+	}
+
+	return c.KeyValueStore.Put(key, value)
+}
+
+func (c *LocalCacheDatabase) Delete(key []byte) error {
+	if c.enableReadCache {
+		_ = c.readCache.Delete(key)
+	}
+
+	return c.KeyValueStore.Delete(key)
+}
+
+func (c *LocalCacheDatabase) NewBatch() ethdb.Batch {
+	return newLocalCacheBatch(c)
+}
+
+func (c *LocalCacheDatabase) batchWrite(b *LocalCacheBatch) error {
+	if c.enableReadCache {
+		_ = b.Replay(c.readCache)
+	}
+
+	batch := c.KeyValueStore.NewBatch()
+	err := b.Replay(batch)
+	if err != nil {
+		return err
+	}
+
+	return batch.Write()
+}

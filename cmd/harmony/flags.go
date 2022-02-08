@@ -213,6 +213,12 @@ var (
 		syncDiscHighFlag,
 		syncDiscBatchFlag,
 	}
+
+	shardDataFlags = []cli.Flag{
+		enableShardDataFlag,
+		diskCountFlag,
+		shardCountFlag,
+	}
 )
 
 var (
@@ -312,6 +318,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
+	flags = append(flags, shardDataFlags...)
 
 	return flags
 }
@@ -1594,5 +1601,36 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
 		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
+}
+
+// shard data flags
+var (
+	enableShardDataFlag = cli.BoolFlag{
+		Name:     "enable_shard_data",
+		Usage:    "whether use multi-database mode of levelDB",
+		DefValue: defaultConfig.ShardData.EnableShardData,
+	}
+	diskCountFlag = cli.IntFlag{
+		Name:     "disk_count",
+		Usage:    "the count of disks you want to storage block data",
+		DefValue: defaultConfig.ShardData.DiskCount,
+	}
+	shardCountFlag = cli.IntFlag{
+		Name:     "shard_count",
+		Usage:    "the count of shards you want to split in each disk",
+		DefValue: defaultConfig.ShardData.ShardCount,
+	}
+)
+
+func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, enableShardDataFlag) {
+		cfg.ShardData.EnableShardData = cli.GetBoolFlagValue(cmd, enableShardDataFlag)
+	}
+	if cli.IsFlagChanged(cmd, diskCountFlag) {
+		cfg.ShardData.DiskCount = cli.GetIntFlagValue(cmd, diskCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, shardCountFlag) {
+		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
 	}
 }
