@@ -150,7 +150,7 @@ var (
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     false,
+		Downloader:     true,
 		Concurrency:    4,
 		MinPeers:       4,
 		InitStreams:    4,
