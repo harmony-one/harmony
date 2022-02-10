@@ -50,7 +50,7 @@ type BlockWithTxHash struct {
 // BlockHeader represents a block header that will serialize to the RPC representation of a block header
 type BlockHeader struct {
 	ParentHash           common.Hash    `json:"parentHash"`
-	Miner                string         `json:"miner"`
+	Miner                common.Address `json:"miner"`
 	StateRoot            common.Hash    `json:"stateRoot"`
 	TransactionsRoot     common.Hash    `json:"transactionsRoot"`
 	ReceiptsRoot         common.Hash    `json:"receiptsRoot"`
@@ -714,7 +714,7 @@ func NewBlockHeader(
 	lastSig := head.LastCommitSignature()
 	blk := &BlockHeader{
 		ParentHash:           head.ParentHash(),
-		Miner:                head.Coinbase().Hex(),
+		Miner:                head.Coinbase(),
 		StateRoot:            head.Root(),
 		TransactionsRoot:     head.TxHash(),
 		ReceiptsRoot:         head.ReceiptHash(),
