@@ -71,6 +71,7 @@ var (
 	offKey   = keyPairs[offIndex]
 	offPub   = offKey.Pub()
 
+	leaderAddr   = makeTestAddress("leader")
 	reporterAddr = makeTestAddress("reporter")
 )
 
@@ -319,28 +320,28 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 			debt: new(big.Int).Set(twentyFiveKOnes),
 			amt:  new(big.Int).Set(thirtyKOnes),
 			diff: &Application{
-				TotalSlashed:      new(big.Int).Set(tenKOnes),
-				TotalSnitchReward: new(big.Int).Set(tenKOnes),
+				TotalSlashed:           new(big.Int).Set(tenKOnes),
+				TotalBeneficiaryReward: new(big.Int).Set(tenKOnes),
 			},
 			expDebt: common.Big0,
 			expAmt:  fiveKOnes,
 			expDiff: &Application{
-				TotalSlashed:      thirtyFiveKOnes,
-				TotalSnitchReward: tenKOnes,
+				TotalSlashed:           thirtyFiveKOnes,
+				TotalBeneficiaryReward: tenKOnes,
 			},
 		},
 		{
 			debt: new(big.Int).Set(thirtyKOnes),
 			amt:  new(big.Int).Set(twentyFiveKOnes),
 			diff: &Application{
-				TotalSlashed:      new(big.Int).Set(tenKOnes),
-				TotalSnitchReward: new(big.Int).Set(tenKOnes),
+				TotalSlashed:           new(big.Int).Set(tenKOnes),
+				TotalBeneficiaryReward: new(big.Int).Set(tenKOnes),
 			},
 			expDebt: fiveKOnes,
 			expAmt:  common.Big0,
 			expDiff: &Application{
-				TotalSlashed:      thirtyFiveKOnes,
-				TotalSnitchReward: tenKOnes,
+				TotalSlashed:           thirtyFiveKOnes,
+				TotalBeneficiaryReward: tenKOnes,
 			},
 		},
 	}
@@ -366,9 +367,9 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 			t.Errorf("Test %v: unexpected expSlashed %v / %v", i, test.diff.TotalSlashed,
 				test.expDiff.TotalSlashed)
 		}
-		if test.diff.TotalSnitchReward.Cmp(test.expDiff.TotalSnitchReward) != 0 {
-			t.Errorf("Test %v: unexpected totalSnitchReward %v / %v", i,
-				test.diff.TotalSnitchReward, test.expDiff.TotalSnitchReward)
+		if test.diff.TotalBeneficiaryReward.Cmp(test.expDiff.TotalBeneficiaryReward) != 0 {
+			t.Errorf("Test %v: unexpected total beneficiary reward %v / %v", i,
+				test.diff.TotalBeneficiaryReward, test.expDiff.TotalBeneficiaryReward)
 		}
 	}
 }
@@ -391,8 +392,8 @@ func TestDelegatorSlashApply(t *testing.T) {
 					expUndelAmt: []*big.Int{},
 				},
 			},
-			expSlashed: common.Big0,
-			expSnitch:  common.Big0,
+			expSlashed:           common.Big0,
+			expBeneficiaryReward: common.Big0,
 		},
 		{
 			rate:     numeric.NewDecWithPrec(25, 2),
@@ -410,8 +411,8 @@ func TestDelegatorSlashApply(t *testing.T) {
 					expUndelAmt: []*big.Int{},
 				},
 			},
-			expSlashed: tenKOnes,
-			expSnitch:  fiveKOnes,
+			expSlashed:           tenKOnes,
+			expBeneficiaryReward: fiveKOnes,
 		},
 		{
 			rate:     numeric.NewDecWithPrec(625, 3),
@@ -429,8 +430,8 @@ func TestDelegatorSlashApply(t *testing.T) {
 					expUndelAmt: []*big.Int{},
 				},
 			},
-			expSlashed: twentyFiveKOnes,
-			expSnitch:  new(big.Int).Div(twentyFiveKOnes, common.Big2),
+			expSlashed:           twentyFiveKOnes,
+			expBeneficiaryReward: new(big.Int).Div(twentyFiveKOnes, common.Big2),
 		},
 		{
 			rate:     numeric.NewDecWithPrec(875, 3),
@@ -448,8 +449,8 @@ func TestDelegatorSlashApply(t *testing.T) {
 					expUndelAmt: []*big.Int{},
 				},
 			},
-			expSlashed: thirtyFiveKOnes,
-			expSnitch:  new(big.Int).Div(thirtyFiveKOnes, common.Big2),
+			expSlashed:           thirtyFiveKOnes,
+			expBeneficiaryReward: new(big.Int).Div(thirtyFiveKOnes, common.Big2),
 		},
 		{
 			rate:     numeric.NewDecWithPrec(150, 2),
@@ -467,8 +468,8 @@ func TestDelegatorSlashApply(t *testing.T) {
 					expUndelAmt: []*big.Int{},
 				},
 			},
-			expSlashed: fourtyKOnes,
-			expSnitch:  twentyKOnes,
+			expSlashed:           fourtyKOnes,
+			expBeneficiaryReward: twentyKOnes,
 		},
 	}
 	for i, tc := range tests {
@@ -485,27 +486,27 @@ type slashApplyTestCase struct {
 	snapshot, current *staking.ValidatorWrapper
 	rate              numeric.Dec
 
-	reporter   common.Address
-	state      *state.DB
-	slashTrack *Application
-	gotErr     error
+	beneficiary common.Address
+	state       *state.DB
+	slashTrack  *Application
+	gotErr      error
 
-	expDels               []expDelegation
-	expSlashed, expSnitch *big.Int
-	expErr                error
+	expDels                          []expDelegation
+	expSlashed, expBeneficiaryReward *big.Int
+	expErr                           error
 }
 
 func (tc *slashApplyTestCase) makeData() {
-	tc.reporter = reporterAddr
+	tc.beneficiary = leaderAddr
 	tc.state = makeTestStateDB()
 	tc.slashTrack = &Application{
-		TotalSlashed:      new(big.Int).Set(common.Big0),
-		TotalSnitchReward: new(big.Int).Set(common.Big0),
+		TotalSlashed:           new(big.Int).Set(common.Big0),
+		TotalBeneficiaryReward: new(big.Int).Set(common.Big0),
 	}
 }
 
 func (tc *slashApplyTestCase) apply() {
-	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.rate, tc.state, tc.reporter,
+	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.rate, tc.state, tc.beneficiary,
 		big.NewInt(doubleSignEpoch), tc.slashTrack)
 }
 
@@ -526,12 +527,12 @@ func (tc *slashApplyTestCase) checkResult() error {
 		return fmt.Errorf("unexpected total slash %v / %v", tc.slashTrack.TotalSlashed,
 			tc.expSlashed)
 	}
-	if tc.slashTrack.TotalSnitchReward.Cmp(tc.expSnitch) != 0 {
-		return fmt.Errorf("unexpected snitch reward %v / %v", tc.slashTrack.TotalSnitchReward,
-			tc.expSnitch)
+	if tc.slashTrack.TotalBeneficiaryReward.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected beneficiary reward %v / %v", tc.slashTrack.TotalBeneficiaryReward,
+			tc.expBeneficiaryReward)
 	}
-	if bal := tc.state.GetBalance(tc.reporter); bal.Cmp(tc.expSnitch) != 0 {
-		return fmt.Errorf("unexpected balance for reporter %v / %v", bal, tc.expSnitch)
+	if bal := tc.state.GetBalance(tc.beneficiary); bal.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected balance for beneficiary %v / %v", bal, tc.expBeneficiaryReward)
 	}
 	return nil
 }
@@ -570,8 +571,8 @@ func TestApply(t *testing.T) {
 			slashes:  Records{defaultSlashRecord()},
 			rate:     numeric.NewDecWithPrec(625, 3),
 
-			expSlashed: twentyFiveKOnes,
-			expSnitch:  new(big.Int).Div(twentyFiveKOnes, common.Big2),
+			expSlashed:           twentyFiveKOnes,
+			expBeneficiaryReward: new(big.Int).Div(twentyFiveKOnes, common.Big2),
 		},
 		{
 			// missing snapshot in chain
@@ -611,9 +612,9 @@ type applyTestCase struct {
 	gotErr           error
 	gotDiff          *Application
 
-	expSlashed *big.Int
-	expSnitch  *big.Int
-	expErr     error
+	expSlashed           *big.Int
+	expBeneficiaryReward *big.Int
+	expErr               error
 }
 
 func (tc *applyTestCase) makeData(t *testing.T) {
@@ -635,7 +636,7 @@ func (tc *applyTestCase) makeData(t *testing.T) {
 }
 
 func (tc *applyTestCase) apply() {
-	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, tc.rate)
+	tc.gotDiff, tc.gotErr = Apply(tc.chain, tc.state, tc.slashes, tc.rate, leaderAddr)
 }
 
 func (tc *applyTestCase) checkResult() error {
@@ -645,9 +646,9 @@ func (tc *applyTestCase) checkResult() error {
 	if (tc.gotErr != nil) || (tc.expErr != nil) {
 		return nil
 	}
-	if tc.gotDiff.TotalSnitchReward.Cmp(tc.expSnitch) != 0 {
-		return fmt.Errorf("unexpected snitch %v / %v", tc.gotDiff.TotalSnitchReward,
-			tc.expSnitch)
+	if tc.gotDiff.TotalBeneficiaryReward.Cmp(tc.expBeneficiaryReward) != 0 {
+		return fmt.Errorf("unexpected beneficiry reward %v / %v", tc.gotDiff.TotalBeneficiaryReward,
+			tc.expBeneficiaryReward)
 	}
 	if tc.gotDiff.TotalSlashed.Cmp(tc.expSlashed) != 0 {
 		return fmt.Errorf("unexpected total slash %v / %v", tc.gotDiff.TotalSlashed,
