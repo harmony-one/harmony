@@ -35,7 +35,7 @@ var (
 	thirtyKOnes     = new(big.Int).Mul(big.NewInt(30000), bigOne)
 	thirtyFiveKOnes = new(big.Int).Mul(big.NewInt(35000), bigOne)
 	fourtyKOnes     = new(big.Int).Mul(big.NewInt(40000), bigOne)
-	hundredKOnes    = new(big.Int).Mul(big.NewInt(1000000), bigOne)
+	thousandKOnes   = new(big.Int).Mul(big.NewInt(1000000), bigOne)
 )
 
 const (
@@ -847,7 +847,7 @@ func defaultTestValidator(pubKeys []bls.SerializedPublicKey) staking.Validator {
 		SlotPubKeys:          pubKeys,
 		LastEpochInCommittee: big.NewInt(lastEpochInComm),
 		MinSelfDelegation:    new(big.Int).Set(tenKOnes),
-		MaxTotalDelegation:   new(big.Int).Set(hundredKOnes),
+		MaxTotalDelegation:   new(big.Int).Set(thousandKOnes),
 		Status:               effective.Active,
 		Commission:           comm,
 		Description:          desc,
