@@ -458,6 +458,8 @@ var (
 		vm.CALL.String():         struct{}{},
 		vm.CALLCODE.String():     struct{}{},
 		vm.SELFDESTRUCT.String(): struct{}{},
+		vm.CREATE.String():       struct{}{},
+		vm.CREATE2.String():      struct{}{},
 	}
 )
 
@@ -476,6 +478,35 @@ func getContractInternalTransferNativeOperations(
 	for _, log := range executionResult.StructLogs {
 		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
 			switch log.Op {
+			case "CREATE", "CREATE2":
+				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
+
+				stack := log.FormatStack()
+				topIndex := len(stack) - 1
+
+				value, ok := new(big.Int).SetString(stack[topIndex], 16)
+				if !ok {
+					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
+					})
+				}
+
+				afterStack := log.FormatAfterStack()
+				topIndex = len(afterStack) - 1
+
+				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(afterStack[topIndex]))
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
+
+				ops = append(
+					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
+				)
+				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+				startingOperationIndex = &nextOpIndex
 			case "SELFDESTRUCT":
 				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
 				if rosettaError != nil {
@@ -502,7 +533,7 @@ func getContractInternalTransferNativeOperations(
 				)
 				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
 				startingOperationIndex = &nextOpIndex
-			default:
+			case "CALL", "CALLCODE":
 				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
 				if rosettaError != nil {
 					return nil, rosettaError
