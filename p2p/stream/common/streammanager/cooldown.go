@@ -27,11 +27,13 @@ func newCoolDownCache() *coolDownCache {
 // Has check and add the peer ID to the cache
 func (cache *coolDownCache) Has(id peer.ID) bool {
 	has := cache.timeCache.Has(string(id))
-	cache.timeCache.Add(string(id))
+	if !has {
+		cache.timeCache.Add(string(id))
+	}
 	return has
 }
 
-// Reset reset the cooldown cache
+// Reset the cool down cache
 func (cache *coolDownCache) Reset() {
 	cache.timeCache.Q = list.New()
 	cache.timeCache.M = make(map[string]time.Time)
