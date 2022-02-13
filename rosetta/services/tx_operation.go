@@ -454,12 +454,12 @@ var (
 	// internalNativeTransferEvmOps are the EVM operations that can execute a native transfer
 	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
 	// All operations have at least 7 elements on the stack when executed.
-	internalNativeTransferEvmOps = map[string]interface{}{
-		vm.CALL.String():         struct{}{},
-		vm.CALLCODE.String():     struct{}{},
-		vm.SELFDESTRUCT.String(): struct{}{},
-		vm.CREATE.String():       struct{}{},
-		vm.CREATE2.String():      struct{}{},
+	internalNativeTransferEvmOps = map[vm.OpCode]interface{}{
+		vm.CALL:         struct{}{},
+		vm.CALLCODE:     struct{}{},
+		vm.SELFDESTRUCT: struct{}{},
+		vm.CREATE:       struct{}{},
+		vm.CREATE2:      struct{}{},
 	}
 )
 
@@ -489,7 +489,7 @@ func getContractInternalTransferNativeOperations(
 			}
 
 			txStatus := status
-			if !(log.ParentIsSuccess && log.IsSuccess) {
+			if log.Reverted {
 				txStatus = common.FailureOperationStatus.Status
 			}
 

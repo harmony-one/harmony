@@ -23,13 +23,13 @@ import (
 )
 
 type RosettaLogItem struct {
-	IsSuccess       bool
-	ParentIsSuccess bool
-	OP              vm.OpCode
-	Depth           []int
-	From            common.Address
-	To              common.Address
-	Value           *big.Int
+	IsSuccess bool
+	Reverted  bool
+	OP        vm.OpCode
+	Depth     []int
+	From      common.Address
+	To        common.Address
+	Value     *big.Int
 }
 
 type RosettaBlockTracer struct {
@@ -43,28 +43,38 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 	}
 
 	return &RosettaLogItem{
-		IsSuccess:       ac.err == nil,
-		ParentIsSuccess: parentErr == nil,
-		OP:              ac.op,
-		Depth:           depth,
-		From:            ac.from,
-		To:              ac.to,
-		Value:           val,
+		IsSuccess: ac.err == nil,
+		Reverted:  !(parentErr == nil && ac.err == nil),
+		OP:        ac.op,
+		Depth:     depth,
+		From:      ac.from,
+		To:        ac.to,
+		Value:     val,
 	}
 }
 
 func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
 	root := &rbt.action
 
-	var results []*RosettaLogItem
+	var results = make([]*RosettaLogItem, 0)
 	var err error
 	var finalize func(ac *action, parentErr error, traceAddress []int)
 	finalize = func(ac *action, parentErr error, traceAddress []int) {
 		results = append(results, rbt.formatAction(traceAddress, parentErr, ac))
+		nextErr := parentErr
+		if ac.err != nil {
+			nextErr = ac.err
+		}
+
 		for i, subAc := range ac.subCalls {
-			finalize(subAc, ac.err, append(traceAddress[:], i))
+			finalize(subAc, nextErr, append(traceAddress[:], i))
 		}
 	}
-	finalize(root, nil, make([]int, 0))
+
+	traceAddress := make([]int, 0)
+	for i, subAc := range root.subCalls {
+		finalize(subAc, root.err, append(traceAddress[:], i))
+	}
+
 	return results, err
 }
