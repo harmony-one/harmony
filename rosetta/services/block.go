@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
 	"sync"
 	"time"
@@ -183,14 +184,7 @@ func (s *BlockAPI) BlockTransaction(
 				contractInfo.ContractCode = state.GetCode(txInfo.receipt.ContractAddress)
 				contractInfo.ContractAddress = &txInfo.receipt.ContractAddress
 			}
-			logFilter := func(pc uint64, op vm.OpCode) bool {
-				if _, ok := internalNativeTransferEvmOps[op.String()]; ok {
-					return true
-				} else {
-					return false
-				}
-			}
-			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo, logFilter)
+			contractInfo.ExecutionResult, rosettaError = s.getTransactionTrace(ctx, blk, txInfo)
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
@@ -295,11 +289,11 @@ func init() {
 
 // getTransactionTrace for the given txInfo.
 func (s *BlockAPI) getTransactionTrace(
-	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo, logFilter vm.LogFilter,
-) (*hmy.ExecutionResult, *types.Error) {
+	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
+) ([]*tracers.RosettaLogItem, *types.Error) {
 	cacheKey := blk.Hash().String() + txInfo.tx.Hash().String()
 	if value, ok := s.txTraceCache.Get(cacheKey); ok {
-		return value.(*hmy.ExecutionResult), nil
+		return value.([]*tracers.RosettaLogItem), nil
 	}
 
 	lock := &sync.Mutex{}
@@ -317,20 +311,21 @@ func (s *BlockAPI) getTransactionTrace(
 	}
 
 	if value, ok := s.txTraceCache.Get(cacheKey); ok {
-		return value.(*hmy.ExecutionResult), nil
+		return value.([]*tracers.RosettaLogItem), nil
 	}
 
 	var blockError *types.Error
-	var foundResult *hmy.ExecutionResult
+	var foundResult []*tracers.RosettaLogItem
+	var tracer = "RosettaBlockTracer"
 	err := s.hmy.ComputeTxEnvEachBlockWithoutApply(blk, defaultTraceReExec, func(txIndex int, tx *coreTypes.Transaction, msg core.Message, vmctx vm.Context, statedb *state.DB) bool {
 		execResultInterface, err := s.hmy.TraceTx(ctx, msg, vmctx, statedb, &hmy.TraceConfig{
+			Tracer: &tracer,
 			LogConfig: &vm.LogConfig{
 				DisableMemory:  true,
 				DisableStack:   false,
 				DisableStorage: true,
 				Debug:          false,
 				Limit:          0,
-				LogFilter:      logFilter,
 			},
 			Timeout: &defaultTraceTimeout,
 			Reexec:  &defaultTraceReExec,
@@ -342,7 +337,7 @@ func (s *BlockAPI) getTransactionTrace(
 			return false
 		}
 
-		execResult, ok := execResultInterface.(*hmy.ExecutionResult)
+		execResult, ok := execResultInterface.([]*tracers.RosettaLogItem)
 		if !ok {
 			blockError = common.NewError(common.CatchAllError, map[string]interface{}{
 				"message": "unknown tracer exec result type",

@@ -1,7 +1,7 @@
 package services
 
 import (
-	"fmt"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
 
 	"github.com/harmony-one/harmony/internal/bech32"
@@ -466,7 +466,7 @@ var (
 // getContractInternalTransferNativeOperations extracts & formats the native operations for a contract's internal
 // native token transfers (i.e: the sender of a transaction is the contract).
 func getContractInternalTransferNativeOperations(
-	executionResult *hmy.ExecutionResult, status string,
+	executionResult []*tracers.RosettaLogItem, status string,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	ops := []*types.Operation{}
@@ -475,98 +475,29 @@ func getContractInternalTransferNativeOperations(
 		return ops, nil
 	}
 
-	for _, log := range executionResult.StructLogs {
-		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
-			switch log.Op {
-			case "CREATE", "CREATE2":
-				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				stack := log.FormatStack()
-				topIndex := len(stack) - 1
-
-				value, ok := new(big.Int).SetString(stack[topIndex], 16)
-				if !ok {
-					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
-					})
-				}
-
-				afterStack := log.FormatAfterStack()
-				topIndex = len(afterStack) - 1
-
-				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(afterStack[topIndex]))
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				ops = append(
-					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
-				)
-				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-				startingOperationIndex = &nextOpIndex
-			case "SELFDESTRUCT":
-				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				stack := log.FormatStack()
-				topIndex := len(stack) - 1
-
-				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex]))
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				value, ok := new(big.Int).SetString(log.GetOperatorEvent("balance"), 10)
-				if !ok {
-					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
-					})
-				}
-
-				ops = append(
-					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
-				)
-				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-				startingOperationIndex = &nextOpIndex
-			case "CALL", "CALLCODE":
-				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-				stack := log.FormatStack()
-				topIndex := len(stack) - 1
-				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex-1]))
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-				value, ok := new(big.Int).SetString(stack[topIndex-2], 16)
-				if !ok {
-					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
-					})
-				}
-
-				afterStack := log.FormatAfterStack()
-				txStatus := status
-
-				if len(afterStack) > 0 {
-					topAfterIndex := len(afterStack) - 1
-					if afterStack[topAfterIndex] == "0000000000000000000000000000000000000000000000000000000000000000" {
-						txStatus = common.FailureOperationStatus.Status
-					}
-				}
-
-				ops = append(
-					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, txStatus, startingOperationIndex)...,
-				)
-				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-				startingOperationIndex = &nextOpIndex
+	for _, log := range executionResult {
+		// skip meaningless information
+		if log.Value.Cmp(big.NewInt(0)) != 0 {
+			fromAccID, rosettaError := newAccountIdentifier(log.From)
+			if rosettaError != nil {
+				return nil, rosettaError
 			}
+
+			toAccID, rosettaError := newAccountIdentifier(log.To)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+
+			txStatus := status
+			if !(log.ParentIsSuccess && log.IsSuccess) {
+				txStatus = common.FailureOperationStatus.Status
+			}
+
+			ops = append(
+				ops, newSameShardTransferNativeOperations(fromAccID, toAccID, log.Value, txStatus, startingOperationIndex)...,
+			)
+			nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+			startingOperationIndex = &nextOpIndex
 		}
 	}
 

@@ -784,370 +784,370 @@ var (
 	testExecResultForInternalTxValueSum = uint64(20000)
 )
 
-func TestGetContractInternalTransferNativeOperations(t *testing.T) {
-	refStatus := common.SuccessOperationStatus.Status
-	refStartingIndex := int64(23)
-	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
-		prevIndex := int64(-1)
-		valueSum := int64(0)
-		absValueSum := uint64(0)
-		for i, op := range ops {
-			if op.OperationIdentifier.Index <= prevIndex {
-				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
-					prevIndex, op.OperationIdentifier.Index, i,
-				)
-			}
-			prevIndex = op.OperationIdentifier.Index
-			if op.Status == nil || *op.Status != refStatus {
-				t.Errorf("wrong status for op %v", i)
-			}
-			if op.Type != common.NativeTransferOperation {
-				t.Errorf("wrong operation type for op %v", i)
-			}
-			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
-				t.Errorf("wrong currency for op %v", i)
-			}
-			val, err := types.AmountValue(op.Amount)
-			if err != nil {
-				t.Error(err)
-			}
-			valueSum += val.Int64()
-			absValueSum += val.Abs(val).Uint64()
-		}
+//func TestGetContractInternalTransferNativeOperations(t *testing.T) {
+//	refStatus := common.SuccessOperationStatus.Status
+//	refStartingIndex := int64(23)
+//	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+//		prevIndex := int64(-1)
+//		valueSum := int64(0)
+//		absValueSum := uint64(0)
+//		for i, op := range ops {
+//			if op.OperationIdentifier.Index <= prevIndex {
+//				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+//					prevIndex, op.OperationIdentifier.Index, i,
+//				)
+//			}
+//			prevIndex = op.OperationIdentifier.Index
+//			if op.Status == nil || *op.Status != refStatus {
+//				t.Errorf("wrong status for op %v", i)
+//			}
+//			if op.Type != common.NativeTransferOperation {
+//				t.Errorf("wrong operation type for op %v", i)
+//			}
+//			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+//				t.Errorf("wrong currency for op %v", i)
+//			}
+//			val, err := types.AmountValue(op.Amount)
+//			if err != nil {
+//				t.Error(err)
+//			}
+//			valueSum += val.Int64()
+//			absValueSum += val.Abs(val).Uint64()
+//		}
+//
+//		if valueSum != 0 {
+//			t.Errorf("expected sum of all non-gas values to be 0")
+//		}
+//		if expectedValueSum*2 != absValueSum {
+//			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+//		}
+//	}
+//
+//	testOps, rosettaError := getContractInternalTransferNativeOperations(
+//		testExecResultForInternalTx, refStatus, &refStartingIndex,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	baseValidation(testOps, testExecResultForInternalTxValueSum)
+//	if len(testOps) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if testOps[0].OperationIdentifier.Index != refStartingIndex {
+//		t.Errorf("expected starting index to be %v", refStartingIndex)
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//
+//	testOps, rosettaError = getContractInternalTransferNativeOperations(
+//		testExecResultForInternalTx, refStatus, nil,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	baseValidation(testOps, testExecResultForInternalTxValueSum)
+//	if len(testOps) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if testOps[0].OperationIdentifier.Index != 0 {
+//		t.Errorf("expected starting index to be 0")
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//
+//	testOps, rosettaError = getContractInternalTransferNativeOperations(
+//		nil, refStatus, nil,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	if len(testOps) != 0 {
+//		t.Errorf("expected len 0 test operations for nil execution result")
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//
+//	testOps, rosettaError = getContractInternalTransferNativeOperations(
+//		&hmy.ExecutionResult{}, refStatus, nil,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	if len(testOps) != 0 {
+//		t.Errorf("expected len 0 test operations for nil struct logs")
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//}
 
-		if valueSum != 0 {
-			t.Errorf("expected sum of all non-gas values to be 0")
-		}
-		if expectedValueSum*2 != absValueSum {
-			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
-		}
-	}
+//func TestGetContractTransferNativeOperations(t *testing.T) {
+//	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
+//	refTxValue := big.NewInt(1)
+//	refTx, err := helpers.CreateTestTransaction(
+//		signer, 0, 0, 0, 1e18, gasPrice, refTxValue, []byte("blah-blah-blah"),
+//	)
+//	if err != nil {
+//		t.Fatal(err.Error())
+//	}
+//	refSenderAddr, err := refTx.SenderAddress()
+//	if err != nil {
+//		t.Fatal(err.Error())
+//	}
+//	refStatus := common.SuccessOperationStatus.Status
+//	refStartingIndex := int64(23)
+//	refReceipt := &hmytypes.Receipt{
+//		PostState: nil,
+//		Status:    1,
+//		GasUsed:   params.TxGas * 3, // somme arb number > TxGas
+//	}
+//	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+//		prevIndex := int64(-1)
+//		valueSum := int64(0)
+//		absValueSum := uint64(0)
+//		for i, op := range ops {
+//			if op.OperationIdentifier.Index <= prevIndex {
+//				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+//					prevIndex, op.OperationIdentifier.Index, i,
+//				)
+//			}
+//			prevIndex = op.OperationIdentifier.Index
+//			if op.Status == nil || *op.Status != refStatus {
+//				t.Errorf("wrong status for op %v", i)
+//			}
+//			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+//				t.Errorf("wrong currency for op %v", i)
+//			}
+//			if op.Type == common.ExpendGasOperation {
+//				continue
+//			}
+//			if op.Type != common.NativeTransferOperation {
+//				t.Errorf("wrong operation type for op %v", i)
+//			}
+//			val, err := types.AmountValue(op.Amount)
+//			if err != nil {
+//				t.Error(err)
+//			}
+//			valueSum += val.Int64()
+//			absValueSum += val.Abs(val).Uint64()
+//		}
+//
+//		if valueSum != 0 {
+//			t.Errorf("expected sum of all non-gas values to be 0")
+//		}
+//		if expectedValueSum*2 != absValueSum {
+//			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+//		}
+//	}
+//
+//	testOps, rosettaError := getContractTransferNativeOperations(
+//		refTx, refReceipt, refSenderAddr, refTx.To(),
+//		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, &refStartingIndex,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
+//	if len(testOps) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if testOps[0].OperationIdentifier.Index != refStartingIndex {
+//		t.Errorf("expected starting index to be %v", refStartingIndex)
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//
+//	testOps, rosettaError = getContractTransferNativeOperations(
+//		refTx, refReceipt, refSenderAddr, refTx.To(),
+//		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, nil,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
+//	if len(testOps) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if testOps[0].OperationIdentifier.Index != 0 {
+//		t.Errorf("expected starting index to be 0")
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//
+//	testOps, rosettaError = getContractTransferNativeOperations(
+//		refTx, refReceipt, refSenderAddr, refTx.To(),
+//		&ContractInfo{}, nil,
+//	)
+//	if rosettaError != nil {
+//		t.Error(rosettaError)
+//	}
+//	baseValidation(testOps, refTxValue.Uint64())
+//	if len(testOps) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if testOps[0].OperationIdentifier.Index != 0 {
+//		t.Errorf("expected starting index to be 0")
+//	}
+//	if len(testOps) > 3 {
+//		t.Errorf("expect at most 3 operations for nil ExecutionResult")
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
+//		t.Error(err)
+//	}
+//}
 
-	testOps, rosettaError := getContractInternalTransferNativeOperations(
-		testExecResultForInternalTx, refStatus, &refStartingIndex,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	baseValidation(testOps, testExecResultForInternalTxValueSum)
-	if len(testOps) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if testOps[0].OperationIdentifier.Index != refStartingIndex {
-		t.Errorf("expected starting index to be %v", refStartingIndex)
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-
-	testOps, rosettaError = getContractInternalTransferNativeOperations(
-		testExecResultForInternalTx, refStatus, nil,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	baseValidation(testOps, testExecResultForInternalTxValueSum)
-	if len(testOps) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if testOps[0].OperationIdentifier.Index != 0 {
-		t.Errorf("expected starting index to be 0")
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-
-	testOps, rosettaError = getContractInternalTransferNativeOperations(
-		nil, refStatus, nil,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	if len(testOps) != 0 {
-		t.Errorf("expected len 0 test operations for nil execution result")
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-
-	testOps, rosettaError = getContractInternalTransferNativeOperations(
-		&hmy.ExecutionResult{}, refStatus, nil,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	if len(testOps) != 0 {
-		t.Errorf("expected len 0 test operations for nil struct logs")
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestGetContractTransferNativeOperations(t *testing.T) {
-	signer := hmytypes.NewEIP155Signer(params.TestChainConfig.ChainID)
-	refTxValue := big.NewInt(1)
-	refTx, err := helpers.CreateTestTransaction(
-		signer, 0, 0, 0, 1e18, gasPrice, refTxValue, []byte("blah-blah-blah"),
-	)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	refSenderAddr, err := refTx.SenderAddress()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	refStatus := common.SuccessOperationStatus.Status
-	refStartingIndex := int64(23)
-	refReceipt := &hmytypes.Receipt{
-		PostState: nil,
-		Status:    1,
-		GasUsed:   params.TxGas * 3, // somme arb number > TxGas
-	}
-	baseValidation := func(ops []*types.Operation, expectedValueSum uint64) {
-		prevIndex := int64(-1)
-		valueSum := int64(0)
-		absValueSum := uint64(0)
-		for i, op := range ops {
-			if op.OperationIdentifier.Index <= prevIndex {
-				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
-					prevIndex, op.OperationIdentifier.Index, i,
-				)
-			}
-			prevIndex = op.OperationIdentifier.Index
-			if op.Status == nil || *op.Status != refStatus {
-				t.Errorf("wrong status for op %v", i)
-			}
-			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
-				t.Errorf("wrong currency for op %v", i)
-			}
-			if op.Type == common.ExpendGasOperation {
-				continue
-			}
-			if op.Type != common.NativeTransferOperation {
-				t.Errorf("wrong operation type for op %v", i)
-			}
-			val, err := types.AmountValue(op.Amount)
-			if err != nil {
-				t.Error(err)
-			}
-			valueSum += val.Int64()
-			absValueSum += val.Abs(val).Uint64()
-		}
-
-		if valueSum != 0 {
-			t.Errorf("expected sum of all non-gas values to be 0")
-		}
-		if expectedValueSum*2 != absValueSum {
-			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
-		}
-	}
-
-	testOps, rosettaError := getContractTransferNativeOperations(
-		refTx, refReceipt, refSenderAddr, refTx.To(),
-		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, &refStartingIndex,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
-	if len(testOps) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if testOps[0].OperationIdentifier.Index != refStartingIndex {
-		t.Errorf("expected starting index to be %v", refStartingIndex)
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-
-	testOps, rosettaError = getContractTransferNativeOperations(
-		refTx, refReceipt, refSenderAddr, refTx.To(),
-		&ContractInfo{ExecutionResult: testExecResultForInternalTx}, nil,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	baseValidation(testOps, testExecResultForInternalTxValueSum+refTxValue.Uint64())
-	if len(testOps) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if testOps[0].OperationIdentifier.Index != 0 {
-		t.Errorf("expected starting index to be 0")
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-
-	testOps, rosettaError = getContractTransferNativeOperations(
-		refTx, refReceipt, refSenderAddr, refTx.To(),
-		&ContractInfo{}, nil,
-	)
-	if rosettaError != nil {
-		t.Error(rosettaError)
-	}
-	baseValidation(testOps, refTxValue.Uint64())
-	if len(testOps) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if testOps[0].OperationIdentifier.Index != 0 {
-		t.Errorf("expected starting index to be 0")
-	}
-	if len(testOps) > 3 {
-		t.Errorf("expect at most 3 operations for nil ExecutionResult")
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(testOps); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestGetContractCreationNativeOperations(t *testing.T) {
-	dummyContractKey, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	chainID := params.TestChainConfig.ChainID
-	signer := hmytypes.NewEIP155Signer(chainID)
-	tx, err := helpers.CreateTestContractCreationTransaction(
-		signer, 0, 0, 1e18, gasPrice, big.NewInt(0), []byte("test"),
-	)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	senderAddr, err := tx.SenderAddress()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	senderAccID, rosettaError := newAccountIdentifier(senderAddr)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	startingOpID := &types.OperationIdentifier{}
-
-	// Test failed contract creation
-	contractAddr := crypto.PubkeyToAddress(dummyContractKey.PublicKey)
-	contractAddressID, rosettaError := newAccountIdentifier(contractAddr)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	refOperations := []*types.Operation{
-		{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: startingOpID.Index + 1,
-			},
-			Type:    common.ContractCreationOperation,
-			Status:  &common.ContractFailureOperationStatus.Status,
-			Account: senderAccID,
-			Amount: &types.Amount{
-				Value:    negativeBigValue(tx.Value()),
-				Currency: &common.NativeCurrency,
-			},
-		},
-		{
-			OperationIdentifier: &types.OperationIdentifier{
-				Index: startingOpID.Index + 2,
-			},
-			RelatedOperations: []*types.OperationIdentifier{
-				{
-					Index: startingOpID.Index + 1,
-				},
-			},
-			Type:    common.ContractCreationOperation,
-			Status:  &common.ContractFailureOperationStatus.Status,
-			Account: contractAddressID,
-			Amount: &types.Amount{
-				Value:    tx.Value().String(),
-				Currency: &common.NativeCurrency,
-			},
-		},
-	}
-	receipt := &hmytypes.Receipt{
-		Status:          hmytypes.ReceiptStatusFailed,
-		ContractAddress: contractAddr,
-	}
-	opIndex := startingOpID.Index + 1
-	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	if !reflect.DeepEqual(operations, refOperations) {
-		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
-		t.Error(err)
-	}
-
-	// Test successful contract creation
-	refOperations[0].Status = &common.SuccessOperationStatus.Status
-	refOperations[1].Status = &common.SuccessOperationStatus.Status
-	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
-	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	if !reflect.DeepEqual(operations, refOperations) {
-		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
-		t.Error(err)
-	}
-
-	traceValidation := func(ops []*types.Operation, expectedValueSum uint64) {
-		prevIndex := int64(-1)
-		valueSum := int64(0)
-		absValueSum := uint64(0)
-		for i, op := range ops {
-			if op.OperationIdentifier.Index <= prevIndex {
-				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
-					prevIndex, op.OperationIdentifier.Index, i,
-				)
-			}
-			prevIndex = op.OperationIdentifier.Index
-			if *op.Status != *refOperations[0].Status {
-				t.Errorf("wrong status for op %v", i)
-			}
-			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
-				t.Errorf("wrong currency for op %v", i)
-			}
-			if op.Type == common.ExpendGasOperation || op.Type == common.ContractCreationOperation {
-				continue
-			}
-			if op.Type != common.NativeTransferOperation {
-				t.Errorf("wrong operation type for op %v", i)
-			}
-			val, err := types.AmountValue(op.Amount)
-			if err != nil {
-				t.Error(err)
-			}
-			valueSum += val.Int64()
-			absValueSum += val.Abs(val).Uint64()
-		}
-
-		if valueSum != 0 {
-			t.Errorf("expected sum of all non-gas values to be 0")
-		}
-		if expectedValueSum*2 != absValueSum {
-			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
-		}
-	}
-	operations, rosettaError = getContractCreationNativeOperations(
-		tx, receipt, senderAddr, &ContractInfo{ExecutionResult: testExecResultForInternalTx}, &opIndex,
-	)
-	if rosettaError != nil {
-		t.Fatal(rosettaError)
-	}
-	traceValidation(operations, testExecResultForInternalTxValueSum)
-	if len(operations) == 0 {
-		t.Errorf("expect atleast 1 operation")
-	}
-	if operations[0].OperationIdentifier.Index != opIndex {
-		t.Errorf("expect first operation to be %v", opIndex)
-	}
-	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
-		t.Error(err)
-	}
-
-}
+//func TestGetContractCreationNativeOperations(t *testing.T) {
+//	dummyContractKey, err := crypto.GenerateKey()
+//	if err != nil {
+//		t.Fatalf(err.Error())
+//	}
+//	chainID := params.TestChainConfig.ChainID
+//	signer := hmytypes.NewEIP155Signer(chainID)
+//	tx, err := helpers.CreateTestContractCreationTransaction(
+//		signer, 0, 0, 1e18, gasPrice, big.NewInt(0), []byte("test"),
+//	)
+//	if err != nil {
+//		t.Fatal(err.Error())
+//	}
+//	senderAddr, err := tx.SenderAddress()
+//	if err != nil {
+//		t.Fatal(err.Error())
+//	}
+//	senderAccID, rosettaError := newAccountIdentifier(senderAddr)
+//	if rosettaError != nil {
+//		t.Fatal(rosettaError)
+//	}
+//	startingOpID := &types.OperationIdentifier{}
+//
+//	// Test failed contract creation
+//	contractAddr := crypto.PubkeyToAddress(dummyContractKey.PublicKey)
+//	contractAddressID, rosettaError := newAccountIdentifier(contractAddr)
+//	if rosettaError != nil {
+//		t.Fatal(rosettaError)
+//	}
+//	refOperations := []*types.Operation{
+//		{
+//			OperationIdentifier: &types.OperationIdentifier{
+//				Index: startingOpID.Index + 1,
+//			},
+//			Type:    common.ContractCreationOperation,
+//			Status:  &common.ContractFailureOperationStatus.Status,
+//			Account: senderAccID,
+//			Amount: &types.Amount{
+//				Value:    negativeBigValue(tx.Value()),
+//				Currency: &common.NativeCurrency,
+//			},
+//		},
+//		{
+//			OperationIdentifier: &types.OperationIdentifier{
+//				Index: startingOpID.Index + 2,
+//			},
+//			RelatedOperations: []*types.OperationIdentifier{
+//				{
+//					Index: startingOpID.Index + 1,
+//				},
+//			},
+//			Type:    common.ContractCreationOperation,
+//			Status:  &common.ContractFailureOperationStatus.Status,
+//			Account: contractAddressID,
+//			Amount: &types.Amount{
+//				Value:    tx.Value().String(),
+//				Currency: &common.NativeCurrency,
+//			},
+//		},
+//	}
+//	receipt := &hmytypes.Receipt{
+//		Status:          hmytypes.ReceiptStatusFailed,
+//		ContractAddress: contractAddr,
+//	}
+//	opIndex := startingOpID.Index + 1
+//	operations, rosettaError := getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
+//	if rosettaError != nil {
+//		t.Fatal(rosettaError)
+//	}
+//	if !reflect.DeepEqual(operations, refOperations) {
+//		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
+//		t.Error(err)
+//	}
+//
+//	// Test successful contract creation
+//	refOperations[0].Status = &common.SuccessOperationStatus.Status
+//	refOperations[1].Status = &common.SuccessOperationStatus.Status
+//	receipt.Status = hmytypes.ReceiptStatusSuccessful // Indicate successful tx
+//	operations, rosettaError = getContractCreationNativeOperations(tx, receipt, senderAddr, &ContractInfo{}, &opIndex)
+//	if rosettaError != nil {
+//		t.Fatal(rosettaError)
+//	}
+//	if !reflect.DeepEqual(operations, refOperations) {
+//		t.Errorf("Expected operations to be %v not %v", refOperations, operations)
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
+//		t.Error(err)
+//	}
+//
+//	traceValidation := func(ops []*types.Operation, expectedValueSum uint64) {
+//		prevIndex := int64(-1)
+//		valueSum := int64(0)
+//		absValueSum := uint64(0)
+//		for i, op := range ops {
+//			if op.OperationIdentifier.Index <= prevIndex {
+//				t.Errorf("expect prev index (%v) < curr index (%v) for op %v",
+//					prevIndex, op.OperationIdentifier.Index, i,
+//				)
+//			}
+//			prevIndex = op.OperationIdentifier.Index
+//			if *op.Status != *refOperations[0].Status {
+//				t.Errorf("wrong status for op %v", i)
+//			}
+//			if types.Hash(op.Amount.Currency) != common.NativeCurrencyHash {
+//				t.Errorf("wrong currency for op %v", i)
+//			}
+//			if op.Type == common.ExpendGasOperation || op.Type == common.ContractCreationOperation {
+//				continue
+//			}
+//			if op.Type != common.NativeTransferOperation {
+//				t.Errorf("wrong operation type for op %v", i)
+//			}
+//			val, err := types.AmountValue(op.Amount)
+//			if err != nil {
+//				t.Error(err)
+//			}
+//			valueSum += val.Int64()
+//			absValueSum += val.Abs(val).Uint64()
+//		}
+//
+//		if valueSum != 0 {
+//			t.Errorf("expected sum of all non-gas values to be 0")
+//		}
+//		if expectedValueSum*2 != absValueSum {
+//			t.Errorf("sum of all positive values of operations do not match execpted sum of values")
+//		}
+//	}
+//	operations, rosettaError = getContractCreationNativeOperations(
+//		tx, receipt, senderAddr, &ContractInfo{ExecutionResult: testExecResultForInternalTx}, &opIndex,
+//	)
+//	if rosettaError != nil {
+//		t.Fatal(rosettaError)
+//	}
+//	traceValidation(operations, testExecResultForInternalTxValueSum)
+//	if len(operations) == 0 {
+//		t.Errorf("expect atleast 1 operation")
+//	}
+//	if operations[0].OperationIdentifier.Index != opIndex {
+//		t.Errorf("expect first operation to be %v", opIndex)
+//	}
+//	if err := assertNativeOperationTypeUniquenessInvariant(operations); err != nil {
+//		t.Error(err)
+//	}
+//
+//}
 
 func TestNewNativeOperations(t *testing.T) {
 	accountID := &types.AccountIdentifier{

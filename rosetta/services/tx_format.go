@@ -3,13 +3,13 @@ package services
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/rosetta/common"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -24,8 +24,8 @@ type ContractInfo struct {
 	// ContractAddress is the address of the primary (or first) contract related to the tx.
 	ContractAddress *ethcommon.Address `json:"contract_hex_address"`
 	// ContractCode is the code of the primary (or first) contract related to the tx.
-	ContractCode    []byte               `json:"contract_code"`
-	ExecutionResult *hmy.ExecutionResult `json:"execution_result"`
+	ContractCode    []byte                    `json:"contract_code"`
+	ExecutionResult []*tracers.RosettaLogItem `json:"execution_result"`
 }
 
 // FormatTransaction for staking, cross-shard sender, and plain transactions
