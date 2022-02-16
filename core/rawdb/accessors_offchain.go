@@ -188,7 +188,7 @@ func IteratorValidatorSnapshot(iterator DatabaseIterator, cb func(addr common.Ad
 	iter := iterator.NewIteratorWithPrefix(validatorSnapshotPrefix)
 	defer iter.Release()
 
-	minKey = headerPrefix
+	minKey = validatorSnapshotPrefix
 	for iter.Next() {
 		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
 		key := iter.Key()
