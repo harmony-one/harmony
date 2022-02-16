@@ -56,6 +56,18 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
 	root := &rbt.action
 
+	for len(rbt.calls) > 1 {
+		call := rbt.pop()
+		if call.op == vm.CREATE || call.op == vm.CREATE2 {
+			call.gasUsed = call.gasIn - call.gasCost
+		} else {
+			if call.gas != 0 {
+				call.gasUsed = call.gasIn - call.gasCost + call.gas
+			}
+		}
+		rbt.last().push(call)
+	}
+
 	var results = make([]*RosettaLogItem, 0)
 	var err error
 	var finalize func(ac *action, parentErr error, traceAddress []int)

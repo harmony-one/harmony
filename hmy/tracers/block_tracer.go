@@ -212,6 +212,15 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		}
 		jst.push(callObj)
 		jst.descended = true
+
+		if op == vm.CALL {
+			hookFunc := func(memory *vm.Memory, stack *vm.Stack) {
+				if stack.Back(0).Sign() == 0 {
+					callObj.err = errors.New("internal failure")
+				}
+			}
+			return hookFunc, retErr
+		}
 		return nil, retErr
 	}
 	if jst.descended {
@@ -296,6 +305,18 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d`,
 		jst.blockNumber, jst.blockHash.Hex(), jst.transactionHash.Hex(), jst.transactionPosition,
 	)
+
+	for len(jst.calls) > 1 {
+		call := jst.pop()
+		if call.op == vm.CREATE || call.op == vm.CREATE2 {
+			call.gasUsed = call.gasIn - call.gasCost
+		} else {
+			if call.gas != 0 {
+				call.gasUsed = call.gasIn - call.gasCost + call.gas
+			}
+		}
+		jst.last().push(call)
+	}
 
 	var results []json.RawMessage
 	var err error
