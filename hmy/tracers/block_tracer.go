@@ -140,9 +140,10 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
 func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
-	//if op < vm.CREATE && !jst.descended {
-	//	return nil
-	//}
+	if err != nil {
+		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
+	}
+
 	var retErr error
 	stackPeek := func(n int) *big.Int {
 		if n >= len(stack.Data()) {
@@ -159,7 +160,8 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return memory.GetCopy(off, size)
 	}
 
-	if op == vm.CREATE || op == vm.CREATE2 {
+	switch op {
+	case vm.CREATE, vm.CREATE2:
 		inOff := stackPeek(1).Int64()
 		inSize := stackPeek(2).Int64()
 		jst.push(&action{
@@ -172,8 +174,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		})
 		jst.descended = true
 		return nil, retErr
-	}
-	if op == vm.SELFDESTRUCT {
+	case vm.SELFDESTRUCT:
 		ac := jst.last()
 		ac.push(&action{
 			op:      op,
@@ -184,8 +185,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			value:   env.StateDB.GetBalance(contract.Address()),
 		})
 		return nil, retErr
-	}
-	if op == vm.CALL || op == vm.CALLCODE || op == vm.DELEGATECALL || op == vm.STATICCALL {
+	case vm.CALL, vm.CALLCODE, vm.DELEGATECALL, vm.STATICCALL:
 		to := common.BigToAddress(stackPeek(1))
 		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
@@ -213,16 +213,9 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		jst.push(callObj)
 		jst.descended = true
 
-		if op == vm.CALL {
-			hookFunc := func(memory *vm.Memory, stack *vm.Stack) {
-				if stack.Back(0).Sign() == 0 {
-					callObj.err = errors.New("internal failure")
-				}
-			}
-			return hookFunc, retErr
-		}
 		return nil, retErr
 	}
+
 	if jst.descended {
 		jst.descended = false
 		if depth >= jst.len() { // >= to >
@@ -268,21 +261,21 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
 func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
-	if op == vm.REVERT {
+	call := jst.pop()
+	if call.err != nil {
 		return nil
 	}
-	call := jst.pop()
-	if call.err == nil {
-		// Consume all available gas and clean any leftovers
-		if call.gas != 0 {
-			call.gasUsed = call.gas
-		}
+	call.err = err
+	// Consume all available gas and clean any leftovers
+	if call.gas != 0 {
+		call.gas = gas
+		call.gasUsed = call.gas
+	}
 
-		// Flatten the failed call into its parent
-		if jst.len() > 0 {
-			jst.last().push(call)
-			return nil
-		}
+	// Flatten the failed call into its parent
+	if jst.len() > 0 {
+		jst.last().push(call)
+		return nil
 	}
 	jst.push(call)
 	return nil
@@ -305,18 +298,6 @@ func (jst *ParityBlockTracer) GetResult() ([]json.RawMessage, error) {
 		`"blockNumber":%d,"blockHash":"%s","transactionHash":"%s","transactionPosition":%d`,
 		jst.blockNumber, jst.blockHash.Hex(), jst.transactionHash.Hex(), jst.transactionPosition,
 	)
-
-	for len(jst.calls) > 1 {
-		call := jst.pop()
-		if call.op == vm.CREATE || call.op == vm.CREATE2 {
-			call.gasUsed = call.gasIn - call.gasCost
-		} else {
-			if call.gas != 0 {
-				call.gasUsed = call.gasIn - call.gasCost + call.gas
-			}
-		}
-		jst.last().push(call)
-	}
 
 	var results []json.RawMessage
 	var err error
