@@ -398,8 +398,8 @@ var blake2FTests = []precompiledTest{
 	},
 }
 
-func testPrecompiled(addr string, test precompiledTest, t *testing.T) {
-	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
+func testPrecompiled(addr string, test precompiledTest, ps map[common.Address]PrecompiledContract, t *testing.T) {
+	p := ps[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
 		nil, new(big.Int), p.RequiredGas(in))
@@ -454,11 +454,11 @@ func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing
 	})
 }
 
-func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
+func benchmarkPrecompiled(addr string, test precompiledTest, ps map[common.Address]PrecompiledContract, bench *testing.B) {
 	if test.noBenchmark {
 		return
 	}
-	p := PrecompiledContractsSHA3FIPS[common.HexToAddress(addr)]
+	p := ps[common.HexToAddress(addr)]
 	in := common.Hex2Bytes(test.input)
 	reqGas := p.RequiredGas(in)
 	contract := NewContract(AccountRef(common.HexToAddress("1337")),
@@ -497,7 +497,7 @@ func BenchmarkPrecompiledEcrecover(bench *testing.B) {
 		expected: "000000000000000000000000ceaccac640adf55b2028469bd36ba501f28b699d",
 		name:     "",
 	}
-	benchmarkPrecompiled("01", t, bench)
+	benchmarkPrecompiled("01", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the SHA256 precompile.
@@ -507,7 +507,7 @@ func BenchmarkPrecompiledSha256(bench *testing.B) {
 		expected: "811c7003375852fabd0d362e40e68607a12bdabae61a7d068fe5fdd1dbbf2a5d",
 		name:     "128",
 	}
-	benchmarkPrecompiled("02", t, bench)
+	benchmarkPrecompiled("02", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the RIPEMD precompile.
@@ -517,7 +517,7 @@ func BenchmarkPrecompiledRipeMD(bench *testing.B) {
 		expected: "0000000000000000000000009215b8d9882ff46f0dfde6684d78e831467f65e6",
 		name:     "128",
 	}
-	benchmarkPrecompiled("03", t, bench)
+	benchmarkPrecompiled("03", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Benchmarks the sample inputs from the identiy precompile.
@@ -527,34 +527,34 @@ func BenchmarkPrecompiledIdentity(bench *testing.B) {
 		expected: "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
 		name:     "128",
 	}
-	benchmarkPrecompiled("04", t, bench)
+	benchmarkPrecompiled("04", t, PrecompiledContractsSHA3FIPS, bench)
 }
 
 // Tests the sample inputs from the ModExp EIP 198.
 func TestPrecompiledModExp(t *testing.T) {
 	for _, test := range modexpTests {
-		testPrecompiled("05", test, t)
+		testPrecompiled("05", test, PrecompiledContractsSHA3FIPS, t)
 	}
 }
 
 // Benchmarks the sample inputs from the ModExp EIP 198.
 func BenchmarkPrecompiledModExp(bench *testing.B) {
 	for _, test := range modexpTests {
-		benchmarkPrecompiled("05", test, bench)
+		benchmarkPrecompiled("05", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
 // Tests the sample inputs from the elliptic curve addition EIP 213.
 func TestPrecompiledBn256Add(t *testing.T) {
 	for _, test := range bn256AddTests {
-		testPrecompiled("06", test, t)
+		testPrecompiled("06", test, PrecompiledContractsSHA3FIPS, t)
 	}
 }
 
 // Benchmarks the sample inputs from the elliptic curve addition EIP 213.
 func BenchmarkPrecompiledBn256Add(bench *testing.B) {
 	for _, test := range bn256AddTests {
-		benchmarkPrecompiled("06", test, bench)
+		benchmarkPrecompiled("06", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -568,39 +568,39 @@ func TestPrecompiledModExpOOG(t *testing.T) {
 // Tests the sample inputs from the elliptic curve scalar multiplication EIP 213.
 func TestPrecompiledBn256ScalarMul(t *testing.T) {
 	for _, test := range bn256ScalarMulTests {
-		testPrecompiled("07", test, t)
+		testPrecompiled("07", test, PrecompiledContractsSHA3FIPS, t)
 	}
 }
 
 // Benchmarks the sample inputs from the elliptic curve scalar multiplication EIP 213.
 func BenchmarkPrecompiledBn256ScalarMul(bench *testing.B) {
 	for _, test := range bn256ScalarMulTests {
-		benchmarkPrecompiled("07", test, bench)
+		benchmarkPrecompiled("07", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
 // Tests the sample inputs from the elliptic curve pairing check EIP 197.
 func TestPrecompiledBn256Pairing(t *testing.T) {
 	for _, test := range bn256PairingTests {
-		testPrecompiled("08", test, t)
+		testPrecompiled("08", test, PrecompiledContractsSHA3FIPS, t)
 	}
 }
 
 // Behcnmarks the sample inputs from the elliptic curve pairing check EIP 197.
 func BenchmarkPrecompiledBn256Pairing(bench *testing.B) {
 	for _, test := range bn256PairingTests {
-		benchmarkPrecompiled("08", test, bench)
+		benchmarkPrecompiled("08", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 func TestPrecompiledBlake2F(t *testing.T) {
 	for _, test := range blake2FTests {
-		testPrecompiled("09", test, t)
+		testPrecompiled("09", test, PrecompiledContractsSHA3FIPS, t)
 	}
 }
 
 func BenchmarkPrecompiledBlake2F(bench *testing.B) {
 	for _, test := range blake2FTests {
-		benchmarkPrecompiled("09", test, bench)
+		benchmarkPrecompiled("09", test, PrecompiledContractsSHA3FIPS, bench)
 	}
 }
 
@@ -657,7 +657,7 @@ var ecRecoverTests = []precompiledTest{
 
 func TestPrecompiledEcrecover(t *testing.T) {
 	for _, test := range ecRecoverTests {
-		testPrecompiled("01", test, t)
+		testPrecompiled("01", test, PrecompiledContractsSHA3FIPS, t)
 	}
 
 }
@@ -679,7 +679,7 @@ var sha3fipTests = []precompiledTest{
 func TestPrecompiledSHA3fip(t *testing.T) {
 
 	for _, test := range sha3fipTests {
-		testPrecompiled("FD", test, t)
+		testPrecompiled("FD", test, PrecompiledContractsSHA3FIPS, t)
 	}
 
 }
@@ -713,7 +713,64 @@ var ecRecoverPublicKeyTests = []precompiledTest{
 
 func TestPrecompiledEcrecoverPublicKey(t *testing.T) {
 	for _, test := range ecRecoverPublicKeyTests {
-		testPrecompiled("FE", test, t)
+		testPrecompiled("FE", test, PrecompiledContractsSHA3FIPS, t)
 	}
 
+}
+
+// ed25519Verify test vectors
+var ed25519VerifyTests = []precompiledTest{
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde0546b3624c07c18b1abdb8f4808f0115e6a33d7323ac821976479cfae8426e86c178bd32dacce8f0d52456da8dfaf88cb42f352679674f9d4980635c9c686c6c560d74657374206d657373616765",
+		expected: "0000000000000000000000000000000000000000000000000000000000000000",
+		name:     "valid_input",
+	},
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde054687c59853650187fbdd565e159f8a22066f1c9b2ef8afe781d8b832f99fd3d7b5e59c6dfaae767195d63fc56bfb5af4d37c00737c4ab58e185cd91f9128b8dd0c74657374206d6573736167652076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279206c6f6f6e67",
+		expected: "0000000000000000000000000000000000000000000000000000000000000000",
+		name:     "valid_input_2_word_msg",
+	},
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde0546851cb1374b1610225a8f549fb9559f7dc729fb6c6703c8ab07cf24cbb9aafff6d8ff927d2e019c81f75483ac11d0a78df645420b5f5045e2f9dcbba099dde10774657374206d657373616765207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279207665727920766572792076657279206c6e67",
+		expected: "0000000000000000000000000000000000000000000000000000000000000000",
+		name:     "valid_input_4_word_msg",
+	},
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde05462704ebb486f5810d4f5b593185addf56b4c7e82667b27c59625fc037106d10906bacd848d1fecd2c06a1a56721bb2961a5cead52c9bd8bba60dc5bf92ec35f04",
+		expected: "0000000000000000000000000000000000000000000000000000000000000000",
+		name:     "valid_input_with_empty_message",
+	},
+	{
+		input:    "204b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde0546b3624c07c18b1abdb8f4808f0115e6a33d7323ac821976479cfae8426e86c178bd32dacce8f0d52456da8dfaf88cb42f352679674f9d4980635c9c686c6c560d74657374206d657373616765",
+		expected: "0000000000000000000000000000000000000000000000000000000000000001",
+		name:     "invalid_input_malformed_public_key",
+	},
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde0546b3624c07c18b1abdb8f4808f0115e6a33d7323ac821976479cfae8426e86c178bd32dacce8f0d52456da8dfaf88cb42f352679674f9d4980635c9c686c6c560f74657374206d657373616765",
+		expected: "0000000000000000000000000000000000000000000000000000000000000001",
+		name:     "invalid_input_malformed_signature",
+	},
+	{
+		input:    "304b6bb12f4dcffd4b147881bdeebfc63b7fb61412a3b696a530df076dde0546b3624c07c18b1abdb8f4808f0115e6a33d7323ac821976479cfae8426e86c178bd32dacce8f0d52456da8dfaf88cb42f352679674f9d4980635c9c686c6c560d",
+		expected: "0000000000000000000000000000000000000000000000000000000000000001",
+		name:     "invalid_input_msg_too_short",
+	},
+	{
+		input:    "",
+		expected: "0000000000000000000000000000000000000000000000000000000000000001",
+		name:     "invalid_input_empty",
+	},
+}
+
+// Tests the sample inputs from the ed25519 verify check CIP 25
+func TestPrecompiledEd25519Verify(t *testing.T) {
+	for _, test := range ed25519VerifyTests {
+		testPrecompiled("FA", test, PrecompiledContractsStaking, t)
+	}
+}
+
+func BenchmarkPrecompiledEd25519Verify(bench *testing.B) {
+	for _, test := range ed25519VerifyTests {
+		benchmarkPrecompiled("FA", test, PrecompiledContractsStaking, bench)
+	}
 }

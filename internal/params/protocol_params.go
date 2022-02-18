@@ -175,6 +175,9 @@ const (
 	Sha3FipsGas     uint64 = 30 // Once per SHA3-256 operation.
 	Sha3FipsWordGas uint64 = 6  // Once per word of the SHA3-256 operation's data.
 
+	Ed25519VerifyGas   uint64 = 1500             // Gas needed for and Ed25519 signature verification
+	Sha2_512BaseGas    uint64 = Sha256BaseGas    // Base price for a Sha2-512 operation
+	Sha2_512PerWordGas uint64 = Sha256PerWordGas // Per-word price for a Sha2-512 operation
 )
 
 // nolint
