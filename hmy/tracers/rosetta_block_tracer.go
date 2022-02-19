@@ -34,6 +34,8 @@ type RosettaLogItem struct {
 
 type RosettaBlockTracer struct {
 	*ParityBlockTracer
+
+	logs []*RosettaLogItem
 }
 
 func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *action) *RosettaLogItem {
@@ -51,6 +53,18 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 		To:        ac.to,
 		Value:     val,
 	}
+}
+
+func (rbt *RosettaBlockTracer) AddRosettaLog(op vm.OpCode, from, to common.Address, val *big.Int) {
+	rbt.logs = append(rbt.logs, &RosettaLogItem{
+		IsSuccess: true,
+		Reverted:  false,
+		OP:        op,
+		Depth:     make([]int, 0),
+		From:      from,
+		To:        to,
+		Value:     val,
+	})
 }
 
 func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {

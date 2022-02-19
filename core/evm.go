@@ -47,6 +47,8 @@ type ChainContext interface {
 	// ReadDelegationsByDelegator returns the validators list of a delegator
 	ReadDelegationsByDelegator(common.Address) (stakingTypes.DelegationIndexes, error)
 
+	ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *big.Int) (m stakingTypes.DelegationIndexes, err error)
+
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*stakingTypes.ValidatorSnapshot, error)
 
@@ -104,7 +106,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 // the function can then be called through the EVM context
 func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidatorFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, createValidator *stakingTypes.CreateValidator) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, createValidator *stakingTypes.CreateValidator) error {
 		wrapper, err := VerifyAndCreateValidatorFromMsg(
 			db, chain, ref.Epoch(), ref.Number(), createValidator,
 		)
@@ -122,7 +124,7 @@ func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidator
 
 func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, editValidator *stakingTypes.EditValidator) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, editValidator *stakingTypes.EditValidator) error {
 		wrapper, err := VerifyAndEditValidatorFromMsg(
 			db, chain, ref.Epoch(), ref.Number(), editValidator,
 		)
@@ -135,8 +137,8 @@ func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc
 
 func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, delegate *stakingTypes.Delegate) error {
-		delegations, err := chain.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) error {
+		delegations, err := chain.ReadDelegationsByDelegatorAt(delegate.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
 			return err
 		}
@@ -188,7 +190,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 
 func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, undelegate *stakingTypes.Undelegate) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, undelegate *stakingTypes.Undelegate) error {
 		wrapper, err := VerifyAndUndelegateFromMsg(db, ref.Epoch(), undelegate)
 		if err != nil {
 			return err
@@ -198,7 +200,7 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 }
 
 func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFunc {
-	return func(db vm.StateDB, collectRewards *stakingTypes.CollectRewards) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
 		if chain == nil {
 			return errors.New("[CollectRewards] No chain context provided")
 		}

@@ -361,7 +361,7 @@ func (node *Node) supportSyncing() {
 		utils.Logger().Debug().Msg("[SYNC] initialized state sync")
 	}
 
-	go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
+	//go node.DoSyncing(node.Blockchain(), node.Worker, joinConsensus)
 }
 
 // InitSyncingServer starts downloader server.

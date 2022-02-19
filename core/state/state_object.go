@@ -341,6 +341,9 @@ func (s *Object) CommitTrie(db Database) error {
 // AddBalance removes amount from c's balance.
 // It is used to add funds to the destination account of a transfer.
 func (s *Object) AddBalance(amount *big.Int) {
+	if s.address.String() == "0x9aFba568f59854539D17B9120B6E4d31b9e8a3eF" {
+		fmt.Printf("AddBalance: %s => %s\n", s.address.String(), amount.String())
+	}
 	// EIP158: We must check emptiness for the objects such that the account
 	// clearing (0,0,0 objects) can take effect.
 	if amount.Sign() == 0 {
@@ -356,6 +359,9 @@ func (s *Object) AddBalance(amount *big.Int) {
 // SubBalance removes amount from c's balance.
 // It is used to remove funds from the origin account of a transfer.
 func (s *Object) SubBalance(amount *big.Int) {
+	if s.address.String() == "0x9aFba568f59854539D17B9120B6E4d31b9e8a3eF" {
+		fmt.Printf("SubBalance: %s\n", amount.String())
+	}
 	if amount.Sign() == 0 {
 		return
 	}
@@ -364,6 +370,9 @@ func (s *Object) SubBalance(amount *big.Int) {
 
 // SetBalance ...
 func (s *Object) SetBalance(amount *big.Int) {
+	if s.address.String() == "0x9aFba568f59854539D17B9120B6E4d31b9e8a3eF" {
+		fmt.Printf("SetBalance: %s\n", amount.String())
+	}
 	s.db.journal.append(balanceChange{
 		account: &s.address,
 		prev:    new(big.Int).Set(s.data.Balance),

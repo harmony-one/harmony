@@ -32,6 +32,10 @@ import (
 // deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
+type RosettaTracer interface {
+	AddRosettaLog(op OpCode, from, to common.Address, val *big.Int)
+}
+
 type (
 	// CanTransferFunc is the signature of a transfer guard function
 	CanTransferFunc func(StateDB, common.Address, *big.Int) bool
@@ -46,11 +50,11 @@ type (
 	// and is used by the precompile VRF contract.
 	GetVRFFunc func(uint64) common.Hash
 	// Below functions are used by staking precompile, and state transition
-	CreateValidatorFunc func(db StateDB, stakeMsg *stakingTypes.CreateValidator) error
-	EditValidatorFunc   func(db StateDB, stakeMsg *stakingTypes.EditValidator) error
-	DelegateFunc        func(db StateDB, stakeMsg *stakingTypes.Delegate) error
-	UndelegateFunc      func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
-	CollectRewardsFunc  func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
+	CreateValidatorFunc func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CreateValidator) error
+	EditValidatorFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.EditValidator) error
+	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) error
+	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
+	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
