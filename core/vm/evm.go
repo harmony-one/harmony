@@ -32,8 +32,13 @@ import (
 // deployed contract addresses (relevant after the account abstraction).
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
+type RosettaLogAddressItem struct {
+	Account, SubAccount common.Address
+	Metadata            map[string]interface{}
+}
+
 type RosettaTracer interface {
-	AddRosettaLog(op OpCode, from, to common.Address, val *big.Int)
+	AddRosettaLog(op OpCode, from, to *RosettaLogAddressItem, val *big.Int)
 }
 
 type (

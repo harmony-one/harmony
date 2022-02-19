@@ -478,12 +478,12 @@ func getContractInternalTransferNativeOperations(
 	for _, log := range executionResult {
 		// skip meaningless information
 		if log.Value.Cmp(big.NewInt(0)) != 0 {
-			fromAccID, rosettaError := newAccountIdentifier(log.From)
+			fromAccID, rosettaError := newAccountIdentifier(log.From.Account)
 			if rosettaError != nil {
 				return nil, rosettaError
 			}
 
-			toAccID, rosettaError := newAccountIdentifier(log.To)
+			toAccID, rosettaError := newAccountIdentifier(log.To.Account)
 			if rosettaError != nil {
 				return nil, rosettaError
 			}

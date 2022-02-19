@@ -17,7 +17,6 @@
 package tracers
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/vm"
 	"math/big"
 )
@@ -27,8 +26,8 @@ type RosettaLogItem struct {
 	Reverted  bool
 	OP        vm.OpCode
 	Depth     []int
-	From      common.Address
-	To        common.Address
+	From      *vm.RosettaLogAddressItem
+	To        *vm.RosettaLogAddressItem
 	Value     *big.Int
 }
 
@@ -49,13 +48,13 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 		Reverted:  !(parentErr == nil && ac.err == nil),
 		OP:        ac.op,
 		Depth:     depth,
-		From:      ac.from,
-		To:        ac.to,
+		From:      &vm.RosettaLogAddressItem{Account: ac.from},
+		To:        &vm.RosettaLogAddressItem{Account: ac.to},
 		Value:     val,
 	}
 }
 
-func (rbt *RosettaBlockTracer) AddRosettaLog(op vm.OpCode, from, to common.Address, val *big.Int) {
+func (rbt *RosettaBlockTracer) AddRosettaLog(op vm.OpCode, from, to *vm.RosettaLogAddressItem, val *big.Int) {
 	rbt.logs = append(rbt.logs, &RosettaLogItem{
 		IsSuccess: true,
 		Reverted:  false,
