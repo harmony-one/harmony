@@ -120,18 +120,21 @@ func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidator
 		db.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
 
 		//add rosetta log
-		rosettaTracer.AddRosettaLog(
-			vm.CALL,
-			&vm.RosettaLogAddressItem{
-				Account: &createValidator.ValidatorAddress,
-			},
-			&vm.RosettaLogAddressItem{
-				Account:    &createValidator.ValidatorAddress,
-				SubAccount: &createValidator.ValidatorAddress,
-				Metadata:   map[string]interface{}{"type": "delegation"},
-			},
-			createValidator.Amount,
-		)
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				&vm.RosettaLogAddressItem{
+					Account: &createValidator.ValidatorAddress,
+				},
+				&vm.RosettaLogAddressItem{
+					Account:    &createValidator.ValidatorAddress,
+					SubAccount: &createValidator.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "delegation"},
+				},
+				createValidator.Amount,
+			)
+		}
+
 		return nil
 	}
 }
@@ -169,7 +172,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 
 		db.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
 
-		if balanceToBeDeducted != big.NewInt(0) {
+		if rosettaTracer != nil && balanceToBeDeducted != big.NewInt(0) {
 			//add rosetta log
 			rosettaTracer.AddRosettaLog(
 				vm.CALL,
@@ -214,20 +217,22 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 				})
 
 				//add rosetta log
-				rosettaTracer.AddRosettaLog(
-					vm.CALL,
-					&vm.RosettaLogAddressItem{
-						Account:    &delegate.DelegatorAddress,
-						SubAccount: &key,
-						Metadata:   map[string]interface{}{"type": "undelegation"},
-					},
-					&vm.RosettaLogAddressItem{
-						Account:    &delegate.DelegatorAddress,
-						SubAccount: &delegate.ValidatorAddress,
-						Metadata:   map[string]interface{}{"type": "delegation"},
-					},
-					redelegatedToken,
-				)
+				if rosettaTracer != nil {
+					rosettaTracer.AddRosettaLog(
+						vm.CALL,
+						&vm.RosettaLogAddressItem{
+							Account:    &delegate.DelegatorAddress,
+							SubAccount: &key,
+							Metadata:   map[string]interface{}{"type": "undelegation"},
+						},
+						&vm.RosettaLogAddressItem{
+							Account:    &delegate.DelegatorAddress,
+							SubAccount: &delegate.ValidatorAddress,
+							Metadata:   map[string]interface{}{"type": "delegation"},
+						},
+						redelegatedToken,
+					)
+				}
 			}
 		}
 		return nil
@@ -243,18 +248,20 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 		}
 
 		//add rosetta log
-		rosettaTracer.AddRosettaLog(
-			vm.CALL,
-			&vm.RosettaLogAddressItem{
-				Account: &undelegate.DelegatorAddress,
-			},
-			&vm.RosettaLogAddressItem{
-				Account:    &undelegate.DelegatorAddress,
-				SubAccount: &undelegate.ValidatorAddress,
-				Metadata:   map[string]interface{}{"type": "undelegation"},
-			},
-			undelegate.Amount,
-		)
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				&vm.RosettaLogAddressItem{
+					Account: &undelegate.DelegatorAddress,
+				},
+				&vm.RosettaLogAddressItem{
+					Account:    &undelegate.DelegatorAddress,
+					SubAccount: &undelegate.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "undelegation"},
+				},
+				undelegate.Amount,
+			)
+		}
 
 		return db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
 	}
@@ -291,14 +298,16 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		})
 
 		//add rosetta log
-		rosettaTracer.AddRosettaLog(
-			vm.CALL,
-			nil,
-			&vm.RosettaLogAddressItem{
-				Account: &collectRewards.DelegatorAddress,
-			},
-			totalRewards,
-		)
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				nil,
+				&vm.RosettaLogAddressItem{
+					Account: &collectRewards.DelegatorAddress,
+				},
+				totalRewards,
+			)
+		}
 
 		return nil
 	}
