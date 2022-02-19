@@ -33,7 +33,7 @@ import (
 var emptyCodeHash = crypto.Keccak256Hash(nil)
 
 type RosettaLogAddressItem struct {
-	Account, SubAccount common.Address
+	Account, SubAccount *common.Address
 	Metadata            map[string]interface{}
 }
 
