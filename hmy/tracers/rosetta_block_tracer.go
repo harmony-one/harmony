@@ -89,5 +89,5 @@ func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
 		finalize(subAc, root.err, append(traceAddress[:], i))
 	}
 
-	return results, err
+	return append(results, rbt.logs...), err
 }
