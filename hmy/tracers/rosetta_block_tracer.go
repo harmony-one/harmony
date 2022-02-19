@@ -48,8 +48,8 @@ func (rbt *RosettaBlockTracer) formatAction(depth []int, parentErr error, ac *ac
 		Reverted:  !(parentErr == nil && ac.err == nil),
 		OP:        ac.op,
 		Depth:     depth,
-		From:      &vm.RosettaLogAddressItem{Account: ac.from},
-		To:        &vm.RosettaLogAddressItem{Account: ac.to},
+		From:      &vm.RosettaLogAddressItem{Account: &ac.from},
+		To:        &vm.RosettaLogAddressItem{Account: &ac.to},
 		Value:     val,
 	}
 }
