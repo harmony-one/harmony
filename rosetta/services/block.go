@@ -291,10 +291,10 @@ func init() {
 func (s *BlockAPI) getTransactionTrace(
 	ctx context.Context, blk *hmytypes.Block, txInfo *transactionInfo,
 ) ([]*tracers.RosettaLogItem, *types.Error) {
-	//cacheKey := blk.Hash().String() + txInfo.tx.Hash().String()
-	//if value, ok := s.txTraceCache.Get(cacheKey); ok {
-	//	return value.([]*tracers.RosettaLogItem), nil
-	//}
+	cacheKey := blk.Hash().String() + txInfo.tx.Hash().String()
+	if value, ok := s.txTraceCache.Get(cacheKey); ok {
+		return value.([]*tracers.RosettaLogItem), nil
+	}
 
 	lock := &sync.Mutex{}
 	if ok, _ := ttLock.ContainsOrAdd(blk.Hash().String(), lock); ok {
@@ -310,9 +310,9 @@ func (s *BlockAPI) getTransactionTrace(
 		defer lock.Unlock()
 	}
 
-	//if value, ok := s.txTraceCache.Get(cacheKey); ok {
-	//	return value.([]*tracers.RosettaLogItem), nil
-	//}
+	if value, ok := s.txTraceCache.Get(cacheKey); ok {
+		return value.([]*tracers.RosettaLogItem), nil
+	}
 
 	var blockError *types.Error
 	var foundResult []*tracers.RosettaLogItem
