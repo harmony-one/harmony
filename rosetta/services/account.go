@@ -164,7 +164,7 @@ func newAccountIdentifier(
 
 // newAccountIdentifier ..
 func newRosettaAccountIdentifier(address *vm.RosettaLogAddressItem) (*types.AccountIdentifier, *types.Error) {
-	if address.Account == nil {
+	if address == nil || address.Account == nil {
 		return nil, nil
 	}
 
