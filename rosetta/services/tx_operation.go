@@ -783,23 +783,28 @@ func newSameShardTransferNativeOperations(
 		Currency: &common.NativeCurrency,
 	}
 
-	return []*types.Operation{
-		{
+	op := []*types.Operation{}
+	if from != nil {
+		op = append(op, &types.Operation{
 			OperationIdentifier: subOperationID,
 			Type:                common.NativeTransferOperation,
 			Status:              &status,
 			Account:             from,
 			Amount:              subAmount,
-		},
-		{
+		})
+	}
+	if to != nil {
+		op = append(op, &types.Operation{
 			OperationIdentifier: addOperationID,
 			RelatedOperations:   addRelatedID,
 			Type:                common.NativeTransferOperation,
 			Status:              &status,
 			Account:             to,
 			Amount:              addAmount,
-		},
+		})
 	}
+
+	return op
 }
 
 // newNativeOperationsWithGas creates a new operation with the gas fee as the first operation.

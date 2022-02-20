@@ -164,6 +164,10 @@ func newAccountIdentifier(
 
 // newAccountIdentifier ..
 func newRosettaAccountIdentifier(address *vm.RosettaLogAddressItem) (*types.AccountIdentifier, *types.Error) {
+	if address.Account == nil {
+		return nil, nil
+	}
+
 	b32Address, err := internalCommon.AddressToBech32(*address.Account)
 	if err != nil {
 		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
