@@ -252,7 +252,9 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 			rosettaTracer.AddRosettaLog(
 				vm.CALL,
 				&vm.RosettaLogAddressItem{
-					Account: &undelegate.DelegatorAddress,
+					Account:    &undelegate.DelegatorAddress,
+					SubAccount: &undelegate.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "delegation"},
 				},
 				&vm.RosettaLogAddressItem{
 					Account:    &undelegate.DelegatorAddress,
