@@ -763,28 +763,20 @@ func newSameShardTransferNativeOperations(
 	} else {
 		opIndex = 0
 	}
-	subOperationID := &types.OperationIdentifier{
-		Index: opIndex,
-	}
-	subAmount := &types.Amount{
-		Value:    negativeBigValue(amount),
-		Currency: &common.NativeCurrency,
-	}
 
-	// Addition operation elements
-	addOperationID := &types.OperationIdentifier{
-		Index: subOperationID.Index + 1,
-	}
-	addRelatedID := []*types.OperationIdentifier{
-		subOperationID,
-	}
-	addAmount := &types.Amount{
-		Value:    amount.String(),
-		Currency: &common.NativeCurrency,
-	}
+	var subOperationID *types.OperationIdentifier
+	var op []*types.Operation
 
-	op := []*types.Operation{}
 	if from != nil {
+		subOperationID = &types.OperationIdentifier{
+			Index: opIndex,
+		}
+
+		subAmount := &types.Amount{
+			Value:    negativeBigValue(amount),
+			Currency: &common.NativeCurrency,
+		}
+
 		op = append(op, &types.Operation{
 			OperationIdentifier: subOperationID,
 			Type:                common.NativeTransferOperation,
@@ -794,6 +786,26 @@ func newSameShardTransferNativeOperations(
 		})
 	}
 	if to != nil {
+		var addOperationID *types.OperationIdentifier
+		var addRelatedID []*types.OperationIdentifier
+		if subOperationID == nil {
+			addOperationID = &types.OperationIdentifier{
+				Index: opIndex,
+			}
+		} else {
+			addOperationID = &types.OperationIdentifier{
+				Index: subOperationID.Index + 1,
+			}
+			addRelatedID = []*types.OperationIdentifier{
+				subOperationID,
+			}
+		}
+
+		addAmount := &types.Amount{
+			Value:    amount.String(),
+			Currency: &common.NativeCurrency,
+		}
+
 		op = append(op, &types.Operation{
 			OperationIdentifier: addOperationID,
 			RelatedOperations:   addRelatedID,
