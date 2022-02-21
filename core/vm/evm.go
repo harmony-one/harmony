@@ -23,9 +23,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/harmony-one/harmony/internal/params"
-
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -45,12 +45,23 @@ type (
 	// GetVRFFunc returns the nth block vrf in the blockchain
 	// and is used by the precompile VRF contract.
 	GetVRFFunc func(uint64) common.Hash
+	// Below functions are used by staking precompile, and state transition
+	CreateValidatorFunc func(db StateDB, stakeMsg *stakingTypes.CreateValidator) error
+	EditValidatorFunc   func(db StateDB, stakeMsg *stakingTypes.EditValidator) error
+	DelegateFunc        func(db StateDB, stakeMsg *stakingTypes.Delegate) error
+	UndelegateFunc      func(db StateDB, stakeMsg *stakingTypes.Undelegate) error
+	CollectRewardsFunc  func(db StateDB, stakeMsg *stakingTypes.CollectRewards) error
+	// Used for migrating delegations via the staking precompile
+	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
 func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
 	if contract.CodeAddr != nil {
 		precompiles := PrecompiledContractsHomestead
+		// assign empty write capable precompiles till they are available in the fork
+		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -62,6 +73,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		}
 		if evm.chainRules.IsSHA3 {
 			precompiles = PrecompiledContractsSHA3FIPS
+		}
+		if evm.chainRules.IsStakingPrecompile {
+			precompiles = PrecompiledContractsStaking
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
@@ -82,9 +97,13 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 					// Override the input with vrf data of the requested block so it can be returned to the contract program.
 					input = evm.Context.VRF.Bytes()
 				}
-
+			} else if _, ok := p.(*epoch); ok {
+				input = evm.EpochNumber.Bytes()
 			}
 			return RunPrecompiledContract(p, input, contract)
+		}
+		if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
+			return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
 		}
 	}
 	for _, interpreter := range evm.interpreters {
@@ -138,6 +157,16 @@ type Context struct {
 	VRF         common.Hash    // Provides information for VRF
 
 	TxType types.TransactionType
+
+	CreateValidator       CreateValidatorFunc
+	EditValidator         EditValidatorFunc
+	Delegate              DelegateFunc
+	Undelegate            UndelegateFunc
+	CollectRewards        CollectRewardsFunc
+	CalculateMigrationGas CalculateMigrationGasFunc
+
+	// staking precompile checks this before proceeding forward
+	ShardID uint32
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -175,6 +204,9 @@ type EVM struct {
 	// available gas is calculated in gasCall* according to the 63/64 rule and later
 	// applied in opCall*.
 	callGasTemp uint64
+	// stored temporarily by stakingPrecompile and cleared immediately after return
+	// (although the EVM object itself is ephemeral)
+	StakeMsgs []stakingTypes.StakeMsg
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -256,6 +288,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	)
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
+		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -268,8 +301,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		if evm.chainRules.IsSHA3 {
 			precompiles = PrecompiledContractsSHA3FIPS
 		}
+		if evm.chainRules.IsStakingPrecompile {
+			precompiles = PrecompiledContractsStaking
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
+		}
 
-		if precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		if writeCapablePrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)

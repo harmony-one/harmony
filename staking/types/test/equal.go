@@ -32,7 +32,7 @@ func checkValidatorWrapperEqual(w1, w2 staking.ValidatorWrapper) error {
 	if err := checkValidatorEqual(w1.Validator, w2.Validator); err != nil {
 		return fmt.Errorf(".Validator%v", err)
 	}
-	if err := checkDelegationsEqual(w1.Delegations, w2.Delegations); err != nil {
+	if err := CheckDelegationsEqual(w1.Delegations, w2.Delegations); err != nil {
 		return fmt.Errorf(".Delegations%v", err)
 	}
 	if err := checkBigIntEqual(w1.Counters.NumBlocksToSign, w2.Counters.NumBlocksToSign); err != nil {
@@ -78,7 +78,7 @@ func checkValidatorEqual(v1, v2 staking.Validator) error {
 	return nil
 }
 
-func checkDelegationsEqual(ds1, ds2 staking.Delegations) error {
+func CheckDelegationsEqual(ds1, ds2 staking.Delegations) error {
 	if len(ds1) != len(ds2) {
 		return fmt.Errorf(".len not equal: %v / %v", len(ds1), len(ds2))
 	}

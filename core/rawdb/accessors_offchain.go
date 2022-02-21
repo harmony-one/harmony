@@ -184,6 +184,27 @@ func DeleteValidatorSnapshot(db DatabaseDeleter, addr common.Address, epoch *big
 	return nil
 }
 
+func IteratorValidatorSnapshot(iterator DatabaseIterator, cb func(addr common.Address, epoch *big.Int) bool) (minKey []byte, maxKey []byte) {
+	iter := iterator.NewIteratorWithPrefix(validatorSnapshotPrefix)
+	defer iter.Release()
+
+	minKey = validatorSnapshotPrefix
+	for iter.Next() {
+		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
+		key := iter.Key()
+
+		maxKey = key
+		addressBytes := key[len(validatorSnapshotPrefix) : len(validatorSnapshotPrefix)+20]
+		epochBytes := key[len(validatorSnapshotPrefix)+20:]
+
+		if !cb(common.BytesToAddress(addressBytes), big.NewInt(0).SetBytes(epochBytes)) {
+			return
+		}
+	}
+
+	return
+}
+
 // DeleteValidatorStats ..
 func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) error {
 	if err := db.Delete(validatorStatsKey(addr)); err != nil {

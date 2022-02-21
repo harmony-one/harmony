@@ -17,16 +17,22 @@
 package core
 
 import (
+	"bytes"
+	"errors"
+	"math"
 	"math/big"
-
-	"github.com/harmony-one/harmony/internal/params"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
-	staking "github.com/harmony-one/harmony/staking/types"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/internal/utils"
+	staking "github.com/harmony-one/harmony/staking"
+	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -39,16 +45,18 @@ type ChainContext interface {
 	GetHeader(common.Hash, uint64) *block.Header
 
 	// ReadDelegationsByDelegator returns the validators list of a delegator
-	ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error)
+	ReadDelegationsByDelegator(common.Address) (stakingTypes.DelegationIndexes, error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
-	ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error)
+	ReadValidatorSnapshot(common.Address) (*stakingTypes.ValidatorSnapshot, error)
 
 	// ReadValidatorList returns the list of all validators
 	ReadValidatorList() ([]common.Address, error)
 
 	// Config returns chain config
 	Config() *params.ChainConfig
+
+	ShardID() uint32 // this is implemented by blockchain.go already
 }
 
 // NewEVMContext creates a new context for use in the EVM.
@@ -66,19 +74,257 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		copy(vrf[:], vrfAndProof[:32])
 	}
 	return vm.Context{
-		CanTransfer: CanTransfer,
-		Transfer:    Transfer,
-		IsValidator: IsValidator,
-		GetHash:     GetHashFn(header, chain),
-		GetVRF:      GetVRFFn(header, chain),
-		Origin:      msg.From(),
-		Coinbase:    beneficiary,
-		BlockNumber: header.Number(),
-		EpochNumber: header.Epoch(),
-		VRF:         vrf,
-		Time:        header.Time(),
-		GasLimit:    header.GasLimit(),
-		GasPrice:    new(big.Int).Set(msg.GasPrice()),
+		CanTransfer:     CanTransfer,
+		Transfer:        Transfer,
+		IsValidator:     IsValidator,
+		GetHash:         GetHashFn(header, chain),
+		GetVRF:          GetVRFFn(header, chain),
+		CreateValidator: CreateValidatorFn(header, chain),
+		EditValidator:   EditValidatorFn(header, chain),
+		Delegate:        DelegateFn(header, chain),
+		Undelegate:      UndelegateFn(header, chain),
+		CollectRewards:  CollectRewardsFn(header, chain),
+		//MigrateDelegations:    MigrateDelegationsFn(header, chain),
+		CalculateMigrationGas: CalculateMigrationGasFn(chain),
+		Origin:                msg.From(),
+		Coinbase:              beneficiary,
+		BlockNumber:           header.Number(),
+		EpochNumber:           header.Epoch(),
+		VRF:                   vrf,
+		Time:                  header.Time(),
+		GasLimit:              header.GasLimit(),
+		GasPrice:              new(big.Int).Set(msg.GasPrice()),
+		ShardID:               chain.ShardID(),
+	}
+}
+
+// HandleStakeMsgFn returns a function which accepts
+// (1) the chain state database
+// (2) the processed staking parameters
+// the function can then be called through the EVM context
+func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidatorFunc {
+	// moved from state_transition.go to here, with some modifications
+	return func(db vm.StateDB, createValidator *stakingTypes.CreateValidator) error {
+		wrapper, err := VerifyAndCreateValidatorFromMsg(
+			db, chain, ref.Epoch(), ref.Number(), createValidator,
+		)
+		if err != nil {
+			return err
+		}
+		if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+			return err
+		}
+		db.SetValidatorFlag(createValidator.ValidatorAddress)
+		db.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
+		return nil
+	}
+}
+
+func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc {
+	// moved from state_transition.go to here, with some modifications
+	return func(db vm.StateDB, editValidator *stakingTypes.EditValidator) error {
+		wrapper, err := VerifyAndEditValidatorFromMsg(
+			db, chain, ref.Epoch(), ref.Number(), editValidator,
+		)
+		if err != nil {
+			return err
+		}
+		return db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	}
+}
+
+func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
+	// moved from state_transition.go to here, with some modifications
+	return func(db vm.StateDB, delegate *stakingTypes.Delegate) error {
+		delegations, err := chain.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
+			db, ref.Epoch(), delegate, delegations, chain.Config())
+		if err != nil {
+			return err
+		}
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+
+		db.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
+
+		if len(fromLockedTokens) > 0 {
+			sortedKeys := []common.Address{}
+			for key := range fromLockedTokens {
+				sortedKeys = append(sortedKeys, key)
+			}
+			sort.SliceStable(sortedKeys, func(i, j int) bool {
+				return bytes.Compare(sortedKeys[i][:], sortedKeys[j][:]) < 0
+			})
+			// Add log if everything is good
+			for _, key := range sortedKeys {
+				redelegatedToken, ok := fromLockedTokens[key]
+				if !ok {
+					return errors.New("Key missing for delegation receipt")
+				}
+				encodedRedelegationData := []byte{}
+				addrBytes := key.Bytes()
+				encodedRedelegationData = append(encodedRedelegationData, addrBytes...)
+				encodedRedelegationData = append(encodedRedelegationData, redelegatedToken.Bytes()...)
+				// The data field format is:
+				// [first 20 bytes]: Validator address from which the locked token is used for redelegation.
+				// [rest of the bytes]: the bigInt serialized bytes for the token amount.
+				db.AddLog(&types.Log{
+					Address:     delegate.DelegatorAddress,
+					Topics:      []common.Hash{staking.DelegateTopic},
+					Data:        encodedRedelegationData,
+					BlockNumber: ref.Number().Uint64(),
+				})
+			}
+		}
+		return nil
+	}
+}
+
+func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
+	// moved from state_transition.go to here, with some modifications
+	return func(db vm.StateDB, undelegate *stakingTypes.Undelegate) error {
+		wrapper, err := VerifyAndUndelegateFromMsg(db, ref.Epoch(), undelegate)
+		if err != nil {
+			return err
+		}
+		return db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
+	}
+}
+
+func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFunc {
+	return func(db vm.StateDB, collectRewards *stakingTypes.CollectRewards) error {
+		if chain == nil {
+			return errors.New("[CollectRewards] No chain context provided")
+		}
+		delegations, err := chain.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+			db, delegations,
+		)
+		if err != nil {
+			return err
+		}
+		for _, wrapper := range updatedValidatorWrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return err
+			}
+		}
+		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
+
+		// Add log if everything is good
+		db.AddLog(&types.Log{
+			Address:     collectRewards.DelegatorAddress,
+			Topics:      []common.Hash{staking.CollectRewardsTopic},
+			Data:        totalRewards.Bytes(),
+			BlockNumber: ref.Number().Uint64(),
+		})
+
+		return nil
+	}
+}
+
+//func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDelegationsFunc {
+//	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+//		// get existing delegations
+//		fromDelegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
+//		if err != nil {
+//			return nil, err
+//		}
+//		// get list of modified wrappers
+//		wrappers, delegates, err := VerifyAndMigrateFromMsg(db, migrationMsg, fromDelegations)
+//		if err != nil {
+//			return nil, err
+//		}
+//		// add to state db
+//		for _, wrapper := range wrappers {
+//			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+//				return nil, err
+//			}
+//		}
+//		return delegates, nil
+//	}
+//}
+
+// calculate the gas for migration; no checks done here similar to other functions
+// the checks are handled by staking_verifier.go, ex, if you try to delegate to an address
+// who is not a validator - you will be charged all gas passed in two steps
+// - 22k initially when gas is calculated
+// - remainder when the tx inevitably is a no-op
+// i have followed the same logic here, this only produces an error if can't read from db
+func CalculateMigrationGasFn(chain ChainContext) vm.CalculateMigrationGasFunc {
+	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error) {
+		var gas uint64 = 0
+		delegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
+		if err != nil {
+			return 0, err
+		}
+		for i := range delegations {
+			delegationIndex := &delegations[i]
+			wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, true, false)
+			if err != nil {
+				return 0, err
+			}
+			if uint64(len(wrapper.Delegations)) <= delegationIndex.Index {
+				utils.Logger().Warn().
+					Str("validator", delegationIndex.ValidatorAddress.String()).
+					Uint64("delegation index", delegationIndex.Index).
+					Int("delegations length", len(wrapper.Delegations)).
+					Msg("Delegation index out of bound")
+				return 0, errors.New("Delegation index out of bound")
+			}
+			foundDelegation := &wrapper.Delegations[delegationIndex.Index]
+			// no need to migrate if amount and undelegations are 0
+			if foundDelegation.Amount.Cmp(common.Big0) == 0 && len(foundDelegation.Undelegations) == 0 {
+				continue
+			}
+			delegate := stakingTypes.Delegate{
+				DelegatorAddress: migrationMsg.From,
+				ValidatorAddress: delegationIndex.ValidatorAddress,
+				Amount:           foundDelegation.Amount,
+			}
+			encoded, err := rlp.EncodeToBytes(delegate)
+			if err != nil {
+				return 0, err
+			}
+			thisGas, err := vm.IntrinsicGas(
+				encoded,
+				false,
+				homestead,
+				istanbul,
+				false, // isValidatorCreation
+			)
+			if err != nil {
+				return 0, err
+			}
+			// overflow when gas + thisGas > Math.MaxUint64
+			// or Math.MaxUint64 < gas + thisGas
+			// or Math.MaxUint64 - gas < thisGas
+			if (math.MaxUint64 - gas) < thisGas {
+				return 0, vm.ErrOutOfGas
+			}
+			gas += thisGas
+		}
+		if gas != 0 {
+			return gas, nil
+		} else {
+			// base gas fee if nothing to do, for example, when
+			// there are no delegations to migrate
+			return vm.IntrinsicGas(
+				[]byte{},
+				false,
+				homestead,
+				istanbul,
+				false, // isValidatorCreation
+			)
+		}
 	}
 }
 

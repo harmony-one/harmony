@@ -23,6 +23,6 @@ type RoundHeader interface {
 
 // ValidatorState is the interface of state.DB
 type ValidatorState interface {
-	ValidatorWrapper(common.Address) (*staking.ValidatorWrapper, error)
+	ValidatorWrapper(common.Address, bool, bool) (*staking.ValidatorWrapper, error)
 	UpdateValidatorWrapper(common.Address, *staking.ValidatorWrapper) error
 }

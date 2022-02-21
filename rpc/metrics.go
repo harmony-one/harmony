@@ -13,6 +13,14 @@ const (
 	GetBlockByHashNew        = "GetBlockByHashNew"
 	GetBlockByHash           = "GetBlockByHash"
 	GetBlocks                = "GetBlocks"
+	IsLastBlock              = "IsLastBlock"
+	EpochLastBlock           = "EpochLastBlock"
+	GetBlockSigners          = "GetBlockSigners"
+	GetBlockSignerKeys       = "GetBlockSignerKeys"
+	IsBlockSigner            = "IsBlockSigner"
+	GetSignedBlocks          = "GetSignedBlocks"
+	GetEpoch                 = "GetEpoch"
+	GetLeader                = "GetLeader"
 	GetShardingStructure     = "GetShardingStructure"
 	GetBalanceByBlockNumber  = "GetBalanceByBlockNumber"
 	LatestHeader             = "LatestHeader"
@@ -24,15 +32,22 @@ const (
 	GetCurrentUtilityMetrics = "GetCurrentUtilityMetrics"
 	GetSuperCommittees       = "GetSuperCommittees"
 	GetCurrentBadBlocks      = "GetCurrentBadBlocks"
+	GetTotalSupply           = "GetTotalSupply"
+	GetCirculatingSupply     = "GetCirculatingSupply"
 	GetStakingNetworkInfo    = "GetStakingNetworkInfo"
+	InSync                   = "InSync"
+	BeaconInSync             = "BeaconInSync"
+	SetNodeToBackupMode      = "SetNodeToBackupMode"
 
 	// contract
 	GetCode      = "GetCode"
 	GetStorageAt = "GetStorageAt"
+	Call         = "Call"
 	DoEvmCall    = "DoEVMCall"
 
 	// net
-	PeerCount = "PeerCount"
+	PeerCount  = "PeerCount"
+	NetVersion = "Version"
 
 	// pool
 	SendRawTransaction             = "SendRawTransaction"
@@ -45,38 +60,80 @@ const (
 	GetPendingCXReceipts           = "GetPendingCXReceipts"
 
 	// staking
+	GetTotalStaking                         = "GetTotalStaking"
+	GetMedianRawStakeSnapshot               = "GetMedianRawStakeSnapshot"
+	GetElectedValidatorAddresses            = "GetElectedValidatorAddresses"
+	GetValidators                           = "GetValidators"
+	GetAllValidatorAddresses                = "GetAllValidatorAddresses"
+	GetValidatorKeys                        = "GetValidatorKeys"
 	GetAllValidatorInformation              = "GetAllValidatorInformation"
 	GetAllValidatorInformationByBlockNumber = "GetAllValidatorInformationByBlockNumber"
 	GetValidatorInformation                 = "GetValidatorInformation"
 	GetValidatorInformationByBlockNumber    = "GetValidatorInformationByBlockNumber"
+	GetValidatorSelfDelegation              = "GetValidatorSelfDelegation"
+	GetValidatorTotalDelegation             = "GetValidatorTotalDelegation"
 	GetAllDelegationInformation             = "GetAllDelegationInformation"
 	GetDelegationsByDelegator               = "GetDelegationsByDelegator"
+	GetDelegationsByDelegatorByBlockNumber  = "GetDelegationsByDelegatorByBlockNumber"
 	GetDelegationsByValidator               = "GetDelegationsByValidator"
 	GetDelegationByDelegatorAndValidator    = "GetDelegationByDelegatorAndValidator"
+	GetAvailableRedelegationBalance         = "GetAvailableRedelegationBalance"
 
 	// tracer
+	TraceChain         = "TraceChain"
 	TraceBlockByNumber = "TraceBlockByNumber"
 	TraceBlockByHash   = "TraceBlockByHash"
 	TraceBlock         = "TraceBlock"
 	TraceTransaction   = "TraceTransaction"
 	TraceCall          = "TraceCall"
 
+	// tracer parity
+	Block       = "Block"
+	Transaction = "Transaction"
+
 	// transaction
-	GetTransactionByHash          = "GetTransactionByHash"
-	GetStakingTransactionByHash   = "GetStakingTransactionByHash"
-	GetTransactionsHistory        = "GetTransactionsHistory"
-	GetStakingTransactionsHistory = "GetStakingTransactionsHistory"
+	GetAccountNonce                            = "GetAccountNonce"
+	GetTransactionCount                        = "GetTransactionCount"
+	GetTransactionsCount                       = "GetTransactionsCount"
+	GetStakingTransactionsCount                = "GetStakingTransactionsCount"
+	RpcEstimateGas                             = "EstimateGas"
+	GetTransactionByHash                       = "GetTransactionByHash"
+	GetStakingTransactionByHash                = "GetStakingTransactionByHash"
+	GetTransactionsHistory                     = "GetTransactionsHistory"
+	GetStakingTransactionsHistory              = "GetStakingTransactionsHistory"
+	GetBlockTransactionCountByNumber           = "GetBlockTransactionCountByNumber"
+	GetBlockTransactionCountByHash             = "GetBlockTransactionCountByHash"
+	GetTransactionByBlockNumberAndIndex        = "GetTransactionByBlockNumberAndIndex"
+	GetTransactionByBlockHashAndIndex          = "GetTransactionByBlockHashAndIndex"
+	GetBlockStakingTransactionCountByNumber    = "GetBlockStakingTransactionCountByNumber"
+	GetBlockStakingTransactionCountByHash      = "GetBlockStakingTransactionCountByHash"
+	GetStakingTransactionByBlockNumberAndIndex = "GetStakingTransactionByBlockNumberAndIndex"
+	GetStakingTransactionByBlockHashAndIndex   = "GetStakingTransactionByBlockHashAndIndex"
+	GetTransactionReceipt                      = "GetTransactionReceipt"
+	GetCXReceiptByHash                         = "GetCXReceiptByHash"
+	ResendCx                                   = "ResendCx"
 
 	// filters
-	GetLogs         = "GetLogs"
-	UninstallFilter = "UninstallFilter"
-	GetFilterLogs   = "GetFilterLogs"
+	NewPendingTransactionFilter = "NewPendingTransactionFilter"
+	NewPendingTransactions      = "NewPendingTransactions"
+	NewBlockFilter              = "NewBlockFilter"
+	NewHeads                    = "NewHeads"
+	GetFilterChanges            = "GetFilterChanges"
+	Logs                        = "Logs"
+	NewFilter                   = "NewFilter"
+	GetLogs                     = "GetLogs"
+	UninstallFilter             = "UninstallFilter"
+	GetFilterLogs               = "GetFilterLogs"
+
+	// Web3
+	ClientVersion = "ClientVersion"
 )
 
 // info type const
 const (
-	QueryNumber  = "query_number"
-	FailedNumber = "failed_number"
+	QueryNumber       = "query_number"
+	FailedNumber      = "failed_number"
+	RateLimitedNumber = "rate_limited_number"
 )
 
 func init() {
@@ -96,7 +153,7 @@ var (
 			Name:      "over_ratelimit",
 			Help:      "number of times triggered rpc rate limit",
 		},
-		[]string{"rate_limit"},
+		[]string{"limiter_name"},
 	)
 
 	rpcQueryInfoCounterVec = prometheus.NewCounterVec(

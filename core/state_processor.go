@@ -54,9 +54,11 @@ type StateProcessor struct {
 	resultCache *lru.Cache              // Cache for result after a certain block is processed
 }
 
+// this structure is cached, and each individual element is returned
 type ProcessorResult struct {
 	Receipts   types.Receipts
 	CxReceipts types.CXReceipts
+	StakeMsgs  []staking.StakeMsg
 	Logs       []*types.Log
 	UsedGas    uint64
 	Reward     reward.Reader
@@ -86,7 +88,7 @@ func NewStateProcessor(
 func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
-	types.Receipts, types.CXReceipts,
+	types.Receipts, types.CXReceipts, []staking.StakeMsg,
 	[]*types.Log, uint64, reward.Reader, *state.DB, error,
 ) {
 	cacheKey := block.Hash()
@@ -96,39 +98,42 @@ func (p *StateProcessor) Process(
 			// Only the successful results are cached in case for retry.
 			result := cached.(*ProcessorResult)
 			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
-			return result.Receipts, result.CxReceipts, result.Logs, result.UsedGas, result.Reward, result.State, nil
+			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.Logs, result.UsedGas, result.Reward, result.State, nil
 		}
 	}
 
 	var (
-		receipts types.Receipts
-		outcxs   types.CXReceipts
-		incxs    = block.IncomingReceipts()
-		usedGas  = new(uint64)
-		header   = block.Header()
-		allLogs  []*types.Log
-		gp       = new(GasPool).AddGas(block.GasLimit())
+		receipts       types.Receipts
+		outcxs         types.CXReceipts
+		incxs          = block.IncomingReceipts()
+		usedGas        = new(uint64)
+		header         = block.Header()
+		allLogs        []*types.Log
+		gp                                = new(GasPool).AddGas(block.GasLimit())
+		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
 	)
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
 	if err != nil {
-		return nil, nil, nil, 0, nil, statedb, err
+		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	startTime := time.Now()
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
-		receipt, cxReceipt, _, err := ApplyTransaction(
+		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		if cxReceipt != nil {
 			outcxs = append(outcxs, cxReceipt)
+		}
+		if len(stakeMsgs) > 0 {
+			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 		}
 		allLogs = append(allLogs, receipt.Logs...)
 	}
@@ -143,7 +148,7 @@ func (p *StateProcessor) Process(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
-			return nil, nil, nil, 0, nil, statedb, err
+			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
@@ -157,14 +162,14 @@ func (p *StateProcessor) Process(
 			p.config, statedb, header, cx,
 		); err != nil {
 			return nil, nil,
-				nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
+				nil, nil, 0, nil, statedb, errors.New("[Process] Cannot apply incoming receipts")
 		}
 	}
 
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
-			return nil, nil, nil, 0, nil, statedb, errors.New(
+			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
 				"[Process] Cannot finalize block",
 			)
 		}
@@ -181,19 +186,20 @@ func (p *StateProcessor) Process(
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
-		return nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
+		return nil, nil, nil, nil, 0, nil, statedb, errors.New("[Process] Cannot finalize block")
 	}
 
 	result := &ProcessorResult{
 		Receipts:   receipts,
 		CxReceipts: outcxs,
+		StakeMsgs:  blockStakeMsgs,
 		Logs:       allLogs,
 		UsedGas:    *usedGas,
 		Reward:     payout,
 		State:      statedb,
 	}
 	p.resultCache.Add(cacheKey, result)
-	return receipts, outcxs, allLogs, *usedGas, payout, statedb, nil
+	return receipts, outcxs, blockStakeMsgs, allLogs, *usedGas, payout, statedb, nil
 }
 
 // CacheProcessorResult caches the process result on the cache key.
@@ -224,14 +230,14 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
-		return nil, nil, 0, errors.New("Invalid Transaction Type")
+		return nil, nil, nil, 0, errors.New("Invalid Transaction Type")
 	}
 
 	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
-		return nil, nil, 0, errors.Errorf(
+		return nil, nil, nil, 0, errors.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch(),
 		)
@@ -240,7 +246,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var signer types.Signer
 	if tx.IsEthCompatible() {
 		if !config.IsEthCompatible(header.Epoch()) {
-			return nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
+			return nil, nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
 		}
 		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
 	} else {
@@ -250,7 +256,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	// skip signer err for additiononly tx
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 
 	// Create a new context to be used in the EVM environment
@@ -262,7 +268,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, 0, err
+		return nil, nil, nil, 0, err
 	}
 	// Update the state with pending changes
 	var root []byte
@@ -298,7 +304,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		cxReceipt = nil
 	}
 
-	return receipt, cxReceipt, result.UsedGas, err
+	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
 }
 
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database

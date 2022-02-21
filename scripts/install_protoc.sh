@@ -43,7 +43,11 @@ case "${platform}" in
 	Linux) platform=linux;;
 	*) echo "unsupported OS name (${platform})" >&2; exit 69;;
 	esac
-	platform="${platform}-$(uname -m)"
+	arch=$(uname -m)
+	case "${arch}" in
+	aarch64) arch=aarch_64;;
+	esac
+	platform="${platform}-${arch}"
 	;;
 esac
 unset -v tmpdir

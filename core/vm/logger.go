@@ -42,6 +42,8 @@ func (s Storage) Copy() Storage {
 	return cpy
 }
 
+type LogFilter func(pc uint64, op OpCode) bool
+
 // LogConfig are the configuration options for structured logger the EVM
 type LogConfig struct {
 	DisableMemory  bool // disable memory capture
@@ -49,6 +51,7 @@ type LogConfig struct {
 	DisableStorage bool // disable storage capture
 	Debug          bool // print output during capture end
 	Limit          int  // maximum length of output, but zero means unlimited
+	LogFilter      LogFilter
 }
 
 //go:generate gencodec -type StructLog -field-override structLogMarshaling -out gen_structlog.go
@@ -69,6 +72,9 @@ type StructLog struct {
 	Depth           int                         `json:"depth"`
 	RefundCounter   uint64                      `json:"refund"`
 	Err             error                       `json:"-"`
+	AfterStack      []*big.Int                  `json:"afterStack"`
+	AfterMemory     []byte                      `json:"afterMemory"`
+	OperatorEvent   map[string]string           `json:"operatorEvent"`
 }
 
 // overrides for gencodec
@@ -94,6 +100,8 @@ func (s *StructLog) ErrorString() string {
 	return ""
 }
 
+type HookAfter = func(memory *Memory, stack *Stack)
+
 // Tracer is used to collect execution traces from an EVM transaction
 // execution. CaptureState is called for each step of the VM with the
 // current VM state.
@@ -101,7 +109,7 @@ func (s *StructLog) ErrorString() string {
 // if you need to retain them beyond the current call.
 type Tracer interface {
 	CaptureStart(env *EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error
-	CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error
+	CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) (HookAfter, error)
 	CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error
 	CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error
 }
@@ -114,7 +122,7 @@ type Tracer interface {
 type StructLogger struct {
 	cfg LogConfig
 
-	logs          []StructLog
+	logs          []*StructLog
 	changedValues map[common.Address]Storage
 	output        []byte
 	err           error
@@ -139,10 +147,16 @@ func (l *StructLogger) CaptureStart(env *EVM, from common.Address, to common.Add
 // CaptureState logs a new structured log message and pushes it out to the environment
 //
 // CaptureState also tracks SSTORE ops to track dirty values.
-func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error {
+func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) (HookAfter, error) {
 	// check if already accumulated the specified number of logs
 	if l.cfg.Limit != 0 && l.cfg.Limit <= len(l.logs) {
-		return ErrTraceLimitReached
+		return nil, ErrTraceLimitReached
+	}
+
+	if l.cfg.LogFilter != nil {
+		if !l.cfg.LogFilter(pc, op) {
+			return nil, nil
+		}
 	}
 
 	// initialise new changed values storage container for this contract
@@ -179,11 +193,40 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	if !l.cfg.DisableStorage {
 		storage = l.changedValues[contract.Address()].Copy()
 	}
+
+	var operatorEvent map[string]string
+	switch op {
+	case SELFDESTRUCT:
+		operatorEvent = map[string]string{}
+
+		operatorEvent["balance"] = env.StateDB.GetBalance(contract.Address()).String()
+	}
+
 	// create a new snapshot of the EVM.
-	log := StructLog{pc, op, contract.CallerAddress, contract.Address(), gas, cost, mem, memory.Len(), stck, storage, depth, env.StateDB.GetRefund(), err}
+	log := &StructLog{pc, op, contract.CallerAddress, contract.Address(), gas, cost, mem, memory.Len(), stck, storage, depth, env.StateDB.GetRefund(), err, nil, nil, operatorEvent}
+	afterHook := func(memory *Memory, stack *Stack) {
+		// Copy a snapshot of the current memory state to a new buffer
+		var mem []byte
+		if !l.cfg.DisableMemory {
+			mem = make([]byte, len(memory.Data()))
+			copy(mem, memory.Data())
+		}
+
+		// Copy a snapshot of the current stack state to a new buffer
+		var stck []*big.Int
+		if !l.cfg.DisableStack {
+			stck = make([]*big.Int, len(stack.Data()))
+			for i, item := range stack.Data() {
+				stck[i] = new(big.Int).Set(item)
+			}
+		}
+
+		log.AfterStack = stck
+		log.AfterMemory = mem
+	}
 
 	l.logs = append(l.logs, log)
-	return nil
+	return afterHook, nil
 }
 
 // CaptureFault implements the Tracer interface to trace an execution fault
@@ -206,7 +249,7 @@ func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration
 }
 
 // StructLogs returns the captured log entries.
-func (l *StructLogger) StructLogs() []StructLog { return l.logs }
+func (l *StructLogger) StructLogs() []*StructLog { return l.logs }
 
 // Error returns the VM error captured by the trace.
 func (l *StructLogger) Error() error { return l.err }

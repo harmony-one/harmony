@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package downloader;
+option go_package="./;downloader";
 
 // Downloader is the service used for downloading/sycning blocks.
 service Downloader {

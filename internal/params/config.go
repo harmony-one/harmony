@@ -64,6 +64,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(101),
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
+		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -96,6 +97,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
+		StakingPrecompileEpoch:     big.NewInt(75175),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -129,6 +131,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -146,7 +149,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(0),
-		SixtyPercentEpoch:          big.NewInt(0),
+		SixtyPercentEpoch:          big.NewInt(4),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
 		VRFEpoch:                   big.NewInt(0),
@@ -162,6 +165,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -195,6 +199,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -227,6 +232,7 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		StakingPrecompileEpoch:     big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -261,6 +267,7 @@ var (
 		big.NewInt(0),                      // ReceiptLogEpoch
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
+		big.NewInt(0),                      // StakingPrecompileEpoch
 	}
 
 	// TestChainConfig ...
@@ -295,6 +302,7 @@ var (
 		big.NewInt(0),        // ReceiptLogEpoch
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
+		big.NewInt(0),        // StakingPrecompileEpoch
 	}
 
 	// TestRules ...
@@ -409,11 +417,14 @@ type ChainConfig struct {
 
 	// IsHIP6And8Epoch is the first epoch to support HIP-6 and HIP-8
 	HIP6And8Epoch *big.Int `json:"hip6_8-epoch,omitempty"`
+
+	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
+	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch:%v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -422,6 +433,7 @@ func (c *ChainConfig) String() string {
 		c.CrossLinkEpoch,
 		c.ReceiptLogEpoch,
 		c.SHA3Epoch,
+		c.StakingPrecompileEpoch,
 	)
 }
 
@@ -562,6 +574,12 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
+// IsStakingPrecompileEpoch determines whether staking
+// precompiles are available in the EVM
+func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
+	return isForked(c.StakingPrecompileEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -610,13 +628,18 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                         *big.Int
-	EthChainID                                                                      *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3 bool
+	ChainID                                                                                              *big.Int
+	EthChainID                                                                                           *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile bool
 }
 
 // Rules ensures c's ChainID is not nil.
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
+	if c.IsStakingPrecompile(epoch) {
+		if !c.IsPreStaking(epoch) {
+			panic("Cannot have staking precompile epoch if not prestaking epoch")
+		}
+	}
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -626,15 +649,16 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ethChainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:      new(big.Int).Set(chainID),
-		EthChainID:   new(big.Int).Set(ethChainID),
-		IsCrossLink:  c.IsCrossLink(epoch),
-		IsEIP155:     c.IsEIP155(epoch),
-		IsS3:         c.IsS3(epoch),
-		IsReceiptLog: c.IsReceiptLog(epoch),
-		IsIstanbul:   c.IsIstanbul(epoch),
-		IsVRF:        c.IsVRF(epoch),
-		IsPrevVRF:    c.IsPrevVRF(epoch),
-		IsSHA3:       c.IsSHA3(epoch),
+		ChainID:             new(big.Int).Set(chainID),
+		EthChainID:          new(big.Int).Set(ethChainID),
+		IsCrossLink:         c.IsCrossLink(epoch),
+		IsEIP155:            c.IsEIP155(epoch),
+		IsS3:                c.IsS3(epoch),
+		IsReceiptLog:        c.IsReceiptLog(epoch),
+		IsIstanbul:          c.IsIstanbul(epoch),
+		IsVRF:               c.IsVRF(epoch),
+		IsPrevVRF:           c.IsPrevVRF(epoch),
+		IsSHA3:              c.IsSHA3(epoch),
+		IsStakingPrecompile: c.IsStakingPrecompile(epoch),
 	}
 }

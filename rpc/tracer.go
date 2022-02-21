@@ -25,10 +25,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
 
@@ -72,6 +72,9 @@ func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
 // TraceChain returns the structured logs created during the execution of EVM
 // between two blocks (excluding start) and returns them as a JSON object.
 func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *hmy.TraceConfig) (*rpc.Subscription, error) {
+	timer := DoMetricRPCRequest(TraceChain)
+	defer DoRPCRequestDuration(TraceChain, timer)
+
 	// TODO (JL): Make API available after DoS testing
 	return nil, ErrNotAvailable
 	if uint64(start) >= uint64(end) {

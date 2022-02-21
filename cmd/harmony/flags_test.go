@@ -100,7 +100,8 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile: "./.hmy/blacklist.txt",
+					BlacklistFile:  "./.hmy/blacklist.txt",
+					RosettaFixFile: "",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -777,19 +778,22 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
+				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file"},
+			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
 			},
 		},
 		{
-			args: []string{"--blacklist", "blacklist.file"},
+			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
 			},
 		},
 	}

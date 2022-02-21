@@ -367,7 +367,7 @@ func payoutUndelegations(
 	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
 	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 	for _, validator := range validators {
-		wrapper, err := state.ValidatorWrapper(validator)
+		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
@@ -409,7 +409,7 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 		return errors.New(msg)
 	}
 	for _, addr := range newShardState.StakedValidators().Addrs {
-		wrapper, err := state.ValidatorWrapper(addr)
+		wrapper, err := state.ValidatorWrapper(addr, true, false)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",

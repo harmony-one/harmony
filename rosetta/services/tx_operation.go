@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/internal/bech32"
+	internalCommon "github.com/harmony-one/harmony/internal/common"
+
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
@@ -53,7 +56,7 @@ func GetNativeOperationsFromTransaction(
 		)
 	} else if tx.ShardID() != tx.ToShardID() {
 		txOperations, rosettaError = getCrossShardSenderTransferNativeOperations(
-			tx, senderAddress, &startingOpIndex,
+			tx, receipt, senderAddress, &startingOpIndex,
 		)
 	} else if contractInfo != nil && contractInfo.ExecutionResult != nil {
 		txOperations, rosettaError = getContractTransferNativeOperations(
@@ -90,7 +93,7 @@ func GetNativeOperationsFromStakingTransaction(
 	if signed {
 		// All operations excepts for cross-shard tx payout expend gas
 		gasExpended := new(big.Int).Mul(new(big.Int).SetUint64(receipt.GasUsed), tx.GasPrice())
-		operations = newNativeOperationsWithGas(gasExpended, accountID)
+		operations = newNativeOperationsWithGasNoSubAccount(gasExpended, accountID)
 	}
 
 	// Format staking message for metadata using decimal numbers (hence usage of rpcV2)
@@ -116,6 +119,10 @@ func GetNativeOperationsFromStakingTransaction(
 		}
 	case stakingTypes.DirectiveDelegate:
 		if amount, rosettaError = getAmountFromDelegateMessage(receipt, tx.Data()); rosettaError != nil {
+			return nil, rosettaError
+		}
+	case stakingTypes.DirectiveUndelegate:
+		if amount, rosettaError = getAmountFromUnDelegateMessage(receipt, tx.Data()); rosettaError != nil {
 			return nil, rosettaError
 		}
 	case stakingTypes.DirectiveCollectRewards:
@@ -157,8 +164,8 @@ func GetNativeOperationsFromStakingTransaction(
 
 		// expose delegated balance
 		if tx.StakingType() == stakingTypes.DirectiveDelegate {
-			op2 := getDelegateOperationForSubAccount(tx, operations[1])
-			return append(operations, op2), nil
+			ops := getDelegateOperationForSubAccount(tx, receipt, operations[1])
+			return append(operations, ops...), nil
 		}
 
 		if tx.StakingType() == stakingTypes.DirectiveUndelegate {
@@ -183,6 +190,12 @@ func getUndelegateOperationForSubAccount(
 		},
 	}
 
+	amount := &types.Amount{
+		Value:    positiveStringValue(delegateOperation.Amount.Value),
+		Currency: delegateOperation.Amount.Currency,
+		Metadata: delegateOperation.Amount.Metadata,
+	}
+
 	undelegateion := &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{
 			Index: delegateOperation.OperationIdentifier.Index + 1,
@@ -199,22 +212,77 @@ func getUndelegateOperationForSubAccount(
 			},
 			Metadata: delegateOperation.Account.Metadata,
 		},
-		Amount:   delegateOperation.Amount,
+		Amount:   amount,
 		Metadata: delegateOperation.Metadata,
 	}
 
 	return undelegateion
 }
 
-func getDelegateOperationForSubAccount(
-	tx *stakingTypes.StakingTransaction, delegateOperation *types.Operation,
-) *types.Operation {
+func getDelegateOperationForSubAccount(tx *stakingTypes.StakingTransaction, receipt *hmytypes.Receipt, delegateOperation *types.Operation) (ops []*types.Operation) {
+	msg, err := stakingTypes.RLPDecodeStakeMsg(tx.Data(), stakingTypes.DirectiveDelegate)
+	if err != nil {
+		return nil
+	}
+	stkMsg, ok := msg.(*stakingTypes.Delegate)
+	if !ok {
+		return nil
+	}
+
 	amt, _ := new(big.Int).SetString(delegateOperation.Amount.Value, 10)
 	delegateAmt := new(big.Int).Sub(new(big.Int).SetUint64(0), amt)
 	validatorAddress := delegateOperation.Metadata["validatorAddress"]
-	delegation := &types.Operation{
+	idx := int64(0)
+
+	logs := hmytypes.FindLogsWithTopic(receipt, staking.DelegateTopic)
+	for _, log := range logs {
+		if len(log.Data) > ethcommon.AddressLength && log.Address == stkMsg.DelegatorAddress {
+			// add undelegated transaction
+			subAccount := log.Data[:ethcommon.AddressLength]
+			address := internalCommon.BytesToAddress(subAccount)
+			b32Address, err := bech32.ConvertAndEncode(internalCommon.Bech32AddressHRP, address.Bytes())
+			if err != nil {
+				return nil
+			}
+
+			deductedAmt := new(big.Int).SetBytes(log.Data[ethcommon.AddressLength:])
+			delegateAmt = stkMsg.Amount
+			idx++
+			ops = append(ops, &types.Operation{
+				OperationIdentifier: &types.OperationIdentifier{
+					Index: delegateOperation.OperationIdentifier.Index + idx,
+				},
+				RelatedOperations: []*types.OperationIdentifier{
+					{
+						Index: delegateOperation.OperationIdentifier.Index,
+					},
+				},
+				Type:   tx.StakingType().String(),
+				Status: delegateOperation.Status,
+				Account: &types.AccountIdentifier{
+					Address: delegateOperation.Account.Address,
+					SubAccount: &types.SubAccountIdentifier{
+						Address: b32Address,
+						Metadata: map[string]interface{}{
+							SubAccountMetadataKey: UnDelegation,
+						},
+					},
+					Metadata: delegateOperation.Account.Metadata,
+				},
+				Amount: &types.Amount{
+					Value:    negativeBigValue(deductedAmt),
+					Currency: delegateOperation.Amount.Currency,
+					Metadata: delegateOperation.Amount.Metadata,
+				},
+				Metadata: delegateOperation.Metadata,
+			})
+		}
+	}
+
+	idx++
+	return append(ops, &types.Operation{
 		OperationIdentifier: &types.OperationIdentifier{
-			Index: delegateOperation.OperationIdentifier.Index + 1,
+			Index: delegateOperation.OperationIdentifier.Index + idx,
 		},
 		RelatedOperations: []*types.OperationIdentifier{
 			{
@@ -239,9 +307,7 @@ func getDelegateOperationForSubAccount(
 			Metadata: delegateOperation.Amount.Metadata,
 		},
 		Metadata: delegateOperation.Metadata,
-	}
-
-	return delegation
+	})
 
 }
 
@@ -283,6 +349,13 @@ func GetSideEffectOperationsFromGenesisSpec(
 func GetTransactionStatus(tx hmytypes.PoolTransaction, receipt *hmytypes.Receipt) *string {
 	if _, ok := tx.(*hmytypes.Transaction); ok {
 		status := common.SuccessOperationStatus.Status
+		if common.GetDefaultFix().IsForceTxSuccess(tx.Hash().Hex()) {
+			return &status
+		} else if common.GetDefaultFix().IsForceTxFailed(tx.Hash().Hex()) {
+			status = common.FailureOperationStatus.Status
+			return &status
+		}
+
 		if receipt.Status == hmytypes.ReceiptStatusFailed {
 			if len(tx.Data()) == 0 && receipt.CumulativeGasUsed <= params.TxGas {
 				status = common.FailureOperationStatus.Status
@@ -382,8 +455,9 @@ var (
 	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
 	// All operations have at least 7 elements on the stack when executed.
 	internalNativeTransferEvmOps = map[string]interface{}{
-		vm.CALL.String():     struct{}{},
-		vm.CALLCODE.String(): struct{}{},
+		vm.CALL.String():         struct{}{},
+		vm.CALLCODE.String():     struct{}{},
+		vm.SELFDESTRUCT.String(): struct{}{},
 	}
 )
 
@@ -401,27 +475,67 @@ func getContractInternalTransferNativeOperations(
 
 	for _, log := range executionResult.StructLogs {
 		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
-			fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-			if rosettaError != nil {
-				return nil, rosettaError
-			}
-			topIndex := len(log.Stack) - 1
-			toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(log.Stack[topIndex-1]))
-			if rosettaError != nil {
-				return nil, rosettaError
-			}
-			value, ok := new(big.Int).SetString(log.Stack[topIndex-2], 16)
-			if !ok {
-				return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-					"message": fmt.Sprintf("unable to set value amount, raw: %v", log.Stack[topIndex-2]),
-				})
-			}
+			switch log.Op {
+			case "SELFDESTRUCT":
+				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
 
-			ops = append(
-				ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
-			)
-			nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-			startingOperationIndex = &nextOpIndex
+				stack := log.FormatStack()
+				topIndex := len(stack) - 1
+
+				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex]))
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
+
+				value, ok := new(big.Int).SetString(log.GetOperatorEvent("balance"), 10)
+				if !ok {
+					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
+					})
+				}
+
+				ops = append(
+					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
+				)
+				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+				startingOperationIndex = &nextOpIndex
+			default:
+				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
+				stack := log.FormatStack()
+				topIndex := len(stack) - 1
+				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex-1]))
+				if rosettaError != nil {
+					return nil, rosettaError
+				}
+				value, ok := new(big.Int).SetString(stack[topIndex-2], 16)
+				if !ok {
+					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
+					})
+				}
+
+				afterStack := log.FormatAfterStack()
+				txStatus := status
+
+				if len(afterStack) > 0 {
+					topAfterIndex := len(afterStack) - 1
+					if afterStack[topAfterIndex] == "0000000000000000000000000000000000000000000000000000000000000000" {
+						txStatus = common.FailureOperationStatus.Status
+					}
+				}
+
+				ops = append(
+					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, txStatus, startingOperationIndex)...,
+				)
+				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+				startingOperationIndex = &nextOpIndex
+			}
 		}
 	}
 
@@ -430,10 +544,7 @@ func getContractInternalTransferNativeOperations(
 
 // getCrossShardSenderTransferNativeOperations extracts & formats the native operation(s)
 // for cross-shard-tx on the sender's shard.
-func getCrossShardSenderTransferNativeOperations(
-	tx *hmytypes.Transaction, senderAddress ethcommon.Address,
-	startingOperationIndex *int64,
-) ([]*types.Operation, *types.Error) {
+func getCrossShardSenderTransferNativeOperations(tx *hmytypes.Transaction, receipt *hmytypes.Receipt, senderAddress ethcommon.Address, startingOperationIndex *int64) ([]*types.Operation, *types.Error) {
 	if tx.To() == nil {
 		return nil, common.NewError(common.CatchAllError, nil)
 	}
@@ -460,13 +571,14 @@ func getCrossShardSenderTransferNativeOperations(
 		opIndex = *startingOperationIndex
 	}
 
+	status := GetTransactionStatus(tx, receipt)
 	return []*types.Operation{
 		{
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: opIndex,
 			},
 			Type:    common.NativeCrossShardTransferOperation,
-			Status:  &common.SuccessOperationStatus.Status,
+			Status:  status,
 			Account: senderAccountID,
 			Amount: &types.Amount{
 				Value:    negativeBigValue(tx.Value()),
@@ -487,7 +599,29 @@ func getSideEffectOperationsFromUndelegationPayoutsMap(
 		opIndex = *startingOperationIndex
 	}
 
-	for delegator, undelegationMap := range undelegationPayouts.Data {
+	for validator, undelegationMap := range undelegationPayouts.Data {
+		ops, err := getOperationAndTotalAmountFromUndelegationMap(validator, &opIndex, opType, undelegationMap)
+		if err != nil {
+			return nil, err
+		}
+		operations = append(operations, ops...)
+	}
+
+	return operations, nil
+}
+
+// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegationPayoutsMap which actually
+// has some side effect(opIndex will be increased by this function) so be careful while using for other purpose
+func getOperationAndTotalAmountFromUndelegationMap(validator ethcommon.Address, opIndex *int64,
+	opType string, undelegationMap map[ethcommon.Address]*big.Int) ([]*types.Operation, *types.Error) {
+	var operations []*types.Operation
+	for delegator, amount := range undelegationMap {
+		subAccId, rosettaError := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
+			SubAccountMetadataKey: UnDelegation,
+		})
+		if rosettaError != nil {
+			return nil, rosettaError
+		}
 
 		accID, rosettaError := newAccountIdentifier(delegator)
 		if rosettaError != nil {
@@ -496,55 +630,24 @@ func getSideEffectOperationsFromUndelegationPayoutsMap(
 
 		receiverOp := &types.Operation{
 			OperationIdentifier: &types.OperationIdentifier{
-				Index: opIndex,
+				Index: *opIndex,
 			},
 			Type:    opType,
 			Status:  &common.SuccessOperationStatus.Status,
 			Account: accID,
+			Amount: &types.Amount{
+				Value:    amount.String(),
+				Currency: &common.NativeCurrency,
+			},
 		}
+		*opIndex++
 
-		opIndex++
-		operations = append(operations, receiverOp)
-		receiverIndex := len(operations) - 1
-
-		totalAmount, ops, err := getOperationAndTotalAmountFromUndelegationMap(delegator, &opIndex,
-			receiverOp.OperationIdentifier, opType, undelegationMap)
-		if err != nil {
-			return nil, err
-		}
-		operations = append(operations, ops...)
-
-		operations[receiverIndex].Amount = &types.Amount{
-			Value:    totalAmount.String(),
-			Currency: &common.NativeCurrency,
-		}
-	}
-
-	return operations, nil
-}
-
-// getOperationAndTotalAmountFromUndelegationMap is a helper for getSideEffectOperationsFromUndelegationPayoutsMap which actually
-// has some side effect(opIndex will be increased by this function) so be careful while using for other purpose
-func getOperationAndTotalAmountFromUndelegationMap(
-	delegator ethcommon.Address, opIndex *int64, relatedOpIdentifier *types.OperationIdentifier, opType string,
-	undelegationMap map[ethcommon.Address]*big.Int,
-) (*big.Int, []*types.Operation, *types.Error) {
-	totalAmount := new(big.Int).SetUint64(0)
-	var operations []*types.Operation
-	for validator, amount := range undelegationMap {
-		totalAmount = new(big.Int).Add(totalAmount, amount)
-		subAccId, rosettaError := newAccountIdentifierWithSubAccount(delegator, validator, map[string]interface{}{
-			SubAccountMetadataKey: UnDelegation,
-		})
-		if rosettaError != nil {
-			return nil, nil, rosettaError
-		}
 		payoutOp := &types.Operation{
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: *opIndex,
 			},
 			RelatedOperations: []*types.OperationIdentifier{
-				relatedOpIdentifier,
+				receiverOp.OperationIdentifier,
 			},
 			Type:    opType,
 			Status:  &common.SuccessOperationStatus.Status,
@@ -554,10 +657,10 @@ func getOperationAndTotalAmountFromUndelegationMap(
 				Currency: &common.NativeCurrency,
 			},
 		}
-		operations = append(operations, payoutOp)
+		operations = append(operations, receiverOp, payoutOp)
 		*opIndex++
 	}
-	return totalAmount, operations, nil
+	return operations, nil
 
 }
 
@@ -629,6 +732,34 @@ func getAmountFromDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*type
 
 	deductedAmt := stkMsg.Amount
 	logs := hmytypes.FindLogsWithTopic(receipt, staking.DelegateTopic)
+	for _, log := range logs {
+		if len(log.Data) > ethcommon.AddressLength && log.Address == stkMsg.DelegatorAddress {
+			// Remove re-delegation amount as funds were never credited to account's balance.
+			deductedAmt = new(big.Int).Sub(deductedAmt, new(big.Int).SetBytes(log.Data[ethcommon.AddressLength:]))
+		}
+	}
+	return &types.Amount{
+		Value:    negativeBigValue(deductedAmt),
+		Currency: &common.NativeCurrency,
+	}, nil
+}
+
+func getAmountFromUnDelegateMessage(receipt *hmytypes.Receipt, data []byte) (*types.Amount, *types.Error) {
+	msg, err := stakingTypes.RLPDecodeStakeMsg(data, stakingTypes.DirectiveUndelegate)
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	stkMsg, ok := msg.(*stakingTypes.Undelegate)
+	if !ok {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": "unable to parse staking message for unDelegate tx",
+		})
+	}
+
+	deductedAmt := stkMsg.Amount
+	logs := hmytypes.FindLogsWithTopic(receipt, staking.UnDelegateTopic)
 	for _, log := range logs {
 		if len(log.Data) > ethcommon.AddressLength && log.Address == stkMsg.DelegatorAddress {
 			// Remove re-delegation amount as funds were never credited to account's balance.
@@ -719,9 +850,36 @@ func newNativeOperationsWithGas(
 			OperationIdentifier: &types.OperationIdentifier{
 				Index: 0, // gas operation is always first
 			},
-			Type:    common.ExpendGasOperation,
-			Status:  &common.SuccessOperationStatus.Status,
-			Account: accountID,
+			Type:   common.ExpendGasOperation,
+			Status: &common.SuccessOperationStatus.Status,
+			Account: &types.AccountIdentifier{
+				Address:  accountID.Address,
+				Metadata: accountID.Metadata,
+			},
+			Amount: &types.Amount{
+				Value:    negativeBigValue(gasFeeInATTO),
+				Currency: &common.NativeCurrency,
+			},
+		},
+	}
+}
+
+// newNativeOperationsWithGasNoSubAccount creates a new operation with the gas fee as the first operation.
+// Note: the gas fee is gasPrice * gasUsed.
+func newNativeOperationsWithGasNoSubAccount(
+	gasFeeInATTO *big.Int, accountID *types.AccountIdentifier,
+) []*types.Operation {
+	return []*types.Operation{
+		{
+			OperationIdentifier: &types.OperationIdentifier{
+				Index: 0, // gas operation is always first
+			},
+			Type:   common.ExpendGasOperation,
+			Status: &common.SuccessOperationStatus.Status,
+			Account: &types.AccountIdentifier{
+				Address:  accountID.Address,
+				Metadata: accountID.Metadata,
+			},
 			Amount: &types.Amount{
 				Value:    negativeBigValue(gasFeeInATTO),
 				Currency: &common.NativeCurrency,

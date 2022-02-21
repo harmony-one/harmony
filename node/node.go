@@ -155,6 +155,14 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
+	// only available in validator node and shard 1-3
+	isEnablePruneBeaconChain := node.HarmonyConfig != nil && node.HarmonyConfig.General.EnablePruneBeaconChain
+	isNotBeaconChainValidator := node.NodeConfig.Role() == nodeconfig.Validator && node.NodeConfig.ShardID != shard.BeaconChainShardID
+	if isEnablePruneBeaconChain && isNotBeaconChainValidator {
+		bc.EnablePruneBeaconChainFeature()
+	} else if isEnablePruneBeaconChain && !isNotBeaconChainValidator {
+		utils.Logger().Info().Msg("`IsEnablePruneBeaconChain` only available in validator node and shard 1-3")
+	}
 	return bc
 }
 
@@ -218,7 +226,7 @@ func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
 	errs = append(errs, node.TxPool.AddRemotes(poolTxs)...)
 
 	pendingCount, queueCount := node.TxPool.Stats()
-	utils.Logger().Info().
+	utils.Logger().Debug().
 		Interface("err", errs).
 		Int("length of newTxs", len(newTxs)).
 		Int("totalPending", pendingCount).
@@ -375,6 +383,7 @@ type withError struct {
 var (
 	errNotRightKeySize   = errors.New("key received over wire is wrong size")
 	errNoSenderPubKey    = errors.New("no sender public BLS key in message")
+	errViewIDTooOld      = errors.New("view id too old")
 	errWrongSizeOfBitmap = errors.New("wrong size of sender bitmap")
 	errWrongShardID      = errors.New("wrong shard id")
 	errInvalidNodeMsg    = errors.New("invalid node message")
@@ -425,6 +434,10 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
 					return nil, 0, errors.New("beacon block height smaller than current height beyond tolerance")
+				} else if block.NumberU64()-beaconBlockHeightTolerance > curBeaconHeight {
+					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
+						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message rejected")
+					return nil, 0, errors.New("beacon block height too much higher than current height beyond tolerance")
 				} else if block.NumberU64() <= curBeaconHeight {
 					utils.Logger().Debug().Uint64("receivedNum", block.NumberU64()).
 						Uint64("currentNum", curBeaconHeight).Msg("beacon block sync message ignored")
@@ -535,12 +548,20 @@ func (node *Node) validateShardBoundMessage(
 		if len(maybeCon.SenderPubkeyBitmap) > 0 {
 			senderBitmap = maybeCon.SenderPubkeyBitmap
 		}
+		// If the viewID is too old, reject the message.
+		if maybeCon.ViewId+5 < node.Consensus.GetCurBlockViewID() {
+			return nil, nil, true, errors.WithStack(errViewIDTooOld)
+		}
 	} else if maybeVC != nil {
 		if maybeVC.ShardId != node.Consensus.ShardID {
 			nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid_shard"}).Inc()
 			return nil, nil, true, errors.WithStack(errWrongShardID)
 		}
 		senderKey = maybeVC.SenderPubkey
+		// If the viewID is too old, reject the message.
+		if maybeVC.ViewId+5 < node.Consensus.GetViewChangingID() {
+			return nil, nil, true, errors.WithStack(errViewIDTooOld)
+		}
 	} else {
 		nodeConsensusMessageCounterVec.With(prometheus.Labels{"type": "invalid"}).Inc()
 		return nil, nil, true, errors.WithStack(errNoSenderPubKey)
@@ -1008,6 +1029,13 @@ func New(
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
+
+		// Temporarily not updating other networks to make the rpc tests pass
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet && node.NodeConfig.GetNetworkType() != nodeconfig.Testnet {
+			txPoolConfig.PriceLimit = 1e9
+			txPoolConfig.PriceBump = 10
+		}
+
 		txPoolConfig.Blacklist = blacklist
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)

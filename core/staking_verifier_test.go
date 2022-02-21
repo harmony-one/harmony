@@ -20,6 +20,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 	staketest "github.com/harmony-one/harmony/staking/types/test"
@@ -134,7 +135,7 @@ func TestCheckDuplicateFields(t *testing.T) {
 			bc: makeFakeChainContextForStake(),
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeStateDBForStake(t)
-				vw, err := sdb.ValidatorWrapper(makeTestAddr(0))
+				vw, err := sdb.ValidatorWrapper(makeTestAddr(0), false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -640,7 +641,7 @@ func TestVerifyAndEditValidatorFromMsg(t *testing.T) {
 			// 13: cannot update a banned validator
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeStateDBForStake(t)
-				vw, err := sdb.ValidatorWrapper(validatorAddr)
+				vw, err := sdb.ValidatorWrapper(validatorAddr, false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1140,7 +1141,7 @@ func makeStateForRedelegate(t *testing.T) *state.DB {
 }
 
 func addStateUndelegationForAddr(sdb *state.DB, addr common.Address, epoch *big.Int) error {
-	w, err := sdb.ValidatorWrapper(addr)
+	w, err := sdb.ValidatorWrapper(addr, false, true)
 	if err != nil {
 		return err
 	}
@@ -1253,7 +1254,7 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 			// 4: Extract tokens from banned validator
 			sdb: func(t *testing.T) *state.DB {
 				sdb := makeDefaultStateForUndelegate(t)
-				w, err := sdb.ValidatorWrapper(validatorAddr)
+				w, err := sdb.ValidatorWrapper(validatorAddr, false, true)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1574,7 +1575,7 @@ func makeStateForReward(t *testing.T) *state.DB {
 }
 
 func addStateRewardForAddr(sdb *state.DB, addr common.Address, rewards []*big.Int) error {
-	w, err := sdb.ValidatorWrapper(addr)
+	w, err := sdb.ValidatorWrapper(addr, false, true)
 	if err != nil {
 		return err
 	}
@@ -1738,6 +1739,10 @@ func (chain *fakeChainContext) ReadDelegationsByDelegator(common.Address) (staki
 	return nil, nil
 }
 
+func (chain *fakeChainContext) ShardID() uint32 {
+	return shard.BeaconChainShardID
+}
+
 func (chain *fakeChainContext) ReadValidatorSnapshot(addr common.Address) (*staking.ValidatorSnapshot, error) {
 	w, ok := chain.vWrappers[addr]
 	if !ok {
@@ -1772,6 +1777,10 @@ func (chain *fakeErrChainContext) Config() *params.ChainConfig {
 
 func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
 	return nil, nil
+}
+
+func (chain *fakeErrChainContext) ShardID() uint32 {
+	return 900 // arbitrary number different from BeaconChainShardID
 }
 
 func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {

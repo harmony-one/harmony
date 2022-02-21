@@ -54,15 +54,16 @@ type P2pConfig struct {
 }
 
 type GeneralConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBackup         bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
-	TraceEnable      bool
+	NodeType               string
+	NoStaking              bool
+	ShardID                int
+	IsArchival             bool
+	IsBackup               bool
+	IsBeaconArchival       bool
+	IsOffline              bool
+	DataDir                string
+	TraceEnable            bool
+	EnablePruneBeaconChain bool
 }
 
 type ConsensusConfig struct {
@@ -86,7 +87,8 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile string
+	BlacklistFile  string
+	RosettaFixFile string
 }
 
 type PprofConfig struct {

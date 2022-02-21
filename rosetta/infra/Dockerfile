@@ -26,6 +26,10 @@ RUN make linux_static && \
     cp ./bin/harmony /root/harmony && \
     cp ./rosetta/infra/run.sh /root/run.sh
 
+RUN cp ./rosetta/infra/harmony-pstn.conf /root/harmony-pstn.conf && \
+    cp ./rosetta/infra/harmony-mainnet.conf /root/harmony-mainnet.conf && \
+    cp ./.hmy/rosetta_local_fix.csv /root/rosetta_local_fix.csv
+
 # Execution
 FROM ubuntu:latest
 
@@ -37,6 +41,9 @@ WORKDIR /root
 
 COPY --from=build /root/harmony /root/harmony
 COPY --from=build /root/run.sh /root/run.sh
+COPY --from=build /root/harmony-pstn.conf /root/harmony-pstn.conf
+COPY --from=build /root/harmony-mainnet.conf /root/harmony-mainnet.conf
+COPY --from=build /root/rosetta_local_fix.csv /root/rosetta_local_fix.csv
 
 EXPOSE 9500/tcp
 EXPOSE 9700/tcp

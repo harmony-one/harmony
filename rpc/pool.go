@@ -2,6 +2,10 @@ package rpc
 
 import (
 	"context"
+	"reflect"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 
 	"github.com/pkg/errors"
 
@@ -9,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -27,6 +31,9 @@ import (
 type PublicPoolService struct {
 	hmy     *hmy.Harmony
 	version Version
+
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterPendingTransactions *rate.Limiter
 }
 
 // NewPublicPoolAPI creates a new API for the RPC interface
@@ -34,9 +41,25 @@ func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicPoolService{hmy, version},
+		Service:   &PublicPoolService{hmy, version, rate.NewLimiter(2, 5)},
 		Public:    true,
 	}
+}
+
+func (s *PublicPoolService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !limiter.Allow() {
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"limiter_name": name,
+			}).Inc()
+		}
+
+		return limiter.Wait(deadlineCtx)
+	}
+	return nil
 }
 
 // SendRawTransaction will add the signed transaction to the transaction pool.
@@ -189,6 +212,12 @@ func (s *PublicPoolService) PendingTransactions(
 ) ([]StructuredResponse, error) {
 	timer := DoMetricRPCRequest(PendingTransactions)
 	defer DoRPCRequestDuration(PendingTransactions, timer)
+
+	err := s.wait(s.limiterPendingTransactions, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(PendingTransactions, RateLimitedNumber)
+		return nil, err
+	}
 
 	// Fetch all pending transactions (stx & plain tx)
 	pending, err := s.hmy.GetPoolTransactions()
