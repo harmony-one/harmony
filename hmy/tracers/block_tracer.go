@@ -140,6 +140,9 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
 func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
+	if err != nil {
+		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
+	}
 	//if op < vm.CREATE && !jst.descended {
 	//	return nil
 	//}
@@ -259,21 +262,19 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
 func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
-	if op == vm.REVERT {
+	if jst.last().err != nil {
 		return nil
 	}
 	call := jst.pop()
-	if call.err == nil {
-		// Consume all available gas and clean any leftovers
-		if call.gas != 0 {
-			call.gasUsed = call.gas
-		}
-
-		// Flatten the failed call into its parent
-		if jst.len() > 0 {
-			jst.last().push(call)
-			return nil
-		}
+	call.err = err
+	// Consume all available gas and clean any leftovers
+	if call.gas != 0 {
+		call.gasUsed = call.gas
+	}
+	// Flatten the failed call into its parent
+	if jst.len() > 0 {
+		jst.last().push(call)
+		return nil
 	}
 	jst.push(call)
 	return nil
