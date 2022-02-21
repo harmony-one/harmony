@@ -143,7 +143,6 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	if err != nil {
 		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
 	}
-
 	var retErr error
 	stackPeek := func(n int) *big.Int {
 		if n >= len(stack.Data()) {
