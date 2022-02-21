@@ -169,6 +169,7 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 		return nil, err
 	}
 	// Trace the transaction and return
+	statedb.Prepare(tx.ConvertToEth().Hash(), block.Hash(), int(index))
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
 
