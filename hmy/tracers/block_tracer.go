@@ -261,10 +261,10 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
 func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
-	call := jst.pop()
-	if call.err != nil {
+	if jst.last().err != nil {
 		return nil
 	}
+	call := jst.pop()
 	call.err = err
 	// Consume all available gas and clean any leftovers
 	if call.gas != 0 {
