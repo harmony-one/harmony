@@ -274,7 +274,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		if chain == nil {
 			return errors.New("[CollectRewards] No chain context provided")
 		}
-		delegations, err := chain.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
+		delegations, err := chain.ReadDelegationsByDelegatorAt(collectRewards.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
 			return err
 		}
