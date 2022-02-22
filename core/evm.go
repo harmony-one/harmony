@@ -218,11 +218,13 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 
 				//add rosetta log
 				if rosettaTracer != nil {
+					// copy from address
+					fromAccount := common.BytesToAddress(key.Bytes())
 					rosettaTracer.AddRosettaLog(
 						vm.CALL,
 						&vm.RosettaLogAddressItem{
 							Account:    &delegate.DelegatorAddress,
-							SubAccount: &key,
+							SubAccount: &fromAccount,
 							Metadata:   map[string]interface{}{"type": "undelegation"},
 						},
 						&vm.RosettaLogAddressItem{
