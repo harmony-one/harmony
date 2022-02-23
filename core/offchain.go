@@ -29,6 +29,7 @@ func (bc *BlockChain) CommitOffChainData(
 	receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
+	delegationsToRemove map[common.Address][]common.Address,
 	payout reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -119,7 +120,7 @@ func (bc *BlockChain) CommitOffChainData(
 
 	// Do bookkeeping for new staking txns
 	newVals, err := bc.UpdateStakingMetaData(
-		batch, block, stakeMsgs, state, epoch, nextBlockEpoch,
+		batch, block, stakeMsgs, delegationsToRemove, state, epoch, nextBlockEpoch,
 	)
 	if err != nil {
 		utils.Logger().Err(err).Msg("UpdateStakingMetaData failed")

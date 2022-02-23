@@ -187,7 +187,7 @@ func testParseStakeMsg(test parseTest, t *testing.T) {
 						t.Errorf("Expected %+v but got %+v", test.expected, converted)
 					}
 				} else {
-					panic("Received unexpected result from ParseStakeMsg")
+					t.Fatalf("Received unexpected result from ParseStakeMsg")
 				}
 			} else if res != nil {
 				t.Errorf("Expected nil, got %v", res)

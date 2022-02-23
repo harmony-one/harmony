@@ -268,7 +268,7 @@ func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
 	// Do not read cache from processor.
-	receipts, cxReceipts, _, _, usedGas, _, _, err := bc.processor.Process(
+	receipts, cxReceipts, _, _, _, usedGas, _, _, err := bc.processor.Process(
 		block, state, bc.vmConfig, false,
 	)
 	if err != nil {
@@ -1149,6 +1149,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
+	delegationsToRemove map[common.Address][]common.Address,
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -1241,6 +1242,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
 		cxReceipts, stakeMsgs,
+		delegationsToRemove,
 		paid, state,
 	); err != nil {
 		return status, err
@@ -1467,7 +1469,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
+		receipts, cxReceipts, stakeMsgs, delegationsToRemove, logs, usedGas, payout, newState, err := bc.processor.Process(
 			block, state, bc.vmConfig, true,
 		)
 		state = newState // update state in case the new state is cached.
@@ -1487,7 +1489,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 		// Write the block to the chain and get the status.
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, stakeMsgs, payout, state,
+			block, receipts, cxReceipts, stakeMsgs, delegationsToRemove, payout, state,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
@@ -2695,6 +2697,7 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, block *types.Block,
 	stakeMsgs []staking.StakeMsg,
+	delegationsToRemove map[common.Address][]common.Address,
 	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, stakeMsgs, state)
@@ -2750,6 +2753,13 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			return newValidators, err
 		}
 	}
+
+	for delegatorAddress, validatorAddresses := range delegationsToRemove {
+		if err := bc.RemoveDelegationsFromDelegator(batch, delegatorAddress, validatorAddresses); err != nil {
+			return newValidators, err
+		}
+	}
+
 	return newValidators, nil
 }
 
@@ -2779,7 +2789,7 @@ func (bc *BlockChain) prepareStakingMetaData(
 				return nil, nil, err
 			}
 		} else {
-			panic("Only *staking.Delegate stakeMsgs are supported at the moment")
+			return nil, nil, errors.New("Only *staking.Delegate stakeMsgs are supported at the moment")
 		}
 	}
 	for _, txn := range block.StakingTransactions() {
@@ -2845,7 +2855,7 @@ func processDelegateMetadata(delegate *staking.Delegate,
 ) (err error) {
 	delegations, ok := newDelegations[delegate.DelegatorAddress]
 	if !ok {
-		// If the cache doesn't have it, load it from DB for the first time.
+		// If the cache (newDelegations) doesn't have it, load it from DB for the first time.
 		delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
 		if err != nil {
 			return err
@@ -2908,12 +2918,14 @@ func (bc *BlockChain) addDelegationIndex(
 	// If there is an existing delegation, just return
 	validatorAddressBytes := validatorAddress.Bytes()
 	for _, delegation := range delegations {
+		// this will happen when someone delegates more to the same validator
+		// since a delegationIndex only stores the blockNum, validator address and block number
 		if bytes.Equal(delegation.ValidatorAddress[:], validatorAddressBytes[:]) {
 			return delegations, nil
 		}
 	}
 
-	// Found the delegation from state and add the delegation index
+	// Find the delegation from state and add the delegation index (== position in validator)
 	// Note this should read from the state of current block in concern
 	wrapper, err := state.ValidatorWrapper(validatorAddress, true, false)
 	if err != nil {
@@ -2929,9 +2941,42 @@ func (bc *BlockChain) addDelegationIndex(
 				uint64(i),
 				blockNum,
 			})
+			break // wrapper.Delegations will not have repeat delegators so we are done
 		}
 	}
 	return delegations, nil
+}
+
+// RemoveDelegationsFromDelegator will remove the delegationIndexes from state
+// for delegatorAddress and all validatorAddresses
+func (bc *BlockChain) RemoveDelegationsFromDelegator(
+	batch rawdb.DatabaseWriter,
+	delegatorAddress common.Address,
+	validatorAddresses []common.Address,
+) error {
+	delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
+	if err != nil {
+		return err
+	}
+	finalDelegationIndexes := delegationIndexes[:0]
+	for _, validatorAddress := range validatorAddresses {
+		// TODO: can this be sped up from O(vd) to something shorter?
+		for _, delegationIndex := range delegationIndexes {
+			if bytes.Equal(
+				validatorAddress.Bytes(),
+				delegationIndex.ValidatorAddress.Bytes(),
+			) {
+				// do nothing
+				break
+			}
+			finalDelegationIndexes = append(
+				finalDelegationIndexes,
+				delegationIndex,
+			)
+		}
+	}
+	bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes)
+	return nil
 }
 
 // ValidatorCandidates returns the up to date validator candidates for next epoch

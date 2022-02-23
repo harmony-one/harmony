@@ -35,20 +35,21 @@ import (
 
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
-	signer     types.Signer
-	ethSigner  types.Signer
-	state      *state.DB     // apply state changes here
-	gasPool    *core.GasPool // available gas used to pack transactions
-	header     *block.Header
-	txs        []*types.Transaction
-	stakingTxs []*staking.StakingTransaction
-	receipts   []*types.Receipt
-	logs       []*types.Log
-	reward     reward.Reader
-	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
-	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
-	slashes    slash.Records
-	stakeMsgs  []staking.StakeMsg
+	signer              types.Signer
+	ethSigner           types.Signer
+	state               *state.DB     // apply state changes here
+	gasPool             *core.GasPool // available gas used to pack transactions
+	header              *block.Header
+	txs                 []*types.Transaction
+	stakingTxs          []*staking.StakingTransaction
+	receipts            []*types.Receipt
+	logs                []*types.Log
+	reward              reward.Reader
+	outcxs              []*types.CXReceipt       // cross shard transaction receipts (source shard)
+	incxs               []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
+	slashes             slash.Records
+	stakeMsgs           []staking.StakeMsg
+	delegationsToRemove map[common.Address][]common.Address
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -328,13 +329,14 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 // GetCurrentResult gets the current block processing result.
 func (w *Worker) GetCurrentResult() *core.ProcessorResult {
 	return &core.ProcessorResult{
-		Receipts:   w.current.receipts,
-		CxReceipts: w.current.outcxs,
-		Logs:       w.current.logs,
-		UsedGas:    w.current.header.GasUsed(),
-		Reward:     w.current.reward,
-		State:      w.current.state,
-		StakeMsgs:  w.current.stakeMsgs,
+		Receipts:            w.current.receipts,
+		CxReceipts:          w.current.outcxs,
+		Logs:                w.current.logs,
+		UsedGas:             w.current.header.GasUsed(),
+		Reward:              w.current.reward,
+		State:               w.current.state,
+		StakeMsgs:           w.current.stakeMsgs,
+		DelegationsToRemove: w.current.delegationsToRemove,
 	}
 }
 
@@ -546,7 +548,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, payout, err := w.engine.Finalize(
+	block, delegationsToRemove, payout, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes, sigsReady, viewID,
@@ -555,6 +557,7 @@ func (w *Worker) FinalizeNewBlock(
 		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
 	w.current.reward = payout
+	w.current.delegationsToRemove = delegationsToRemove
 	return block, nil
 }
 

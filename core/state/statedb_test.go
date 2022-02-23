@@ -33,7 +33,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
-
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
@@ -1186,9 +1185,7 @@ func TestValidatorMultipleReverts(t *testing.T) {
 	}
 }
 
-func TestValidatorWrapperPanic(t *testing.T) {
-	defer func() { recover() }()
-
+func TestValidatorWrapperOriginalCopy(t *testing.T) {
 	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
 	if err != nil {
 		t.Fatalf("Could not instantiate state %v\n", err)
@@ -1198,9 +1195,13 @@ func TestValidatorWrapperPanic(t *testing.T) {
 		t.Fatalf("Could not generate key %v\n", err)
 	}
 	validatorAddress := crypto.PubkeyToAddress(key.PublicKey)
-	// will panic because we are asking for Original with copy of delegations
-	_, _ = state.ValidatorWrapper(validatorAddress, true, true)
-	t.Fatalf("Did not panic")
+	if _, err := state.ValidatorWrapper(validatorAddress, true, true); err == nil {
+		t.Errorf("Got no error")
+	} else {
+		if err.Error() != "'sendOriginal' must not expect copy of delegations" {
+			t.Errorf("Got unexpected error %v", err)
+		}
+	}
 }
 
 func TestValidatorWrapperGetCode(t *testing.T) {
@@ -1224,4 +1225,216 @@ func TestValidatorWrapperGetCode(t *testing.T) {
 		fmt.Printf("LoadedCounters: %v\n", loadedWrapper.Counters)
 		t.Fatalf("Loaded wrapper not equal to expected wrapper%v\n", err)
 	}
+}
+
+func TestAddRewardYesNilDelegations(t *testing.T) {
+	testAddReward(t, false)
+}
+
+func TestAddRewardNoNilDelegations(t *testing.T) {
+	testAddReward(t, true)
+}
+
+func testAddReward(t *testing.T, nilDelegationsRemoved bool) {
+	state, err := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
+	if err != nil {
+		t.Fatalf("Could not instantiate state %v\n", err)
+	}
+	// normal case where snapshot and validator are same
+	snapshot := makeValidValidatorWrapper(common.BytesToAddress([]byte{1}))
+	snapshot.BlockReward = big.NewInt(0)
+	snapshot.Delegations[0].Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000))
+	snapshot.MaxTotalDelegation = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(50000))
+	rate, _ := numeric.NewDecFromStr("0.1")
+	snapshot.Rate = rate
+	snapshot.MaxRate = rate
+	snapshot.MaxChangeRate = rate
+	updateAndCheckValidator(t, state, snapshot)
+	shareLookup := make(map[common.Address]numeric.Dec, 0)
+	shareLookup[snapshot.Address] = numeric.OneDec()
+	if err := state.AddReward(
+		&snapshot,
+		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20)),
+		shareLookup,
+		nilDelegationsRemoved,
+	); err != nil {
+		t.Errorf("Got error %v", err)
+	}
+	// fetch the wrapper from state now
+	wrapper, _ := state.ValidatorWrapper(snapshot.Address, true, false)
+	if wrapper.BlockReward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+		t.Errorf("Expected 20 ONE as BlockReward, got %d", wrapper.BlockReward)
+	}
+	if wrapper.Delegations[0].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+		t.Errorf("Expected 20 ONE as delegation reward, got %d", wrapper.Delegations[0].Reward)
+	}
+	// case where validator has more delegations but such a delegation is missing in snapshot
+	// occurs when delegations have been added since the time of snapshot
+	key, _ := crypto.GenerateKey()
+	snapshot.Delegations = append(
+		snapshot.Delegations,
+		stk.NewDelegation(
+			crypto.PubkeyToAddress(key.PublicKey),
+			new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)),
+		),
+	)
+	// since this uses snapshot as a base, there is no (block) reward embedded here
+	updateAndCheckValidator(t, state, snapshot)
+	// drop the delegation from snapshot
+	snapshot.Delegations = snapshot.Delegations[:1]
+	if err := state.AddReward(
+		&snapshot,
+		new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20)),
+		shareLookup,
+		nilDelegationsRemoved,
+	); err != nil {
+		t.Errorf("Got error %v", err)
+	}
+	// fetch the wrapper from state now
+	wrapper, _ = state.ValidatorWrapper(snapshot.Address, true, false)
+	if wrapper.BlockReward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+		t.Errorf("Expected 20 ONE as BlockReward, got %d", wrapper.BlockReward)
+	}
+	if wrapper.Delegations[0].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+		t.Errorf("Expected 20 ONE as delegation reward, got %d", wrapper.Delegations[0].Reward)
+	}
+	if nilDelegationsRemoved {
+		// case where validator has less delegations than the snapshot
+		// occurs when a nil delegation is removed
+		updateAndCheckValidator(t, state, snapshot) // save wrapper with 1 delegation
+		// add 1 delegation to snapshot (so total 2)
+		snapshot.Delegations = append(
+			snapshot.Delegations,
+			stk.NewDelegation(
+				crypto.PubkeyToAddress(key.PublicKey),
+				big.NewInt(0), // nil delegation
+			),
+		)
+		if err := state.AddReward(
+			&snapshot,
+			new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20)),
+			shareLookup,
+			true,
+		); err != nil && err.Error() != "[AddReward] Snapshot and shareLookup mismatch" {
+			t.Errorf("Got error %v but expected [AddReward] Snapshot and shareLookup mismatch", err)
+		} else if err == nil {
+			t.Errorf("Got no error but expected [AddReward] Snapshot and shareLookup mismatch")
+		}
+		// now add the address to shareLookup with zero reward
+		shareLookup[snapshot.Delegations[1].DelegatorAddress] = numeric.ZeroDec()
+		if err := state.AddReward(
+			&snapshot,
+			new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20)),
+			shareLookup,
+			nilDelegationsRemoved,
+		); err != nil {
+			t.Errorf("Got error %v", err)
+		}
+		// fetch the wrapper from state now
+		wrapper, _ = state.ValidatorWrapper(snapshot.Address, true, false)
+		if wrapper.BlockReward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+			t.Errorf("Expected 20 ONE as BlockReward, got %d", wrapper.BlockReward)
+		}
+		if wrapper.Delegations[0].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+			t.Errorf("Expected 20 ONE as delegation reward, got %d", wrapper.Delegations[0].Reward)
+		}
+		// snapshot has 2 delegations while wrapper has just 1
+		snapshot.Delegations = snapshot.Delegations[:1]
+		updateAndCheckValidator(t, state, snapshot) // rewrite to remove 20 reward
+		snapshot.Delegations = append(
+			snapshot.Delegations,
+			stk.NewDelegation(
+				crypto.PubkeyToAddress(key.PublicKey),
+				big.NewInt(0), // nil delegation
+			),
+		)
+		// non zero reward
+		expect := "Non-zero reward found in snapshot but delegation missing in wrapper"
+		shareLookup[snapshot.Delegations[1].DelegatorAddress] = numeric.OneDec()
+		if err := state.AddReward(
+			&snapshot,
+			new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20)),
+			shareLookup,
+			nilDelegationsRemoved,
+		); err != nil && err.Error() != expect {
+			t.Errorf("Got error %v", err)
+		} else if err == nil {
+			t.Errorf("Got no error but expected %v", expect)
+		}
+		// fetch the wrapper from state now
+		// since AddReward occurs in state, the numbers below are okay
+		wrapper, _ = state.ValidatorWrapper(snapshot.Address, true, false)
+		if wrapper.BlockReward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+			t.Errorf("Expected 20 ONE as BlockReward, got %d", wrapper.BlockReward)
+		}
+		if wrapper.Delegations[0].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(20))) != 0 {
+			t.Errorf("Expected 20 ONE as delegation reward, got %d", wrapper.Delegations[0].Reward)
+		}
+		// lastly, different order between wrapper and snapshot
+		// snapshot is A / B / C / D with rewards on A and B and D and C is stale
+		// validator is A / B / D / C after removal of C followed by re-addition
+		snapshot.Delegations = snapshot.Delegations[:1]       // only self delegation
+		shareLookup = make(map[common.Address]numeric.Dec, 0) // restart
+		for i := 0; i < 3; i++ {
+			snapshot.Delegations = append(
+				snapshot.Delegations,
+				stk.NewDelegation(
+					makeTestAddr(i),
+					new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(3000)),
+				),
+			)
+		}
+		// C is stale, so remove the amount
+		snapshot.Delegations[2].Amount = big.NewInt(0)
+		// calculate the rewards
+		totalDelegationDec := numeric.NewDecFromBigInt(snapshot.TotalDelegation())
+		for i := range snapshot.Delegations {
+			delegation := snapshot.Delegations[i]
+			// NOTE percentage = <this_delegator_amount>/<total_delegation>
+			percentage := numeric.NewDecFromBigInt(delegation.Amount).Quo(totalDelegationDec)
+			shareLookup[delegation.DelegatorAddress] = percentage
+		}
+		// now make wrapper
+		updateAndCheckValidator(t, state, snapshot)                        // saves a copy of snapshot
+		wrapper, _ = state.ValidatorWrapper(snapshot.Address, true, false) // load that copy
+		// drop C
+		cDelegation := wrapper.Delegations[2]
+		wrapper.Delegations = append(wrapper.Delegations[:2], wrapper.Delegations[3:]...)
+		// add back C
+		cDelegation.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))
+		wrapper.Delegations = append(wrapper.Delegations, cDelegation)
+		if err := state.AddReward(
+			&snapshot,
+			new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(160)),
+			shareLookup,
+			nilDelegationsRemoved,
+		); err != nil {
+			t.Errorf("Got error %v", err)
+		}
+		// now check reward
+		// self reward is 62.5% (10/16) while B and D have 18.75% (3/16) each and C has 0%
+		// but base is 144 since 10% commission
+		// so validator gets 16 + 90
+		// B and D get 27 each
+		if wrapper.BlockReward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(160))) != 0 {
+			t.Errorf("Expected 160 ONE as BlockReward, got %d", wrapper.BlockReward)
+		}
+		if wrapper.Delegations[0].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(106))) != 0 {
+			t.Errorf("Expected 100 ONE as delegation reward, got %d", wrapper.Delegations[0].Reward)
+		}
+		if wrapper.Delegations[1].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(27))) != 0 {
+			t.Errorf("Expected 27 ONE as delegation reward, got %d", wrapper.Delegations[1].Reward)
+		}
+		if wrapper.Delegations[2].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(27))) != 0 {
+			t.Errorf("Expected 27 ONE as delegation reward, got %d", wrapper.Delegations[2].Reward)
+		}
+		if wrapper.Delegations[3].Reward.Cmp(new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(0))) != 0 {
+			t.Errorf("Expected 0 ONE as delegation reward, got %d", wrapper.Delegations[3].Reward)
+		}
+	}
+}
+
+func makeTestAddr(item interface{}) common.Address {
+	s := fmt.Sprintf("harmony-one-%v", item)
+	return common.BytesToAddress([]byte(s))
 }

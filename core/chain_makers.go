@@ -175,7 +175,7 @@ func GenerateChain(
 	}
 	factory := blockfactory.NewFactory(config)
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
-	chainreader := &fakeChainReader{config: config}
+	chainreader := &FakeChainReader{InternalConfig: config}
 	genblock := func(i int, parent *types.Block, statedb *state.DB) (*types.Block, types.Receipts) {
 		b := &BlockGen{
 			i:       i,
@@ -195,7 +195,7 @@ func GenerateChain(
 
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _, err := b.engine.Finalize(
+			block, _, _, err := b.engine.Finalize(
 				chainreader, b.header, statedb, b.txs, b.receipts, nil, nil, nil, nil, nil, func() uint64 { return 0 },
 			)
 			if err != nil {
@@ -245,73 +245,73 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		Header()
 }
 
-type fakeChainReader struct {
-	config *params.ChainConfig
+type FakeChainReader struct {
+	InternalConfig *params.ChainConfig
 }
 
 // Config returns the chain configuration.
-func (cr *fakeChainReader) Config() *params.ChainConfig {
-	return cr.config
+func (cr *FakeChainReader) Config() *params.ChainConfig {
+	return cr.InternalConfig
 }
 
-func (cr *fakeChainReader) CurrentHeader() *block.Header                            { return nil }
-func (cr *fakeChainReader) ShardID() uint32                                         { return 0 }
-func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *block.Header           { return nil }
-func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
-func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
-func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
-func (cr *fakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error)     { return nil, nil }
-func (cr *fakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
-func (cr *fakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
-func (cr *fakeChainReader) SuperCommitteeForNextEpoch(
+func (cr *FakeChainReader) CurrentHeader() *block.Header                            { return nil }
+func (cr *FakeChainReader) ShardID() uint32                                         { return 0 }
+func (cr *FakeChainReader) GetHeaderByNumber(number uint64) *block.Header           { return nil }
+func (cr *FakeChainReader) GetHeaderByHash(hash common.Hash) *block.Header          { return nil }
+func (cr *FakeChainReader) GetHeader(hash common.Hash, number uint64) *block.Header { return nil }
+func (cr *FakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }
+func (cr *FakeChainReader) ReadShardState(epoch *big.Int) (*shard.State, error)     { return nil, nil }
+func (cr *FakeChainReader) ReadValidatorList() ([]common.Address, error)            { return nil, nil }
+func (cr *FakeChainReader) ValidatorCandidates() []common.Address                   { return nil }
+func (cr *FakeChainReader) SuperCommitteeForNextEpoch(
 	beacon consensus_engine.ChainReader, header *block.Header, isVerify bool,
 ) (*shard.State, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorInformation(
+func (cr *FakeChainReader) ReadValidatorInformation(
 	addr common.Address,
 ) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorInformationAtState(
+func (cr *FakeChainReader) ReadValidatorInformationAtState(
 	addr common.Address, state *state.DB,
 ) (*staking.ValidatorWrapper, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) StateAt(root common.Hash) (*state.DB, error) {
+func (cr *FakeChainReader) StateAt(root common.Hash) (*state.DB, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorSnapshot(
+func (cr *FakeChainReader) ReadValidatorSnapshot(
 	addr common.Address,
 ) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
-func (cr *fakeChainReader) ReadValidatorSnapshotAtEpoch(
+func (cr *FakeChainReader) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int, addr common.Address,
 ) (*staking.ValidatorSnapshot, error) {
 	return nil, nil
 }
 
-func (cr *fakeChainReader) ReadBlockRewardAccumulator(
+func (cr *FakeChainReader) ReadBlockRewardAccumulator(
 	uint64,
 ) (*big.Int, error) {
 	return nil, nil
 }
 
-func (cr *fakeChainReader) CurrentBlock() *types.Block {
+func (cr *FakeChainReader) CurrentBlock() *types.Block {
 	return nil
 }
 
-func (cr *fakeChainReader) ValidatorStakingWithDelegation(
+func (cr *FakeChainReader) ValidatorStakingWithDelegation(
 	addr common.Address,
 ) *big.Int {
 	return nil
 }
 
-func (cr *fakeChainReader) ReadValidatorStats(
+func (cr *FakeChainReader) ReadValidatorStats(
 	addr common.Address,
 ) (*staking.ValidatorStats, error) {
 	return nil, nil
 }
 
-func (cr *fakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }
+func (cr *FakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }

@@ -220,9 +220,24 @@ func AccumulateRewardsAndCountSigs(
 			if blockNum%RewardFrequency != RewardFrequency-1 {
 				return network.EmptyPayout, nil
 			}
-			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+			return distributeRewardAfterAggregateEpoch(bc,
+				state,
+				header,
+				beaconChain,
+				defaultReward,
+				// pruning only occurs at the end of the epoch
+				bc.Config().IsNoNilDelegations(header.Epoch()) && header.IsLastBlockInEpoch() && header.ShardID() == shard.BeaconChainShardID,
+			)
 		} else {
-			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+			return distributeRewardBeforeAggregateEpoch(bc,
+				state,
+				header,
+				beaconChain,
+				defaultReward,
+				sigsReady,
+				// pruning only occurs at the end of the epoch
+				bc.Config().IsNoNilDelegations(header.Epoch()) && header.IsLastBlockInEpoch() && header.ShardID() == shard.BeaconChainShardID,
+			)
 		}
 	}
 
@@ -301,8 +316,14 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec) (reward.Reader, error) {
+func distributeRewardAfterAggregateEpoch(
+	bc engine.ChainReader,
+	state *state.DB,
+	header *block.Header,
+	beaconChain engine.ChainReader,
+	defaultReward numeric.Dec,
+	nilDelegationsRemoved bool,
+) (reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -396,7 +417,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		if err != nil {
 			return network.EmptyPayout, err
 		}
-		if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
+		if err := state.AddReward(snapshot.Validator, due, shares, nilDelegationsRemoved); err != nil {
 			return network.EmptyPayout, err
 		}
 	}
@@ -408,8 +429,15 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	), nil
 }
 
-func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec, sigsReady chan bool) (reward.Reader, error) {
+func distributeRewardBeforeAggregateEpoch(
+	bc engine.ChainReader,
+	state *state.DB,
+	header *block.Header,
+	beaconChain engine.ChainReader,
+	defaultReward numeric.Dec,
+	sigsReady chan bool,
+	nilDelegationsRemoved bool,
+) (reward.Reader, error) {
 	newRewards, payouts :=
 		big.NewInt(0), []reward.Payout{}
 
@@ -472,7 +500,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 				if err != nil {
 					return network.EmptyPayout, err
 				}
-				if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
+				if err := state.AddReward(snapshot.Validator, due, shares, nilDelegationsRemoved); err != nil {
 					return network.EmptyPayout, err
 				}
 				payouts = append(payouts, reward.Payout{
@@ -541,7 +569,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 			if err != nil {
 				return network.EmptyPayout, err
 			}
-			if err := state.AddReward(snapshot.Validator, due, shares); err != nil {
+			if err := state.AddReward(snapshot.Validator, due, shares, nilDelegationsRemoved); err != nil {
 				return network.EmptyPayout, err
 			}
 			payouts = append(payouts, reward.Payout{
