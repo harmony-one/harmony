@@ -87,11 +87,17 @@ cd $(go env GOPATH)/src/github.com/harmony-one/harmony
 make clean
 docker build -t harmony .
 ```
+> If your build machine has an ARM-based chip, like Apple silicon (M1), the image is built for `linux/arm64` by default. To build for `x86_64`, apply the `--platform` arg like so:
+> ```bash
+> docker build --platform linux/amd64 -t harmony .
+> ```
+> Learn more about the `--platform` arg and multi-CPU architecture support, [here](https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope) and [here](https://docs.docker.com/desktop/multi-arch/).
+
+
 
 Then you can start your docker container with the following command:
 ```bash
-docker rm harmony # Remove old docker container
-docker run --name harmony -it -v "$(go env GOPATH)/src/github.com/harmony-one/harmony:/root/go/src/github.com/harmony-one/harmony" harmony /bin/bash
+docker run --rm --name harmony -it -v "$(go env GOPATH)/src/github.com/harmony-one/harmony:/root/go/src/github.com/harmony-one/harmony" harmony /bin/bash
 ```
 > Note that the harmony repo will be shared between your docker container and your host machine. However, everything else in the docker container will be ephemeral.
 
