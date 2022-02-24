@@ -3,8 +3,9 @@ package services
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"

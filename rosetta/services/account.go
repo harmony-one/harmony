@@ -3,8 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
-	"github.com/harmony-one/harmony/core/vm"
 	"math/big"
+
+	"github.com/harmony-one/harmony/core/vm"
 
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"

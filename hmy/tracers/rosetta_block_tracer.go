@@ -17,8 +17,9 @@
 package tracers
 
 import (
-	"github.com/harmony-one/harmony/core/vm"
 	"math/big"
+
+	"github.com/harmony-one/harmony/core/vm"
 )
 
 type RosettaLogItem struct {

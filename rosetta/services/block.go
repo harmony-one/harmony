@@ -3,10 +3,11 @@ package services
 import (
 	"context"
 	"fmt"
-	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
 	"sync"
 	"time"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/state"

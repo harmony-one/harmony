@@ -1,8 +1,9 @@
 package services
 
 import (
-	"github.com/harmony-one/harmony/hmy/tracers"
 	"math/big"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 
 	"github.com/harmony-one/harmony/internal/bech32"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
