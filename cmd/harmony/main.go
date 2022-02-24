@@ -101,6 +101,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(dumpConfigLegacyCmd)
+	rootCmd.AddCommand(dumpDBCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
