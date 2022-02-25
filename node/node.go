@@ -1034,6 +1034,9 @@ func New(
 			txPoolConfig.PriceLimit = 1e9
 			txPoolConfig.PriceBump = 10
 		}
+		if harmonyconfig != nil {
+			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
+		}
 
 		txPoolConfig.Blacklist = blacklist
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
