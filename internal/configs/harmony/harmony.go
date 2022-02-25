@@ -88,6 +88,7 @@ type BlsConfig struct {
 type TxPoolConfig struct {
 	BlacklistFile  string
 	RosettaFixFile string
+	AccountSlots   uint64
 }
 
 type PprofConfig struct {
