@@ -635,6 +635,10 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 	return nil
 }
 
+func (bc *BlockChain) WriteHeadBlock(block *types.Block) error {
+	return bc.writeHeadBlock(block)
+}
+
 // writeHeadBlock writes a new head block
 func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 	// If the block is on a side chain or an unknown one, force other heads onto it too
@@ -1852,6 +1856,22 @@ func (bc *BlockChain) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	cacheKey := string(epoch.Bytes())
 	bc.shardStateCache.Add(cacheKey, decodeShardState)
 	return decodeShardState, nil
+}
+
+func (bc *BlockChain) StoreShardStateBytes(epoch *big.Int, shardState []byte) (*shard.State, error) {
+	batch := bc.db.NewBatch()
+	rs, err := bc.WriteShardStateBytes(batch, epoch, shardState)
+	if err != nil {
+		return nil, err
+	}
+	if err := batch.Write(); err != nil {
+		if isUnrecoverableErr(err) {
+			fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+			os.Exit(1)
+		}
+		return nil, err
+	}
+	return rs, nil
 }
 
 // ReadCommitSig retrieves the commit signature on a block.

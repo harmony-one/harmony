@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/Workiva/go-datastructures/queue"
@@ -190,6 +189,23 @@ type StateSync struct {
 	lastMileMux        sync.Mutex
 
 	syncStatus syncStatus
+}
+
+func (ss *StateSync) IntoEpochSync() *EpochSync {
+	return &EpochSync{
+		blockChain:         ss.blockChain,
+		selfip:             ss.selfip,
+		selfport:           ss.selfport,
+		selfPeerHash:       ss.selfPeerHash,
+		commonBlocks:       ss.commonBlocks,
+		lastMileBlocks:     ss.lastMileBlocks,
+		syncConfig:         ss.syncConfig,
+		isExplorer:         ss.isExplorer,
+		stateSyncTaskQueue: ss.stateSyncTaskQueue,
+		syncMux:            sync.Mutex{},
+		lastMileMux:        sync.Mutex{},
+		syncStatus:         ss.syncStatus.Clone(),
+	}
 }
 
 func (ss *StateSync) purgeAllBlocksFromCache() {
@@ -1215,6 +1231,15 @@ func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
 		status.update(result)
 	}
 	return status.lastResult
+}
+
+func (status *syncStatus) Clone() syncStatus {
+	return syncStatus{
+		lastResult:     status.lastResult,
+		lastUpdateTime: status.lastUpdateTime,
+		lock:           sync.RWMutex{},
+		expiration:     status.expiration,
+	}
 }
 
 func (status *syncStatus) expired() bool {

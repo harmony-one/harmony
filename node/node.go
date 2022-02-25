@@ -95,7 +95,8 @@ type Node struct {
 	downloaderServer     *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *legacysync.StateSync
+	stateSync              *legacysync.StateSync
+	beaconSync             *legacysync.EpochSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -162,6 +163,15 @@ func (node *Node) Beaconchain() *core.BlockChain {
 		bc.EnablePruneBeaconChainFeature()
 	} else if isEnablePruneBeaconChain && !isNotBeaconChainValidator {
 		utils.Logger().Info().Msg("`IsEnablePruneBeaconChain` only available in validator node and shard 1-3")
+	}
+	return bc
+}
+
+// EpochChain returns the epoch chain from node.
+func (node *Node) EpochChain() *core.BlockChain {
+	bc, err := node.shardChains.ShardChain(shard.EpochChain)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("cannot get epoch chain")
 	}
 	return bc
 }
@@ -1011,6 +1021,7 @@ func New(
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
+		epochChain := node.EpochChain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
 			var err error
 			if b2 {
@@ -1054,6 +1065,7 @@ func New(
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		engine.SetBeaconchain(beaconChain)
+		engine.SetEpochChain(epochChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
