@@ -67,7 +67,7 @@ func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderRespons
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlocksByHeights query failed")
 	}
 	return response
 }

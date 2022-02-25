@@ -231,7 +231,7 @@ func (node *Node) doBeaconSyncing() {
 							beaconBlock, node.Beaconchain(), true,
 						)
 						if err != nil {
-							node.beaconSync.AddLastMileBlock(beaconBlock)
+							//node.beaconSync.AddLastMileBlock(beaconBlock)
 						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
 							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
@@ -248,7 +248,7 @@ func (node *Node) doBeaconSyncing() {
 	for {
 		if node.beaconSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = node.createStateSync(node.Beaconchain())
+			node.beaconSync = node.createStateSync(node.EpochChain()).IntoEpochSync()
 		}
 		if node.beaconSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
@@ -264,7 +264,8 @@ func (node *Node) doBeaconSyncing() {
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
+
+		node.beaconSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil)
 		time.Sleep(time.Duration(SyncFrequency) * time.Second)
 	}
 }

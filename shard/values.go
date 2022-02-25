@@ -10,6 +10,7 @@ import (
 const (
 	// BeaconChainShardID is the ShardID of the BeaconChain
 	BeaconChainShardID = 0
+	EpochChain         = 4
 )
 
 // TODO ek – Schedule should really be part of a general-purpose network

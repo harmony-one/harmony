@@ -40,7 +40,8 @@ const (
 )
 
 type engineImpl struct {
-	beacon engine.ChainReader
+	beacon     engine.ChainReader
+	epochChain engine.ChainReader
 
 	// Caching field
 	epochCtxCache    *lru.Cache // epochCtxKey -> epochCtx
@@ -65,6 +66,11 @@ func (e *engineImpl) Beaconchain() engine.ChainReader {
 // SetBeaconchain assigns the beaconchain handle used
 func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 	e.beacon = beaconchain
+}
+
+// SetEpochChain assigns the epoch cjain handler.
+func (e *engineImpl) SetEpochChain(chain engine.ChainReader) {
+	e.epochChain = chain
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
