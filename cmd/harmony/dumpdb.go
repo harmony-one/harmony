@@ -24,10 +24,10 @@ import (
 )
 
 var dumpDBCmd = &cobra.Command{
-	Use:     "dumpdb",
+	Use:     "dumpdb srcdb destdb [startKey [endKey [firstStateStartKey [firstStateEndKey]",
 	Short:   "dump a snapshot db.",
 	Long:    "dump a snapshot db.",
-	Example: "harmony dumpdb /srcDir/harmony_db_0 /destDir/harmony_db_0 [startKey] [endKey] [firstStateStartKey] [firstStateEndKey]",
+	Example: "harmony dumpdb /srcDir/harmony_db_0 /destDir/harmony_db_0",
 	Args:    cobra.RangeArgs(2, 6),
 	Run: func(cmd *cobra.Command, args []string) {
 		srcDBDir, destDBDir := args[0], args[1]
