@@ -211,7 +211,6 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 				}
 				key := s.trie.GetKey(storageIt.Key)
 				c.OnAccountState(addr, storageIt.Key, key, storageIt.Value)
-				continue
 				_, content, _, err := rlp.Split(storageIt.Value)
 				if err != nil {
 					log.Error("Failed to decode the value returned by iterator", "error", err)
