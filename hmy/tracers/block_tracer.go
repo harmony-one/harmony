@@ -68,9 +68,14 @@ func (c action) toJsonStr() (string, *string, *string) {
 			c.value = big.NewInt(0)
 		}
 
+		var valueStr string
+		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
+			valueStr = `,"value":"0x"` + c.value.Text(16)
+		}
+
 		action := fmt.Sprintf(
-			`{"callType":"%s","value":"0x%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
-			callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
+			`{"callType":"%s"%s,"to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
+			callType, valueStr, c.to, c.gas, c.from, c.input,
 		)
 
 		output := fmt.Sprintf(
