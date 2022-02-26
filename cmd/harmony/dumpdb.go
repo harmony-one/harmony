@@ -225,6 +225,7 @@ func (db *KakashiDB) GetBlockByNumber(number uint64) *types.Block {
 }
 
 func (db *KakashiDB) indexerDataDump(block *types.Block) {
+	fmt.Println("indexerDataDump:")
 	bloomIndexer := hmy.NewBloomIndexer(db, params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Close() // just stop event loop
 	section, blkno, blkhash := bloomIndexer.Sections()
@@ -236,6 +237,7 @@ func (db *KakashiDB) indexerDataDump(block *types.Block) {
 }
 
 func (db *KakashiDB) offchainDataDump(block *types.Block) {
+	fmt.Println("offchainDataDump:")
 	rawdb.WriteHeadBlockHash(db.toDBBatch, block.Hash())
 	rawdb.WriteHeadHeaderHash(db.toDBBatch, block.Hash())
 	db.GetHeaderByNumber(0)
@@ -256,20 +258,17 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 	headEpoch := block.Epoch()
 
 	for shard := 0; shard < 4; shard++ {
-		//rawdb.ReadCrossLinkShardBlock(db, uint32(shard), block.NumberU64())
 		rawdb.ReadShardLastCrossLink(db, uint32(shard))
 	}
 
 	rawdb.IteratorValidatorStats(db, func(it ethdb.Iterator, addr common.Address) bool {
 		db.copyKV(it.Key(), it.Value())
-		//rawdb.ReadValidatorStats(db, addr)
 		return true
 	})
 	rawdb.ReadPendingCrossLinks(db)
 
 	rawdb.IteratorDelegatorDelegations(db, func(it ethdb.Iterator, delegator common.Address) bool {
 		db.copyKV(it.Key(), it.Value())
-		//rawdb.ReadDelegationsByDelegator(db, delegator)
 		return true
 	})
 	for i := 0; i < 10; i++ {
@@ -291,19 +290,18 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 		})
 		if i == 0 {
 			rawdb.ReadValidatorList(db)
-			//rawdb.WriteValidatorList(db.toDBBatch, validators)
 		}
 	}
 
 	rawdb.IteratorCXReceiptsProofSpent(db, func(it ethdb.Iterator, shardID uint32, number uint64) bool {
 		db.copyKV(it.Key(), it.Value())
-		//rawdb.ReadCXReceiptsProofSpent(db, shardID, number)
 		return true
 	})
 	db.flush()
 }
 
 func (db *KakashiDB) stateDataDump(block *types.Block, startKey, endKey, firstStateStartKey, firstStateEndKey []byte) {
+	fmt.Println("stateDataDump:")
 	stateDB0 := state.NewDatabaseWithCache(db, 64)
 	rootHash := block.Root()
 	stateDB, err := state.New(rootHash, stateDB0)
