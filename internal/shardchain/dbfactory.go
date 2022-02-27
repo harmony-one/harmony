@@ -2,10 +2,11 @@ package shardchain
 
 import (
 	"fmt"
-	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
-	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
 	"path"
 	"path/filepath"
+
+	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
+	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
 

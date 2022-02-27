@@ -2,10 +2,11 @@ package local_cache
 
 import (
 	"bytes"
-	"github.com/allegro/bigcache"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"log"
 	"time"
+
+	"github.com/allegro/bigcache"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 type cacheWrapper struct {

@@ -1,10 +1,11 @@
 package leveldb_shard
 
 import (
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/syndtr/goleveldb/leveldb"
 	"runtime"
 	"sync"
+
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var batchesPool = sync.Pool{
