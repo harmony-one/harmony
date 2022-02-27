@@ -2919,7 +2919,7 @@ func (bc *BlockChain) addDelegationIndex(
 	validatorAddressBytes := validatorAddress.Bytes()
 	for _, delegation := range delegations {
 		// this will happen when someone delegates more to the same validator
-		// since a delegationIndex only stores the blockNum, validator address and block number
+		// since a delegationIndex does not store the amount
 		if bytes.Equal(delegation.ValidatorAddress[:], validatorAddressBytes[:]) {
 			return delegations, nil
 		}
