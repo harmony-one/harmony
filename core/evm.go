@@ -47,6 +47,7 @@ type ChainContext interface {
 	// ReadDelegationsByDelegator returns the validators list of a delegator
 	ReadDelegationsByDelegator(common.Address) (stakingTypes.DelegationIndexes, error)
 
+	// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
 	ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *big.Int) (m stakingTypes.DelegationIndexes, err error)
 
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
