@@ -96,6 +96,11 @@ Version = "1.0.4"
   LegacyServer = true
   MinPeers = 6
 
+[ShardData]
+  EnableShardData = false
+  DiskCount = 8
+  ShardCount = 4
+
 [WS]
   Enabled = true
   IP = "127.0.0.1"
