@@ -126,6 +126,7 @@ func TestEVMStaking(t *testing.T) {
 	updateErr := db.UpdateValidatorWrapper(wrapper.Address, wrapper)
 	if updateErr != nil {
 		t.Errorf("Got error %v in UpdateValidatorWrapper", updateErr)
+		return
 	}
 
 	err = ctx.CollectRewards(db, nil, &collectRewards)
