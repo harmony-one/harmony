@@ -660,7 +660,7 @@ var (
 			To: &vm.RosettaLogAddressItem{
 				Account: getAddressPtr(ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a")),
 			},
-			Value: big.NewInt(0),
+			Value: big.NewInt(1),
 		},
 		{
 			IsSuccess: true,
@@ -672,7 +672,7 @@ var (
 			To: &vm.RosettaLogAddressItem{
 				Account: getAddressPtr(ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a")),
 			},
-			Value: big.NewInt(0),
+			Value: big.NewInt(1),
 		},
 		{
 			IsSuccess: true,
@@ -684,7 +684,7 @@ var (
 			To: &vm.RosettaLogAddressItem{
 				Account: getAddressPtr(ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a")),
 			},
-			Value: big.NewInt(0),
+			Value: big.NewInt(1),
 		},
 		{
 			IsSuccess: true,
@@ -696,11 +696,11 @@ var (
 			To: &vm.RosettaLogAddressItem{
 				Account: getAddressPtr(ethcommon.HexToAddress("0x4c4fde977fbbe722cddf5719d7edd488510be16a")),
 			},
-			Value: big.NewInt(0),
+			Value: big.NewInt(1),
 		},
 	}
 	testExecResultForInternalTxValueSum = uint64(
-		0,
+		4,
 	)
 )
 
