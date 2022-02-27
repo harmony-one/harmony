@@ -142,8 +142,8 @@ func TestHarmonyFlags(t *testing.T) {
 				Sync: defaultMainnetSyncConfig,
 				ShardData: harmonyconfig.ShardDataConfig{
 					EnableShardData: false,
-					DiskCount:       1,
-					ShardCount:      1,
+					DiskCount:       8,
+					ShardCount:      4,
 				},
 			},
 		},
@@ -1249,7 +1249,7 @@ func TestShardDataFlags(t *testing.T) {
 			expConfig: defaultConfig.ShardData,
 		},
 		{
-			args: []string{"--sharddata.enable_shard_data",
+			args: []string{"--sharddata.enable",
 				"--sharddata.disk_count", "8",
 				"--sharddata.shard_count", "4",
 			},

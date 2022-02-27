@@ -1607,17 +1607,17 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 // shard data flags
 var (
 	enableShardDataFlag = cli.BoolFlag{
-		Name:     "enable_shard_data",
+		Name:     "sharddata.enable",
 		Usage:    "whether use multi-database mode of levelDB",
 		DefValue: defaultConfig.ShardData.EnableShardData,
 	}
 	diskCountFlag = cli.IntFlag{
-		Name:     "disk_count",
+		Name:     "sharddata.disk_count",
 		Usage:    "the count of disks you want to storage block data",
 		DefValue: defaultConfig.ShardData.DiskCount,
 	}
 	shardCountFlag = cli.IntFlag{
-		Name:     "shard_count",
+		Name:     "sharddata.shard_count",
 		Usage:    "the count of shards you want to split in each disk",
 		DefValue: defaultConfig.ShardData.ShardCount,
 	}
