@@ -59,6 +59,7 @@ func TestEVMStaking(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	chain, db, header, database := getTestEnvironment(*key)
 	batch := database.NewBatch()
+	header.SetNumber(big.NewInt(1))
 
 	// fake transaction
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
