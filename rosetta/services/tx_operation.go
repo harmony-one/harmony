@@ -13,7 +13,6 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -450,19 +449,6 @@ func getContractCreationNativeOperations(
 
 	return append(basicOps, internalTxOps...), nil
 }
-
-var (
-	// internalNativeTransferEvmOps are the EVM operations that can execute a native transfer
-	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
-	// All operations have at least 7 elements on the stack when executed.
-	internalNativeTransferEvmOps = map[vm.OpCode]interface{}{
-		vm.CALL:         struct{}{},
-		vm.CALLCODE:     struct{}{},
-		vm.SELFDESTRUCT: struct{}{},
-		vm.CREATE:       struct{}{},
-		vm.CREATE2:      struct{}{},
-	}
-)
 
 // getContractInternalTransferNativeOperations extracts & formats the native operations for a contract's internal
 // native token transfers (i.e: the sender of a transaction is the contract).
