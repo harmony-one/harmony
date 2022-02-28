@@ -47,6 +47,9 @@ type ChainContext interface {
 	// ReadDelegationsByDelegator returns the validators list of a delegator
 	ReadDelegationsByDelegator(common.Address) (stakingTypes.DelegationIndexes, error)
 
+	// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
+	ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *big.Int) (m stakingTypes.DelegationIndexes, err error)
+
 	// ReadValidatorSnapshot returns the snapshot of validator at the beginning of current epoch.
 	ReadValidatorSnapshot(common.Address) (*stakingTypes.ValidatorSnapshot, error)
 
@@ -104,7 +107,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 // the function can then be called through the EVM context
 func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidatorFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, createValidator *stakingTypes.CreateValidator) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, createValidator *stakingTypes.CreateValidator) error {
 		wrapper, err := VerifyAndCreateValidatorFromMsg(
 			db, chain, ref.Epoch(), ref.Number(), createValidator,
 		)
@@ -116,13 +119,30 @@ func CreateValidatorFn(ref *block.Header, chain ChainContext) vm.CreateValidator
 		}
 		db.SetValidatorFlag(createValidator.ValidatorAddress)
 		db.SubBalance(createValidator.ValidatorAddress, createValidator.Amount)
+
+		//add rosetta log
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				&vm.RosettaLogAddressItem{
+					Account: &createValidator.ValidatorAddress,
+				},
+				&vm.RosettaLogAddressItem{
+					Account:    &createValidator.ValidatorAddress,
+					SubAccount: &createValidator.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "delegation"},
+				},
+				createValidator.Amount,
+			)
+		}
+
 		return nil
 	}
 }
 
 func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, editValidator *stakingTypes.EditValidator) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, editValidator *stakingTypes.EditValidator) error {
 		wrapper, err := VerifyAndEditValidatorFromMsg(
 			db, chain, ref.Epoch(), ref.Number(), editValidator,
 		)
@@ -135,8 +155,8 @@ func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc
 
 func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, delegate *stakingTypes.Delegate) error {
-		delegations, err := chain.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) error {
+		delegations, err := chain.ReadDelegationsByDelegatorAt(delegate.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
 			return err
 		}
@@ -152,6 +172,22 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 		}
 
 		db.SubBalance(delegate.DelegatorAddress, balanceToBeDeducted)
+
+		if rosettaTracer != nil && balanceToBeDeducted != big.NewInt(0) {
+			//add rosetta log
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				&vm.RosettaLogAddressItem{
+					Account: &delegate.DelegatorAddress,
+				},
+				&vm.RosettaLogAddressItem{
+					Account:    &delegate.DelegatorAddress,
+					SubAccount: &delegate.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "delegation"},
+				},
+				balanceToBeDeducted,
+			)
+		}
 
 		if len(fromLockedTokens) > 0 {
 			sortedKeys := []common.Address{}
@@ -180,6 +216,26 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 					Data:        encodedRedelegationData,
 					BlockNumber: ref.Number().Uint64(),
 				})
+
+				//add rosetta log
+				if rosettaTracer != nil {
+					// copy from address
+					fromAccount := common.BytesToAddress(key.Bytes())
+					rosettaTracer.AddRosettaLog(
+						vm.CALL,
+						&vm.RosettaLogAddressItem{
+							Account:    &delegate.DelegatorAddress,
+							SubAccount: &fromAccount,
+							Metadata:   map[string]interface{}{"type": "undelegation"},
+						},
+						&vm.RosettaLogAddressItem{
+							Account:    &delegate.DelegatorAddress,
+							SubAccount: &delegate.ValidatorAddress,
+							Metadata:   map[string]interface{}{"type": "delegation"},
+						},
+						redelegatedToken,
+					)
+				}
 			}
 		}
 		return nil
@@ -188,21 +244,40 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 
 func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, undelegate *stakingTypes.Undelegate) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, undelegate *stakingTypes.Undelegate) error {
 		wrapper, err := VerifyAndUndelegateFromMsg(db, ref.Epoch(), undelegate)
 		if err != nil {
 			return err
 		}
+
+		//add rosetta log
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				&vm.RosettaLogAddressItem{
+					Account:    &undelegate.DelegatorAddress,
+					SubAccount: &undelegate.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "delegation"},
+				},
+				&vm.RosettaLogAddressItem{
+					Account:    &undelegate.DelegatorAddress,
+					SubAccount: &undelegate.ValidatorAddress,
+					Metadata:   map[string]interface{}{"type": "undelegation"},
+				},
+				undelegate.Amount,
+			)
+		}
+
 		return db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper)
 	}
 }
 
 func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFunc {
-	return func(db vm.StateDB, collectRewards *stakingTypes.CollectRewards) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
 		if chain == nil {
 			return errors.New("[CollectRewards] No chain context provided")
 		}
-		delegations, err := chain.ReadDelegationsByDelegator(collectRewards.DelegatorAddress)
+		delegations, err := chain.ReadDelegationsByDelegatorAt(collectRewards.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
 			return err
 		}
@@ -226,6 +301,18 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			Data:        totalRewards.Bytes(),
 			BlockNumber: ref.Number().Uint64(),
 		})
+
+		//add rosetta log
+		if rosettaTracer != nil {
+			rosettaTracer.AddRosettaLog(
+				vm.CALL,
+				nil,
+				&vm.RosettaLogAddressItem{
+					Account: &collectRewards.DelegatorAddress,
+				},
+				totalRewards,
+			)
+		}
 
 		return nil
 	}
