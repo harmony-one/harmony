@@ -213,6 +213,13 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 		utils.Logger().Warn().Msg("Sanitizing nil blacklist set")
 		conf.Blacklist = DefaultTxPoolConfig.Blacklist
 	}
+	if conf.AccountSlots == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.AccountSlots).
+			Uint64("updated", DefaultTxPoolConfig.AccountSlots).
+			Msg("Sanitizing invalid txpool account slots")
+		conf.AccountSlots = DefaultTxPoolConfig.AccountSlots
+	}
 
 	return conf
 }

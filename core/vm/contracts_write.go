@@ -112,8 +112,14 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if err != nil {
 		return nil, err
 	}
+
+	var rosettaBlockTracer RosettaTracer
+	if tmpTracker, ok := evm.vmConfig.Tracer.(RosettaTracer); ok {
+		rosettaBlockTracer = tmpTracker
+	}
+
 	if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-		if err := evm.Delegate(evm.StateDB, delegate); err != nil {
+		if err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
 			return nil, err
 		} else {
 			evm.StakeMsgs = append(evm.StakeMsgs, delegate)
@@ -121,10 +127,10 @@ func (c *stakingPrecompile) RunWriteCapable(
 		}
 	}
 	if undelegate, ok := stakeMsg.(*stakingTypes.Undelegate); ok {
-		return nil, evm.Undelegate(evm.StateDB, undelegate)
+		return nil, evm.Undelegate(evm.StateDB, rosettaBlockTracer, undelegate)
 	}
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
-		return nil, evm.CollectRewards(evm.StateDB, collectRewards)
+		return nil, evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
 	}
 	// Migrate is not supported in precompile and will be done in a batch hard fork
 	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {

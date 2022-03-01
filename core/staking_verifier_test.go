@@ -1798,6 +1798,10 @@ func (chain *fakeChainContext) ReadDelegationsByDelegator(common.Address) (staki
 	return nil, nil
 }
 
+func (chain *fakeChainContext) ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *big.Int) (staking.DelegationIndexes, error) {
+	return nil, nil
+}
+
 func (chain *fakeChainContext) ShardID() uint32 {
 	return shard.BeaconChainShardID
 }
@@ -1835,6 +1839,10 @@ func (chain *fakeErrChainContext) Config() *params.ChainConfig {
 }
 
 func (chain *fakeErrChainContext) ReadDelegationsByDelegator(common.Address) (staking.DelegationIndexes, error) {
+	return nil, nil
+}
+
+func (chain *fakeErrChainContext) ReadDelegationsByDelegatorAt(delegator common.Address, blockNum *big.Int) (staking.DelegationIndexes, error) {
 	return nil, nil
 }
 
