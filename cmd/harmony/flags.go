@@ -214,6 +214,14 @@ var (
 		syncDiscHighFlag,
 		syncDiscBatchFlag,
 	}
+
+	shardDataFlags = []cli.Flag{
+		enableShardDataFlag,
+		diskCountFlag,
+		shardCountFlag,
+		cacheTimeFlag,
+		cacheSizeFlag,
+	}
 )
 
 var (
@@ -313,6 +321,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
+	flags = append(flags, shardDataFlags...)
 
 	return flags
 }
@@ -1606,5 +1615,52 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
 		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
+}
+
+// shard data flags
+var (
+	enableShardDataFlag = cli.BoolFlag{
+		Name:     "sharddata.enable",
+		Usage:    "whether use multi-database mode of levelDB",
+		DefValue: defaultConfig.ShardData.EnableShardData,
+	}
+	diskCountFlag = cli.IntFlag{
+		Name:     "sharddata.disk_count",
+		Usage:    "the count of disks you want to storage block data",
+		DefValue: defaultConfig.ShardData.DiskCount,
+	}
+	shardCountFlag = cli.IntFlag{
+		Name:     "sharddata.shard_count",
+		Usage:    "the count of shards you want to split in each disk",
+		DefValue: defaultConfig.ShardData.ShardCount,
+	}
+	cacheTimeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_time",
+		Usage:    "local cache save time (minute)",
+		DefValue: defaultConfig.ShardData.CacheTime,
+	}
+	cacheSizeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_size",
+		Usage:    "local cache storage size (MB)",
+		DefValue: defaultConfig.ShardData.CacheSize,
+	}
+)
+
+func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, enableShardDataFlag) {
+		cfg.ShardData.EnableShardData = cli.GetBoolFlagValue(cmd, enableShardDataFlag)
+	}
+	if cli.IsFlagChanged(cmd, diskCountFlag) {
+		cfg.ShardData.DiskCount = cli.GetIntFlagValue(cmd, diskCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, shardCountFlag) {
+		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheTimeFlag) {
+		cfg.ShardData.CacheTime = cli.GetIntFlagValue(cmd, cacheTimeFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
+		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
 	}
 }

@@ -88,6 +88,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
+	ShardData: harmonyconfig.ShardDataConfig{
+		EnableShardData: false,
+		DiskCount:       8,
+		ShardCount:      4,
+		CacheTime:       10,
+		CacheSize:       512,
+	},
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{

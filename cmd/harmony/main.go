@@ -231,6 +231,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
+	applyShardDataFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
@@ -655,7 +656,18 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	}
 
 	// Current node.
-	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	var chainDBFactory shardchain.DBFactory
+	if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
 

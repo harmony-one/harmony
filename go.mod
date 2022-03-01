@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/VictoriaMetrics/fastcache v1.5.7 // indirect
 	github.com/Workiva/go-datastructures v1.0.50
-	github.com/allegro/bigcache v1.2.1 // indirect
+	github.com/allegro/bigcache v1.2.1
 	github.com/aristanetworks/goarista v0.0.0-20190607111240-52c2a7864a08 // indirect
 	github.com/aws/aws-sdk-go v1.30.1
 	github.com/beevik/ntp v0.3.0
