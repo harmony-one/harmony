@@ -2,9 +2,10 @@ package local_cache
 
 import (
 	"bytes"
+	"time"
+
 	"github.com/harmony-one/harmony/internal/utils"
 	"go.uber.org/zap"
-	"time"
 
 	"github.com/allegro/bigcache"
 	"github.com/ethereum/go-ethereum/ethdb"
