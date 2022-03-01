@@ -218,6 +218,8 @@ var (
 		enableShardDataFlag,
 		diskCountFlag,
 		shardCountFlag,
+		cacheTimeFlag,
+		cacheSizeFlag,
 	}
 )
 

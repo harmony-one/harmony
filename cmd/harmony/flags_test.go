@@ -144,6 +144,8 @@ func TestHarmonyFlags(t *testing.T) {
 					EnableShardData: false,
 					DiskCount:       8,
 					ShardCount:      4,
+					CacheTime:       10,
+					CacheSize:       512,
 				},
 			},
 		},
