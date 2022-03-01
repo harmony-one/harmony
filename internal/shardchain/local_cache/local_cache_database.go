@@ -2,7 +2,8 @@ package local_cache
 
 import (
 	"bytes"
-	"log"
+	"github.com/harmony-one/harmony/internal/utils"
+	"go.uber.org/zap"
 	"time"
 
 	"github.com/allegro/bigcache"
@@ -45,8 +46,8 @@ func NewLocalCacheDatabase(remoteDB ethdb.KeyValueStore) *LocalCacheDatabase {
 	}
 
 	go func() {
-		for range time.Tick(time.Second) {
-			log.Printf("cache: %#v %d (%d)", cache.Stats(), cache.Len(), cache.Capacity())
+		for range time.Tick(time.Minute) {
+			utils.GetLogger().Info("local-cache", zap.Any("stats", cache.Stats()), zap.Int("count", cache.Len()), zap.Int("size", cache.Capacity()))
 		}
 	}()
 
