@@ -123,6 +123,7 @@ var (
 	}
 
 	txPoolFlags = []cli.Flag{
+		tpAccountSlotsFlag,
 		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
@@ -977,6 +978,11 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig
 
 // transaction pool flags
 var (
+	tpAccountSlotsFlag = cli.IntFlag{
+		Name:     "txpool.accountslots",
+		Usage:    "number of executable transaction slots guaranteed per account",
+		DefValue: int(defaultConfig.TxPool.AccountSlots),
+	}
 	tpBlacklistFileFlag = cli.StringFlag{
 		Name:     "txpool.blacklist",
 		Usage:    "file of blacklisted wallet addresses",
@@ -999,7 +1005,13 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
 		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
 	}
-
+	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
+		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
+		if value <= 0 {
+			panic("Must provide positive for txpool.accountslots")
+		}
+		config.TxPool.AccountSlots = uint64(cli.GetIntFlagValue(cmd, tpAccountSlotsFlag))
+	}
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {

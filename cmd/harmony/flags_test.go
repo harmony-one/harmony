@@ -102,6 +102,7 @@ func TestHarmonyFlags(t *testing.T) {
 				TxPool: harmonyconfig.TxPoolConfig{
 					BlacklistFile:  "./.hmy/blacklist.txt",
 					RosettaFixFile: "",
+					AccountSlots:   16,
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -780,6 +781,7 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
 				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:   defaultConfig.TxPool.AccountSlots,
 			},
 		},
 		{
@@ -787,11 +789,21 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
+			},
+		},
+		{
+			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				AccountSlots:   5,
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
 			},

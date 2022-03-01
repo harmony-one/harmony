@@ -328,7 +328,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.evm.CreateValidator(st.evm.StateDB, stkMsg)
+		err = st.evm.CreateValidator(st.evm.StateDB, nil, stkMsg)
 	case types.StakeEditVal:
 		stkMsg := &stakingTypes.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
@@ -339,7 +339,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.ValidatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.evm.EditValidator(st.evm.StateDB, stkMsg)
+		err = st.evm.EditValidator(st.evm.StateDB, nil, stkMsg)
 	case types.Delegate:
 		stkMsg := &stakingTypes.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
@@ -349,7 +349,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.evm.Delegate(st.evm.StateDB, stkMsg)
+		err = st.evm.Delegate(st.evm.StateDB, nil, stkMsg)
 	case types.Undelegate:
 		stkMsg := &stakingTypes.Undelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
@@ -359,7 +359,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.evm.Undelegate(st.evm.StateDB, stkMsg)
+		err = st.evm.Undelegate(st.evm.StateDB, nil, stkMsg)
 	case types.CollectRewards:
 		stkMsg := &stakingTypes.CollectRewards{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
@@ -369,7 +369,7 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 		if msg.From() != stkMsg.DelegatorAddress {
 			return 0, errInvalidSigner
 		}
-		err = st.evm.CollectRewards(st.evm.StateDB, stkMsg)
+		err = st.evm.CollectRewards(st.evm.StateDB, nil, stkMsg)
 	default:
 		return 0, stakingTypes.ErrInvalidStakingKind
 	}
