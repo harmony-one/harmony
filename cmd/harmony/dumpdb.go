@@ -15,16 +15,18 @@ import (
 	ethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
-
-	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/internal/cli"
+
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 )
 
-var dumpDBFlag = cli.IntFlag{
+var batchFlag = cli.IntFlag{
 	Name:      "batch",
 	Shorthand: "b",
 	Usage:     "batch size limit in MB",
@@ -76,15 +78,39 @@ var dumpDBCmd = &cobra.Command{
 			}
 			firstStateEndKey = _endKey
 		}
-		batchLimitMB = cli.GetIntFlagValue(cmd, dumpDBFlag)
+		batchLimitMB = cli.GetIntFlagValue(cmd, batchFlag)
+		networkType := getNetworkType(cmd)
+		shardSchedule = getShardSchedule(networkType)
+		if shardSchedule == nil {
+			fmt.Println("unsupported network type")
+			os.Exit(-1)
+		}
 		fmt.Println(srcDBDir, destDBDir, batchLimitMB, hexutil.Encode(startKey), hexutil.Encode(endKey), hexutil.Encode(firstStateStartKey), hexutil.Encode(firstStateEndKey))
 		dumpMain(srcDBDir, destDBDir, batchLimitMB*MB, startKey, endKey, firstStateStartKey, firstStateEndKey)
 		os.Exit(0)
 	},
 }
 
+func getShardSchedule(networkType nodeconfig.NetworkType) shardingconfig.Schedule {
+	switch networkType {
+	case nodeconfig.Mainnet:
+		return shardingconfig.MainnetSchedule
+	case nodeconfig.Testnet:
+		return shardingconfig.TestnetSchedule
+	case nodeconfig.Pangaea:
+		return shardingconfig.PangaeaSchedule
+	case nodeconfig.Localnet:
+		return shardingconfig.LocalnetSchedule
+	case nodeconfig.Partner:
+		return shardingconfig.PartnerSchedule
+	case nodeconfig.Stressnet:
+		return shardingconfig.StressNetSchedule
+	}
+	return nil
+}
+
 func registerDumpDBFlags() error {
-	return cli.RegisterFlags(dumpDBCmd, []cli.Flag{dumpDBFlag})
+	return cli.RegisterFlags(dumpDBCmd, []cli.Flag{batchFlag, networkTypeFlag})
 }
 
 type KakashiDB struct {
@@ -123,6 +149,7 @@ var (
 	savedStateKey hexutil.Bytes
 	accountState  = NONE
 	emptyHash     = common.Hash{}
+	shardSchedule shardingconfig.Schedule
 )
 
 func now() int64 {
@@ -281,13 +308,13 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 		db.GetBlockByHash(latestBlock.Hash())
 		rawdb.ReadBlockRewardAccumulator(db, latestNumber)
 		rawdb.ReadBlockCommitSig(db, latestNumber)
-		for shard := 0; shard < 4; shard++ {
+		for shard := 0; shard < int(params.Sha256BaseGas); shard++ {
 			rawdb.ReadCrossLinkShardBlock(db, uint32(shard), latestNumber)
 		}
 	}
 	headEpoch := block.Epoch()
-
-	for shard := 0; shard < 4; shard++ {
+	epochInstance := shardSchedule.InstanceForEpoch(headEpoch)
+	for shard := 0; shard < int(epochInstance.NumShards()); shard++ {
 		rawdb.ReadShardLastCrossLink(db, uint32(shard))
 	}
 
