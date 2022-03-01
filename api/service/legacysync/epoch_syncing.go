@@ -221,10 +221,20 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 
 		decoded = append(decoded, block)
 	}
-	// TODO(k.potapov) validate blocks
 
 	for _, block := range decoded {
-		_, err := bc.StoreShardStateBytes(block.Header().Epoch(), block.Header().ShardState())
+		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
+		if err != nil {
+			return errors.Wrap(err, "parse commitSigAndBitmap")
+		}
+
+		// Signature validation.
+		err = bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
+		if err != nil {
+			return errors.Wrap(err, "failed signature validation")
+		}
+
+		_, err = bc.StoreShardStateBytes(block.Header().Epoch(), block.Header().ShardState())
 		if err != nil {
 			return err
 		}
