@@ -125,7 +125,7 @@ func TestEVMStaking(t *testing.T) {
 	delegate = sampleDelegate(*delegatorKey) // 1000 ONE
 	db.AddBalance(delegate.DelegatorAddress, delegate.Amount)
 	delegate.ValidatorAddress = wrapper.Address
-	err = ctx.Delegate(db, &delegate)
+	err = ctx.Delegate(db, nil, &delegate)
 	if err != nil {
 		t.Errorf("Got error %v in Delegate for new delegator", err)
 	}
@@ -133,7 +133,7 @@ func TestEVMStaking(t *testing.T) {
 	// try undelegating such that remaining < minimum (100 ONE)
 	undelegate.ValidatorAddress = wrapper.Address
 	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(901))
-	err = ctx3.Undelegate(db, &undelegate)
+	err = ctx3.Undelegate(db, nil, &undelegate)
 	if err == nil {
 		t.Errorf("Got no error in Undelegate for new delegator")
 	} else {
@@ -143,13 +143,13 @@ func TestEVMStaking(t *testing.T) {
 	}
 	// now undelegate such that remaining == minimum (100 ONE)
 	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(900))
-	err = ctx3.Undelegate(db, &undelegate)
+	err = ctx3.Undelegate(db, nil, &undelegate)
 	if err != nil {
 		t.Errorf("Got error %v in Undelegate for new delegator", err)
 	}
 	// remaining < 100 ONE after remaining = minimum
 	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(1))
-	err = ctx3.Undelegate(db, &undelegate)
+	err = ctx3.Undelegate(db, nil, &undelegate)
 	if err == nil {
 		t.Errorf("Got no error in Undelegate for new delegator")
 	} else {
@@ -159,7 +159,7 @@ func TestEVMStaking(t *testing.T) {
 	}
 	// remaining == 0
 	undelegate.Amount = new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))
-	err = ctx3.Undelegate(db, &undelegate)
+	err = ctx3.Undelegate(db, nil, &undelegate)
 	if err != nil {
 		t.Errorf("Got error %v in Undelegate for new delegator", err)
 	}
