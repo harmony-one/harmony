@@ -70,7 +70,7 @@ func (c action) toJsonStr() (string, *string, *string) {
 
 		var valueStr string
 		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
-			valueStr = `,"value":"0x"` + c.value.Text(16)
+			valueStr = fmt.Sprintf(`,"value":"0x%s"`, c.value.Text(16))
 		}
 
 		action := fmt.Sprintf(
