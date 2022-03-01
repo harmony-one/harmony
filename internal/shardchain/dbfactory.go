@@ -13,6 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
+const (
+	LDBDirPrefix      = "harmony_db"
+	LDBShardDirPrefix = "harmony_sharddb"
+)
+
 // DBFactory is a blockchain database factory.
 type DBFactory interface {
 	// NewChainDB returns a new database for the blockchain for
@@ -27,7 +32,7 @@ type LDBFactory struct {
 
 // NewChainDB returns a new LDB for the blockchain for given shard.
 func (f *LDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
-	dir := path.Join(f.RootDir, fmt.Sprintf("harmony_db_%d", shardID))
+	dir := path.Join(f.RootDir, fmt.Sprintf("%s_%d", LDBDirPrefix, shardID))
 	return rawdb.NewLevelDBDatabase(dir, 256, 1024, "")
 }
 
@@ -48,7 +53,7 @@ type LDBShardFactory struct {
 
 // NewChainDB returns a new memDB for the blockchain for given shard.
 func (f *LDBShardFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
-	dir := filepath.Join(f.RootDir, fmt.Sprintf("harmony_sharddb_%d", shardID))
+	dir := filepath.Join(f.RootDir, fmt.Sprintf("%s_%d", LDBShardDirPrefix, shardID))
 	shard, err := leveldb_shard.NewLeveldbShard(dir, f.DiskCount, f.ShardCount)
 	if err != nil {
 		return nil, err
