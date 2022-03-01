@@ -100,6 +100,8 @@ Version = "1.0.4"
   EnableShardData = false
   DiskCount = 8
   ShardCount = 4
+  CacheTime = 10
+  CacheSize = 512
 
 [WS]
   Enabled = true

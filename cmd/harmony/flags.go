@@ -1621,6 +1621,16 @@ var (
 		Usage:    "the count of shards you want to split in each disk",
 		DefValue: defaultConfig.ShardData.ShardCount,
 	}
+	cacheTimeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_time",
+		Usage:    "local cache save time (minute)",
+		DefValue: defaultConfig.ShardData.CacheTime,
+	}
+	cacheSizeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_size",
+		Usage:    "local cache storage size (MB)",
+		DefValue: defaultConfig.ShardData.CacheSize,
+	}
 )
 
 func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
@@ -1632,5 +1642,11 @@ func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, shardCountFlag) {
 		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheTimeFlag) {
+		cfg.ShardData.CacheTime = cli.GetIntFlagValue(cmd, cacheTimeFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
+		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
 	}
 }
