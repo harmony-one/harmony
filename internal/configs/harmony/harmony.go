@@ -70,6 +70,8 @@ type ShardDataConfig struct {
 	EnableShardData bool
 	DiskCount       int
 	ShardCount      int
+	CacheTime       int
+	CacheSize       int
 }
 
 type ConsensusConfig struct {

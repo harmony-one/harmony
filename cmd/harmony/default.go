@@ -91,6 +91,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		EnableShardData: false,
 		DiskCount:       8,
 		ShardCount:      4,
+		CacheTime:       10,
+		CacheSize:       512,
 	},
 }
 

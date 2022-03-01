@@ -1252,11 +1252,15 @@ func TestShardDataFlags(t *testing.T) {
 			args: []string{"--sharddata.enable",
 				"--sharddata.disk_count", "8",
 				"--sharddata.shard_count", "4",
+				"--sharddata.cache_time", "10",
+				"--sharddata.cache_size", "512",
 			},
 			expConfig: harmonyconfig.ShardDataConfig{
 				EnableShardData: true,
 				DiskCount:       8,
 				ShardCount:      4,
+				CacheTime:       10,
+				CacheSize:       512,
 			},
 		},
 	}

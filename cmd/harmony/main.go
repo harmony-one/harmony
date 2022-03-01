@@ -662,6 +662,8 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 			RootDir:    nodeConfig.DBDir,
 			DiskCount:  hc.ShardData.DiskCount,
 			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
 		}
 	} else {
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}

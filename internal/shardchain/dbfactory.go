@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
 	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
@@ -49,6 +50,8 @@ type LDBShardFactory struct {
 	RootDir    string // directory in which to put shard databases in.
 	DiskCount  int
 	ShardCount int
+	CacheTime  int
+	CacheSize  int
 }
 
 // NewChainDB returns a new memDB for the blockchain for given shard.
@@ -59,5 +62,8 @@ func (f *LDBShardFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 		return nil, err
 	}
 
-	return rawdb.NewDatabase(local_cache.NewLocalCacheDatabase(shard)), nil
+	return rawdb.NewDatabase(local_cache.NewLocalCacheDatabase(shard, local_cache.CacheConfig{
+		CacheTime: time.Duration(f.CacheTime) * time.Minute,
+		CacheSize: f.CacheSize,
+	})), nil
 }

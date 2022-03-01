@@ -15,6 +15,11 @@ type cacheWrapper struct {
 	*bigcache.BigCache
 }
 
+type CacheConfig struct {
+	CacheTime time.Duration
+	CacheSize int
+}
+
 func (c *cacheWrapper) Put(key []byte, value []byte) error {
 	return c.BigCache.Set(String(key), value)
 }
@@ -32,10 +37,10 @@ type LocalCacheDatabase struct {
 	readCache *cacheWrapper
 }
 
-func NewLocalCacheDatabase(remoteDB ethdb.KeyValueStore) *LocalCacheDatabase {
-	config := bigcache.DefaultConfig(10 * time.Minute)
-	config.HardMaxCacheSize = 512
-	config.MaxEntriesInWindow = 2000 * 10 * 60
+func NewLocalCacheDatabase(remoteDB ethdb.KeyValueStore, cacheConfig CacheConfig) *LocalCacheDatabase {
+	config := bigcache.DefaultConfig(cacheConfig.CacheTime)
+	config.HardMaxCacheSize = cacheConfig.CacheSize
+	config.MaxEntriesInWindow = cacheConfig.CacheSize * 4 * int(cacheConfig.CacheTime.Seconds())
 	cache, _ := bigcache.NewBigCache(config)
 
 	db := &LocalCacheDatabase{
