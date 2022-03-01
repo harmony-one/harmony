@@ -35,7 +35,7 @@ RUN cp ./rosetta/infra/harmony-pstn.conf /root/harmony-pstn.conf && \
 FROM ubuntu:latest
 
 RUN apt update -y && \
-    apt install libgmp-dev libssl-dev rclone -y && \
+    apt install libgmp-dev libssl-dev rclone ca-certificates -y && \
     apt -y clean all
 
 WORKDIR /root
