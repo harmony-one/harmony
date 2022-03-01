@@ -109,6 +109,9 @@ func init() {
 	if err := registerDumpConfigFlags(); err != nil {
 		os.Exit(2)
 	}
+	if err := registerDumpDBFlags(); err != nil {
+		os.Exit(2)
+	}
 }
 
 func main() {

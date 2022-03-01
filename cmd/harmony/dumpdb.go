@@ -21,7 +21,15 @@ import (
 	"github.com/harmony-one/harmony/hmy"
 
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/internal/cli"
 )
+
+var dumpDBFlag = cli.IntFlag{
+	Name:      "batch",
+	Shorthand: "b",
+	Usage:     "batch size limit in MB",
+	DefValue:  512,
+}
 
 var dumpDBCmd = &cobra.Command{
 	Use:     "dumpdb srcdb destdb [startKey [endKey [firstStateStartKey [firstStateEndKey]",
@@ -31,6 +39,7 @@ var dumpDBCmd = &cobra.Command{
 	Args:    cobra.RangeArgs(2, 6),
 	Run: func(cmd *cobra.Command, args []string) {
 		srcDBDir, destDBDir := args[0], args[1]
+		var batchLimitMB int
 		var startKey []byte
 		var endKey []byte
 		var firstStateStartKey []byte
@@ -67,20 +76,41 @@ var dumpDBCmd = &cobra.Command{
 			}
 			firstStateEndKey = _endKey
 		}
-		fmt.Println(srcDBDir, destDBDir, hexutil.Encode(startKey), hexutil.Encode(endKey), hexutil.Encode(firstStateStartKey), hexutil.Encode(firstStateEndKey))
-		dumpMain(srcDBDir, destDBDir, startKey, endKey, firstStateStartKey, firstStateEndKey)
+		batchLimitMB = cli.GetIntFlagValue(cmd, dumpDBFlag)
+		fmt.Println(srcDBDir, destDBDir, batchLimitMB, hexutil.Encode(startKey), hexutil.Encode(endKey), hexutil.Encode(firstStateStartKey), hexutil.Encode(firstStateEndKey))
+		dumpMain(srcDBDir, destDBDir, batchLimitMB*MB, startKey, endKey, firstStateStartKey, firstStateEndKey)
 		os.Exit(0)
 	},
 }
 
-type KakashiDB struct {
-	ethdb.Database
-	toDB      ethdb.Database
-	toDBBatch ethdb.Batch
-	cache     *lru.Cache
+func registerDumpDBFlags() error {
+	return cli.RegisterFlags(dumpDBCmd, []cli.Flag{dumpDBFlag})
 }
 
-const MB = 1024 * 1024
+type KakashiDB struct {
+	ethdb.Database
+	toDB       ethdb.Database
+	toDBBatch  ethdb.Batch
+	batchLimit int
+	cache      *lru.Cache
+}
+
+const (
+	MB                 = 1024 * 1024
+	BLOCKS_DUMP        = 512 // must >= 256
+	EPOCHS_DUMP        = 10
+	STATEDB_CACHE_SIZE = 64 // size in MB
+	LEVELDB_CACHE_SIZE = 256
+	LEVELDB_HANDLES    = 1024
+	LRU_CACHE_SIZE     = 64 * 1024 * 1024
+)
+
+const (
+	NONE = iota
+	ON_ACCOUNT_START
+	ON_ACCOUNT_STATE
+	ON_ACCOUNT_END
+)
 
 var (
 	totalSize    = 0 // current dump size
@@ -91,9 +121,8 @@ var (
 		Address: &common.Address{},
 	}
 	savedStateKey hexutil.Bytes
-	accountState  = 0 // 0: onStart 1: onState 2: onEnd
-
-	emptyHash = common.Hash{}
+	accountState  = NONE
+	emptyHash     = common.Hash{}
 )
 
 func now() int64 {
@@ -152,26 +181,25 @@ func (db *KakashiDB) OnRoot(common.Hash) {}
 
 // OnAccount implements DumpCollector interface
 func (db *KakashiDB) OnAccountStart(addr common.Address, acc state.DumpAccount) {
-	accountState = 1
+	accountState = ON_ACCOUNT_START
 	lastAccount = acc
 	lastAccount.Address = &addr
 }
 
 // OnAccount implements DumpCollector interface
 func (db *KakashiDB) OnAccountState(addr common.Address, StateSecureKey hexutil.Bytes, key, value []byte) {
-	if totalSize-flushSize > 512*MB {
+	accountState = ON_ACCOUNT_STATE
+	if totalSize-flushSize > int(db.batchLimit) {
 		savedStateKey = StateSecureKey
 		db.flush()
 	}
 }
 
-// OnAccount is called once for each account in the trie
+// OnAccount implements DumpCollector interface
 func (db *KakashiDB) OnAccountEnd(addr common.Address, acc state.DumpAccount) {
-	//lastAccount = acc
-	//lastAccount.Address = &addr
 	accountCount++
-	accountState = 2
-	if totalSize-flushSize > 512*MB {
+	accountState = ON_ACCOUNT_END
+	if totalSize-flushSize > int(db.batchLimit) {
 		db.flush()
 	}
 }
@@ -198,27 +226,25 @@ func (db *KakashiDB) GetHeaderByHash(hash common.Hash) *block.Header {
 	return rawdb.ReadHeader(db, hash, *number)
 }
 
-// GetBlock retrieves a block from the database by hash and number,
-// caching it if found.
+// GetBlock retrieves a block from the database by hash and number
 func (db *KakashiDB) GetBlock(hash common.Hash, number uint64) *types.Block {
 	block := rawdb.ReadBlock(db, hash, number)
 	return block
 }
 
 // GetBlockNumber retrieves the block number belonging to the given hash
-// from the cache or database
+// from the database
 func (db *KakashiDB) GetBlockNumber(hash common.Hash) *uint64 {
 	return rawdb.ReadHeaderNumber(db, hash)
 }
 
-// GetBlockByHash retrieves a block from the database by hash, caching it if found.
+// GetBlockByHash retrieves a block from the database by hash
 func (db *KakashiDB) GetBlockByHash(hash common.Hash) *types.Block {
 	number := db.GetBlockNumber(hash)
 	return db.GetBlock(hash, *number)
 }
 
-// GetBlockByNumber retrieves a block from the database by number, caching it
-// (associated with its hash) if found.
+// GetBlockByNumber retrieves a block from the database by number
 func (db *KakashiDB) GetBlockByNumber(number uint64) *types.Block {
 	hash := rawdb.ReadCanonicalHash(db, number)
 	return db.GetBlock(hash, number)
@@ -243,7 +269,11 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 	db.GetHeaderByNumber(0)
 	db.GetBlockByNumber(0)
 	db.GetHeaderByHash(block.Hash())
-	for i := 0; i < 512; i++ {
+	// EVM may access the last 256 block hash
+	for i := 0; i <= BLOCKS_DUMP; i++ {
+		if block.NumberU64() < uint64(i) {
+			break
+		}
 		latestNumber := block.NumberU64() - uint64(i)
 		latestBlock := db.GetBlockByNumber(latestNumber)
 		db.GetBlockByHash(latestBlock.Hash())
@@ -271,8 +301,11 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 		db.copyKV(it.Key(), it.Value())
 		return true
 	})
-	for i := 0; i < 10; i++ {
+	for i := 0; i < EPOCHS_DUMP; i++ {
 		epoch := new(big.Int).Sub(headEpoch, big.NewInt(int64(i)))
+		if epoch.Sign() < 0 {
+			break
+		}
 		rawdb.ReadShardState(db, epoch)
 		rawdb.ReadEpochBlockNumber(db, epoch)
 		rawdb.ReadEpochVrfBlockNums(db, epoch)
@@ -302,7 +335,7 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 
 func (db *KakashiDB) stateDataDump(block *types.Block, startKey, endKey, firstStateStartKey, firstStateEndKey []byte) {
 	fmt.Println("stateDataDump:")
-	stateDB0 := state.NewDatabaseWithCache(db, 64)
+	stateDB0 := state.NewDatabaseWithCache(db, STATEDB_CACHE_SIZE)
 	rootHash := block.Root()
 	stateDB, err := state.New(rootHash, stateDB0)
 	if err != nil {
@@ -317,14 +350,14 @@ func (db *KakashiDB) stateDataDump(block *types.Block, startKey, endKey, firstSt
 	db.flush()
 }
 
-func dumpMain(srcDBDir, destDBDir string, startKey, endKey, firstStateStartKey, firstStateEndKey []byte) {
+func dumpMain(srcDBDir, destDBDir string, batchLimit int, startKey, endKey, firstStateStartKey, firstStateEndKey []byte) {
 	fmt.Println("===dumpMain===")
-	srcDB, err := ethRawDB.NewLevelDBDatabase(srcDBDir, 256, 1024, "")
+	srcDB, err := ethRawDB.NewLevelDBDatabase(srcDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "")
 	if err != nil {
 		fmt.Println("open src db error:", err)
 		os.Exit(-1)
 	}
-	destDB, err := ethRawDB.NewLevelDBDatabase(destDBDir, 256, 1024, "")
+	destDB, err := ethRawDB.NewLevelDBDatabase(destDBDir, LEVELDB_CACHE_SIZE, LEVELDB_HANDLES, "")
 	if err != nil {
 		fmt.Println("open dest db error:", err)
 		os.Exit(-1)
@@ -344,12 +377,13 @@ func dumpMain(srcDBDir, destDBDir string, startKey, endKey, firstStateStartKey, 
 		os.Exit(-1)
 	}
 	fmt.Println("start copying...")
-	cache, _ := lru.New(64 * 1024 * 1024)
+	cache, _ := lru.New(LRU_CACHE_SIZE)
 	copier := &KakashiDB{
-		Database:  srcDB,
-		toDB:      destDB,
-		toDBBatch: destDB.NewBatch(),
-		cache:     cache,
+		Database:   srcDB,
+		toDB:       destDB,
+		toDBBatch:  destDB.NewBatch(),
+		batchLimit: batchLimit,
+		cache:      cache,
 	}
 	defer copier.Close()
 	copier.offchainDataDump(block)
