@@ -206,35 +206,35 @@ type UndelegateMsg struct {
 type TxReceipt struct {
 	BlockHash         common.Hash    `json:"blockHash"`
 	TransactionHash   common.Hash    `json:"transactionHash"`
-	BlockNumber       hexutil.Uint64 `json:"blockNumber"`
-	TransactionIndex  hexutil.Uint64 `json:"transactionIndex"`
-	GasUsed           hexutil.Uint64 `json:"gasUsed"`
-	CumulativeGasUsed hexutil.Uint64 `json:"cumulativeGasUsed"`
+	BlockNumber       uint64         `json:"blockNumber"`
+	TransactionIndex  uint64         `json:"transactionIndex"`
+	GasUsed           uint64         `json:"gasUsed"`
+	CumulativeGasUsed uint64         `json:"cumulativeGasUsed"`
 	ContractAddress   common.Address `json:"contractAddress"`
 	Logs              []*types.Log   `json:"logs"`
 	LogsBloom         ethtypes.Bloom `json:"logsBloom"`
-	ShardID           hexutil.Uint64 `json:"shardID"`
+	ShardID           uint32         `json:"shardID"`
 	From              string         `json:"from"`
 	To                string         `json:"to"`
 	Root              hexutil.Bytes  `json:"root"`
-	Status            hexutil.Uint64 `json:"status"`
+	Status            uint           `json:"status"`
 }
 
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
 type StakingTxReceipt struct {
 	BlockHash         common.Hash       `json:"blockHash"`
 	TransactionHash   common.Hash       `json:"transactionHash"`
-	BlockNumber       hexutil.Uint64    `json:"blockNumber"`
-	TransactionIndex  hexutil.Uint64    `json:"transactionIndex"`
-	GasUsed           hexutil.Uint64    `json:"gasUsed"`
-	CumulativeGasUsed hexutil.Uint64    `json:"cumulativeGasUsed"`
+	BlockNumber       uint64            `json:"blockNumber"`
+	TransactionIndex  uint64            `json:"transactionIndex"`
+	GasUsed           uint64            `json:"gasUsed"`
+	CumulativeGasUsed uint64            `json:"cumulativeGasUsed"`
 	ContractAddress   common.Address    `json:"contractAddress"`
 	Logs              []*types.Log      `json:"logs"`
 	LogsBloom         ethtypes.Bloom    `json:"logsBloom"`
 	Sender            string            `json:"sender"`
 	Type              staking.Directive `json:"type"`
 	Root              hexutil.Bytes     `json:"root"`
-	Status            hexutil.Uint64    `json:"status"`
+	Status            uint              `json:"status"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -377,24 +377,24 @@ func NewTxReceipt(
 	txReceipt := &TxReceipt{
 		BlockHash:         blockHash,
 		TransactionHash:   tx.Hash(),
-		BlockNumber:       hexutil.Uint64(blockNumber),
-		TransactionIndex:  hexutil.Uint64(blockIndex),
-		GasUsed:           hexutil.Uint64(receipt.GasUsed),
-		CumulativeGasUsed: hexutil.Uint64(receipt.CumulativeGasUsed),
+		BlockNumber:       blockNumber,
+		TransactionIndex:  blockIndex,
+		GasUsed:           receipt.GasUsed,
+		CumulativeGasUsed: receipt.CumulativeGasUsed,
 		Logs:              receipt.Logs,
 		LogsBloom:         receipt.Bloom,
-		ShardID:           hexutil.Uint64(tx.ShardID()),
+		ShardID:           tx.ShardID(),
 		From:              sender,
 		To:                receiver,
 		Root:              receipt.PostState,
-		Status:            hexutil.Uint64(receipt.Status),
+		Status:            uint(receipt.Status),
 	}
 
 	// Set optionals
 	if len(receipt.PostState) > 0 {
 		txReceipt.Root = receipt.PostState
 	} else {
-		txReceipt.Status = hexutil.Uint64(receipt.Status)
+		txReceipt.Status = uint(receipt.Status)
 	}
 
 	// Set empty array for empty logs
@@ -427,16 +427,16 @@ func NewStakingTxReceipt(
 	txReceipt := &StakingTxReceipt{
 		BlockHash:         blockHash,
 		TransactionHash:   tx.Hash(),
-		BlockNumber:       hexutil.Uint64(blockNumber),
-		TransactionIndex:  hexutil.Uint64(blockIndex),
-		GasUsed:           hexutil.Uint64(receipt.GasUsed),
-		CumulativeGasUsed: hexutil.Uint64(receipt.CumulativeGasUsed),
+		BlockNumber:       blockNumber,
+		TransactionIndex:  blockIndex,
+		GasUsed:           receipt.GasUsed,
+		CumulativeGasUsed: receipt.CumulativeGasUsed,
 		Logs:              receipt.Logs,
 		LogsBloom:         receipt.Bloom,
 		Sender:            sender,
 		Type:              tx.StakingType(),
 		Root:              receipt.PostState,
-		Status:            hexutil.Uint64(receipt.Status),
+		Status:            uint(receipt.Status),
 	}
 
 	// Set empty array for empty logs
