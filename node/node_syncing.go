@@ -231,7 +231,7 @@ func (node *Node) doBeaconSyncing() {
 							beaconBlock, node.Beaconchain(), true,
 						)
 						if err != nil {
-							//node.beaconSync.AddLastMileBlock(beaconBlock)
+							node.beaconSync.AddLastMileBlock(beaconBlock)
 						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
 							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
