@@ -1502,7 +1502,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 
 		// Process block using the parent state as reference point.
-    substart := time.Now()
+		substart := time.Now()
 		receipts, cxReceipts, stakeMsgs, delegationsToRemove, logs, usedGas, payout, newState, err := bc.processor.Process(
 			block, state, bc.vmConfig, true,
 		)
