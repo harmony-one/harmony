@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/harmony-one/harmony/internal/utils"
-	"go.uber.org/zap"
-
 	"github.com/allegro/bigcache"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/internal/utils"
 )
 
 type cacheWrapper struct {
@@ -53,7 +51,11 @@ func NewLocalCacheDatabase(remoteDB ethdb.KeyValueStore, cacheConfig CacheConfig
 
 	go func() {
 		for range time.Tick(time.Minute) {
-			utils.GetLogger().Info("local-cache", zap.Any("stats", cache.Stats()), zap.Int("count", cache.Len()), zap.Int("size", cache.Capacity()))
+			utils.Logger().Info().
+				Interface("stats", cache.Stats()).
+				Int("count", cache.Len()).
+				Int("size", cache.Capacity()).
+				Msg("local-cache stats")
 		}
 	}()
 
