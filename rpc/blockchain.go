@@ -415,6 +415,75 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 	return s.helper.GetBLSSigners(bn)
 }
 
+// GetBlockReceipts returns all transaction receipts for a particular block.
+func (s *PublicBlockchainService) GetBlockReceipts(
+	ctx context.Context, blockHash common.Hash,
+) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetBlockReceipts)
+	defer DoRPCRequestDuration(GetBlockReceipts, timer)
+
+	block, err := s.hmy.GetBlock(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	rmap := make(map[common.Hash]*types.Receipt, len(receipts))
+	for _, r := range receipts {
+		rmap[r.TxHash] = r
+	}
+
+	txns := make([]types.CoreTransaction, 0,
+		block.Transactions().Len()+block.StakingTransactions().Len())
+	for _, tx := range block.Transactions() {
+		txns = append(txns, tx)
+	}
+	for _, tx := range block.StakingTransactions() {
+		txns = append(txns, tx)
+	}
+
+	if len(txns) != len(rmap) {
+		return nil, fmt.Errorf(
+			"transactions (%d) and receipts (%d) count mismatch",
+			len(txns), len(rmap))
+	}
+
+	rpcr := make([]StructuredResponse, 0, len(txns))
+
+	for i, tx := range txns {
+		index := uint64(i)
+
+		r, err := interface{}(nil), error(nil)
+		switch s.version {
+		case V1:
+			r, err = v1.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case V2:
+			r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case Eth:
+			if tx, ok := tx.(*types.Transaction); ok {
+				r, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+			}
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		sr, err := NewStructuredResponse(r)
+		if err != nil {
+			return nil, err
+		}
+		rpcr = append(rpcr, sr)
+	}
+
+	return rpcr, nil
+}
+
 // IsBlockSigner returns true if validator with address signed blockNum block.
 func (s *PublicBlockchainService) IsBlockSigner(
 	ctx context.Context, blockNumber BlockNumber, address string,
