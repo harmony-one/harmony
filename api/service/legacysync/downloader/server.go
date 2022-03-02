@@ -19,6 +19,7 @@ const (
 
 // Server is the Server struct for downloader package.
 type Server struct {
+	pb.UnimplementedDownloaderServer
 	downloadInterface DownloadInterface
 	GrpcServer        *grpc.Server
 	Port              int
