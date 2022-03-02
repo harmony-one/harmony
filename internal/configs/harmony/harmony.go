@@ -28,6 +28,7 @@ type HarmonyConfig struct {
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
 	DNSSync    DnsSync
+	ShardData  ShardDataConfig
 }
 
 type DnsSync struct {
@@ -63,6 +64,14 @@ type GeneralConfig struct {
 	IsOffline              bool
 	DataDir                string
 	EnablePruneBeaconChain bool
+}
+
+type ShardDataConfig struct {
+	EnableShardData bool
+	DiskCount       int
+	ShardCount      int
+	CacheTime       int
+	CacheSize       int
 }
 
 type ConsensusConfig struct {
