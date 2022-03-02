@@ -149,16 +149,13 @@ var (
 	savedStateKey hexutil.Bytes
 	accountState  = NONE
 	emptyHash     = common.Hash{}
-	shardSchedule shardingconfig.Schedule
+	shardSchedule shardingconfig.Schedule // init by cli flag
 )
-
-func now() int64 {
-	return time.Now().Unix()
-}
 
 func dumpPrint(prefix string, showAccount bool) {
 	if totalSize-printSize > MB || showAccount {
-		fmt.Println(now(), prefix, accountCount, totalSize, printSize/MB, flushSize/MB)
+		now := time.Now().Unix()
+		fmt.Println(now, prefix, accountCount, totalSize, printSize/MB, flushSize/MB)
 		if showAccount {
 			fmt.Println("account:", lastAccount.Address.Hex(), lastAccount.Balance, len(lastAccount.Code), accountState, lastAccount.SecureKey.String(), savedStateKey.String())
 		}
@@ -308,7 +305,9 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 		db.GetBlockByHash(latestBlock.Hash())
 		rawdb.ReadBlockRewardAccumulator(db, latestNumber)
 		rawdb.ReadBlockCommitSig(db, latestNumber)
-		for shard := 0; shard < int(params.Sha256BaseGas); shard++ {
+		epoch := block.Epoch()
+		epochInstance := shardSchedule.InstanceForEpoch(epoch)
+		for shard := 0; shard < int(epochInstance.NumShards()); shard++ {
 			rawdb.ReadCrossLinkShardBlock(db, uint32(shard), latestNumber)
 		}
 	}
