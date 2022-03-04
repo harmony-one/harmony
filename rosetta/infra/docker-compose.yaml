@@ -13,6 +13,6 @@ services:
       - "DATA_NAME=harmony_sharddb_0"
     volumes:
       - "./data:/root/data/"
-    command: [ "--run.shard=0", "--sharddata.enable=true"]
+    command: ["-c", "harmony-mainnet.conf", "--run.shard=0", "--sharddata.enable=true"]
     labels:
       service_group: rosetta
