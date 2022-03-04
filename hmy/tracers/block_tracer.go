@@ -157,7 +157,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return stack.Back(n)
 	}
 	memoryCopy := func(off, size int64) []byte {
-		if off+size >= int64(memory.Len()) {
+		if off+size > int64(memory.Len()) {
 			retErr = errors.New("tracer bug:memory leak")
 			return nil
 		}
