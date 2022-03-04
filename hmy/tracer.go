@@ -720,6 +720,9 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 		if *config.Tracer == "ParityBlockTracer" {
 			tracer = &tracers.ParityBlockTracer{}
 			break
+		} else if *config.Tracer == "RosettaBlockTracer" {
+			tracer = &tracers.RosettaBlockTracer{ParityBlockTracer: &tracers.ParityBlockTracer{}}
+			break
 		}
 		// Define a meaningful timeout of a single transaction trace
 		timeout := defaultTraceTimeout
@@ -766,6 +769,8 @@ func (hmy *Harmony) TraceTx(ctx context.Context, message core.Message, vmctx vm.
 	case *tracers.Tracer:
 		return tracer.GetResult()
 	case *tracers.ParityBlockTracer:
+		return tracer.GetResult()
+	case *tracers.RosettaBlockTracer:
 		return tracer.GetResult()
 
 	default:

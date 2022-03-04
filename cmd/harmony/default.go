@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.0"
+const tomlConfigVersion = "2.5.1" // bump from 2.5.0 for AccountSlots
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -66,6 +66,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	TxPool: harmonyconfig.TxPoolConfig{
 		BlacklistFile:  "./.hmy/blacklist.txt",
 		RosettaFixFile: "",
+		AccountSlots:   16,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

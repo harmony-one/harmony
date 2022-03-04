@@ -173,9 +173,14 @@ func (c action) toJsonStr() (string, *string, *string) {
 			c.value = big.NewInt(0)
 		}
 
+		var valueStr string
+		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
+			valueStr = fmt.Sprintf(`,"value":"0x%s"`, c.value.Text(16))
+		}
+
 		action := fmt.Sprintf(
-			`{"callType":"%s","value":"0x%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
-			callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
+			`{"callType":"%s"%s,"to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
+			callType, valueStr, c.to, c.gas, c.from, c.input,
 		)
 
 		output := fmt.Sprintf(
@@ -252,9 +257,10 @@ func (jst *ParityBlockTracer) CaptureStart(env *vm.EVM, from common.Address, to 
 
 // CaptureState implements the ParityBlockTracer interface to trace a single step of VM execution.
 func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) (vm.HookAfter, error) {
-	//if op < vm.CREATE && !jst.descended {
-	//	return nil
-	//}
+	if err != nil {
+		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
+	}
+
 	var retErr error
 	stackPeek := func(n int) *big.Int {
 		if n >= len(stack.Data()) {
@@ -264,14 +270,15 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return stack.Back(n)
 	}
 	memoryCopy := func(off, size int64) []byte {
-		if off+size >= int64(memory.Len()) {
+		if off+size > int64(memory.Len()) {
 			retErr = errors.New("tracer bug:memory leak")
 			return nil
 		}
 		return memory.GetCopy(off, size)
 	}
 
-	if op == vm.CREATE || op == vm.CREATE2 {
+	switch op {
+	case vm.CREATE, vm.CREATE2:
 		inOff := stackPeek(1).Int64()
 		inSize := stackPeek(2).Int64()
 		jst.cur.push(&action{
@@ -284,8 +291,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		})
 		jst.cur.descended = true
 		return nil, retErr
-	}
-	if op == vm.SELFDESTRUCT {
+	case vm.SELFDESTRUCT:
 		ac := jst.cur.last()
 		ac.push(&action{
 			op:      op,
@@ -296,8 +302,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 			value:   env.StateDB.GetBalance(contract.Address()),
 		})
 		return nil, retErr
-	}
-	if op == vm.CALL || op == vm.CALLCODE || op == vm.DELEGATECALL || op == vm.STATICCALL {
+	case vm.CALL, vm.CALLCODE, vm.DELEGATECALL, vm.STATICCALL:
 		to := common.BigToAddress(stackPeek(1))
 		precompiles := vm.PrecompiledContractsVRF
 		if _, exist := precompiles[to]; exist {
@@ -326,6 +331,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		jst.cur.descended = true
 		return nil, retErr
 	}
+
 	if jst.cur.descended {
 		jst.cur.descended = false
 		if depth >= jst.cur.len() { // >= to >
@@ -371,21 +377,21 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 // CaptureFault implements the ParityBlockTracer interface to trace an execution fault
 // while running an opcode.
 func (jst *ParityBlockTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *vm.Stack, contract *vm.Contract, depth int, err error) error {
-	if op == vm.REVERT {
+	if jst.cur.last().err != nil {
 		return nil
 	}
 	call := jst.cur.pop()
-	if call.err == nil {
-		// Consume all available gas and clean any leftovers
-		if call.gas != 0 {
-			call.gasUsed = call.gas
-		}
+	call.err = err
+	// Consume all available gas and clean any leftovers
+	if call.gas != 0 {
+		call.gas = gas
+		call.gasUsed = call.gas
+	}
 
-		// Flatten the failed call into its parent
-		if jst.cur.len() > 0 {
-			jst.cur.last().push(call)
-			return nil
-		}
+	// Flatten the failed call into its parent
+	if jst.cur.len() > 0 {
+		jst.cur.last().push(call)
+		return nil
 	}
 	jst.cur.push(call)
 	return nil
