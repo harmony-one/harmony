@@ -168,6 +168,7 @@ func (s *BlockAPI) BlockTransaction(
 	if state == nil || err != nil {
 		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
 			"message": fmt.Sprintf("block state not found for block %v", blk.NumberU64()),
+			"err":     fmt.Sprintf("%#v", err),
 		})
 	}
 
