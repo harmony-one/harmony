@@ -1,0 +1,18 @@
+version: "2"
+
+services:
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    privileged: true
+    ports:
+      - "8080:9700"
+    environment:
+      - "RCLONE_DB_0_URL=release:pub.harmony.one/mainnet.min.22816573/harmony_sharddb_0"
+      - "DATA_NAME=harmony_sharddb_0"
+    volumes:
+      - "./data:/root/data/"
+    command: [ "-c", "harmony-mainnet.conf", "--run.shard=0", "--sharddata.enable=true" ]
+    labels:
+      service_group: rosetta
