@@ -2,11 +2,16 @@ package shardchain
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
 	"path"
 	"path/filepath"
+	"time"
+
+	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
+	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
+
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
@@ -51,19 +56,14 @@ type LDBShardFactory struct {
 
 // NewChainDB returns a new memDB for the blockchain for given shard.
 func (f *LDBShardFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
-	var err error
-	var shard ethdb.KeyValueStore
 	dir := filepath.Join(f.RootDir, fmt.Sprintf("%s_%d", LDBShardDirPrefix, shardID))
-
-	shard, err = leveldb_shard.NewLeveldbShard(dir, f.DiskCount, f.ShardCount)
+	shard, err := leveldb_shard.NewLeveldbShard(dir, f.DiskCount, f.ShardCount)
 	if err != nil {
 		return nil, err
 	}
 
-	//shard = local_cache.NewLocalCacheDatabase(shard, local_cache.CacheConfig{
-	//	CacheTime: time.Duration(f.CacheTime) * time.Minute,
-	//	CacheSize: f.CacheSize,
-	//})
-
-	return rawdb.NewDatabase(shard), nil
+	return rawdb.NewDatabase(local_cache.NewLocalCacheDatabase(shard, local_cache.CacheConfig{
+		CacheTime: time.Duration(f.CacheTime) * time.Minute,
+		CacheSize: f.CacheSize,
+	})), nil
 }
