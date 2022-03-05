@@ -32,11 +32,11 @@ RUN cp ./rosetta/infra/harmony-pstn.conf /root/harmony-pstn.conf && \
     cp ./.hmy/rosetta_local_fix.csv /root/rosetta_local_fix.csv
 
 # Execution
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 RUN apt update -y && \
-    apt install libgmp-dev libssl-dev rclone ca-certificates -y && \
-    apt -y clean all
+    apt install libgmp-dev libssl-dev ca-certificates rclone -y && \
+    apt -y clean all \
 
 WORKDIR /root
 
