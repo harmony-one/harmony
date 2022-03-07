@@ -25,7 +25,7 @@ func (gi *genesisInitializer) InitChainDB(db ethdb.Database, shardID uint32) err
 		return errors.New("failed to create genesis shard state")
 	}
 	switch shardID {
-	case shard.BeaconChainShardID, shard.EpochChain:
+	case shard.BeaconChainShardID:
 	default:
 		// store only the local shard for shard chains
 		subComm, err := shardState.FindCommitteeByID(shardID)
