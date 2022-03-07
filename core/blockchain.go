@@ -100,6 +100,12 @@ type CacheConfig struct {
 	TrieTimeLimit time.Duration // Time limit after which to flush the current in-memory trie to disk
 }
 
+// Options contains configuration values to change blockchain behaviour.
+type Options struct {
+	// Skip state check on initialization. Should be enabled for epoch chain.
+	SkipInitialStateValidation bool
+}
+
 // BlockChain represents the canonical chain given a database with a genesis
 // block. The Blockchain manages chain imports, reverts, chain reorganisations.
 //
@@ -172,6 +178,8 @@ type BlockChain struct {
 	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
+
+	options Options
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -181,6 +189,23 @@ func NewBlockChain(
 	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
+) (*BlockChain, error) {
+	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, Options{})
+}
+
+// NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
+func NewBlockChainWithOptions(
+	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	engine consensus_engine.Engine, vmConfig vm.Config,
+	shouldPreserve func(block *types.Block) bool, options Options,
+) (*BlockChain, error) {
+	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, options)
+}
+
+func newBlockChainWithOptions(
+	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	engine consensus_engine.Engine, vmConfig vm.Config,
+	shouldPreserve func(block *types.Block) bool, options Options,
 ) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
@@ -234,6 +259,7 @@ func NewBlockChain(
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
 		maxGarbCollectedBlkNum:        -1,
+		options:                       options,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -317,15 +343,18 @@ func (bc *BlockChain) loadLastState() error {
 		utils.Logger().Warn().Str("hash", head.Hex()).Msg("Head block missing, resetting chain")
 		return bc.Reset()
 	}
-	// Make sure the state associated with the block is available
-	if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
-		// Dangling block without a state associated, init from scratch
-		utils.Logger().Warn().
-			Str("number", currentBlock.Number().String()).
-			Str("hash", currentBlock.Hash().Hex()).
-			Msg("Head state missing, repairing chain")
-		if err := bc.repair(&currentBlock); err != nil {
-			return err
+
+	if !bc.options.SkipInitialStateValidation {
+		// Make sure the state associated with the block is available
+		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
+			// Dangling block without a state associated, init from scratch
+			utils.Logger().Warn().
+				Str("number", currentBlock.Number().String()).
+				Str("hash", currentBlock.Hash().Hex()).
+				Msg("Head state missing, repairing chain")
+			if err := bc.repair(&currentBlock); err != nil {
+				return err
+			}
 		}
 	}
 	// Everything seems to be fine, set as the head block

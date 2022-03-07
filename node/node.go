@@ -152,7 +152,11 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
+	return node.chain(shard.BeaconChainShardID, core.Options{})
+}
+
+func (node *Node) chain(shardID uint32, options core.Options) *core.BlockChain {
+	bc, err := node.shardChains.ShardChain(shardID, options)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -167,13 +171,12 @@ func (node *Node) Beaconchain() *core.BlockChain {
 	return bc
 }
 
-// EpochChain returns the epoch chain from node.
+// EpochChain returns the epoch chain from node. Epoch chain is the same as BeaconChain,
+// but with differences in behaviour.
 func (node *Node) EpochChain() *core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shard.EpochChain)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("cannot get epoch chain")
-	}
-	return bc
+	return node.chain(shard.BeaconChainShardID, core.Options{
+		SkipInitialStateValidation: true,
+	})
 }
 
 // TODO: make this batch more transactions
@@ -1021,7 +1024,6 @@ func New(
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
 		beaconChain := node.Beaconchain()
-		epochChain := node.EpochChain()
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
 			var err error
 			if b2 {
@@ -1065,7 +1067,6 @@ func New(
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
 		engine.SetBeaconchain(beaconChain)
-		engine.SetEpochChain(epochChain)
 		// the sequence number is the next block number to be added in consensus protocol, which is
 		// always one more than current chain header block
 		node.Consensus.SetBlockNum(blockchain.CurrentBlock().NumberU64() + 1)
