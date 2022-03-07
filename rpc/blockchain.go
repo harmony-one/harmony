@@ -807,6 +807,48 @@ func toHexSlice(b [][]byte) []string {
 	return r
 }
 
+func (s *PublicBlockchainService) GetShardState(
+	ctx context.Context, epoch *big.Int,
+) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetShardState)
+	defer DoRPCRequestDuration(GetShardState, timer)
+
+	err := s.wait(s.limiter, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetShardState, RateLimitedNumber)
+		return nil, err
+	}
+
+	return s.hmy.BlockChain.ReadShardState(epoch)
+}
+
+func (s *PublicBlockchainService) GetShardStateRLPHex(
+	ctx context.Context, epoch *big.Int,
+) (string, error) {
+	timer := DoMetricRPCRequest(GetShardStateRLPHex)
+	defer DoRPCRequestDuration(GetShardStateRLPHex, timer)
+
+	err := s.wait(s.limiter, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetShardStateRLPHex, RateLimitedNumber)
+		return "", err
+	}
+
+	ss, err := s.hmy.BlockChain.ReadShardState(epoch)
+	if err != nil {
+		return "", err
+	}
+
+	b, err := shard.EncodeWrapper(*ss,
+		s.hmy.BlockChain.Config().IsStaking(epoch))
+	if err != nil {
+		return "", err
+	}
+
+	v, err := hexutil.Bytes(b).MarshalText()
+	return string(v), err
+}
+
 // GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
 func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
 	ctx context.Context, blockNumber BlockNumber,
