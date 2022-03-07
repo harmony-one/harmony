@@ -1,7 +1,6 @@
 package legacysync
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -107,24 +106,25 @@ func (ss *EpochSync) GetActivePeerNumber() int {
 
 // SyncLoop will keep syncing with peers until catches up
 func (ss *EpochSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+	timeout := 2
 	for {
-		<-time.After(5 * time.Second)
-		ss.syncLoop(bc, worker, isBeacon, consensus)
+		<-time.After(time.Duration(timeout) * time.Second)
+		timeout = ss.syncLoop(bc, worker, isBeacon, consensus)
 	}
 }
 
-func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
+	maxHeight := ss.getMaxPeerHeight(isBeacon)
 	for {
-		maxHeight := ss.getMaxPeerHeight(isBeacon)
 		block := bc.CurrentBlock()
 		height := block.NumberU64()
-		fmt.Println("EpochSync Syncloop ", height, " ", maxHeight)
 		if height >= maxHeight {
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), maxHeight, height)
-			break
+			return 10
 		}
+
 		utils.Logger().Info().
 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 				isBeacon, bc.ShardID(), maxHeight, height)
@@ -136,8 +136,15 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			if epochLastBlock > maxHeight {
 				break
 			}
-			heights = append(heights, epochLastBlock)
+			if height != epochLastBlock {
+				heights = append(heights, epochLastBlock)
+			}
 			curEpoch = curEpoch.Add(curEpoch, common.Big1)
+		}
+
+		if len(heights) == 0 {
+			// We currently on top.
+			return 10
 		}
 
 		err := ss.ProcessStateSync(heights, bc, worker)
@@ -145,7 +152,7 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Error().Err(err).
 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), maxHeight, height)
-			break
+			return 2
 		}
 	}
 }
@@ -234,7 +241,9 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 			return errors.Wrap(err, "failed signature validation")
 		}
 
-		_, err = bc.StoreShardStateBytes(block.Header().Epoch(), block.Header().ShardState())
+		ep := block.Header().Epoch()
+		next := ep.Add(ep, common.Big1)
+		_, err = bc.StoreShardStateBytes(next, block.Header().ShardState())
 		if err != nil {
 			return err
 		}
