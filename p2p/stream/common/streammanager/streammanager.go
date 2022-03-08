@@ -125,6 +125,7 @@ func (sm *streamManager) loop() {
 
 		case <-sm.discCh:
 			if sm.coolDown.IsSet() {
+				sm.logger.Info().Msg("skipping discover for cool down")
 				continue
 			}
 			if discCancel != nil {
