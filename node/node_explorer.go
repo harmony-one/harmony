@@ -86,7 +86,8 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		}
 
 		block := recvMsg.Block
-		if blockObj := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash); blockObj == nil {
+		if !node.Consensus.FBFTLog.HasBlock(recvMsg.BlockHash) {
+			var blockObj *types.Block
 			decodeBlock := func() (*types.Block, error) {
 				if err := rlp.DecodeBytes(block, blockObj); err != nil {
 					return nil, err

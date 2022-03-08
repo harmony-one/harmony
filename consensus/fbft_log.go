@@ -129,6 +129,14 @@ func (log *FBFTLog) AddBlock(block *types.Block) {
 	log.blocks[block.Hash()] = block
 }
 
+// HasBlock return whether the given hash is in the FBFTLog
+func (log *FBFTLog) HasBlock(hash common.Hash) bool {
+	log.blockLock.RLock()
+	defer log.blockLock.RUnlock()
+
+	return log.blocks[hash] != nil
+}
+
 // AddBlockIfNotExist use double lock mechanism to avoid calculation in getBlock twice in
 // high concurrency.
 func (log *FBFTLog) AddBlockIfNotExist(hash common.Hash, getBlock func() (*types.Block, error)) error {
