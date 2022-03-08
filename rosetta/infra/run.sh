@@ -19,9 +19,6 @@ mainnet-22816573)
 testnet)
   CONFIG_PATH="-c /root/harmony-testnet.conf"
   ;;
-pstn)
-  CONFIG_PATH="-c /root/harmony-pstn.conf"
-  ;;
 *)
   echo "unknown network"
   exit 1
