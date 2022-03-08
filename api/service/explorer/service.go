@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/shard"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
@@ -114,6 +115,7 @@ func (s *Service) Run() *http.Server {
 	// parameter prefix: from which address prefix start
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+	s.router.Path("/height").HandlerFunc(s.GetHeight)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -171,6 +173,23 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
 		return
+	}
+}
+
+// GetHeight serves end-point /addresses, returns size of addresses from address with prefix.
+func (s *Service) GetHeight(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bc := s.backend.Blockchain()
+	out := map[uint32]uint64{
+		bc.ShardID(): s.backend.Blockchain().CurrentBlock().NumberU64(),
+	}
+	if bc.ShardID() != shard.BeaconChainShardID && s.backend.Beaconchain() != nil {
+		out[shard.BeaconChainShardID] = s.backend.Beaconchain().CurrentBlock().NumberU64()
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
 	}
 }
 
