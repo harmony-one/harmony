@@ -86,8 +86,7 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 		}
 
 		block := recvMsg.Block
-		blockObj := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
-		if blockObj == nil {
+		if blockObj := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash); blockObj == nil {
 			decodeBlock := func() (*types.Block, error) {
 				if err := rlp.DecodeBytes(block, blockObj); err != nil {
 					return nil, err
@@ -96,10 +95,10 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 			}
 			if err = node.Consensus.FBFTLog.AddBlockIfNotExist(recvMsg.BlockHash, decodeBlock); err != nil {
 				utils.Logger().Error().Err(err).Msg("explorer could not rlp decode block")
-				return errors.Wrap(err, "explorer decode prepared")
+				return errors.Wrap(err, "explorer decode prepared message")
 			}
 		}
-		blockObj = node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+		blockObj := node.Consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
 
 		// Try to search for MessageType_COMMITTED message from pbft log.
 		msgs := node.Consensus.FBFTLog.GetMessagesByTypeSeqHash(
