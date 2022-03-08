@@ -28,6 +28,7 @@ RUN make linux_static && \
     cp ./rosetta/infra/rclone.conf /root/rclone.conf
 
 RUN cp ./rosetta/infra/harmony-pstn.conf /root/harmony-pstn.conf && \
+    cp ./rosetta/infra/harmony-testnet.conf /root/harmony-testnet.conf && \
     cp ./rosetta/infra/harmony-mainnet.conf /root/harmony-mainnet.conf && \
     cp ./.hmy/rosetta_local_fix.csv /root/rosetta_local_fix.csv
 
@@ -44,6 +45,7 @@ COPY --from=build /root/harmony /root/harmony
 COPY --from=build /root/run.sh /root/run.sh
 COPY --from=build /root/rclone.conf /root/.config/rclone/rclone.conf
 COPY --from=build /root/harmony-pstn.conf /root/harmony-pstn.conf
+COPY --from=build /root/harmony-testnet.conf /root/harmony-testnet.conf
 COPY --from=build /root/harmony-mainnet.conf /root/harmony-mainnet.conf
 COPY --from=build /root/rosetta_local_fix.csv /root/rosetta_local_fix.csv
 

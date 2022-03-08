@@ -17,6 +17,9 @@ mainnet-22816573)
   rclone -P -L sync $MAINNET_22816573_SNAPSHOT $DATA/$DATA_NAME --transfers=64
   ;;
 testnet)
+  CONFIG_PATH="-c /root/harmony-testnet.conf"
+  ;;
+pstn)
   CONFIG_PATH="-c /root/harmony-pstn.conf"
   ;;
 *)
