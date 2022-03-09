@@ -6,7 +6,6 @@ import (
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
@@ -51,7 +50,7 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := ss.getMaxPeerHeight(false)
+	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
 	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
@@ -73,7 +72,7 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2 := ss.getMaxPeerHeight(false)
+	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
@@ -114,7 +113,7 @@ func (ss *EpochSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 }
 
 func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
-	maxHeight := ss.getMaxPeerHeight(isBeacon)
+	maxHeight := getMaxPeerHeight(ss.syncConfig)
 	for {
 		block := bc.CurrentBlock()
 		height := block.NumberU64()
@@ -155,43 +154,6 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			return 2
 		}
 	}
-}
-
-// getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *EpochSync) getMaxPeerHeight(isBeacon bool) uint64 {
-	maxHeight := uint64(math.MaxUint64)
-	var (
-		wg   sync.WaitGroup
-		lock sync.Mutex
-	)
-
-	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
-			response, err := peerConfig.client.GetBlockChainHeight()
-			if err != nil {
-				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
-				ss.syncConfig.RemovePeer(peerConfig)
-				return
-			}
-			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
-				Msg("[SYNC] getMaxPeerHeight")
-
-			lock.Lock()
-			if response != nil {
-				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
-					maxHeight = response.BlockHeight
-				}
-			}
-			lock.Unlock()
-		}()
-		return
-	})
-	wg.Wait()
-	return maxHeight
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
