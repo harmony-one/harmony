@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/math"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/Workiva/go-datastructures/queue"
@@ -1050,53 +1049,16 @@ func (ss *StateSync) RegisterNodeInfo() int {
 	return count
 }
 
-// getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
-	maxHeight := uint64(math.MaxUint64)
-	var (
-		wg   sync.WaitGroup
-		lock sync.Mutex
-	)
-
-	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
-			response, err := peerConfig.client.GetBlockChainHeight()
-			if err != nil {
-				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
-				ss.syncConfig.RemovePeer(peerConfig)
-				return
-			}
-			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
-				Msg("[SYNC] getMaxPeerHeight")
-
-			lock.Lock()
-			if response != nil {
-				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
-					maxHeight = response.BlockHeight
-				}
-			}
-			lock.Unlock()
-		}()
-		return
-	})
-	wg.Wait()
-	return maxHeight
-}
-
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
-	otherHeight := ss.getMaxPeerHeight(false)
+	otherHeight := getMaxPeerHeight(ss.syncConfig)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
 func (ss *StateSync) GetMaxPeerHeight() uint64 {
-	return ss.getMaxPeerHeight(false)
+	return getMaxPeerHeight(ss.syncConfig)
 }
 
 // SyncLoop will keep syncing with peers until catches up
@@ -1105,7 +1067,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		ss.RegisterNodeInfo()
 	}
 	for {
-		otherHeight := ss.getMaxPeerHeight(isBeacon)
+		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
 			utils.Logger().Info().
@@ -1273,7 +1235,7 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := ss.getMaxPeerHeight(false)
+	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
 	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
@@ -1295,7 +1257,7 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2 := ss.getMaxPeerHeight(false)
+	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
 	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
