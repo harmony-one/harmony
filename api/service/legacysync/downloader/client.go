@@ -58,15 +58,13 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port str
 }
 
 // GetBlocksByHeights gets blocks from peers by calling grpc request.
-func (client *Client) GetBlocksByHeights(heights []uint64, ip, port string) *pb.DownloaderResponse {
+func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request := &pb.DownloaderRequest{
 		Type:    pb.DownloaderRequest_BLOCKBYHEIGHT,
 		Heights: heights,
 	}
-	request.Ip = ip
-	request.Port = port
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
 		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
