@@ -51,20 +51,22 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
+	curBlock := ss.blockChain.CurrentBlock()
+	epochLastBlock := shard.Schedule.EpochLastBlock(curBlock.Epoch().Uint64())
 	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
-	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
 		heightDiff := otherHeight1 - lastHeight
 		if otherHeight1 < lastHeight {
 			heightDiff = 0 //
 		}
+		onTop := epochLastBlock > otherHeight1
 		utils.Logger().Info().
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
 		return SyncCheckResult{
-			IsInSync:    !wasOutOfSync,
+			IsInSync:    !onTop,
 			OtherHeight: otherHeight1,
 			HeightDiff:  heightDiff,
 		}
@@ -73,22 +75,15 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 	time.Sleep(1 * time.Second)
 
 	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
-	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
+	onTop := epochLastBlock > otherHeight2
 
-	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
-	utils.Logger().Info().
-		Uint64("OtherHeight1", otherHeight1).
-		Uint64("OtherHeight2", otherHeight2).
-		Uint64("lastHeight", lastHeight).
-		Uint64("currentHeight", currentHeight).
-		Msg("[SYNC] Checking sync status")
-	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
 	heightDiff := otherHeight2 - lastHeight
 	if otherHeight2 < lastHeight {
 		heightDiff = 0 // overflow
 	}
+
 	return SyncCheckResult{
-		IsInSync:    !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		IsInSync:    !onTop,
 		OtherHeight: otherHeight2,
 		HeightDiff:  heightDiff,
 	}
