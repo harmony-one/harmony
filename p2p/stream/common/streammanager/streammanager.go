@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/internal/utils"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
 	"github.com/libp2p/go-libp2p-core/network"
 	libp2p_peer "github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
 
@@ -49,7 +49,9 @@ type streamManager struct {
 	stopCh      chan stopTask
 	discCh      chan discTask
 	curTask     interface{}
+	coolDown    *abool.AtomicBool
 	// utils
+	coolDownCache    *coolDownCache
 	addStreamFeed    event.Feed
 	removeStreamFeed event.Feed
 	logger           zerolog.Logger
@@ -72,21 +74,22 @@ func newStreamManager(pid sttypes.ProtoID, host host, pf peerFinder, handleStrea
 	protoSpec, _ := sttypes.ProtoIDToProtoSpec(pid)
 
 	return &streamManager{
-		myProtoID:    pid,
-		myProtoSpec:  protoSpec,
-		config:       c,
-		streams:      newStreamSet(),
-		host:         host,
-		pf:           pf,
-		handleStream: handleStream,
-		addStreamCh:  make(chan addStreamTask),
-		rmStreamCh:   make(chan rmStreamTask),
-		stopCh:       make(chan stopTask),
-		discCh:       make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
-
-		logger: logger,
-		ctx:    ctx,
-		cancel: cancel,
+		myProtoID:     pid,
+		myProtoSpec:   protoSpec,
+		config:        c,
+		streams:       newStreamSet(),
+		host:          host,
+		pf:            pf,
+		handleStream:  handleStream,
+		addStreamCh:   make(chan addStreamTask),
+		rmStreamCh:    make(chan rmStreamTask),
+		stopCh:        make(chan stopTask),
+		discCh:        make(chan discTask, 1), // discCh is a buffered channel to avoid overuse of goroutine
+		coolDown:      abool.New(),
+		coolDownCache: newCoolDownCache(),
+		logger:        logger,
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 }
 
@@ -121,15 +124,26 @@ func (sm *streamManager) loop() {
 			}
 
 		case <-sm.discCh:
-			// cancel last discovery
+			if sm.coolDown.IsSet() {
+				sm.logger.Info().Msg("skipping discover for cool down")
+				continue
+			}
 			if discCancel != nil {
-				discCancel()
+				discCancel() // cancel last discovery
 			}
 			discCtx, discCancel = context.WithCancel(sm.ctx)
 			go func() {
-				err := sm.discoverAndSetupStream(discCtx)
+				discovered, err := sm.discoverAndSetupStream(discCtx)
 				if err != nil {
 					sm.logger.Err(err)
+				}
+				if discovered == 0 {
+					// start discover cool down
+					sm.coolDown.Set()
+					go func() {
+						time.Sleep(coolDownPeriod)
+						sm.coolDown.UnSet()
+					}()
 				}
 			}()
 
@@ -142,6 +156,9 @@ func (sm *streamManager) loop() {
 			rmStream.errC <- err
 
 		case stop := <-sm.stopCh:
+			if discCancel != nil {
+				discCancel()
+			}
 			sm.cancel()
 			sm.removeAllStreamOnClose()
 			stop.done <- struct{}{}
@@ -278,18 +295,21 @@ func (sm *streamManager) removeAllStreamOnClose() {
 	sm.streams = newStreamSet()
 }
 
-func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) error {
+func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) (int, error) {
 	peers, err := sm.discover(discCtx)
 	if err != nil {
-		return errors.Wrap(err, "failed to discover")
+		return 0, errors.Wrap(err, "failed to discover")
 	}
 	discoverCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
 
+	connecting := 0
 	for peer := range peers {
-		if peer.ID == sm.host.ID() {
+		if peer.ID == sm.host.ID() || sm.coolDownCache.Has(peer.ID) {
+			// If the peer has the same ID and was just connected, skip.
 			continue
 		}
 		discoveredPeersCounterVec.With(prometheus.Labels{"topic": string(sm.myProtoID)}).Inc()
+		connecting += 1
 		go func(pid libp2p_peer.ID) {
 			// The ctx here is using the module context instead of discover context
 			err := sm.setupStreamWithPeer(sm.ctx, pid)
@@ -299,7 +319,7 @@ func (sm *streamManager) discoverAndSetupStream(discCtx context.Context) error {
 			}
 		}(peer.ID)
 	}
-	return nil
+	return connecting, nil
 }
 
 func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrInfo, error) {
