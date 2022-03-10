@@ -157,7 +157,7 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 	var payload [][]byte
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		resp := peerConfig.GetClient().GetBlocksByHeights(heights, ss.selfip, ss.selfport)
+		resp := peerConfig.GetClient().GetBlocksByHeights(heights)
 		if resp == nil {
 			return false
 		}
