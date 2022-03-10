@@ -102,6 +102,7 @@ func TestHarmonyFlags(t *testing.T) {
 				TxPool: harmonyconfig.TxPoolConfig{
 					BlacklistFile:  "./.hmy/blacklist.txt",
 					RosettaFixFile: "",
+					AccountSlots:   16,
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -140,6 +141,13 @@ func TestHarmonyFlags(t *testing.T) {
 					Gateway:    "https://gateway.harmony.one",
 				},
 				Sync: defaultMainnetSyncConfig,
+				ShardData: harmonyconfig.ShardDataConfig{
+					EnableShardData: false,
+					DiskCount:       8,
+					ShardCount:      4,
+					CacheTime:       10,
+					CacheSize:       512,
+				},
 			},
 		},
 	}
@@ -780,6 +788,7 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
 				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:   defaultConfig.TxPool.AccountSlots,
 			},
 		},
 		{
@@ -787,11 +796,21 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
+			},
+		},
+		{
+			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				AccountSlots:   5,
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
 			},
@@ -1227,6 +1246,52 @@ func TestSyncFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc.Sync, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sync, test.expConfig)
+		}
+
+		ts.tearDown()
+	}
+}
+
+func TestShardDataFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.ShardDataConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: defaultConfig.ShardData,
+		},
+		{
+			args: []string{"--sharddata.enable",
+				"--sharddata.disk_count", "8",
+				"--sharddata.shard_count", "4",
+				"--sharddata.cache_time", "10",
+				"--sharddata.cache_size", "512",
+			},
+			expConfig: harmonyconfig.ShardDataConfig{
+				EnableShardData: true,
+				DiskCount:       8,
+				ShardCount:      4,
+				CacheTime:       10,
+				CacheSize:       512,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, shardDataFlags, func(command *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+			applyShardDataFlags(command, config)
+		})
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.ShardData, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.ShardData, test.expConfig)
 		}
 
 		ts.tearDown()

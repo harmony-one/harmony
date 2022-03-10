@@ -59,6 +59,7 @@ func TestEVMStaking(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	chain, db, header, database := getTestEnvironment(*key)
 	batch := database.NewBatch()
+	header.SetNumber(big.NewInt(1))
 
 	// fake transaction
 	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
@@ -69,7 +70,7 @@ func TestEVMStaking(t *testing.T) {
 
 	// createValidator test
 	createValidator := sampleCreateValidator(*key)
-	err := ctx.CreateValidator(db, &createValidator)
+	err := ctx.CreateValidator(db, nil, &createValidator)
 	if err != nil {
 		t.Errorf("Got error %v in CreateValidator", err)
 	}
@@ -88,7 +89,7 @@ func TestEVMStaking(t *testing.T) {
 	// editValidator test
 	editValidator := sampleEditValidator(*key)
 	editValidator.SlotKeyToRemove = &createValidator.SlotPubKeys[0]
-	err = ctx.EditValidator(db, &editValidator)
+	err = ctx.EditValidator(db, nil, &editValidator)
 	if err != nil {
 		t.Errorf("Got error %v in EditValidator", err)
 	}
@@ -106,14 +107,14 @@ func TestEVMStaking(t *testing.T) {
 	// redelegate using epoch1, so that we can cover the locked tokens use case as well
 	ctx2 := NewEVMContext(msg, blockfactory.ForTest.NewHeader(common.Big1), chain, nil)
 	err = db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-	err = ctx2.Delegate(db, &delegate)
+	err = ctx2.Delegate(db, nil, &delegate)
 	if err != nil {
 		t.Errorf("Got error %v in Delegate", err)
 	}
 
 	// undelegate test
 	undelegate := sampleUndelegate(*key)
-	err = ctx.Undelegate(db, &undelegate)
+	err = ctx.Undelegate(db, nil, &undelegate)
 	if err != nil {
 		t.Errorf("Got error %v in Undelegate", err)
 	}
@@ -124,7 +125,7 @@ func TestEVMStaking(t *testing.T) {
 	wrapper.Delegations[0].Undelegations = []staking.Undelegation{}
 	wrapper.Delegations[0].Reward = common.Big257
 	db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-	err = ctx.CollectRewards(db, &collectRewards)
+	err = ctx.CollectRewards(db, nil, &collectRewards)
 	if err != nil {
 		t.Errorf("Got error %v in CollectRewards", err)
 	}
@@ -453,7 +454,7 @@ func TestWriteCapablePrecompilesIntegration(t *testing.T) {
 
 	// now add a validator, and send its address as caller
 	createValidator := sampleCreateValidator(*key)
-	err = ctx.CreateValidator(db, &createValidator)
+	err = ctx.CreateValidator(db, nil, &createValidator)
 	_, _, err = evm.Call(vm.AccountRef(common.Address{}),
 		createValidator.ValidatorAddress,
 		[]byte{},
