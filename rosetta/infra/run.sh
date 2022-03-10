@@ -26,7 +26,7 @@ testnet)
 esac
 
 if [ "$MODE" = "offline" ]; then
-  BASE_ARGS=(--datadir "$DATA" --log.dir "$LOGS" --run.offline --dns.server false --dns.client false --sync.legacy.server false --sync.legacy.client false)
+  BASE_ARGS=(--datadir "$DATA" --log.dir "$LOGS" --run.offline)
 else
   BASE_ARGS=(--datadir "$DATA" --log.dir "$LOGS")
 fi

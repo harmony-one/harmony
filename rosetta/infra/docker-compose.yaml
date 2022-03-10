@@ -1,7 +1,7 @@
 version: "2"
 
 services:
-  node:
+  online-node:
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,5 +13,17 @@ services:
       - "NETWORK=mainnet-22816573"
     volumes:
       - "./data:/root/data/"
+    labels:
+      service_group: rosetta
+  offline-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    privileged: true
+    ports:
+      - "8081:9700"
+    environment:
+      - "MODE=offline"
+      - "NETWORK=mainnet"
     labels:
       service_group: rosetta
