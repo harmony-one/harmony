@@ -116,7 +116,7 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			utils.Logger().Info().
 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					isBeacon, bc.ShardID(), maxHeight, height)
-			return 10
+			return 60
 		}
 
 		utils.Logger().Info().

@@ -33,7 +33,7 @@ import (
 
 // Constants related to doing syncing.
 const (
-	SyncFrequency = 60
+	SyncFrequency = 60 * time.Second
 
 	// getBlocksRequestHardCap is the hard capped message size at server side for getBlocks request.
 	// The number is 4MB (default gRPC message size) minus 2k reserved for message overhead.
@@ -266,7 +266,7 @@ func (node *Node) doBeaconSyncing() {
 		}
 
 		node.beaconSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil)
-		time.Sleep(time.Duration(SyncFrequency) * time.Second)
+		time.Sleep(SyncFrequency)
 	}
 }
 
@@ -276,7 +276,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
+	ticker := time.NewTicker(SyncFrequency)
 	defer ticker.Stop()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
