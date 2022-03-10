@@ -20,31 +20,31 @@ type writeCapablePrecompileTest struct {
 }
 
 func CollectRewardsFn() CollectRewardsFunc {
-	return func(db StateDB, collectRewards *stakingTypes.CollectRewards) error {
+	return func(db StateDB, rosettaTracer RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
 		return nil
 	}
 }
 
 func DelegateFn() DelegateFunc {
-	return func(db StateDB, delegate *stakingTypes.Delegate) error {
+	return func(db StateDB, rosettaTracer RosettaTracer, delegate *stakingTypes.Delegate) error {
 		return nil
 	}
 }
 
 func UndelegateFn() UndelegateFunc {
-	return func(db StateDB, undelegate *stakingTypes.Undelegate) error {
+	return func(db StateDB, rosettaTracer RosettaTracer, undelegate *stakingTypes.Undelegate) error {
 		return nil
 	}
 }
 
 func CreateValidatorFn() CreateValidatorFunc {
-	return func(db StateDB, createValidator *stakingTypes.CreateValidator) error {
+	return func(db StateDB, rosettaTracer RosettaTracer, createValidator *stakingTypes.CreateValidator) error {
 		return nil
 	}
 }
 
 func EditValidatorFn() EditValidatorFunc {
-	return func(db StateDB, editValidator *stakingTypes.EditValidator) error {
+	return func(db StateDB, rosettaTracer RosettaTracer, editValidator *stakingTypes.EditValidator) error {
 		return nil
 	}
 }

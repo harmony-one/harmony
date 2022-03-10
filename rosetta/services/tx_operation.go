@@ -1,8 +1,9 @@
 package services
 
 import (
-	"fmt"
 	"math/big"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 
 	"github.com/harmony-one/harmony/internal/bech32"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/harmony-one/harmony/core"
 	hmytypes "github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -450,21 +450,10 @@ func getContractCreationNativeOperations(
 	return append(basicOps, internalTxOps...), nil
 }
 
-var (
-	// internalNativeTransferEvmOps are the EVM operations that can execute a native transfer
-	// where the sender is a contract address. This is also known as ops for an 'internal' transaction.
-	// All operations have at least 7 elements on the stack when executed.
-	internalNativeTransferEvmOps = map[string]interface{}{
-		vm.CALL.String():         struct{}{},
-		vm.CALLCODE.String():     struct{}{},
-		vm.SELFDESTRUCT.String(): struct{}{},
-	}
-)
-
 // getContractInternalTransferNativeOperations extracts & formats the native operations for a contract's internal
 // native token transfers (i.e: the sender of a transaction is the contract).
 func getContractInternalTransferNativeOperations(
-	executionResult *hmy.ExecutionResult, status string,
+	executionResult []*tracers.RosettaLogItem, status string,
 	startingOperationIndex *int64,
 ) ([]*types.Operation, *types.Error) {
 	ops := []*types.Operation{}
@@ -473,69 +462,29 @@ func getContractInternalTransferNativeOperations(
 		return ops, nil
 	}
 
-	for _, log := range executionResult.StructLogs {
-		if _, ok := internalNativeTransferEvmOps[log.Op]; ok {
-			switch log.Op {
-			case "SELFDESTRUCT":
-				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				stack := log.FormatStack()
-				topIndex := len(stack) - 1
-
-				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex]))
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-
-				value, ok := new(big.Int).SetString(log.GetOperatorEvent("balance"), 10)
-				if !ok {
-					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
-					})
-				}
-
-				ops = append(
-					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, status, startingOperationIndex)...,
-				)
-				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-				startingOperationIndex = &nextOpIndex
-			default:
-				fromAccID, rosettaError := newAccountIdentifier(log.ContractAddress)
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-				stack := log.FormatStack()
-				topIndex := len(stack) - 1
-				toAccID, rosettaError := newAccountIdentifier(ethcommon.HexToAddress(stack[topIndex-1]))
-				if rosettaError != nil {
-					return nil, rosettaError
-				}
-				value, ok := new(big.Int).SetString(stack[topIndex-2], 16)
-				if !ok {
-					return nil, common.NewError(common.CatchAllError, map[string]interface{}{
-						"message": fmt.Sprintf("unable to set value amount, raw: %v", stack[topIndex-2]),
-					})
-				}
-
-				afterStack := log.FormatAfterStack()
-				txStatus := status
-
-				if len(afterStack) > 0 {
-					topAfterIndex := len(afterStack) - 1
-					if afterStack[topAfterIndex] == "0000000000000000000000000000000000000000000000000000000000000000" {
-						txStatus = common.FailureOperationStatus.Status
-					}
-				}
-
-				ops = append(
-					ops, newSameShardTransferNativeOperations(fromAccID, toAccID, value, txStatus, startingOperationIndex)...,
-				)
-				nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
-				startingOperationIndex = &nextOpIndex
+	for _, log := range executionResult {
+		// skip meaningless information
+		if log.Value.Cmp(big.NewInt(0)) != 0 {
+			fromAccID, rosettaError := newRosettaAccountIdentifier(log.From)
+			if rosettaError != nil {
+				return nil, rosettaError
 			}
+
+			toAccID, rosettaError := newRosettaAccountIdentifier(log.To)
+			if rosettaError != nil {
+				return nil, rosettaError
+			}
+
+			txStatus := status
+			if log.Reverted {
+				txStatus = common.FailureOperationStatus.Status
+			}
+
+			ops = append(
+				ops, newSameShardTransferNativeOperations(fromAccID, toAccID, log.Value, txStatus, startingOperationIndex)...,
+			)
+			nextOpIndex := ops[len(ops)-1].OperationIdentifier.Index + 1
+			startingOperationIndex = &nextOpIndex
 		}
 	}
 
@@ -801,43 +750,60 @@ func newSameShardTransferNativeOperations(
 	} else {
 		opIndex = 0
 	}
-	subOperationID := &types.OperationIdentifier{
-		Index: opIndex,
-	}
-	subAmount := &types.Amount{
-		Value:    negativeBigValue(amount),
-		Currency: &common.NativeCurrency,
-	}
 
-	// Addition operation elements
-	addOperationID := &types.OperationIdentifier{
-		Index: subOperationID.Index + 1,
-	}
-	addRelatedID := []*types.OperationIdentifier{
-		subOperationID,
-	}
-	addAmount := &types.Amount{
-		Value:    amount.String(),
-		Currency: &common.NativeCurrency,
-	}
+	var subOperationID *types.OperationIdentifier
+	var op []*types.Operation
 
-	return []*types.Operation{
-		{
+	if from != nil {
+		subOperationID = &types.OperationIdentifier{
+			Index: opIndex,
+		}
+
+		subAmount := &types.Amount{
+			Value:    negativeBigValue(amount),
+			Currency: &common.NativeCurrency,
+		}
+
+		op = append(op, &types.Operation{
 			OperationIdentifier: subOperationID,
 			Type:                common.NativeTransferOperation,
 			Status:              &status,
 			Account:             from,
 			Amount:              subAmount,
-		},
-		{
+		})
+	}
+	if to != nil {
+		var addOperationID *types.OperationIdentifier
+		var addRelatedID []*types.OperationIdentifier
+		if subOperationID == nil {
+			addOperationID = &types.OperationIdentifier{
+				Index: opIndex,
+			}
+		} else {
+			addOperationID = &types.OperationIdentifier{
+				Index: subOperationID.Index + 1,
+			}
+			addRelatedID = []*types.OperationIdentifier{
+				subOperationID,
+			}
+		}
+
+		addAmount := &types.Amount{
+			Value:    amount.String(),
+			Currency: &common.NativeCurrency,
+		}
+
+		op = append(op, &types.Operation{
 			OperationIdentifier: addOperationID,
 			RelatedOperations:   addRelatedID,
 			Type:                common.NativeTransferOperation,
 			Status:              &status,
 			Account:             to,
 			Amount:              addAmount,
-		},
+		})
 	}
+
+	return op
 }
 
 // newNativeOperationsWithGas creates a new operation with the gas fee as the first operation.

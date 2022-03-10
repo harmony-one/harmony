@@ -11,13 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/shard"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -176,16 +174,31 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetHeight serves end-point /addresses, returns size of addresses from address with prefix.
+type HeightResponse struct {
+	S0 uint64 `json:"0,omitempty"`
+	S1 uint64 `json:"1,omitempty"`
+	S2 uint64 `json:"2,omitempty"`
+	S3 uint64 `json:"3,omitempty"`
+}
+
+// GetHeight returns heights of current and beacon chains if needed.
 func (s *Service) GetHeight(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	bc := s.backend.Blockchain()
-	out := map[uint32]uint64{
-		bc.ShardID(): s.backend.Blockchain().CurrentBlock().NumberU64(),
-	}
-	if bc.ShardID() != shard.BeaconChainShardID && s.backend.Beaconchain() != nil {
-		out[shard.BeaconChainShardID] = s.backend.Beaconchain().CurrentBlock().NumberU64()
+	out := HeightResponse{}
+	switch bc.ShardID() {
+	case 0:
+		out.S0 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 1:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S1 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 2:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S2 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 3:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S3 = s.backend.Blockchain().CurrentBlock().NumberU64()
 	}
 
 	if err := json.NewEncoder(w).Encode(out); err != nil {

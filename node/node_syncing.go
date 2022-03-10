@@ -583,6 +583,11 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		if len(request.Heights) == 0 {
 			return response, errors.New("empty heights list provided")
 		}
+
+		if len(request.Heights) > int(legacysync.SyncLoopBatchSize) {
+			return response, errors.New("exceed size limit")
+		}
+
 		out := make([][]byte, 0, len(request.Heights))
 		for _, v := range request.Heights {
 			block := node.Blockchain().GetBlockByNumber(v)

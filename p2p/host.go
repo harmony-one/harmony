@@ -106,6 +106,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.Identity(key),
 		libp2p.EnableNATService(),
 		libp2p.ForceReachabilityPublic(),
+		libp2p.BandwidthReporter(newCounter()),
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
