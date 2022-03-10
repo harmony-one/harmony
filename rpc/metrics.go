@@ -16,6 +16,7 @@ const (
 	IsLastBlock              = "IsLastBlock"
 	EpochLastBlock           = "EpochLastBlock"
 	GetBlockSigners          = "GetBlockSigners"
+	GetBlockReceipts         = "GetBlockReceipts"
 	GetBlockSignerKeys       = "GetBlockSignerKeys"
 	IsBlockSigner            = "IsBlockSigner"
 	GetSignedBlocks          = "GetSignedBlocks"
