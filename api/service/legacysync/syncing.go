@@ -192,7 +192,7 @@ type StateSync struct {
 
 func (ss *StateSync) IntoEpochSync() *EpochSync {
 	return &EpochSync{
-		blockChain:         ss.blockChain,
+		beaconChain:        ss.blockChain,
 		selfip:             ss.selfip,
 		selfport:           ss.selfport,
 		selfPeerHash:       ss.selfPeerHash,

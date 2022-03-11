@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
-	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -20,7 +19,7 @@ import (
 )
 
 type EpochSync struct {
-	blockChain         *core.BlockChain
+	beaconChain        *core.BlockChain
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
@@ -51,22 +50,22 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
-	curBlock := ss.blockChain.CurrentBlock()
+	curBlock := ss.beaconChain.CurrentBlock()
 	epochLastBlock := shard.Schedule.EpochLastBlock(curBlock.Epoch().Uint64())
-	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
+	lastHeight := ss.beaconChain.CurrentBlock().NumberU64()
 
 	if !doubleCheck {
 		heightDiff := otherHeight1 - lastHeight
 		if otherHeight1 < lastHeight {
 			heightDiff = 0 //
 		}
-		onTop := epochLastBlock > otherHeight1
+		inSync := epochLastBlock > otherHeight1
 		utils.Logger().Info().
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
 		return SyncCheckResult{
-			IsInSync:    !onTop,
+			IsInSync:    inSync,
 			OtherHeight: otherHeight1,
 			HeightDiff:  heightDiff,
 		}
@@ -75,7 +74,7 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 	time.Sleep(1 * time.Second)
 
 	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
-	onTop := epochLastBlock > otherHeight2
+	inSync := epochLastBlock > otherHeight2
 
 	heightDiff := otherHeight2 - lastHeight
 	if otherHeight2 < lastHeight {
@@ -83,7 +82,7 @@ func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
 	}
 
 	return SyncCheckResult{
-		IsInSync:    !onTop,
+		IsInSync:    inSync,
 		OtherHeight: otherHeight2,
 		HeightDiff:  heightDiff,
 	}
@@ -306,78 +305,5 @@ func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Bool("isBeacon", isBeacon).
 		Msg("[SYNC] Finished making connection to peers")
 
-	return nil
-}
-
-// UpdateBlockAndStatus ...
-func (ss *EpochSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
-	// disabled
-	return nil
-	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
-		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
-		return nil
-	}
-
-	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
-	// Verify block signatures
-	if block.NumberU64() > 1 {
-		// Verify signature every 100 blocks
-		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
-		verifyCurrentSig := verifyAllSig && haveCurrentSig
-		if verifyCurrentSig {
-			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
-			if err != nil {
-				return errors.Wrap(err, "parse commitSigAndBitmap")
-			}
-
-			startTime := time.Now()
-			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
-				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
-			}
-			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[Sync] VerifyHeaderSignature")
-		}
-		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
-		if err == engine.ErrUnknownAncestor {
-			return err
-		} else if err != nil {
-			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
-
-			if !verifyAllSig {
-				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Err(rbErr).Msg("[SYNC] UpdateBlockAndStatus: failed to rollback")
-						return err
-					}
-				}
-			}
-			return err
-		}
-	}
-
-	_, err := bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
-	if err != nil {
-		utils.Logger().Error().
-			Err(err).
-			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
-				block.NumberU64(),
-				block.ShardID(),
-			)
-		return err
-	}
-	utils.Logger().Info().
-		Uint64("blockHeight", block.NumberU64()).
-		Uint64("blockEpoch", block.Epoch().Uint64()).
-		Str("blockHex", block.Hash().Hex()).
-		Uint32("ShardID", block.ShardID()).
-		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
-
-	for i, tx := range block.StakingTransactions() {
-		utils.Logger().Info().
-			Msgf(
-				"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
-			)
-	}
 	return nil
 }
