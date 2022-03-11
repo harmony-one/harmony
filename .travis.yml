@@ -20,6 +20,8 @@ install:
   - git clone https://github.com/harmony-one/bls.git $HOME/gopath/src/github.com/harmony-one/bls
   - (cd $HOME/gopath/src/github.com/harmony-one/mcl; make -j4)
   - (cd $HOME/gopath/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
+  - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+  - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
   - make go-get
   - scripts/install_build_tools.sh
 script:
