@@ -7,10 +7,11 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -57,6 +58,7 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		maxConnPerIPFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -72,6 +74,7 @@ var (
 		wsEnabledFlag,
 		wsIPFlag,
 		wsPortFlag,
+		wsAuthPortFlag,
 	}
 
 	rpcOptFlags = []cli.Flag{
@@ -120,6 +123,8 @@ var (
 	}
 
 	txPoolFlags = []cli.Flag{
+		tpAccountSlotsFlag,
+		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
 	}
@@ -208,6 +213,14 @@ var (
 		syncDiscHardLowFlag,
 		syncDiscHighFlag,
 		syncDiscBatchFlag,
+	}
+
+	shardDataFlags = []cli.Flag{
+		enableShardDataFlag,
+		diskCountFlag,
+		shardCountFlag,
+		cacheTimeFlag,
+		cacheSizeFlag,
 	}
 )
 
@@ -308,6 +321,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
+	flags = append(flags, shardDataFlags...)
 
 	return flags
 }
@@ -525,6 +539,11 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	maxConnPerIPFlag = cli.IntFlag{
+		Name:     "p2p.security.max-conn-per-ip",
+		Usage:    "maximum number of connections allowed per node",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -551,6 +570,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
 		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
+		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
 	}
 }
 
@@ -642,6 +665,11 @@ var (
 		Usage:    "port for websocket endpoint",
 		DefValue: defaultConfig.WS.Port,
 	}
+	wsAuthPortFlag = cli.IntFlag{
+		Name:     "ws.auth-port",
+		Usage:    "port for websocket auth endpoint",
+		DefValue: defaultConfig.WS.AuthPort,
+	}
 )
 
 func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -653,6 +681,9 @@ func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, wsPortFlag) {
 		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
+	}
+	if cli.IsFlagChanged(cmd, wsAuthPortFlag) {
+		config.WS.AuthPort = cli.GetIntFlagValue(cmd, wsAuthPortFlag)
 	}
 }
 
@@ -956,10 +987,20 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig
 
 // transaction pool flags
 var (
+	tpAccountSlotsFlag = cli.IntFlag{
+		Name:     "txpool.accountslots",
+		Usage:    "number of executable transaction slots guaranteed per account",
+		DefValue: int(defaultConfig.TxPool.AccountSlots),
+	}
 	tpBlacklistFileFlag = cli.StringFlag{
 		Name:     "txpool.blacklist",
 		Usage:    "file of blacklisted wallet addresses",
 		DefValue: defaultConfig.TxPool.BlacklistFile,
+	}
+	rosettaFixFileFlag = cli.StringFlag{
+		Name:     "txpool.rosettafixfile",
+		Usage:    "file of rosetta fix file",
+		DefValue: defaultConfig.TxPool.RosettaFixFile,
 	}
 	legacyTPBlacklistFileFlag = cli.StringFlag{
 		Name:       "blacklist",
@@ -970,6 +1011,16 @@ var (
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
+		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
+		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
+		if value <= 0 {
+			panic("Must provide positive for txpool.accountslots")
+		}
+		config.TxPool.AccountSlots = uint64(cli.GetIntFlagValue(cmd, tpAccountSlotsFlag))
+	}
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
@@ -1370,6 +1421,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfi
 		config.HTTP.AuthPort = nodeconfig.GetRPCAuthHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
+		config.WS.AuthPort = nodeconfig.GetWSAuthPortFromBase(legacyPort)
 
 		legPortStr := strconv.Itoa(legacyPort)
 		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))
@@ -1563,5 +1615,52 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
 		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
+}
+
+// shard data flags
+var (
+	enableShardDataFlag = cli.BoolFlag{
+		Name:     "sharddata.enable",
+		Usage:    "whether use multi-database mode of levelDB",
+		DefValue: defaultConfig.ShardData.EnableShardData,
+	}
+	diskCountFlag = cli.IntFlag{
+		Name:     "sharddata.disk_count",
+		Usage:    "the count of disks you want to storage block data",
+		DefValue: defaultConfig.ShardData.DiskCount,
+	}
+	shardCountFlag = cli.IntFlag{
+		Name:     "sharddata.shard_count",
+		Usage:    "the count of shards you want to split in each disk",
+		DefValue: defaultConfig.ShardData.ShardCount,
+	}
+	cacheTimeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_time",
+		Usage:    "local cache save time (minute)",
+		DefValue: defaultConfig.ShardData.CacheTime,
+	}
+	cacheSizeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_size",
+		Usage:    "local cache storage size (MB)",
+		DefValue: defaultConfig.ShardData.CacheSize,
+	}
+)
+
+func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, enableShardDataFlag) {
+		cfg.ShardData.EnableShardData = cli.GetBoolFlagValue(cmd, enableShardDataFlag)
+	}
+	if cli.IsFlagChanged(cmd, diskCountFlag) {
+		cfg.ShardData.DiskCount = cli.GetIntFlagValue(cmd, diskCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, shardCountFlag) {
+		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheTimeFlag) {
+		cfg.ShardData.CacheTime = cli.GetIntFlagValue(cmd, cacheTimeFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
+		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
 	}
 }

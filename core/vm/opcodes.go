@@ -215,8 +215,8 @@ const (
 	CREATE2
 	STATICCALL = 0xfa
 
-	REVERT       = 0xfd
-	SELFDESTRUCT = 0xff
+	REVERT              = 0xfd
+	SELFDESTRUCT OpCode = 0xff
 )
 
 // Since the opcodes aren't all in order we can't use a regular slice.

@@ -28,6 +28,7 @@ type HarmonyConfig struct {
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
 	DNSSync    DnsSync
+	ShardData  ShardDataConfig
 }
 
 type DnsSync struct {
@@ -50,17 +51,27 @@ type P2pConfig struct {
 	KeyFile         string
 	DHTDataStore    *string `toml:",omitempty"`
 	DiscConcurrency int     // Discovery Concurrency value
+	MaxConnsPerIP   int
 }
 
 type GeneralConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBackup         bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
+	NodeType               string
+	NoStaking              bool
+	ShardID                int
+	IsArchival             bool
+	IsBackup               bool
+	IsBeaconArchival       bool
+	IsOffline              bool
+	DataDir                string
+	EnablePruneBeaconChain bool
+}
+
+type ShardDataConfig struct {
+	EnableShardData bool
+	DiskCount       int
+	ShardCount      int
+	CacheTime       int
+	CacheSize       int
 }
 
 type ConsensusConfig struct {
@@ -84,7 +95,9 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile string
+	BlacklistFile  string
+	RosettaFixFile string
+	AccountSlots   uint64
 }
 
 type PprofConfig struct {
@@ -144,9 +157,10 @@ type HttpConfig struct {
 }
 
 type WsConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled  bool
+	IP       string
+	Port     int
+	AuthPort int
 }
 
 type RpcOptConfig struct {

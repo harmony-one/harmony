@@ -1,5 +1,6 @@
 syntax = "proto3";
 package message;
+option go_package="./;message";
 
 
 // Client is the service used for any client-facing requests.

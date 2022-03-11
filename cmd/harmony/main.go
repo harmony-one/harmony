@@ -15,14 +15,17 @@ import (
 	"syscall"
 	"time"
 
+	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
+
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/pprof"
@@ -98,11 +101,15 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(dumpConfigLegacyCmd)
+	rootCmd.AddCommand(dumpDBCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
 	}
 	if err := registerDumpConfigFlags(); err != nil {
+		os.Exit(2)
+	}
+	if err := registerDumpDBFlags(); err != nil {
 		os.Exit(2)
 	}
 }
@@ -228,6 +235,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
+	applyShardDataFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
@@ -319,6 +327,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		WSEnabled:          hc.WS.Enabled,
 		WSIp:               hc.WS.IP,
 		WSPort:             hc.WS.Port,
+		WSAuthPort:         hc.WS.AuthPort,
 		DebugEnabled:       hc.RPCOpt.DebugEnabled,
 		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
@@ -350,6 +359,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
 				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
 			}
+			fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
+			utils.Logger().Warn().
+				Uint64("Current Block", chain.CurrentBlock().NumberU64()).
+				Msg("Revert finished.")
+			os.Exit(1)
 		}
 	}
 
@@ -579,13 +593,13 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
-
 	myHost, err = p2p.NewHost(p2p.HostConfig{
 		Self:            &selfPeer,
 		BLSKey:          nodeConfig.P2PPriKey,
 		BootNodes:       hc.Network.BootNodes,
 		DataStoreFile:   hc.P2P.DHTDataStore,
 		DiscConcurrency: hc.P2P.DiscConcurrency,
+		MaxConnPerIP:    hc.P2P.MaxConnsPerIP,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -646,7 +660,18 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	}
 
 	// Current node.
-	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	var chainDBFactory shardchain.DBFactory
+	if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
 
@@ -790,6 +815,8 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 }
 
 func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
+	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
+
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
 	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {

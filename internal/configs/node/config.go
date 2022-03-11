@@ -103,9 +103,10 @@ type RPCServerConfig struct {
 	HTTPPort     int
 	HTTPAuthPort int
 
-	WSEnabled bool
-	WSIp      string
-	WSPort    int
+	WSEnabled  bool
+	WSIp       string
+	WSPort     int
+	WSAuthPort int
 
 	DebugEnabled bool
 

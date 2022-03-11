@@ -48,6 +48,7 @@ type environment struct {
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 	slashes    slash.Records
+	stakeMsgs  []staking.StakeMsg
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -225,7 +226,7 @@ func (w *Worker) commitTransaction(
 ) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(
+	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
 		w.config,
 		w.chain,
 		&coinbase,
@@ -252,6 +253,7 @@ func (w *Worker) commitTransaction(
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
 	w.current.logs = append(w.current.logs, receipt.Logs...)
+	w.current.stakeMsgs = append(w.current.stakeMsgs, stakeMsgs...)
 
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
@@ -332,6 +334,7 @@ func (w *Worker) GetCurrentResult() *core.ProcessorResult {
 		UsedGas:    w.current.header.GasUsed(),
 		Reward:     w.current.reward,
 		State:      w.current.state,
+		StakeMsgs:  w.current.stakeMsgs,
 	}
 }
 

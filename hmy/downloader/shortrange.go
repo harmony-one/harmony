@@ -24,7 +24,9 @@ import (
 func (d *Downloader) doShortRangeSync() (int, error) {
 	numShortRangeCounterVec.With(d.promLabels()).Inc()
 
-	srCtx, _ := context.WithTimeout(d.ctx, shortRangeTimeout)
+	srCtx, cancel := context.WithTimeout(d.ctx, shortRangeTimeout)
+	defer cancel()
+
 	sh := &srHelper{
 		syncProtocol: d.syncProtocol,
 		ctx:          srCtx,

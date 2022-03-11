@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -44,6 +45,34 @@ type BlockWithTxHash struct {
 	EthTransactions  []common.Hash  `json:"transactionsInEthHash"`
 	StakingTxs       []common.Hash  `json:"stakingTransactions"`
 	Signers          []string       `json:"signers,omitempty"`
+}
+
+// BlockHeader represents a block header that will serialize to the RPC representation of a block header
+type BlockHeader struct {
+	ParentHash           common.Hash    `json:"parentHash"`
+	Miner                common.Address `json:"miner"`
+	StateRoot            common.Hash    `json:"stateRoot"`
+	TransactionsRoot     common.Hash    `json:"transactionsRoot"`
+	ReceiptsRoot         common.Hash    `json:"receiptsRoot"`
+	OutgoingReceiptsRoot common.Hash    `json:"outgoingReceiptsRoot"`
+	IncomingReceiptsRoot common.Hash    `json:"incomingReceiptsRoot"`
+	LogsBloom            ethtypes.Bloom `json:"logsBloom"`
+	Number               *big.Int       `json:"number"`
+	GasLimit             uint64         `json:"gasLimit"`
+	GasUsed              uint64         `json:"gasUsed"`
+	Timestamp            *big.Int       `json:"timestamp"`
+	ExtraData            hexutil.Bytes  `json:"extraData"`
+	MixHash              common.Hash    `json:"mixHash"`
+	ViewID               *big.Int       `json:"viewID"`
+	Epoch                *big.Int       `json:"epoch"`
+	ShardID              uint32         `json:"shardID"`
+	LastCommitSignature  hexutil.Bytes  `json:"lastCommitSignature"`
+	LastCommitBitmap     hexutil.Bytes  `json:"lastCommitBitmap"`
+	Vrf                  hexutil.Bytes  `json:"vrf"`
+	Vdf                  hexutil.Bytes  `json:"vdf"`
+	ShardState           hexutil.Bytes  `json:"shardState"`
+	CrossLink            hexutil.Bytes  `json:"crossLink"`
+	Slashes              hexutil.Bytes  `json:"slashes"`
 }
 
 // BlockWithFullTx represents a block that will serialize to the RPC representation of a block
@@ -675,6 +704,42 @@ func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 			return nil, err
 		}
 		blk.Transactions = append(blk.Transactions, fmtTx)
+	}
+	return blk, nil
+}
+
+func NewBlockHeader(
+	head *block.Header,
+) (*BlockHeader, error) {
+	lastSig := head.LastCommitSignature()
+	blk := &BlockHeader{
+		ParentHash:           head.ParentHash(),
+		Miner:                head.Coinbase(),
+		StateRoot:            head.Root(),
+		TransactionsRoot:     head.TxHash(),
+		ReceiptsRoot:         head.ReceiptHash(),
+		OutgoingReceiptsRoot: head.OutgoingReceiptHash(),
+		IncomingReceiptsRoot: head.IncomingReceiptHash(),
+		LogsBloom:            head.Bloom(),
+
+		Number:    head.Number(),
+		GasLimit:  head.GasLimit(),
+		GasUsed:   head.GasUsed(),
+		Timestamp: head.Time(),
+		ExtraData: hexutil.Bytes(head.Extra()),
+		MixHash:   head.MixDigest(),
+
+		ViewID:  head.ViewID(),
+		Epoch:   head.Epoch(),
+		ShardID: head.ShardID(),
+
+		LastCommitSignature: hexutil.Bytes(lastSig[:]),
+		LastCommitBitmap:    head.LastCommitBitmap(),
+		Vrf:                 head.Vrf(),
+		Vdf:                 head.Vdf(),
+		ShardState:          head.ShardState(),
+		CrossLink:           head.CrossLinks(),
+		Slashes:             head.Slashes(),
 	}
 	return blk, nil
 }

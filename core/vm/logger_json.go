@@ -48,7 +48,7 @@ func (l *JSONLogger) CaptureStart(env *EVM, from common.Address, to common.Addre
 }
 
 // CaptureState outputs state information on the logger.
-func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error {
+func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) (HookAfter, error) {
 	log := StructLog{
 		Pc:              pc,
 		Op:              op,
@@ -68,7 +68,7 @@ func (l *JSONLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost uint
 	if !l.cfg.DisableStack {
 		log.Stack = stack.Data()
 	}
-	return l.encoder.Encode(log)
+	return nil, l.encoder.Encode(log)
 }
 
 // CaptureFault outputs state information on the logger.

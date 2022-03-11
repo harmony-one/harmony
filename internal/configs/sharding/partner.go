@@ -16,8 +16,8 @@ var PartnerSchedule partnerSchedule
 type partnerSchedule struct{}
 
 const (
-	// 10 minutes per epoch (at 8s/block)
-	partnerBlocksPerEpoch = 75
+	// 12 hours per epoch (at 2s/block)
+	partnerBlocksPerEpoch = 21600
 
 	partnerVdfDifficulty = 10000 // This takes about 20s to finish the vdf
 
@@ -73,8 +73,8 @@ func (ps partnerSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 
 var partnerReshardingEpoch = []*big.Int{
 	big.NewInt(0),
-	params.TestnetChainConfig.StakingEpoch,
+	params.PartnerChainConfig.StakingEpoch,
 }
 
-var partnerV0 = MustNewInstance(2, 15, 15, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV1 = MustNewInstance(2, 30, 15, numeric.MustNewDecFromStr("0.68"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV0 = MustNewInstance(2, 5, 5, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV1 = MustNewInstance(2, 5, 4, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())

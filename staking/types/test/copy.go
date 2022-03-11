@@ -10,9 +10,25 @@ import (
 
 // CopyValidatorWrapper deep copies staking.ValidatorWrapper
 func CopyValidatorWrapper(w staking.ValidatorWrapper) staking.ValidatorWrapper {
+	return copyValidatorWrapper(w, true)
+}
+
+// CopyValidatorWrapperNoDelegations deep copies staking.ValidatorWrapper, excluding Delegations
+// With the heap pprof turned on, we see that copying validator wrapper is an expensive operation
+// of which the most expensive part is copyng the delegations
+// this function can be used when delegations are not expected to be changed by the caller
+func CopyValidatorWrapperNoDelegations(w staking.ValidatorWrapper) staking.ValidatorWrapper {
+	return copyValidatorWrapper(w, false)
+}
+
+func copyValidatorWrapper(w staking.ValidatorWrapper, copyDelegations bool) staking.ValidatorWrapper {
 	cp := staking.ValidatorWrapper{
-		Validator:   CopyValidator(w.Validator),
-		Delegations: CopyDelegations(w.Delegations),
+		Validator: CopyValidator(w.Validator),
+	}
+	if copyDelegations {
+		cp.Delegations = CopyDelegations(w.Delegations)
+	} else {
+		cp.Delegations = w.Delegations
 	}
 	if w.Counters.NumBlocksSigned != nil {
 		cp.Counters.NumBlocksSigned = new(big.Int).Set(w.Counters.NumBlocksSigned)

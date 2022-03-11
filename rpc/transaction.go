@@ -6,16 +6,16 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/pkg/errors"
+
 	"github.com/harmony-one/harmony/accounts/abi"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
@@ -51,6 +51,9 @@ func NewPublicTransactionAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicTransactionService) GetAccountNonce(
 	ctx context.Context, address string, blockNumber BlockNumber,
 ) (uint64, error) {
+	timer := DoMetricRPCRequest(GetAccountNonce)
+	defer DoRPCRequestDuration(GetAccountNonce, timer)
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -69,6 +72,9 @@ func (s *PublicTransactionService) GetAccountNonce(
 func (s *PublicTransactionService) GetTransactionCount(
 	ctx context.Context, addr string, blockNumber BlockNumber,
 ) (response interface{}, err error) {
+	timer := DoMetricRPCRequest(GetTransactionCount)
+	defer DoRPCRequestDuration(GetTransactionCount, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	address, err := internal_common.ParseAddr(addr)
@@ -114,6 +120,9 @@ func (s *PublicTransactionService) GetTransactionCount(
 func (s *PublicTransactionService) GetTransactionsCount(
 	ctx context.Context, address, txType string,
 ) (count uint64, err error) {
+	timer := DoMetricRPCRequest(GetTransactionsCount)
+	defer DoRPCRequestDuration(GetTransactionsCount, timer)
+
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
 		addr, err := internal_common.ParseAddr(address)
@@ -134,6 +143,9 @@ func (s *PublicTransactionService) GetTransactionsCount(
 func (s *PublicTransactionService) GetStakingTransactionsCount(
 	ctx context.Context, address, txType string,
 ) (count uint64, err error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionsCount)
+	defer DoRPCRequestDuration(GetStakingTransactionsCount, timer)
+
 	if !strings.HasPrefix(address, "one1") {
 		// Handle hex address
 		addr, err := internal_common.ParseAddr(address)
@@ -155,6 +167,9 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 func (s *PublicTransactionService) EstimateGas(
 	ctx context.Context, args CallArgs,
 ) (hexutil.Uint64, error) {
+	timer := DoMetricRPCRequest(RpcEstimateGas)
+	defer DoRPCRequestDuration(RpcEstimateGas, timer)
+
 	gas, err := EstimateGas(ctx, s.hmy, args, nil)
 	if err != nil {
 		return 0, err
@@ -411,6 +426,9 @@ func (s *PublicTransactionService) GetStakingTransactionsHistory(
 func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockTransactionCountByNumber)
+	defer DoRPCRequestDuration(GetBlockTransactionCountByNumber, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -440,6 +458,9 @@ func (s *PublicTransactionService) GetBlockTransactionCountByNumber(
 func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 	ctx context.Context, blockHash common.Hash,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockTransactionCountByHash)
+	defer DoRPCRequestDuration(GetBlockTransactionCountByHash, timer)
+
 	// Fetch block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -465,6 +486,9 @@ func (s *PublicTransactionService) GetBlockTransactionCountByHash(
 func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 	ctx context.Context, blockNumber BlockNumber, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionByBlockNumberAndIndex)
+	defer DoRPCRequestDuration(GetTransactionByBlockNumberAndIndex, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -507,6 +531,9 @@ func (s *PublicTransactionService) GetTransactionByBlockNumberAndIndex(
 func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 	ctx context.Context, blockHash common.Hash, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionByBlockHashAndIndex)
+	defer DoRPCRequestDuration(GetTransactionByBlockHashAndIndex, timer)
+
 	// Fetch Block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -547,6 +574,9 @@ func (s *PublicTransactionService) GetTransactionByBlockHashAndIndex(
 func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 	ctx context.Context, blockNumber BlockNumber,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockStakingTransactionCountByNumber)
+	defer DoRPCRequestDuration(GetBlockStakingTransactionCountByNumber, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -576,6 +606,9 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByNumber(
 func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 	ctx context.Context, blockHash common.Hash,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetBlockStakingTransactionCountByHash)
+	defer DoRPCRequestDuration(GetBlockStakingTransactionCountByHash, timer)
+
 	// Fetch block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -601,6 +634,9 @@ func (s *PublicTransactionService) GetBlockStakingTransactionCountByHash(
 func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 	ctx context.Context, blockNumber BlockNumber, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionByBlockNumberAndIndex)
+	defer DoRPCRequestDuration(GetStakingTransactionByBlockNumberAndIndex, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -637,6 +673,9 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockNumberAndIndex(
 func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 	ctx context.Context, blockHash common.Hash, index TransactionIndex,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetStakingTransactionByBlockHashAndIndex)
+	defer DoRPCRequestDuration(GetStakingTransactionByBlockHashAndIndex, timer)
+
 	// Fetch Block
 	block, err := s.hmy.GetBlock(ctx, blockHash)
 	if err != nil {
@@ -670,6 +709,9 @@ func (s *PublicTransactionService) GetStakingTransactionByBlockHashAndIndex(
 func (s *PublicTransactionService) GetTransactionReceipt(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetTransactionReceipt)
+	defer DoRPCRequestDuration(GetTransactionReceipt, timer)
+
 	// Fetch receipt for plain & staking transaction
 	var tx *types.Transaction
 	var stx *staking.StakingTransaction
@@ -735,6 +777,9 @@ func (s *PublicTransactionService) GetTransactionReceipt(
 func (s *PublicTransactionService) GetCXReceiptByHash(
 	ctx context.Context, hash common.Hash,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetCXReceiptByHash)
+	defer DoRPCRequestDuration(GetCXReceiptByHash, timer)
+
 	if cx, blockHash, blockNumber, _ := rawdb.ReadCXReceipt(s.hmy.ChainDb(), hash); cx != nil {
 		// Format response according to version
 		switch s.version {
@@ -766,6 +811,9 @@ func (s *PublicTransactionService) GetCXReceiptByHash(
 // withdrawn already from the source shard but not credited yet in the
 // destination account due to transient failures.
 func (s *PublicTransactionService) ResendCx(ctx context.Context, txID common.Hash) (bool, error) {
+	timer := DoMetricRPCRequest(ResendCx)
+	defer DoRPCRequestDuration(ResendCx, timer)
+
 	_, success := s.hmy.ResendCx(ctx, txID)
 
 	// Response output is the same for all versions

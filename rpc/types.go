@@ -17,9 +17,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -140,7 +140,7 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 		if len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"' {
 			input = input[1 : len(input)-1]
 		}
-		input = strings.TrimPrefix(input, "0x")
+		input = strings.TrimPrefix(strings.ToLower(input), "0x")
 		num, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {
 			return err

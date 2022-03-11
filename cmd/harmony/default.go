@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.3.0"
+const tomlConfigVersion = "2.5.1" // bump from 2.5.0 for AccountSlots
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -28,6 +28,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IP:              nodeconfig.DefaultPublicListenIP,
 		KeyFile:         "./.hmykey",
 		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -38,9 +39,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: harmonyconfig.WsConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultWSPort,
+		Enabled:  true,
+		IP:       "127.0.0.1",
+		Port:     nodeconfig.DefaultWSPort,
+		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
 		DebugEnabled:      false,
@@ -61,7 +63,9 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigFile:    "",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile: "./.hmy/blacklist.txt",
+		BlacklistFile:  "./.hmy/blacklist.txt",
+		RosettaFixFile: "",
+		AccountSlots:   16,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
@@ -84,6 +88,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
+	ShardData: harmonyconfig.ShardDataConfig{
+		EnableShardData: false,
+		DiskCount:       8,
+		ShardCount:      4,
+		CacheTime:       10,
+		CacheSize:       512,
+	},
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{
@@ -136,25 +147,25 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      8,
+		DiscBatch:      3,
 	}
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
+		Downloader:     true,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      8,
+		DiscBatch:      3,
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{

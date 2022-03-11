@@ -8,9 +8,10 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -30,7 +31,7 @@ func TestHarmonyFlags(t *testing.T) {
 				"2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj --ip 8.8.8.8 --port 9000 --network_type=mainn" +
 				"et --dns_zone=t.hmny.io --blacklist=./.hmy/blacklist.txt --min_peers=6 --max_bls_keys_per_node=" +
 				"10 --broadcast_invalid_tx=true --verbosity=3 --is_archival=false --shard_id=-1 --staking=true -" +
-				"-aws-config-source file:config.json --p2p.disc.concurrency 5",
+				"-aws-config-source file:config.json --p2p.disc.concurrency 5 --p2p.security.max-conn-per-ip 5",
 			expConfig: harmonyconfig.HarmonyConfig{
 				Version: tomlConfigVersion,
 				General: harmonyconfig.GeneralConfig{
@@ -61,6 +62,7 @@ func TestHarmonyFlags(t *testing.T) {
 					IP:              defaultConfig.P2P.IP,
 					KeyFile:         defaultConfig.P2P.KeyFile,
 					DiscConcurrency: 5,
+					MaxConnsPerIP:   5,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -76,9 +78,10 @@ func TestHarmonyFlags(t *testing.T) {
 					RequestsPerSecond: 1000,
 				},
 				WS: harmonyconfig.WsConfig{
-					Enabled: true,
-					IP:      "127.0.0.1",
-					Port:    9800,
+					Enabled:  true,
+					IP:       "127.0.0.1",
+					Port:     9800,
+					AuthPort: 9801,
 				},
 				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
@@ -97,7 +100,9 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile: "./.hmy/blacklist.txt",
+					BlacklistFile:  "./.hmy/blacklist.txt",
+					RosettaFixFile: "",
+					AccountSlots:   16,
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -136,6 +141,13 @@ func TestHarmonyFlags(t *testing.T) {
 					Gateway:    "https://gateway.harmony.one",
 				},
 				Sync: defaultMainnetSyncConfig,
+				ShardData: harmonyconfig.ShardDataConfig{
+					EnableShardData: false,
+					DiskCount:       8,
+					ShardCount:      4,
+					CacheTime:       10,
+					CacheSize:       512,
+				},
 			},
 		},
 	}
@@ -363,27 +375,30 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:         9001,
-				IP:           nodeconfig.DefaultPublicListenIP,
-				KeyFile:      "./key.file",
-				DHTDataStore: &defDataStore,
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				DHTDataStore:  &defDataStore,
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:    9001,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				KeyFile: "./key.file",
+				Port:          9001,
+				IP:            nodeconfig.DefaultPublicListenIP,
+				KeyFile:       "./key.file",
+				MaxConnsPerIP: 10,
 			},
 		},
 		{
-			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5"},
+			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5", "--p2p.security.max-conn-per-ip", "5"},
 			expConfig: harmonyconfig.P2pConfig{
 				Port:            9001,
 				IP:              nodeconfig.DefaultPublicListenIP,
 				KeyFile:         "./.hmykey",
 				DiscConcurrency: 5,
+				MaxConnsPerIP:   5,
 			},
 		},
 	}
@@ -524,25 +539,37 @@ func TestWSFlags(t *testing.T) {
 		{
 			args: []string{"--ws=false"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: false,
-				IP:      defaultConfig.WS.IP,
-				Port:    defaultConfig.WS.Port,
+				Enabled:  false,
+				IP:       defaultConfig.WS.IP,
+				Port:     defaultConfig.WS.Port,
+				AuthPort: defaultConfig.WS.AuthPort,
 			},
 		},
 		{
 			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.port", "9001"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      "8.8.8.8",
-				Port:    9001,
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     9001,
+				AuthPort: defaultConfig.WS.AuthPort,
+			},
+		},
+		{
+			args: []string{"--ws", "--ws.ip", "8.8.8.8", "--ws.auth-port", "9001"},
+			expConfig: harmonyconfig.WsConfig{
+				Enabled:  true,
+				IP:       "8.8.8.8",
+				Port:     defaultConfig.WS.Port,
+				AuthPort: 9001,
 			},
 		},
 		{
 			args: []string{"--ip", "8.8.8.8", "--port", "9001", "--public_rpc"},
 			expConfig: harmonyconfig.WsConfig{
-				Enabled: true,
-				IP:      nodeconfig.DefaultPublicListenIP,
-				Port:    9801,
+				Enabled:  true,
+				IP:       nodeconfig.DefaultPublicListenIP,
+				Port:     9801,
+				AuthPort: 9802,
 			},
 		},
 	}
@@ -759,19 +786,33 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: defaultConfig.TxPool.BlacklistFile,
+				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:   defaultConfig.TxPool.AccountSlots,
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file"},
+			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
 			},
 		},
 		{
-			args: []string{"--blacklist", "blacklist.file"},
+			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile: "blacklist.file",
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
+				AccountSlots:   16, // default
+			},
+		},
+		{
+			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				AccountSlots:   5,
+				BlacklistFile:  "blacklist.file",
+				RosettaFixFile: "rosettafix.file",
 			},
 		},
 	}
@@ -1205,6 +1246,52 @@ func TestSyncFlags(t *testing.T) {
 		}
 		if !reflect.DeepEqual(hc.Sync, test.expConfig) {
 			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Sync, test.expConfig)
+		}
+
+		ts.tearDown()
+	}
+}
+
+func TestShardDataFlags(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig harmonyconfig.ShardDataConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: defaultConfig.ShardData,
+		},
+		{
+			args: []string{"--sharddata.enable",
+				"--sharddata.disk_count", "8",
+				"--sharddata.shard_count", "4",
+				"--sharddata.cache_time", "10",
+				"--sharddata.cache_size", "512",
+			},
+			expConfig: harmonyconfig.ShardDataConfig{
+				EnableShardData: true,
+				DiskCount:       8,
+				ShardCount:      4,
+				CacheTime:       10,
+				CacheSize:       512,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, shardDataFlags, func(command *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+			applyShardDataFlags(command, config)
+		})
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.ShardData, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.ShardData, test.expConfig)
 		}
 
 		ts.tearDown()

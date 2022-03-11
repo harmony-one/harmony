@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"reflect"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/common/denominations"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	hmyCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -26,6 +30,8 @@ const (
 type PublicContractService struct {
 	hmy     *hmy.Harmony
 	version Version
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterCall *rate.Limiter
 }
 
 // NewPublicContractAPI creates a new API for the RPC interface
@@ -33,9 +39,25 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version},
+		Service:   &PublicContractService{hmy, version, rate.NewLimiter(200, 1500)},
 		Public:    true,
 	}
+}
+
+func (s *PublicContractService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !limiter.Allow() {
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"limiter_name": name,
+			}).Inc()
+		}
+
+		return limiter.Wait(deadlineCtx)
+	}
+	return nil
 }
 
 // Call executes the given transaction on the state for the given block number.
@@ -43,8 +65,17 @@ func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
 func (s *PublicContractService) Call(
 	ctx context.Context, args CallArgs, blockNumber BlockNumber,
 ) (hexutil.Bytes, error) {
+	timer := DoMetricRPCRequest(Call)
+	defer DoRPCRequestDuration(Call, timer)
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
+
+	err := s.wait(s.limiterCall, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(Call, RateLimitedNumber)
+		return nil, err
+	}
 
 	// Execute call
 	result, err := DoEVMCall(ctx, s.hmy, args, blockNum, CallTimeout)
@@ -116,9 +147,6 @@ func DoEVMCall(
 	ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNum rpc.BlockNumber,
 	timeout time.Duration,
 ) (core.ExecutionResult, error) {
-	timer := DoMetricRPCRequest(DoEvmCall)
-	defer DoRPCRequestDuration(DoEvmCall, timer)
-
 	defer func(start time.Time) {
 		utils.Logger().Debug().
 			Dur("runtime", time.Since(start)).

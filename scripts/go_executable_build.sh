@@ -18,7 +18,11 @@ FOLDER=${WHOAMI:-$USER}
 RACE=
 TRACEPTR=
 VERBOSE=
-GO_GCFLAGS="all=-c 2"
+if [ "$(uname -s)" == "Darwin" ]; then
+   GO_GCFLAGS=""
+else
+   GO_GCFLAGS="all=-c 2"
+fi
 DEBUG=false
 STATIC=true
 

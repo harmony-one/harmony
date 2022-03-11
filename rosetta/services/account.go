@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/core/vm"
+
 	"github.com/coinbase/rosetta-sdk-go/server"
 	"github.com/coinbase/rosetta-sdk-go/types"
 	ethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	hmyTypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internalCommon "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/rosetta/common"
@@ -159,6 +161,47 @@ func newAccountIdentifier(
 		Address:  b32Address,
 		Metadata: metadata,
 	}, nil
+}
+
+// newAccountIdentifier ..
+func newRosettaAccountIdentifier(address *vm.RosettaLogAddressItem) (*types.AccountIdentifier, *types.Error) {
+	if address == nil || address.Account == nil {
+		return nil, nil
+	}
+
+	b32Address, err := internalCommon.AddressToBech32(*address.Account)
+	if err != nil {
+		return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+	metadata, err := types.MarshalMap(AccountMetadata{Address: address.Account.String()})
+	if err != nil {
+		return nil, common.NewError(common.CatchAllError, map[string]interface{}{
+			"message": err.Error(),
+		})
+	}
+
+	ai := &types.AccountIdentifier{
+		Address:  b32Address,
+		Metadata: metadata,
+	}
+
+	if address.SubAccount != nil {
+		b32Address, err := internalCommon.AddressToBech32(*address.SubAccount)
+		if err != nil {
+			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
+				"message": err.Error(),
+			})
+		}
+
+		ai.SubAccount = &types.SubAccountIdentifier{
+			Address:  b32Address,
+			Metadata: address.Metadata,
+		}
+	}
+
+	return ai, nil
 }
 
 func newSubAccountIdentifier(
