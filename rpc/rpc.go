@@ -161,12 +161,16 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelim
 		NewPublicPoolAPI(hmy, Eth),
 		NewPublicStakingAPI(hmy, V1),
 		NewPublicStakingAPI(hmy, V2),
-		NewPublicDebugAPI(hmy, V1),
-		NewPublicDebugAPI(hmy, V2),
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
 		eth.NewPublicEthService(hmy, "eth"),
 		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
+	}
+
+	publicDebugAPIs := []rpc.API{
+		//Public debug API
+		NewPublicDebugAPI(hmy, V1),
+		NewPublicDebugAPI(hmy, V2),
 	}
 
 	privateAPIs := []rpc.API{
@@ -175,7 +179,8 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelim
 	}
 
 	if debugEnable {
-		return append(publicAPIs, privateAPIs...)
+		apis := append(publicAPIs, publicDebugAPIs...)
+		return append(apis, privateAPIs...)
 	}
 	return publicAPIs
 }
