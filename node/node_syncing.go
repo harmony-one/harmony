@@ -225,7 +225,7 @@ func (node *Node) doBeaconSyncing() {
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
 			for beaconBlock := range node.BeaconBlockChannel {
-				if node.beaconSync != nil {
+				if node.epochSync != nil {
 					if beaconBlock.NumberU64() >= node.Beaconchain().CurrentBlock().NumberU64()+1 {
 						if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
@@ -241,11 +241,11 @@ func (node *Node) doBeaconSyncing() {
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = node.createStateSync(node.EpochChain()).IntoEpochSync()
+			node.epochSync = node.createStateSync(node.EpochChain()).IntoEpochSync()
 		}
-		if node.beaconSync.GetActivePeerNumber() == 0 {
+		if node.epochSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
 			peers, err := node.SyncingPeerProvider.SyncingPeers(shard.BeaconChainShardID)
 			if err != nil {
@@ -254,13 +254,13 @@ func (node *Node) doBeaconSyncing() {
 					Msg("cannot retrieve beacon syncing peers")
 				continue
 			}
-			if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, true); err != nil {
 				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
 				continue
 			}
 		}
 
-		node.beaconSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil)
+		node.epochSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil)
 		time.Sleep(SyncFrequency)
 	}
 }
@@ -780,10 +780,10 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	case shard.BeaconChainShardID:
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			return false, 0, 0
 		}
-		result := node.beaconSync.GetSyncStatus()
+		result := node.epochSync.GetSyncStatus()
 		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	default:
@@ -813,10 +813,10 @@ func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 		return !result.IsInSync
 
 	case shard.BeaconChainShardID:
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			return true
 		}
-		result := node.beaconSync.GetSyncStatus()
+		result := node.epochSync.GetSyncStatus()
 		return !result.IsInSync
 
 	default:

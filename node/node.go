@@ -96,7 +96,7 @@ type Node struct {
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync              *legacysync.StateSync
-	beaconSync             *legacysync.EpochSync
+	epochSync              *legacysync.EpochSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
