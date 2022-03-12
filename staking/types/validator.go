@@ -109,6 +109,8 @@ type Computed struct {
 	BlocksLeftInEpoch uint64      `json:"-"`
 	Percentage        numeric.Dec `json:"current-epoch-signing-percentage"`
 	IsBelowThreshold  bool        `json:"-"`
+	Epoch             uint64      `json:"epoch"`
+	Block             uint64      `json:"block"`
 }
 
 func (c Computed) String() string {
@@ -121,8 +123,10 @@ func NewComputed(
 	signed, toSign *big.Int,
 	blocksLeft uint64,
 	percent numeric.Dec,
-	isBelowNow bool) *Computed {
-	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow}
+	isBelowNow bool,
+	epoch uint64,
+	block uint64) *Computed {
+	return &Computed{signed, toSign, blocksLeft, percent, isBelowNow, epoch, block}
 }
 
 // NewEmptyStats ..
