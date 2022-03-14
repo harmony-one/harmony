@@ -600,6 +600,12 @@ func (c *ChainConfig) IsNoNilDelegations(epoch *big.Int) bool {
 	return isForked(c.NoNilDelegationsEpoch, epoch)
 }
 
+// IsPostNoNilDelegations determines whether the NoNilDelegationsEpoch
+// has already ended
+func (c *ChainConfig) IsPostNoNilDelegations(epoch *big.Int) bool {
+	return isPostForked(c.NoNilDelegationsEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -642,15 +648,34 @@ func isForked(s, epoch *big.Int) bool {
 	return s.Cmp(epoch) <= 0
 }
 
+// isPostForked returns whether the epoch 's' with a
+// scheduled hard fork has concluded at the given head epoch
+func isPostForked(s, epoch *big.Int) bool {
+	if s == nil || epoch == nil {
+		return false
+	}
+	return s.Cmp(epoch) < 0
+}
+
 // Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
 // that do not have or require information about the block.
 //
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                                                                  *big.Int
-	EthChainID                                                                                                               *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile, IsNoNilDelegations bool
+	ChainID                *big.Int
+	EthChainID             *big.Int
+	IsCrossLink            bool
+	IsEIP155               bool
+	IsS3                   bool
+	IsReceiptLog           bool
+	IsIstanbul             bool
+	IsVRF                  bool
+	IsPrevVRF              bool
+	IsSHA3                 bool
+	IsStakingPrecompile    bool
+	IsNoNilDelegations     bool
+	IsPostNoNilDelegations bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -669,17 +694,18 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ethChainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:             new(big.Int).Set(chainID),
-		EthChainID:          new(big.Int).Set(ethChainID),
-		IsCrossLink:         c.IsCrossLink(epoch),
-		IsEIP155:            c.IsEIP155(epoch),
-		IsS3:                c.IsS3(epoch),
-		IsReceiptLog:        c.IsReceiptLog(epoch),
-		IsIstanbul:          c.IsIstanbul(epoch),
-		IsVRF:               c.IsVRF(epoch),
-		IsPrevVRF:           c.IsPrevVRF(epoch),
-		IsSHA3:              c.IsSHA3(epoch),
-		IsStakingPrecompile: c.IsStakingPrecompile(epoch),
-		IsNoNilDelegations:  c.IsNoNilDelegations(epoch),
+		ChainID:                new(big.Int).Set(chainID),
+		EthChainID:             new(big.Int).Set(ethChainID),
+		IsCrossLink:            c.IsCrossLink(epoch),
+		IsEIP155:               c.IsEIP155(epoch),
+		IsS3:                   c.IsS3(epoch),
+		IsReceiptLog:           c.IsReceiptLog(epoch),
+		IsIstanbul:             c.IsIstanbul(epoch),
+		IsVRF:                  c.IsVRF(epoch),
+		IsPrevVRF:              c.IsPrevVRF(epoch),
+		IsSHA3:                 c.IsSHA3(epoch),
+		IsStakingPrecompile:    c.IsStakingPrecompile(epoch),
+		IsNoNilDelegations:     c.IsNoNilDelegations(epoch),
+		IsPostNoNilDelegations: c.IsPostNoNilDelegations(epoch),
 	}
 }

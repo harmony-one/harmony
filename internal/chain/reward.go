@@ -225,8 +225,17 @@ func AccumulateRewardsAndCountSigs(
 				header,
 				beaconChain,
 				defaultReward,
-				// pruning only occurs at the end of the epoch
-				bc.Config().IsNoNilDelegations(header.Epoch()) && header.IsLastBlockInEpoch() && header.ShardID() == shard.BeaconChainShardID,
+				// in NoNilDelegationsEpoch
+				// block 32767 -> snapshot saved, rewards paid
+				// block 32768 -> stale delegations pruned
+				// in NoNilDelegationsEpoch + 1
+				// block 63 -> rewards paid based on snapshot saved in #32767 of NoNilDelegationsEpoch
+				// block 127 -> rewards paid based on snapshot saved in #32767 of NoNilDelegationsEpoch
+				// ...
+				// block 32767 -> snapshot saved, rewards paid
+				// block 32768 -> stale delegations pruned
+				// beacon chain related checks have already been made before this
+				bc.Config().IsPostNoNilDelegations(header.Epoch()),
 			)
 		} else {
 			return distributeRewardBeforeAggregateEpoch(bc,
@@ -235,8 +244,7 @@ func AccumulateRewardsAndCountSigs(
 				beaconChain,
 				defaultReward,
 				sigsReady,
-				// pruning only occurs at the end of the epoch
-				bc.Config().IsNoNilDelegations(header.Epoch()) && header.IsLastBlockInEpoch() && header.ShardID() == shard.BeaconChainShardID,
+				bc.Config().IsPostNoNilDelegations(header.Epoch()),
 			)
 		}
 	}
