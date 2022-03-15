@@ -477,6 +477,9 @@ func applySlashes(
 		return false
 	})
 
+	// The Leader of the block gets all slashing rewards.
+	slashRewardBeneficiary := header.Coinbase()
+
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
@@ -510,6 +513,7 @@ func applySlashes(
 			state,
 			records,
 			rate,
+			slashRewardBeneficiary,
 		); err != nil {
 			return errors.New("[Finalize] could not apply slash")
 		}
