@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
+
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
@@ -99,11 +101,15 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(dumpConfigLegacyCmd)
+	rootCmd.AddCommand(dumpDBCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
 	}
 	if err := registerDumpConfigFlags(); err != nil {
+		os.Exit(2)
+	}
+	if err := registerDumpDBFlags(); err != nil {
 		os.Exit(2)
 	}
 }
@@ -229,6 +235,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
+	applyShardDataFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
@@ -653,7 +660,18 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	}
 
 	// Current node.
-	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	var chainDBFactory shardchain.DBFactory
+	if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
 
 	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
 
@@ -797,6 +815,8 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 }
 
 func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
+	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
+
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
 	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {

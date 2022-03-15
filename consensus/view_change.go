@@ -453,7 +453,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 // from the new leader
 func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
-	consensus.mutex.Unlock()
+	defer consensus.mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).

@@ -264,13 +264,19 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			mem.Resize(memorySize)
 		}
 
+		var afterHook HookAfter
 		if in.cfg.Debug {
-			in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, mem, stack, contract, in.evm.depth, err)
+			afterHook, _ = in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, mem, stack, contract, in.evm.depth, err)
 			logged = true
 		}
 
 		// execute the operation
 		res, err = operation.execute(&pc, in, contract, mem, stack)
+
+		// record the after executed operation content
+		if afterHook != nil {
+			afterHook(mem, stack)
+		}
 
 		// verifyPool is a build flag. Pool verification makes sure the integrity
 		// of the integer pool by comparing values to a default value.

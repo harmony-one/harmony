@@ -28,6 +28,7 @@ type HarmonyConfig struct {
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
 	DNSSync    DnsSync
+	ShardData  ShardDataConfig
 }
 
 type DnsSync struct {
@@ -65,6 +66,14 @@ type GeneralConfig struct {
 	EnablePruneBeaconChain bool
 }
 
+type ShardDataConfig struct {
+	EnableShardData bool
+	DiskCount       int
+	ShardCount      int
+	CacheTime       int
+	CacheSize       int
+}
+
 type ConsensusConfig struct {
 	MinPeers     int
 	AggregateSig bool
@@ -86,7 +95,9 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile string
+	BlacklistFile  string
+	RosettaFixFile string
+	AccountSlots   uint64
 }
 
 type PprofConfig struct {

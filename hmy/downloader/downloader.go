@@ -203,6 +203,7 @@ func (d *Downloader) loop() {
 					time.Sleep(5 * time.Second)
 					trigger()
 				}()
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			d.logger.Info().Int("block added", addedBN).
