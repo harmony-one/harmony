@@ -35,4 +35,8 @@ mkdir -p "$LOGS"
 echo -e NODE ARGS: \" $CONFIG_PATH "$@" "${BASE_ARGS[@]}" \"
 echo "NODE VERSION: $($DIR/harmony --version)"
 
-"$DIR/harmony" $CONFIG_PATH "$@" "${BASE_ARGS[@]}"
+set +e
+
+while true;do
+  "$DIR/harmony" $CONFIG_PATH "$@" "${BASE_ARGS[@]}"
+done
