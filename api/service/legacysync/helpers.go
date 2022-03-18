@@ -2,9 +2,13 @@ package legacysync
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
+	"github.com/pkg/errors"
 )
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
@@ -42,4 +46,52 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 	})
 	wg.Wait()
 	return maxHeight
+}
+
+func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, isBeacon bool) (*SyncConfig, error) {
+	// sanity check to ensure no duplicate peers
+	if err := checkPeersDuplicity(peers); err != nil {
+		return syncConfig, err
+	}
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	peers = limitNumPeers(peers, randSeed)
+
+	utils.Logger().Debug().
+		Int("len", len(peers)).
+		Bool("isBeacon", isBeacon).
+		Msg("[SYNC] CreateSyncConfig: len of peers")
+
+	if len(peers) == 0 {
+		return syncConfig, errors.New("[SYNC] no peers to connect to")
+	}
+	if syncConfig != nil {
+		syncConfig.CloseConnections()
+	}
+	syncConfig = &SyncConfig{}
+
+	var wg sync.WaitGroup
+	for _, peer := range peers {
+		wg.Add(1)
+		go func(peer p2p.Peer) {
+			defer wg.Done()
+			client := downloader.ClientSetup(peer.IP, peer.Port)
+			if client == nil {
+				return
+			}
+			peerConfig := &SyncPeerConfig{
+				ip:     peer.IP,
+				port:   peer.Port,
+				client: client,
+			}
+			syncConfig.AddPeer(peerConfig)
+		}(peer)
+	}
+	wg.Wait()
+	utils.Logger().Info().
+		Int("len", len(syncConfig.peers)).
+		Bool("isBeacon", isBeacon).
+		Msg("[SYNC] Finished making connection to peers")
+
+	return syncConfig, nil
 }

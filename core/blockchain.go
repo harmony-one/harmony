@@ -360,6 +360,8 @@ func (bc *BlockChain) loadLastState() error {
 		return bc.Reset()
 	}
 
+	// Skip state check on initialization.
+	// Should be enabled for epoch chain because it doesn't contain valid state.
 	if !bc.options.SkipInitialStateValidation {
 		// Make sure the state associated with the block is available
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
