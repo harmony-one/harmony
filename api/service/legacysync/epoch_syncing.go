@@ -6,7 +6,6 @@ import (
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -218,92 +217,9 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 	return nil
 }
 
-// getConsensusHashes gets all hashes needed to download.
-func (ss *EpochSync) getConsensusHashes(startHash []byte, size uint32) error {
-	var wg sync.WaitGroup
-	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
-			if response == nil {
-				utils.Logger().Warn().
-					Str("peerIP", peerConfig.ip).
-					Str("peerPort", peerConfig.port).
-					Msg("[SYNC] getConsensusHashes Nil Response")
-				ss.syncConfig.RemovePeer(peerConfig)
-				return
-			}
-			utils.Logger().Info().Uint32("queried blockHash size", size).
-				Int("got blockHashSize", len(response.Payload)).
-				Str("PeerIP", peerConfig.ip).
-				Msg("[SYNC] GetBlockHashes")
-			if len(response.Payload) > int(size+1) {
-				utils.Logger().Warn().
-					Uint32("requestSize", size).
-					Int("respondSize", len(response.Payload)).
-					Msg("[SYNC] getConsensusHashes: receive more blockHashes than requested!")
-				peerConfig.blockHashes = response.Payload[:size+1]
-			} else {
-				peerConfig.blockHashes = response.Payload
-			}
-		}()
-		return
-	})
-	wg.Wait()
-	if err := ss.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
-		return err
-	}
-	utils.Logger().Info().Msg("[SYNC] Finished getting consensus block hashes")
-	return nil
-}
-
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *EpochSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
-	// sanity check to ensure no duplicate peers
-	if err := checkPeersDuplicity(peers); err != nil {
-		return err
-	}
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
-
-	utils.Logger().Debug().
-		Int("len", len(peers)).
-		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] CreateSyncConfig: len of peers")
-
-	if len(peers) == 0 {
-		return errors.New("[SYNC] no peers to connect to")
-	}
-	if ss.syncConfig != nil {
-		ss.syncConfig.CloseConnections()
-	}
-	ss.syncConfig = &SyncConfig{}
-
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		wg.Add(1)
-		go func(peer p2p.Peer) {
-			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port)
-			if client == nil {
-				return
-			}
-			peerConfig := &SyncPeerConfig{
-				ip:     peer.IP,
-				port:   peer.Port,
-				client: client,
-			}
-			ss.syncConfig.AddPeer(peerConfig)
-		}(peer)
-	}
-	wg.Wait()
-	utils.Logger().Info().
-		Int("len", len(ss.syncConfig.peers)).
-		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] Finished making connection to peers")
-
-	return nil
+	var err error
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, isBeacon)
+	return err
 }

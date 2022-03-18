@@ -327,51 +327,9 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
 func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
-	// sanity check to ensure no duplicate peers
-	if err := checkPeersDuplicity(peers); err != nil {
-		return err
-	}
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
-
-	utils.Logger().Debug().
-		Int("len", len(peers)).
-		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] CreateSyncConfig: len of peers")
-
-	if len(peers) == 0 {
-		return errors.New("[SYNC] no peers to connect to")
-	}
-	if ss.syncConfig != nil {
-		ss.syncConfig.CloseConnections()
-	}
-	ss.syncConfig = &SyncConfig{}
-
-	var wg sync.WaitGroup
-	for _, peer := range peers {
-		wg.Add(1)
-		go func(peer p2p.Peer) {
-			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port)
-			if client == nil {
-				return
-			}
-			peerConfig := &SyncPeerConfig{
-				ip:     peer.IP,
-				port:   peer.Port,
-				client: client,
-			}
-			ss.syncConfig.AddPeer(peerConfig)
-		}(peer)
-	}
-	wg.Wait()
-	utils.Logger().Info().
-		Int("len", len(ss.syncConfig.peers)).
-		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] Finished making connection to peers")
-
-	return nil
+	var err error
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, isBeacon)
+	return err
 }
 
 // checkPeersDuplicity checks whether there are duplicates in p2p.Peer
