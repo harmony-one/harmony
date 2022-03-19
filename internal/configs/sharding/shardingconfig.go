@@ -72,7 +72,7 @@ type Instance interface {
 
 	// Count of blocks per epoch
 	BlocksPerEpoch() uint64
-	// HIP-16: Enforce a 6% max keys per shard limit for each validator
+	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator.
 	SlotsLimit() int
 }
 
