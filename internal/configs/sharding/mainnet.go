@@ -53,6 +53,8 @@ type mainnetSchedule struct{}
 
 func (ms mainnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.MainnetChainConfig.IsSlotsLimited(epoch):
+		return mainnetV3_3
 	case params.MainnetChainConfig.IsHIP6And8Epoch(epoch):
 		// Decrease internal voting power from 60% to 49%
 		// Increase external nodes from 800 to 900
@@ -202,21 +204,22 @@ func (ms mainnetSchedule) IsSkippedEpoch(shardID uint32, epoch *big.Int) bool {
 var mainnetReshardingEpoch = []*big.Int{big.NewInt(0), big.NewInt(mainnetV0_1Epoch), big.NewInt(mainnetV0_2Epoch), big.NewInt(mainnetV0_3Epoch), big.NewInt(mainnetV0_4Epoch), big.NewInt(mainnetV1Epoch), big.NewInt(mainnetV1_1Epoch), big.NewInt(mainnetV1_2Epoch), big.NewInt(mainnetV1_3Epoch), big.NewInt(mainnetV1_4Epoch), big.NewInt(mainnetV1_5Epoch), big.NewInt(mainnetV2_0Epoch), big.NewInt(mainnetV2_1Epoch), big.NewInt(mainnetV2_2Epoch), params.MainnetChainConfig.TwoSecondsEpoch, params.MainnetChainConfig.SixtyPercentEpoch, params.MainnetChainConfig.HIP6And8Epoch}
 
 var (
-	mainnetV0   = MustNewInstance(4, 150, 112, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV0_1 = MustNewInstance(4, 152, 112, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV0_2 = MustNewInstance(4, 200, 148, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_2, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV0_3 = MustNewInstance(4, 210, 148, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV0_4 = MustNewInstance(4, 216, 148, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1   = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1_1 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1_2 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_2, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1_3 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1_4 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV1_5 = MustNewInstance(4, 250, 170, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV2_0 = MustNewInstance(4, 250, 170, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV2_1 = MustNewInstance(4, 250, 130, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV2_2 = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
-	mainnetV3   = MustNewInstance(4, 250, 90, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV3_1 = MustNewInstance(4, 250, 50, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
-	mainnetV3_2 = MustNewInstance(4, 250, 25, numeric.MustNewDecFromStr("0.49"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV0   = MustNewInstance(4, 150, 112, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV0_1 = MustNewInstance(4, 152, 112, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV0_2 = MustNewInstance(4, 200, 148, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_2, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV0_3 = MustNewInstance(4, 210, 148, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV0_4 = MustNewInstance(4, 216, 148, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV0_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1   = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1_1 = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_1, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1_2 = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_2, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1_3 = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_3, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1_4 = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_4, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV1_5 = MustNewInstance(4, 250, 170, 0, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV2_0 = MustNewInstance(4, 250, 170, 0, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV2_1 = MustNewInstance(4, 250, 130, 0, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV2_2 = MustNewInstance(4, 250, 90, 0, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpochOld())
+	mainnetV3   = MustNewInstance(4, 250, 90, 0, numeric.MustNewDecFromStr("0.68"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_1 = MustNewInstance(4, 250, 50, 0, numeric.MustNewDecFromStr("0.60"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_2 = MustNewInstance(4, 250, 25, 0, numeric.MustNewDecFromStr("0.49"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
+	mainnetV3_3 = MustNewInstance(4, 250, 25, 250*6/100, numeric.MustNewDecFromStr("0.49"), genesis.HarmonyAccounts, genesis.FoundationalNodeAccountsV1_5, mainnetReshardingEpoch, MainnetSchedule.BlocksPerEpoch())
 )

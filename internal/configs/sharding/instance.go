@@ -32,12 +32,13 @@ type instance struct {
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
 	blocksPerEpoch                  uint64
+	slotsLimit                      int // HIP-16: Enforce a 6% max keys per shard limit for each validator
 }
 
 // NewInstance creates and validates a new sharding configuration based
 // upon given parameters.
 func NewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
+	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksE uint64,
@@ -82,6 +83,7 @@ func NewInstance(
 		fnAccounts:                      fnAccounts,
 		reshardingEpoch:                 reshardingEpoch,
 		blocksPerEpoch:                  blocksE,
+		slotsLimit:                      slotsLimit,
 	}, nil
 }
 
@@ -90,14 +92,14 @@ func NewInstance(
 // It is intended to be used for static initialization.
 func MustNewInstance(
 	numShards uint32,
-	numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit int,
 	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, harmonyVotePercent,
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit, harmonyVotePercent,
 		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
 	)
 	if err != nil {
@@ -114,6 +116,11 @@ func (sc instance) BlocksPerEpoch() uint64 {
 // NumShards returns the number of shards in the network.
 func (sc instance) NumShards() uint32 {
 	return sc.numShards
+}
+
+// SlotsLimit returns the max slots per shard limit for each validator
+func (sc instance) SlotsLimit() int {
+	return sc.slotsLimit
 }
 
 // HarmonyVotePercent returns total percentage of voting power harmony nodes possess.

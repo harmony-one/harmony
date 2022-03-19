@@ -79,11 +79,10 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 
 // Compute ..
 func Compute(
-	shortHand map[common.Address]*SlotOrder, pull int,
+	shortHand map[common.Address]*SlotOrder, pull, slotsLimit, shardCount int,
 ) (numeric.Dec, []SlotPurchase) {
-	eposedSlots := []SlotPurchase{}
 	if len(shortHand) == 0 {
-		return numeric.ZeroDec(), eposedSlots
+		return numeric.ZeroDec(), []SlotPurchase{}
 	}
 
 	type t struct {
@@ -91,10 +90,13 @@ func Compute(
 		slot *SlotOrder
 	}
 
+	totalSlots := 0
 	shorter := []t{}
 	for key, value := range shortHand {
+		totalSlots += len(value.SpreadAmong)
 		shorter = append(shorter, t{key, value})
 	}
+	eposedSlots := make([]SlotPurchase, 0, totalSlots)
 
 	sort.SliceStable(
 		shorter,
@@ -111,16 +113,31 @@ func Compute(
 		if slotsCount == 0 {
 			continue
 		}
+		shardSlotsCount := make([]int, shardCount)
 		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
+		startIndex := len(eposedSlots)
 		for i := 0; i < slotsCount; i++ {
-			eposedSlots = append(eposedSlots, SlotPurchase{
+			slot := SlotPurchase{
 				Addr: staker.addr,
 				Key:  staker.slot.SpreadAmong[i],
 				// NOTE these are same because later the .EPoSStake mutated
 				RawStake:  spread,
 				EPoSStake: spread,
-			})
+			}
+			shard := new(big.Int).Mod(slot.Key.Big(), big.NewInt(int64(shardCount))).Int64()
+			shardSlotsCount[int(shard)]++
+			if slotsLimit > 0 && shardSlotsCount[int(shard)] > slotsLimit {
+				continue
+			}
+			eposedSlots = append(eposedSlots, slot)
+		}
+		if effectiveSlotsCount := len(eposedSlots) - startIndex; effectiveSlotsCount != slotsCount {
+			effectiveSpread := numeric.NewDecFromBigInt(staker.slot.Stake).QuoInt64(int64(effectiveSlotsCount))
+			for _, slot := range eposedSlots[startIndex:] {
+				slot.RawStake = effectiveSpread
+				slot.EPoSStake = effectiveSpread
+			}
 		}
 	}
 
@@ -145,10 +162,10 @@ func Compute(
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]*SlotOrder, pull int, isExtendedBound bool) (
+func Apply(shortHand map[common.Address]*SlotOrder, pull int, isExtendedBound bool, slotsLimit int, shardCount int) (
 	numeric.Dec, []SlotPurchase,
 ) {
-	median, picks := Compute(shortHand, pull)
+	median, picks := Compute(shortHand, pull, slotsLimit, shardCount)
 	max := onePlusC.Mul(median)
 	min := oneMinusC.Mul(median)
 	if isExtendedBound {

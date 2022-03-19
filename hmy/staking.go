@@ -445,7 +445,8 @@ func (hmy *Harmony) GetMedianRawStakeSnapshot() (
 		func() (interface{}, error) {
 			// Compute for next epoch
 			epoch := big.NewInt(0).Add(hmy.CurrentBlock().Epoch(), big.NewInt(1))
-			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch))
+			instance := shard.Schedule.InstanceForEpoch(epoch)
+			return committee.NewEPoSRound(epoch, hmy.BlockChain, hmy.BlockChain.Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
 		},
 	)
 	if err != nil {
