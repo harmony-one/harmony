@@ -32,7 +32,7 @@ type instance struct {
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
 	blocksPerEpoch                  uint64
-	slotsLimit                      int // HIP-16: Enforce a 6% max keys per shard limit for each validator
+	slotsLimit                      int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator.
 }
 
 // NewInstance creates and validates a new sharding configuration based
