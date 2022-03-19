@@ -85,7 +85,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 
 // NewEPoSRound runs a fresh computation of EPoS using
 // latest data always
-func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool) (
+func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool, slotsLimit, shardCount int) (
 	*CompletedEPoSRound, error,
 ) {
 	eligibleCandidate, err := prepareOrders(stakedReader)
@@ -96,7 +96,7 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 		epoch,
 	)
 	median, winners := effective.Apply(
-		eligibleCandidate, maxExternalSlots, isExtendedBound,
+		eligibleCandidate, maxExternalSlots, isExtendedBound, slotsLimit, shardCount,
 	)
 	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
 
@@ -353,7 +353,7 @@ func eposStakedCommittee(
 	}
 
 	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
-	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch))
+	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch), s.SlotsLimit(), shardCount)
 
 	if err != nil {
 		return nil, err

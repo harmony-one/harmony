@@ -65,6 +65,7 @@ var (
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
+		SlotsLimitedEpoch:          EpochTBD,        // epoch to enable HIP-16
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -98,6 +99,7 @@ var (
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -132,6 +134,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
+		SlotsLimitedEpoch:          EpochTBD,      // epoch to enable HIP-16
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -166,6 +169,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -200,6 +204,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -233,6 +238,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		StakingPrecompileEpoch:     big.NewInt(2),
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// AllProtocolChanges ...
@@ -268,6 +274,7 @@ var (
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
+		big.NewInt(0),                      // SlotsLimitedEpoch
 	}
 
 	// TestChainConfig ...
@@ -303,6 +310,7 @@ var (
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
+		big.NewInt(0),        // SlotsLimitedEpoch
 	}
 
 	// TestRules ...
@@ -420,6 +428,9 @@ type ChainConfig struct {
 
 	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
 	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
+
+	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
+	SlotsLimitedEpoch *big.Int `json:"slots-limit,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -475,6 +486,11 @@ func (c *ChainConfig) IsAggregatedRewardEpoch(epoch *big.Int) bool {
 // IsStaking determines whether it is staking epoch
 func (c *ChainConfig) IsStaking(epoch *big.Int) bool {
 	return isForked(c.StakingEpoch, epoch)
+}
+
+// IsSlotsLimited determines whether HIP-16 is enabled
+func (c *ChainConfig) IsSlotsLimited(epoch *big.Int) bool {
+	return isForked(c.SlotsLimitedEpoch, epoch)
 }
 
 // IsFiveSeconds determines whether it is the epoch to change to 5 seconds block time
