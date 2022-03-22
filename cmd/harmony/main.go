@@ -811,7 +811,9 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	node.RegisterService(service.Synchronize, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
-	node.Consensus.SetDownloader(d)
+	if hc.Sync.Downloader {
+		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
+	}
 }
 
 func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
