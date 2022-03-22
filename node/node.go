@@ -152,7 +152,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() *core.BlockChain {
-	return node.chain(shard.BeaconChainShardID, core.Options{})
+	return node.EpochChain()
 }
 
 func (node *Node) chain(shardID uint32, options core.Options) *core.BlockChain {
