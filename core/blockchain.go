@@ -2640,10 +2640,9 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 // ReadValidatorList reads the addresses of current all validators
 func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 	if cached, ok := bc.validatorListCache.Get("validatorList"); ok {
-		by := cached.([]byte)
-		m := []common.Address{}
-		if err := rlp.DecodeBytes(by, &m); err != nil {
-			return nil, err
+		m, ok := cached.([]common.Address)
+		if !ok {
+			return nil, errors.New("failed to get validator list")
 		}
 		return m, nil
 	}
@@ -2658,10 +2657,7 @@ func (bc *BlockChain) WriteValidatorList(
 	if err := rawdb.WriteValidatorList(db, addrs); err != nil {
 		return err
 	}
-	bytes, err := rlp.EncodeToBytes(addrs)
-	if err == nil {
-		bc.validatorListCache.Add("validatorList", bytes)
-	}
+	bc.validatorListCache.Add("validatorList", addrs)
 	return nil
 }
 
