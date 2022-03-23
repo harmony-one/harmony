@@ -338,25 +338,22 @@ func (s *PublicStakingService) getPagedValidatorInformationCached(ctx context.Co
 func (s *PublicStakingService) getAllValidatorInformation(
 	ctx context.Context, page int, blockNum uint64,
 ) (interface{}, error) {
-	if page < -1 {
-		return nil, errors.Errorf("page given %d cannot be less than -1", page)
+	if page < 0 {
+		return nil, errors.Errorf("page given %d cannot be less than 0", page)
 	}
 
 	// Get all validators
 	addresses := s.hmy.GetAllValidatorAddresses()
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
+	if len(addresses) <= page*validatorsPageSize {
 		return []StructuredResponse{}, nil
 	}
 
 	// Set page start
-	validatorsNum := len(addresses)
 	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
+	validatorsNum := validatorsPageSize
+	start = page * validatorsPageSize
+	if len(addresses)-start < validatorsPageSize {
+		validatorsNum = len(addresses) - start
 	}
 
 	// Fetch block
