@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.16 AS build
+FROM golang:1.18 AS build
 
 RUN apt update -y && \
     apt install libgmp-dev libssl-dev git -y && \

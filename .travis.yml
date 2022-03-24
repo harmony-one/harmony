@@ -2,7 +2,7 @@ os: linux
 dist: bionic
 language: go
 go:
-  - 1.16
+  - 1.18
 go_import_path: github.com/harmony-one/harmony
 cache:
   directories:
