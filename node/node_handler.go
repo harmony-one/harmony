@@ -66,7 +66,27 @@ func (node *Node) HandleNodeMessage(
 	case proto_node.Block:
 		switch blockMsgType := proto_node.BlockMessageType(msgPayload[0]); blockMsgType {
 		case proto_node.Sync:
-			// noop
+			blocks := []*types.Block{}
+			if err := rlp.DecodeBytes(msgPayload[1:], &blocks); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msg("block sync")
+			} else {
+				// for non-beaconchain node, subscribe to beacon block broadcast
+				if node.Blockchain().ShardID() != shard.BeaconChainShardID {
+					for _, block := range blocks {
+						if block.ShardID() == 0 {
+							utils.Logger().Info().
+								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
+							if block.IsLastBlockInEpoch() {
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
+							}
+						}
+					}
+				}
+			}
 		case
 			proto_node.SlashCandidate,
 			proto_node.Receipt,
