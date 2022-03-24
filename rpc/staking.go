@@ -245,7 +245,6 @@ func (s *PublicStakingService) GetValidatorKeys(
 }
 
 // GetAllValidatorInformation returns information about all validators.
-// If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicStakingService) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) (interface{}, error) {
