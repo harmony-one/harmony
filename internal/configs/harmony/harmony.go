@@ -174,7 +174,7 @@ type DevnetConfig struct {
 	NumShards   int
 	ShardSize   int
 	HmyNodeSize int
-	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator.
+	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 }
 
 // TODO: make `revert` to a separate command

@@ -127,13 +127,15 @@ func Compute(
 			}
 			shard := new(big.Int).Mod(slot.Key.Big(), big.NewInt(int64(shardCount))).Int64()
 			shardSlotsCount[int(shard)]++
+			// skip if count of slots in this shard exceeds the limit
 			if slotsLimit > 0 && shardSlotsCount[int(shard)] > slotsLimit {
 				continue
 			}
 			eposedSlots = append(eposedSlots, slot)
 		}
-		if effectiveSlotsCount := len(eposedSlots) - startIndex; effectiveSlotsCount != slotsCount {
-			effectiveSpread := numeric.NewDecFromBigInt(staker.slot.Stake).QuoInt64(int64(effectiveSlotsCount))
+		// recalculate the effectiveSpread if slots exceed the limit
+		if limitedSlotsCount := len(eposedSlots) - startIndex; limitedSlotsCount != slotsCount {
+			effectiveSpread := numeric.NewDecFromBigInt(staker.slot.Stake).QuoInt64(int64(limitedSlotsCount))
 			for _, slot := range eposedSlots[startIndex:] {
 				slot.RawStake = effectiveSpread
 				slot.EPoSStake = effectiveSpread

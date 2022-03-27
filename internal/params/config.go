@@ -430,7 +430,7 @@ type ChainConfig struct {
 	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
 
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
-	SlotsLimitedEpoch *big.Int `json:"slots-limit,omitempty"`
+	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.

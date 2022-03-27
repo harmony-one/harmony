@@ -106,7 +106,7 @@ var defaultDevnetConfig = harmonyconfig.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
-	SlotsLimit:  0,
+	SlotsLimit:  0, // 0 means no limit
 }
 
 var defaultRevertConfig = harmonyconfig.RevertConfig{
