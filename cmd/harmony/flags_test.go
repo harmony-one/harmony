@@ -1149,6 +1149,40 @@ func TestRevertFlags(t *testing.T) {
 	}
 }
 
+func TestPruneRewardFlag(t *testing.T) {
+	tests := []struct {
+		args      []string
+		expConfig *harmonyconfig.PruneRewardConfig
+		expErr    error
+	}{
+		{
+			args:      []string{},
+			expConfig: nil,
+		},
+		{
+			args: []string{"--prune.rewards"},
+			expConfig: &harmonyconfig.PruneRewardConfig{
+				TakeAction: true,
+			},
+		},
+	}
+	for i, test := range tests {
+		ts := newFlagTestSuite(t, []cli.Flag{pruneRewardFlag}, applyPruneRewardFlag)
+		hc, err := ts.run(test.args)
+
+		if assErr := assertError(err, test.expErr); assErr != nil {
+			t.Fatalf("Test %v: %v", i, assErr)
+		}
+		if err != nil || test.expErr != nil {
+			continue
+		}
+		if !reflect.DeepEqual(hc.PruneReward, test.expConfig) {
+			t.Errorf("Test %v:\n\t%+v\n\t%+v", i, hc.Revert, test.expConfig)
+		}
+		ts.tearDown()
+	}
+}
+
 func TestDNSSyncFlags(t *testing.T) {
 	tests := []struct {
 		args      []string

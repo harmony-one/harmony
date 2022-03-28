@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -107,6 +108,8 @@ const (
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
 	pendingCLCacheKey = "pendingCLs"
+	// Number of blocks ago to trim validator wrappers
+	ClearValidatorWrappersLag = 32768
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -188,6 +191,9 @@ type BlockChain struct {
 	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
+
+	// minimum block number for clearing validator wrappers
+	ClearValidatorWrappersAtMinBlock uint64
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -221,35 +227,50 @@ func NewBlockChain(
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 
+	var minNum uint64
+	if cacheConfig.Disabled {
+		if chainConfig.PreStakingEpoch.Cmp(common.Big0) == 0 {
+			minNum = 0
+		} else {
+			targetEpoch := new(big.Int).Add(chainConfig.PreStakingEpoch, big.NewInt(-1))
+			minNum = shard.Schedule.EpochLastBlock(
+				targetEpoch.Uint64(),
+			) + 1
+		}
+	} else {
+		minNum = math.MaxUint64
+	}
+
 	bc := &BlockChain{
-		chainConfig:                   chainConfig,
-		cacheConfig:                   cacheConfig,
-		db:                            db,
-		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
-		quit:                          make(chan struct{}),
-		shouldPreserve:                shouldPreserve,
-		bodyCache:                     bodyCache,
-		bodyRLPCache:                  bodyRLPCache,
-		receiptsCache:                 receiptsCache,
-		blockCache:                    blockCache,
-		futureBlocks:                  futureBlocks,
-		shardStateCache:               shardCache,
-		lastCommitsCache:              commitsCache,
-		epochCache:                    epochCache,
-		randomnessCache:               randomnessCache,
-		validatorSnapshotCache:        validatorCache,
-		validatorStatsCache:           validatorStatsCache,
-		validatorListCache:            validatorListCache,
-		validatorListByDelegatorCache: validatorListByDelegatorCache,
-		pendingCrossLinksCache:        pendingCrossLinksCache,
-		blockAccumulatorCache:         blockAccumulatorCache,
-		blockchainPruner:              newBlockchainPruner(db),
-		engine:                        engine,
-		vmConfig:                      vmConfig,
-		badBlocks:                     badBlocks,
-		pendingSlashes:                slash.Records{},
-		maxGarbCollectedBlkNum:        -1,
+		chainConfig:                      chainConfig,
+		cacheConfig:                      cacheConfig,
+		db:                               db,
+		triegc:                           prque.New(nil),
+		stateCache:                       state.NewDatabase(db),
+		quit:                             make(chan struct{}),
+		shouldPreserve:                   shouldPreserve,
+		bodyCache:                        bodyCache,
+		bodyRLPCache:                     bodyRLPCache,
+		receiptsCache:                    receiptsCache,
+		blockCache:                       blockCache,
+		futureBlocks:                     futureBlocks,
+		shardStateCache:                  shardCache,
+		lastCommitsCache:                 commitsCache,
+		epochCache:                       epochCache,
+		randomnessCache:                  randomnessCache,
+		validatorSnapshotCache:           validatorCache,
+		validatorStatsCache:              validatorStatsCache,
+		validatorListCache:               validatorListCache,
+		validatorListByDelegatorCache:    validatorListByDelegatorCache,
+		pendingCrossLinksCache:           pendingCrossLinksCache,
+		blockAccumulatorCache:            blockAccumulatorCache,
+		blockchainPruner:                 newBlockchainPruner(db),
+		engine:                           engine,
+		vmConfig:                         vmConfig,
+		badBlocks:                        badBlocks,
+		pendingSlashes:                   slash.Records{},
+		maxGarbCollectedBlkNum:           -1,
+		ClearValidatorWrappersAtMinBlock: minNum,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1258,6 +1279,13 @@ func (bc *BlockChain) WriteBlockWithState(
 					triedb.Dereference(root.(common.Hash))
 				}
 			}
+		}
+	}
+
+	if bc.cacheConfig.Disabled { // archival node
+		laggedNumber := currentBlock.NumberU64() - ClearValidatorWrappersLag
+		if laggedNumber >= bc.ClearValidatorWrappersAtMinBlock {
+			bc.ClearValidatorWrappersAtBlock(laggedNumber)
 		}
 	}
 
@@ -3157,4 +3185,76 @@ func isUnrecoverableErr(err error) bool {
 	isLeveldbErr := strings.Contains(err.Error(), leveldbErrSpec)
 	isTooManyOpenFiles := strings.Contains(err.Error(), tooManyOpenFilesErrStr)
 	return isLeveldbErr && !isTooManyOpenFiles
+}
+
+func (bc *BlockChain) ClearValidatorWrappersAtBlock(number uint64) error {
+	if number == 0 {
+		return errors.New("Cannot clear validator wrappers from genesis block")
+	}
+	block := bc.GetBlockByNumber(number)
+	if block == nil {
+		return errors.New(fmt.Sprintf("Block %d not found", number))
+	}
+	state, err := bc.StateAt(block.Root())
+	if err != nil {
+		return errors.Wrapf(err, "State for block %d not found", number)
+	}
+	currentState, err := bc.State()
+	if err != nil {
+		return errors.Wrapf(err, "State for current block not found")
+	}
+	// TODO: Is this list available by block?
+	validators, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+	// var addressToWrapper map[common.Address]string = make(map[common.Address]string, 0)
+	trieDb := state.Database().TrieDB()
+	for _, address := range validators {
+		object := state.GetOrNewStateObject(address)
+		// check whether this address, which is currently a validator,
+		// was also a validator during that block
+		if object.IsValidator(bc.stateCache) {
+			// check if the code has changed
+			// if it has changed, delete the old code
+			// this is done to ensure that a validator,
+			// which has not been updated in a while,
+			// does not end up deleted
+			// inactive validators, for example, with no changes in reward
+			// or delegations could be deleted if not for this comparison
+			if !bytes.Equal(object.CodeHash(), currentState.GetCodeHash(address).Bytes()) {
+				codeHash := common.BytesToHash(object.CodeHash())
+				// addressToWrapper[address] = common.Bytes2Hex(state.GetCode(address))
+				// replace the code hash with nil code
+				// since there is no such thing as DeleteBlob
+				trieDb.InsertBlob(codeHash, nil)
+				// commit this specific key to disk
+				if err := trieDb.Commit(codeHash, false); err != nil {
+					return errors.Wrapf(
+						err,
+						"Could not commit empty code for %s to disk",
+						address.Hex(),
+					)
+				}
+			}
+		}
+	}
+	//// The below can be used to check that the deletion works
+	//// Note how the state is reinitialized below to make sure nothing cached
+	//// in memory is loaded
+	// fmt.Printf("Deleted code for %d validators\n", len(addressToWrapper))
+	// state, _ = bc.StateAt(block.Root())
+	// fmt.Println("Checking that the deletion worked")
+	// for address, oldCode := range addressToWrapper {
+	// 	newCode := common.Bytes2Hex(state.GetCode(address))
+	// 	if strings.Compare(newCode, oldCode) == 0 {
+	// 		fmt.Printf(
+	// 			"Code for %s not changed\n, old %s\n, new %s\n",
+	// 			address.Hex(),
+	// 			oldCode[:20],
+	// 			newCode[:20],
+	// 		)
+	// 	}
+	// }
+	return nil
 }

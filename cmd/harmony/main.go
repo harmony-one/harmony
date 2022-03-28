@@ -233,6 +233,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPruneRewardFlag(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
@@ -365,6 +366,34 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				Msg("Revert finished.")
 			os.Exit(1)
 		}
+	}
+
+	// prune rewards from archival node
+	shouldPrune := hc.PruneReward != nil && hc.PruneReward.TakeAction && // asked
+		(hc.General.IsBeaconArchival || (hc.General.IsArchival && hc.General.ShardID == 0)) // eligible
+	if shouldPrune {
+		chain := currentNode.Beaconchain()
+		curNum := chain.CurrentBlock().NumberU64()
+		if curNum == 0 {
+			fmt.Println("No rewards to prune because we are at genesis block")
+			os.Exit(1)
+		}
+
+		// start with the minimum
+		// but keep the lag
+		for i := chain.ClearValidatorWrappersAtMinBlock; i+core.ClearValidatorWrappersLag <= curNum; i++ {
+			if err := chain.ClearValidatorWrappersAtBlock(i); err != nil {
+				fmt.Printf(
+					"Error when clearing validator wrappers at block %d: %s\n", i, err,
+				)
+				os.Exit(1)
+			} else {
+				fmt.Printf(
+					"Cleared validator wrappers for block %d successfully\n", i,
+				)
+			}
+		}
+		os.Exit(1) // same as revert exit code
 	}
 
 	startMsg := "==== New Harmony Node ===="
@@ -811,9 +840,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	node.RegisterService(service.Synchronize, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
-	if hc.Sync.Downloader {
-		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
-	}
+	node.Consensus.SetDownloader(d)
 }
 
 func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
