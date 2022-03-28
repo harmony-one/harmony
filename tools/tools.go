@@ -3,7 +3,6 @@
 // and not really importable packages.
 //
 //go:build tools
-// +build tools
 
 // Package tools provides build tools necessary for Harmony.
 package tools
@@ -14,4 +13,6 @@ import (
 	_ "github.com/golang/mock/mockgen"
 	_ "github.com/golang/protobuf/protoc-gen-go"
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/harmony-ek/gencodec"
+	_ "golang.org/x/tools/cmd/goimports"
 )
