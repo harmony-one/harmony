@@ -326,12 +326,12 @@ func (hmy *Harmony) GetValidatorInformation(
 	lastBlockOfEpoch := shard.Schedule.EpochLastBlock(hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64())
 
 	computed.BlocksLeftInEpoch = lastBlockOfEpoch - hmy.BeaconChain.CurrentBlock().Header().Number().Uint64()
-	computed.Block = hmy.BeaconChain.CurrentBlock().Header().Number().Uint64()
-	computed.Epoch = hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64()
 
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
 			CurrentSigningPercentage: *computed,
+			Epoch:                    hmy.BeaconChain.CurrentBlock().Header().Number().Uint64(),
+			Block:                    hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64(),
 		}
 	}
 
