@@ -209,8 +209,9 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 	//// Read - Start
 	if !consensus.isCurrentBlockNumAndViewID(recvMsg) {
-		if consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch()) && consensus.isPreviousBlockNumAndViewID(recvMsg) {
-			// If it's the block in extra epoch epoch, accept and process it for the extra commit sig.
+		if consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch()) &&
+			consensus.isLatestCommittedBlockNumAndViewID(recvMsg) && !blockObj.IsLastBlockInEpoch() {
+			// If it's the block in extra epoch epoch and not the epoch block, process it for the extra commit sig.
 			consensus.processExtraCommit(recvMsg)
 		}
 		return
@@ -314,7 +315,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		if !isExtraCommitEpoch {
+		// Extra commit logic won't be enabled for epoch block to avoid problems between epoch transition.
+		if !isExtraCommitEpoch || blockObj.IsLastBlockInEpoch() {
 			go func(viewID uint64) {
 				waitTime := 1000 * time.Millisecond
 				maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond

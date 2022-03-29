@@ -67,9 +67,8 @@ func (consensus *Consensus) isCurrentBlockNumAndViewID(recvMsg *FBFTMessage,
 	return true
 }
 
-func (consensus *Consensus) isPreviousBlockNumAndViewID(recvMsg *FBFTMessage,
-) bool {
-	if recvMsg.ViewID != consensus.GetCurBlockViewID()-1 || recvMsg.BlockNum != consensus.blockNum-1 {
+func (consensus *Consensus) isLatestCommittedBlockNumAndViewID(recvMsg *FBFTMessage) bool {
+	if recvMsg.ViewID != consensus.GetLatestCommittedBlockViewID() || recvMsg.BlockNum != consensus.blockNum-1 {
 		consensus.getLogger().Debug().
 			Uint64("blockNum", consensus.blockNum).
 			Str("recvMsg", recvMsg.String()).
