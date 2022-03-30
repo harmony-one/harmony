@@ -1023,7 +1023,13 @@ func New(
 
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		beaconChain := node.Beaconchain()
+		var beaconChain *core.BlockChain
+		if blockchain.ShardID() == shard.BeaconChainShardID {
+			beaconChain = node.Beaconchain()
+		} else {
+			beaconChain = node.EpochChain()
+		}
+
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
 			var err error
 			if b2 {
