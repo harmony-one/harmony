@@ -7,9 +7,19 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
+
+type prepareStakingMetaData interface {
+	prepareStakingMetaData(
+		block *types.Block, stakeMsgs []staking.StakeMsg, state *state.DB,
+	) ([]common.Address,
+		map[common.Address]staking.DelegationIndexes,
+		error,
+	)
+}
 
 func TestPrepareStakingMetadata(t *testing.T) {
 	key, _ := crypto.GenerateKey()
@@ -27,7 +37,7 @@ func TestPrepareStakingMetadata(t *testing.T) {
 	block := types.NewBlock(header, txs, []*types.Receipt{types.NewReceipt([]byte{}, false, 0), types.NewReceipt([]byte{}, false, 0),
 		types.NewReceipt([]byte{}, false, 0)}, nil, nil, stxs)
 	// run it
-	if _, _, err := chain.prepareStakingMetaData(block, []staking.StakeMsg{&staking.Delegate{}}, db); err != nil {
+	if _, _, err := chain.(prepareStakingMetaData).prepareStakingMetaData(block, []staking.StakeMsg{&staking.Delegate{}}, db); err != nil {
 		if err.Error() != "address not present in state" { // when called in test for core/vm
 			t.Errorf("Got error %v in prepareStakingMetaData", err)
 		}

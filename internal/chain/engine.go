@@ -198,7 +198,7 @@ func (e *engineImpl) VerifyVRF(
 	return nil
 }
 
-// retrieve corresponding blsPublicKey from Coinbase Address
+// GetLeaderPubKeyFromCoinbase retrieves corresponding blsPublicKey from Coinbase Address.
 func GetLeaderPubKeyFromCoinbase(
 	blockchain engine.ChainReader, h *block.Header,
 ) (*bls.PublicKeyWrapper, error) {

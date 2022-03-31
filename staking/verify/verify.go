@@ -20,7 +20,7 @@ var (
 
 // AggregateSigForCommittee ..
 func AggregateSigForCommittee(
-	chain *core.BlockChain,
+	chain core.BlockChain,
 	committee *shard.Committee,
 	decider quorum.Decider,
 	aggSignature *bls.Sign,

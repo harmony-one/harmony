@@ -49,7 +49,7 @@ const (
 // StateProcessor implements Processor.
 type StateProcessor struct {
 	config      *params.ChainConfig     // Chain configuration options
-	bc          *BlockChain             // Canonical block chain
+	bc          BlockChain              // Canonical block chain
 	engine      consensus_engine.Engine // Consensus engine used for block rewards
 	resultCache *lru.Cache              // Cache for result after a certain block is processed
 }
@@ -67,7 +67,7 @@ type ProcessorResult struct {
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
-	config *params.ChainConfig, bc *BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, bc BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
 	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{

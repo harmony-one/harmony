@@ -92,7 +92,7 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
-func (node *Node) createStateSync(bc *core.BlockChain) *legacysync.StateSync {
+func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
 	// But registration is done through an old way of port arithmetics (syncPort + 3000).
 	// Thus for compatibility, we are doing the arithmetics here, and not to change the
@@ -270,7 +270,7 @@ func (node *Node) doBeaconSyncing() {
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.NodeConfig.IsOffline {
 		return
 	}
@@ -289,7 +289,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 }
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)

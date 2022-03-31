@@ -12,7 +12,7 @@ type Service struct {
 }
 
 // NewService creates the a new downloader service
-func NewService(host p2p.Host, bcs []*core.BlockChain, config downloader.Config) *Service {
+func NewService(host p2p.Host, bcs []core.BlockChain, config downloader.Config) *Service {
 	return &Service{
 		Downloaders: downloader.NewDownloaders(host, bcs, config),
 	}
