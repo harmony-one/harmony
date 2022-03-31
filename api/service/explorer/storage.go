@@ -32,7 +32,7 @@ var ErrExplorerNotReady = errors.New("explorer db not ready")
 type (
 	storage struct {
 		db database
-		bc *core.BlockChain
+		bc core.BlockChain
 
 		// TODO: optimize this with priority queue
 		tm      *taskManager
@@ -55,7 +55,7 @@ type (
 	}
 )
 
-func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
+func newStorage(bc core.BlockChain, dbPath string) (*storage, error) {
 	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
 	db, err := newLvlDB(dbPath)
 	if err != nil {

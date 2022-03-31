@@ -137,7 +137,7 @@ type Node struct {
 }
 
 // Blockchain returns the blockchain for the node's current shard.
-func (node *Node) Blockchain() *core.BlockChain {
+func (node *Node) Blockchain() core.BlockChain {
 	shardID := node.NodeConfig.ShardID
 	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
@@ -150,7 +150,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 }
 
 // Beaconchain returns the beaconchain from node.
-func (node *Node) Beaconchain() *core.BlockChain {
+func (node *Node) Beaconchain() core.BlockChain {
 	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")

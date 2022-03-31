@@ -16,6 +16,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
 	"github.com/harmony-one/harmony/common/denominations"
+	harmonyrawdb "github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -27,7 +28,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *block.Header, ethdb.Database) {
+func getTestEnvironment(testBankKey ecdsa.PrivateKey) (BlockChain, *state.DB, *block.Header, ethdb.Database) {
 	// initialize
 	var (
 		testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
@@ -53,6 +54,14 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *
 	header := blockFactory.NewHeader(common.Big0)
 
 	return chain, db, header, database
+}
+
+type writeDelegationsByDelegator interface {
+	writeDelegationsByDelegator(
+		batch harmonyrawdb.DatabaseWriter,
+		delegator common.Address,
+		indices []staking.DelegationIndex,
+	) error
 }
 
 func TestEVMStaking(t *testing.T) {
@@ -84,7 +93,7 @@ func TestEVMStaking(t *testing.T) {
 		Index:            uint64(0),
 		BlockNum:         common.Big0, // block number at which delegation starts
 	}
-	err = chain.writeDelegationsByDelegator(batch, createValidator.ValidatorAddress, []staking.DelegationIndex{selfIndex})
+	err = chain.(writeDelegationsByDelegator).writeDelegationsByDelegator(batch, createValidator.ValidatorAddress, []staking.DelegationIndex{selfIndex})
 
 	// editValidator test
 	editValidator := sampleEditValidator(*key)
