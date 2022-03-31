@@ -310,8 +310,8 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.FBFTLog.MarkBlockVerified(blockObj)
 
-		if !blockObj.IsLastBlockInEpoch() {
-			// only do early commit if it's not epoch block to avoid problems
+		if !blockObj.IsLastBlockInEpoch() && !isExtraCommitEpoch {
+			// only do early commit if it's not epoch block and not extra commit epoch to avoid problems
 			consensus.preCommitAndPropose(blockObj)
 		}
 
