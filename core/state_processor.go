@@ -303,12 +303,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
 		}
 		cxReceipt = &types.CXReceipt{
-			TxHash:    tx.Hash(),
-			From:      msg.From(),
-			To:        msg.To(),
-			ShardID:   tx.ShardID(),
-			ToShardID: tx.ToShardID(),
-			Amount:    msg.Value(),
+			TxHash: tx.Hash(), From: msg.From(), To: msg.To(), ShardID: tx.ShardID(), ToShardID: tx.ToShardID(), Amount:    msg.Value(),
 		}
 	} else {
 		if !failedExe {
