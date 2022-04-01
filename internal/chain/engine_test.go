@@ -1,8 +1,8 @@
 package chain
 
 import (
-	"bytes"
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -110,7 +110,7 @@ func sampleWrapper(address common.Address) *staking.ValidatorWrapper {
 	return w
 }
 
-func TestPruneStaleStakingData(t *testing.T) {
+func TestBulkPruneStaleStakingData(t *testing.T) {
 	blockFactory := blockfactory.ForTest
 	header := blockFactory.NewHeader(common.Big0) // epoch
 	chain := fakeReader{core.FakeChainReader{InternalConfig: params.LocalnetChainConfig}}
@@ -120,9 +120,9 @@ func TestPruneStaleStakingData(t *testing.T) {
 	wrapper.Status = effective.Inactive
 	wrapper.Delegations = staking.Delegations{
 		staking.NewDelegation(wrapper.Address, big.NewInt(0)),
-		staking.NewDelegation(delegator1, big.NewInt(0)),
-		staking.NewDelegation(delegator2, big.NewInt(0)),
-		staking.NewDelegation(delegator3, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
+		staking.NewDelegation(delegator1, big.NewInt(0)),                                                    // stale
+		staking.NewDelegation(delegator2, big.NewInt(0)),                                                    // stale
+		staking.NewDelegation(delegator3, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))), // not stale
 	}
 	if err := wrapper.Delegations[3].Undelegate(
 		big.NewInt(2), new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)), nil,
@@ -148,63 +148,125 @@ func TestPruneStaleStakingData(t *testing.T) {
 	if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
 		t.Fatalf("Got error %v", err)
 	}
-	// we expect
-	// (1) validator1 to show up with validator2 only (and not validator1 where the delegation is 0)
-	// (2) delegator1 to show up with validator1 only (validator2 has amount)
-	// (3) delegator2 to show up with both validator1 and validator2
-	// (4) delegator3 to show up with neither validator1 (undelegation) nor validator2 (reward)
-	delegationsToRemove := make(map[common.Address][]common.Address, 0)
-	if err := pruneStaleStakingData(&chain, header, db, delegationsToRemove); err != nil {
+	// inputs are: validator1
+	// 0 -> self delegation
+	// 1 -> stale delegation
+	// 2 -> stale delegation
+	// 3 -> 0 delegation but not stale
+
+	// validator2:
+	// 0 -> self delegation (validator2)
+	// 1 -> non stale delegation (with amount) (delegator1)
+	// 2 -> stale delegation (delegator2)
+	// 3 -> non stale delegation (delegator3)
+	// 4 -> stale delegation (validator1)
+
+	expected := make(map[common.Address](map[common.Address]uint64))
+
+	expected[delegator1] = make(map[common.Address]uint64)
+	expected[delegator1][validator1] = math.MaxUint64
+
+	expected[delegator2] = make(map[common.Address]uint64)
+	expected[delegator2][validator1] = math.MaxUint64
+	expected[delegator2][validator2] = math.MaxUint64
+
+	expected[delegator3] = make(map[common.Address]uint64)
+	expected[delegator3][validator1] = 2
+	expected[delegator3][validator2] = 1
+
+	expected[validator1] = make(map[common.Address]uint64)
+	expected[validator1][validator2] = math.MaxUint64
+
+	var delegationsToAlter map[common.Address](map[common.Address]uint64)
+	var err error
+	if delegationsToAlter, err = bulkPruneStaleStakingData(&chain, header, db, nil); err != nil {
 		t.Fatalf("Got error %v", err)
 	}
-	if toRemove, ok := delegationsToRemove[validator1]; ok {
-		if len(toRemove) != 1 {
-			t.Errorf("Unexpected # of removals for validator1 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) {
-					t.Errorf("Found validator1 being removed from validator1's delegations")
-				}
-			}
-		}
+	if err := staking.CompareDelegationsToAlter(expected, delegationsToAlter); err != nil {
+		t.Error(err)
 	}
-	if toRemove, ok := delegationsToRemove[delegator1]; ok {
-		if len(toRemove) != 1 {
-			t.Errorf("Unexpected # of removals for delegator1 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if !bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) {
-					t.Errorf("Unexpected removal for delegator1; validator1 %s, validator2 %s, validatorAddress %s",
-						validator1.Hex(),
-						validator2.Hex(),
-						validatorAddress.Hex(),
-					)
-				}
-			}
-		}
+}
+
+func TestPruneStaleStakingData(t *testing.T) {
+	blockFactory := blockfactory.ForTest
+	header := blockFactory.NewHeader(common.Big0) // epoch
+	chain := fakeReader{core.FakeChainReader{InternalConfig: params.LocalnetChainConfig}}
+	db := getDatabase()
+	// now make the two wrappers and store them
+	wrapper := sampleWrapper(validator1)
+	wrapper.Status = effective.Inactive
+	wrapper.Delegations = staking.Delegations{
+		staking.NewDelegation(wrapper.Address, big.NewInt(0)),
+		staking.NewDelegation(delegator1, big.NewInt(0)),                                                    // stale
+		staking.NewDelegation(delegator2, big.NewInt(0)),                                                    // stale
+		staking.NewDelegation(delegator3, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))), // not stale
 	}
-	if toRemove, ok := delegationsToRemove[delegator2]; ok {
-		if len(toRemove) != 2 {
-			t.Errorf("Unexpected # of removals for delegator2 %d", len(toRemove))
-		}
-		if len(toRemove) > 0 {
-			for _, validatorAddress := range toRemove {
-				if !(bytes.Equal(validatorAddress.Bytes(), validator1.Bytes()) ||
-					bytes.Equal(validatorAddress.Bytes(), validator2.Bytes())) {
-					t.Errorf("Unexpected removal for delegator2; validator1 %s, validator2 %s, validatorAddress %s",
-						validator1.Hex(),
-						validator2.Hex(),
-						validatorAddress.Hex(),
-					)
-				}
-			}
-		}
+	if err := wrapper.Delegations[3].Undelegate(
+		big.NewInt(2), new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100)), nil,
+	); err != nil {
+		t.Fatalf("Got error %v", err)
 	}
-	if toRemove, ok := delegationsToRemove[delegator3]; ok {
-		if len(toRemove) != 0 {
-			t.Errorf("Unexpected # of removals for delegator3 %d", len(toRemove))
-		}
+	if wrapper.Delegations[3].Amount.Cmp(common.Big0) != 0 {
+		t.Fatalf("Expected 0 delegation but got %v", wrapper.Delegations[3].Amount)
+	}
+	if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+		t.Fatalf("Got error %v", err)
+	}
+	wrapper = sampleWrapper(validator2)
+	wrapper.Status = effective.Active
+	wrapper.Delegations = staking.Delegations{
+		staking.NewDelegation(wrapper.Address, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000))),
+		staking.NewDelegation(delegator1, new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(100))),
+		staking.NewDelegation(delegator2, big.NewInt(0)),
+		staking.NewDelegation(delegator3, big.NewInt(0)),
+		staking.NewDelegation(validator1, big.NewInt(0)),
+	}
+	wrapper.Delegations[3].Reward = common.Big257
+	if err := db.UpdateValidatorWrapper(wrapper.Address, wrapper); err != nil {
+		t.Fatalf("Got error %v", err)
+	}
+	// inputs are: validator1
+	// 0 -> self delegation
+	// 1 -> stale delegation
+	// 2 -> stale delegation
+	// 3 -> 0 delegation but not stale
+
+	// validator2:
+	// 0 -> self delegation (validator2)
+	// 1 -> non stale delegation (with amount) (delegator1)
+	// 2 -> stale delegation (delegator2)
+	// 3 -> non stale delegation (delegator3)
+	// 4 -> stale delegation (validator1)
+
+	expected := make(map[common.Address](map[common.Address]uint64))
+
+	expected[delegator1] = make(map[common.Address]uint64)
+	expected[delegator1][validator1] = math.MaxUint64
+
+	expected[delegator2] = make(map[common.Address]uint64)
+	expected[delegator2][validator1] = math.MaxUint64
+	expected[delegator2][validator2] = math.MaxUint64
+
+	expected[delegator3] = make(map[common.Address]uint64)
+	expected[delegator3][validator1] = math.MaxUint64 // manually marked for removal (last so no other changes)
+	expected[delegator3][validator2] = 1
+
+	expected[validator1] = make(map[common.Address]uint64)
+	expected[validator1][validator2] = math.MaxUint64
+
+	delegationsToAlter := make(map[common.Address](map[common.Address]uint64))
+	delegationsToAlter[delegator3] = make(map[common.Address]uint64)
+	delegationsToAlter[delegator3][validator1] = math.MaxUint64
+	var err error
+	// pay out undelegations
+	delegationsToRemove := make(map[common.Address][]uint64)
+	delegationsToRemove[validator1] = []uint64{1, 2}
+	delegationsToRemove[validator2] = []uint64{2, 4}
+	// and besides this, remove
+	if delegationsToAlter, err = pruneStaleStakingData(&chain, header, db, delegationsToAlter, delegationsToRemove); err != nil {
+		t.Fatalf("Got error %v", err)
+	}
+	if err := staketest.CompareDelegationsToAlter(expected, delegationsToAlter); err != nil {
+		t.Error(err)
 	}
 }

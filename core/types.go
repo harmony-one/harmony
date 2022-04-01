@@ -61,7 +61,7 @@ type Validator interface {
 type Processor interface {
 	Process(block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool) (
 		types.Receipts, types.CXReceipts, []stakingTypes.StakeMsg,
-		map[common.Address][]common.Address,
+		map[common.Address](map[common.Address]uint64),
 		[]*types.Log, uint64, reward.Reader, *state.DB, error,
 	)
 	CacheProcessorResult(cacheKey interface{}, result *ProcessorResult)

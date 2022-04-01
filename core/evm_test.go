@@ -107,7 +107,7 @@ func TestEVMStaking(t *testing.T) {
 	// redelegate using epoch1, so that we can cover the locked tokens use case as well
 	ctx2 := NewEVMContext(msg, blockfactory.ForTest.NewHeader(common.Big1), chain, nil)
 	err = db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-	err = ctx2.Delegate(db, nil, &delegate)
+	_, err = ctx2.Delegate(db, nil, &delegate)
 	if err != nil {
 		t.Errorf("Got error %v in Delegate", err)
 	}
@@ -125,7 +125,7 @@ func TestEVMStaking(t *testing.T) {
 	delegate = sampleDelegate(*delegatorKey) // 1000 ONE
 	db.AddBalance(delegate.DelegatorAddress, delegate.Amount)
 	delegate.ValidatorAddress = wrapper.Address
-	err = ctx.Delegate(db, nil, &delegate)
+	_, err = ctx.Delegate(db, nil, &delegate)
 	if err != nil {
 		t.Errorf("Got error %v in Delegate for new delegator", err)
 	}

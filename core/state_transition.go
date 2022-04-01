@@ -152,7 +152,11 @@ func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error
 }
 
 // ApplyStakingMessage computes the new state for staking message
-func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (uint64, error) {
+func ApplyStakingMessage(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) (
+	map[common.Address](map[common.Address]uint64),
+	uint64,
+	error,
+) {
 	return NewStateTransition(evm, msg, gp, bc).StakingTransitionDb()
 }
 
@@ -290,9 +294,9 @@ func (st *StateTransition) gasUsed() uint64 {
 // StakingTransitionDb will transition the state by applying the staking message and
 // returning the result including the used gas. It returns an error if failed.
 // It is used for staking transaction only
-func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
+func (st *StateTransition) StakingTransitionDb() (delegationsToAlter map[common.Address](map[common.Address]uint64), usedGas uint64, err error) {
 	if err = st.preCheck(); err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	msg := st.msg
 
@@ -304,10 +308,10 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	gas, err := vm.IntrinsicGas(st.data, false, homestead, istanbul, msg.Type() == types.StakeCreateVal)
 
 	if err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 	if err = st.useGas(gas); err != nil {
-		return 0, err
+		return nil, 0, err
 	}
 
 	// Increment the nonce for the next transaction
@@ -321,57 +325,57 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	case types.StakeCreateVal:
 		stkMsg := &stakingTypes.CreateValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		utils.Logger().Info().
 			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
+			return nil, 0, errInvalidSigner
 		}
 		err = st.evm.CreateValidator(st.evm.StateDB, nil, stkMsg)
 	case types.StakeEditVal:
 		stkMsg := &stakingTypes.EditValidator{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		utils.Logger().Info().
 			Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.ValidatorAddress {
-			return 0, errInvalidSigner
+			return nil, 0, errInvalidSigner
 		}
 		err = st.evm.EditValidator(st.evm.StateDB, nil, stkMsg)
 	case types.Delegate:
 		stkMsg := &stakingTypes.Delegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
+			return nil, 0, errInvalidSigner
 		}
-		err = st.evm.Delegate(st.evm.StateDB, nil, stkMsg)
+		delegationsToAlter, err = st.evm.Delegate(st.evm.StateDB, nil, stkMsg)
 	case types.Undelegate:
 		stkMsg := &stakingTypes.Undelegate{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
+			return nil, 0, errInvalidSigner
 		}
 		err = st.evm.Undelegate(st.evm.StateDB, nil, stkMsg)
 	case types.CollectRewards:
 		stkMsg := &stakingTypes.CollectRewards{}
 		if err = rlp.DecodeBytes(msg.Data(), stkMsg); err != nil {
-			return 0, err
+			return nil, 0, err
 		}
 		utils.Logger().Info().Msgf("[DEBUG STAKING] staking type: %s, gas: %d, txn: %+v", msg.Type(), gas, stkMsg)
 		if msg.From() != stkMsg.DelegatorAddress {
-			return 0, errInvalidSigner
+			return nil, 0, errInvalidSigner
 		}
 		err = st.evm.CollectRewards(st.evm.StateDB, nil, stkMsg)
 	default:
-		return 0, stakingTypes.ErrInvalidStakingKind
+		return nil, 0, stakingTypes.ErrInvalidStakingKind
 	}
 	st.refundGas()
 
@@ -379,5 +383,5 @@ func (st *StateTransition) StakingTransitionDb() (usedGas uint64, err error) {
 	//txFee := new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice)
 	//st.state.AddBalance(st.evm.Coinbase, txFee)
 
-	return st.gasUsed(), err
+	return delegationsToAlter, st.gasUsed(), err
 }

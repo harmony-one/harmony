@@ -3,7 +3,6 @@ package vm
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -26,8 +25,9 @@ func CollectRewardsFn() CollectRewardsFunc {
 }
 
 func DelegateFn() DelegateFunc {
-	return func(db StateDB, rosettaTracer RosettaTracer, delegate *stakingTypes.Delegate) error {
-		return nil
+	return func(db StateDB, rosettaTracer RosettaTracer, delegate *stakingTypes.Delegate) (
+		map[common.Address](map[common.Address]uint64), error) {
+		return nil, nil
 	}
 }
 
@@ -73,7 +73,7 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	}, nil, params.TestChainConfig, Config{})
 	// use required gas to avoid out of gas errors
 	p := &stakingPrecompile{}
-	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
+	t.Run(test.name, func(t *testing.T) {
 		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), 0)
 		gas, err := p.RequiredGas(env, contract, test.input)
 		if err != nil {

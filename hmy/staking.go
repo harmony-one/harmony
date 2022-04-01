@@ -507,12 +507,14 @@ func (hmy *Harmony) GetDelegationsByDelegatorByBlock(
 		if err != nil || wrapper == nil {
 			return nil, nil
 		}
-
-		if uint64(len(wrapper.Delegations)) > delegationIndexes[i].Index {
-			delegations = append(delegations, &wrapper.Delegations[delegationIndexes[i].Index])
-		} else {
-			delegations = append(delegations, nil)
-		}
+		delegation, _, _ := staking.FindDelegationInWrapper(
+			delegator,
+			wrapper,
+			&delegationIndexes[i],
+			hmy.ChainConfig(),
+			block.Epoch(),
+		)
+		delegations = append(delegations, delegation)
 		addresses = append(addresses, delegationIndexes[i].ValidatorAddress)
 	}
 	return addresses, delegations

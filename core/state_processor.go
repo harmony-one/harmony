@@ -56,14 +56,14 @@ type StateProcessor struct {
 
 // this structure is cached, and each individual element is returned
 type ProcessorResult struct {
-	Receipts            types.Receipts
-	CxReceipts          types.CXReceipts
-	StakeMsgs           []staking.StakeMsg
-	Logs                []*types.Log
-	UsedGas             uint64
-	Reward              reward.Reader
-	State               *state.DB
-	DelegationsToRemove map[common.Address][]common.Address
+	Receipts           types.Receipts
+	CxReceipts         types.CXReceipts
+	StakeMsgs          []staking.StakeMsg
+	Logs               []*types.Log
+	UsedGas            uint64
+	Reward             reward.Reader
+	State              *state.DB
+	DelegationsToAlter map[common.Address](map[common.Address]uint64)
 }
 
 // NewStateProcessor initialises a new StateProcessor.
@@ -90,7 +90,7 @@ func (p *StateProcessor) Process(
 	block *types.Block, statedb *state.DB, cfg vm.Config, readCache bool,
 ) (
 	types.Receipts, types.CXReceipts, []staking.StakeMsg,
-	map[common.Address][]common.Address,
+	map[common.Address](map[common.Address]uint64),
 	[]*types.Log, uint64, reward.Reader, *state.DB, error,
 ) {
 	cacheKey := block.Hash()
@@ -100,19 +100,20 @@ func (p *StateProcessor) Process(
 			// Only the successful results are cached in case for retry.
 			result := cached.(*ProcessorResult)
 			utils.Logger().Info().Str("block num", block.Number().String()).Msg("result cache hit.")
-			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.DelegationsToRemove, result.Logs, result.UsedGas, result.Reward, result.State, nil
+			return result.Receipts, result.CxReceipts, result.StakeMsgs, result.DelegationsToAlter, result.Logs, result.UsedGas, result.Reward, result.State, nil
 		}
 	}
 
 	var (
-		receipts       types.Receipts
-		outcxs         types.CXReceipts
-		incxs          = block.IncomingReceipts()
-		usedGas        = new(uint64)
-		header         = block.Header()
-		allLogs        []*types.Log
-		gp                                = new(GasPool).AddGas(block.GasLimit())
-		blockStakeMsgs []staking.StakeMsg = make([]staking.StakeMsg, 0)
+		receipts           types.Receipts
+		outcxs             types.CXReceipts
+		incxs              = block.IncomingReceipts()
+		usedGas            = new(uint64)
+		header             = block.Header()
+		allLogs            []*types.Log
+		gp                                    = new(GasPool).AddGas(block.GasLimit())
+		blockStakeMsgs     []staking.StakeMsg = make([]staking.StakeMsg, 0)
+		delegationsToAlter map[common.Address](map[common.Address]uint64)
 	)
 
 	beneficiary, err := p.bc.GetECDSAFromCoinbase(header)
@@ -124,7 +125,7 @@ func (p *StateProcessor) Process(
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
+		receipt, cxReceipt, stakeMsgs, delegationsToAlterTx, _, err := ApplyTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
@@ -137,6 +138,8 @@ func (p *StateProcessor) Process(
 		if len(stakeMsgs) > 0 {
 			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 		}
+		// merge per transaction information into per-block information
+		delegationsToAlter = staking.MergeDelegationsToAlter(delegationsToAlter, delegationsToAlterTx)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Normal Txns")
@@ -146,7 +149,7 @@ func (p *StateProcessor) Process(
 	L := len(block.Transactions())
 	for i, tx := range block.StakingTransactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i+L)
-		receipt, _, err := ApplyStakingTransaction(
+		delegationsToAlterTx, receipt, _, err := ApplyStakingTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
@@ -154,6 +157,11 @@ func (p *StateProcessor) Process(
 		}
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
+		// as a reminder - bc.prepareStakingMetadata uses stake msgs from processor results
+		// as well as any staking transactions directly to commit the offchain data
+		// in this case, there is no easy way to deduce the delegationsToAlter when committing metadata
+		// hence, this line to merge per-transaction information into per-block info is needed here
+		delegationsToAlter = staking.MergeDelegationsToAlter(delegationsToAlter, delegationsToAlterTx)
 	}
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("Process Staking Txns")
 
@@ -182,9 +190,10 @@ func (p *StateProcessor) Process(
 		// Block processing don't need to block on reward computation as in block proposal
 		sigsReady <- true
 	}()
-	_, delegationsToRemove, payout, err := p.engine.Finalize(
+	_, delegationsToAlter, payout, err := p.engine.Finalize(
 		p.bc, header, statedb, block.Transactions(),
-		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
+		receipts, outcxs, incxs, block.StakingTransactions(), delegationsToAlter,
+		slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, 0, nil, statedb, errors.Wrap(err,
@@ -192,17 +201,17 @@ func (p *StateProcessor) Process(
 	}
 
 	result := &ProcessorResult{
-		Receipts:            receipts,
-		CxReceipts:          outcxs,
-		StakeMsgs:           blockStakeMsgs,
-		Logs:                allLogs,
-		UsedGas:             *usedGas,
-		Reward:              payout,
-		State:               statedb,
-		DelegationsToRemove: delegationsToRemove,
+		Receipts:           receipts,
+		CxReceipts:         outcxs,
+		StakeMsgs:          blockStakeMsgs,
+		Logs:               allLogs,
+		UsedGas:            *usedGas,
+		Reward:             payout,
+		State:              statedb,
+		DelegationsToAlter: delegationsToAlter,
 	}
 	p.resultCache.Add(cacheKey, result)
-	return receipts, outcxs, blockStakeMsgs, delegationsToRemove, allLogs, *usedGas, payout, statedb, nil
+	return receipts, outcxs, blockStakeMsgs, delegationsToAlter, allLogs, *usedGas, payout, statedb, nil
 }
 
 // CacheProcessorResult caches the process result on the cache key.
@@ -233,14 +242,30 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
+func ApplyTransaction(
+	config *params.ChainConfig,
+	bc ChainContext,
+	author *common.Address,
+	gp *GasPool,
+	statedb *state.DB,
+	header *block.Header,
+	tx *types.Transaction,
+	usedGas *uint64,
+	cfg vm.Config,
+) (*types.Receipt,
+	*types.CXReceipt,
+	[]staking.StakeMsg,
+	map[common.Address](map[common.Address]uint64),
+	uint64,
+	error,
+) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
-		return nil, nil, nil, 0, errors.New("Invalid Transaction Type")
+		return nil, nil, nil, nil, 0, errors.New("Invalid Transaction Type")
 	}
 
 	if txType != types.SameShardTx && !config.AcceptsCrossTx(header.Epoch()) {
-		return nil, nil, nil, 0, errors.Errorf(
+		return nil, nil, nil, nil, 0, errors.Errorf(
 			"cannot handle cross-shard transaction until after epoch %v (now %v)",
 			config.CrossTxEpoch, header.Epoch(),
 		)
@@ -249,7 +274,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var signer types.Signer
 	if tx.IsEthCompatible() {
 		if !config.IsEthCompatible(header.Epoch()) {
-			return nil, nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
+			return nil, nil, nil, nil, 0, errors.New("ethereum compatible transactions not supported at current epoch")
 		}
 		signer = types.NewEIP155Signer(config.EthCompatibleChainID)
 	} else {
@@ -259,7 +284,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	// skip signer err for additiononly tx
 	if err != nil {
-		return nil, nil, nil, 0, err
+		return nil, nil, nil, nil, 0, err
 	}
 
 	// Create a new context to be used in the EVM environment
@@ -271,7 +296,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	// Apply the transaction to the current state (included in the env)
 	result, err := ApplyMessage(vmenv, msg, gp)
 	if err != nil {
-		return nil, nil, nil, 0, err
+		return nil, nil, nil, nil, 0, err
 	}
 	// Update the state with pending changes
 	var root []byte
@@ -307,7 +332,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		cxReceipt = nil
 	}
 
-	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
+	return receipt, cxReceipt, vmenv.StakeMsgs, vmenv.DelegationsToAlter, result.UsedGas, err
 }
 
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database
@@ -316,12 +341,20 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 // indicating the block was invalid.
 // staking transaction will use the code field in the account to store the staking information
 func ApplyStakingTransaction(
-	config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB,
-	header *block.Header, tx *staking.StakingTransaction, usedGas *uint64, cfg vm.Config) (receipt *types.Receipt, gas uint64, err error) {
+	config *params.ChainConfig,
+	bc ChainContext,
+	author *common.Address,
+	gp *GasPool,
+	statedb *state.DB,
+	header *block.Header,
+	tx *staking.StakingTransaction,
+	usedGas *uint64,
+	cfg vm.Config,
+) (delegationsToAlter map[common.Address](map[common.Address]uint64), receipt *types.Receipt, gas uint64, err error) {
 
 	msg, err := StakingToMessage(tx, header.Number())
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 
 	// Create a new context to be used in the EVM environment
@@ -332,9 +365,9 @@ func ApplyStakingTransaction(
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
 
 	// Apply the transaction to the current state (included in the env)
-	gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
+	delegationsToAlter, gas, err = ApplyStakingMessage(vmenv, msg, gp, bc)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, 0, err
 	}
 
 	// Update the state with pending changes
@@ -354,7 +387,7 @@ func ApplyStakingTransaction(
 		utils.Logger().Info().Interface("CollectReward", receipt.Logs)
 	}
 
-	return receipt, gas, nil
+	return delegationsToAlter, receipt, gas, nil
 }
 
 // ApplyIncomingReceipt will add amount into ToAddress in the receipt

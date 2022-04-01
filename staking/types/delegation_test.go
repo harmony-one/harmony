@@ -1,11 +1,15 @@
 package types
 
 import (
+	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
 	common "github.com/ethereum/go-ethereum/common"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/params"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -209,4 +213,217 @@ func TestMinRemainingDelegation(t *testing.T) {
 			common.Big0,
 		)
 	}
+}
+
+func TestMergeDelegationsToAlter(t *testing.T) {
+	delegators := [3]common.Address{}
+	validators := [3]common.Address{}
+	top := make(map[common.Address](map[common.Address]uint64))
+	leaf := make(map[common.Address](map[common.Address]uint64))
+	expected := make(map[common.Address](map[common.Address]uint64))
+	// blank test
+	top = MergeDelegationsToAlter(top, leaf)
+	if len(top) != 0 {
+		t.Error("Length values of top not equal to leaf")
+	}
+	// reassign to avoid reference issues
+	top = make(map[common.Address](map[common.Address]uint64))
+	leaf = make(map[common.Address](map[common.Address]uint64))
+	for i := 0; i < 3; i++ {
+		delegators[i] = makeTestAddr(fmt.Sprintf("delegator%d", i))
+		top[delegators[i]] = make(map[common.Address]uint64)
+		leaf[delegators[i]] = make(map[common.Address]uint64)
+		expected[delegators[i]] = make(map[common.Address]uint64)
+		validators[i] = makeTestAddr(fmt.Sprintf("validator%d", i))
+	}
+	// now start with real test
+	// (1) case where leaf says delete, top says move
+	leaf[delegators[0]][validators[0]] = math.MaxUint64
+	top[delegators[0]][validators[0]] = 1
+	result := MergeDelegationsToAlter(top, leaf)
+	expected[delegators[0]][validators[0]] = math.MaxUint64
+	if err := compareDelegationsToAlter(expected, result); err != nil {
+		t.Error(err)
+	}
+	// (2) case where top says delete, leaf says move
+	leaf[delegators[0]][validators[0]] = 1
+	top[delegators[0]][validators[0]] = math.MaxUint64
+	result = MergeDelegationsToAlter(top, leaf)
+	if err := compareDelegationsToAlter(expected, result); err != nil {
+		t.Error(err)
+	}
+	// (3) case where both say move
+	leaf[delegators[0]][validators[0]] = 1
+	top[delegators[0]][validators[0]] = 1
+	result = MergeDelegationsToAlter(top, leaf)
+	expected[delegators[0]][validators[0]] = 2
+	if err := compareDelegationsToAlter(expected, result); err != nil {
+		t.Error(err)
+	}
+	// (4) case where both say delete
+	top[delegators[0]][validators[0]] = math.MaxUint64
+	leaf[delegators[0]][validators[0]] = math.MaxUint64
+	result = MergeDelegationsToAlter(top, leaf)
+	expected[delegators[0]][validators[0]] = math.MaxUint64
+	if err := compareDelegationsToAlter(expected, result); err != nil {
+		t.Error(err)
+	}
+	// (5) another guy is being moved, with different values
+	// and original is being deleted and a diff combo is moving too
+	top[delegators[1]][validators[0]] = 2
+	leaf[delegators[1]][validators[0]] = 1
+	top[delegators[2]][validators[1]] = 4
+	leaf[delegators[2]][validators[1]] = 3
+	result = MergeDelegationsToAlter(top, leaf)
+	expected[delegators[1]][validators[0]] = 3
+	expected[delegators[2]][validators[1]] = 7
+	if err := compareDelegationsToAlter(expected, result); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestFindDelegationInWrapper(t *testing.T) {
+	config := &params.ChainConfig{}
+	config.NoNilDelegationsEpoch = big.NewInt(100)
+	// has one extra delegation in there
+	wrapper := makeValidValidatorWrapper()
+	delegatorAddress := wrapper.Address
+	delegationIndex := DelegationIndex{
+		ValidatorAddress: delegatorAddress,
+		Index:            0,
+		BlockNum:         big.NewInt(1),
+	}
+	// pre no nil delegations epoch
+	if delegation, actualIndex, err := FindDelegationInWrapper(
+		delegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(1),
+	); err != nil {
+		t.Error(err)
+	} else if delegation == nil {
+		t.Error("Delegation is nil")
+	} else if actualIndex != 0 {
+		t.Errorf("Actual index is not 0 but %d", actualIndex)
+	}
+	// post no nil delegations epoch with self delegation
+	if delegation, actualIndex, err := FindDelegationInWrapper(
+		delegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(200),
+	); err != nil {
+		t.Error(err)
+	} else if delegation == nil {
+		t.Error("Delegation is nil")
+	} else if actualIndex != 0 {
+		t.Errorf("Actual index is not 0 but %d", actualIndex)
+	}
+	// post no nil delegations epoch with matching index
+	delegationIndex.Index = 1
+	delegatorAddress = wrapper.Delegations[1].DelegatorAddress
+	if delegation, actualIndex, err := FindDelegationInWrapper(
+		delegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(200),
+	); err != nil {
+		t.Error(err)
+	} else if delegation == nil {
+		t.Error("Delegation is nil")
+	} else if actualIndex != 1 {
+		t.Errorf("Actual index is not 1 but %d", actualIndex)
+	}
+	// post no nil delegations epoch with too high index (more than length)
+	delegationIndex.Index = 2
+	if delegation, actualIndex, err := FindDelegationInWrapper(
+		delegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(200),
+	); err != nil {
+		t.Error(err)
+	} else if delegation == nil {
+		t.Error("Delegation is nil")
+	} else if actualIndex != 1 {
+		t.Errorf("Actual index is not 1 but %d", actualIndex)
+	}
+	// post no nil delegations epoch with too low index (less than the expected index)
+	delegationIndex.Index = 1
+	wrapper.Delegations = append(
+		wrapper.Delegations,
+		NewDelegation(
+			common.BigToAddress(common.Big257),
+			big.NewInt(500),
+		),
+	)
+	if delegation, _, err := FindDelegationInWrapper(
+		wrapper.Delegations[2].DelegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(200),
+	); err != nil {
+		t.Error(err)
+	} else if delegation != nil {
+		t.Error("Delegation is not nil")
+	}
+	// pre no nil delegations epoch with messed up lengths
+	delegationIndex.Index = 5
+	if _, _, err := FindDelegationInWrapper(
+		delegatorAddress,
+		&wrapper,
+		&delegationIndex,
+		config,
+		big.NewInt(1),
+	); err == nil {
+		t.Error("Expected error out of bounds but got nil")
+	}
+}
+
+func makeTestAddr(item interface{}) common.Address {
+	s := fmt.Sprintf("harmony-one-%v", item)
+	return common.BytesToAddress([]byte(s))
+}
+
+// pasted here to avoid import cycle
+func compareDelegationsToAlter(expected, delegationsToAlter map[common.Address](map[common.Address]uint64)) error {
+	for expectedDelegator, expectedModified := range expected {
+		// check it is in delegationsToAlter
+		if modified, ok := delegationsToAlter[expectedDelegator]; !ok {
+			return errors.Errorf("Did not find %s in delegationsToAlter", expectedDelegator.Hex())
+		} else {
+			for expectedValidator, expectedOffset := range expectedModified {
+				if offset, ok := modified[expectedValidator]; !ok {
+					return errors.Errorf("Did not find validator %s for delegator %s in delegationsToAlter", expectedValidator.Hex(), expectedDelegator.Hex())
+				} else if offset != expectedOffset {
+					return errors.Errorf(
+						"Mismatch in validator %s for delegator %s in delegationsToAlter: expected %d actual %d",
+						expectedValidator.Hex(),
+						expectedDelegator.Hex(),
+						expectedOffset,
+						offset,
+					)
+				}
+			}
+		}
+	}
+
+	// opposite check for different keys
+	for delegator, modified := range delegationsToAlter {
+		if expectedModified, ok := expected[delegator]; !ok {
+			return errors.Errorf("Did not find %s in expected", delegator.Hex())
+		} else {
+			for validator, _ := range modified {
+				if _, ok := expectedModified[validator]; !ok {
+					return errors.Errorf("Did not find validator %s for delegator %s in expected", validator.Hex(), delegator.Hex())
+				}
+			}
+		}
+	}
+	return nil
 }

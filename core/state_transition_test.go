@@ -71,7 +71,7 @@ func testApplyStakingMessage(test applyStakingMessageTest, t *testing.T) {
 		vmenv := vm.NewEVM(ctx, db, params.TestChainConfig, vm.Config{})
 
 		// run the staking tx
-		_, err := ApplyStakingMessage(vmenv, msg, gp, chain)
+		_, _, err := ApplyStakingMessage(vmenv, msg, gp, chain)
 		if err != nil {
 			if test.expectedError == nil {
 				t.Errorf(fmt.Sprintf("Got error %v but expected none", err))

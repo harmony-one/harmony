@@ -680,9 +680,15 @@ type Rules struct {
 
 // Rules ensures c's ChainID is not nil.
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
-	if c.IsStakingPrecompile(epoch) {
-		if !c.IsPreStaking(epoch) {
+	// sanity check on staking related rules that
+	// post-staking epochs (precompile, no nil delegations)
+	// must occur after, or at the same time as, pre-staking
+	if !c.IsPreStaking(epoch) {
+		if c.IsStakingPrecompile(epoch) {
 			panic("Cannot have staking precompile epoch if not prestaking epoch")
+		}
+		if c.IsNoNilDelegations(epoch) {
+			panic("Cannot have no nil delegations epoch if not prestaking epoch")
 		}
 	}
 	chainID := c.ChainID

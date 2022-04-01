@@ -850,7 +850,9 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return err
 		}
 		pendingEpoch := pool.pendingEpoch()
-		_, delegateAmt, _, err := VerifyAndDelegateFromMsg(
+		// since this does not actually do the transaction
+		// the delegationsToAlter is irrelevant
+		_, delegateAmt, _, _, err := VerifyAndDelegateFromMsg(
 			pool.currentState, pendingEpoch, stkMsg, delegations, pool.chainconfig)
 		if err != nil {
 			return err
@@ -900,7 +902,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return err
 		}
 
-		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations)
+		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations, stkMsg, pool.pendingEpoch(), pool.chainconfig)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind

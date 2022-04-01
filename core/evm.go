@@ -155,19 +155,19 @@ func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc
 
 func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) (map[common.Address](map[common.Address]uint64), error) {
 		delegations, err := chain.ReadDelegationsByDelegatorAt(delegate.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
-			return err
+			return nil, err
 		}
-		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
+		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, delegationsToAlter, err := VerifyAndDelegateFromMsg(
 			db, ref.Epoch(), delegate, delegations, chain.Config())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
 			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -201,7 +201,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 			for _, key := range sortedKeys {
 				redelegatedToken, ok := fromLockedTokens[key]
 				if !ok {
-					return errors.New("Key missing for delegation receipt")
+					return nil, errors.New("Key missing for delegation receipt")
 				}
 				encodedRedelegationData := []byte{}
 				addrBytes := key.Bytes()
@@ -238,7 +238,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 				}
 			}
 		}
-		return nil
+		return delegationsToAlter, nil
 	}
 }
 
@@ -282,7 +282,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			return err
 		}
 		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
-			db, delegations,
+			db, delegations, collectRewards, ref.Epoch(), chain.Config(),
 		)
 		if err != nil {
 			return err

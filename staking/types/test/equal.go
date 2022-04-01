@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/numeric"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -205,6 +207,43 @@ func checkBigIntEqual(i1, i2 *big.Int) error {
 	}
 	if i1.Cmp(i2) != 0 {
 		return fmt.Errorf("not equal: %v / %v", i1, i2)
+	}
+	return nil
+}
+
+func CompareDelegationsToAlter(expected, delegationsToAlter map[common.Address](map[common.Address]uint64)) error {
+	for expectedDelegator, expectedModified := range expected {
+		// check it is in delegationsToAlter
+		if modified, ok := delegationsToAlter[expectedDelegator]; !ok {
+			return errors.Errorf("Did not find %s in delegationsToAlter", expectedDelegator.Hex())
+		} else {
+			for expectedValidator, expectedOffset := range expectedModified {
+				if offset, ok := modified[expectedValidator]; !ok {
+					return errors.Errorf("Did not find validator %s for delegator %s in delegationsToAlter", expectedValidator.Hex(), expectedDelegator.Hex())
+				} else if offset != expectedOffset {
+					return errors.Errorf(
+						"Mismatch in validator %s for delegator %s in delegationsToAlter: expected %d actual %d",
+						expectedValidator.Hex(),
+						expectedDelegator.Hex(),
+						expectedOffset,
+						offset,
+					)
+				}
+			}
+		}
+	}
+
+	// opposite check for different keys
+	for delegator, modified := range delegationsToAlter {
+		if expectedModified, ok := expected[delegator]; !ok {
+			return errors.Errorf("Did not find %s in expected", delegator.Hex())
+		} else {
+			for validator, _ := range modified {
+				if _, ok := expectedModified[validator]; !ok {
+					return errors.Errorf("Did not find validator %s for delegator %s in expected", validator.Hex(), delegator.Hex())
+				}
+			}
+		}
 	}
 	return nil
 }
