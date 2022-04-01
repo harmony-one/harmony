@@ -182,7 +182,7 @@ func TestBulkPruneStaleStakingData(t *testing.T) {
 	if delegationsToAlter, err = bulkPruneStaleStakingData(&chain, header, db, nil); err != nil {
 		t.Fatalf("Got error %v", err)
 	}
-	if err := staking.CompareDelegationsToAlter(expected, delegationsToAlter); err != nil {
+	if err := staketest.CompareDelegationsToAlter(expected, delegationsToAlter); err != nil {
 		t.Error(err)
 	}
 }
