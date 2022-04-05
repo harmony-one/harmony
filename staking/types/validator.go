@@ -139,6 +139,8 @@ func NewEmptyStats() *ValidatorStats {
 // whatever current epoch is
 type CurrentEpochPerformance struct {
 	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
+	Epoch                    uint64   `json:"epoch"`
+	Block                    uint64   `json:"block"`
 }
 
 // ValidatorRPCEnhanced contains extra information for RPC consumer
