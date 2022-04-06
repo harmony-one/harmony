@@ -192,19 +192,19 @@ type TxReceipt struct {
 
 // StakingTxReceipt represents a staking transaction receipt that will serialize to the RPC representation.
 type StakingTxReceipt struct {
-	BlockHash         common.Hash       `json:"blockHash"`
-	TransactionHash   common.Hash       `json:"transactionHash"`
-	BlockNumber       hexutil.Uint64    `json:"blockNumber"`
-	TransactionIndex  hexutil.Uint64    `json:"transactionIndex"`
-	GasUsed           hexutil.Uint64    `json:"gasUsed"`
-	CumulativeGasUsed hexutil.Uint64    `json:"cumulativeGasUsed"`
-	ContractAddress   common.Address    `json:"contractAddress"`
-	Logs              []*types.Log      `json:"logs"`
-	LogsBloom         ethtypes.Bloom    `json:"logsBloom"`
-	Sender            string            `json:"sender"`
-	Type              staking.Directive `json:"type"`
-	Root              hexutil.Bytes     `json:"root"`
-	Status            hexutil.Uint      `json:"status"`
+	BlockHash         common.Hash    `json:"blockHash"`
+	TransactionHash   common.Hash    `json:"transactionHash"`
+	BlockNumber       hexutil.Uint64 `json:"blockNumber"`
+	TransactionIndex  hexutil.Uint64 `json:"transactionIndex"`
+	GasUsed           hexutil.Uint64 `json:"gasUsed"`
+	CumulativeGasUsed hexutil.Uint64 `json:"cumulativeGasUsed"`
+	ContractAddress   common.Address `json:"contractAddress"`
+	Logs              []*types.Log   `json:"logs"`
+	LogsBloom         ethtypes.Bloom `json:"logsBloom"`
+	Sender            string         `json:"sender"`
+	Type              hexutil.Uint64 `json:"type"`
+	Root              hexutil.Bytes  `json:"root"`
+	Status            hexutil.Uint   `json:"status"`
 }
 
 // CxReceipt represents a CxReceipt that will serialize to the RPC representation of a CxReceipt
@@ -398,7 +398,7 @@ func NewStakingTxReceipt(
 		Logs:              receipt.Logs,
 		LogsBloom:         receipt.Bloom,
 		Sender:            sender,
-		Type:              tx.StakingType(),
+		Type:              hexutil.Uint64(tx.StakingType()),
 		Root:              receipt.PostState,
 		Status:            hexutil.Uint(receipt.Status),
 	}
