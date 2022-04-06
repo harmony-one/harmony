@@ -20,6 +20,10 @@ type CXReceipt struct {
 	ShardID   uint32
 	ToShardID uint32
 	Amount    *big.Int
+
+	// If non-nil, this is an asynchronous mesage send, rather than just
+	// a balance transfer:
+	MessageSend *CXMessageInfo
 }
 
 // Copy makes a deep copy of the receiver.
@@ -34,6 +38,41 @@ func (r *CXReceipt) Copy() *CXReceipt {
 	}
 	cpy.Amount = new(big.Int).Set(cpy.Amount)
 	return &cpy
+}
+
+// CXMessageInfo contains information about an asynchronous message send.
+type CXMessageInfo struct {
+	// Each of these corresponds to the named parameter in the Router's
+	// send() method. Must satisfy:
+	//
+	// - GasBudget <= CXReceipt.Amount.
+	// - GasBudget >= GasLimit * GasPrice
+	GasBudget, GasLimit, GasPrice *big.Int
+	GasLeftoverTo                 common.Address
+
+	// A nonce, unique per message sender pair, used when computing the
+	// message address.
+	Nonce [16]byte
+
+	// The address of the message itself. This could in principle be
+	// left out and computed from the other information in CXReceipt.
+	Address common.Address
+
+	// Actual data in the message
+	Payload []byte
+}
+
+// Ensures that the message info, if present, satisifies the constraints
+// documented for CXMessageInfo.
+func (r *CXReceipt) MessageInfoValid() bool {
+	m := r.MessageSend
+	if m == nil {
+		// Nothing to validate.
+		return true
+	}
+
+	return m.GasBudget.Cmp(r.Amount) <= 0 &&
+		m.GasBudget.Cmp((&big.Int{}).Mul(m.GasLimit, m.GasPrice)) >= 0
 }
 
 // CXReceipts is a list of CXReceipt

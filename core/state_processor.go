@@ -299,7 +299,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var cxReceipt *types.CXReceipt
 	// Do not create cxReceipt if EVM call failed
 	if txType == types.SubtractionOnly && !failedExe {
-		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value()}
+		cxReceipt = &types.CXReceipt{tx.Hash(), msg.From(), msg.To(), tx.ShardID(), tx.ToShardID(), msg.Value(), nil}
 	} else {
 		cxReceipt = nil
 	}
