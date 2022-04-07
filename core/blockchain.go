@@ -121,9 +121,9 @@ type BlockChainWithoutLocks struct {
 	cacheConfig            *CacheConfig        // Cache configuration for pruning
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 
-	db     ethdb.Database // Low level persistent database to store final content in
-	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+	db     *dbWrapper    // Low level persistent database to store final content in
+	triegc *prque.Prque  // Priority queue mapping block numbers to tries to gc
+	gcproc time.Duration // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
 	rmLogsFeed    event.Feed
@@ -177,6 +177,7 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainWithLocks, error) {
+	dbw := NewDbWrapper(db)
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -203,9 +204,9 @@ func NewBlockChain(
 	bc := &BlockChainWithoutLocks{
 		chainConfig:                   chainConfig,
 		cacheConfig:                   cacheConfig,
-		db:                            db,
+		db:                            dbw,
 		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
+		stateCache:                    state.NewDatabase(dbw),
 		quit:                          make(chan struct{}),
 		shouldPreserve:                shouldPreserve,
 		bodyCache:                     bodyCache,
@@ -223,7 +224,7 @@ func NewBlockChain(
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
-		blockchainPruner:              newBlockchainPruner(db),
+		blockchainPruner:              newBlockchainPruner(dbw),
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -234,7 +235,7 @@ func NewBlockChain(
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
 
 	var err error
-	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
+	bc.hc, err = NewHeaderChain(dbw, chainConfig, engine, bc.getProcInterrupt)
 	if err != nil {
 		return nil, err
 	}
@@ -1286,6 +1287,23 @@ func (bc *BlockChainWithoutLocks) InsertChain(chain types.Blocks, verifyHeaders 
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
 func (bc *BlockChainWithoutLocks) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
+	bc.db.Wrap(true)
+	n, v, log, err := bc._insertChain(chain, verifyHeaders)
+	bc.db.Wrap(false)
+	if err == nil {
+		err := bc.db.Write()
+		if err != nil {
+			return n, v, log, err
+		}
+		bc.db.Clear()
+	}
+	return n, v, log, err
+}
+
+// insertChain will execute the actual chain insertion and event aggregation. The
+// only reason this method exists as a separate one is to make locking cleaner
+// with deferred statements.
+func (bc *BlockChainWithoutLocks) _insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
