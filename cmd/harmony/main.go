@@ -841,7 +841,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
 	if hc.Sync.Downloader {
-		node.Consensus.SetDownloader(d)
+		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
 	}
 }
 
