@@ -649,7 +649,7 @@ func (node *Node) StartPubSub() error {
 			}
 			allTopics = append(
 				allTopics, u{
-					NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+					NamedTopic:     p2p.NamedTopic{Name: string(key), Topic: topicHandle},
 					consensusBound: isCon,
 				},
 			)
@@ -787,19 +787,6 @@ func (node *Node) StartPubSub() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-				select {
-				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
-						errors.Is(ctx.Err(), context.Canceled) {
-						utils.Logger().Warn().
-							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
-					}
-					errChan <- withError{errors.WithStack(ctx.Err()), nil}
-				default:
-					return libp2p_pubsub.ValidationAccept
-				}
-
-				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			// TODO: Currently this timeout is useless. Verify me.

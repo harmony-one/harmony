@@ -2590,7 +2590,7 @@ func (bc *BlockChain) ComputeAndUpdateAPR(
 		}
 	} else {
 		// only insert if APR for current epoch does not exists
-		aprEntry := staking.APREntry{now, *aprComputed}
+		aprEntry := staking.APREntry{Epoch: now, Value: *aprComputed}
 		l := len(stats.APRs)
 		// first time inserting apr for validator or
 		// apr for current epoch does not exists
@@ -2628,7 +2628,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 			return err
 		}
 
-		snapshot := &staking.ValidatorSnapshot{validator, epoch}
+		snapshot := &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}
 		if err := bc.WriteValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
@@ -2775,13 +2775,13 @@ func (bc *BlockChain) UpdateStakingMetaData(
 				return newValidators, err
 			}
 
-			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, epoch}); err != nil {
+			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}); err != nil {
 				return newValidators, err
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
 			if newEpoch.Cmp(epoch) > 0 {
-				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, newEpoch}); err != nil {
+				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: newEpoch}); err != nil {
 					return newValidators, err
 				}
 			}
@@ -2854,9 +2854,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 
 			// Add self delegation into the index
 			selfIndex := staking.DelegationIndex{
-				createValidator.ValidatorAddress,
-				uint64(0),
-				blockNum,
+				ValidatorAddress: createValidator.ValidatorAddress,
+				Index:            uint64(0),
+				BlockNum:         blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if !ok {
@@ -2974,9 +2974,9 @@ func (bc *BlockChain) addDelegationIndex(
 		) {
 			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
-				validatorAddress,
-				uint64(i),
-				blockNum,
+				ValidatorAddress: validatorAddress,
+				Index:            uint64(i),
+				BlockNum:         blockNum,
 			})
 		}
 	}

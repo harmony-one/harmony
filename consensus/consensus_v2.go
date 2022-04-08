@@ -424,7 +424,6 @@ func (consensus *Consensus) Start(
 				return
 			}
 		}
-		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Ended.")
 	}()
 
 	if consensus.dHelper != nil {

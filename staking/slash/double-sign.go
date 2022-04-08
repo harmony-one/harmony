@@ -130,7 +130,7 @@ func (r Record) MarshalJSON() ([]byte, error) {
 		common2.MustAddressToBech32(r.Evidence.Offender)
 	return json.Marshal(struct {
 		Evidence         Evidence `json:"evidence"`
-		Reporter         string   `json:"reporter"`
+		Beneficiary      string   `json:"beneficiary"`
 		AddressForBLSKey string   `json:"offender"`
 	}{r.Evidence, reporter, offender})
 }

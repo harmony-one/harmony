@@ -194,7 +194,6 @@ var dumpConfigLegacyCmd = &cobra.Command{
 
 func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
-	return cli.RegisterFlags(dumpConfigLegacyCmd, []cli.Flag{networkTypeFlag})
 }
 
 func promptConfigUpdate() bool {

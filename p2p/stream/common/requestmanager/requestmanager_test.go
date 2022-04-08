@@ -25,7 +25,8 @@ func TestRequestManager_Request_Normal(t *testing.T) {
 	defer ts.Close()
 
 	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	res := <-ts.rm.doRequestAsync(ctx, req)
 
 	if res.err != nil {
@@ -92,7 +93,8 @@ func TestRequestManager_RemoveStream(t *testing.T) {
 	defer ts.Close()
 
 	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	resC := ts.rm.doRequestAsync(ctx, req)
 	time.Sleep(defTestSleep)
 
@@ -153,7 +155,8 @@ func TestRequestManager_StaleDelivery(t *testing.T) {
 	defer ts.Close()
 
 	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
 	resC := ts.rm.doRequestAsync(ctx, req)
 	time.Sleep(2 * time.Second)
 
@@ -192,7 +195,8 @@ func TestRequestManager_cancelWaitings(t *testing.T) {
 	ts.Start()
 	defer ts.Close()
 
-	ctx1, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx1, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 1*time.Second)
 	resC1 := ts.rm.doRequestAsync(ctx1, req1)
 	resC2 := ts.rm.doRequestAsync(ctx2, req2)
@@ -245,7 +249,8 @@ func TestRequestManager_Close(t *testing.T) {
 	ts := newTestSuite(delayF, respF, 3)
 	ts.Start()
 
-	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	resC := ts.rm.doRequestAsync(ctx, makeTestRequest(0))
 	time.Sleep(100 * time.Millisecond)
 	ts.Close()
@@ -266,7 +271,8 @@ func TestRequestManager_Request_Blacklist(t *testing.T) {
 	defer ts.Close()
 
 	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	res := <-ts.rm.doRequestAsync(ctx, req, WithBlacklist([]sttypes.StreamID{
 		makeStreamID(0),
 		makeStreamID(1),
@@ -293,7 +299,8 @@ func TestRequestManager_Request_Whitelist(t *testing.T) {
 	defer ts.Close()
 
 	req := makeTestRequest(100)
-	ctx, _ := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	res := <-ts.rm.doRequestAsync(ctx, req, WithWhitelist([]sttypes.StreamID{
 		makeStreamID(3),
 	}))
