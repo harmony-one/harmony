@@ -840,7 +840,7 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 
 func listenOSSigAndShutDown(node *node.Node) {
 	// Prepare for graceful shutdown from os signals
-	osSignal := make(chan os.Signal)
+	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-osSignal
 	utils.Logger().Warn().Str("signal", sig.String()).Msg("Gracefully shutting down...")

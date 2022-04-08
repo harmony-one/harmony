@@ -68,7 +68,7 @@ type NodeMetadata struct {
 	PeerID          peer.ID            `json:"peerid"`
 	Consensus       ConsensusInternal  `json:"consensus"`
 	C               C                  `json:"p2p-connectivity"`
-	SyncPeers       map[string]int     `json:"sync-peers",omitempty`
+	SyncPeers       map[string]int     `json:"sync-peers,omitempty"`
 }
 
 // P captures the connected peers per topic

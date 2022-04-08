@@ -36,7 +36,7 @@ func main() {
 	startTime = time.Now()
 	for i := 0; i < size; i++ {
 		if !sig.VerifyHash(pubKeyWrapper.Object, blockHash[:]) {
-			fmt.Errorf("failed to verify sig")
+			fmt.Println("failed to verify sig")
 		}
 	}
 	endTime = time.Now()
@@ -99,7 +99,7 @@ func main() {
 
 	startTime = time.Now()
 	if !aggSig.VerifyHash(aggPub, blockHash[:]) {
-		fmt.Errorf("failed to verify sig")
+		fmt.Println("failed to verify sig")
 	}
 
 	endTime = time.Now()
