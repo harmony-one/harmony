@@ -3239,22 +3239,5 @@ func (bc *BlockChain) ClearValidatorWrappersAtBlock(number uint64) error {
 			}
 		}
 	}
-	//// The below can be used to check that the deletion works
-	//// Note how the state is reinitialized below to make sure nothing cached
-	//// in memory is loaded
-	// fmt.Printf("Deleted code for %d validators\n", len(addressToWrapper))
-	// state, _ = bc.StateAt(block.Root())
-	// fmt.Println("Checking that the deletion worked")
-	// for address, oldCode := range addressToWrapper {
-	// 	newCode := common.Bytes2Hex(state.GetCode(address))
-	// 	if strings.Compare(newCode, oldCode) == 0 {
-	// 		fmt.Printf(
-	// 			"Code for %s not changed\n, old %s\n, new %s\n",
-	// 			address.Hex(),
-	// 			oldCode[:20],
-	// 			newCode[:20],
-	// 		)
-	// 	}
-	// }
 	return nil
 }
