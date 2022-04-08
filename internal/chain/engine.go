@@ -283,6 +283,14 @@ func (e *engineImpl) Finalize(
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
+	// This is strictly required use the same chain as provided, but not get from stored one,
+	// because we can get into double lock case e.g. read lock while write lock.
+	var beaconChain engine.ChainReader
+	if chain.ShardID() == shard.BeaconChainShardID {
+		beaconChain = chain
+	} else {
+		beaconChain = e.beacon
+	}
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
@@ -324,7 +332,7 @@ func (e *engineImpl) Finalize(
 	// Accumulate block rewards and commit the final state root
 	// Header seems complete, assemble into a block and return
 	payout, err := AccumulateRewardsAndCountSigs(
-		chain, state, header, e.Beaconchain(), sigsReady,
+		chain, state, header, beaconChain, sigsReady,
 	)
 	if err != nil {
 		return nil, nil, err
