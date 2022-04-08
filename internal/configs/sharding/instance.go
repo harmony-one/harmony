@@ -66,6 +66,9 @@ func NewInstance(
 			numNodesPerShard,
 		)
 	}
+	if slotsLimit < 0 {
+		return nil, errors.Errorf("SlotsLimit cannot be negative %d", slotsLimit)
+	}
 	if harmonyVotePercent.LT(numeric.ZeroDec()) ||
 		harmonyVotePercent.GT(numeric.OneDec()) {
 		return nil, errors.Errorf("" +
@@ -92,12 +95,13 @@ func NewInstance(
 // It is intended to be used for static initialization.
 func MustNewInstance(
 	numShards uint32,
-	numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit int,
+	numNodesPerShard, numHarmonyOperatedNodesPerShard int, slotsLimitPercent float32,
 	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
+	slotsLimit := int(float32(numNodesPerShard-numHarmonyOperatedNodesPerShard) * slotsLimitPercent)
 	sc, err := NewInstance(
 		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit, harmonyVotePercent,
 		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,

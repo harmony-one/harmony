@@ -121,4 +121,4 @@ var testnetV1 = MustNewInstance(4, 20, 15, 0, numeric.MustNewDecFromStr("0.90"),
 var testnetV2 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
 var testnetV3 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
 var testnetV3_1 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-var testnetV3_2 = MustNewInstance(4, 30, 8, 30*6/100, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV3_2 = MustNewInstance(4, 30, 8, 0.06, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
