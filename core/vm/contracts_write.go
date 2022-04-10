@@ -15,6 +15,10 @@ import (
 // for now, we have only one contract at 252 or 0xfc - which is the staking precompile
 var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
+	// TODO(isd): we probably want to have this in a separate set; this map is used
+	// by pre-router H1 deployments. Also note: the proposal suggested using 252,
+	// but H1 already uses 252-255 for other things, so we pick another address instead:
+	common.BytesToAddress([]byte{1, 1}): &routerPrecompile{},
 }
 
 // WriteCapablePrecompiledContract represents the interface for Native Go contracts
@@ -149,4 +153,24 @@ func (c *stakingPrecompile) RunWriteCapable(
 	//	}
 	//}
 	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
+}
+
+// routerPrecompile implements the router contract used for cross-shard messaging
+// (via the WriteCapablePrecompiledContract interface).
+type routerPrecompile struct{}
+
+func (c *routerPrecompile) RequiredGas(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) (uint64, error) {
+	return 0, errors.New("[RouterPrecompile]: TODO: implement RequiredGas().")
+}
+
+func (c *routerPrecompile) RunWriteCapable(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) ([]byte, error) {
+	return nil, errors.New("[RouterPrecompile]: TODO: implement RunWriteCapable().")
 }
