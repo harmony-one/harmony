@@ -912,6 +912,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker) error {
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
+	fmt.Println("generateNewState called")
 
 	var err error
 
