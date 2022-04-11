@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
-
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 
 	"github.com/Workiva/go-datastructures/queue"
@@ -917,17 +916,47 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 	var err error
 
 	commonIter := ss.getCommonBlockIter(parentHash)
+	blocks := make([]*types.Block, 0, 2)
 	for {
 		block := commonIter.Next()
 		if block == nil {
 			break
 		}
-		// Enforce sig check for the last block in a batch
-		enforceSigCheck := !commonIter.HasNext()
-		fmt.Println("StateSync::generateNewState UpdateBlockAndStatus ", block.NumberU64(), " ", block.ShardID())
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
+		blocks = append(blocks, block)
+		if len(blocks) == 2 {
+			_, err := bc.InsertChain(blocks, true /* verifyHeaders */)
+			if err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msgf(
+						"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
+						block.NumberU64(),
+						block.ShardID(),
+					)
+				return err
+			}
+			blocks = blocks[0:0]
+		}
+
+		//// Enforce sig check for the last block in a batch
+		//enforceSigCheck := !commonIter.HasNext()
+		//fmt.Println("StateSync::generateNewState UpdateBlockAndStatus ", block.NumberU64(), " ", block.ShardID())
+		//err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
+		//if err != nil {
+		//	break
+		//}
+	}
+	if len(blocks) > 0 {
+		_, err := bc.InsertChain(blocks, true /* verifyHeaders */)
 		if err != nil {
-			break
+			//utils.Logger().Error().
+			//	Err(err).
+			//	Msgf(
+			//		"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
+			//		block.NumberU64(),
+			//		block.ShardID(),
+			//	)
+			return err
 		}
 	}
 
