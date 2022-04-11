@@ -23,18 +23,14 @@ type dbWrapper struct {
 }
 
 func (d *dbWrapper) ValueSize() int {
-	//TODO implement me
-	panic("implement me")
+	return 0
 }
 
 func (d *dbWrapper) Reset() {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (d *dbWrapper) Replay(w ethdb.KeyValueWriter) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func NewDbWrapper(db ethdb.Database) *dbWrapper {

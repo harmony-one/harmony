@@ -924,6 +924,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 		}
 		// Enforce sig check for the last block in a batch
 		enforceSigCheck := !commonIter.HasNext()
+		fmt.Println("StateSync::generateNewState UpdateBlockAndStatus ", block.NumberU64(), " ", block.ShardID())
 		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
 		if err != nil {
 			break
