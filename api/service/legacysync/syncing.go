@@ -935,6 +935,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 					)
 				return err
 			}
+			fmt.Println("StateSync::generateNewState UpdateBlockAndStatus ", blocks[0].NumberU64(), blocks[1].NumberU64(), " ", block.ShardID())
 			blocks = blocks[0:0]
 		}
 
