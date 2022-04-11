@@ -26,6 +26,7 @@ import (
 	"github.com/harmony-one/harmony/staking/availability"
 	"github.com/harmony-one/harmony/staking/network"
 	stakingReward "github.com/harmony-one/harmony/staking/reward"
+
 	"github.com/pkg/errors"
 )
 
@@ -299,6 +300,50 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
+// Calculates total stake of slotlist; both self-delegated and externally delegated.
+func getTotalDelegatedStake(bc engine.ChainReader, slotList shard.SlotList) (numeric.Dec, error) {
+	totalStake := numeric.NewDec(0)
+	for _, validator := range slotList {
+		snapshot, err := bc.ReadValidatorSnapshot(validator.EcdsaAddress)
+		if err != nil {
+			return numeric.ZeroDec(), err
+		}
+		totalDelegation := numeric.NewDecFromBigInt(snapshot.Validator.TotalDelegation())
+		totalStake = totalStake.Add(totalDelegation)
+	}
+
+	return totalStake, nil
+}
+
+// Used to calculate rewards based on the amount of signatures included in the
+// block. That way, leaders are incentivised to include as many signatures as
+// possible. Issuance based rewards formula is calculated as:
+//     I * (x / X)^2 where:
+//     x: Delelegated stake of signers.
+//             X: Total delegated stake of committee in the shard.
+//     I: A reward limit that the dynamic reward cannot exceed.
+func calculateIssuanceRewards(bc engine.ChainReader, cxLink types.CrossLink) (numeric.Dec, error) {
+	shardID := cxLink.ShardID()
+	epoch := cxLink.Epoch()
+	shardState, _ := bc.ReadShardState(epoch)
+
+	subComm, err := shardState.FindCommitteeByID(shardID)
+	if err != nil {
+		return numeric.ZeroDec(), err
+	}
+	signed, _, err := availability.BlockSigners(cxLink.Bitmap(), subComm)
+	if err != nil {
+		return numeric.ZeroDec(), err
+	}
+
+	I := numeric.NewDec(2)
+	stakeOfSigners, err := getTotalDelegatedStake(bc, signed)
+	stakeOfCommittee, err := getTotalDelegatedStake(bc, subComm.Slots)
+	stakePercentage := stakeOfSigners.Quo(stakeOfCommittee)
+
+	return I.Mul(stakePercentage.Mul(stakePercentage)), nil
+}
+
 func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
 	defaultReward numeric.Dec) (reward.Reader, error) {
 	newRewards, payouts :=
@@ -342,8 +387,26 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		if !bc.Config().IsStaking(cxLink.Epoch()) {
 			continue
 		}
+
+		// If dynamic rewards based on issuance (and / or) transactions is
+		// enabled, then instead of the default reward, the reward of each block
+		// is calculated dynamically.
+		var reward numeric.Dec
+		if bc.Config().IsDynamicIssuanceRewardsEpoch(cxLink.Epoch()) {
+			issuanceRewards, err := calculateIssuanceRewards(bc, cxLink)
+			if err != nil {
+				utils.Logger().Info().Msg(fmt.Sprintf("Dynamic Issuance rewards for shard %d block %d. Error: %v", cxLink.ShardID(), cxLink.BlockNum(), err))
+				return network.EmptyPayout, err
+			}
+			transactionRewards := stakingReward.TransactionsRewardLimit
+
+			reward = issuanceRewards.Add(transactionRewards)
+		} else {
+			reward = defaultReward
+		}
+
 		utils.Logger().Info().Msg(fmt.Sprintf("allCrossLinks shard %d block %d", cxLink.ShardID(), cxLink.BlockNum()))
-		payables, _, err := processOneCrossLink(bc, state, cxLink, defaultReward, i)
+		payables, _, err := processOneCrossLink(bc, state, cxLink, reward, i)
 
 		if err != nil {
 			return network.EmptyPayout, err
@@ -556,7 +619,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	), nil
 }
 
-func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.CrossLink, defaultReward numeric.Dec, bucket int) ([]slotPayable, []slotMissing, error) {
+func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.CrossLink, reward numeric.Dec, bucket int) ([]slotPayable, []slotMissing, error) {
 	epoch, shardID := cxLink.Epoch(), cxLink.ShardID()
 	if !bc.Config().IsStaking(epoch) {
 		return nil, nil, nil
@@ -617,7 +680,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	for j := range payableSigners {
 		voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
 		if !voter.IsHarmonyNode && !voter.OverallPercent.IsZero() {
-			due := defaultReward.Mul(
+			due := reward.Mul(
 				voter.OverallPercent.Quo(allSignersShare),
 			)
 			allPayables = append(allPayables, slotPayable{

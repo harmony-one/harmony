@@ -296,6 +296,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
+		big.NewInt(0),                      // IsDynamicIssuanceRewardsEpoch
 	}
 
 	// TestChainConfig ...
@@ -335,6 +336,7 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
+		big.NewInt(0),        // IsDynamicIssuanceRewardsEpoch
 	}
 
 	// TestRules ...
@@ -464,6 +466,10 @@ type ChainConfig struct {
 
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
+
+	// DynamicIssuanceRewardsEpoch is the first epoch that supports dynamic
+	// rewards base on the amount of sigs included in a block
+	DynamicIssuanceRewardsEpoch *big.Int `json:"dynamic-issuance-rewards-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
@@ -645,6 +651,12 @@ func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 // IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
 func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
+}
+
+// IsDynamicIssuanceRewardsEpoch returns whether reward is calculated
+// dynamically using the issuance of a block.
+func (c *ChainConfig) IsDynamicIssuanceRewardsEpoch(epoch *big.Int) bool {
+	return isForked(c.DynamicIssuanceRewardsEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

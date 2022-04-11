@@ -41,6 +41,9 @@ var (
 
 	// ErrInvalidBeaconChain if given chain is not beacon chain
 	ErrInvalidBeaconChain = fmt.Errorf("given chain is not beaconchain")
+
+	IssuanceRewardLimit     = numeric.Dec{Int: big.NewInt(2)}
+	TransactionsRewardLimit = numeric.Dec{Int: big.NewInt(5)}
 )
 
 // getPreStakingRewardsFromBlockNumber returns the number of tokens injected into the network
