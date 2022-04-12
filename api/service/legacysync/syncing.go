@@ -908,6 +908,8 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 	return nil
 }
 
+const blocksCnt = 30
+
 // generateNewState will construct most recent state from downloaded blocks
 func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker) error {
 	// update blocks created before node start sync
@@ -918,7 +920,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 
 	commonIter := ss.getCommonBlockIter(parentHash)
 	fmt.Println("generateNewState called parentHash")
-	blocks := make([]*types.Block, 0, 2)
+	blocks := make([]*types.Block, 0, blocksCnt)
 	for {
 		block := commonIter.Next()
 		fmt.Println("generateNewState called iter block ", block)
@@ -926,7 +928,8 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 			break
 		}
 		blocks = append(blocks, block)
-		if len(blocks) == 2 {
+		if len(blocks) == blocksCnt {
+			fmt.Println("InsertChain ??")
 			_, err := bc.InsertChain(blocks, true /* verifyHeaders */)
 			if err != nil {
 				utils.Logger().Error().
