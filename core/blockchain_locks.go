@@ -3,7 +3,7 @@ package core
 import (
 	"io"
 	"math/big"
-	"time"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -32,7 +32,7 @@ type BlockChainWithLocks struct {
 func newBlockchainWithLocks(bc *BlockChainWithoutLocks) *BlockChainWithLocks {
 	return &BlockChainWithLocks{
 		bc:   bc,
-		lock: locker.NewRwLocker(2 * time.Second),
+		lock: &sync.RWMutex{},
 	}
 }
 
