@@ -948,6 +948,7 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 		//	break
 		//}
 	}
+	fmt.Printf("generateNewState break with blocks count %d\n", len(blocks))
 	if len(blocks) > 0 {
 		_, err := bc.InsertChain(blocks, true /* verifyHeaders */)
 		if err != nil {
