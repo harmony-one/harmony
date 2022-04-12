@@ -917,9 +917,11 @@ func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker)
 	var err error
 
 	commonIter := ss.getCommonBlockIter(parentHash)
+	fmt.Println("generateNewState called parentHash")
 	blocks := make([]*types.Block, 0, 2)
 	for {
 		block := commonIter.Next()
+		fmt.Println("generateNewState called iter block ", block)
 		if block == nil {
 			break
 		}
