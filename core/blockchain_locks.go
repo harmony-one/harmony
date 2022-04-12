@@ -3,7 +3,7 @@ package core
 import (
 	"io"
 	"math/big"
-	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/libs/locker"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -25,13 +26,13 @@ import (
 
 type BlockChainWithLocks struct {
 	bc   *BlockChainWithoutLocks
-	lock sync.RWMutex
+	lock locker.RWLocker
 }
 
 func newBlockchainWithLocks(bc *BlockChainWithoutLocks) *BlockChainWithLocks {
 	return &BlockChainWithLocks{
 		bc:   bc,
-		lock: sync.RWMutex{},
+		lock: locker.NewRwLocker(2 * time.Second),
 	}
 }
 
