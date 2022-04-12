@@ -79,6 +79,10 @@ var (
 	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
 
+	// counter and timer to keep track of wrapper pruning
+	pruneWrappersCounter = metrics.NewRegisteredCounter("chain/wrappersPruned/count", nil)
+	pruneWrappersTimer   = metrics.NewRegisteredTimer("chain/wrappersPruned/time", nil)
+
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
@@ -1285,7 +1289,10 @@ func (bc *BlockChain) WriteBlockWithState(
 	if bc.cacheConfig.Disabled { // archival node
 		laggedNumber := currentBlock.NumberU64() - ClearValidatorWrappersLag
 		if laggedNumber >= bc.ClearValidatorWrappersAtMinBlock {
-			bc.ClearValidatorWrappersAtBlock(laggedNumber)
+			// no error checking here as this is not crucial to the node operation
+			bc.ClearValidatorWrappersBetweenBlocks(
+				laggedNumber, laggedNumber,
+			)
 		}
 	}
 
@@ -3187,55 +3194,100 @@ func isUnrecoverableErr(err error) bool {
 	return isLeveldbErr && !isTooManyOpenFiles
 }
 
-func (bc *BlockChain) ClearValidatorWrappersAtBlock(number uint64) error {
+// ClearValidatorWrappersBetweenBlocks will iterate over start and end blocks
+// (both inclusive) to clear out the validator wrapper information from each of them
+func (bc *BlockChain) ClearValidatorWrappersBetweenBlocks(
+	start uint64,
+	end uint64,
+) (result error) {
+	// this is the disk db so we can use it directly
+	batch := bc.db.NewBatch()
+	defer func() {
+		// flush out any remainder data from the last batch
+		if err := batch.Write(); err != nil {
+			if isUnrecoverableErr(err) {
+				fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+				os.Exit(1)
+			}
+			result = err
+		}
+	}()
+	// start from the top and work backwards so that we can assess the space saved faster
+	for i := end; i >= start; i-- {
+		startTime := time.Now()
+		if err := bc.clearValidatorWrappersAtBlock(i, batch); err != nil {
+			pruneWrappersTimer.UpdateSince(startTime)
+			utils.Logger().Error().AnErr("err", err).
+				Int64("elapsed time", time.Since(startTime).Milliseconds()).
+				Uint64("blockNum", i).
+				Msg("ClearValidatorWrappersBetweenBlocks")
+			fmt.Printf(
+				"Could not clear wrappers at block %d due to %s\n", i, err,
+			)
+			return err
+		} else {
+			pruneWrappersCounter.Inc(1)
+			pruneWrappersTimer.UpdateSince(startTime)
+			utils.Logger().Info().
+				Int64("elapsed time", time.Since(startTime).Milliseconds()).
+				Uint64("blockNum", i).
+				Msg("ClearValidatorWrappersBetweenBlocks")
+			fmt.Printf(
+				"Successfully cleared wrappers at block %d\n", i,
+			)
+		}
+	}
+	return nil
+}
+
+// clearValidatorWrappersAtBlock is the internal locked version used by
+// ClearValidatorWrappersBetweenBlocks and WriteBlockWithState to clear wrappers
+// from the specified block. the caller MUST commit any remaining data from batch
+// once done
+func (bc *BlockChain) clearValidatorWrappersAtBlock(
+	number uint64,
+	batch ethdb.Batch,
+) (result error) {
 	if number == 0 {
-		return errors.New("Cannot clear validator wrappers from genesis block")
+		return errors.New("cannot clear validator wrappers from genesis block")
 	}
 	block := bc.GetBlockByNumber(number)
 	if block == nil {
-		return errors.New(fmt.Sprintf("Block %d not found", number))
+		return errors.New(fmt.Sprintf("block %d not found", number))
 	}
 	state, err := bc.StateAt(block.Root())
 	if err != nil {
-		return errors.Wrapf(err, "State for block %d not found", number)
+		return errors.Wrapf(err, "state for block %d not found", number)
 	}
 	currentState, err := bc.State()
 	if err != nil {
-		return errors.Wrapf(err, "State for current block not found")
+		return errors.Wrapf(err, "state for current block not found")
 	}
 	// TODO: Is this list available by block?
 	validators, err := bc.ReadValidatorList()
 	if err != nil {
 		return err
 	}
-	// var addressToWrapper map[common.Address]string = make(map[common.Address]string, 0)
-	trieDb := state.Database().TrieDB()
 	for _, address := range validators {
 		object := state.GetOrNewStateObject(address)
-		// check whether this address, which is currently a validator,
-		// was also a validator during that block
-		if object.IsValidator(bc.stateCache) {
-			// check if the code has changed
-			// if it has changed, delete the old code
-			// this is done to ensure that a validator,
-			// which has not been updated in a while,
-			// does not end up deleted
-			// inactive validators, for example, with no changes in reward
-			// or delegations could be deleted if not for this comparison
-			if !bytes.Equal(object.CodeHash(), currentState.GetCodeHash(address).Bytes()) {
-				codeHash := common.BytesToHash(object.CodeHash())
-				// addressToWrapper[address] = common.Bytes2Hex(state.GetCode(address))
-				// replace the code hash with nil code
-				// since there is no such thing as DeleteBlob
-				trieDb.InsertBlob(codeHash, nil)
-				// commit this specific key to disk
-				if err := trieDb.Commit(codeHash, false); err != nil {
-					return errors.Wrapf(
-						err,
-						"Could not commit empty code for %s to disk",
-						address.Hex(),
-					)
+		// check if the code has changed
+		// if it has changed, delete the old code
+		// this is done to ensure that a validator,
+		// which has not been updated in a while,
+		// does not end up deleted
+		// inactive validators, for example, with no changes in reward
+		// or delegations could be deleted if not for this comparison
+		if !bytes.Equal(object.CodeHash(), currentState.GetCodeHash(address).Bytes()) {
+			batch.Delete(object.CodeHash())
+			if batch.ValueSize() > ethdb.IdealBatchSize {
+				if err := batch.Write(); err != nil {
+					if isUnrecoverableErr(err) {
+						fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+						os.Exit(1)
+					}
+					return err
 				}
+				batch.Reset()
 			}
 		}
 	}

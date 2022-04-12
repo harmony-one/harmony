@@ -379,20 +379,15 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 			os.Exit(1)
 		}
 
-		// start with the minimum
-		// but keep the lag
-		for i := chain.ClearValidatorWrappersAtMinBlock; i+core.ClearValidatorWrappersLag <= curNum; i++ {
-			if err := chain.ClearValidatorWrappersAtBlock(i); err != nil {
-				fmt.Printf(
-					"Error when clearing validator wrappers at block %d: %s\n", i, err,
-				)
-				os.Exit(1)
-			} else {
-				fmt.Printf(
-					"Cleared validator wrappers for block %d successfully\n", i,
-				)
-			}
+		// ClearValidatorWrappersBetweenBlocks takes care of printing to stdout
+		if err := chain.ClearValidatorWrappersBetweenBlocks(
+			chain.ClearValidatorWrappersAtMinBlock, // start
+			curNum-core.ClearValidatorWrappersLag,  // end
+		); err != nil {
+			// if a single block fails, exit
+			os.Exit(1)
 		}
+		// no failures, we are done with this cli
 		os.Exit(1) // same as revert exit code
 	}
 
