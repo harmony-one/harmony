@@ -45,6 +45,7 @@ func NewDHTDiscovery(host libp2p_host.Host, opt DHTConfig) (Discovery, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	dht, err := libp2p_dht.New(ctx, host, opts...)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	d := libp2p_dis.NewRoutingDiscovery(dht)

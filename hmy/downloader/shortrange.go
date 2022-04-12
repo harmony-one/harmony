@@ -122,6 +122,7 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 
 func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
 	ctx, cancel := context.WithCancel(sh.ctx)
+	defer cancel()
 	m := newGetBlocksByHashManager(hashes, whitelist)
 
 	var (

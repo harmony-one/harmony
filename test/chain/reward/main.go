@@ -121,10 +121,8 @@ func main() {
 	}
 	for i := 0; i < 100000; i++ {
 		validator.Delegations = append(validator.Delegations, staking.Delegation{
-			common2.Address{},
-			big.NewInt(int64(rand.Intn(100))),
-			big.NewInt(0),
-			nil,
+			Amount: big.NewInt(int64(rand.Intn(100))),
+			Reward: big.NewInt(0),
 		})
 	}
 
