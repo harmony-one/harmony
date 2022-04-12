@@ -197,9 +197,9 @@ func prepareOrders(
 		totalStaked.Add(totalStaked, validatorStake)
 
 		essentials[validator.Address] = &effective.SlotOrder{
-			validatorStake,
-			validator.SlotPubKeys,
-			tempZero,
+			Stake:       validatorStake,
+			SpreadAmong: validator.SlotPubKeys,
+			Percentage:  tempZero,
 		}
 	}
 	totalStakedDec := numeric.NewDecFromBigInt(totalStaked)
@@ -291,9 +291,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 				return nil, err
 			}
 			curNodeID := shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			}
 			com.Slots = append(com.Slots, curNodeID)
 		}
@@ -310,9 +309,8 @@ func preStakingEnabledCommittee(s shardingconfig.Instance) (*shard.State, error)
 				return nil, err
 			}
 			curNodeID := shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			}
 			com.Slots = append(com.Slots, curNodeID)
 		}
@@ -331,7 +329,7 @@ func eposStakedCommittee(
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
 	for i := 0; i < shardCount; i++ {
-		shardState.Shards[i] = shard.Committee{uint32(i), shard.SlotList{}}
+		shardState.Shards[i] = shard.Committee{ShardID: uint32(i), Slots: shard.SlotList{}}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
 			pub := &bls_core.PublicKey{}
@@ -348,9 +346,8 @@ func eposStakedCommittee(
 				return nil, err
 			}
 			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
-				addr,
-				pubKey,
-				nil,
+				EcdsaAddress: addr,
+				BLSPublicKey: pubKey,
 			})
 		}
 	}
@@ -368,9 +365,9 @@ func eposStakedCommittee(
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
 		shardState.Shards[shardID].Slots = append(
 			shardState.Shards[shardID].Slots, shard.Slot{
-				purchasedSlot.Addr,
-				purchasedSlot.Key,
-				&purchasedSlot.EPoSStake,
+				EcdsaAddress:   purchasedSlot.Addr,
+				BLSPublicKey:   purchasedSlot.Key,
+				EffectiveStake: &purchasedSlot.EPoSStake,
 			},
 		)
 	}

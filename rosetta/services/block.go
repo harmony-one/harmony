@@ -164,10 +164,10 @@ func (s *BlockAPI) BlockTransaction(
 		}
 		return response, rosettaError2
 	}
-	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(request.BlockIdentifier.Index))
+	state, _, err := s.hmy.StateAndHeaderByNumber(ctx, rpc.BlockNumber(blk.NumberU64()))
 	if state == nil || err != nil {
 		return nil, common.NewError(common.BlockNotFoundError, map[string]interface{}{
-			"message": fmt.Sprintf("block state not found for block %v", request.BlockIdentifier.Index),
+			"message": fmt.Sprintf("block state not found for block %v", blk.NumberU64()),
 		})
 	}
 

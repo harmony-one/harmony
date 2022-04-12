@@ -123,7 +123,7 @@ func TestLrSyncIter_FetchAndInsertBlocks(t *testing.T) {
 	targetBN := uint64(1000)
 	chain := newTestBlockChain(0, nil)
 	protocol := newTestSyncProtocol(targetBN, 32, nil)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	lsi := &lrSyncIter{
 		bc:  chain,
@@ -155,7 +155,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrRequest(t *testing.T) {
 	}
 	chain := newTestBlockChain(0, nil)
 	protocol := newTestSyncProtocol(targetBN, 32, errHook)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	lsi := &lrSyncIter{
 		bc:  chain,
@@ -187,7 +187,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_ErrInsert(t *testing.T) {
 	}
 	chain := newTestBlockChain(0, errHook)
 	protocol := newTestSyncProtocol(targetBN, 32, nil)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	lsi := &lrSyncIter{
 		bc:  chain,
@@ -219,7 +219,7 @@ func TestLrSyncIter_FetchAndInsertBlocks_RandomErr(t *testing.T) {
 	}
 	chain := newTestBlockChain(0, errHook)
 	protocol := newTestSyncProtocol(targetBN, 32, errHook)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	lsi := &lrSyncIter{
 		bc:  chain,

@@ -155,15 +155,14 @@ func TestVerifyVRF(t *testing.T) {
 	spKey := bls.SerializedPublicKey{}
 	spKey.FromLibBLSPublicKey(pubKey)
 	curNodeID := shard.Slot{
-		ecdsaAddr,
-		spKey,
-		nil,
+		EcdsaAddress: ecdsaAddr,
+		BLSPublicKey: spKey,
 	}
 	com.Slots = append(com.Slots, curNodeID)
 	shardState.Epoch = big.NewInt(1)
 	shardState.Shards = append(shardState.Shards, com)
 
-	node.Consensus.LeaderPubKey = &bls.PublicKeyWrapper{spKey, pubKey}
+	node.Consensus.LeaderPubKey = &bls.PublicKeyWrapper{Bytes: spKey, Object: pubKey}
 	node.Worker.GetCurrentHeader().SetEpoch(big.NewInt(1))
 	node.Consensus.GenerateVrfAndProof(node.Worker.GetCurrentHeader())
 	block, _ := node.Worker.FinalizeNewBlock(

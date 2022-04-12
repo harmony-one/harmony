@@ -106,8 +106,10 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.Identity(key),
 		libp2p.EnableNATService(),
 		libp2p.ForceReachabilityPublic(),
+		libp2p.BandwidthReporter(newCounter()),
 	)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
@@ -117,6 +119,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 		DiscConcurrency: cfg.DiscConcurrency,
 	})
 	if err != nil {
+		cancel()
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
@@ -168,6 +171,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pub-sub")
 	}
 

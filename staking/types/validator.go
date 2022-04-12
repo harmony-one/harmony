@@ -79,9 +79,9 @@ type ValidatorSnapshotReader interface {
 type counters struct {
 	// The number of blocks the validator
 	// should've signed when in active mode (selected in committee)
-	NumBlocksToSign *big.Int `json:"to-sign",rlp:"nil"`
+	NumBlocksToSign *big.Int `json:"to-sign" rlp:"nil"`
 	// The number of blocks the validator actually signed
-	NumBlocksSigned *big.Int `json:"signed",rlp:"nil"`
+	NumBlocksSigned *big.Int `json:"signed" rlp:"nil"`
 }
 
 // ValidatorWrapper contains validator,
@@ -139,6 +139,8 @@ func NewEmptyStats() *ValidatorStats {
 // whatever current epoch is
 type CurrentEpochPerformance struct {
 	CurrentSigningPercentage Computed `json:"current-epoch-signing-percent"`
+	Epoch                    uint64   `json:"epoch"`
+	Block                    uint64   `json:"block"`
 }
 
 // ValidatorRPCEnhanced contains extra information for RPC consumer

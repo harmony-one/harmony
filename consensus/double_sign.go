@@ -86,14 +86,14 @@ func (consensus *Consensus) checkDoubleSign(recvMsg *FBFTMessage) bool {
 									evid := slash.Evidence{
 										ConflictingVotes: slash.ConflictingVotes{
 											FirstVote: slash.Vote{
-												alreadyCastBallot.SignerPubKeys,
-												alreadyCastBallot.BlockHeaderHash,
-												alreadyCastBallot.Signature,
+												SignerPubKeys:   alreadyCastBallot.SignerPubKeys,
+												BlockHeaderHash: alreadyCastBallot.BlockHeaderHash,
+												Signature:       alreadyCastBallot.Signature,
 											},
 											SecondVote: slash.Vote{
-												secondKeys,
-												recvMsg.BlockHash,
-												common.Hex2Bytes(doubleSign.SerializeToHexStr()),
+												SignerPubKeys:   secondKeys,
+												BlockHeaderHash: recvMsg.BlockHash,
+												Signature:       common.Hex2Bytes(doubleSign.SerializeToHexStr()),
 											}},
 										Moment: slash.Moment{
 											Epoch:   curHeader.Epoch(),

@@ -1,10 +1,12 @@
 package rawdb
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -157,7 +159,7 @@ func ReadValidatorSnapshot(
 			Msg("Unable to decode validator snapshot from database")
 		return nil, err
 	}
-	s := staking.ValidatorSnapshot{&v, epoch}
+	s := staking.ValidatorSnapshot{Validator: &v, Epoch: epoch}
 	return &s, nil
 }
 
@@ -203,6 +205,74 @@ func IteratorValidatorSnapshot(iterator DatabaseIterator, cb func(addr common.Ad
 	}
 
 	return
+}
+
+func IteratorCXReceipt(iterator DatabaseIterator, cb func(it ethdb.Iterator, shardID uint32, number uint64, hash common.Hash) bool) {
+	preifxKey := cxReceiptPrefix
+	iter := iterator.NewIteratorWithPrefix(preifxKey)
+	defer iter.Release()
+	shardOffset := len(preifxKey)
+	numberOffset := shardOffset + 4
+	hashOffset := numberOffset + 8
+
+	for iter.Next() {
+		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
+		key := iter.Key()
+		shardID := binary.BigEndian.Uint32(key[shardOffset : shardOffset+4])
+		number := binary.BigEndian.Uint64(key[numberOffset : numberOffset+8])
+		hash := common.BytesToHash(key[hashOffset : hashOffset+20])
+		if !cb(iter, shardID, number, hash) {
+			return
+		}
+	}
+}
+
+func IteratorCXReceiptsProofSpent(iterator DatabaseIterator, cb func(it ethdb.Iterator, shardID uint32, number uint64) bool) {
+	preifxKey := cxReceiptSpentPrefix
+	iter := iterator.NewIteratorWithPrefix(preifxKey)
+	defer iter.Release()
+	shardOffset := len(preifxKey)
+	numberOffset := shardOffset + 4
+
+	for iter.Next() {
+		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
+		key := iter.Key()
+		shardID := binary.BigEndian.Uint32(key[shardOffset : shardOffset+4])
+		number := binary.BigEndian.Uint64(key[numberOffset : numberOffset+8])
+		if !cb(iter, shardID, number) {
+			return
+		}
+	}
+}
+func IteratorValidatorStats(iterator DatabaseIterator, cb func(it ethdb.Iterator, addr common.Address) bool) {
+	preifxKey := validatorStatsPrefix
+	iter := iterator.NewIteratorWithPrefix(preifxKey)
+	defer iter.Release()
+	addrOffset := len(preifxKey)
+
+	for iter.Next() {
+		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
+		key := iter.Key()
+		addr := common.BytesToAddress(key[addrOffset : addrOffset+20])
+		if !cb(iter, addr) {
+			return
+		}
+	}
+}
+func IteratorDelegatorDelegations(iterator DatabaseIterator, cb func(it ethdb.Iterator, delegator common.Address) bool) {
+	preifxKey := delegatorValidatorListPrefix
+	iter := iterator.NewIteratorWithPrefix(preifxKey)
+	defer iter.Release()
+	addrOffset := len(preifxKey)
+
+	for iter.Next() {
+		// validatorSnapshotKey = validatorSnapshotPrefix + addr bytes (20 bytes) + epoch bytes
+		key := iter.Key()
+		addr := common.BytesToAddress(key[addrOffset : addrOffset+20])
+		if !cb(iter, addr) {
+			return
+		}
+	}
 }
 
 // DeleteValidatorStats ..

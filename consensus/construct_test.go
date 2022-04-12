@@ -39,7 +39,7 @@ func TestConstructAnnounceMessage(test *testing.T) {
 	consensus.blockHash = [32]byte{}
 	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{Pri: blsPriKey, Pub: &pubKeyWrapper}
 	if _, err = consensus.construct(msg_pb.MessageType_ANNOUNCE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper}); err != nil {
 		test.Fatalf("could not construct announce: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 
 	pubKeyWrapper := bls.PublicKeyWrapper{Object: blsPriKey.GetPublicKey()}
 	pubKeyWrapper.Bytes.FromLibBLSPublicKey(pubKeyWrapper.Object)
-	priKeyWrapper := bls.PrivateKeyWrapper{blsPriKey, &pubKeyWrapper}
+	priKeyWrapper := bls.PrivateKeyWrapper{Pri: blsPriKey, Pub: &pubKeyWrapper}
 	network, err := consensus.construct(msg_pb.MessageType_PREPARED, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper})
 	if err != nil {
 		test.Errorf("Error when creating prepared message")
@@ -134,12 +134,12 @@ func TestConstructPrepareMessage(test *testing.T) {
 	blsPriKey1 := bls.RandPrivateKey()
 	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
 	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	priKeyWrapper1 := bls.PrivateKeyWrapper{Pri: blsPriKey1, Pub: &pubKeyWrapper1}
 
 	blsPriKey2 := bls.RandPrivateKey()
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,
@@ -226,12 +226,12 @@ func TestConstructCommitMessage(test *testing.T) {
 	blsPriKey1 := bls.RandPrivateKey()
 	pubKeyWrapper1 := bls.PublicKeyWrapper{Object: blsPriKey1.GetPublicKey()}
 	pubKeyWrapper1.Bytes.FromLibBLSPublicKey(pubKeyWrapper1.Object)
-	priKeyWrapper1 := bls.PrivateKeyWrapper{blsPriKey1, &pubKeyWrapper1}
+	priKeyWrapper1 := bls.PrivateKeyWrapper{Pri: blsPriKey1, Pub: &pubKeyWrapper1}
 
 	blsPriKey2 := bls.RandPrivateKey()
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
-	priKeyWrapper2 := bls.PrivateKeyWrapper{blsPriKey2, &pubKeyWrapper2}
+	priKeyWrapper2 := bls.PrivateKeyWrapper{Pri: blsPriKey2, Pub: &pubKeyWrapper2}
 
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityStake, shard.BeaconChainShardID,

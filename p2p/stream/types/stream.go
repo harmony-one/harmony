@@ -44,12 +44,12 @@ func NewBaseStream(st libp2p_network.Stream) *BaseStream {
 }
 
 // StreamID is the unique identifier for the stream. It has the value of
-// libp2p_network.Stream.ID()
+// libp2p_network_peer.ID
 type StreamID string
 
-// Meta return the StreamID of the stream
+// ID return the StreamID of the stream
 func (st *BaseStream) ID() StreamID {
-	return StreamID(st.raw.Conn().ID())
+	return StreamID(st.raw.Conn().RemotePeer().String())
 }
 
 // ProtoID return the remote protocol ID of the stream

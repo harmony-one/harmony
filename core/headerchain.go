@@ -110,7 +110,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		}
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return hc, nil
 }
 
@@ -474,6 +474,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *block.Header) error {
 
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
+	headHeaderGauge.Update(head.Number().Int64())
 	return nil
 }
 
@@ -530,7 +531,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 		hc.currentHeader.Store(hc.genesisHeader)
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return nil
 }
 

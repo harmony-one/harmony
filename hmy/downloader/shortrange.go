@@ -24,7 +24,9 @@ import (
 func (d *Downloader) doShortRangeSync() (int, error) {
 	numShortRangeCounterVec.With(d.promLabels()).Inc()
 
-	srCtx, _ := context.WithTimeout(d.ctx, shortRangeTimeout)
+	srCtx, cancel := context.WithTimeout(d.ctx, shortRangeTimeout)
+	defer cancel()
+
 	sh := &srHelper{
 		syncProtocol: d.syncProtocol,
 		ctx:          srCtx,
@@ -120,6 +122,7 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 
 func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
 	ctx, cancel := context.WithCancel(sh.ctx)
+	defer cancel()
 	m := newGetBlocksByHashManager(hashes, whitelist)
 
 	var (

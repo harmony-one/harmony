@@ -57,6 +57,21 @@ func (client *Client) GetBlockHashes(startHash []byte, size uint32, ip, port str
 	return response
 }
 
+// GetBlocksByHeights gets blocks from peers by calling grpc request.
+func (client *Client) GetBlocksByHeights(heights []uint64) *pb.DownloaderResponse {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request := &pb.DownloaderRequest{
+		Type:    pb.DownloaderRequest_BLOCKBYHEIGHT,
+		Heights: heights,
+	}
+	response, err := client.dlClient.Query(ctx, request)
+	if err != nil {
+		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] GetBlockHashes query failed")
+	}
+	return response
+}
+
 // GetBlockHeaders gets block headers in serialization byte array by calling a grpc request.
 func (client *Client) GetBlockHeaders(hashes [][]byte) *pb.DownloaderResponse {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

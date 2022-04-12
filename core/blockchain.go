@@ -61,8 +61,25 @@ import (
 )
 
 var (
-	// blockInsertTimer
-	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
+	headBlockGauge     = metrics.NewRegisteredGauge("chain/head/block", nil)
+	headHeaderGauge    = metrics.NewRegisteredGauge("chain/head/header", nil)
+	headFastBlockGauge = metrics.NewRegisteredGauge("chain/head/receipt", nil)
+
+	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
+	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
+	accountUpdateTimer = metrics.NewRegisteredTimer("chain/account/updates", nil)
+	accountCommitTimer = metrics.NewRegisteredTimer("chain/account/commits", nil)
+
+	storageReadTimer   = metrics.NewRegisteredTimer("chain/storage/reads", nil)
+	storageHashTimer   = metrics.NewRegisteredTimer("chain/storage/hashes", nil)
+	storageUpdateTimer = metrics.NewRegisteredTimer("chain/storage/updates", nil)
+	storageCommitTimer = metrics.NewRegisteredTimer("chain/storage/commits", nil)
+
+	blockInsertTimer     = metrics.NewRegisteredTimer("chain/inserts", nil)
+	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
+	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
+	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
+
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
@@ -165,8 +182,7 @@ type BlockChain struct {
 	running                       int32             // running must be called atomically
 	blockchainPruner              *blockchainPruner // use to prune beacon chain
 	// procInterrupt must be atomically called
-	procInterrupt int32          // interrupt signaler for block processing
-	wg            sync.WaitGroup // chain processing wait group for shutting down
+	procInterrupt int32 // interrupt signaler for block processing
 
 	engine                 consensus_engine.Engine
 	processor              Processor // block processor interface
@@ -334,6 +350,7 @@ func (bc *BlockChain) loadLastState() error {
 	}
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(currentBlock)
+	headBlockGauge.Update(int64(currentBlock.NumberU64()))
 
 	// We don't need the following as we want the current header and block to be consistent
 	// Restore the last known head header
@@ -350,9 +367,11 @@ func (bc *BlockChain) loadLastState() error {
 
 	// Restore the last known head fast block
 	bc.currentFastBlock.Store(currentBlock)
+	headFastBlockGauge.Update(int64(currentBlock.NumberU64()))
 	if head := rawdb.ReadHeadFastBlockHash(bc.db); head != (common.Hash{}) {
 		if block := bc.GetBlockByHash(head); block != nil {
 			bc.currentFastBlock.Store(block)
+			headFastBlockGauge.Update(int64(block.NumberU64()))
 		}
 	}
 
@@ -414,24 +433,31 @@ func (bc *BlockChain) SetHead(head uint64) error {
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number().Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
+		newHeadBlock := bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64())
+		bc.currentBlock.Store(newHeadBlock)
+		headBlockGauge.Update(int64(newHeadBlock.NumberU64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 			// Rewound state missing, rolled back to before pivot, reset to genesis
 			bc.currentBlock.Store(bc.genesisBlock)
+			headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number().Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
+		newHeadFastBlock := bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64())
+		bc.currentFastBlock.Store(newHeadFastBlock)
+		headFastBlockGauge.Update(int64(newHeadFastBlock.NumberU64()))
 	}
 	// If either blocks reached nil, reset to the genesis state
 	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
 		bc.currentBlock.Store(bc.genesisBlock)
+		headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	}
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock == nil {
 		bc.currentFastBlock.Store(bc.genesisBlock)
+		headFastBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	}
 	currentBlock := bc.CurrentBlock()
 	currentFastBlock := bc.CurrentFastBlock()
@@ -536,8 +562,9 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 		return err
 	}
 	bc.currentBlock.Store(bc.genesisBlock)
+	headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	bc.currentFastBlock.Store(bc.genesisBlock)
-
+	headFastBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	return nil
 }
 
@@ -657,6 +684,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 	}
 
 	bc.currentBlock.Store(block)
+	headBlockGauge.Update(int64(block.NumberU64()))
 
 	// If the block is better than our head or is on a different chain, force update heads
 	if updateHeads {
@@ -668,6 +696,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 		}
 
 		bc.currentFastBlock.Store(block)
+		headFastBlockGauge.Update(int64(block.NumberU64()))
 	}
 	return nil
 }
@@ -847,6 +876,9 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
 	if err := bc.SavePendingCrossLinks(); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to save pending cross links")
 	}
@@ -855,8 +887,6 @@ func (bc *BlockChain) Stop() {
 	bc.scope.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
-
-	bc.wg.Wait()
 
 	// Ensure the state of a recent block is also stored to disk before exiting.
 	// We're writing three different states to catch different restart scenarios:
@@ -941,6 +971,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
 			if newFastBlock != nil {
 				bc.currentFastBlock.Store(newFastBlock)
+				headFastBlockGauge.Update(int64(newFastBlock.NumberU64()))
 				rawdb.WriteHeadFastBlockHash(bc.db, newFastBlock.Hash())
 			}
 		}
@@ -948,6 +979,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
 			if newBlock != nil {
 				bc.currentBlock.Store(newBlock)
+				headBlockGauge.Update(int64(newBlock.NumberU64()))
 				if err := rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash()); err != nil {
 					return err
 				}
@@ -1030,9 +1062,6 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
 func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(blockChain); i++ {
 		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].ParentHash() != blockChain[i-1].Hash() {
@@ -1047,6 +1076,9 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
 		}
 	}
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	var (
 		stats = struct{ processed, ignored int32 }{}
@@ -1112,6 +1144,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		if bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64()).Cmp(td) < 0 {
 			rawdb.WriteHeadFastBlockHash(bc.db, head.Hash())
 			bc.currentFastBlock.Store(head)
+			headFastBlockGauge.Update(int64(head.NumberU64()))
 		}
 	}
 	bc.mu.Unlock()
@@ -1135,8 +1168,8 @@ var lastWrite uint64
 // but does not write any state. This is used to construct competing side forks
 // up to the point where they exceed the canonical total difficulty.
 func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
 		return err
@@ -1156,9 +1189,6 @@ func (bc *BlockChain) WriteBlockWithState(
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	// Make sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
@@ -1336,9 +1366,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
 		}
 	}
-	// Pre-checks passed, start the full block imports
-	bc.wg.Add(1)
-	defer bc.wg.Done()
 
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
@@ -1484,6 +1511,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			events = append(events, ev)
 		}
 		// Process block using the parent state as reference point.
+		substart := time.Now()
 		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
 			block, state, vmConfig, true,
 		)
@@ -1493,7 +1521,18 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			return i, events, coalescedLogs, err
 		}
 
+		// Update the metrics touched during block processing
+		accountReadTimer.Update(state.AccountReads)           // Account reads are complete, we can mark them
+		storageReadTimer.Update(state.StorageReads)           // Storage reads are complete, we can mark them
+		accountUpdateTimer.Update(state.AccountUpdates)       // Account updates are complete, we can mark them
+		storageUpdateTimer.Update(state.StorageUpdates)       // Storage updates are complete, we can mark them
+		triehash := state.AccountHashes + state.StorageHashes // Save to not double count in validation
+		trieproc := state.AccountReads + state.AccountUpdates
+		trieproc += state.StorageReads + state.StorageUpdates
+		blockExecutionTimer.Update(time.Since(substart) - trieproc - triehash)
+
 		// Validate the state using the default validator
+		substart = time.Now()
 		if err := bc.Validator().ValidateState(
 			block, state, receipts, cxReceipts, usedGas,
 		); err != nil {
@@ -1502,7 +1541,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 		proctime := time.Since(bstart)
 
+		// Update the metrics touched during block validation
+		accountHashTimer.Update(state.AccountHashes) // Account hashes are complete, we can mark them
+		storageHashTimer.Update(state.StorageHashes) // Storage hashes are complete, we can mark them
+		blockValidationTimer.Update(time.Since(substart) - (state.AccountHashes + state.StorageHashes - triehash))
+
 		// Write the block to the chain and get the status.
+		substart = time.Now()
 		status, err := bc.WriteBlockWithState(
 			block, receipts, cxReceipts, stakeMsgs, payout, state,
 		)
@@ -1518,6 +1563,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			Uint64("gas", block.GasUsed()).
 			Str("elapsed", common.PrettyDuration(time.Since(bstart)).String()).
 			Logger()
+
+		// Update the metrics touched during block commit
+		accountCommitTimer.Update(state.AccountCommits) // Account commits are complete, we can mark them
+		storageCommitTimer.Update(state.StorageCommits) // Storage commits are complete, we can mark them
+
+		blockWriteTimer.Update(time.Since(substart) - state.AccountCommits - state.StorageCommits)
+		blockInsertTimer.UpdateSince(bstart)
 
 		switch status {
 		case CanonStatTy:
@@ -1732,9 +1784,6 @@ func (bc *BlockChain) InsertHeaderChain(chain []*block.Header, checkFreq int) (i
 	// Make sure only one thread manipulates the chain at once
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
-
-	bc.wg.Add(1)
-	defer bc.wg.Done()
 
 	whFunc := func(header *block.Header) error {
 		bc.mu.Lock()
@@ -2567,7 +2616,7 @@ func (bc *BlockChain) ComputeAndUpdateAPR(
 		}
 	} else {
 		// only insert if APR for current epoch does not exists
-		aprEntry := staking.APREntry{now, *aprComputed}
+		aprEntry := staking.APREntry{Epoch: now, Value: *aprComputed}
 		l := len(stats.APRs)
 		// first time inserting apr for validator or
 		// apr for current epoch does not exists
@@ -2605,7 +2654,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 			return err
 		}
 
-		snapshot := &staking.ValidatorSnapshot{validator, epoch}
+		snapshot := &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}
 		if err := bc.WriteValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
@@ -2752,13 +2801,13 @@ func (bc *BlockChain) UpdateStakingMetaData(
 				return newValidators, err
 			}
 
-			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, epoch}); err != nil {
+			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}); err != nil {
 				return newValidators, err
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
 			if newEpoch.Cmp(epoch) > 0 {
-				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, newEpoch}); err != nil {
+				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: newEpoch}); err != nil {
 					return newValidators, err
 				}
 			}
@@ -2831,9 +2880,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 
 			// Add self delegation into the index
 			selfIndex := staking.DelegationIndex{
-				createValidator.ValidatorAddress,
-				uint64(0),
-				blockNum,
+				ValidatorAddress: createValidator.ValidatorAddress,
+				Index:            uint64(0),
+				BlockNum:         blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if !ok {
@@ -2951,9 +3000,9 @@ func (bc *BlockChain) addDelegationIndex(
 		) {
 			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
-				validatorAddress,
-				uint64(i),
-				blockNum,
+				ValidatorAddress: validatorAddress,
+				Index:            uint64(i),
+				BlockNum:         blockNum,
 			})
 		}
 	}

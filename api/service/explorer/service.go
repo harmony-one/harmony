@@ -11,12 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/harmony-one/harmony/core/types"
-
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -115,6 +114,7 @@ func (s *Service) Run() *http.Server {
 	// parameter prefix: from which address prefix start
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
+	s.router.Path("/height").HandlerFunc(s.GetHeight)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -172,6 +172,38 @@ func (s *Service) GetAddresses(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		utils.Logger().Warn().Err(err).Msg("wasn't able to fetch addresses from storage")
 		return
+	}
+}
+
+type HeightResponse struct {
+	S0 uint64 `json:"0,omitempty"`
+	S1 uint64 `json:"1,omitempty"`
+	S2 uint64 `json:"2,omitempty"`
+	S3 uint64 `json:"3,omitempty"`
+}
+
+// GetHeight returns heights of current and beacon chains if needed.
+func (s *Service) GetHeight(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	bc := s.backend.Blockchain()
+	out := HeightResponse{}
+	switch bc.ShardID() {
+	case 0:
+		out.S0 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 1:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S1 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 2:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S2 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	case 3:
+		out.S0 = s.backend.Beaconchain().CurrentBlock().NumberU64()
+		out.S3 = s.backend.Blockchain().CurrentBlock().NumberU64()
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		utils.Logger().Warn().Err(err).Msg("cannot JSON-encode addresses")
 	}
 }
 

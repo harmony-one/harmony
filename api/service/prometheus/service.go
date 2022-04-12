@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/metrics"
+	eth_prometheus "github.com/ethereum/go-ethereum/metrics/prometheus"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -104,6 +106,7 @@ func newService(cfg Config, additionalHandlers ...Handler) *Service {
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", handler)
+	mux.Handle("/metrics/eth", eth_prometheus.Handler(metrics.DefaultRegistry))
 	mux.HandleFunc("/goroutinez", svc.goroutinezHandler)
 
 	// Register additional handlers.

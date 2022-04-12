@@ -897,7 +897,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 	// Create an initial state with a single contract
 	state, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
 
-	addr := toAddr([]byte("so"))
+	addr := common.BytesToAddress([]byte("so"))
 	state.SetBalance(addr, big.NewInt(1))
 
 	root, _ := state.Commit(false)
@@ -926,7 +926,7 @@ func makeValidValidatorWrapper(addr common.Address) stk.ValidatorWrapper {
 		MaxRate:       numeric.ZeroDec(),
 		MaxChangeRate: numeric.ZeroDec(),
 	}
-	c := stk.Commission{cr, big.NewInt(300)}
+	c := stk.Commission{CommissionRates: cr, UpdateHeight: big.NewInt(300)}
 	d := stk.Description{
 		Name:     "Wayne",
 		Identity: "wen",

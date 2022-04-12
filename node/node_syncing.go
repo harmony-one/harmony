@@ -578,6 +578,28 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 				Msg("[SYNC] extra node registered")
 		}
 
+	case downloader_pb.DownloaderRequest_BLOCKBYHEIGHT:
+		if len(request.Heights) == 0 {
+			return response, errors.New("empty heights list provided")
+		}
+
+		if len(request.Heights) > int(legacysync.SyncLoopBatchSize) {
+			return response, errors.New("exceed size limit")
+		}
+
+		out := make([][]byte, 0, len(request.Heights))
+		for _, v := range request.Heights {
+			block := node.Blockchain().GetBlockByNumber(v)
+			if block == nil {
+				return response, errors.Errorf("no block with height %d found", v)
+			}
+			blockBytes, err := node.getEncodedBlockWithSigByHeight(v)
+			if err != nil {
+				return response, errors.Errorf("failed to get block")
+			}
+			out = append(out, blockBytes)
+		}
+		response.Payload = out
 	}
 
 	return response, nil
@@ -676,6 +698,26 @@ func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error)
 		return nil, err
 	}
 	blockWithSigReqCache.Add(hash, b)
+	return b, nil
+}
+
+func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) {
+	blk := node.Blockchain().GetBlockByNumber(height)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	sab, err := node.getCommitSigAndBitmapFromChildOrDB(blk)
+	if err != nil {
+		return nil, err
+	}
+	bwh := legacysync.BlockWithSig{
+		Block:              blk,
+		CommitSigAndBitmap: sab,
+	}
+	b, err := rlp.EncodeToBytes(bwh)
+	if err != nil {
+		return nil, err
+	}
 	return b, nil
 }
 
