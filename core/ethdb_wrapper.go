@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/libs/locker"
 )
 
 type kv struct {
@@ -200,4 +201,110 @@ func (d *dbWrapper) Write() error {
 		return batch.Write()
 	}
 	return nil
+}
+
+type dbWrapperLocked struct {
+	db   ethdb.Database
+	lock locker.RWLocker
+}
+
+func (d *dbWrapperLocked) Has(key []byte) (bool, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.db.Has(key)
+}
+
+func (d *dbWrapperLocked) Get(key []byte) ([]byte, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.db.Get(key)
+}
+
+func (d *dbWrapperLocked) HasAncient(kind string, number uint64) (bool, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+	return d.db.HasAncient(kind, number)
+}
+
+func (d *dbWrapperLocked) Ancient(kind string, number uint64) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Ancients() (uint64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) AncientSize(kind string) (uint64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Put(key []byte, value []byte) error {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	return d.db.Put(key, value)
+}
+
+func (d *dbWrapperLocked) Delete(key []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) AppendAncient(number uint64, hash, header, body, receipt, td []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) TruncateAncients(n uint64) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Sync() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) NewBatch() ethdb.Batch {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) NewIterator() ethdb.Iterator {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) NewIteratorWithStart(start []byte) ethdb.Iterator {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) NewIteratorWithPrefix(prefix []byte) ethdb.Iterator {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Stat(property string) (string, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Compact(start []byte, limit []byte) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d *dbWrapperLocked) Close() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewEthWrapperWithLocks(db ethdb.Database, mu locker.RWLocker) *dbWrapperLocked {
+	return &dbWrapperLocked{
+		db:   db,
+		lock: mu,
+	}
 }

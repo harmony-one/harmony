@@ -375,7 +375,7 @@ func (b *BlockChainWithLocks) GetVrfByNumber(number uint64) []byte {
 }
 
 func (b *BlockChainWithLocks) ChainDb() ethdb.Database {
-	return b.bc.ChainDb()
+	return NewEthWrapperWithLocks(b.bc.ChainDb(), b.lock)
 }
 
 func (b *BlockChainWithLocks) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {
