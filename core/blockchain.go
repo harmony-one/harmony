@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/libs/ethdb_memwrap"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -121,9 +122,9 @@ type BlockChainWithoutLocks struct {
 	cacheConfig            *CacheConfig        // Cache configuration for pruning
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 
-	db     *dbWrapper    // Low level persistent database to store final content in
-	triegc *prque.Prque  // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration // Accumulates canonical block processing for trie dumping
+	db     *ethdb_memwrap.DbWrapper // Low level persistent database to store final content in
+	triegc *prque.Prque             // Priority queue mapping block numbers to tries to gc
+	gcproc time.Duration            // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
 	rmLogsFeed    event.Feed
@@ -177,7 +178,7 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainWithLocks, error) {
-	dbw := NewDbWrapper(db)
+	dbw := ethdb_memwrap.NewDbWrapper(db)
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,

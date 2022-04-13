@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
+	"github.com/harmony-one/harmony/libs/ethdb_locker"
 	"github.com/harmony-one/harmony/libs/locker"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking/slash"
@@ -345,8 +346,6 @@ func (b *BlockChainWithLocks) ReadShardState(epoch *big.Int) (*shard.State, erro
 }
 
 func (b *BlockChainWithLocks) WriteShardStateBytes(db rawdb.DatabaseWriter, epoch *big.Int, shardState []byte) (*shard.State, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
 	return b.bc.WriteShardStateBytes(db, epoch, shardState)
 }
 
@@ -375,7 +374,7 @@ func (b *BlockChainWithLocks) GetVrfByNumber(number uint64) []byte {
 }
 
 func (b *BlockChainWithLocks) ChainDb() ethdb.Database {
-	return NewEthWrapperWithLocks(b.bc.ChainDb(), b.lock)
+	return ethdb_locker.NewEthWrapperWithLocks(b.bc.ChainDb(), b.lock)
 }
 
 func (b *BlockChainWithLocks) GetEpochBlockNumber(epoch *big.Int) (*big.Int, error) {

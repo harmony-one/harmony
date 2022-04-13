@@ -1,16 +1,16 @@
-package core_test
+package ethdb_memwrap_test
 
 import (
 	"testing"
 
-	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/libs/ethdb_memwrap"
 	"github.com/stretchr/testify/require"
 )
 
 var key = []byte("01234567")
 
 func TestEthWrapper(t *testing.T) {
-	db := core.NewDbWrapper(nil)
+	db := ethdb_memwrap.NewDbWrapper(nil)
 	db.Wrap(true)
 
 	t.Run("simple_get", func(t *testing.T) {
