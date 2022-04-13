@@ -46,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -3212,10 +3213,19 @@ func (bc *BlockChain) ClearValidatorWrappersBetweenBlocks(
 			result = err
 		}
 	}()
+	currentState, err := bc.State()
+	if err != nil {
+		return errors.Wrapf(err, "state for current block not found")
+	}
+	// TODO: Is this list available by block?
+	validators, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
 	// start from the top and work backwards so that we can assess the space saved faster
 	for i := end; i >= start; i-- {
 		startTime := time.Now()
-		if err := bc.clearValidatorWrappersAtBlock(i, batch); err != nil {
+		if err := bc.clearValidatorWrappersAtBlock(i, batch, currentState, validators); err != nil {
 			pruneWrappersTimer.UpdateSince(startTime)
 			utils.Logger().Error().AnErr("err", err).
 				Int64("elapsed time", time.Since(startTime).Milliseconds()).
@@ -3241,12 +3251,13 @@ func (bc *BlockChain) ClearValidatorWrappersBetweenBlocks(
 }
 
 // clearValidatorWrappersAtBlock is the internal locked version used by
-// ClearValidatorWrappersBetweenBlocks and WriteBlockWithState to clear wrappers
-// from the specified block. the caller MUST commit any remaining data from batch
-// once done
+// ClearValidatorWrappersBetweenBlocks to clear wrappers from the specified block.
+// the caller MUST commit any remaining data from batch once done
 func (bc *BlockChain) clearValidatorWrappersAtBlock(
 	number uint64,
 	batch ethdb.Batch,
+	currentState *state.DB,
+	validators []common.Address,
 ) (result error) {
 	if number == 0 {
 		return errors.New("cannot clear validator wrappers from genesis block")
@@ -3259,14 +3270,15 @@ func (bc *BlockChain) clearValidatorWrappersAtBlock(
 	if err != nil {
 		return errors.Wrapf(err, "state for block %d not found", number)
 	}
-	currentState, err := bc.State()
-	if err != nil {
-		return errors.Wrapf(err, "state for current block not found")
-	}
-	// TODO: Is this list available by block?
-	validators, err := bc.ReadValidatorList()
-	if err != nil {
-		return err
+	// pre staking epoch already checked
+	isAggregated := bc.chainConfig.IsAggregatedRewardEpoch(block.Epoch())
+	// either we had a staking tx, or we had rewards, which means either...
+	// ...we had rewards due to pre aggregated epoch, or...
+	// ...we are post aggregated epoch, and it's a reward distribution block)
+	wrappersChanged := len(block.StakingTransactions()) > 0 ||
+		(!isAggregated || (isAggregated && block.NumberU64()%chain.RewardFrequency == chain.RewardFrequency-1))
+	if !wrappersChanged {
+		return nil
 	}
 	for _, address := range validators {
 		object := state.GetOrNewStateObject(address)
