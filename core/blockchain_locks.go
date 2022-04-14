@@ -4,6 +4,7 @@ import (
 	"io"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -31,10 +32,31 @@ type BlockChainWithLocks struct {
 }
 
 func newBlockchainWithLocks(bc *BlockChainWithoutLocks) *BlockChainWithLocks {
-	return &BlockChainWithLocks{
+	b := &BlockChainWithLocks{
 		bc:   bc,
 		lock: &sync.RWMutex{},
 	}
+	go b.update()
+	return b
+}
+
+func (b *BlockChainWithLocks) update() {
+	futureTimer := time.NewTicker(5 * time.Second)
+	defer futureTimer.Stop()
+	for {
+		select {
+		case <-futureTimer.C:
+			b.procFutureBlocks()
+		case <-b.bc.quit:
+			return
+		}
+	}
+}
+
+func (b *BlockChainWithLocks) procFutureBlocks() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.bc.procFutureBlocks()
 }
 
 func (b *BlockChainWithLocks) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []types2.StakeMsg, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
