@@ -47,6 +47,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/libs/ethdb_memwrap"
+	"github.com/harmony-one/harmony/libs/ethdb_panic_wrap"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/shard/committee"
@@ -178,7 +179,7 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainWithLocks, error) {
-	dbw := ethdb_memwrap.NewDbWrapper(db)
+	dbw := ethdb_memwrap.NewDbWrapper(ethdb_panic_wrap.New(db))
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -1289,7 +1290,9 @@ func (bc *BlockChainWithoutLocks) InsertChain(chain types.Blocks, verifyHeaders 
 // with deferred statements.
 func (bc *BlockChainWithoutLocks) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
 	bc.db.Wrap(true)
+	ethdb_panic_wrap.Set(1)
 	n, v, log, err := bc._insertChain(chain, verifyHeaders)
+	ethdb_panic_wrap.Set(0)
 	bc.db.Wrap(false)
 	if err == nil {
 		err := bc.db.Write()
