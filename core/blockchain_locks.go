@@ -260,6 +260,9 @@ func (b *BlockChainWithLocks) GetMaxGarbageCollectedBlockNumber() int64 {
 }
 
 func (b *BlockChainWithLocks) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+	if len(chain) == 0 {
+		return 0, nil
+	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return b.bc.InsertChain(chain, verifyHeaders)

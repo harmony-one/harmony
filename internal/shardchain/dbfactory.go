@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethdb/leveldb"
 	"github.com/harmony-one/harmony/internal/shardchain/leveldb_shard"
 	"github.com/harmony-one/harmony/internal/shardchain/local_cache"
 
@@ -34,7 +35,20 @@ type LDBFactory struct {
 // NewChainDB returns a new LDB for the blockchain for given shard.
 func (f *LDBFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 	dir := path.Join(f.RootDir, fmt.Sprintf("%s_%d", LDBDirPrefix, shardID))
-	return rawdb.NewLevelDBDatabase(dir, 256, 1024, "")
+	//db, err :=  rawdb.NewLevelDBDatabase(dir, 256, 1024, "")
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	db, err := leveldb.New(dir, 256, 1024, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return rawdb.NewDatabase(local_cache.NewLocalCacheDatabase(db, local_cache.CacheConfig{
+		CacheTime: time.Duration(10) * time.Minute,
+		CacheSize: 15 * 1024, // MiB
+	})), nil
 }
 
 // MemDBFactory is a memory-backed blockchain database factory.
