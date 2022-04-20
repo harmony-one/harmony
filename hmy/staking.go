@@ -330,8 +330,8 @@ func (hmy *Harmony) GetValidatorInformation(
 	if defaultReply.CurrentlyInCommittee {
 		defaultReply.Performance = &staking.CurrentEpochPerformance{
 			CurrentSigningPercentage: *computed,
-			Epoch:                    hmy.BeaconChain.CurrentBlock().Header().Number().Uint64(),
-			Block:                    hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64(),
+			Epoch:                    hmy.BeaconChain.CurrentBlock().Header().Epoch().Uint64(),
+			Block:                    hmy.BeaconChain.CurrentBlock().Header().Number().Uint64(),
 		}
 	}
 
