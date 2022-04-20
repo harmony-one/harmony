@@ -91,7 +91,7 @@ func (d *Downloader) Start() {
 	}
 }
 
-// Close close the downloader
+// Close closes the downloader.
 func (d *Downloader) Close() {
 	close(d.closeC)
 	d.cancel()
@@ -116,7 +116,7 @@ func (d *Downloader) NumPeers() int {
 	return d.syncProtocol.NumStreams()
 }
 
-// IsSyncing return the current sync status
+// SyncStatus returns the current sync status.
 func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	syncing, target := d.status.get()
 	if !syncing {
@@ -125,12 +125,12 @@ func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	return syncing, target, 0
 }
 
-// SubscribeDownloadStarted subscribe download started
+// SubscribeDownloadStarted subscribe download started.
 func (d *Downloader) SubscribeDownloadStarted(ch chan struct{}) event.Subscription {
 	return d.evtDownloadStarted.Subscribe(ch)
 }
 
-// SubscribeDownloadFinishedEvent subscribe the download finished
+// SubscribeDownloadFinished subscribe the download finished.
 func (d *Downloader) SubscribeDownloadFinished(ch chan struct{}) event.Subscription {
 	return d.evtDownloadFinished.Subscribe(ch)
 }

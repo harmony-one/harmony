@@ -203,11 +203,19 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		utils.Logger().Debug().
-			Int("length of newTxs", len(newTxs)).
-			Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
-		return nil
+	if !node.IsCurrentlyLeader() {
+		if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+			debug := utils.Logger().Debug()
+			for i, tx := range newTxs {
+				debug = debug.Str(fmt.Sprintf("tx%d", i), tx.Hash().Hex())
+				if i > 10 {
+					break
+				}
+			}
+			debug.Int("length of newTxs", len(newTxs)).
+				Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
+			return nil
+		}
 	}
 	poolTxs := types.PoolTransactions{}
 	errs := []error{}
