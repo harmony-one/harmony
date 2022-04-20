@@ -21,9 +21,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"io"
+	"log"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -95,6 +99,7 @@ const (
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInMemory                      = 128
+	triesInRedis                       = 1000
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
@@ -141,6 +146,10 @@ type BlockChain struct {
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+
+	latestCleanCacheNum uint64
+	cleanCacheChan      chan uint64
+	redisPreempt        *redis_helper.RedisPreempt
 
 	hc            *HeaderChain
 	trace         bool       // atomic?
@@ -198,7 +207,7 @@ type BlockChain struct {
 // available in the database. It initialises the default Ethereum validator and
 // Processor.
 func NewBlockChain(
-	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChain, error) {
@@ -230,7 +239,7 @@ func NewBlockChain(
 		cacheConfig:                   cacheConfig,
 		db:                            db,
 		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
+		stateCache:                    stateCache,
 		quit:                          make(chan struct{}),
 		shouldPreserve:                shouldPreserve,
 		bodyCache:                     bodyCache,
@@ -349,6 +358,7 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 	// Everything seems to be fine, set as the head block
+	bc.latestCleanCacheNum = currentBlock.NumberU64() - triesInRedis
 	bc.currentBlock.Store(currentBlock)
 	headBlockGauge.Update(int64(currentBlock.NumberU64()))
 
@@ -698,6 +708,30 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 		bc.currentFastBlock.Store(block)
 		headFastBlockGauge.Update(int64(block.NumberU64()))
 	}
+	return nil
+}
+
+// writeHeadBlock writes a new head block
+func (bc *BlockChain) tikvFastForward(block *types.Block, logs []*types.Log) error {
+	bc.currentBlock.Store(block)
+	headBlockGauge.Update(int64(block.NumberU64()))
+
+	if err := bc.hc.SetCurrentHeader(block.Header()); err != nil {
+		return errors.Wrap(err, "HeaderChain SetCurrentHeader")
+	}
+
+	bc.currentFastBlock.Store(block)
+	headFastBlockGauge.Update(int64(block.NumberU64()))
+
+	var events []interface{}
+	events = append(events, ChainEvent{block, block.Hash(), logs})
+	events = append(events, ChainHeadEvent{block})
+
+	if block.NumberU64() > triesInRedis {
+		bc.latestCleanCacheNum = block.NumberU64() - triesInRedis
+	}
+
+	bc.PostChainEvents(events, logs)
 	return nil
 }
 
@@ -1214,6 +1248,13 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 			return NonStatTy, err
 		}
+
+		if block.NumberU64() > triesInRedis {
+			select {
+			case bc.cleanCacheChan <- block.NumberU64() - triesInRedis:
+			default:
+			}
+		}
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
@@ -1346,6 +1387,10 @@ func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, 
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
 func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
+	if !bc.tikvPreemptMaster(bc.maxBlock(chain)) {
+		return len(chain), nil, nil, nil
+	}
+
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1578,6 +1623,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainEvent{block, block.Hash(), logs})
 			lastCanon = block
+
+			err = redis_helper.PublishShardUpdate(bc.ShardID(), block.NumberU64(), logs)
+			if err != nil {
+				utils.Logger().Info().Err(err).Msg("redis publish shard update error")
+			}
 
 			// Only count canonical blocks for GC processing time
 			bc.gcproc += proctime
@@ -3156,6 +3206,122 @@ func (bc *BlockChain) EnablePruneBeaconChainFeature() {
 // IsEnablePruneBeaconChainFeature returns is enable prune BeaconChain feature
 func (bc *BlockChain) IsEnablePruneBeaconChainFeature() bool {
 	return bc.pruneBeaconChainEnable
+}
+
+func (bc *BlockChain) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
+	head := rawdb.ReadHeadBlockHash(bc.db)
+	dbBlock := bc.GetBlockByHash(head)
+	currentBlock := bc.CurrentBlock()
+
+	if dbBlock == nil || currentBlock == nil {
+		return nil
+	}
+
+	currentBlockNum := currentBlock.NumberU64()
+	if currentBlockNum < newBlkNum {
+		start := time.Now()
+		for i := currentBlockNum; i <= newBlkNum; i++ {
+			blk := bc.GetBlockByNumber(i)
+			if blk == nil {
+				// todo check later
+				return nil
+			}
+
+			err := bc.tikvFastForward(blk, logs)
+			if err != nil {
+				return err
+			}
+		}
+		log.Printf("sync to %d use %v", currentBlockNum, time.Now().Sub(start))
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) tikvCleanCache() {
+	var count int
+	for to := range bc.cleanCacheChan {
+		for i := bc.latestCleanCacheNum + 1; i <= to; i++ {
+			fromBlock := bc.GetBlockByNumber(i)
+			fromTrie, err := state.New(fromBlock.Root(), bc.stateCache)
+			if err != nil {
+				continue
+			}
+
+			toBlock := bc.GetBlockByNumber(i + 1)
+			toTrie, err := state.New(toBlock.Root(), bc.stateCache)
+			if err != nil {
+				continue
+			}
+
+			start := time.Now()
+			count, err = fromTrie.DiffAndCleanCache(bc.ShardID(), toTrie)
+			if err != nil {
+				utils.Logger().Warn().
+					Err(err).
+					Msg("tikv clean cache error")
+				break
+			}
+
+			log.Println("tikvCleanCache block", i, "count", count, "use", time.Now().Sub(start))
+			bc.latestCleanCacheNum = i
+		}
+	}
+}
+
+func (bc *BlockChain) tikvPreemptMaster(toBlock uint64) bool {
+	for {
+		if ok, _ := bc.redisPreempt.TryLock(60); ok {
+			return true
+		}
+
+		if bc.CurrentBlock().NumberU64() >= toBlock {
+			return false
+		}
+
+		time.Sleep(time.Second)
+	}
+}
+
+func (bc *BlockChain) maxBlock(blocks types.Blocks) uint64 {
+	max := uint64(0)
+	for _, tmpBlock := range blocks {
+		if tmpBlock.NumberU64() > max {
+			max = tmpBlock.NumberU64()
+		}
+	}
+
+	return max
+}
+
+func (bc *BlockChain) RedisPreempt() *redis_helper.RedisPreempt {
+	return bc.redisPreempt
+}
+
+func (bc *BlockChain) InitTiKV(conf *harmonyconfig.TiKVConfig) {
+	bc.cleanCacheChan = make(chan uint64, 10)
+
+	if conf.Role == "Writer" {
+		bc.redisPreempt = redis_helper.CreatePreempt(fmt.Sprintf("shard_%d_preempt", bc.ShardID()))
+	}
+
+	if conf.Debug {
+		if os.Getenv("LOAD_PRE_FETCH") == "yes" {
+			if trie, err := state.New(bc.CurrentBlock().Root(), bc.stateCache); err == nil {
+				trie.Prefetch(512)
+			} else {
+				log.Println("LOAD_PRE_FETCH ERR: ", err)
+			}
+		}
+		if os.Getenv("CLEAN_INIT") != "" {
+			from, err := strconv.Atoi(os.Getenv("CLEAN_INIT"))
+			if err == nil {
+				bc.latestCleanCacheNum = uint64(from)
+			}
+		}
+	}
+
+	go bc.tikvCleanCache()
 }
 
 var (

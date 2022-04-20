@@ -3,6 +3,7 @@ package hmy
 import (
 	"context"
 	"fmt"
+	v3 "github.com/harmony-one/harmony/block/v3"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -174,10 +175,20 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 
 // GetLatestChainHeaders ..
 func (hmy *Harmony) GetLatestChainHeaders() *block.HeaderPair {
-	return &block.HeaderPair{
-		BeaconHeader: hmy.BeaconChain.CurrentHeader(),
-		ShardHeader:  hmy.BlockChain.CurrentHeader(),
+	pair := &block.HeaderPair{
+		BeaconHeader: &block.Header{Header: v3.NewHeader()},
+		ShardHeader:  &block.Header{Header: v3.NewHeader()},
 	}
+
+	if hmy.BeaconChain != nil {
+		pair.BeaconHeader = hmy.BeaconChain.CurrentHeader()
+	}
+
+	if hmy.BlockChain != nil {
+		pair.ShardHeader = hmy.BlockChain.CurrentHeader()
+	}
+
+	return pair
 }
 
 // GetLastCrossLinks ..

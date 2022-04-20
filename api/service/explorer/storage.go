@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"os"
 	"sync"
 	"time"
@@ -55,13 +56,22 @@ type (
 	}
 )
 
-func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
+func newStorage(hc *harmonyconfig.HarmonyConfig, bc *core2.BlockChain, dbPath string) (*storage, error) {
 	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
-	db, err := newLvlDB(dbPath)
+	var db database
+	var err error
+
+	if hc.General.UseTiKV {
+		db, err = newExplorerTiKv(hc.TiKV.PDAddr, fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID))
+	} else {
+		db, err = newExplorerLvlDB(dbPath)
+	}
+
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create new database")
+		utils.Logger().Error().Err(err).Msg("Failed to create new explorer database")
 		return nil, err
 	}
+
 	return &storage{
 		db:        db,
 		bc:        bc,

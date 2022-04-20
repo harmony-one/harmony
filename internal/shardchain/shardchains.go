@@ -1,6 +1,9 @@
 package shardchain
 
 import (
+	"github.com/harmony-one/harmony/core/state"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
 	"math/big"
 	"sync"
 
@@ -33,13 +36,14 @@ type Collection interface {
 // CollectionImpl is the main implementation of the shard chain collection.
 // See the Collection interface for details.
 type CollectionImpl struct {
-	dbFactory    DBFactory
-	dbInit       DBInitializer
-	engine       engine.Engine
-	mtx          sync.Mutex
-	pool         map[uint32]*core.BlockChain
-	disableCache map[uint32]bool
-	chainConfig  *params.ChainConfig
+	dbFactory     DBFactory
+	dbInit        DBInitializer
+	engine        engine.Engine
+	mtx           sync.Mutex
+	pool          map[uint32]*core.BlockChain
+	disableCache  map[uint32]bool
+	chainConfig   *params.ChainConfig
+	harmonyconfig *harmonyconfig.HarmonyConfig
 }
 
 // NewCollection creates and returns a new shard chain collection.
@@ -48,17 +52,15 @@ type CollectionImpl struct {
 //
 // dbInit is the shard chain initializer to use when the database returned by
 // the factory is brand new (empty).
-func NewCollection(
-	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
-	chainConfig *params.ChainConfig,
-) *CollectionImpl {
+func NewCollection(harmonyconfig *harmonyconfig.HarmonyConfig, dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine, chainConfig *params.ChainConfig) *CollectionImpl {
 	return &CollectionImpl{
-		dbFactory:    dbFactory,
-		dbInit:       dbInit,
-		engine:       engine,
-		pool:         make(map[uint32]*core.BlockChain),
-		disableCache: make(map[uint32]bool),
-		chainConfig:  chainConfig,
+		harmonyconfig: harmonyconfig,
+		dbFactory:     dbFactory,
+		dbInit:        dbInit,
+		engine:        engine,
+		pool:          make(map[uint32]*core.BlockChain),
+		disableCache:  make(map[uint32]bool),
+		chainConfig:   chainConfig,
 	}
 }
 
@@ -105,14 +107,31 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
 		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
 	}
+
+	var stateCache state.Database
+	if sc.harmonyconfig.General.UseTiKV {
+		stateDB, err := tikv_manage.GetDefaultTiKVFactory().NewStateDB(shardID)
+		if err != nil {
+			return nil, err
+		}
+		stateCache = state.NewDatabaseWithCache(stateDB, 64)
+	} else {
+		stateCache = state.NewDatabase(db)
+	}
+
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
+		db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
 	}
 	db = nil // don't close
 	sc.pool[shardID] = bc
+
+	if sc.harmonyconfig.General.UseTiKV {
+		bc.InitTiKV(sc.harmonyconfig.TiKV)
+	}
+
 	return bc, nil
 }
 

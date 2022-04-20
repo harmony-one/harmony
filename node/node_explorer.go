@@ -145,6 +145,11 @@ func (node *Node) TraceLoopForExplorer() {
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
+	if node.HarmonyConfig.General.UseTiKV && node.HarmonyConfig.TiKV.Role == "Reader" {
+		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
+		return
+	}
+
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
@@ -153,41 +158,51 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 		}
 		// Clean up the blocks to avoid OOM.
 		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
-		// Do dump all blocks from state syncing for explorer one time
-		// TODO: some blocks can be dumped before state syncing finished.
-		// And they would be dumped again here. Please fix it.
-		once.Do(func() {
-			utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
-				Msg("[Explorer] Populating explorer data from state synced blocks")
-			go func() {
-				exp, err := node.getExplorerService()
-				if err != nil {
-					// shall be unreachable
-					utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
-				}
-				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
-				}
-			}()
-		})
+
+		if !node.HarmonyConfig.General.UseTiKV || node.Blockchain().RedisPreempt().LastLockStatus() {
+			// Do dump all blocks from state syncing for explorer one time
+			// TODO: some blocks can be dumped before state syncing finished.
+			// And they would be dumped again here. Please fix it.
+			once.Do(func() {
+				utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
+					Msg("[Explorer] Populating explorer data from state synced blocks")
+				go func() {
+					exp, err := node.getExplorerService()
+					if err != nil {
+						// shall be unreachable
+						utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+					}
+					for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
+						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
+					}
+				}()
+			})
+		}
 	} else {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Error when adding new block for explorer node")
 	}
 }
 
+func (node *Node) AddNewBlockForTiKV(block *types.Block) {
+	// Clean up the blocks to avoid OOM.
+	node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
+}
+
 // ExplorerMessageHandler passes received message in node_handler to explorer service.
 func (node *Node) commitBlockForExplorer(block *types.Block) {
-	if block.ShardID() != node.NodeConfig.ShardID {
-		return
+	if !node.HarmonyConfig.General.UseTiKV || (node.HarmonyConfig.TiKV.Role == "Writer" && node.Blockchain().RedisPreempt().LastLockStatus()) {
+		if block.ShardID() != node.NodeConfig.ShardID {
+			return
+		}
+		// Dump new block into level db.
+		utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
+		exp, err := node.getExplorerService()
+		if err != nil {
+			// shall be unreachable
+			utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+		}
+		exp.DumpNewBlock(block)
 	}
-	// Dump new block into level db.
-	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	exp, err := node.getExplorerService()
-	if err != nil {
-		// shall be unreachable
-		utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
-	}
-	exp.DumpNewBlock(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {

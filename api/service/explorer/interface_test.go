@@ -73,7 +73,7 @@ func TestLevelDBPrefixIterator(t *testing.T) {
 
 func newTestLevelDB(t *testing.T, i int) database {
 	dbDir := tempTestDir(t, i)
-	db, err := newLvlDB(dbDir)
+	db, err := newExplorerLvlDB(dbDir)
 	if err != nil {
 		t.Fatal(err)
 	}

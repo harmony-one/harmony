@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -293,6 +296,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeConfig, err := createGlobalConfig(hc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		os.Exit(1)
+	}
+
+	if hc.General.UseTiKV && hc.TiKV == nil {
+		fmt.Fprintf(os.Stderr, "Use TIKV MUST HAS TIKV CONFIG")
 		os.Exit(1)
 	}
 
@@ -675,7 +683,26 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// Current node.
 	var chainDBFactory shardchain.DBFactory
-	if hc.ShardData.EnableShardData {
+	if hc.General.UseTiKV {
+		err := redis_helper.Init(hc.TiKV.StateDBRedisServerAddr)
+		if err != nil {
+			panic("can not connect to redis: " + err.Error())
+		}
+
+		tikv_manage.SetDefaultTiKVFactory(&shardchain.TiKvFactory{
+			PDAddr: hc.TiKV.PDAddr,
+			Role:   hc.TiKV.Role,
+			CacheConfig: statedb_cache.StateDBCacheConfig{
+				CacheSizeInMB:        hc.TiKV.StateDBCacheSizeInMB,
+				CachePersistencePath: hc.TiKV.StateDBCachePersistencePath,
+				RedisServerAddr:      hc.TiKV.StateDBRedisServerAddr,
+				RedisLRUTimeInDay:    hc.TiKV.StateDBRedisLRUTimeInDay,
+				DebugHitRate:         hc.TiKV.Debug,
+			},
+		})
+
+		chainDBFactory = tikv_manage.GetDefaultTiKVFactory()
+	} else if hc.ShardData.EnableShardData {
 		chainDBFactory = &shardchain.LDBShardFactory{
 			RootDir:    nodeConfig.DBDir,
 			DiskCount:  hc.ShardData.DiskCount,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"net"
 	"net/http"
 	"path"
@@ -42,20 +43,21 @@ type HTTPError struct {
 
 // Service is the struct for explorer service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	storage     *storage
-	server      *http.Server
-	messageChan chan *msg_pb.Message
-	blockchain  *core.BlockChain
-	backend     hmy.NodeAPI
+	router        *mux.Router
+	IP            string
+	Port          string
+	storage       *storage
+	server        *http.Server
+	messageChan   chan *msg_pb.Message
+	blockchain    *core.BlockChain
+	backend       hmy.NodeAPI
+	harmonyConfig *harmonyconfig.HarmonyConfig
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+func New(harmonyConfig *harmonyconfig.HarmonyConfig, selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
 	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
-	storage, err := newStorage(bc, dbPath)
+	storage, err := newStorage(harmonyConfig, bc, dbPath)
 	if err != nil {
 		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")
 	}

@@ -220,6 +220,10 @@ func (node *Node) doBeaconSyncing() {
 		return
 	}
 
+	if node.HarmonyConfig.General.UseTiKV {
+		return
+	}
+
 	if !node.NodeConfig.Downloader {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
@@ -338,7 +342,18 @@ func (node *Node) StartGRPCSyncClient() {
 			Msg("SupportBeaconSyncing")
 		go node.doBeaconSyncing()
 	}
-	node.supportSyncing()
+
+	if node.HarmonyConfig.General.UseTiKV {
+		node.syncFromTiKVWriter()
+
+		if node.HarmonyConfig.TiKV.Role == "Writer" {
+			node.supportSyncing()
+		} else {
+			node.Consensus.UpdateConsensusInformation()
+		}
+	} else {
+		node.supportSyncing()
+	}
 }
 
 // supportSyncing keeps sleeping until it's doing consensus or it's a leader.

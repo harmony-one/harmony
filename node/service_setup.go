@@ -27,7 +27,7 @@ func (node *Node) RegisterValidatorServices() {
 func (node *Node) RegisterExplorerServices() {
 	// Register explorer service.
 	node.serviceManager.Register(
-		service.SupportExplorer, explorer.New(&node.SelfPeer, node.Blockchain(), node),
+		service.SupportExplorer, explorer.New(node.HarmonyConfig, &node.SelfPeer, node.Blockchain(), node),
 	)
 }
 
