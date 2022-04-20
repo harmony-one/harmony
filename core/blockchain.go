@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -331,4 +332,15 @@ type BlockChain interface {
 		payout reward.Reader,
 		state *state.DB,
 	) (status WriteStatus, err error)
+
+	// ========== Only For Tikv Start ==========
+
+	// return true if is tikv writer master
+	IsTikvWriterMaster() bool
+	// RedisPreempt used for tikv mode, get the redis preempt instance
+	RedisPreempt() *redis_helper.RedisPreempt
+	// SyncFromTiKVWriter used for tikv mode, all reader or follower writer used to sync block from master writer
+	SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error
+
+	// ========== Only For Tikv End ==========
 }

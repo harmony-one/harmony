@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	v3 "github.com/harmony-one/harmony/block/v3"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/event"
@@ -174,10 +176,20 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 
 // GetLatestChainHeaders ..
 func (hmy *Harmony) GetLatestChainHeaders() *block.HeaderPair {
-	return &block.HeaderPair{
-		BeaconHeader: hmy.BeaconChain.CurrentHeader(),
-		ShardHeader:  hmy.BlockChain.CurrentHeader(),
+	pair := &block.HeaderPair{
+		BeaconHeader: &block.Header{Header: v3.NewHeader()},
+		ShardHeader:  &block.Header{Header: v3.NewHeader()},
 	}
+
+	if hmy.BeaconChain != nil {
+		pair.BeaconHeader = hmy.BeaconChain.CurrentHeader()
+	}
+
+	if hmy.BlockChain != nil {
+		pair.ShardHeader = hmy.BlockChain.CurrentHeader()
+	}
+
+	return pair
 }
 
 // GetLastCrossLinks ..

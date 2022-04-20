@@ -27,6 +27,7 @@ type HarmonyConfig struct {
 	Revert     *RevertConfig     `toml:",omitempty"`
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
+	TiKV       *TiKVConfig       `toml:",omitempty"`
 	DNSSync    DnsSync
 	ShardData  ShardDataConfig
 }
@@ -66,6 +67,18 @@ type GeneralConfig struct {
 	DataDir                string
 	TraceEnable            bool
 	EnablePruneBeaconChain bool
+	RunElasticMode         bool
+}
+
+type TiKVConfig struct {
+	Debug bool
+
+	PDAddr                      []string
+	Role                        string
+	StateDBCacheSizeInMB        uint32
+	StateDBCachePersistencePath string
+	StateDBRedisServerAddr      []string
+	StateDBRedisLRUTimeInDay    uint32
 }
 
 type ShardDataConfig struct {

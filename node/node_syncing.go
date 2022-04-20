@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/tikv"
+
 	prom "github.com/harmony-one/harmony/api/service/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -216,6 +218,10 @@ func (node *Node) doBeaconSyncing() {
 		return
 	}
 
+	if node.HarmonyConfig.General.RunElasticMode {
+		return
+	}
+
 	if !node.NodeConfig.Downloader {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
@@ -319,7 +325,22 @@ func (node *Node) StartGRPCSyncClient() {
 			Msg("SupportBeaconSyncing")
 		go node.doBeaconSyncing()
 	}
-	node.supportSyncing()
+}
+
+// NodeSyncing makes sure to start all the processes needed to sync the node based on different configuration factors.
+func (node *Node) NodeSyncing() {
+	if node.HarmonyConfig.General.RunElasticMode {
+		node.syncFromTiKVWriter() // this is for both reader and backup writers
+
+		if node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
+			node.Consensus.UpdateConsensusInformation()
+		}
+		if node.HarmonyConfig.TiKV.Role == tikv.RoleWriter {
+			node.supportSyncing() // the writer needs to be in sync with it's other peers
+		}
+	} else if !node.HarmonyConfig.General.IsOffline && node.HarmonyConfig.DNSSync.Client {
+		node.supportSyncing() // for non-writer-reader mode a.k.a tikv nodes
+	}
 }
 
 // supportSyncing keeps sleeping until it's doing consensus or it's a leader.

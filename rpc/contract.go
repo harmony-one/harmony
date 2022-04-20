@@ -35,11 +35,16 @@ type PublicContractService struct {
 }
 
 // NewPublicContractAPI creates a new API for the RPC interface
-func NewPublicContractAPI(hmy *hmy.Harmony, version Version) rpc.API {
+func NewPublicContractAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	var limiter *rate.Limiter
+	if limiterEnable {
+		limiter = rate.NewLimiter(rate.Limit(limit), limit)
+	}
+
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicContractService{hmy, version, rate.NewLimiter(200, 1500)},
+		Service:   &PublicContractService{hmy, version, limiter},
 		Public:    true,
 	}
 }

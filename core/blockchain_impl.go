@@ -22,12 +22,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -95,6 +101,7 @@ const (
 	maxTimeFutureBlocks                = 30
 	badBlockLimit                      = 10
 	triesInMemory                      = 128
+	triesInRedis                       = 1000
 	shardCacheLimit                    = 10
 	commitsCacheLimit                  = 10
 	epochCacheLimit                    = 10
@@ -128,6 +135,14 @@ type BlockChainImpl struct {
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+
+	// The following two variables are used to clean up the cache of redis in tikv mode.
+	// This can improve the cache hit rate of redis
+	latestCleanCacheNum uint64      // The most recently cleaned cache of block num
+	cleanCacheChan      chan uint64 // Used to notify blocks that will be cleaned up
+
+	// redisPreempt used in tikv mode, write nodes preempt for write permissions and publish updates to reader nodes
+	redisPreempt *redis_helper.RedisPreempt
 
 	hc            *HeaderChain
 	trace         bool       // atomic?
@@ -196,7 +211,7 @@ func NewBlockChainWithOptions(
 // available in the database. It initialises the default Ethereum validator and
 // Processor.
 func NewBlockChain(
-	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainImpl, error) {
@@ -235,7 +250,7 @@ func newBlockChainWithOptions(
 		cacheConfig:                   cacheConfig,
 		db:                            db,
 		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
+		stateCache:                    stateCache,
 		quit:                          make(chan struct{}),
 		shouldPreserve:                shouldPreserve,
 		bodyCache:                     bodyCache,
@@ -355,6 +370,7 @@ func (bc *BlockChainImpl) loadLastState() error {
 		}
 	}
 	// Everything seems to be fine, set as the head block
+	bc.latestCleanCacheNum = currentBlock.NumberU64() - triesInRedis
 	bc.currentBlock.Store(currentBlock)
 	headBlockGauge.Update(int64(currentBlock.NumberU64()))
 
@@ -689,6 +705,30 @@ func (bc *BlockChainImpl) writeHeadBlock(block *types.Block) error {
 	return nil
 }
 
+// tikvFastForward writes a new head block in tikv mode, used for reader node or follower writer node
+func (bc *BlockChainImpl) tikvFastForward(block *types.Block, logs []*types.Log) error {
+	bc.currentBlock.Store(block)
+	headBlockGauge.Update(int64(block.NumberU64()))
+
+	if err := bc.hc.SetCurrentHeader(block.Header()); err != nil {
+		return errors.Wrap(err, "HeaderChain SetCurrentHeader")
+	}
+
+	bc.currentFastBlock.Store(block)
+	headFastBlockGauge.Update(int64(block.NumberU64()))
+
+	var events []interface{}
+	events = append(events, ChainEvent{block, block.Hash(), logs})
+	events = append(events, ChainHeadEvent{block})
+
+	if block.NumberU64() > triesInRedis {
+		bc.latestCleanCacheNum = block.NumberU64() - triesInRedis
+	}
+
+	bc.PostChainEvents(events, logs)
+	return nil
+}
+
 // insert injects a new head block into the current block chain. This method
 // assumes that the block is indeed a true head. It will also reset the head
 // header and the head fast sync block to this very same block if they are older
@@ -846,6 +886,10 @@ func (bc *BlockChainImpl) TrieNode(hash common.Hash) ([]byte, error) {
 }
 
 func (bc *BlockChainImpl) Stop() {
+	if bc == nil {
+		return
+	}
+
 	if !atomic.CompareAndSwapInt32(&bc.running, 0, 1) {
 		return
 	}
@@ -1184,6 +1228,14 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 			}
 			return NonStatTy, err
 		}
+
+		// clean block tire info in redis, used for tikv mode
+		if block.NumberU64() > triesInRedis {
+			select {
+			case bc.cleanCacheChan <- block.NumberU64() - triesInRedis:
+			default:
+			}
+		}
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
@@ -1300,8 +1352,17 @@ func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
 }
 
 func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+	// if in tikv mode, writer node need preempt master or come be a follower
+	if bc.isInitTiKV() && !bc.tikvPreemptMaster(bc.rangeBlock(chain)) {
+		return len(chain), nil
+	}
+
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
+	if bc.isInitTiKV() && err != nil {
+		// if has some error, master writer node will release the permission
+		_, _ = bc.redisPreempt.Unlock()
+	}
 	return n, err
 }
 
@@ -1541,6 +1602,14 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainEvent{block, block.Hash(), logs})
 			lastCanon = block
+
+			// used for tikv mode, writer node will publish update to all reader node
+			if bc.isInitTiKV() {
+				err = redis_helper.PublishShardUpdate(bc.ShardID(), block.NumberU64(), logs)
+				if err != nil {
+					utils.Logger().Info().Err(err).Msg("redis publish shard update error")
+				}
+			}
 
 			// Only count canonical blocks for GC processing time
 			bc.gcproc += proctime
@@ -3026,6 +3095,172 @@ func (bc *BlockChainImpl) EnablePruneBeaconChainFeature() {
 
 func (bc *BlockChainImpl) IsEnablePruneBeaconChainFeature() bool {
 	return bc.pruneBeaconChainEnable
+}
+
+// SyncFromTiKVWriter used for tikv mode, all reader or follower writer used to sync block from master writer
+func (bc *BlockChainImpl) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
+	head := rawdb.ReadHeadBlockHash(bc.db)
+	dbBlock := bc.GetBlockByHash(head)
+	currentBlock := bc.CurrentBlock()
+
+	if dbBlock == nil || currentBlock == nil {
+		return nil
+	}
+
+	currentBlockNum := currentBlock.NumberU64()
+	if currentBlockNum < newBlkNum {
+		start := time.Now()
+		for i := currentBlockNum; i <= newBlkNum; i++ {
+			blk := bc.GetBlockByNumber(i)
+			if blk == nil {
+				// cluster synchronization may be in progress
+				utils.Logger().Warn().
+					Uint64("currentBlockNum", i).
+					Msg("[tikv sync] sync from writer got block nil, cluster synchronization may be in progress")
+				return nil
+			}
+
+			err := bc.tikvFastForward(blk, logs)
+			if err != nil {
+				return err
+			}
+		}
+		utils.Logger().Info().
+			Uint64("currentBlockNum", currentBlockNum).
+			Dur("usedTime", time.Now().Sub(start)).
+			Msg("[tikv sync] sync from writer")
+	}
+
+	return nil
+}
+
+// tikvCleanCache used for tikv mode, clean block tire data from redis
+func (bc *BlockChainImpl) tikvCleanCache() {
+	var count int
+	for to := range bc.cleanCacheChan {
+		for i := bc.latestCleanCacheNum + 1; i <= to; i++ {
+			// build previous block statedb
+			fromBlock := bc.GetBlockByNumber(i)
+			fromTrie, err := state.New(fromBlock.Root(), bc.stateCache)
+			if err != nil {
+				continue
+			}
+
+			// build current block statedb
+			toBlock := bc.GetBlockByNumber(i + 1)
+			toTrie, err := state.New(toBlock.Root(), bc.stateCache)
+			if err != nil {
+				continue
+			}
+
+			// diff two statedb and delete redis cache
+			start := time.Now()
+			count, err = fromTrie.DiffAndCleanCache(bc.ShardID(), toTrie)
+			if err != nil {
+				utils.Logger().Warn().
+					Err(err).
+					Msg("[tikv clean cache] error")
+				break
+			}
+
+			utils.Logger().Info().
+				Uint64("blockNum", i).
+				Int("removeCacheEntriesCount", count).
+				Dur("usedTime", time.Now().Sub(start)).
+				Msg("[tikv clean cache] success")
+			bc.latestCleanCacheNum = i
+		}
+	}
+}
+
+func (bc *BlockChainImpl) isInitTiKV() bool {
+	return bc.redisPreempt != nil
+}
+
+// tikvPreemptMaster used for tikv mode, writer node need preempt master or come be a follower
+func (bc *BlockChainImpl) tikvPreemptMaster(fromBlock, toBlock uint64) bool {
+	for {
+		// preempt master
+		if ok, _ := bc.redisPreempt.TryLock(60); ok {
+			return true
+		}
+
+		// follower
+		if bc.CurrentBlock().NumberU64() >= toBlock {
+			return false
+		}
+
+		time.Sleep(time.Second)
+	}
+}
+
+// rangeBlock get the block range of blocks
+func (bc *BlockChainImpl) rangeBlock(blocks types.Blocks) (uint64, uint64) {
+	if len(blocks) == 0 {
+		return 0, 0
+	}
+	max := blocks[0].NumberU64()
+	min := max
+	for _, tmpBlock := range blocks {
+		if tmpBlock.NumberU64() > max {
+			max = tmpBlock.NumberU64()
+		} else if tmpBlock.NumberU64() < min {
+			min = tmpBlock.NumberU64()
+		}
+	}
+
+	return min, max
+}
+
+// RedisPreempt used for tikv mode, get the redis preempt instance
+func (bc *BlockChainImpl) RedisPreempt() *redis_helper.RedisPreempt {
+	if bc == nil {
+		return nil
+	}
+	return bc.redisPreempt
+}
+
+func (bc *BlockChainImpl) IsTikvWriterMaster() bool {
+	if bc == nil || bc.redisPreempt == nil {
+		return false
+	}
+
+	return bc.redisPreempt.LastLockStatus()
+}
+
+// InitTiKV used for tikv mode, init the tikv mode
+func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
+	bc.cleanCacheChan = make(chan uint64, 10)
+
+	if conf.Role == tikv.RoleWriter {
+		// only writer need preempt permission
+		bc.redisPreempt = redis_helper.CreatePreempt(fmt.Sprintf("shard_%d_preempt", bc.ShardID()))
+	}
+
+	if conf.Debug {
+		// used for init redis cache
+		// If redis is empty, the hit rate will be too low and the synchronization block speed will be slow
+		// set LOAD_PRE_FETCH is yes can significantly improve this.
+		if os.Getenv("LOAD_PRE_FETCH") == "yes" {
+			if trie, err := state.New(bc.CurrentBlock().Root(), bc.stateCache); err == nil {
+				trie.Prefetch(512)
+			} else {
+				log.Println("LOAD_PRE_FETCH ERR: ", err)
+			}
+		}
+
+		// If redis is empty, there is no need to clear the cache of nearly 1000 blocks
+		// set CLEAN_INIT is the latest block num can skip slow and unneeded cleanup process
+		if os.Getenv("CLEAN_INIT") != "" {
+			from, err := strconv.Atoi(os.Getenv("CLEAN_INIT"))
+			if err == nil {
+				bc.latestCleanCacheNum = uint64(from)
+			}
+		}
+	}
+
+	// start clean block tire data process
+	go bc.tikvCleanCache()
 }
 
 var (

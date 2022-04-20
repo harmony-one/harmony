@@ -37,11 +37,15 @@ type PublicPoolService struct {
 }
 
 // NewPublicPoolAPI creates a new API for the RPC interface
-func NewPublicPoolAPI(hmy *hmy.Harmony, version Version) rpc.API {
+func NewPublicPoolAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
+	var limiter *rate.Limiter
+	if limiterEnable {
+		limiter = rate.NewLimiter(rate.Limit(limit), limit)
+	}
 	return rpc.API{
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
-		Service:   &PublicPoolService{hmy, version, rate.NewLimiter(2, 5)},
+		Service:   &PublicPoolService{hmy, version, limiter},
 		Public:    true,
 	}
 }

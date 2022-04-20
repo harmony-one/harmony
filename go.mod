@@ -3,6 +3,8 @@ module github.com/harmony-one/harmony
 go 1.18
 
 require (
+	github.com/RoaringBitmap/roaring v1.1.0
+	github.com/VictoriaMetrics/fastcache v1.5.7
 	github.com/Workiva/go-datastructures v1.0.50
 	github.com/allegro/bigcache v1.2.1
 	github.com/aws/aws-sdk-go v1.30.1
@@ -13,6 +15,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.9.25
+	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/golangci/golangci-lint v1.22.2
@@ -38,7 +42,7 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml v1.9.3
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.10.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rjeczalik/notify v0.9.2
 	github.com/rs/cors v1.7.0
@@ -48,13 +52,15 @@ require (
 	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20200815110645-5c35d600f0ca
+	github.com/tikv/client-go/v2 v2.0.1
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee
 	go.uber.org/ratelimit v0.1.0
-	go.uber.org/zap v1.16.0
+	go.uber.org/zap v1.20.0
 	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
-	google.golang.org/grpc v1.33.2
+	golang.org/x/tools v0.1.7 // indirect
+	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce

@@ -170,6 +170,8 @@ type TxPoolConfig struct {
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
+	AddEvent func(tx types.PoolTransaction, local bool) // Fire add event
+
 	Blacklist  map[common.Address]struct{}      // Set of accounts that cannot be a part of any transaction
 	AllowedTxs map[common.Address]AllowedTxData // Set of allowed transactions can break the blocklist
 }
@@ -958,7 +960,14 @@ func (pool *TxPool) pendingEpoch() *big.Int {
 // If a newly added transaction is marked as local, its sending account will be
 // whitelisted, preventing any associated transaction from being dropped out of
 // the pool due to pricing constraints.
-func (pool *TxPool) add(tx types.PoolTransaction, local bool) (bool, error) {
+func (pool *TxPool) add(tx types.PoolTransaction, local bool) (replaced bool, err error) {
+	defer func() {
+		if err == nil && pool.config.AddEvent != nil {
+			// used for tikv mode, writer will publish txpool change to all reader, this makes the state consistent
+			pool.config.AddEvent(tx, local)
+		}
+	}()
+
 	logger := utils.Logger().With().Stack().Logger()
 	// If the transaction is in the error sink, remove it as it may succeed
 	if pool.txErrorSink.Contains(tx.Hash().String()) {
