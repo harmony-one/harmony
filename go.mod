@@ -26,7 +26,7 @@ require (
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/ipfs/go-ds-badger v0.2.7
-	github.com/json-iterator/go v1.1.10
+	github.com/json-iterator/go v1.1.12
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-crypto v0.1.0
@@ -83,10 +83,8 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/elastic/gosigar v0.8.1-0.20180330100440-37f05ff46ffa // indirect
 	github.com/fatih/color v1.10.0 // indirect
-	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/garslo/gogen v0.0.0-20170307003452-d6ebae628c7c // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/go-critic/go-critic v0.4.0 // indirect
 	github.com/go-lintpack/lintpack v0.5.2 // indirect
@@ -191,7 +189,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.0.3 // indirect
 	github.com/multiformats/go-base36 v0.1.0 // indirect
@@ -232,7 +230,6 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect
 	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e // indirect
