@@ -176,7 +176,7 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 		// Assume that node sent us invalid data.
 		ss.syncConfig.RemovePeer(peerCfg)
 		utils.Logger().Error().Err(err).
-			Msgf("[EPOCHSYNC] Removing peer for invalid data", peerCfg.String())
+			Msgf("[EPOCHSYNC] Removing peer %s for invalid data", peerCfg.String())
 		return err
 	}
 	return nil
