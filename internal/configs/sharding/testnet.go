@@ -116,9 +116,9 @@ var testnetReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.TwoSecondsEpoch,
 }
 
-var testnetV0 = MustNewInstance(4, 16, 15, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
-var testnetV1 = MustNewInstance(4, 20, 15, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
-var testnetV2 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
-var testnetV3 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-var testnetV3_1 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
-var testnetV3_2 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV0 = MustNewInstance(4, 16, 15, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV1 = MustNewInstance(4, 20, 15, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV2 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpochOld())
+var testnetV3 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV3_1 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV3_2 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())

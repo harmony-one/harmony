@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/harmony-one/harmony/internal/genesis"
@@ -74,6 +75,10 @@ type Instance interface {
 	BlocksPerEpoch() uint64
 	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	SlotsLimit() int
+
+	ExternalAllowlist() []bls.PublicKeyWrapper
+
+	ExternalAllowlistLimit() int
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

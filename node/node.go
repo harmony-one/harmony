@@ -1170,7 +1170,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}
