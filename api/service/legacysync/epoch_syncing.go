@@ -153,6 +153,7 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, worker *worker.Worker) error {
 
 	var payload [][]byte
+	var peerCfg *SyncPeerConfig
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		resp := peerConfig.GetClient().GetBlocksByHeights(heights)
@@ -163,13 +164,23 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 			return false
 		}
 		payload = resp.Payload
-		return true
+		peerCfg = peerConfig
+		return false
 	})
 
 	if len(payload) == 0 {
 		return errors.New("empty payload")
 	}
+	err := ss.processWithPayload(payload, bc)
+	if err != nil {
+		// Assume that node sent us invalid data.
+		ss.syncConfig.RemovePeer(peerCfg)
+		return err
+	}
+	return nil
+}
 
+func (ss *EpochSync) processWithPayload(payload [][]byte, bc *core.BlockChain) error {
 	decoded := make([]*types.Block, 0, len(payload))
 	for idx, blockBytes := range payload {
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)

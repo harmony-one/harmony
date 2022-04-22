@@ -36,8 +36,10 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 
 			lock.Lock()
 			if response != nil {
-				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
-					maxHeight = response.BlockHeight
+				if response.BlockHeight < math.MaxUint32 { // That's enough for decades.
+					if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
+						maxHeight = response.BlockHeight
+					}
 				}
 			}
 			lock.Unlock()
