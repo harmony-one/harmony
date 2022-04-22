@@ -226,7 +226,7 @@ func (ss *EpochSync) processWithPayload(payload [][]byte, bc *core.BlockChain) e
 			return err
 		}
 		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Added block %s", block.Hash().Hex())
+			Msgf("[EPOCHSYNC] Added block %d %s", block.NumberU64(), block.Hash().Hex())
 	}
 
 	return nil
