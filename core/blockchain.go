@@ -2641,7 +2641,7 @@ func (bc *BlockChain) ComputeAndUpdateAPR(
 		}
 	} else {
 		// only insert if APR for current epoch does not exists
-		aprEntry := staking.APREntry{now, *aprComputed}
+		aprEntry := staking.APREntry{Epoch: now, Value: *aprComputed}
 		l := len(stats.APRs)
 		// first time inserting apr for validator or
 		// apr for current epoch does not exists
@@ -2679,7 +2679,7 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 			return err
 		}
 
-		snapshot := &staking.ValidatorSnapshot{validator, epoch}
+		snapshot := &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}
 		if err := bc.WriteValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
@@ -2691,10 +2691,9 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 // ReadValidatorList reads the addresses of current all validators
 func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 	if cached, ok := bc.validatorListCache.Get("validatorList"); ok {
-		by := cached.([]byte)
-		m := []common.Address{}
-		if err := rlp.DecodeBytes(by, &m); err != nil {
-			return nil, err
+		m, ok := cached.([]common.Address)
+		if !ok {
+			return nil, errors.New("failed to get validator list")
 		}
 		return m, nil
 	}
@@ -2709,10 +2708,7 @@ func (bc *BlockChain) WriteValidatorList(
 	if err := rawdb.WriteValidatorList(db, addrs); err != nil {
 		return err
 	}
-	bytes, err := rlp.EncodeToBytes(addrs)
-	if err == nil {
-		bc.validatorListCache.Add("validatorList", bytes)
-	}
+	bc.validatorListCache.Add("validatorList", addrs)
 	return nil
 }
 
@@ -2826,13 +2822,13 @@ func (bc *BlockChain) UpdateStakingMetaData(
 				return newValidators, err
 			}
 
-			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, epoch}); err != nil {
+			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}); err != nil {
 				return newValidators, err
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
 			if newEpoch.Cmp(epoch) > 0 {
-				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, newEpoch}); err != nil {
+				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: newEpoch}); err != nil {
 					return newValidators, err
 				}
 			}
@@ -2905,9 +2901,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 
 			// Add self delegation into the index
 			selfIndex := staking.DelegationIndex{
-				createValidator.ValidatorAddress,
-				uint64(0),
-				blockNum,
+				ValidatorAddress: createValidator.ValidatorAddress,
+				Index:            uint64(0),
+				BlockNum:         blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if !ok {
@@ -3025,9 +3021,9 @@ func (bc *BlockChain) addDelegationIndex(
 		) {
 			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
-				validatorAddress,
-				uint64(i),
-				blockNum,
+				ValidatorAddress: validatorAddress,
+				Index:            uint64(i),
+				BlockNum:         blockNum,
 			})
 		}
 	}

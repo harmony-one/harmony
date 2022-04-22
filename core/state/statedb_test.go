@@ -926,7 +926,7 @@ func makeValidValidatorWrapper(addr common.Address) stk.ValidatorWrapper {
 		MaxRate:       numeric.ZeroDec(),
 		MaxChangeRate: numeric.ZeroDec(),
 	}
-	c := stk.Commission{cr, big.NewInt(300)}
+	c := stk.Commission{CommissionRates: cr, UpdateHeight: big.NewInt(300)}
 	d := stk.Description{
 		Name:     "Wayne",
 		Identity: "wen",

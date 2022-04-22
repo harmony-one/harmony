@@ -498,7 +498,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	if err != nil {
 		return network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
 	}
-	subComm := shard.Committee{shard.BeaconChainShardID, members}
+	subComm := shard.Committee{ShardID: shard.BeaconChainShardID, Slots: members}
 
 	if err := availability.IncrementValidatorSigningCounts(
 		beaconChain,

@@ -68,9 +68,14 @@ func (c action) toJsonStr() (string, *string, *string) {
 			c.value = big.NewInt(0)
 		}
 
+		var valueStr string
+		if c.op != vm.STATICCALL && c.op != vm.DELEGATECALL {
+			valueStr = fmt.Sprintf(`,"value":"0x%s"`, c.value.Text(16))
+		}
+
 		action := fmt.Sprintf(
-			`{"callType":"%s","value":"0x%s","to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
-			callType, c.value.Text(16), c.to, c.gas, c.from, c.input,
+			`{"callType":"%s"%s,"to":"0x%x","gas":"0x%x","from":"0x%x","input":"0x%x"}`,
+			callType, valueStr, c.to, c.gas, c.from, c.input,
 		)
 
 		output := fmt.Sprintf(
@@ -143,7 +148,6 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 	if err != nil {
 		return nil, jst.CaptureFault(env, pc, op, gas, cost, memory, stack, contract, depth, err)
 	}
-
 	var retErr error
 	stackPeek := func(n int) *big.Int {
 		if n >= len(stack.Data()) {
@@ -153,7 +157,7 @@ func (jst *ParityBlockTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode,
 		return stack.Back(n)
 	}
 	memoryCopy := func(off, size int64) []byte {
-		if off+size >= int64(memory.Len()) {
+		if off+size > int64(memory.Len()) {
 			retErr = errors.New("tracer bug:memory leak")
 			return nil
 		}

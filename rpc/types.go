@@ -94,6 +94,16 @@ type Delegation struct {
 	Undelegations    []Undelegation `json:"Undelegations"`
 }
 
+func (d Delegation) IntoStructuredResponse() StructuredResponse {
+	return StructuredResponse{
+		"validator_address": d.ValidatorAddress,
+		"delegator_address": d.DelegatorAddress,
+		"amount":            d.Amount,
+		"reward":            d.Reward,
+		"Undelegations":     d.Undelegations,
+	}
+}
+
 // Undelegation represents one undelegation entry
 type Undelegation struct {
 	Amount *big.Int

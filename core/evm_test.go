@@ -77,12 +77,12 @@ func TestEVMStaking(t *testing.T) {
 	// write it to snapshot so that we can use it in edit
 	// use a copy because we are editing below (wrapper.Delegations)
 	wrapper, err := db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
-	err = chain.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{wrapper, header.Epoch()})
+	err = chain.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: wrapper, Epoch: header.Epoch()})
 	// also write the delegation so we can use it in CollectRewards
 	selfIndex := staking.DelegationIndex{
-		createValidator.ValidatorAddress,
-		uint64(0),
-		common.Big0, // block number at which delegation starts
+		ValidatorAddress: createValidator.ValidatorAddress,
+		Index:            uint64(0),
+		BlockNum:         common.Big0, // block number at which delegation starts
 	}
 	err = chain.writeDelegationsByDelegator(batch, createValidator.ValidatorAddress, []staking.DelegationIndex{selfIndex})
 
@@ -98,10 +98,9 @@ func TestEVMStaking(t *testing.T) {
 	delegate := sampleDelegate(*key)
 	// add undelegations in epoch0
 	wrapper.Delegations[0].Undelegations = []staking.Undelegation{
-		staking.Undelegation{
-			new(big.Int).Mul(big.NewInt(denominations.One),
-				big.NewInt(10000)),
-			common.Big0,
+		{
+			Amount: new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000)),
+			Epoch:  common.Big0,
 		},
 	}
 	// redelegate using epoch1, so that we can cover the locked tokens use case as well

@@ -332,8 +332,12 @@ func (sm *streamManager) discover(ctx context.Context) (<-chan libp2p_peer.AddrI
 		return nil, nil
 	}
 
-	ctx, _ = context.WithTimeout(ctx, discTimeout)
-	return sm.pf.FindPeers(ctx, protoID, discBatch)
+	ctx2, cancel := context.WithTimeout(ctx, discTimeout)
+	go func() { // avoid context leak
+		<-time.After(discTimeout)
+		cancel()
+	}()
+	return sm.pf.FindPeers(ctx2, protoID, discBatch)
 }
 
 func (sm *streamManager) setupStreamWithPeer(ctx context.Context, pid libp2p_peer.ID) error {
