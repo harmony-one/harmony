@@ -114,6 +114,7 @@ func Compute(
 			continue
 		}
 		shardSlotsCount := make([]int, shardCount)
+		// may changed spread later
 		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
 		startIndex := len(eposedSlots)
@@ -136,10 +137,12 @@ func Compute(
 		// recalculate the effectiveSpread if slots exceed the limit
 		if limitedSlotsCount := len(eposedSlots) - startIndex; limitedSlotsCount != slotsCount {
 			effectiveSpread := numeric.NewDecFromBigInt(staker.slot.Stake).QuoInt64(int64(limitedSlotsCount))
-			for _, slot := range eposedSlots[startIndex:] {
-				slot.RawStake = effectiveSpread
-				slot.EPoSStake = effectiveSpread
-			}
+			// spread is wrapped pointer of big.Int, when we set it's value, releated slot.RawStake and slot.EPoSStake will also 'changed'
+			spread.Int.Set(effectiveSpread.Int)
+			//for _, slot := range eposedSlots[startIndex:] {
+			//	slot.RawStake = effectiveSpread
+			//	slot.EPoSStake = effectiveSpread
+			//}
 		}
 	}
 
