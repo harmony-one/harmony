@@ -969,6 +969,10 @@ func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port 
 	return ErrRegistrationFail
 }
 
+func (peerConfig *SyncPeerConfig) String() interface{} {
+	return fmt.Sprintf("peer: %s:%s ", peerConfig.ip, peerConfig.port)
+}
+
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
 // return number of successful registration
 func (ss *StateSync) RegisterNodeInfo() int {
