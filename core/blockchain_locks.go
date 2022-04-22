@@ -4,6 +4,7 @@ import (
 	"io"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -29,10 +30,31 @@ type BlockChainWithLocks struct {
 }
 
 func newBlockchainWithLocks(bc *BlockChainWithoutLocks) *BlockChainWithLocks {
-	return &BlockChainWithLocks{
+	b := &BlockChainWithLocks{
 		bc:   bc,
 		lock: sync.RWMutex{},
 	}
+	go b.update()
+	return b
+}
+
+func (b *BlockChainWithLocks) update() {
+	futureTimer := time.NewTicker(5 * time.Second)
+	defer futureTimer.Stop()
+	for {
+		select {
+		case <-futureTimer.C:
+			b.procFutureBlocks()
+		case <-b.bc.quit:
+			return
+		}
+	}
+}
+
+func (b *BlockChainWithLocks) procFutureBlocks() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	b.bc.procFutureBlocks()
 }
 
 func (b *BlockChainWithLocks) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []types2.StakeMsg, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
@@ -236,6 +258,9 @@ func (b *BlockChainWithLocks) GetMaxGarbageCollectedBlockNumber() int64 {
 }
 
 func (b *BlockChainWithLocks) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+	if len(chain) == 0 {
+		return 0, nil
+	}
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return b.bc.InsertChain(chain, verifyHeaders)
@@ -344,8 +369,7 @@ func (b *BlockChainWithLocks) ReadShardState(epoch *big.Int) (*shard.State, erro
 }
 
 func (b *BlockChainWithLocks) WriteShardStateBytes(db rawdb.DatabaseWriter, epoch *big.Int, shardState []byte) (*shard.State, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	// This function doesn't have access to internal state.
 	return b.bc.WriteShardStateBytes(db, epoch, shardState)
 }
 
@@ -374,6 +398,7 @@ func (b *BlockChainWithLocks) GetVrfByNumber(number uint64) []byte {
 }
 
 func (b *BlockChainWithLocks) ChainDb() ethdb.Database {
+	// TODO(kp), lock escape.
 	return b.bc.ChainDb()
 }
 
