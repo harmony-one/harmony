@@ -29,6 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -2085,7 +2087,7 @@ func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardI
 	}
 	oldLinkNumber := oldLink.BlockNum()
 	// Temp fix to skip the hole in continuous crosslink in shard 1
-	if bc.ShardID() == 1 && oldLinkNumber < 27841415 {
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet && shardID == 1 && oldLinkNumber < 27841415 {
 		oldLinkNumber = 27841415
 	}
 	newLink := oldLink
