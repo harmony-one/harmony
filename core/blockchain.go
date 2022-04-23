@@ -2083,9 +2083,14 @@ func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardI
 	if oldLink == nil || err != nil {
 		return err
 	}
+	oldLinkNumber := oldLink.BlockNum()
+	// Temp fix to skip the hole in continuous crosslink in shard 1
+	if bc.ShardID() == 1 && oldLinkNumber < 27841415 {
+		oldLinkNumber = 27841415
+	}
 	newLink := oldLink
 	// Starting from last checkpoint, keeping reading immediate next crosslink until there is a gap
-	for i := oldLink.BlockNum() + 1; ; i++ {
+	for i := oldLinkNumber + 1; ; i++ {
 		tmp, err := bc.ReadCrossLink(shardID, i)
 		if err == nil && tmp != nil && tmp.BlockNum() == i {
 			newLink = tmp
@@ -2094,7 +2099,7 @@ func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardI
 		}
 	}
 
-	if newLink.BlockNum() > oldLink.BlockNum() {
+	if newLink.BlockNum() > oldLinkNumber {
 		utils.Logger().Debug().Msgf("LastContinuousCrossLink: latest checkpoint blockNum %d", newLink.BlockNum())
 		return rawdb.WriteShardLastCrossLink(batch, shardID, newLink.Serialize())
 	}
