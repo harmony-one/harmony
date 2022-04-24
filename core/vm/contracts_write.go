@@ -170,6 +170,19 @@ type routerMethod struct {
 	retrySend *routerRetrySendArgs
 }
 
+func (m routerMethod) requiredGas() uint64 {
+	const sstoreCost = 20000
+	switch {
+	case m.send != nil:
+		storedWords := uint64(len(m.send.payload))/32 + 10
+		return sstoreCost * storedWords
+	case m.retrySend != nil:
+		return 3 * sstoreCost
+	default:
+		panic("Exactly one of send or retrySend must be set.")
+	}
+}
+
 type routerSendArgs struct {
 	to                            common.Address
 	toShard                       uint16
@@ -264,8 +277,7 @@ func (c *routerPrecompile) RequiredGas(
 		fmt.Fprint(os.Stderr, "parseRouterMethod: ", err)
 		return 0, nil
 	}
-	fmt.Fprint(os.Stderr, "router method: ", m)
-	panic("TODO")
+	return m.requiredGas(), nil
 }
 
 func (c *routerPrecompile) RunWriteCapable(
