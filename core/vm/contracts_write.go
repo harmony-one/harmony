@@ -1,7 +1,11 @@
 package vm
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"math/big"
+	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -159,12 +163,109 @@ func (c *stakingPrecompile) RunWriteCapable(
 // (via the WriteCapablePrecompiledContract interface).
 type routerPrecompile struct{}
 
+type routerMethod struct {
+	// Exactly one of these, corresponding to the method
+	// being called, must be non-nil:
+	send      *routerSendArgs
+	retrySend *routerRetrySendArgs
+}
+
+type routerSendArgs struct {
+	to                            common.Address
+	toShard                       uint16
+	payload                       []byte
+	gasBudget, gasPrice, gasLimit *big.Int
+	gasLeftoverTo                 common.Address
+}
+
+type routerRetrySendArgs struct {
+	msgAddr            common.Address
+	gasLimit, gasPrice *big.Int
+}
+
+func readBig(input []byte) *big.Int {
+	ret := &big.Int{}
+	for _, b := range input {
+		ret = ret.Lsh(ret, 8)
+		ret = ret.Add(ret, big.NewInt(int64(b)))
+	}
+	return ret
+}
+
+func parseRouterMethod(input []byte) (m routerMethod, err error) {
+	fmt.Fprintf(os.Stderr, "input: %q\n", input)
+	if len(input) < 4 {
+		return m, fmt.Errorf(
+			"Input too short (%d bytes); does not contain method identifier.",
+			len(input),
+		)
+	}
+	methodId := binary.BigEndian.Uint32(input[:4])
+	args := input[4:]
+	switch methodId {
+	// TODO(cleanup): make constants for these, or something.
+	case 0x0db24a7d: // retrySend
+		if len(args) != 32*3 {
+			return m, fmt.Errorf(
+				"Arguments to retrySend() are the wrong length: %d",
+				len(args),
+			)
+		}
+		m = routerMethod{
+			retrySend: &routerRetrySendArgs{
+				gasLimit: readBig(input[32:64]),
+				gasPrice: readBig(input[64:96]),
+			},
+		}
+		copy(m.retrySend.msgAddr[:], input[12:32])
+		return m, nil
+	case 0x98054083: // send
+		if len(args) < 32*7 {
+			return m, fmt.Errorf(
+				"Arguments to send() are too short: %d",
+				len(args),
+			)
+		}
+		m = routerMethod{
+			send: &routerSendArgs{
+				toShard:   binary.BigEndian.Uint16(input[62:64]),
+				gasBudget: readBig(input[96:128]),
+				gasPrice:  readBig(input[128:160]),
+				gasLimit:  readBig(input[160:192]),
+			},
+		}
+		copy(m.send.to[:], input[12:32])
+		copy(m.send.gasLeftoverTo[:], input[192+12:192+32])
+		payloadOffset := readBig(input[64:96])
+		if !payloadOffset.IsInt64() {
+			return m, fmt.Errorf("Payload offset is too large: %v", payloadOffset)
+		}
+		off := payloadOffset.Int64()
+		if off > int64(len(input)) {
+			return m, fmt.Errorf("Payload offset is out of bounds: %v (max %v)",
+				off, len(input))
+		}
+		m.send.payload = input[off:]
+		return m, nil
+	default:
+		return m, fmt.Errorf("Unknown method id: 0x%x\n", methodId)
+	}
+}
+
 func (c *routerPrecompile) RequiredGas(
 	evm *EVM,
 	contract *Contract,
 	input []byte,
 ) (uint64, error) {
-	return 0, errors.New("[RouterPrecompile]: TODO: implement RequiredGas().")
+	fmt.Fprintf(os.Stderr, "[RouterPrecompile]: RequiredGas(...)\n")
+
+	m, err := parseRouterMethod(input)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "parseRouterMethod: ", err)
+		return 0, nil
+	}
+	fmt.Fprint(os.Stderr, "router method: ", m)
+	panic("TODO")
 }
 
 func (c *routerPrecompile) RunWriteCapable(
@@ -172,5 +273,6 @@ func (c *routerPrecompile) RunWriteCapable(
 	contract *Contract,
 	input []byte,
 ) ([]byte, error) {
-	return nil, errors.New("[RouterPrecompile]: TODO: implement RunWriteCapable().")
+	fmt.Fprintf(os.Stderr, "[RouterPrecompile]: RunWriteCapable(_, _, %q)\n", input)
+	return nil, nil
 }
