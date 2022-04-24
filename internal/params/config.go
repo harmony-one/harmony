@@ -619,6 +619,11 @@ func (c *ChainConfig) IsChainIdFixEpoch(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
 }
 
+// IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
+func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
+	return isForked(c.AllowlistEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {

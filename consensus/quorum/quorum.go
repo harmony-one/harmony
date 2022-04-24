@@ -76,6 +76,7 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
 	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
 }
@@ -159,8 +160,9 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys     []bls.PublicKeyWrapper
-	keyIndexMap    map[bls.SerializedPublicKey]int
+	publicKeys  []bls.PublicKeyWrapper
+	keyIndexMap map[bls.SerializedPublicKey]int
+	// every element is a index of publickKeys
 	allowlistIndex []int
 	prepare        *votepower.Round
 	commit         *votepower.Round
@@ -253,6 +255,43 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	if idx >= numHmyNodes {
 		// find index of external slot key
 		idx = s.allowlistIndex[idx-numHmyNodes]
+	}
+	return found, &s.publicKeys[idx]
+}
+
+// NthNextHmy return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number
+func (s *cIdentities) NthNextHmyExt(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	}
+	numHmyNodes := instance.NumHarmonyOperatedNodesPerShard()
+	// sanity check to avoid out of bound access
+	if numHmyNodes <= 0 || numHmyNodes > len(s.publicKeys) {
+		numHmyNodes = len(s.publicKeys)
+	}
+	nth := idx
+	if idx >= numHmyNodes {
+		nth = sort.SearchInts(s.allowlistIndex, idx) + numHmyNodes
+	}
+
+	numExtNodes := instance.ExternalAllowlistLimit()
+	if numExtNodes > len(s.allowlistIndex) {
+		numExtNodes = len(s.allowlistIndex)
+	}
+
+	nth = (nth + next) % (numHmyNodes + numExtNodes)
+	if nth < 0 {
+		// for example, in golang 4+(-5)%10 = -1, but it expect 9
+		nth = numHmyNodes + numExtNodes + nth
+	}
+	if nth < numHmyNodes {
+		idx = nth
+	} else {
+		// find index of external slot key
+		idx = s.allowlistIndex[nth-numHmyNodes]
 	}
 	return found, &s.publicKeys[idx]
 }
