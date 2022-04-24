@@ -282,11 +282,9 @@ func (s *cIdentities) NthNextHmyExt(instance shardingconfig.Instance, pubKey *bl
 		numExtNodes = len(s.allowlistIndex)
 	}
 
-	nth = (nth + next) % (numHmyNodes + numExtNodes)
-	if nth < 0 {
-		// for example, in golang 4+(-5)%10 = -1, but it expect 9
-		nth = numHmyNodes + numExtNodes + nth
-	}
+	totalNodes := numHmyNodes + numExtNodes
+	// (totalNodes + next%totalNodes) can convert negitive 'next' to positive
+	nth = (nth + totalNodes + next%totalNodes) % totalNodes
 	if nth < numHmyNodes {
 		idx = nth
 	} else {

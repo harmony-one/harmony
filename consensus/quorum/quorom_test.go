@@ -549,7 +549,7 @@ func TestInvalidAggregateSig(test *testing.T) {
 	}
 }
 
-func TestNthNextHmy(test *testing.T) {
+func TestNthNextHmyExt(test *testing.T) {
 	numHmyNodes := 10
 	numAllExtNodes := 10
 	numAllowlistExtNodes := numAllExtNodes / 2
@@ -581,10 +581,7 @@ func TestNthNextHmy(test *testing.T) {
 			}
 
 			preJ := -j
-			preIndex := (i + preJ) % len(allLeaders)
-			if preIndex < 0 {
-				preIndex = len(allLeaders) + preIndex
-			}
+			preIndex := (i + len(allLeaders) + preJ%len(allLeaders)) % len(allLeaders)
 			expectPreLeader := allLeaders[preIndex]
 			found, preLeader := decider.NthNextHmyExt(fakeInstance, &leader, preJ)
 			if !found {
