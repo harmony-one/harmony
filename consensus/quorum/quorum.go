@@ -241,21 +241,12 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	if idx != -1 {
 		found = true
 	}
-	numHmyNodes := instance.NumHarmonyOperatedNodesPerShard()
+	numNodes := instance.NumHarmonyOperatedNodesPerShard()
 	// sanity check to avoid out of bound access
-	if numHmyNodes <= 0 || numHmyNodes > len(s.publicKeys) {
-		numHmyNodes = len(s.publicKeys)
+	if numNodes <= 0 || numNodes > len(s.publicKeys) {
+		numNodes = len(s.publicKeys)
 	}
-	numExtNodes := instance.ExternalAllowlistLimit()
-	if numExtNodes > len(s.allowlistIndex) {
-		numExtNodes = len(s.allowlistIndex)
-	}
-
-	idx = (idx + next) % (numHmyNodes + numExtNodes)
-	if idx >= numHmyNodes {
-		// find index of external slot key
-		idx = s.allowlistIndex[idx-numHmyNodes]
-	}
+	idx = (idx + next) % numNodes
 	return found, &s.publicKeys[idx]
 }
 
