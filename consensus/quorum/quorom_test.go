@@ -63,7 +63,7 @@ func TestAddingQuoromParticipants(t *testing.T) {
 		blsKeys = append(blsKeys, wrapper)
 	}
 
-	decider.UpdateParticipants(blsKeys)
+	decider.UpdateParticipants(blsKeys, []bls.PublicKeyWrapper{})
 	assert.Equal(t, keyCount, decider.ParticipantsCount())
 }
 
@@ -86,7 +86,7 @@ func TestSubmitVote(test *testing.T) {
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
 
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	if _, err := decider.submitVote(
 		Prepare,
@@ -143,7 +143,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 	pubKeyWrapper3 := bls.PublicKeyWrapper{Object: blsPriKey3.GetPublicKey()}
 	pubKeyWrapper3.Bytes.FromLibBLSPublicKey(pubKeyWrapper3.Object)
 
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	decider.submitVote(
 		Prepare,
@@ -221,7 +221,7 @@ func TestAddNewVote(test *testing.T) {
 		pubKeys = append(pubKeys, wrapper)
 	}
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -326,7 +326,7 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	// make all external keys belong to same account
 	slotList[3].EcdsaAddress = slotList[4].EcdsaAddress
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -410,7 +410,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	slotList[5].EcdsaAddress = slotList[7].EcdsaAddress
 	slotList[6].EcdsaAddress = slotList[7].EcdsaAddress
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))

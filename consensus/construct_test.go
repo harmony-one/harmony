@@ -151,7 +151,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
@@ -243,7 +243,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	if err != nil {
 		test.Fatalf("Cannot create consensus: %v", err)
 	}
-	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	consensus.UpdatePublicKeys([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
