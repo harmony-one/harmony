@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -275,6 +276,7 @@ func (s *cIdentities) UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapp
 			s.allowlistIndex = append(s.allowlistIndex, i)
 		}
 	}
+	sort.Ints(s.allowlistIndex)
 	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
 }
