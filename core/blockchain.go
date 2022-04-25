@@ -2568,29 +2568,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
 			newEpochSuperCommittee.Epoch, key,
 		); err == nil {
-			wrapper := snapshot.Validator
-			spread := numeric.ZeroDec()
-			if len(wrapper.SlotPubKeys) > 0 {
-				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-					QuoInt64(int64(len(wrapper.SlotPubKeys)))
-			}
-			instance := shard.Schedule.InstanceForEpoch(newEpochSuperCommittee.Epoch)
-			limitedSlotsCount := 0 // limited slots count for HIP16
-			slotsLimit := instance.SlotsLimit()
-			if slotsLimit > 0 {
-				shardCount := big.NewInt(int64(instance.NumShards()))
-				shardSlotsCount := make([]int, shardCount.Uint64()) // number slots keys on each shard
-				for _, pubkey := range wrapper.SlotPubKeys {
-					shardIndex := new(big.Int).Mod(pubkey.Big(), shardCount).Uint64()
-					shardSlotsCount[shardIndex] += 1
-					if shardSlotsCount[shardIndex] > slotsLimit {
-						continue
-					}
-					limitedSlotsCount += 1
-				}
-				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-					QuoInt64(int64(limitedSlotsCount))
-			}
+			spread := snapshot.RawStake()
 			for i := range stats.MetricsPerShard {
 				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}

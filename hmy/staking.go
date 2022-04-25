@@ -46,9 +46,7 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 			if err != nil {
 				continue
 			}
-			wrapper := snapshot.Validator
-			spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-				QuoInt64(int64(len(wrapper.SlotPubKeys)))
+			spread = snapshot.RawStake()
 			validatorSpreads[slotAddr] = spread
 		}
 
