@@ -337,7 +337,7 @@ func (c *routerPrecompile) RunWriteCapable(
 		value.FillBytes(valBytes[:])
 		h.Write(valBytes[:])
 		nonce := c.newNonce(evm.StateDB, fromAddr)
-		h.Write(nonce[:])
+		binary.Write(h, binary.BigEndian, nonce)
 		msgAddr := h.Sum(nil)[12:]
 
 		// Store data in the message outbox:
@@ -424,21 +424,15 @@ func (ms msgStorage) StoreSlice(n uint8, buf []byte) {
 	ms.StoreWord(n, wbuf)
 }
 
-func (ms msgStorage) StoreNonceToShard(nonce [16]byte, toShard uint32) {
+func (ms msgStorage) StoreNonceToShard(nonce uint64, toShard uint32) {
 	var buf common.Hash
-	copy(buf[:], nonce[:])
-	binary.BigEndian.PutUint32(buf[len(nonce):len(nonce)+4], toShard)
+	binary.BigEndian.PutUint64(buf[:8], nonce)
+	binary.BigEndian.PutUint32(buf[8:8+4], toShard)
 	ms.StoreWord(msIdxNonceToShard, buf)
 }
 
-func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) [16]byte {
-	// FIXME: the spec says this should be a second counter.
-	// TODO(design): consider: do we really need different nonce
-	// from the usual one used by CREATE and such?
-	// TODO: do we really need 128 bits? 64 is probably plenty.
+func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) uint64 {
 	nonce := db.GetNonce(addr)
 	db.SetNonce(addr, nonce+1)
-	var ret [16]byte
-	binary.BigEndian.PutUint64(ret[8:], nonce)
-	return ret
+	return nonce
 }
