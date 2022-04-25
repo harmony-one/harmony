@@ -61,9 +61,9 @@ type headerFields struct {
 	Epoch                *big.Int `json:"epoch"            gencodec:"required"`
 	ShardID              uint32   `json:"shardID"          gencodec:"required"`
 	LastCommitSignature  [96]byte `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap     []byte   `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	ExtraCommitSignature [96]byte `json:"extraCommitSignature"  gencodec:"required"`
-	ExtraCommitBitmap    []byte   `json:"extraCommitBitmap"     gencodec:"required"` // Contains which validator signed late
+	LastCommitBitmap     []byte   `json:"lastCommitBitmap"     gencodec:"required"`  // Contains which validator signed
+	ExtraCommitSignature [96]byte `json:"extraCommitSignature"  gencodec:"required"` // Introduced in header v4
+	ExtraCommitBitmap    []byte   `json:"extraCommitBitmap"     gencodec:"required"` // Introduced in header v4. Contains which validator signed late
 	Vrf                  []byte   `json:"vrf"`
 	Vdf                  []byte   `json:"vdf"`
 	ShardState           []byte   `json:"shardState"`

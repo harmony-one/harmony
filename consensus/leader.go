@@ -211,7 +211,7 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	if !consensus.isCurrentBlockNumAndViewID(recvMsg) {
 		if consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch()) &&
 			consensus.isLatestCommittedBlockNumAndViewID(recvMsg) && !blockObj.IsLastBlockInEpoch() {
-			// If it's the block in extra epoch epoch and not the epoch block, process it for the extra commit sig.
+			// If it's the block in extra commit epoch and not the epoch block, process it for the extra commit sig.
 			consensus.processExtraCommit(recvMsg)
 		}
 		return

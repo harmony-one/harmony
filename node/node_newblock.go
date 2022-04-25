@@ -76,6 +76,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							parentHeader := node.Consensus.Blockchain.GetHeaderByHash(node.Blockchain().CurrentBlock().ParentHash())
 							if parentHeader != nil &&
 								node.Consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
+								// Extra commit sig logic only works starting from block 2 since genesis block doesn't have signatures.
 								sigs.ShouldProcessExtraCommit = true
 							}
 

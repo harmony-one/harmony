@@ -213,6 +213,7 @@ func (consensus *Consensus) finalCommit() {
 	commitSigBitmap := CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}
 	parentHeader := consensus.Blockchain.GetBlockByHash(block.ParentHash())
 	if consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
+		// Extra commit sig logic only works starting from block 2 since genesis block doesn't have signatures.
 		commitSigBitmap.ShouldProcessExtraCommit = true
 		// Fill in this field when parent block is in the ExtraCommit epoch
 		commitSigBitmap.ExtraCommitSigBitmap = extraCommitSigAndBitmap
