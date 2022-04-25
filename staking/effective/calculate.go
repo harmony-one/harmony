@@ -79,10 +79,11 @@ func Median(stakes []SlotPurchase) numeric.Dec {
 
 // Compute ..
 func Compute(
-	shortHand map[common.Address]*SlotOrder, pull, slotsLimit, shardCount int,
+	shortHand map[common.Address]*SlotOrder, pull int,
 ) (numeric.Dec, []SlotPurchase) {
+	eposedSlots := []SlotPurchase{}
 	if len(shortHand) == 0 {
-		return numeric.ZeroDec(), []SlotPurchase{}
+		return numeric.ZeroDec(), eposedSlots
 	}
 
 	type t struct {
@@ -90,13 +91,10 @@ func Compute(
 		slot *SlotOrder
 	}
 
-	totalSlots := 0
 	shorter := []t{}
 	for key, value := range shortHand {
-		totalSlots += len(value.SpreadAmong)
 		shorter = append(shorter, t{key, value})
 	}
-	eposedSlots := make([]SlotPurchase, 0, totalSlots)
 
 	sort.SliceStable(
 		shorter,
@@ -113,36 +111,16 @@ func Compute(
 		if slotsCount == 0 {
 			continue
 		}
-		shardSlotsCount := make([]int, shardCount)
-		// may changed spread later
 		spread := numeric.NewDecFromBigInt(staker.slot.Stake).
 			QuoInt64(int64(slotsCount))
-		startIndex := len(eposedSlots)
 		for i := 0; i < slotsCount; i++ {
-			slot := SlotPurchase{
+			eposedSlots = append(eposedSlots, SlotPurchase{
 				Addr: staker.addr,
 				Key:  staker.slot.SpreadAmong[i],
 				// NOTE these are same because later the .EPoSStake mutated
 				RawStake:  spread,
 				EPoSStake: spread,
-			}
-			shard := new(big.Int).Mod(slot.Key.Big(), big.NewInt(int64(shardCount))).Int64()
-			shardSlotsCount[int(shard)]++
-			// skip if count of slots in this shard exceeds the limit
-			if slotsLimit > 0 && shardSlotsCount[int(shard)] > slotsLimit {
-				continue
-			}
-			eposedSlots = append(eposedSlots, slot)
-		}
-		// recalculate the effectiveSpread if slots exceed the limit
-		if limitedSlotsCount := len(eposedSlots) - startIndex; limitedSlotsCount != slotsCount {
-			effectiveSpread := numeric.NewDecFromBigInt(staker.slot.Stake).QuoInt64(int64(limitedSlotsCount))
-			// spread is wrapped pointer of big.Int, when we set it's value, releated slot.RawStake and slot.EPoSStake will also 'changed'
-			spread.Int.Set(effectiveSpread.Int)
-			//for _, slot := range eposedSlots[startIndex:] {
-			//	slot.RawStake = effectiveSpread
-			//	slot.EPoSStake = effectiveSpread
-			//}
+			})
 		}
 	}
 
@@ -167,10 +145,10 @@ func Compute(
 }
 
 // Apply ..
-func Apply(shortHand map[common.Address]*SlotOrder, pull int, isExtendedBound bool, slotsLimit int, shardCount int) (
+func Apply(shortHand map[common.Address]*SlotOrder, pull int, isExtendedBound bool) (
 	numeric.Dec, []SlotPurchase,
 ) {
-	median, picks := Compute(shortHand, pull, slotsLimit, shardCount)
+	median, picks := Compute(shortHand, pull)
 	max := onePlusC.Mul(median)
 	min := oneMinusC.Mul(median)
 	if isExtendedBound {

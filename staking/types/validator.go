@@ -387,6 +387,32 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	return nil
 }
 
+func (snapshot *ValidatorSnapshot) RawStake() numeric.Dec {
+	wrapper := snapshot.Validator
+	instance := shard.Schedule.InstanceForEpoch(snapshot.Epoch)
+	slotsLimit := instance.SlotsLimit()
+	if slotsLimit > 0 {
+		limitedSlotsCount := 0 // limited slots count for HIP16
+		shardCount := big.NewInt(int64(instance.NumShards()))
+		shardSlotsCount := make([]int, shardCount.Uint64()) // number slots keys on each shard
+		for _, pubkey := range wrapper.SlotPubKeys {
+			shardIndex := new(big.Int).Mod(pubkey.Big(), shardCount).Uint64()
+			shardSlotsCount[shardIndex] += 1
+			if shardSlotsCount[shardIndex] > slotsLimit {
+				continue
+			}
+			limitedSlotsCount += 1
+		}
+		return numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+			QuoInt64(int64(limitedSlotsCount))
+	}
+	if len(wrapper.SlotPubKeys) > 0 {
+		return numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
+			QuoInt64(int64(len(wrapper.SlotPubKeys)))
+	}
+	return numeric.ZeroDec()
+}
+
 // Description - some possible IRL connections
 type Description struct {
 	Name            string `json:"name"`             // name

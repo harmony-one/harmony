@@ -88,7 +88,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool, slotsLimit, shardCount int) (
 	*CompletedEPoSRound, error,
 ) {
-	eligibleCandidate, err := prepareOrders(stakedReader)
+	eligibleCandidate, err := prepareOrders(stakedReader, slotsLimit, shardCount)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 		epoch,
 	)
 	median, winners := effective.Apply(
-		eligibleCandidate, maxExternalSlots, isExtendedBound, slotsLimit, shardCount,
+		eligibleCandidate, maxExternalSlots, isExtendedBound,
 	)
 	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
 
@@ -131,6 +131,7 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 
 func prepareOrders(
 	stakedReader StakingCandidatesReader,
+	slotsLimit, shardCount int,
 ) (map[common.Address]*effective.SlotOrder, error) {
 	candidates := stakedReader.ValidatorCandidates()
 	blsKeys := map[bls.SerializedPublicKey]struct{}{}
@@ -174,12 +175,19 @@ func prepareOrders(
 			continue
 		}
 
+		slotPubKeysLimited := make([]bls.SerializedPublicKey, 0, len(validator.SlotPubKeys))
 		found := false
+		shardSlotsCount := make([]int, shardCount)
 		for _, key := range validator.SlotPubKeys {
 			if _, ok := blsKeys[key]; ok {
 				found = true
 			} else {
 				blsKeys[key] = struct{}{}
+				shard := new(big.Int).Mod(key.Big(), big.NewInt(int64(shardCount))).Int64()
+				if slotsLimit == 0 || shardSlotsCount[shard] < slotsLimit {
+					slotPubKeysLimited = append(slotPubKeysLimited, key)
+				}
+				shardSlotsCount[shard]++
 			}
 		}
 
@@ -198,7 +206,7 @@ func prepareOrders(
 
 		essentials[validator.Address] = &effective.SlotOrder{
 			Stake:       validatorStake,
-			SpreadAmong: validator.SlotPubKeys,
+			SpreadAmong: slotPubKeysLimited,
 			Percentage:  tempZero,
 		}
 	}
