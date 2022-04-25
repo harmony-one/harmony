@@ -238,7 +238,7 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		}
 		copy(m.retrySend.msgAddr[:], input[12:32])
 		return m, nil
-	case 0x98054083: // send
+	case 0x3ba2ea6b: // send
 		if len(args) < 32*7 {
 			return m, fmt.Errorf(
 				"Arguments to send() are too short: %d",
