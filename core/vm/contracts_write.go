@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/sha3"
 	"math/big"
 	"os"
 
@@ -196,6 +197,8 @@ type routerRetrySendArgs struct {
 	gasLimit, gasPrice *big.Int
 }
 
+// TODO: probably should go in some utility module somewhere, if we don't have one
+// already
 func readBig(input []byte) *big.Int {
 	ret := &big.Int{}
 	for _, b := range input {
@@ -274,8 +277,7 @@ func (c *routerPrecompile) RequiredGas(
 
 	m, err := parseRouterMethod(input)
 	if err != nil {
-		fmt.Fprint(os.Stderr, "parseRouterMethod: ", err)
-		return 0, nil
+		return 0, fmt.Errorf("Error parsing method arguments: %w", err)
 	}
 	return m.requiredGas(), nil
 }
@@ -285,6 +287,71 @@ func (c *routerPrecompile) RunWriteCapable(
 	contract *Contract,
 	input []byte,
 ) ([]byte, error) {
-	fmt.Fprintf(os.Stderr, "[RouterPrecompile]: RunWriteCapable(_, _, %q)\n", input)
-	return nil, nil
+	// XXX: it would be nice if we could avoid parsing this twice, since we
+	// already did it in requiredGas.
+	m, err := parseRouterMethod(input)
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing method arguments: %w", err)
+	}
+
+	switch {
+	case m.send != nil:
+		args := m.send
+		fromAddr := contract.Caller()
+		fromShard := evm.Context.ShardID
+		value := contract.Value()
+		if args.gasBudget.Cmp(value) < 0 {
+			return nil, fmt.Errorf(
+				"gasBudget (%v) is less that attached value (%v).",
+				args.gasBudget,
+				value,
+			)
+		}
+		gasPriceTimesLimit := (&big.Int{}).Mul(args.gasPrice, args.gasLimit)
+		if args.gasBudget.Cmp(gasPriceTimesLimit) < 0 {
+			return nil, fmt.Errorf(
+				"gasBudget (%v) is less than gasPrice * gasLimit (%v * %v = %v)",
+				args.gasBudget,
+				args.gasPrice,
+				args.gasLimit,
+				gasPriceTimesLimit,
+			)
+		}
+		value.Sub(value, args.gasBudget) // value transferred (rather than spent on gas).
+
+		// compute the message address
+		h := sha3.NewLegacyKeccak256()
+		h.Write(args.payload)
+		payloadHash := h.Sum(nil)
+		h.Reset()
+		h.Write([]byte{0xff})
+		h.Write(fromAddr[:])
+		h.Write(args.to[:])
+		binary.Write(h, binary.BigEndian, fromShard)
+		binary.Write(h, binary.BigEndian, args.toShard)
+		h.Write(payloadHash)
+		var valBytes [32]byte
+		value.FillBytes(valBytes[:])
+		h.Write(valBytes[:])
+		nonce := c.newNonce(evm.StateDB, fromAddr)
+		h.Write(nonce[:])
+		msgAddr := h.Sum(nil)[12:]
+
+	case m.retrySend != nil:
+		panic("TODO")
+	default:
+		panic("parseRouterMethod left all fields nil!")
+	}
+}
+
+func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) [16]byte {
+	// FIXME: the spec says this should be a second counter.
+	// TODO(design): consider: do we really need different nonce
+	// from the usual one used by CREATE and such?
+	// TODO: do we really need 128 bits? 64 is probably plenty.
+	nonce := db.GetNonce(addr)
+	db.SetNonce(addr, nonce+1)
+	var ret [16]byte
+	binary.BigEndian.PutUint64(ret[8:], nonce)
+	return ret
 }
