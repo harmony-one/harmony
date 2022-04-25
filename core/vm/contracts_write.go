@@ -247,15 +247,15 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		}
 		m = routerMethod{
 			send: &routerSendArgs{
-				toShard:   binary.BigEndian.Uint32(input[62:66]),
-				gasBudget: readBig(input[98:130]),
-				gasPrice:  readBig(input[130:162]),
-				gasLimit:  readBig(input[162:194]),
+				toShard:   binary.BigEndian.Uint32(input[60:64]),
+				gasBudget: readBig(input[96:128]),
+				gasPrice:  readBig(input[128:160]),
+				gasLimit:  readBig(input[160:192]),
 			},
 		}
 		copy(m.send.to[:], input[12:32])
-		copy(m.send.gasLeftoverTo[:], input[194+12:194+32])
-		payloadOffset := readBig(input[66:98])
+		copy(m.send.gasLeftoverTo[:], input[192+12:192+32])
+		payloadOffset := readBig(input[64:96])
 		if !payloadOffset.IsInt64() {
 			return m, fmt.Errorf("Payload offset is too large: %v", payloadOffset)
 		}
