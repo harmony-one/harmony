@@ -80,7 +80,7 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 
 		status: newStatus(),
 		config: config,
-		logger: utils.Logger().With().Str("module", "downloader").Logger(),
+		logger: utils.Logger().With().Str("module", "downloader").Uint32("ShardID", bc.ShardID()).Logger(),
 	}
 }
 
