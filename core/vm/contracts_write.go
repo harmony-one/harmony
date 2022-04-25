@@ -15,15 +15,18 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
+// NOTE: the proposal suggested using 252, but H1 already uses 252-255 for
+// other things, so we pick another address instead:
+var routerAddress = common.BytesToAddress([]byte{1, 1})
+
 // WriteCapablePrecompiledContractsStaking lists out the write capable precompiled contracts
 // which are available after the StakingPrecompileEpoch
 // for now, we have only one contract at 252 or 0xfc - which is the staking precompile
 var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 	// TODO(isd): we probably want to have this in a separate set; this map is used
-	// by pre-router H1 deployments. Also note: the proposal suggested using 252,
-	// but H1 already uses 252-255 for other things, so we pick another address instead:
-	common.BytesToAddress([]byte{1, 1}): &routerPrecompile{},
+	// by pre-router H1 deployments.
+	routerAddress: &routerPrecompile{},
 }
 
 // WriteCapablePrecompiledContract represents the interface for Native Go contracts
@@ -186,7 +189,7 @@ func (m routerMethod) requiredGas() uint64 {
 
 type routerSendArgs struct {
 	to                            common.Address
-	toShard                       uint16
+	toShard                       uint32
 	payload                       []byte
 	gasBudget, gasPrice, gasLimit *big.Int
 	gasLeftoverTo                 common.Address
@@ -244,15 +247,15 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		}
 		m = routerMethod{
 			send: &routerSendArgs{
-				toShard:   binary.BigEndian.Uint16(input[62:64]),
-				gasBudget: readBig(input[96:128]),
-				gasPrice:  readBig(input[128:160]),
-				gasLimit:  readBig(input[160:192]),
+				toShard:   binary.BigEndian.Uint32(input[62:66]),
+				gasBudget: readBig(input[98:130]),
+				gasPrice:  readBig(input[130:162]),
+				gasLimit:  readBig(input[162:194]),
 			},
 		}
 		copy(m.send.to[:], input[12:32])
-		copy(m.send.gasLeftoverTo[:], input[192+12:192+32])
-		payloadOffset := readBig(input[64:96])
+		copy(m.send.gasLeftoverTo[:], input[194+12:194+32])
+		payloadOffset := readBig(input[66:98])
 		if !payloadOffset.IsInt64() {
 			return m, fmt.Errorf("Payload offset is too large: %v", payloadOffset)
 		}
@@ -337,11 +340,95 @@ func (c *routerPrecompile) RunWriteCapable(
 		h.Write(nonce[:])
 		msgAddr := h.Sum(nil)[12:]
 
+		// Store data in the message outbox:
+		ms := msgStorage{db: evm.StateDB}
+		copy(ms.addr[:], msgAddr)
+
+		ms.StoreAddr(msIdxFromAddr, fromAddr)
+		ms.StoreAddr(msIdxToAddr, args.to)
+		ms.StoreNonceToShard(nonce, args.toShard)
+		ms.StoreU256(msIdxValue, value)
+		ms.StoreU256(msIdxGasBudget, args.gasBudget)
+		ms.StoreU256(msIdxGasPrice, args.gasPrice)
+		ms.StoreU256(msIdxGasLimit, args.gasLimit)
+		ms.StoreAddr(msIdxGasLeftoverTo, args.gasLeftoverTo)
+		ms.StoreLen(msIdxPayloadLen, len(args.payload))
+		ms.StoreSlice(msIdxPayloadHash, payloadHash)
+
+		panic("TODO: emit a receipt/actually send the message somehow")
 	case m.retrySend != nil:
 		panic("TODO")
 	default:
 		panic("parseRouterMethod left all fields nil!")
 	}
+}
+
+// Offsets (in words) of various data in a msgStorage
+const (
+	msIdxFromAddr = iota
+	msIdxToAddr
+	msIdxNonceToShard // The nonce and toShard fields live in the same word.
+	msIdxValue
+	msIdxGasBudget
+	msIdxGasPrice
+	msIdxGasLimit
+	msIdxGasLeftoverTo
+	msIdxPayloadLen
+	msIdxPayloadHash
+)
+
+type msgStorage struct {
+	addr common.Address
+	db   StateDB
+}
+
+// compute the storage address of the nth word in the entry for
+// this message.
+func (ms msgStorage) wordAddr(n uint8) common.Hash {
+	var ret common.Hash
+	copy(ret[:], ms.addr[:])
+	ret[20] = 0x01
+	ret[31] = n
+	return ret
+}
+
+func (ms msgStorage) StoreWord(n uint8, w common.Hash) {
+	ms.db.SetState(routerAddress, ms.wordAddr(n), w)
+}
+
+func (ms msgStorage) StoreAddr(n uint8, addr common.Address) {
+	var buf common.Hash
+	copy(buf[:], addr[:])
+	ms.StoreWord(n, buf)
+}
+
+func (ms msgStorage) StoreU256(n uint8, val *big.Int) {
+	var buf common.Hash
+	val.FillBytes(buf[:])
+	ms.StoreWord(n, buf)
+}
+
+func (ms msgStorage) StoreLen(n uint8, val int) {
+	var buf common.Hash
+	binary.BigEndian.PutUint64(buf[:], uint64(val))
+	ms.StoreWord(n, buf)
+}
+
+// Store a byte slice, which must be at most one word in length (panics otherwise).
+func (ms msgStorage) StoreSlice(n uint8, buf []byte) {
+	var wbuf common.Hash
+	if len(buf) < len(wbuf[:]) {
+		panic("Buffer is the wrong size")
+	}
+	copy(wbuf[:], buf)
+	ms.StoreWord(n, wbuf)
+}
+
+func (ms msgStorage) StoreNonceToShard(nonce [16]byte, toShard uint32) {
+	var buf common.Hash
+	copy(buf[:], nonce[:])
+	binary.BigEndian.PutUint32(buf[len(nonce):len(nonce)+4], toShard)
+	ms.StoreWord(msIdxNonceToShard, buf)
 }
 
 func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) [16]byte {
