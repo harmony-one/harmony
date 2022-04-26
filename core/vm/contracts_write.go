@@ -353,7 +353,7 @@ func (c *routerPrecompile) RunWriteCapable(
 			addr: msgAddr,
 		}.StoreMessage(msg, payloadHash)
 
-		panic("TODO: emit a receipt/actually send the message somehow")
+		return nil, evm.Context.EmitCXMessage(msg)
 	case m.retrySend != nil:
 		panic("TODO")
 	default:

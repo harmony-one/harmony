@@ -63,6 +63,8 @@ type (
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
+	// Used by router precompile
+	EmitCXMessageFunc func(types.CXMessage) error
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -176,6 +178,10 @@ type Context struct {
 
 	// staking precompile checks this before proceeding forward
 	ShardID uint32
+
+	// Emit a cross-shard message to be sent when this transaction
+	// commits
+	EmitCXMessage EmitCXMessageFunc
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
