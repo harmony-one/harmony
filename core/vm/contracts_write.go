@@ -353,7 +353,9 @@ func (c *routerPrecompile) RunWriteCapable(
 			addr: msgAddr,
 		}.StoreMessage(msg, payloadHash)
 
-		return nil, evm.Context.EmitCXMessage(msg)
+		// TODO: We should be returning the message address, but I'm not
+		// 100% sure this is the right way to encode it. Check.
+		return msgAddr[:], evm.Context.EmitCXMessage(msg)
 	case m.retrySend != nil:
 		panic("TODO")
 	default:
