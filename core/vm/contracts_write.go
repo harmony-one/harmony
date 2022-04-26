@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"golang.org/x/crypto/sha3"
 	"math/big"
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -212,7 +211,6 @@ func readBig(input []byte) *big.Int {
 }
 
 func parseRouterMethod(input []byte) (m routerMethod, err error) {
-	fmt.Fprintf(os.Stderr, "input: %q\n", input)
 	if len(input) < 4 {
 		return m, fmt.Errorf(
 			"Input too short (%d bytes); does not contain method identifier.",
@@ -221,6 +219,10 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 	}
 	methodId := binary.BigEndian.Uint32(input[:4])
 	args := input[4:]
+
+	argWord := func(i int) []byte {
+		return args[32*i : 32*(i+1)]
+	}
 	switch methodId {
 	// TODO(cleanup): make constants for these, or something.
 	case 0x0db24a7d: // retrySend
@@ -232,11 +234,11 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		}
 		m = routerMethod{
 			retrySend: &routerRetrySendArgs{
-				gasLimit: readBig(input[32:64]),
-				gasPrice: readBig(input[64:96]),
+				gasLimit: readBig(argWord(1)),
+				gasPrice: readBig(argWord(2)),
 			},
 		}
-		copy(m.retrySend.msgAddr[:], input[12:32])
+		copy(m.retrySend.msgAddr[:], argWord(0)[12:])
 		return m, nil
 	case 0x3ba2ea6b: // send
 		if len(args) < 32*7 {
@@ -247,24 +249,24 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		}
 		m = routerMethod{
 			send: &routerSendArgs{
-				toShard:   binary.BigEndian.Uint32(input[60:64]),
-				gasBudget: readBig(input[96:128]),
-				gasPrice:  readBig(input[128:160]),
-				gasLimit:  readBig(input[160:192]),
+				toShard:   binary.BigEndian.Uint32(argWord(1)[32-4:]),
+				gasBudget: readBig(argWord(3)),
+				gasPrice:  readBig(argWord(4)),
+				gasLimit:  readBig(argWord(5)),
 			},
 		}
-		copy(m.send.to[:], input[12:32])
-		copy(m.send.gasLeftoverTo[:], input[192+12:192+32])
-		payloadOffset := readBig(input[64:96])
+		copy(m.send.to[:], argWord(0)[12:])
+		copy(m.send.gasLeftoverTo[:], argWord(6)[12:])
+		payloadOffset := readBig(argWord(2))
 		if !payloadOffset.IsInt64() {
 			return m, fmt.Errorf("Payload offset is too large: %v", payloadOffset)
 		}
 		off := payloadOffset.Int64()
-		if off > int64(len(input)) {
+		if off > int64(len(args)) {
 			return m, fmt.Errorf("Payload offset is out of bounds: %v (max %v)",
-				off, len(input))
+				off, len(args))
 		}
-		m.send.payload = input[off:]
+		m.send.payload = args[off:]
 		return m, nil
 	default:
 		return m, fmt.Errorf("Unknown method id: 0x%x\n", methodId)
@@ -276,8 +278,6 @@ func (c *routerPrecompile) RequiredGas(
 	contract *Contract,
 	input []byte,
 ) (uint64, error) {
-	fmt.Fprintf(os.Stderr, "[RouterPrecompile]: RequiredGas(...)\n")
-
 	m, err := parseRouterMethod(input)
 	if err != nil {
 		return 0, fmt.Errorf("Error parsing method arguments: %w", err)
