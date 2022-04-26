@@ -387,10 +387,12 @@ func (w *ValidatorWrapper) SanityCheck() error {
 	return nil
 }
 
-func (snapshot *ValidatorSnapshot) RawStake() numeric.Dec {
+// RawStakePerSlot return raw stake of each slot key. If HIP16 was activated at that apoch, it only calculate raw stake for keys not exceed the slotsLimit.
+func (snapshot ValidatorSnapshot) RawStakePerSlot() numeric.Dec {
 	wrapper := snapshot.Validator
 	instance := shard.Schedule.InstanceForEpoch(snapshot.Epoch)
 	slotsLimit := instance.SlotsLimit()
+	// HIP16 is acatived
 	if slotsLimit > 0 {
 		limitedSlotsCount := 0 // limited slots count for HIP16
 		shardCount := big.NewInt(int64(instance.NumShards()))
