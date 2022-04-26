@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
@@ -194,6 +195,39 @@ type routerSendArgs struct {
 	gasLeftoverTo                 common.Address
 }
 
+func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMessage, error) {
+	m := types.CXMessage{
+		From:      contract.Caller(),
+		FromShard: evm.Context.ShardID,
+		To:        args.to,
+		ToShard:   args.toShard,
+		Payload:   args.payload,
+		GasBudget: args.gasBudget,
+		GasPrice:  args.gasPrice,
+		GasLimit:  args.gasLimit,
+	}
+	totalValue := contract.Value()
+	if args.gasBudget.Cmp(totalValue) < 0 {
+		return m, fmt.Errorf(
+			"gasBudget (%v) is less that attached value (%v).",
+			args.gasBudget,
+			totalValue,
+		)
+	}
+	m.Value = (&big.Int{}).Sub(totalValue, args.gasBudget)
+	gasPriceTimesLimit := (&big.Int{}).Mul(args.gasPrice, args.gasLimit)
+	if args.gasBudget.Cmp(gasPriceTimesLimit) < 0 {
+		return m, fmt.Errorf(
+			"gasBudget (%v) is less than gasPrice * gasLimit (%v * %v = %v)",
+			args.gasBudget,
+			args.gasPrice,
+			args.gasLimit,
+			gasPriceTimesLimit,
+		)
+	}
+	return m, nil
+}
+
 type routerRetrySendArgs struct {
 	msgAddr            common.Address
 	gasLimit, gasPrice *big.Int
@@ -309,61 +343,15 @@ func (c *routerPrecompile) RunWriteCapable(
 
 	switch {
 	case m.send != nil:
-		args := m.send
-		fromAddr := contract.Caller()
-		fromShard := evm.Context.ShardID
-		value := contract.Value()
-		if args.gasBudget.Cmp(value) < 0 {
-			return nil, fmt.Errorf(
-				"gasBudget (%v) is less that attached value (%v).",
-				args.gasBudget,
-				value,
-			)
+		msg, err := m.send.MakeMessage(evm, contract)
+		if err != nil {
+			return nil, err
 		}
-		gasPriceTimesLimit := (&big.Int{}).Mul(args.gasPrice, args.gasLimit)
-		if args.gasBudget.Cmp(gasPriceTimesLimit) < 0 {
-			return nil, fmt.Errorf(
-				"gasBudget (%v) is less than gasPrice * gasLimit (%v * %v = %v)",
-				args.gasBudget,
-				args.gasPrice,
-				args.gasLimit,
-				gasPriceTimesLimit,
-			)
-		}
-		value.Sub(value, args.gasBudget) // value transferred (rather than spent on gas).
-
-		// compute the message address
-		h := sha3.NewLegacyKeccak256()
-		h.Write(args.payload)
-		payloadHash := h.Sum(nil)
-		h.Reset()
-		h.Write([]byte{0xff})
-		h.Write(fromAddr[:])
-		h.Write(args.to[:])
-		binary.Write(h, binary.BigEndian, fromShard)
-		binary.Write(h, binary.BigEndian, args.toShard)
-		h.Write(payloadHash)
-		var valBytes [32]byte
-		value.FillBytes(valBytes[:])
-		h.Write(valBytes[:])
-		nonce := c.newNonce(evm.StateDB, fromAddr)
-		binary.Write(h, binary.BigEndian, nonce)
-		msgAddr := h.Sum(nil)[12:]
-
-		// Store data in the message outbox:
-		ms := msgStorage{db: evm.StateDB}
-		copy(ms.addr[:], msgAddr)
-
-		ms.StoreAddr(msIdxFromAddr, fromAddr)
-		ms.StoreAddr(msIdxToAddr, args.to)
-		ms.StoreNonceToShard(nonce, args.toShard)
-		ms.StoreU256(msIdxValue, value)
-		ms.StoreU256(msIdxGasBudget, args.gasBudget)
-		ms.StoreU256(msIdxGasPrice, args.gasPrice)
-		ms.StoreU256(msIdxGasLimit, args.gasLimit)
-		ms.StoreAddr(msIdxGasLeftoverTo, args.gasLeftoverTo)
-		ms.StoreLen(msIdxPayloadLen, len(args.payload))
-		ms.StoreSlice(msIdxPayloadHash, payloadHash)
+		msgAddr, payloadHash := messageAddrAndPayloadHash(msg)
+		msgStorage{
+			db:   evm.StateDB,
+			addr: msgAddr,
+		}.StoreMessage(msg, payloadHash)
 
 		panic("TODO: emit a receipt/actually send the message somehow")
 	case m.retrySend != nil:
@@ -371,6 +359,28 @@ func (c *routerPrecompile) RunWriteCapable(
 	default:
 		panic("parseRouterMethod left all fields nil!")
 	}
+}
+
+// Compute the message address and address of the payload.
+func messageAddrAndPayloadHash(m types.CXMessage) (common.Address, common.Hash) {
+	h := sha3.NewLegacyKeccak256()
+	h.Write(m.Payload)
+	var payloadHash common.Hash
+	copy(payloadHash[:], h.Sum(nil))
+	h.Reset()
+	h.Write([]byte{0xff})
+	h.Write(m.From[:])
+	h.Write(m.To[:])
+	binary.Write(h, binary.BigEndian, m.FromShard)
+	binary.Write(h, binary.BigEndian, m.ToShard)
+	h.Write(payloadHash[:])
+	var valBytes [32]byte
+	m.Value.FillBytes(valBytes[:])
+	h.Write(valBytes[:])
+	binary.Write(h, binary.BigEndian, m.Nonce)
+	var msgAddr common.Address
+	copy(msgAddr[:], h.Sum(nil)[12:])
+	return msgAddr, payloadHash
 }
 
 // Offsets (in words) of various data in a msgStorage
@@ -400,6 +410,19 @@ func (ms msgStorage) wordAddr(n uint8) common.Hash {
 	ret[20] = 0x01
 	ret[31] = n
 	return ret
+}
+
+func (ms msgStorage) StoreMessage(m types.CXMessage, payloadHash common.Hash) {
+	ms.StoreAddr(msIdxFromAddr, m.From)
+	ms.StoreAddr(msIdxToAddr, m.To)
+	ms.StoreNonceToShard(m.Nonce, m.ToShard)
+	ms.StoreU256(msIdxValue, m.Value)
+	ms.StoreU256(msIdxGasBudget, m.GasBudget)
+	ms.StoreU256(msIdxGasPrice, m.GasPrice)
+	ms.StoreU256(msIdxGasLimit, m.GasLimit)
+	ms.StoreAddr(msIdxGasLeftoverTo, m.GasLeftoverTo)
+	ms.StoreLen(msIdxPayloadLen, len(m.Payload))
+	ms.StoreWord(msIdxPayloadHash, payloadHash)
 }
 
 func (ms msgStorage) StoreWord(n uint8, w common.Hash) {
