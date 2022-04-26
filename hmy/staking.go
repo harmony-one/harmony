@@ -46,7 +46,7 @@ func (hmy *Harmony) readAndUpdateRawStakes(
 			if err != nil {
 				continue
 			}
-			spread = snapshot.RawStake()
+			spread = snapshot.RawStakePerSlot()
 			validatorSpreads[slotAddr] = spread
 		}
 
