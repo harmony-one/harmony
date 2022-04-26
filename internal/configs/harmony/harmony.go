@@ -63,6 +63,7 @@ type GeneralConfig struct {
 	IsBeaconArchival       bool
 	IsOffline              bool
 	DataDir                string
+	TraceEnable            bool
 	EnablePruneBeaconChain bool
 }
 

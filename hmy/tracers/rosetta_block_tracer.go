@@ -68,7 +68,7 @@ func (rbt *RosettaBlockTracer) AddRosettaLog(op vm.OpCode, from, to *vm.RosettaL
 }
 
 func (rbt *RosettaBlockTracer) GetResult() ([]*RosettaLogItem, error) {
-	root := &rbt.action
+	root := &rbt.cur.action
 
 	var results = make([]*RosettaLogItem, 0)
 	var err error

@@ -621,6 +621,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 
 	nodeConfig.NtpServer = hc.Sys.NtpServer
 
+	nodeConfig.TraceEnable = hc.General.TraceEnable
+
 	return nodeConfig, nil
 }
 

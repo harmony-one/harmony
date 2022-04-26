@@ -49,6 +49,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -141,6 +143,8 @@ type BlockChain struct {
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
+	trace         bool       // atomic?
+	traceFeed     event.Feed // send trace_block result to explorer
 	rmLogsFeed    event.Feed
 	chainFeed     event.Feed
 	chainSideFeed event.Feed
@@ -1492,11 +1496,24 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
-
+		vmConfig := bc.vmConfig
+		if bc.trace {
+			ev := TraceEvent{
+				Tracer: &tracers.ParityBlockTracer{
+					Hash:   block.Hash(),
+					Number: block.NumberU64(),
+				},
+			}
+			vmConfig = vm.Config{
+				Debug:  true,
+				Tracer: ev.Tracer,
+			}
+			events = append(events, ev)
+		}
 		// Process block using the parent state as reference point.
 		substart := time.Now()
 		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
-			block, state, bc.vmConfig, true,
+			block, state, vmConfig, true,
 		)
 		state = newState // update state in case the new state is cached.
 		if err != nil {
@@ -1659,6 +1676,9 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
+
+		case TraceEvent:
+			bc.traceFeed.Send(ev)
 		}
 	}
 }
@@ -1845,6 +1865,12 @@ func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
+}
+
+// SubscribeChainEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	bc.trace = true
+	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.

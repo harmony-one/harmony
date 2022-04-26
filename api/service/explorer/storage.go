@@ -2,6 +2,7 @@ package explorer
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	core2 "github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	common2 "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -35,6 +37,7 @@ type (
 		// TODO: optimize this with priority queue
 		tm      *taskManager
 		resultC chan blockResult
+		resultT chan *traceResult
 
 		available *abool.AtomicBool
 		closeC    chan struct{}
@@ -44,6 +47,11 @@ type (
 	blockResult struct {
 		btc batch
 		bn  uint64
+	}
+
+	traceResult struct {
+		btc  batch
+		data *tracers.TraceBlockStorage
 	}
 )
 
@@ -59,6 +67,7 @@ func newStorage(bc *core.BlockChain, dbPath string) (*storage, error) {
 		bc:        bc,
 		tm:        newTaskManager(),
 		resultC:   make(chan blockResult, numWorker),
+		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
 		closeC:    make(chan struct{}),
 		log:       utils.Logger().With().Str("module", "explorer storage").Logger(),
@@ -71,6 +80,10 @@ func (s *storage) Start() {
 
 func (s *storage) Close() {
 	close(s.closeC)
+}
+
+func (s *storage) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.tm.AddNewTraceTask(data)
 }
 
 func (s *storage) DumpNewBlock(b *types.Block) {
@@ -113,6 +126,22 @@ func (s *storage) GetStakingTxsByAddress(addr string) ([]common.Hash, []TxType, 
 	return getStakingTxnHashesByAccount(s.db, oneAddress(addr))
 }
 
+func (s *storage) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
+	if !s.available.IsSet() {
+		return nil, ErrExplorerNotReady
+	}
+	traceStorage := &tracers.TraceBlockStorage{
+		Hash: hash,
+	}
+	err := traceStorage.FromDB(func(key []byte) ([]byte, error) {
+		return getTraceResult(s.db, key)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return traceStorage.ToJson()
+}
+
 func (s *storage) run() {
 	if is, err := isVersionV100(s.db); !is || err != nil {
 		s.available.UnSet()
@@ -136,6 +165,11 @@ func (s *storage) loop() {
 			if err := res.btc.Write(); err != nil {
 				s.log.Error().Err(err).Msg("explorer db failed to write")
 			}
+		case res := <-s.resultT:
+			s.log.Info().Str("block hash", res.data.Hash.Hex()).Msg("writing trace into explorer DB")
+			if err := res.btc.Write(); err != nil {
+				s.log.Error().Err(err).Msg("explorer db failed to write trace data")
+			}
 
 		case <-s.closeC:
 			return
@@ -149,11 +183,13 @@ type taskManager struct {
 	lock     sync.Mutex
 
 	C chan struct{}
+	T chan *traceResult
 }
 
 func newTaskManager() *taskManager {
 	return &taskManager{
 		C: make(chan struct{}, numWorker),
+		T: make(chan *traceResult, numWorker),
 	}
 }
 
@@ -165,6 +201,12 @@ func (tm *taskManager) AddNewTask(b *types.Block) {
 	select {
 	case tm.C <- struct{}{}:
 	default:
+	}
+}
+
+func (tm *taskManager) AddNewTraceTask(data *tracers.TraceBlockStorage) {
+	tm.T <- &traceResult{
+		data: data,
 	}
 }
 
@@ -211,6 +253,7 @@ func (s *storage) makeWorkersAndStart() {
 			db:      s.db,
 			bc:      s.bc,
 			resultC: s.resultC,
+			resultT: s.resultT,
 			closeC:  s.closeC,
 			log:     s.log.With().Int("worker", i).Logger(),
 		})
@@ -225,6 +268,7 @@ type blockComputer struct {
 	db      database
 	bc      blockChainTxIndexer
 	resultC chan blockResult
+	resultT chan *traceResult
 	closeC  chan struct{}
 	log     zerolog.Logger
 }
@@ -255,7 +299,21 @@ LOOP:
 					return
 				}
 			}
-
+		case traceResult := <-bc.tm.T:
+			if exist, err := isTraceResultInDB(bc.db, traceResult.data.KeyDB()); exist || err != nil {
+				continue
+			}
+			traceResult.btc = bc.db.NewBatch()
+			traceResult.data.ToDB(func(key, value []byte) {
+				if exist, err := isTraceResultInDB(bc.db, key); !exist && err == nil {
+					_ = writeTraceResult(traceResult.btc, key, value)
+				}
+			})
+			select {
+			case bc.resultT <- traceResult:
+			case <-bc.closeC:
+				return
+			}
 		case <-bc.closeC:
 			return
 		}

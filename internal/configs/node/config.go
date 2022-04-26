@@ -94,6 +94,7 @@ type ConfigType struct {
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
+	TraceEnable bool
 }
 
 // RPCServerConfig is the config for rpc listen addresses
