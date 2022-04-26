@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"testing/quick"
 	"unicode"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -56,53 +57,47 @@ func newTestRouterTxer() (*router.RouterTransactor, *mockContractTxer) {
 	return routerTxer, mockTxer
 }
 
-func TestRouter(t *testing.T) {
+// Test that the decoding arguments for the supplied generates the right
+// result.
+func testParseRouterMethod(t *testing.T, m routerMethod) {
 	rtx, mtx := newTestRouterTxer()
-
 	opts := &bind.TransactOpts{
 		Signer: bind.SignerFn(func(_ types.Signer, _ common.Address, tx *types.Transaction) (*types.Transaction, error) {
 			return tx, nil
 		}),
 	}
-
-	bobAddr := common.BytesToAddress([]byte{0x0b, 0x0b})
-	toShard := uint32(math.MaxUint32)
-	payload := []byte("hello, strange world!")
-	gasBudget := &big.Int{}
-	gasPrice := &big.Int{}
-	gasLimit := &big.Int{}
-	assert.Nil(t, gasBudget.UnmarshalText([]byte("0x4444444444444444444444444444444444444444444444444444444444444444")))
-	assert.Nil(t, gasPrice.UnmarshalText([]byte("0x3333333333333333333333333333333333333333333333333333333333333333")))
-	assert.Nil(t, gasLimit.UnmarshalText([]byte("0x2222222222222222222222222222222222222222222222222222222222222222")))
-	aliceAddr := common.BytesToAddress([]byte{0xa1, 0x1c, 0xe0})
-
-	_, err := rtx.Send(opts,
-		bobAddr,
-		toShard,
-		payload,
-		gasBudget, gasPrice, gasLimit,
-		aliceAddr,
-	)
-	assert.Nil(t, err, "send() transaction failed.")
+	var err error
+	switch {
+	case m.send != nil:
+		args := m.send
+		_, err = rtx.Send(opts,
+			args.to,
+			args.toShard,
+			args.payload,
+			args.gasBudget,
+			args.gasPrice,
+			args.gasLimit,
+			args.gasLeftoverTo,
+		)
+	case m.retrySend != nil:
+		args := m.retrySend
+		_, err = rtx.RetrySend(opts, args.msgAddr, args.gasLimit, args.gasPrice)
+	default:
+		t.Errorf("routerMethod has no variant set: %v", m)
+		return
+	}
+	assert.Nil(t, err, "transaction failed.")
 
 	t.Log("## Payload ##")
 	t.Log("")
 	logPayload(t, mtx.Data)
 
-	m, err := parseRouterMethod(mtx.Data)
-	assert.Nil(t, err, "parsing the data should not produce an error")
-	assert.Nil(t, m.retrySend, "parsed retrySend(), wanted send()")
-	assert.Equal(t, &routerSendArgs{
-		to:            bobAddr,
-		toShard:       toShard,
-		payload:       payload,
-		gasBudget:     gasBudget,
-		gasPrice:      gasPrice,
-		gasLimit:      gasLimit,
-		gasLeftoverTo: aliceAddr,
-	}, m.send, "send() method arguments are not equal.")
+	gotM, err := parseRouterMethod(mtx.Data)
+	assert.Nil(t, err, "Parsing the data should not produce an error.")
+	assert.Equal(t, m, gotM, "Parsed method is not as expected.")
 }
 
+// Dump the payload in a semi-usable hexdump format, via t.Logf.
 func logPayload(t *testing.T, data []byte) {
 	i := 0
 	for len(data) > 0 {
@@ -125,4 +120,80 @@ func logPayload(t *testing.T, data []byte) {
 		t.Logf("%2d: %0x %s", i, prefix, buf)
 		i++
 	}
+}
+
+// genSendArgs is an alternate encoding of routerSendArgs, which does the right
+// thing when interacting with quick.Check.
+type genSendArgs struct {
+	To, GasLeftoverTo             common.Address
+	ToShard                       uint32
+	GasBudget, GasPrice, GasLimit common.Hash
+	Payload                       []byte
+}
+
+// Like genSendArgs, but for retrySend().
+type genRetrySendArgs struct {
+	MsgAddr            common.Address
+	GasLimit, GasPrice common.Hash
+}
+
+func (g genSendArgs) ToRouterMethod() routerMethod {
+	return routerMethod{send: &routerSendArgs{
+		to:        g.To,
+		toShard:   g.ToShard,
+		payload:   g.Payload,
+		gasBudget: readBig(g.GasBudget[:]),
+		gasPrice:  readBig(g.GasPrice[:]),
+		gasLimit:  readBig(g.GasLimit[:]),
+	}}
+}
+
+func (g genRetrySendArgs) ToRouterMethod() routerMethod {
+	return routerMethod{retrySend: &routerRetrySendArgs{
+		msgAddr:  g.MsgAddr,
+		gasLimit: readBig(g.GasLimit[:]),
+		gasPrice: readBig(g.GasPrice[:]),
+	}}
+}
+
+// Test decoding arguments for hand-picked arguments to send()
+func TestParseRouterSendExample(t *testing.T) {
+	bobAddr := common.BytesToAddress([]byte{0x0b, 0x0b})
+	toShard := uint32(math.MaxUint32)
+	payload := []byte("hello, strange world!")
+	gasBudget := &big.Int{}
+	gasPrice := &big.Int{}
+	gasLimit := &big.Int{}
+	assert.Nil(t, gasBudget.UnmarshalText([]byte("0x4444444444444444444444444444444444444444444444444444444444444444")))
+	assert.Nil(t, gasPrice.UnmarshalText([]byte("0x3333333333333333333333333333333333333333333333333333333333333333")))
+	assert.Nil(t, gasLimit.UnmarshalText([]byte("0x2222222222222222222222222222222222222222222222222222222222222222")))
+	aliceAddr := common.BytesToAddress([]byte{0xa1, 0x1c, 0xe0})
+
+	testParseRouterMethod(t, routerMethod{send: &routerSendArgs{
+		to:            bobAddr,
+		toShard:       toShard,
+		payload:       payload,
+		gasBudget:     gasBudget,
+		gasPrice:      gasPrice,
+		gasLimit:      gasLimit,
+		gasLeftoverTo: aliceAddr,
+	}})
+}
+
+// Test decoding randomized arguments to send()
+func TestParseRouterSendRandom(t *testing.T) {
+	err := quick.Check(func(g genSendArgs) bool {
+		testParseRouterMethod(t, g.ToRouterMethod())
+		return true
+	}, nil)
+	assert.Nil(t, err)
+}
+
+// Test decoding randomized arguments to retrySend()
+func TestParseRouterRetrySendRandom(t *testing.T) {
+	err := quick.Check(func(g genRetrySendArgs) bool {
+		testParseRouterMethod(t, g.ToRouterMethod())
+		return true
+	}, nil)
+	assert.Nil(t, err)
 }
