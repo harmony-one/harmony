@@ -241,7 +241,7 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 		copy(m.retrySend.msgAddr[:], argWord(0)[12:])
 		return m, nil
 	case 0x3ba2ea6b: // send
-		if len(args) < 32*7 {
+		if len(args) < 32*8 {
 			return m, fmt.Errorf(
 				"Arguments to send() are too short: %d",
 				len(args),
@@ -266,7 +266,17 @@ func parseRouterMethod(input []byte) (m routerMethod, err error) {
 			return m, fmt.Errorf("Payload offset is out of bounds: %v (max %v)",
 				off, len(args))
 		}
-		m.send.payload = args[off:]
+		payloadLen := readBig(args[off : off+32])
+		if !payloadLen.IsInt64() {
+			return m, fmt.Errorf("Payload length is *way* too big: %v", payloadLen)
+		}
+		payloadBytes := args[off+32:]
+		payloadLen64 := payloadLen.Int64()
+		if payloadLen64 > int64(len(payloadBytes)) {
+			return m, fmt.Errorf("Payload length is out of bounds: %v (max %v)",
+				payloadLen64, len(payloadBytes))
+		}
+		m.send.payload = payloadBytes[:payloadLen64]
 		return m, nil
 	default:
 		return m, fmt.Errorf("Unknown method id: 0x%x\n", methodId)

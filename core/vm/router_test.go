@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"testing"
 	"unicode"
@@ -63,19 +64,24 @@ func TestRouter(t *testing.T) {
 			return tx, nil
 		}),
 	}
+
+	bobAddr := common.BytesToAddress([]byte{0x0b, 0x0b})
+	toShard := uint32(math.MaxUint32)
+	payload := []byte("hello, strange world!")
 	gasBudget := &big.Int{}
 	gasPrice := &big.Int{}
 	gasLimit := &big.Int{}
 	assert.Nil(t, gasBudget.UnmarshalText([]byte("0x4444444444444444444444444444444444444444444444444444444444444444")))
 	assert.Nil(t, gasPrice.UnmarshalText([]byte("0x3333333333333333333333333333333333333333333333333333333333333333")))
 	assert.Nil(t, gasLimit.UnmarshalText([]byte("0x2222222222222222222222222222222222222222222222222222222222222222")))
+	aliceAddr := common.BytesToAddress([]byte{0xa1, 0x1c, 0xe0})
 
 	_, err := rtx.Send(opts,
-		common.BytesToAddress([]byte{0x0b, 0x0b}),
-		(1<<32)-1,
-		[]byte("hello, strange world!"),
+		bobAddr,
+		toShard,
+		payload,
 		gasBudget, gasPrice, gasLimit,
-		common.BytesToAddress([]byte{0xa1, 0x1c, 0xe0}),
+		aliceAddr,
 	)
 	assert.Nil(t, err, "send() transaction failed.")
 
@@ -85,8 +91,16 @@ func TestRouter(t *testing.T) {
 
 	m, err := parseRouterMethod(mtx.Data)
 	assert.Nil(t, err, "parsing the data should not produce an error")
-	assert.Nil(t, m.retrySend)
-	assert.NotNil(t, m.send)
+	assert.Nil(t, m.retrySend, "parsed retrySend(), wanted send()")
+	assert.Equal(t, &routerSendArgs{
+		to:            bobAddr,
+		toShard:       toShard,
+		payload:       payload,
+		gasBudget:     gasBudget,
+		gasPrice:      gasPrice,
+		gasLimit:      gasLimit,
+		gasLeftoverTo: aliceAddr,
+	}, m.send, "send() method arguments are not equal.")
 }
 
 func logPayload(t *testing.T, data []byte) {
