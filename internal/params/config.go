@@ -99,7 +99,7 @@ var (
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
-		SlotsLimitedEpoch:          big.NewInt(75737), // epoch to enable HIP-16, around Thu, 12 May 2022 09:25:35 UTC with 2s block time
+		SlotsLimitedEpoch:          big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
