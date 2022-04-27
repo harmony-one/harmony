@@ -112,8 +112,11 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 					Msg("doGetBlockHashes return error")
 				return
 			}
-			sh.logger.Info().Str("StreamID", string(stid)).Int("hashes", len(hashes)).
-				Int("index", i).Msg("GetBlockHashesRequests response")
+			sh.logger.Info().
+				Str("StreamID", string(stid)).
+				Int("hashes", len(hashes)).
+				Interface("hashes", hashes).Int("index", i).
+				Msg("GetBlockHashesRequests response")
 			results.addResult(hashes, stid)
 		}(i)
 	}
