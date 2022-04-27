@@ -131,7 +131,12 @@ func (c *stakingPrecompile) RunWriteCapable(
 		return nil, evm.Undelegate(evm.StateDB, rosettaBlockTracer, undelegate)
 	}
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
-		return nil, evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
+		if delegationsToAlter, err := evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards); err != nil {
+			return nil, err
+		} else {
+			evm.DelegationsToAlter = delegationsToAlter
+			return nil, nil
+		}
 	}
 	// Migrate is not supported in precompile and will be done in a batch hard fork
 	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {

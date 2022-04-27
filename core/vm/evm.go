@@ -59,7 +59,7 @@ type (
 	EditValidatorFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.EditValidator) error
 	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) (map[common.Address](map[common.Address]uint64), error)
 	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
-	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
+	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) (map[common.Address](map[common.Address]uint64), error)
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)

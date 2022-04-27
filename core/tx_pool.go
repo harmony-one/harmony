@@ -902,7 +902,7 @@ func (pool *TxPool) validateStakingTx(tx *staking.StakingTransaction) error {
 			return err
 		}
 
-		_, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations, stkMsg, pool.pendingEpoch(), pool.chainconfig)
+		_, _, _, err = VerifyAndCollectRewardsFromDelegation(pool.currentState, delegations, stkMsg, pool.pendingEpoch(), pool.chainconfig)
 		return err
 	default:
 		return staking.ErrInvalidStakingKind

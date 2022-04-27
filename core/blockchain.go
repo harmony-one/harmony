@@ -2813,7 +2813,7 @@ func (bc *BlockChain) UpdateStakingMetaData(
 		}
 	}
 
-	if err := bc.UpdateDelegationIndices(batch, delegationsToAlter); err != nil {
+	if err := bc.UpdateDelegationIndices(block, batch, delegationsToAlter); err != nil {
 		return newValidators, err
 	}
 
@@ -3009,10 +3009,12 @@ func (bc *BlockChain) addDelegationIndex(
 // RemoveDelegationsFromDelegator will remove the delegationIndexes from state
 // for delegatorAddress and all validatorAddresses
 func (bc *BlockChain) UpdateDelegationIndices(
+	block *types.Block,
 	batch rawdb.DatabaseWriter,
 	delegationsToAlter map[common.Address](map[common.Address]uint64),
 ) error {
 	for delegatorAddress, validatorAddressToOffset := range delegationsToAlter {
+		startTime := time.Now()
 		delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
 		if err != nil {
 			return err
@@ -3042,6 +3044,12 @@ func (bc *BlockChain) UpdateDelegationIndices(
 		if err := bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes); err != nil {
 			return err
 		}
+		utils.Logger().Info().
+			Int64("elapsed time", time.Since(startTime).Milliseconds()).
+			Uint64("blockNum", block.Number().Uint64()).
+			Uint64("epoch", block.Epoch().Uint64()).
+			Str("delegator", delegatorAddress.Hex()).
+			Msg("UpdateDelegationIndices")
 	}
 	return nil
 }

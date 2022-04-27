@@ -273,23 +273,23 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 }
 
 func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFunc {
-	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) (map[common.Address](map[common.Address]uint64), error) {
 		if chain == nil {
-			return errors.New("[CollectRewards] No chain context provided")
+			return nil, errors.New("[CollectRewards] No chain context provided")
 		}
 		delegations, err := chain.ReadDelegationsByDelegatorAt(collectRewards.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
-			return err
+			return nil, err
 		}
-		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+		updatedValidatorWrappers, totalRewards, delegationsToAlter, err := VerifyAndCollectRewardsFromDelegation(
 			db, delegations, collectRewards, ref.Epoch(), chain.Config(),
 		)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
 			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
@@ -314,7 +314,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			)
 		}
 
-		return nil
+		return delegationsToAlter, nil
 	}
 }
 

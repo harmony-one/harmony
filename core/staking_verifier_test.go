@@ -1645,7 +1645,7 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	stakeMsg := makeCollectRewards()
 	for i, test := range tests {
 		config := &params.ChainConfig{}
-		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds, stakeMsg, big.NewInt(defaultEpoch), config)
+		ws, tReward, _, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds, stakeMsg, big.NewInt(defaultEpoch), config)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Fatalf("Test %v: %v", i, err)

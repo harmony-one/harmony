@@ -170,7 +170,7 @@ func TestEVMStaking(t *testing.T) {
 	wrapper.Delegations[0].Undelegations = []staking.Undelegation{}
 	wrapper.Delegations[0].Reward = common.Big257
 	db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-	err = ctx.CollectRewards(db, nil, &collectRewards)
+	_, err = ctx.CollectRewards(db, nil, &collectRewards)
 	if err != nil {
 		t.Errorf("Got error %v in CollectRewards", err)
 	}

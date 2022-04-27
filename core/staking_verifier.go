@@ -574,28 +574,34 @@ func VerifyAndCollectRewardsFromDelegation(
 	msg *staking.CollectRewards,
 	epoch *big.Int,
 	chainConfig *params.ChainConfig,
-) ([]*staking.ValidatorWrapper, *big.Int, error) {
+) ([]*staking.ValidatorWrapper,
+	*big.Int,
+	map[common.Address](map[common.Address]uint64),
+	error,
+) {
 	if stateDB == nil {
-		return nil, nil, errStateDBIsMissing
+		return nil, nil, nil, errStateDBIsMissing
 	}
 	updatedValidatorWrappers := []*staking.ValidatorWrapper{}
 	totalRewards := big.NewInt(0)
+	var delegationsToAlter map[common.Address](map[common.Address]uint64)
 	for i := range delegations {
 		delegationIndex := &delegations[i]
 		// request a copy, and since delegations will be changed (.Reward.Set), copy them too
 		wrapper, err := stateDB.ValidatorWrapper(delegationIndex.ValidatorAddress, false, true)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		var delegation *staking.Delegation
-		if delegation, _, err = staking.FindDelegationInWrapper(
+		var actualIndex uint64
+		if delegation, actualIndex, err = staking.FindDelegationInWrapper(
 			msg.DelegatorAddress,
 			wrapper,
 			delegationIndex,
 			chainConfig,
 			epoch,
 		); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if delegation == nil {
 			continue
@@ -604,10 +610,39 @@ func VerifyAndCollectRewardsFromDelegation(
 			totalRewards.Add(totalRewards, delegation.Reward)
 			delegation.Reward.SetUint64(0)
 		}
+		shouldRemove := actualIndex != 0 && // never remove the (inactive) validator
+			len(delegation.Undelegations) == 0 &&
+			delegation.Amount.Cmp(common.Big0) == 0 &&
+			delegation.Reward.Cmp(common.Big0) == 0 &&
+			chainConfig.IsPostNoNilDelegations(epoch)
+		if shouldRemove {
+			if len(delegationsToAlter) == 0 {
+				delegationsToAlter = make(map[common.Address](map[common.Address]uint64))
+			}
+			modification := make(map[common.Address]uint64)
+			// mark for removal
+			modification[wrapper.Address] = math.MaxUint64
+			delegationsToAlter[delegation.DelegatorAddress] = modification
+			// mark the following ones with offset 1
+			for j := actualIndex + 1; j < uint64(len(wrapper.Delegations)); j++ {
+				// this is re-created every time because each of these offsets
+				// could be changed after paying out undelegations
+				// so they all need to be different objects
+				modification := make(map[common.Address]uint64)
+				// only 1 delegator is removed here (the delegation.DelegatorAddress)
+				// so this offset is always one (and no merging is required, just assignment)
+				modification[wrapper.Address] = uint64(1)
+				delegationsToAlter[wrapper.Delegations[j].DelegatorAddress] = modification
+			}
+			wrapper.Delegations = append(
+				wrapper.Delegations[:actualIndex],
+				wrapper.Delegations[actualIndex+1:]...,
+			)
+		}
 		updatedValidatorWrappers = append(updatedValidatorWrappers, wrapper)
 	}
 	if totalRewards.Int64() == 0 {
-		return nil, nil, errNoRewardsToCollect
+		return nil, nil, nil, errNoRewardsToCollect
 	}
-	return updatedValidatorWrappers, totalRewards, nil
+	return updatedValidatorWrappers, totalRewards, delegationsToAlter, nil
 }

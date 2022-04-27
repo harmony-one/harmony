@@ -19,8 +19,9 @@ type writeCapablePrecompileTest struct {
 }
 
 func CollectRewardsFn() CollectRewardsFunc {
-	return func(db StateDB, rosettaTracer RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
-		return nil
+	return func(db StateDB, rosettaTracer RosettaTracer, collectRewards *stakingTypes.CollectRewards) (
+		map[common.Address](map[common.Address]uint64), error) {
+		return nil, nil
 	}
 }
 

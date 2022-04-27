@@ -373,7 +373,7 @@ func (st *StateTransition) StakingTransitionDb() (delegationsToAlter map[common.
 		if msg.From() != stkMsg.DelegatorAddress {
 			return nil, 0, errInvalidSigner
 		}
-		err = st.evm.CollectRewards(st.evm.StateDB, nil, stkMsg)
+		delegationsToAlter, err = st.evm.CollectRewards(st.evm.StateDB, nil, stkMsg)
 	default:
 		return nil, 0, stakingTypes.ErrInvalidStakingKind
 	}
