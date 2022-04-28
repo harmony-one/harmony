@@ -65,7 +65,7 @@ var (
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
-		ChainIdFixEpoch:            big.NewInt(871), // Around Tue Feb 11 2022
+		ChainIdFixEpoch:            EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -99,7 +99,7 @@ var (
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
-		ChainIdFixEpoch:            big.NewInt(75175),
+		ChainIdFixEpoch:            big.NewInt(75685),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
