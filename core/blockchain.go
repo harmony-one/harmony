@@ -2086,9 +2086,12 @@ func (bc *BlockChain) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardI
 		return err
 	}
 	oldLinkNumber := oldLink.BlockNum()
-	// Temp fix to skip the hole in continuous crosslink in shard 1
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet && shardID == 1 && oldLinkNumber < 27841415 {
-		oldLinkNumber = 27841415
+	// Temp fix to skip the hole in continuous crosslink in shard 2, 3
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet && shardID == 2 && oldLinkNumber < 28218942 {
+		oldLinkNumber = 28218942
+	}
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Mainnet && shardID == 3 && oldLinkNumber < 28119711 {
+		oldLinkNumber = 28119711
 	}
 	newLink := oldLink
 	// Starting from last checkpoint, keeping reading immediate next crosslink until there is a gap
