@@ -155,7 +155,7 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 
 	wg.Add(concurrency)
 	for i := 0; i != concurrency; i++ {
-		go func() {
+		go func(index int) {
 			defer wg.Done()
 			defer cancel() // it's ok to cancel context more than once
 
@@ -188,7 +188,7 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 					m.addResult(hashes, blocks, stid)
 				}
 			}
-		}()
+		}(i)
 	}
 	wg.Wait()
 
