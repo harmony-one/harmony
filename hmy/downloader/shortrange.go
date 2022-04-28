@@ -103,7 +103,7 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 	wg.Add(sh.config.Concurrency)
 
 	for i := 0; i != sh.config.Concurrency; i++ {
-		go func(i int) {
+		go func(index int) {
 			defer wg.Done()
 
 			hashes, stid, err := sh.doGetBlockHashesRequest(bns)
@@ -115,7 +115,7 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 			sh.logger.Info().
 				Str("StreamID", string(stid)).
 				Int("hashes", len(hashes)).
-				Interface("hashes", hashes).Int("index", i).
+				Interface("hashes", hashes).Int("index", index).
 				Msg("GetBlockHashesRequests response")
 			results.addResult(hashes, stid)
 		}(i)
