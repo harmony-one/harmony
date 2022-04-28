@@ -99,7 +99,7 @@ var (
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
-		ChainIdFixEpoch:            big.NewInt(75685),
+		ChainIdFixEpoch:            EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
