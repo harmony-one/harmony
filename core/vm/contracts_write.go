@@ -357,7 +357,42 @@ func (c *routerPrecompile) RunWriteCapable(
 		// 100% sure this is the right way to encode it. Check.
 		return msgAddr[:], evm.Context.EmitCXMessage(msg)
 	case m.retrySend != nil:
-		panic("TODO")
+		ms := msgStorage{
+			db:   evm.StateDB,
+			addr: m.retrySend.msgAddr,
+		}
+		oldMsg, _ := ms.LoadMessage()
+		newMsg := oldMsg
+		newMsg.GasLimit = m.retrySend.gasLimit
+		newMsg.GasPrice = m.retrySend.gasPrice
+		newMsg.GasBudget = (&big.Int{}).Add(oldMsg.GasBudget, contract.Value())
+
+		if newMsg.GasLimit.Cmp(oldMsg.GasLimit) < 0 {
+			return nil, fmt.Errorf(
+				"New gas limit (%v) must not be smaller than old gas limit (%v).",
+				newMsg.GasLimit, oldMsg.GasLimit,
+			)
+		}
+		if newMsg.GasPrice.Cmp(oldMsg.GasPrice) < 0 {
+			return nil, fmt.Errorf(
+				"New gas price (%v) must not be smaller than old gas price (%v).",
+				newMsg.GasPrice, oldMsg.GasPrice,
+			)
+		}
+		gasPriceTimesLimit := (&big.Int{}).Mul(newMsg.GasPrice, newMsg.GasLimit)
+		if newMsg.GasBudget.Cmp(gasPriceTimesLimit) < 0 {
+			return nil, fmt.Errorf(
+				"new gas budget (%v) must be at least gasPrice * gasLimit (%v).",
+				newMsg.GasBudget, gasPriceTimesLimit,
+			)
+		}
+
+		// Save just the bits that changed:
+		ms.StoreU256(msIdxGasBudget, newMsg.GasBudget)
+		ms.StoreU256(msIdxGasPrice, newMsg.GasPrice)
+		ms.StoreU256(msIdxGasLimit, newMsg.GasLimit)
+
+		return nil, evm.Context.EmitCXMessage(newMsg)
 	default:
 		panic("parseRouterMethod left all fields nil!")
 	}
@@ -425,10 +460,51 @@ func (ms msgStorage) StoreMessage(m types.CXMessage, payloadHash common.Hash) {
 	ms.StoreAddr(msIdxGasLeftoverTo, m.GasLeftoverTo)
 	ms.StoreLen(msIdxPayloadLen, len(m.Payload))
 	ms.StoreWord(msIdxPayloadHash, payloadHash)
+	panic("TODO: store the payload itself.")
+}
+
+func (ms msgStorage) LoadMessage() (msg types.CXMessage, payloadHash common.Hash) {
+	nonce, toShard := ms.LoadNonceToShard()
+	payloadLen := ms.LoadLen(msIdxPayloadLen)
+	payloadHash = ms.LoadWord(msIdxPayloadHash)
+	payload := loadPayload(ms.db, payloadHash, payloadLen)
+	msg = types.CXMessage{
+		From:          ms.LoadAddr(msIdxFromAddr),
+		To:            ms.LoadAddr(msIdxToAddr),
+		ToShard:       toShard,
+		Nonce:         nonce,
+		Value:         ms.LoadU256(msIdxValue),
+		GasBudget:     ms.LoadU256(msIdxGasBudget),
+		GasPrice:      ms.LoadU256(msIdxGasPrice),
+		GasLimit:      ms.LoadU256(msIdxGasLimit),
+		GasLeftoverTo: ms.LoadAddr(msIdxGasLeftoverTo),
+		Payload:       payload,
+	}
+	// TODO: sanity check that the hash is correct.
+	return
+}
+
+func loadPayload(db StateDB, hash common.Hash, length int) []byte {
+	ret := make([]byte, length)
+	buf := ret
+	offset := readBig(hash[:])
+	key := hash
+	for len(buf) > 0 {
+		word := db.GetState(routerAddress, key)
+		copy(buf, word[:])
+		buf = buf[len(word):]
+		offset.Add(offset, big.NewInt(1))
+		offset.FillBytes(key[:])
+	}
+	return ret
 }
 
 func (ms msgStorage) StoreWord(n uint8, w common.Hash) {
 	ms.db.SetState(routerAddress, ms.wordAddr(n), w)
+}
+
+func (ms msgStorage) LoadWord(n uint8) common.Hash {
+	return ms.db.GetState(routerAddress, ms.wordAddr(n))
 }
 
 func (ms msgStorage) StoreAddr(n uint8, addr common.Address) {
@@ -437,16 +513,33 @@ func (ms msgStorage) StoreAddr(n uint8, addr common.Address) {
 	ms.StoreWord(n, buf)
 }
 
+func (ms msgStorage) LoadAddr(n uint8) common.Address {
+	var ret common.Address
+	w := ms.LoadWord(n)
+	copy(ret[:], w[:])
+	return ret
+}
+
 func (ms msgStorage) StoreU256(n uint8, val *big.Int) {
 	var buf common.Hash
 	val.FillBytes(buf[:])
 	ms.StoreWord(n, buf)
 }
 
+func (ms msgStorage) LoadU256(n uint8) *big.Int {
+	w := ms.LoadWord(n)
+	return readBig(w[:])
+}
+
 func (ms msgStorage) StoreLen(n uint8, val int) {
 	var buf common.Hash
 	binary.BigEndian.PutUint64(buf[:], uint64(val))
 	ms.StoreWord(n, buf)
+}
+
+func (ms msgStorage) LoadLen(n uint8) int {
+	w := ms.LoadWord(n)
+	return int(binary.BigEndian.Uint64(w[:]))
 }
 
 // Store a byte slice, which must be at most one word in length (panics otherwise).
@@ -464,6 +557,13 @@ func (ms msgStorage) StoreNonceToShard(nonce uint64, toShard uint32) {
 	binary.BigEndian.PutUint64(buf[:8], nonce)
 	binary.BigEndian.PutUint32(buf[8:8+4], toShard)
 	ms.StoreWord(msIdxNonceToShard, buf)
+}
+
+func (ms msgStorage) LoadNonceToShard() (nonce uint64, toShard uint32) {
+	buf := ms.LoadWord(msIdxNonceToShard)
+	nonce = binary.BigEndian.Uint64(buf[:8])
+	toShard = binary.BigEndian.Uint32(buf[8 : 8+4])
+	return
 }
 
 func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) uint64 {
