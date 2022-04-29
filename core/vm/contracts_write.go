@@ -361,7 +361,7 @@ func (c *routerPrecompile) RunWriteCapable(
 			db:   evm.StateDB,
 			addr: m.retrySend.msgAddr,
 		}
-		oldMsg, _ := ms.LoadMessage()
+		oldMsg, _ := ms.LoadMessage(evm.Context.ShardID)
 		newMsg := oldMsg
 		newMsg.GasLimit = m.retrySend.gasLimit
 		newMsg.GasPrice = m.retrySend.gasPrice
@@ -460,10 +460,29 @@ func (ms msgStorage) StoreMessage(m types.CXMessage, payloadHash common.Hash) {
 	ms.StoreAddr(msIdxGasLeftoverTo, m.GasLeftoverTo)
 	ms.StoreLen(msIdxPayloadLen, len(m.Payload))
 	ms.StoreWord(msIdxPayloadHash, payloadHash)
-	panic("TODO: store the payload itself.")
+	storePayload(ms.db, payloadHash, m.Payload)
 }
 
-func (ms msgStorage) LoadMessage() (msg types.CXMessage, payloadHash common.Hash) {
+func storePayload(db StateDB, hash common.Hash, data []byte) {
+	offset := readBig(hash[:])
+	key := hash
+	for len(data) > 0 {
+		var val common.Hash
+		copy(val[:], data[:])
+		db.SetState(routerAddress, key, val)
+		if len(data) < len(val[:]) {
+			data = nil
+		} else {
+			data = data[len(val[:]):]
+			offset.Add(offset, big.NewInt(1))
+			offset.FillBytes(key[:])
+		}
+	}
+}
+
+// Load a message from storage. The fromShard field is supplied by the
+// caller; it is not stored, since storage is per-shard anyway.
+func (ms msgStorage) LoadMessage(fromShard uint32) (msg types.CXMessage, payloadHash common.Hash) {
 	nonce, toShard := ms.LoadNonceToShard()
 	payloadLen := ms.LoadLen(msIdxPayloadLen)
 	payloadHash = ms.LoadWord(msIdxPayloadHash)
@@ -472,6 +491,7 @@ func (ms msgStorage) LoadMessage() (msg types.CXMessage, payloadHash common.Hash
 		From:          ms.LoadAddr(msIdxFromAddr),
 		To:            ms.LoadAddr(msIdxToAddr),
 		ToShard:       toShard,
+		FromShard:     fromShard,
 		Nonce:         nonce,
 		Value:         ms.LoadU256(msIdxValue),
 		GasBudget:     ms.LoadU256(msIdxGasBudget),
@@ -492,9 +512,13 @@ func loadPayload(db StateDB, hash common.Hash, length int) []byte {
 	for len(buf) > 0 {
 		word := db.GetState(routerAddress, key)
 		copy(buf, word[:])
-		buf = buf[len(word):]
-		offset.Add(offset, big.NewInt(1))
-		offset.FillBytes(key[:])
+		if len(buf) < len(word) {
+			buf = nil
+		} else {
+			buf = buf[len(word):]
+			offset.Add(offset, big.NewInt(1))
+			offset.FillBytes(key[:])
+		}
 	}
 	return ret
 }

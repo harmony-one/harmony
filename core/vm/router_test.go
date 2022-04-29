@@ -242,7 +242,7 @@ func TestLoadStoreMessage(t *testing.T) {
 			addr: msgAddr,
 		}
 		ms.StoreMessage(msg, payloadHash)
-		loadedMsg, loadedHash := ms.LoadMessage()
+		loadedMsg, loadedHash := ms.LoadMessage(msg.FromShard)
 
 		assert.Equal(t, loadedHash, payloadHash, "Payload hashes should match")
 
