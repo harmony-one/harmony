@@ -245,20 +245,6 @@ func TestLoadStoreMessage(t *testing.T) {
 		loadedMsg, loadedHash := ms.LoadMessage(msg.FromShard)
 
 		assert.Equal(t, loadedHash, payloadHash, "Payload hashes should match")
-
-		/*
-			// We can't compare bigints directly with assert.Equal. But we can compare their
-			// string representations:
-			assert.Equal(t, loadedMsg.GasPrice.String(), msg.GasPrice.String(), "Gas price should match.")
-			assert.Equal(t, loadedMsg.GasLimit.String(), msg.GasLimit.String(), "Gas limit should match.")
-			assert.Equal(t, loadedMsg.GasBudget.String(), msg.GasBudget.String(), "Gas budget should match.")
-
-			// Check the rest of the message. First set the bigint fields to be identical,
-			// so they don't get in the way:
-			loadedMsg.GasPrice = msg.GasPrice
-			loadedMsg.GasLimit = msg.GasLimit
-			loadedMsg.GasBudget = msg.GasBudget
-		*/
 		assert.Equal(t, loadedMsg, msg, "Messages should match.")
 		return true
 	}, nil)
