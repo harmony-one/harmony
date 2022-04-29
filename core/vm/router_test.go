@@ -11,10 +11,13 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/harmony-one/harmony/contracts/router"
+	"github.com/harmony-one/harmony/core/state"
+	harmonyTypes "github.com/harmony-one/harmony/core/types"
 )
 
 // A ContractTransactor for test purposes. SendTransaction just stores
@@ -137,6 +140,17 @@ type genRetrySendArgs struct {
 	GasLimit, GasPrice common.Hash
 }
 
+// Like genSendArgs, but for types.CXMessage
+type genCXMessage struct {
+	To, From                      common.Address
+	ToShard, FromShard            uint32
+	Payload                       []byte
+	GasBudget, GasPrice, GasLimit common.Hash
+	GasLeftoverTo                 common.Address
+	Nonce                         uint64
+	Value                         common.Hash
+}
+
 func (g genSendArgs) ToRouterMethod() routerMethod {
 	return routerMethod{send: &routerSendArgs{
 		to:        g.To,
@@ -154,6 +168,20 @@ func (g genRetrySendArgs) ToRouterMethod() routerMethod {
 		gasLimit: readBig(g.GasLimit[:]),
 		gasPrice: readBig(g.GasPrice[:]),
 	}}
+}
+
+func (g genCXMessage) ToMessage() harmonyTypes.CXMessage {
+	return harmonyTypes.CXMessage{
+		To: g.To, From: g.From,
+		ToShard: g.ToShard, FromShard: g.FromShard,
+		Payload:       g.Payload,
+		GasBudget:     readBig(g.GasBudget[:]),
+		GasPrice:      readBig(g.GasPrice[:]),
+		GasLimit:      readBig(g.GasLimit[:]),
+		GasLeftoverTo: g.GasLeftoverTo,
+		Nonce:         g.Nonce,
+		Value:         readBig(g.Value[:]),
+	}
 }
 
 // Test decoding arguments for hand-picked arguments to send()
@@ -193,6 +221,45 @@ func TestParseRouterSendRandom(t *testing.T) {
 func TestParseRouterRetrySendRandom(t *testing.T) {
 	err := quick.Check(func(g genRetrySendArgs) bool {
 		testParseRouterMethod(t, g.ToRouterMethod())
+		return true
+	}, nil)
+	assert.Nil(t, err)
+}
+
+func newTestStateDB() (*state.DB, error) {
+	return state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
+}
+
+// Tries storing and then loading random messages, and makes sure the results are correct.
+func TestLoadStoreMessage(t *testing.T) {
+	err := quick.Check(func(gmsg genCXMessage) bool {
+		msg := gmsg.ToMessage()
+		db, err := newTestStateDB()
+		assert.Nil(t, err, "newTestStateDB() failed.")
+		msgAddr, payloadHash := messageAddrAndPayloadHash(msg)
+		ms := msgStorage{
+			db:   db,
+			addr: msgAddr,
+		}
+		ms.StoreMessage(msg, payloadHash)
+		loadedMsg, loadedHash := ms.LoadMessage()
+
+		assert.Equal(t, loadedHash, payloadHash, "Payload hashes should match")
+
+		/*
+			// We can't compare bigints directly with assert.Equal. But we can compare their
+			// string representations:
+			assert.Equal(t, loadedMsg.GasPrice.String(), msg.GasPrice.String(), "Gas price should match.")
+			assert.Equal(t, loadedMsg.GasLimit.String(), msg.GasLimit.String(), "Gas limit should match.")
+			assert.Equal(t, loadedMsg.GasBudget.String(), msg.GasBudget.String(), "Gas budget should match.")
+
+			// Check the rest of the message. First set the bigint fields to be identical,
+			// so they don't get in the way:
+			loadedMsg.GasPrice = msg.GasPrice
+			loadedMsg.GasLimit = msg.GasLimit
+			loadedMsg.GasBudget = msg.GasBudget
+		*/
+		assert.Equal(t, loadedMsg, msg, "Messages should match.")
 		return true
 	}, nil)
 	assert.Nil(t, err)
