@@ -179,7 +179,7 @@ func (m routerMethod) requiredGas() uint64 {
 	switch {
 	case m.send != nil:
 		storedWords := uint64(len(m.send.payload))/32 + 10
-		return sstoreCost * storedWords
+		return storedWords * sstoreCost
 	case m.retrySend != nil:
 		return 3 * sstoreCost
 	default:
