@@ -25,9 +25,10 @@ type Stream interface {
 
 // BaseStream is the wrapper around
 type BaseStream struct {
-	raw      libp2p_network.Stream
-	reader   *bufio.Reader
-	readLock sync.Mutex
+	raw       libp2p_network.Stream
+	reader    *bufio.Reader
+	readLock  sync.Mutex
+	writeLock sync.Mutex
 
 	// parse protocol spec fields
 	spec     ProtoSpec
@@ -95,6 +96,8 @@ func (st *BaseStream) WriteBytes(b []byte) (err error) {
 	copy(message, intToBytes(len(b)))
 	copy(message[sizeBytes:], b)
 
+	st.writeLock.Lock()
+	defer st.writeLock.Unlock()
 	if _, err = st.raw.Write(message); err != nil {
 		return err
 	}
