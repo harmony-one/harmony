@@ -381,9 +381,8 @@ traceLoop:
 		}
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
-
-		ethTx := tx.ConvertToEth()
-		statedb.Prepare(ethTx.Hash(), blockHash, i)
+		statedb.Prepare(tx.Hash(), blockHash, i)
+		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
 		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
 		res, err := hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 		if err != nil {
@@ -467,8 +466,9 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 
 				msg, _ := txs[task.index].AsMessage(signer)
 				vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
-				ethTx := txs[task.index].ConvertToEth()
-				task.statedb.Prepare(ethTx.Hash(), blockHash, task.index)
+				tx := txs[task.index]
+				task.statedb.Prepare(tx.Hash(), blockHash, task.index)
+				task.statedb.SetTxHashETH(tx.ConvertToEth().Hash())
 				res, err := hmy.TraceTx(ctx, msg, vmctx, task.statedb, config)
 				if err != nil {
 					results[task.index] = &TxTraceResult{Error: err.Error()}
@@ -491,6 +491,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
+		statedb.SetTxHashETH(tx.ConvertToEth().Hash())
 		vmctx := core.NewEVMContext(msg, block.Header(), hmy.BlockChain, nil)
 
 		vmenv := vm.NewEVM(vmctx, statedb, hmy.BlockChain.Config(), vm.Config{})

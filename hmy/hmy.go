@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -89,6 +90,7 @@ type NodeAPI interface {
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
+	GetTraceResultByHash(hash common.Hash) (json.RawMessage, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64, uint64)

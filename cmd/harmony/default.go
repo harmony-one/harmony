@@ -21,6 +21,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsBeaconArchival: false,
 		IsOffline:        false,
 		DataDir:          "./",
+		TraceEnable:      false,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
@@ -105,6 +106,7 @@ var defaultDevnetConfig = harmonyconfig.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
+	SlotsLimit:  0, // 0 means no limit
 }
 
 var defaultRevertConfig = harmonyconfig.RevertConfig{

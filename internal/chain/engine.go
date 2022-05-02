@@ -725,7 +725,8 @@ func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint
 		return shardState, nil
 
 	} else {
-		shardState, err := chain.ReadShardState(epoch)
+		//shardState, err := chain.ReadShardState(epoch)
+		shardState, err := committee.WithStakingEnabled.ReadFromDB(epoch, chain)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
 		}
