@@ -41,7 +41,8 @@ import (
 
 // Errors constants for Transaction.
 var (
-	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
+	ErrInvalidSig      = errors.New("invalid transaction v, r, s values")
+	ErrGasFeeCapTooLow = errors.New("fee cap less than base fee")
 )
 
 // TransactionType different types of transactions
