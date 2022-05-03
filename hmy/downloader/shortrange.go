@@ -184,7 +184,7 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 					m.handleResultError(hashes, stid)
 				} else {
 					sh.logger.Info().Str("StreamID", string(stid)).Int("blocks", len(blocks)).
-						Int("index", i).Msg("doGetBlocksByHashesRequest response")
+						Int("index", index).Msg("doGetBlocksByHashesRequest response")
 					m.addResult(hashes, blocks, stid)
 				}
 			}
