@@ -2,6 +2,7 @@ package vm
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
@@ -18,10 +19,12 @@ import (
 	"github.com/harmony-one/harmony/contracts/router"
 	"github.com/harmony-one/harmony/core/state"
 	harmonyTypes "github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/internal/params"
 )
 
-// A ContractTransactor for test purposes. SendTransaction just stores
-// the data & value for later inspection, other methods are stubs.
+// A ContractTransactor for test purposes, which doesn't actually execute
+// transactions. SendTransaction just stores the data & value for a call
+// for later inspection, other methods are stubs.
 type mockContractTxer struct {
 	Data  []byte
 	Value *big.Int
@@ -60,20 +63,18 @@ func newTestRouterTxer() (*router.RouterTransactor, *mockContractTxer) {
 	return routerTxer, mockTxer
 }
 
-// Test that the decoding arguments for the supplied generates the right
-// result.
-func testParseRouterMethod(t *testing.T, m routerMethod) {
-	rtx, mtx := newTestRouterTxer()
-	opts := &bind.TransactOpts{
-		Signer: bind.SignerFn(func(_ types.Signer, _ common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return tx, nil
-		}),
-	}
+var dummyTxOpts = &bind.TransactOpts{
+	Signer: bind.SignerFn(func(_ types.Signer, _ common.Address, tx *types.Transaction) (*types.Transaction, error) {
+		return tx, nil
+	}),
+}
+
+func callRouterMethod(rtx *router.RouterTransactor, m routerMethod) error {
 	var err error
 	switch {
 	case m.send != nil:
 		args := m.send
-		_, err = rtx.Send(opts,
+		_, err = rtx.Send(dummyTxOpts,
 			args.to,
 			args.toShard,
 			args.payload,
@@ -82,13 +83,22 @@ func testParseRouterMethod(t *testing.T, m routerMethod) {
 			args.gasLimit,
 			args.gasLeftoverTo,
 		)
+		return err
 	case m.retrySend != nil:
 		args := m.retrySend
-		_, err = rtx.RetrySend(opts, args.msgAddr, args.gasLimit, args.gasPrice)
+		_, err = rtx.RetrySend(dummyTxOpts, args.msgAddr, args.gasLimit, args.gasPrice)
+		return err
 	default:
-		t.Errorf("routerMethod has no variant set: %v", m)
-		return
+		err = fmt.Errorf("routerMethod has no variant set: %v", m)
 	}
+	return err
+}
+
+// Test that the decoding arguments for the supplied generates the right
+// result.
+func testParseRouterMethod(t *testing.T, m routerMethod) {
+	rtx, mtx := newTestRouterTxer()
+	err := callRouterMethod(rtx, m)
 	assert.Nil(t, err, "transaction failed.")
 
 	t.Log("## Payload ##")
@@ -249,4 +259,94 @@ func TestLoadStoreMessage(t *testing.T) {
 		return true
 	}, nil)
 	assert.Nil(t, err)
+}
+
+func TestRouterSendSimple(t *testing.T) {
+	txAddr := common.BytesToAddress([]byte{1, 2, 3})
+	rxAddr := common.BytesToAddress([]byte{4, 5, 6})
+	leftoverAddr := common.BytesToAddress([]byte{7, 8, 9})
+
+	gasBudget := big.NewInt(40)
+	gasPrice := big.NewInt(4)
+	gasLimit := big.NewInt(10)
+	value := big.NewInt(75)
+
+	testCallRouter(t,
+		txAddr,
+		routerMethod{send: &routerSendArgs{
+			to:            rxAddr,
+			toShard:       4,
+			payload:       []byte("hello"),
+			gasBudget:     gasBudget,
+			gasPrice:      gasPrice,
+			gasLimit:      gasLimit,
+			gasLeftoverTo: leftoverAddr,
+		}},
+		big.NewInt(100000),
+		7000, // Arbitrary
+		[]harmonyTypes.CXMessage{
+			{
+				To:            txAddr,
+				From:          rxAddr,
+				ToShard:       4,
+				FromShard:     0,
+				Payload:       []byte("hello"),
+				GasBudget:     gasBudget,
+				GasPrice:      gasPrice,
+				GasLimit:      gasLimit,
+				GasLeftoverTo: leftoverAddr,
+				Nonce:         0,
+				Value:         value,
+			},
+		},
+	)
+}
+
+func testCallRouter(
+	t *testing.T,
+	callerAddr common.Address,
+	m routerMethod,
+	value *big.Int,
+	gas uint64,
+	expectedMsgs []harmonyTypes.CXMessage,
+) {
+	rtx, mtx := newTestRouterTxer()
+	db, err := newTestStateDB()
+	assert.Nil(t, err, "newTestStateDB() failed")
+
+	var msgs []harmonyTypes.CXMessage
+
+	evm := NewEVM(
+		Context{
+			CanTransfer: func(db StateDB, addr common.Address, value *big.Int) bool {
+				return true
+			},
+			EmitCXMessage: func(m harmonyTypes.CXMessage) error {
+				msgs = append(msgs, m)
+				return nil
+			},
+			Transfer: func(db StateDB, from common.Address, to common.Address, value *big.Int, txType harmonyTypes.TransactionType) {
+				db.SubBalance(from, value)
+				db.AddBalance(to, value)
+			},
+			IsValidator: func(db StateDB, addr common.Address) bool {
+				return db.IsValidator(addr)
+			},
+		},
+		db,
+		params.TestChainConfig,
+		Config{},
+	)
+	err = callRouterMethod(rtx, m)
+	assert.Nil(t, err, "transaction failed.")
+
+	evm.Call(
+		AccountRef(callerAddr),
+		routerAddress,
+		mtx.Data,
+		gas,
+		mtx.Value,
+	)
+
+	assert.Equal(t, msgs, expectedMsgs)
 }
