@@ -274,7 +274,7 @@ var (
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
-		big.NewInt(0),						// ChainIdFixEpoch
+		big.NewInt(0),                      // ChainIdFixEpoch
 	}
 
 	// TestChainConfig ...
@@ -310,7 +310,7 @@ var (
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
-		big.NewInt(0),		  // ChainIdFixEpoch
+		big.NewInt(0),        // ChainIdFixEpoch
 	}
 
 	// TestRules ...
