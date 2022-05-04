@@ -2568,12 +2568,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
 			newEpochSuperCommittee.Epoch, key,
 		); err == nil {
-			wrapper := snapshot.Validator
-			spread := numeric.ZeroDec()
-			if len(wrapper.SlotPubKeys) > 0 {
-				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-					QuoInt64(int64(len(wrapper.SlotPubKeys)))
-			}
+			spread := snapshot.RawStakePerSlot()
 			for i := range stats.MetricsPerShard {
 				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}
