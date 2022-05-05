@@ -208,9 +208,9 @@ func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMe
 		GasLeftoverTo: args.gasLeftoverTo,
 	}
 	totalValue := contract.Value()
-	if args.gasBudget.Cmp(totalValue) < 0 {
+	if args.gasBudget.Cmp(totalValue) > 0 {
 		return m, fmt.Errorf(
-			"gasBudget (%v) is less that attached value (%v).",
+			"gasBudget (%v) is greater that attached value (%v).",
 			args.gasBudget,
 			totalValue,
 		)

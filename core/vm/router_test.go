@@ -269,7 +269,8 @@ func TestRouterSendSimple(t *testing.T) {
 	gasBudget := big.NewInt(40)
 	gasPrice := big.NewInt(4)
 	gasLimit := big.NewInt(10)
-	value := big.NewInt(75)
+	totalValue := big.NewInt(75)
+	value := big.NewInt(0).Sub(totalValue, gasBudget)
 
 	testCallRouter(t,
 		txAddr,
@@ -282,7 +283,7 @@ func TestRouterSendSimple(t *testing.T) {
 			gasLimit:      gasLimit,
 			gasLeftoverTo: leftoverAddr,
 		}},
-		big.NewInt(100000),
+		totalValue,
 		7000, // Arbitrary
 		[]harmonyTypes.CXMessage{
 			{
@@ -343,7 +344,7 @@ func testCallRouter(
 	contract := NewContract(
 		AccountRef(callerAddr),
 		AccountRef(routerAddress),
-		new(big.Int),
+		value,
 		7000000)
 	_, err = RunWriteCapablePrecompiledContract(&routerPrecompile{}, evm, contract, mtx.Data, false)
 	assert.Nil(t, err, "Error calling router contract.")
