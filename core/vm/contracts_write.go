@@ -197,14 +197,15 @@ type routerSendArgs struct {
 
 func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMessage, error) {
 	m := types.CXMessage{
-		From:      contract.Caller(),
-		FromShard: evm.Context.ShardID,
-		To:        args.to,
-		ToShard:   args.toShard,
-		Payload:   args.payload,
-		GasBudget: args.gasBudget,
-		GasPrice:  args.gasPrice,
-		GasLimit:  args.gasLimit,
+		From:          contract.Caller(),
+		FromShard:     evm.Context.ShardID,
+		To:            args.to,
+		ToShard:       args.toShard,
+		Payload:       args.payload,
+		GasBudget:     args.gasBudget,
+		GasPrice:      args.gasPrice,
+		GasLimit:      args.gasLimit,
+		GasLeftoverTo: args.gasLeftoverTo,
 	}
 	totalValue := contract.Value()
 	if args.gasBudget.Cmp(totalValue) < 0 {

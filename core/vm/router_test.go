@@ -286,8 +286,8 @@ func TestRouterSendSimple(t *testing.T) {
 		7000, // Arbitrary
 		[]harmonyTypes.CXMessage{
 			{
-				To:            txAddr,
-				From:          rxAddr,
+				To:            rxAddr,
+				From:          txAddr,
 				ToShard:       4,
 				FromShard:     0,
 				Payload:       []byte("hello"),
@@ -340,13 +340,12 @@ func testCallRouter(
 	err = callRouterMethod(rtx, m)
 	assert.Nil(t, err, "transaction failed.")
 
-	evm.Call(
+	contract := NewContract(
 		AccountRef(callerAddr),
-		routerAddress,
-		mtx.Data,
-		gas,
-		mtx.Value,
-	)
-
-	assert.Equal(t, msgs, expectedMsgs)
+		AccountRef(routerAddress),
+		new(big.Int),
+		7000000)
+	_, err = RunWriteCapablePrecompiledContract(&routerPrecompile{}, evm, contract, mtx.Data, false)
+	assert.Nil(t, err, "Error calling router contract.")
+	assert.Equal(t, expectedMsgs, msgs)
 }
