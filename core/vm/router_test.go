@@ -291,18 +291,20 @@ func TestCallRouter(t *testing.T) {
 	db, err := newTestStateDB()
 	assert.Nil(t, err, "Creating test DB failed")
 
+	sendMethod := routerMethod{send: &routerSendArgs{
+		to:            rxAddr,
+		toShard:       toShard,
+		payload:       payload,
+		gasBudget:     gasBudget,
+		gasPrice:      gasPrice,
+		gasLimit:      gasLimit,
+		gasLeftoverTo: leftoverAddr,
+	}}
+
 	ok := t.Run("Initial send", func(t *testing.T) {
 		testCallRouter(t, db,
 			txAddr,
-			routerMethod{send: &routerSendArgs{
-				to:            rxAddr,
-				toShard:       toShard,
-				payload:       payload,
-				gasBudget:     gasBudget,
-				gasPrice:      gasPrice,
-				gasLimit:      gasLimit,
-				gasLeftoverTo: leftoverAddr,
-			}},
+			sendMethod,
 			totalValue,
 			7000, // Arbitrary
 			[]harmonyTypes.CXMessage{msg},
@@ -342,15 +344,7 @@ func TestCallRouter(t *testing.T) {
 	ok = t.Run("Send second message", func(t *testing.T) {
 		testCallRouter(t, db,
 			txAddr,
-			routerMethod{send: &routerSendArgs{
-				to:            rxAddr,
-				toShard:       toShard,
-				payload:       payload,
-				gasBudget:     gasBudget,
-				gasPrice:      gasPrice,
-				gasLimit:      gasLimit,
-				gasLeftoverTo: leftoverAddr,
-			}},
+			sendMethod,
 			totalValue,
 			7000, // Arbitrary
 			[]harmonyTypes.CXMessage{msg2},
