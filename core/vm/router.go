@@ -47,8 +47,13 @@ type routerSendArgs struct {
 }
 
 func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMessage, error) {
+	fromAddr := contract.Caller()
+	db := evm.StateDB
+	nonce := db.GetNonce(fromAddr)
+	db.SetNonce(fromAddr, nonce+1)
+
 	m := types.CXMessage{
-		From:          contract.Caller(),
+		From:          fromAddr,
 		FromShard:     evm.Context.ShardID,
 		To:            args.to,
 		ToShard:       args.toShard,
@@ -57,6 +62,7 @@ func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMe
 		GasPrice:      args.gasPrice,
 		GasLimit:      args.gasLimit,
 		GasLeftoverTo: args.gasLeftoverTo,
+		Nonce:         nonce,
 	}
 	totalValue := contract.Value()
 	if args.gasBudget.Cmp(totalValue) > 0 {
@@ -454,10 +460,4 @@ func (ms msgStorage) LoadNonceToShard() (nonce uint64, toShard uint32) {
 	nonce = binary.BigEndian.Uint64(buf[:8])
 	toShard = binary.BigEndian.Uint32(buf[8 : 8+4])
 	return
-}
-
-func (c *routerPrecompile) newNonce(db StateDB, addr common.Address) uint64 {
-	nonce := db.GetNonce(addr)
-	db.SetNonce(addr, nonce+1)
-	return nonce
 }

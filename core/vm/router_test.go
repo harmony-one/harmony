@@ -333,6 +333,30 @@ func TestCallRouter(t *testing.T) {
 	})
 
 	assert.True(t, ok, "Retry send failed")
+
+	// If we send another message, with the same arguments, it should be the
+	// same except for the nonce:
+	msg2 := msg
+	msg2.Nonce++
+
+	ok = t.Run("Send second message", func(t *testing.T) {
+		testCallRouter(t, db,
+			txAddr,
+			routerMethod{send: &routerSendArgs{
+				to:            rxAddr,
+				toShard:       toShard,
+				payload:       payload,
+				gasBudget:     gasBudget,
+				gasPrice:      gasPrice,
+				gasLimit:      gasLimit,
+				gasLeftoverTo: leftoverAddr,
+			}},
+			totalValue,
+			7000, // Arbitrary
+			[]harmonyTypes.CXMessage{msg2},
+		)
+	})
+	assert.True(t, ok, "Sending second message failed")
 }
 
 func testCallRouter(
