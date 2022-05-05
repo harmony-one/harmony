@@ -252,8 +252,8 @@ func TestLoadStoreMessage(t *testing.T) {
 			addr: msgAddr,
 		}
 		ms.StoreMessage(msg, payloadHash)
-		loadedMsg, loadedHash := ms.LoadMessage(msg.FromShard)
-
+		loadedMsg, loadedHash, err := ms.LoadMessage(msg.FromShard)
+		assert.Nil(t, err, "Loading message failed")
 		assert.Equal(t, loadedHash, payloadHash, "Payload hashes should match")
 		assert.Equal(t, loadedMsg, msg, "Messages should match.")
 		return true
@@ -261,7 +261,7 @@ func TestLoadStoreMessage(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestRouterSendSimple(t *testing.T) {
+func TestCallRouter(t *testing.T) {
 	txAddr := common.BytesToAddress([]byte{1, 2, 3})
 	rxAddr := common.BytesToAddress([]byte{4, 5, 6})
 	leftoverAddr := common.BytesToAddress([]byte{7, 8, 9})
@@ -271,40 +271,73 @@ func TestRouterSendSimple(t *testing.T) {
 	gasLimit := big.NewInt(10)
 	totalValue := big.NewInt(75)
 	value := big.NewInt(0).Sub(totalValue, gasBudget)
+	payload := []byte("hello")
+	toShard := uint32(4)
 
-	testCallRouter(t,
-		txAddr,
-		routerMethod{send: &routerSendArgs{
-			to:            rxAddr,
-			toShard:       4,
-			payload:       []byte("hello"),
-			gasBudget:     gasBudget,
-			gasPrice:      gasPrice,
-			gasLimit:      gasLimit,
-			gasLeftoverTo: leftoverAddr,
-		}},
-		totalValue,
-		7000, // Arbitrary
-		[]harmonyTypes.CXMessage{
-			{
-				To:            rxAddr,
-				From:          txAddr,
-				ToShard:       4,
-				FromShard:     0,
-				Payload:       []byte("hello"),
-				GasBudget:     gasBudget,
-				GasPrice:      gasPrice,
-				GasLimit:      gasLimit,
-				GasLeftoverTo: leftoverAddr,
-				Nonce:         0,
-				Value:         value,
-			},
-		},
-	)
+	msg := harmonyTypes.CXMessage{
+		To:            rxAddr,
+		From:          txAddr,
+		ToShard:       4,
+		FromShard:     0,
+		Payload:       []byte("hello"),
+		GasBudget:     gasBudget,
+		GasPrice:      gasPrice,
+		GasLimit:      gasLimit,
+		GasLeftoverTo: leftoverAddr,
+		Nonce:         0,
+		Value:         value,
+	}
+
+	db, err := newTestStateDB()
+	assert.Nil(t, err, "Creating test DB failed")
+
+	ok := t.Run("Initial send", func(t *testing.T) {
+		testCallRouter(t, db,
+			txAddr,
+			routerMethod{send: &routerSendArgs{
+				to:            rxAddr,
+				toShard:       toShard,
+				payload:       payload,
+				gasBudget:     gasBudget,
+				gasPrice:      gasPrice,
+				gasLimit:      gasLimit,
+				gasLeftoverTo: leftoverAddr,
+			}},
+			totalValue,
+			7000, // Arbitrary
+			[]harmonyTypes.CXMessage{msg},
+		)
+	})
+	assert.True(t, ok, "Initial send failed")
+
+	msgAddr, _ := messageAddrAndPayloadHash(msg)
+
+	additionalValue := big.NewInt(20)
+	newGasPrice := big.NewInt(6)
+	newMessage := msg
+	newMessage.GasPrice = newGasPrice
+	newMessage.GasBudget = (&big.Int{}).Add(msg.GasBudget, additionalValue)
+
+	ok = t.Run("Retry", func(t *testing.T) {
+		testCallRouter(t, db,
+			txAddr,
+			routerMethod{retrySend: &routerRetrySendArgs{
+				gasLimit: gasLimit,
+				gasPrice: newGasPrice,
+				msgAddr:  msgAddr,
+			}},
+			additionalValue,
+			7000, // Arbitrary
+			[]harmonyTypes.CXMessage{newMessage},
+		)
+	})
+
+	assert.True(t, ok, "Retry send failed")
 }
 
 func testCallRouter(
 	t *testing.T,
+	db StateDB,
 	callerAddr common.Address,
 	m routerMethod,
 	value *big.Int,
@@ -312,8 +345,6 @@ func testCallRouter(
 	expectedMsgs []harmonyTypes.CXMessage,
 ) {
 	rtx, mtx := newTestRouterTxer()
-	db, err := newTestStateDB()
-	assert.Nil(t, err, "newTestStateDB() failed")
 
 	var msgs []harmonyTypes.CXMessage
 
@@ -338,7 +369,7 @@ func testCallRouter(
 		params.TestChainConfig,
 		Config{},
 	)
-	err = callRouterMethod(rtx, m)
+	err := callRouterMethod(rtx, m)
 	assert.Nil(t, err, "transaction failed.")
 
 	contract := NewContract(

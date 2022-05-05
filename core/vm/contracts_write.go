@@ -362,7 +362,10 @@ func (c *routerPrecompile) RunWriteCapable(
 			db:   evm.StateDB,
 			addr: m.retrySend.msgAddr,
 		}
-		oldMsg, _ := ms.LoadMessage(evm.Context.ShardID)
+		oldMsg, _, err := ms.LoadMessage(evm.Context.ShardID)
+		if err != nil {
+			return nil, err
+		}
 		newMsg := oldMsg
 		newMsg.GasLimit = m.retrySend.gasLimit
 		newMsg.GasPrice = m.retrySend.gasPrice
@@ -483,7 +486,7 @@ func storePayload(db StateDB, hash common.Hash, data []byte) {
 
 // Load a message from storage. The fromShard field is supplied by the
 // caller; it is not stored, since storage is per-shard anyway.
-func (ms msgStorage) LoadMessage(fromShard uint32) (msg types.CXMessage, payloadHash common.Hash) {
+func (ms msgStorage) LoadMessage(fromShard uint32) (msg types.CXMessage, payloadHash common.Hash, err error) {
 	nonce, toShard := ms.LoadNonceToShard()
 	payloadLen := ms.LoadLen(msIdxPayloadLen)
 	payloadHash = ms.LoadWord(msIdxPayloadHash)
@@ -501,7 +504,18 @@ func (ms msgStorage) LoadMessage(fromShard uint32) (msg types.CXMessage, payload
 		GasLeftoverTo: ms.LoadAddr(msIdxGasLeftoverTo),
 		Payload:       payload,
 	}
-	// TODO: sanity check that the hash is correct.
+	computedAddr, computedHash := messageAddrAndPayloadHash(msg)
+	if computedHash != payloadHash {
+		err = fmt.Errorf(
+			"Loaded message's payload hash was not as expected; wanted %x but got %x.",
+			payloadHash, computedHash,
+		)
+	} else if computedAddr != ms.addr {
+		err = fmt.Errorf(
+			"Loaded message's address was not as expected; wanted %x but got %x.",
+			ms.addr, computedAddr,
+		)
+	}
 	return
 }
 
