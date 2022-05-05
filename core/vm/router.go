@@ -10,9 +10,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-// NOTE: the proposal suggested using 252, but H1 already uses 252-255 for
-// other things, so we pick another address instead:
-var routerAddress = common.BytesToAddress([]byte{1, 1})
+var routerAddress = common.BytesToAddress([]byte{1, 0})
 
 // routerPrecompile implements the router contract used for cross-shard messaging
 // (via the WriteCapablePrecompiledContract interface).
