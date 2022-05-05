@@ -94,9 +94,10 @@ type Message interface {
 
 // ExecutionResult is the return value from a transaction committed to the DB
 type ExecutionResult struct {
-	ReturnData []byte
-	UsedGas    uint64
-	VMErr      error
+	ReturnData     []byte
+	SentCXMessages []types.CXMessage
+	UsedGas        uint64
+	VMErr          error
 }
 
 // Unwrap returns the internal evm error which allows us for further
@@ -144,9 +145,10 @@ func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool, bc ChainContext) 
 // against the old state within the environment.
 //
 // ApplyMessage returns the bytes returned by any EVM execution (if it took place),
-// the gas used (which includes gas refunds) and an error if it failed. An error always
-// indicates a core error meaning that the message would always fail for that particular
-// state and would never be accepted within a block.
+// the gas used (which includes gas refunds), any cross shard messages sent, and an
+// error if it failed. An error always indicates a core error meaning that the
+// message would always fail for that particular state and would never be accepted
+// within a block.
 func ApplyMessage(evm *vm.EVM, msg Message, gp *GasPool) (ExecutionResult, error) {
 	return NewStateTransition(evm, msg, gp, nil).TransitionDb()
 }
@@ -228,6 +230,11 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	}
 
 	evm := st.evm
+	var sentCXMessages []types.CXMessage
+	evm.Context.EmitCXMessage = func(m types.CXMessage) error {
+		sentCXMessages = append(sentCXMessages, m)
+		return nil
+	}
 
 	var ret []byte
 	// All VM errors are valid except for insufficient balance, therefore returned separately
@@ -259,9 +266,10 @@ func (st *StateTransition) TransitionDb() (ExecutionResult, error) {
 	}
 
 	return ExecutionResult{
-		ReturnData: ret,
-		UsedGas:    st.gasUsed(),
-		VMErr:      vmErr,
+		ReturnData:     ret,
+		UsedGas:        st.gasUsed(),
+		SentCXMessages: sentCXMessages,
+		VMErr:          vmErr,
 	}, err
 }
 
