@@ -191,10 +191,12 @@ func (sc instance) GetNetworkID() NetworkID {
 	return DevNet
 }
 
+// ExternalAllowlist returns the list of external leader keys in allowlist(HIP18)
 func (sc instance) ExternalAllowlist() []bls.PublicKeyWrapper {
 	return sc.allowlist.BLSPublicKeys
 }
 
+// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard
 func (sc instance) ExternalAllowlistLimit() int {
-	return sc.allowlist.MaxLimit
+	return sc.allowlist.MaxLimitPerShard
 }

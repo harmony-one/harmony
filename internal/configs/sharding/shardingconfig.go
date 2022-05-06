@@ -76,8 +76,10 @@ type Instance interface {
 	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	SlotsLimit() int
 
+	// ExternalAllowlist returns the list of external leader keys in allowlist(HIP18)
 	ExternalAllowlist() []bls.PublicKeyWrapper
 
+	// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard(HIP18)
 	ExternalAllowlistLimit() int
 }
 

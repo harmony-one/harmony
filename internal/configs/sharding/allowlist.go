@@ -7,8 +7,8 @@ import (
 )
 
 type Allowlist struct {
-	MaxLimit      int
-	BLSPublicKeys []bls_cosi.PublicKeyWrapper
+	MaxLimitPerShard int
+	BLSPublicKeys    []bls_cosi.PublicKeyWrapper
 }
 
 func _BLS(pubkeys []string) []bls_cosi.PublicKeyWrapper {
@@ -24,18 +24,18 @@ func _BLS(pubkeys []string) []bls_cosi.PublicKeyWrapper {
 }
 
 var mainnetAllowlist = Allowlist{
-	MaxLimit:      0,
-	BLSPublicKeys: _BLS([]string{}),
+	MaxLimitPerShard: 0,
+	BLSPublicKeys:    _BLS([]string{}),
 }
 
 var testnetAllowlist = Allowlist{
-	MaxLimit:      0,
-	BLSPublicKeys: _BLS([]string{}),
+	MaxLimitPerShard: 0,
+	BLSPublicKeys:    _BLS([]string{}),
 }
 
 var localnetAllowlist = Allowlist{
-	MaxLimit:      0,
-	BLSPublicKeys: _BLS([]string{}),
+	MaxLimitPerShard: 0,
+	BLSPublicKeys:    _BLS([]string{}),
 }
 
 var emptyAllowlist = Allowlist{}
