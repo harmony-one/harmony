@@ -553,7 +553,7 @@ func TestNthNextHmyExt(test *testing.T) {
 	numHmyNodes := 10
 	numAllExtNodes := 10
 	numAllowlistExtNodes := numAllExtNodes / 2
-	allowlist := shardingconfig.Allowlist{MaxLimit: numAllowlistExtNodes - 1}
+	allowlist := shardingconfig.Allowlist{MaxLimitPerShard: numAllowlistExtNodes - 1}
 	blsKeys := []harmony_bls.PublicKeyWrapper{}
 	for i := 0; i < numHmyNodes+numAllExtNodes; i++ {
 		blsKey := harmony_bls.RandPrivateKey()
@@ -561,11 +561,11 @@ func TestNthNextHmyExt(test *testing.T) {
 		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
 		blsKeys = append(blsKeys, wrapper)
 	}
-	allowlistLeaders := blsKeys[len(blsKeys)-allowlist.MaxLimit:]
+	allowlistLeaders := blsKeys[len(blsKeys)-allowlist.MaxLimitPerShard:]
 	allLeaders := append(blsKeys[:numHmyNodes], allowlistLeaders...)
 
 	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
-	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, numeric.OneDec(), nil, nil, allowlist, nil, 0)
+	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, nil, 0)
 
 	decider.UpdateParticipants(blsKeys, allowlistLeaders)
 	for i := 0; i < len(allLeaders); i++ {
