@@ -66,7 +66,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 		ChainIdFixEpoch:            EpochTBD,
-		SlotsLimitedEpoch:          EpochTBD,        // epoch to enable HIP-16
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -137,7 +137,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
 		ChainIdFixEpoch:            big.NewInt(0),
-		SlotsLimitedEpoch:          EpochTBD,      // epoch to enable HIP-16
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -439,7 +439,7 @@ type ChainConfig struct {
 
 	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
 	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
-	
+
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
 	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
 }
@@ -608,7 +608,6 @@ func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
 }
 
-
 // IsChainIdFixEpoch returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFixEpoch(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
@@ -662,8 +661,8 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                                              *big.Int
-	EthChainID                                                                                           *big.Int
+	ChainID                                                                                                                 *big.Int
+	EthChainID                                                                                                              *big.Int
 	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile, IsChainIdFixEpoch bool
 }
 
