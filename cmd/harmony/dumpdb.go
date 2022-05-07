@@ -118,7 +118,7 @@ var (
 func dumpPrint(prefix string, showAccount bool) {
 	if snapdbInfo.DumpedSize-printSize > MB || showAccount {
 		now := time.Now().Unix()
-		fmt.Println(now, prefix, snapdbInfo.AccountCount, snapdbInfo.DumpedSize, printSize/MB, flushedSize/MB)
+		fmt.Println(now, prefix, snapdbInfo.AccountCount, snapdbInfo.DumpedSize/MB, printSize/MB, flushedSize/MB)
 		if showAccount {
 			fmt.Println("account:", lastAccount.Address.Hex(), lastAccount.Balance, len(lastAccount.Code), accountState, lastAccount.SecureKey.String(), snapdbInfo.LastAccountStateKey.String())
 		}
@@ -151,11 +151,12 @@ func (db *KakashiDB) copyKV(key, value []byte) {
 
 func (db *KakashiDB) flush() {
 	dumpPrint("KakashiDB batch writhing", true)
-	rawdb.WriteSnapdbInfo(db.toDBBatch, &snapdbInfo)
+	if err := rawdb.WriteSnapdbInfo(db.toDBBatch, &snapdbInfo); err != nil {
+		panic(err)
+	}
 	db.toDBBatch.Write()
 	db.toDBBatch.Reset()
 	flushedSize = snapdbInfo.DumpedSize
-	dumpPrint("KakashiDB flushed", false)
 }
 
 func (db *KakashiDB) Close() error {
@@ -265,6 +266,7 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 			break
 		}
 		latestNumber := block.NumberU64() - uint64(i)
+		fmt.Println("blockx:", i, latestNumber)
 		latestBlock := db.GetBlockByNumber(latestNumber)
 		db.GetBlockByHash(latestBlock.Hash())
 		db.GetHeaderByHash(latestBlock.Hash())
@@ -368,8 +370,9 @@ func dumpMain(srcDBDir, destDBDir string, batchLimit int) {
 			os.Exit(-1)
 		}
 		snapdbInfo = *lastSnapdbInfo
+		flushedSize = snapdbInfo.DumpedSize
+		printSize = flushedSize
 	}
-
 	headHash := rawdb.ReadHeadBlockHash(srcDB)
 	headNumber := rawdb.ReadHeaderNumber(srcDB, headHash)
 	block := rawdb.ReadBlock(srcDB, headHash, *headNumber)

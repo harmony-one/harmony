@@ -11,7 +11,7 @@ import (
 type SnapdbInfo struct {
 	NetworkType         nodeconfig.NetworkType // network type
 	BlockHeader         *block.Header          // latest header at snapshot
-	AccountCount        int                    // number of dumped account
+	AccountCount        uint64                 // number of dumped account
 	OffchainDataDumped  bool                   // is OffchainData dumped
 	IndexerDataDumped   bool                   // is IndexerData dumped
 	StateDataDumped     bool                   // is StateData dumped
