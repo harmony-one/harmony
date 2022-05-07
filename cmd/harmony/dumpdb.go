@@ -370,22 +370,22 @@ func dumpMain(srcDBDir, destDBDir string, batchLimit int) {
 		snapdbInfo = *lastSnapdbInfo
 	}
 
-	var block *types.Block
-	if snapdbInfo.BlockHeader == nil {
-		headHash := rawdb.ReadHeadBlockHash(srcDB)
-		headNumber := rawdb.ReadHeaderNumber(srcDB, headHash)
-		block = rawdb.ReadBlock(srcDB, headHash, *headNumber)
-	} else {
-		block = rawdb.ReadBlock(destDB, snapdbInfo.BlockHeader.Hash(), snapdbInfo.BlockHeader.Number().Uint64())
-	}
-
+	headHash := rawdb.ReadHeadBlockHash(srcDB)
+	headNumber := rawdb.ReadHeaderNumber(srcDB, headHash)
+	block := rawdb.ReadBlock(srcDB, headHash, *headNumber)
 	if block == nil || block.Hash() == emptyHash {
 		fmt.Println("empty head block")
 		os.Exit(-1)
 	}
-	fmt.Println("head-block:", block.Header().Number(), block.Hash().Hex())
-	snapdbInfo.BlockHeader = block.Header()
+	if snapdbInfo.BlockHeader == nil {
+		snapdbInfo.BlockHeader = block.Header()
+	}
+	if snapdbInfo.BlockHeader.Hash() != block.Hash() {
+		fmt.Printf("head block does not match! src: %s dest: %x\n", block.Hash().String(), snapdbInfo.BlockHeader.Hash().String())
+		os.Exit(-1)
+	}
 
+	fmt.Println("head-block:", block.Header().Number(), block.Hash().Hex())
 	fmt.Println("start copying...")
 	cache, _ := lru.New(LRU_CACHE_SIZE)
 	copier := &KakashiDB{
