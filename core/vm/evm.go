@@ -66,11 +66,11 @@ type (
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
-func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
+func run(evm *EVM, contract *Contract, input []byte, readOnly bool, value *big.Int) ([]byte, error) {
 	if contract.CodeAddr != nil {
 		precompiles := PrecompiledContractsHomestead
 		// assign empty write capable precompiles till they are available in the fork
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -86,6 +86,9 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if evm.chainRules.IsStakingPrecompile {
 			precompiles = PrecompiledContractsStaking
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
+		}
+		if evm.chainRules.IsCrossShardXferPrecompile {
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
 		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
@@ -111,8 +114,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
-		if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
-			return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+		if len(writeCapablePrecompiles) > 0 {
+			if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
+				return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly, value)
+			}
 		}
 	}
 	for _, interpreter := range evm.interpreters {
@@ -174,8 +179,8 @@ type Context struct {
 	CollectRewards        CollectRewardsFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
-	// staking precompile checks this before proceeding forward
-	ShardID uint32
+	ShardID   uint32 // Used by staking and cross shard transfer precompile
+	NumShards uint32 // Used by cross shard transfer precompile
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -216,6 +221,7 @@ type EVM struct {
 	// stored temporarily by stakingPrecompile and cleared immediately after return
 	// (although the EVM object itself is ephemeral)
 	StakeMsgs []stakingTypes.StakeMsg
+	CXReceipt *types.CXReceipt
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -297,7 +303,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	)
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -314,8 +320,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			precompiles = PrecompiledContractsStaking
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
-
-		if writeCapablePrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		if evm.chainRules.IsCrossShardXferPrecompile {
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
+		}
+		if (len(writeCapablePrecompiles) == 0 || writeCapablePrecompiles[addr] == nil) && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)
@@ -351,7 +359,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			evm.vmConfig.Tracer.CaptureEnd(ret, gas-contract.Gas, time.Since(start), err)
 		}()
 	}
-	ret, err = run(evm, contract, input, false)
+	ret, err = run(evm, contract, input, false, value)
 
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
@@ -396,7 +404,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	contract := NewContract(caller, to, value, gas)
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
-	ret, err = run(evm, contract, input, false)
+	ret, err = run(evm, contract, input, false, value)
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -429,7 +437,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	contract := NewContract(caller, to, nil, gas).AsDelegate()
 	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
-	ret, err = run(evm, contract, input, false)
+	ret, err = run(evm, contract, input, false, nil)
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -471,7 +479,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in Homestead this also counts for code storage gas errors.
-	ret, err = run(evm, contract, input, true)
+	ret, err = run(evm, contract, input, true, nil)
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != ErrExecutionReverted {
@@ -534,7 +542,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	start := time.Now()
 
-	ret, err := run(evm, contract, nil, false)
+	ret, err := run(evm, contract, nil, false, value)
 
 	// check whether the max code size has been exceeded
 	maxCodeSizeExceeded := evm.ChainConfig().IsEIP155(evm.EpochNumber) && len(ret) > params.MaxCodeSize

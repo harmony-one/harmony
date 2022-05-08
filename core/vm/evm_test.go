@@ -24,6 +24,7 @@ func TestEpochPrecompile(t *testing.T) {
 		&contract,
 		input,
 		true,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Got error%v\n", err)

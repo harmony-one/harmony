@@ -2,7 +2,6 @@ package staking
 
 import (
 	"bytes"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -126,11 +125,11 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 			if err != nil {
 				return nil, err
 			}
-			validatorAddress, err := ParseAddressFromKey(args, "validatorAddress")
+			validatorAddress, err := abi.ParseAddressFromKey(args, "validatorAddress")
 			if err != nil {
 				return nil, err
 			}
-			amount, err := ParseBigIntFromKey(args, "amount")
+			amount, err := abi.ParseBigIntFromKey(args, "amount")
 			if err != nil {
 				return nil, err
 			}
@@ -148,12 +147,12 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 			if err != nil {
 				return nil, err
 			}
-			validatorAddress, err := ParseAddressFromKey(args, "validatorAddress")
+			validatorAddress, err := abi.ParseAddressFromKey(args, "validatorAddress")
 			if err != nil {
 				return nil, err
 			}
 			// this type assertion is needed by Golang
-			amount, err := ParseBigIntFromKey(args, "amount")
+			amount, err := abi.ParseBigIntFromKey(args, "amount")
 			if err != nil {
 				return nil, err
 			}
@@ -201,7 +200,7 @@ func ParseStakeMsg(contractCaller common.Address, input []byte) (interface{}, er
 
 // used to ensure caller == delegatorAddress
 func ValidateContractAddress(contractCaller common.Address, args map[string]interface{}, key string) (common.Address, error) {
-	address, err := ParseAddressFromKey(args, key)
+	address, err := abi.ParseAddressFromKey(args, key)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -212,25 +211,5 @@ func ValidateContractAddress(contractCaller common.Address, args map[string]inte
 		)
 	} else {
 		return address, nil
-	}
-}
-
-// used for both delegatorAddress and validatorAddress
-func ParseAddressFromKey(args map[string]interface{}, key string) (common.Address, error) {
-	if address, ok := args[key].(common.Address); ok {
-		return address, nil
-	} else {
-		return common.Address{}, errors.Errorf("Cannot parse address from %v", args[key])
-	}
-}
-
-// used for amounts
-func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, error) {
-	bigInt, ok := args[key].(*big.Int)
-	if !ok {
-		return nil, errors.Errorf(
-			"Cannot parse BigInt from %v", args[key])
-	} else {
-		return bigInt, nil
 	}
 }

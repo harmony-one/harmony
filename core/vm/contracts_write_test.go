@@ -8,6 +8,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/params"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -17,6 +21,7 @@ type writeCapablePrecompileTest struct {
 	name            string
 	expectedError   error
 	p               *WriteCapablePrecompiledContract
+	value           *big.Int
 }
 
 func CollectRewardsFn() CollectRewardsFunc {
@@ -61,18 +66,7 @@ func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 	}
 }
 
-func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
-	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
-		Delegate:        DelegateFn(),
-		Undelegate:      UndelegateFn(),
-		CreateValidator: CreateValidatorFn(),
-		EditValidator:   EditValidatorFn(),
-		ShardID:         0,
-		//MigrateDelegations:    MigrateDelegationsFn(),
-		CalculateMigrationGas: CalculateMigrationGasFn(),
-	}, nil, params.TestChainConfig, Config{})
-	// use required gas to avoid out of gas errors
-	p := &stakingPrecompile{}
+func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, env *EVM, p WriteCapablePrecompiledContract) {
 	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
 		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), 0)
 		gas, err := p.RequiredGas(env, contract, test.input)
@@ -80,7 +74,7 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
+		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false, test.value); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -99,23 +93,18 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	})
 }
 
-func TestStakingPrecompiles(t *testing.T) {
-	for _, test := range StakingPrecompileTests {
-		testStakingPrecompile(test, t)
-	}
-}
-
-func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
+func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
+	var env = NewEVM(Context{CollectRewards: CollectRewardsFn(),
+		Delegate:        DelegateFn(),
+		Undelegate:      UndelegateFn(),
+		CreateValidator: CreateValidatorFn(),
+		EditValidator:   EditValidatorFn(),
+		ShardID:         0,
+		//MigrateDelegations:    MigrateDelegationsFn(),
+		CalculateMigrationGas: CalculateMigrationGasFn(),
+	}, nil, params.TestChainConfig, Config{})
 	p := &stakingPrecompile{}
-	expectedError := errWriteProtection
-	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
-	if err != nil {
-		if err.Error() != expectedError.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected an error %v but instead got result %v", expectedError, res)
-	}
+	testWriteCapablePrecompile(test, t, env, p)
 }
 
 var StakingPrecompileTests = []writeCapablePrecompileTest{
@@ -210,4 +199,93 @@ var StakingPrecompileTests = []writeCapablePrecompileTest{
 	//	expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
 	//	name:          "migrationAddressMismatch",
 	//},
+}
+
+func TestStakingPrecompiles(t *testing.T) {
+	for _, test := range StakingPrecompileTests {
+		testStakingPrecompile(test, t)
+	}
+}
+
+func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
+	p := &stakingPrecompile{}
+	expectedError := errWriteProtection
+	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true, nil)
+	if err != nil {
+		if err.Error() != expectedError.Error() {
+			t.Errorf("Expected error %v, got %v", expectedError, err)
+		}
+	} else {
+		t.Errorf("Expected an error %v but instead got result %v", expectedError, res)
+	}
+}
+
+func transfer(db StateDB, sender, recipient common.Address, amount *big.Int, txType types.TransactionType) {
+}
+
+func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T) {
+	// this EVM needs stateDB, Transfer, and NumShards
+	var db ethdb.Database
+	var err error
+	defer func() {
+		if db != nil {
+			db.Close()
+		}
+	}()
+	if db, err = rawdb.NewLevelDBDatabase("/tmp/harmony_shard_0", 256, 1024, ""); err != nil {
+		db = nil
+		t.Fatalf("Could not initialize db %s", err)
+	}
+	stateCache := state.NewDatabase(db)
+	state, err := state.New(common.Hash{}, stateCache)
+	if err != nil {
+		t.Fatalf("Error while initializing state %s", err)
+	}
+	var env = NewEVM(Context{
+		NumShards: 4,
+		Transfer:  transfer,
+	}, state, params.TestChainConfig, Config{})
+	p := &crossShardXferPrecompile{}
+	testWriteCapablePrecompile(test, t, env, p)
+}
+
+func TestCrossShardXferPrecompile(t *testing.T) {
+	for _, test := range CrossShardXferPrecompileTests {
+		testCrossShardXferPrecompile(test, t)
+	}
+}
+
+var CrossShardXferPrecompileTests = []writeCapablePrecompileTest{
+	{
+		input:    []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		expected: nil,
+		name:     "crossShardSuccess",
+		value:    new(big.Int).Mul(big.NewInt(100), big.NewInt(1e18)),
+	},
+	{
+		input:         []byte{40, 72, 8, 1},
+		expectedError: errors.New("no method with id: 0x28480801"),
+		name:          "crossShardMethodSigFail",
+	},
+	{
+		input:         []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 95 require 96"),
+		name:          "crossShardMalformedInputFail",
+	},
+	{
+		input:         []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6},
+		expectedError: errors.New("toShardId out of bounds"),
+		name:          "crossShardOutOfBoundsFail",
+	},
+	{
+		input:         []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		expectedError: errors.New("from and to shard id can't be equal"),
+		name:          "crossShardSameShardFail",
+	},
+	{
+		input:         []byte{40, 72, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 107, 199, 94, 45, 99, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 36, 21, 19, 218, 159, 68, 99, 241, 212, 135, 75, 84, 141, 251, 172, 41, 217, 31, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		expectedError: errors.New("argument value and msg.value not equal"),
+		name:          "crossShardDiffValueFail",
+		value:         new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
+	},
 }
