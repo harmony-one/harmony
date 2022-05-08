@@ -170,7 +170,7 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 	c.OnRoot(s.trie.Hash())
 
 	hasEnd := len(conf.End) > 0
-	stateStart := conf.Start
+	stateStart := conf.StateStart
 	hasStateEnd := len(conf.StateEnd) > 0
 	it := trie.NewIterator(s.trie.NodeIterator(conf.Start))
 	for it.Next() {
