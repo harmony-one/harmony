@@ -232,7 +232,7 @@ func (w *Worker) commitTransaction(
 ) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
+	receipt, cxs, stakeMsgs, _, err := core.ApplyTransaction(
 		w.config,
 		w.chain,
 		&coinbase,
@@ -252,7 +252,7 @@ func (w *Worker) commitTransaction(
 		return errNilReceipt
 	}
 	if receipt == nil {
-		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
+		utils.Logger().Warn().Interface("tx", tx).Interface("cxs", cxs).Msg("Receipt is Nil!")
 		return errNilReceipt
 	}
 
@@ -260,10 +260,7 @@ func (w *Worker) commitTransaction(
 	w.current.receipts = append(w.current.receipts, receipt)
 	w.current.logs = append(w.current.logs, receipt.Logs...)
 	w.current.stakeMsgs = append(w.current.stakeMsgs, stakeMsgs...)
-
-	if cx != nil {
-		w.current.outcxs = append(w.current.outcxs, cx)
-	}
+	w.current.outcxs = append(w.current.outcxs, cxs...)
 	return nil
 }
 

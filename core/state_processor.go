@@ -122,16 +122,14 @@ func (p *StateProcessor) Process(
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, cxReceipt, stakeMsgs, _, err := ApplyTransaction(
+		receipt, cxReceipts, stakeMsgs, _, err := ApplyTransaction(
 			p.config, p.bc, &beneficiary, gp, statedb, header, tx, usedGas, cfg,
 		)
 		if err != nil {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 		receipts = append(receipts, receipt)
-		if cxReceipt != nil {
-			outcxs = append(outcxs, cxReceipt)
-		}
+		outcxs = append(outcxs, cxReceipts...)
 		if len(stakeMsgs) > 0 {
 			blockStakeMsgs = append(blockStakeMsgs, stakeMsgs...)
 		}
@@ -230,7 +228,7 @@ func getTransactionType(
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, *types.CXReceipt, []staking.StakeMsg, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.DB, header *block.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config) (*types.Receipt, types.CXReceipts, []staking.StakeMsg, uint64, error) {
 	txType := getTransactionType(config, header, tx)
 	if txType == types.InvalidTx {
 		return nil, nil, nil, 0, errors.New("Invalid Transaction Type")
@@ -296,15 +294,27 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
-	var cxReceipt *types.CXReceipt
+	var cxReceipts types.CXReceipts
 	// Do not create cxReceipt if EVM call failed
 	if txType == types.SubtractionOnly && !failedExe {
-		cxReceipt = &types.CXReceipt{TxHash: tx.Hash(), From: msg.From(), To: msg.To(), ShardID: tx.ShardID(), ToShardID: tx.ToShardID(), Amount: msg.Value()}
-	} else {
-		cxReceipt = nil
+		cxReceipts = append(
+			cxReceipts,
+			&types.CXReceipt{
+				TxHash:    tx.Hash(),
+				From:      msg.From(),
+				To:        msg.To(),
+				ShardID:   tx.ShardID(),
+				ToShardID: tx.ToShardID(),
+				Amount:    msg.Value(),
+			},
+		)
 	}
 
-	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
+	for _, m := range result.SentCXMessages {
+		receipt := m.ToReceipt(tx.Hash())
+		cxReceipts = append(cxReceipts, &receipt)
+	}
+	return receipt, cxReceipts, vmenv.StakeMsgs, result.UsedGas, err
 }
 
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database
