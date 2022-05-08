@@ -20,6 +20,24 @@ type CXReceipt struct {
 	ShardID   uint32
 	ToShardID uint32
 	Amount    *big.Int
+
+	MessageReceipt *CXMessageReceipt
+}
+
+// Returns the CXMessage corresponding to this receipt, if any. If this receipt
+// is not for a message, it will return the zero value and `ok = false`
+func (r CXReceipt) ToCXMessage() (_ CXMessage, ok bool) {
+	if r.MessageReceipt == nil {
+		return CXMessage{}, false
+	}
+	return CXMessage{
+		To:               *r.To,
+		From:             r.From,
+		ToShard:          r.ToShardID,
+		FromShard:        r.ShardID,
+		Value:            r.Amount,
+		CXMessageReceipt: *r.MessageReceipt,
+	}, true
 }
 
 // Copy makes a deep copy of the receiver.

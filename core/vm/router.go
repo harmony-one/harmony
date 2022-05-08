@@ -51,16 +51,18 @@ func (args routerSendArgs) MakeMessage(evm *EVM, contract *Contract) (types.CXMe
 	db.SetNonce(fromAddr, nonce+1)
 
 	m := types.CXMessage{
-		From:          fromAddr,
-		FromShard:     evm.Context.ShardID,
-		To:            args.to,
-		ToShard:       args.toShard,
-		Payload:       args.payload,
-		GasBudget:     args.gasBudget,
-		GasPrice:      args.gasPrice,
-		GasLimit:      args.gasLimit,
-		GasLeftoverTo: args.gasLeftoverTo,
-		Nonce:         nonce,
+		From:      fromAddr,
+		FromShard: evm.Context.ShardID,
+		To:        args.to,
+		ToShard:   args.toShard,
+		CXMessageReceipt: types.CXMessageReceipt{
+			Payload:       args.payload,
+			GasBudget:     args.gasBudget,
+			GasPrice:      args.gasPrice,
+			GasLimit:      args.gasLimit,
+			GasLeftoverTo: args.gasLeftoverTo,
+			Nonce:         nonce,
+		},
 	}
 	totalValue := contract.Value()
 	if args.gasBudget.Cmp(totalValue) > 0 {
@@ -347,17 +349,19 @@ func (ms msgStorage) LoadMessage(fromShard uint32) (msg types.CXMessage, payload
 	payloadHash = ms.LoadWord(msIdxPayloadHash)
 	payload := loadPayload(ms.db, payloadHash, payloadLen)
 	msg = types.CXMessage{
-		From:          ms.LoadAddr(msIdxFromAddr),
-		To:            ms.LoadAddr(msIdxToAddr),
-		ToShard:       toShard,
-		FromShard:     fromShard,
-		Nonce:         nonce,
-		Value:         ms.LoadU256(msIdxValue),
-		GasBudget:     ms.LoadU256(msIdxGasBudget),
-		GasPrice:      ms.LoadU256(msIdxGasPrice),
-		GasLimit:      ms.LoadU256(msIdxGasLimit),
-		GasLeftoverTo: ms.LoadAddr(msIdxGasLeftoverTo),
-		Payload:       payload,
+		From:      ms.LoadAddr(msIdxFromAddr),
+		To:        ms.LoadAddr(msIdxToAddr),
+		ToShard:   toShard,
+		FromShard: fromShard,
+		Value:     ms.LoadU256(msIdxValue),
+		CXMessageReceipt: types.CXMessageReceipt{
+			Nonce:         nonce,
+			GasBudget:     ms.LoadU256(msIdxGasBudget),
+			GasPrice:      ms.LoadU256(msIdxGasPrice),
+			GasLimit:      ms.LoadU256(msIdxGasLimit),
+			GasLeftoverTo: ms.LoadAddr(msIdxGasLeftoverTo),
+			Payload:       payload,
+		},
 	}
 	computedAddr, computedHash := messageAddrAndPayloadHash(msg)
 	if computedHash != payloadHash {

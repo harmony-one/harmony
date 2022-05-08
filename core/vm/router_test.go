@@ -184,13 +184,15 @@ func (g genCXMessage) ToMessage() harmonyTypes.CXMessage {
 	return harmonyTypes.CXMessage{
 		To: g.To, From: g.From,
 		ToShard: g.ToShard, FromShard: g.FromShard,
-		Payload:       g.Payload,
-		GasBudget:     readBig(g.GasBudget[:]),
-		GasPrice:      readBig(g.GasPrice[:]),
-		GasLimit:      readBig(g.GasLimit[:]),
-		GasLeftoverTo: g.GasLeftoverTo,
-		Nonce:         g.Nonce,
-		Value:         readBig(g.Value[:]),
+		Value: readBig(g.Value[:]),
+		CXMessageReceipt: harmonyTypes.CXMessageReceipt{
+			Payload:       g.Payload,
+			GasBudget:     readBig(g.GasBudget[:]),
+			GasPrice:      readBig(g.GasPrice[:]),
+			GasLimit:      readBig(g.GasLimit[:]),
+			GasLeftoverTo: g.GasLeftoverTo,
+			Nonce:         g.Nonce,
+		},
 	}
 }
 
@@ -275,17 +277,19 @@ func TestCallRouter(t *testing.T) {
 	toShard := uint32(4)
 
 	msg := harmonyTypes.CXMessage{
-		To:            rxAddr,
-		From:          txAddr,
-		ToShard:       4,
-		FromShard:     0,
-		Payload:       []byte("hello"),
-		GasBudget:     gasBudget,
-		GasPrice:      gasPrice,
-		GasLimit:      gasLimit,
-		GasLeftoverTo: leftoverAddr,
-		Nonce:         0,
-		Value:         value,
+		To:        rxAddr,
+		From:      txAddr,
+		ToShard:   4,
+		FromShard: 0,
+		Value:     value,
+		CXMessageReceipt: harmonyTypes.CXMessageReceipt{
+			Payload:       []byte("hello"),
+			GasBudget:     gasBudget,
+			GasPrice:      gasPrice,
+			GasLimit:      gasLimit,
+			GasLeftoverTo: leftoverAddr,
+			Nonce:         0,
+		},
 	}
 
 	db, err := newTestStateDB()
