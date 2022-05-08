@@ -8,6 +8,7 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+// SnapdbInfo only used by cmd/harmony/dumpdb.go
 type SnapdbInfo struct {
 	NetworkType         nodeconfig.NetworkType // network type
 	BlockHeader         *block.Header          // latest header at snapshot
