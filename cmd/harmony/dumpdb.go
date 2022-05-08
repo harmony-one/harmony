@@ -266,7 +266,6 @@ func (db *KakashiDB) offchainDataDump(block *types.Block) {
 			break
 		}
 		latestNumber := block.NumberU64() - uint64(i)
-		fmt.Println("blockx:", i, latestNumber)
 		latestBlock := db.GetBlockByNumber(latestNumber)
 		db.GetBlockByHash(latestBlock.Hash())
 		db.GetHeaderByHash(latestBlock.Hash())
@@ -408,4 +407,5 @@ func dumpMain(srcDBDir, destDBDir string, batchLimit int) {
 	if !snapdbInfo.StateDataDumped {
 		copier.stateDataDump(block)
 	}
+	fmt.Println("Dump completed!")
 }
