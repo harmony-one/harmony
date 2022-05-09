@@ -281,7 +281,7 @@ func UnpackRevert(data []byte) (string, error) {
 }
 
 // ParseAddressFromKey pulls out the address value from a map with provided key,
-// andv alidates the data type for it
+// and validates the data type for it
 func ParseAddressFromKey(args map[string]interface{}, key string) (common.Address, error) {
 	if address, ok := args[key].(common.Address); ok {
 		return address, nil
