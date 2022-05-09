@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,6 +12,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/explorer"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
@@ -119,9 +121,32 @@ func (node *Node) explorerMessageHandler(ctx context.Context, msg *msg_pb.Messag
 	return nil
 }
 
+func (node *Node) TraceLoopForExplorer() {
+	if !node.HarmonyConfig.General.TraceEnable {
+		return
+	}
+	ch := make(chan core.TraceEvent)
+	subscribe := node.Blockchain().SubscribeTraceEvent(ch)
+	go func() {
+	loop:
+		select {
+		case ev := <-ch:
+			if exp, err := node.getExplorerService(); err == nil {
+				storage := ev.Tracer.GetStorage()
+				exp.DumpTraceResult(storage)
+			}
+			goto loop
+		case <-subscribe.Err():
+			//subscribe.Unsubscribe()
+			break
+		}
+	}()
+}
+
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
+
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
 		if block.IsLastBlockInEpoch() {
 			node.Consensus.UpdateConsensusInformation()
@@ -243,6 +268,15 @@ func (node *Node) GetStakingTransactionsCount(address, txType string) (uint64, e
 		}
 	}
 	return count, nil
+}
+
+// GetStakingTransactionsCount returns the number of staking transactions hashes of address for input type.
+func (node *Node) GetTraceResultByHash(hash common.Hash) (json.RawMessage, error) {
+	exp, err := node.getExplorerService()
+	if err != nil {
+		return nil, err
+	}
+	return exp.GetTraceResultByHash(hash)
 }
 
 func (node *Node) getExplorerService() (*explorer.Service, error) {

@@ -485,7 +485,7 @@ func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 		}
 
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, dnConfig.SlotsLimit, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
@@ -620,6 +620,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	}
 
 	nodeConfig.NtpServer = hc.Sys.NtpServer
+
+	nodeConfig.TraceEnable = hc.General.TraceEnable
 
 	return nodeConfig, nil
 }
@@ -811,7 +813,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	node.RegisterService(service.Synchronize, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
-	if hc.Sync.Downloader {
+	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
 		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
 	}
 }

@@ -16,6 +16,7 @@ import (
 const (
 	LegAddressPrefix = "ad_"
 	CheckpointPrefix = "dc"
+	TracePrefix      = "tr_"
 
 	oneAddrByteLen = 42 // byte size of string "one1..."
 )
@@ -34,6 +35,24 @@ func isBlockComputedInDB(db databaseReader, bn uint64) (bool, error) {
 func writeCheckpoint(db databaseWriter, bn uint64) error {
 	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
 	return db.Put(blockCheckpoint, []byte{})
+}
+
+func getTraceResultKey(key []byte) []byte {
+	return append([]byte(TracePrefix), key...)
+}
+func isTraceResultInDB(db databaseReader, key []byte) (bool, error) {
+	key = getTraceResultKey(key)
+	return db.Has(key)
+}
+
+func writeTraceResult(db databaseWriter, key []byte, data []byte) error {
+	key = getTraceResultKey(key)
+	return db.Put(key, data)
+}
+
+func getTraceResult(db databaseReader, key []byte) ([]byte, error) {
+	key = getTraceResultKey(key)
+	return db.Get(key)
 }
 
 // New schema
