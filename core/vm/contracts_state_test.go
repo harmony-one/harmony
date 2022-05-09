@@ -16,7 +16,7 @@ type writeCapablePrecompileTest struct {
 	input, expected []byte
 	name            string
 	expectedError   error
-	p               *WriteCapablePrecompiledContract
+	p               *StateDependentPrecompiledContract
 }
 
 func CollectRewardsFn() CollectRewardsFunc {
@@ -75,12 +75,12 @@ func testStakingPrecompile(test writeCapablePrecompileTest, t *testing.T) {
 	p := &stakingPrecompile{}
 	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
 		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), 0)
-		gas, err := p.RequiredGas(env, contract, test.input)
+		gas, err := p.RequiredGas(env, contract, test.input, false)
 		if err != nil {
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
+		if res, err := RunStateDependentPrecompiledContract(p, env, contract, test.input, false); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -105,10 +105,10 @@ func TestStakingPrecompiles(t *testing.T) {
 	}
 }
 
-func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
+func TestStakingPrecompilesReadOnly(t *testing.T) {
 	p := &stakingPrecompile{}
 	expectedError := errWriteProtection
-	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
+	res, err := RunStateDependentPrecompiledContract(p, nil, nil, []byte{}, true)
 	if err != nil {
 		if err.Error() != expectedError.Error() {
 			t.Errorf("Expected error %v, got %v", expectedError, err)
@@ -210,4 +210,21 @@ var StakingPrecompileTests = []writeCapablePrecompileTest{
 	//	expectedError: errors.New("abi: cannot marshal in to go type: length insufficient 63 require 64"),
 	//	name:          "migrationAddressMismatch",
 	//},
+}
+
+func FetchStakingInfoFn(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error) {
+	return nil, nil
+}
+
+func TestRoStakingPrecompile(t *testing.T) {
+	var env = NewEVM(Context{
+		FetchStakingInfo: FetchStakingInfoFn,
+	}, nil, params.TestChainConfig, Config{})
+	p := &roStakingPrecompile{}
+	input := []byte{102, 54, 146, 228, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55}
+	contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), GasQuickStep)
+	_, err := RunStateDependentPrecompiledContract(p, env, contract, input, false)
+	if err != nil {
+		t.Error(err)
+	}
 }

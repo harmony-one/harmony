@@ -55,6 +55,143 @@ func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *
 	return chain, db, header, database
 }
 
+func TestRoStaking(t *testing.T) {
+	key, _ := crypto.GenerateKey()
+	chain, db, header, database := getTestEnvironment(*key)
+	header.SetNumber(big.NewInt(1))
+
+	// fake transaction
+	tx := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), 0, big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
+	// transaction as message (chainId = 2)
+	msg, _ := tx.AsMessage(types.NewEIP155Signer(common.Big2))
+	// context
+	ctx := NewEVMContext(msg, header, chain, nil /* coinbase */)
+
+	createValidator := sampleCreateValidator(*key)
+	err := ctx.CreateValidator(db, nil, &createValidator)
+	if err != nil {
+		t.Fatalf("Got error %v in CreateValidator", err)
+	}
+
+	// delegate test
+	delegate := sampleDelegate(*key)
+	// add undelegations in epoch0
+	wrapper, err := db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
+	wrapper.Delegations[0].Undelegations = []staking.Undelegation{
+		{
+			Amount: new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000)),
+			Epoch:  common.Big0,
+		},
+	}
+	// so that we can fetch balance available for redelegation from prior block
+	header2 := blockfactory.NewTestHeader().With().Number(big.NewInt(1)).Header()
+	ctx2 := NewEVMContext(msg, header2, chain, nil)
+	err = db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	err = ctx2.Delegate(db, nil, &delegate)
+	if err != nil {
+		t.Fatalf("Got error %v in Delegate", err)
+	}
+
+	// now run the actual test
+	readOnlyMsg := &staking.ReadOnlyStakeMsg{
+		DelegatorAddress: delegate.DelegatorAddress,
+		ValidatorAddress: delegate.ValidatorAddress,
+		What:             "DelegationByDelegatorAndValidator",
+	}
+	bytes, err := ctx.FetchStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine DelegationByDelegatorAndValidator %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		expectedAmount := new(big.Int).Add(createValidator.Amount, delegate.Amount)
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		ValidatorAddress: delegate.ValidatorAddress,
+		What:             "ValidatorMaxTotalDelegation",
+	}
+	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine ValidatorMaxTotalDelegation %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		expectedAmount := createValidator.MaxTotalDelegation
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		ValidatorAddress: delegate.ValidatorAddress,
+		What:             "ValidatorTotalDelegation",
+	}
+	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine ValidatorTotalDelegation %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		wrapper, _ := db.ValidatorWrapper(createValidator.ValidatorAddress, true, false)
+		expectedAmount := wrapper.TotalDelegation()
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		ValidatorAddress: delegate.ValidatorAddress,
+		What:             "ValidatorCommissionRate",
+	}
+	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine ValidatorCommissionRate %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		expectedAmount := new(big.Int).SetBytes(createValidator.CommissionRates.Rate.Bytes())
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	// add to state delegation by delegator
+	batch := database.NewBatch()
+	selfIndex := staking.DelegationIndex{
+		ValidatorAddress: createValidator.ValidatorAddress,
+		Index:            uint64(0),
+		BlockNum:         common.Big0, // block number at which delegation starts
+	}
+	err = chain.writeDelegationsByDelegator(batch, createValidator.ValidatorAddress, []staking.DelegationIndex{selfIndex})
+	if err != nil {
+		t.Fatal(err)
+	}
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		DelegatorAddress: delegate.DelegatorAddress,
+		What:             "BalanceAvailableForRedelegation",
+	}
+	bytes, err = ctx2.FetchStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine BalanceAvailableForRedelegation %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		expectedAmount := wrapper.Delegations[0].Undelegations[0].Amount
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		ValidatorAddress: delegate.ValidatorAddress,
+		What:             "SlashingHeightFromBlockForValidator",
+		BlockNumber:      common.Big1,
+	}
+	bytes, err = ctx2.FetchStakingInfo(db, readOnlyMsg)
+	if err.Error() != "cannot find header for block" || err == nil {
+		t.Errorf("Unexpected error in SlashingHeightFromBlockForValidator %s", err)
+	}
+}
+
 func TestEVMStaking(t *testing.T) {
 	key, _ := crypto.GenerateKey()
 	chain, db, header, database := getTestEnvironment(*key)

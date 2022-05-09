@@ -140,7 +140,7 @@ var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
 func init() {
 	// check that there is no overlap, and panic if there is
 	readOnlyContracts := PrecompiledContractsStaking
-	writeCapableContracts := WriteCapablePrecompiledContractsStaking
+	writeCapableContracts := StateDependentPrecompiledContractsRoStaking
 	for address, readOnlyContract := range readOnlyContracts {
 		if readOnlyContract != nil && writeCapableContracts[address] != nil {
 			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))

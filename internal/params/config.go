@@ -66,6 +66,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 		SlotsLimitedEpoch:          EpochTBD,        // epoch to enable HIP-16
+		ROStakingPrecompileEpoch:   EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -100,6 +101,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
 		SlotsLimitedEpoch:          big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
+		ROStakingPrecompileEpoch:   EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -135,6 +137,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
 		SlotsLimitedEpoch:          EpochTBD,      // epoch to enable HIP-16
+		ROStakingPrecompileEpoch:   big.NewInt(2),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -170,6 +173,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		ROStakingPrecompileEpoch:   big.NewInt(2),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -205,6 +209,7 @@ var (
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		ROStakingPrecompileEpoch:   big.NewInt(2),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -239,6 +244,7 @@ var (
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		StakingPrecompileEpoch:     big.NewInt(2),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		ROStakingPrecompileEpoch:   big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -275,6 +281,7 @@ var (
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
+		big.NewInt(0),                      // ROStakingPrecompileEpoch
 	}
 
 	// TestChainConfig ...
@@ -311,6 +318,7 @@ var (
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
+		big.NewInt(0),        // ROStakingPrecompileEpoch
 	}
 
 	// TestRules ...
@@ -431,11 +439,14 @@ type ChainConfig struct {
 
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
 	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
+
+	// ROStakingPrecompileEpoch is the first epoch to support the read-only staking precompile
+	ROStakingPrecompileEpoch *big.Int `json:"read-only-staking-precompile-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ROStakingPrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -445,6 +456,7 @@ func (c *ChainConfig) String() string {
 		c.ReceiptLogEpoch,
 		c.SHA3Epoch,
 		c.StakingPrecompileEpoch,
+		c.ROStakingPrecompileEpoch,
 	)
 }
 
@@ -590,10 +602,16 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
-// IsStakingPrecompileEpoch determines whether staking
+// IsStakingPrecompile determines whether staking
 // precompiles are available in the EVM
 func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
+}
+
+// IsROStakingPrecompile determines whether staking
+// precompiles are available in the EVM
+func (c *ChainConfig) IsROStakingPrecompile(epoch *big.Int) bool {
+	return isForked(c.ROStakingPrecompileEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
@@ -644,16 +662,21 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                                              *big.Int
-	EthChainID                                                                                           *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile bool
+	ChainID    *big.Int
+	EthChainID *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
+	IsStakingPrecompile, IsROStakingPrecompile bool
 }
 
 // Rules ensures c's ChainID is not nil.
 func (c *ChainConfig) Rules(epoch *big.Int) Rules {
-	if c.IsStakingPrecompile(epoch) {
-		if !c.IsPreStaking(epoch) {
+	// check that staking precompile epochs are correctly set
+	if !c.IsPreStaking(epoch) {
+		if c.IsStakingPrecompile(epoch) {
 			panic("Cannot have staking precompile epoch if not prestaking epoch")
+		}
+		if c.IsROStakingPrecompile(epoch) {
+			panic("Cannot have read-only staking precompile epoch if not prestaking epoch")
 		}
 	}
 	chainID := c.ChainID
@@ -665,16 +688,17 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		ethChainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:             new(big.Int).Set(chainID),
-		EthChainID:          new(big.Int).Set(ethChainID),
-		IsCrossLink:         c.IsCrossLink(epoch),
-		IsEIP155:            c.IsEIP155(epoch),
-		IsS3:                c.IsS3(epoch),
-		IsReceiptLog:        c.IsReceiptLog(epoch),
-		IsIstanbul:          c.IsIstanbul(epoch),
-		IsVRF:               c.IsVRF(epoch),
-		IsPrevVRF:           c.IsPrevVRF(epoch),
-		IsSHA3:              c.IsSHA3(epoch),
-		IsStakingPrecompile: c.IsStakingPrecompile(epoch),
+		ChainID:               new(big.Int).Set(chainID),
+		EthChainID:            new(big.Int).Set(ethChainID),
+		IsCrossLink:           c.IsCrossLink(epoch),
+		IsEIP155:              c.IsEIP155(epoch),
+		IsS3:                  c.IsS3(epoch),
+		IsReceiptLog:          c.IsReceiptLog(epoch),
+		IsIstanbul:            c.IsIstanbul(epoch),
+		IsVRF:                 c.IsVRF(epoch),
+		IsPrevVRF:             c.IsPrevVRF(epoch),
+		IsSHA3:                c.IsSHA3(epoch),
+		IsStakingPrecompile:   c.IsStakingPrecompile(epoch),
+		IsROStakingPrecompile: c.IsROStakingPrecompile(epoch),
 	}
 }

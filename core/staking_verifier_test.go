@@ -1759,6 +1759,10 @@ func (chain *fakeChainContext) ReadValidatorSnapshot(addr common.Address) (*stak
 	}, nil
 }
 
+func (chain *fakeChainContext) GetHeaderByNumber(number uint64) *block.Header {
+	return nil
+}
+
 type fakeErrChainContext struct{}
 
 func (chain *fakeErrChainContext) ReadValidatorList() ([]common.Address, error) {
@@ -1793,6 +1797,10 @@ func (chain *fakeErrChainContext) ShardID() uint32 {
 
 func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*staking.ValidatorSnapshot, error) {
 	return nil, errors.New("error intended")
+}
+
+func (chain *fakeErrChainContext) GetHeaderByNumber(number uint64) *block.Header {
+	return nil
 }
 
 func makeIdentityStr(item interface{}) string {

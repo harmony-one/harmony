@@ -263,3 +263,10 @@ func (v MigrationMsg) Copy() MigrationMsg {
 func (v MigrationMsg) Equals(s MigrationMsg) bool {
 	return v.From == s.From && v.To == s.To
 }
+
+type ReadOnlyStakeMsg struct {
+	DelegatorAddress common.Address
+	ValidatorAddress common.Address
+	What             string
+	BlockNumber      *big.Int
+}

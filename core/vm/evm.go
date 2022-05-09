@@ -63,6 +63,8 @@ type (
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
+	// Read only staking precompile
+	RoStakingPrecompileFunc func(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error)
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -70,7 +72,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 	if contract.CodeAddr != nil {
 		precompiles := PrecompiledContractsHomestead
 		// assign empty write capable precompiles till they are available in the fork
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		stateDependentPrecompiles := make(map[common.Address]StateDependentPrecompiledContract)
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -85,7 +87,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		}
 		if evm.chainRules.IsStakingPrecompile {
 			precompiles = PrecompiledContractsStaking
-			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
+			stateDependentPrecompiles = StateDependentPrecompiledContractsStaking
+		}
+		if evm.chainRules.IsROStakingPrecompile {
+			stateDependentPrecompiles = StateDependentPrecompiledContractsRoStaking
 		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
@@ -111,8 +116,8 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
-		if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
-			return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+		if p := stateDependentPrecompiles[*contract.CodeAddr]; p != nil {
+			return RunStateDependentPrecompiledContract(p, evm, contract, input, readOnly)
 		}
 	}
 	for _, interpreter := range evm.interpreters {
@@ -176,6 +181,9 @@ type Context struct {
 
 	// staking precompile checks this before proceeding forward
 	ShardID uint32
+
+	// read only staking precompile
+	FetchStakingInfo RoStakingPrecompileFunc
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -297,7 +305,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	)
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		stateDependentPrecompiles := make(map[common.Address]StateDependentPrecompiledContract)
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -312,10 +320,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		if evm.chainRules.IsStakingPrecompile {
 			precompiles = PrecompiledContractsStaking
-			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
+			stateDependentPrecompiles = StateDependentPrecompiledContractsStaking
 		}
-
-		if writeCapablePrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		if evm.chainRules.IsROStakingPrecompile {
+			stateDependentPrecompiles = StateDependentPrecompiledContractsRoStaking
+		}
+		if stateDependentPrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)

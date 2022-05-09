@@ -1,9 +1,11 @@
 package staking
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -199,5 +201,160 @@ func testParseStakeMsg(test parseTest, t *testing.T) {
 func TestParseStakeMsgs(t *testing.T) {
 	for _, test := range ParseStakeMsgTests {
 		testParseStakeMsg(test, t)
+	}
+}
+
+type parseRoTest struct {
+	input         []byte
+	name          string
+	expectedError error
+	expected      *stakingTypes.ReadOnlyStakeMsg
+}
+
+var ParseRoStakeMsgTests = []parseRoTest{
+	{
+		input:         []byte{102, 54, 146, 228, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+		name:          "getBalanceAvailableForRedelegationSuccess",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			DelegatorAddress: common.HexToAddress("0x1337"),
+			What:             "BalanceAvailableForRedelegation",
+		},
+	},
+	{
+		input:         []byte{55, 162, 85, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+		name:          "getDelegationByDelegatorAndValidatorSuccess",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			DelegatorAddress: common.HexToAddress("0x1337"),
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			What:             "DelegationByDelegatorAndValidator",
+		},
+	},
+	{
+		input:         []byte{116, 78, 71, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+		name:          "getValidatorTotalDelegationSuccess",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			What:             "ValidatorTotalDelegation",
+		},
+	},
+	{
+		input:         []byte{62, 128, 166, 177, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+		name:          "getValidatorMaxTotalDelegationSuccess",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			What:             "ValidatorMaxTotalDelegation",
+		},
+	},
+	{
+		input:         []byte{41, 202, 19, 238, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53},
+		name:          "getSlashingHeightFromBlockForValidator",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			ValidatorAddress: common.HexToAddress("0x1338"),
+			What:             "SlashingHeightFromBlockForValidator",
+			BlockNumber:      big.NewInt(53),
+		},
+	},
+	{
+		input:         []byte{41, 202, 191, 238},
+		name:          "NoMethodFailure",
+		expectedError: errors.New("no method with id: 0x29cabfee"),
+	},
+	{
+		input:         []byte{41, 202, 19, 238},
+		name:          "MissingDataFailure",
+		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
+	},
+	{
+		input:         []byte{41, 202, 19},
+		name:          "MissingBytesFailure",
+		expectedError: errors.New("data too short (3 bytes) for abi method lookup"),
+	},
+}
+
+func testParseRoStakeMsg(test parseRoTest, t *testing.T) {
+	t.Run(test.name, func(t *testing.T) {
+		if res, err := ParseReadOnlyStakeMsg(test.input); err != nil {
+			if test.expectedError != nil {
+				if test.expectedError.Error() != err.Error() {
+					t.Errorf("Expected error %v, got %v", test.expectedError, err)
+				}
+			} else {
+				t.Error(err)
+			}
+		} else {
+			if test.expectedError != nil {
+				t.Errorf("Expected an error %v but instead got result %v", test.expectedError, res)
+			}
+			if test.expected != nil {
+				if strings.Compare(test.expected.What, res.What) != 0 {
+					t.Errorf(
+						"Unequal value for what %s and %s",
+						test.expected.What, res.What,
+					)
+				}
+				if strings.Compare(test.expected.What, "DelegationByDelegatorAndValidator") == 0 {
+					if !bytes.Equal(test.expected.DelegatorAddress[:], res.DelegatorAddress[:]) {
+						t.Errorf(
+							"Unequal value for delegator address %s and %s",
+							test.expected.DelegatorAddress.Hex(),
+							res.DelegatorAddress.Hex(),
+						)
+					}
+					if !bytes.Equal(test.expected.ValidatorAddress[:], res.ValidatorAddress[:]) {
+						t.Errorf(
+							"Unequal value for validator address %s and %s",
+							test.expected.ValidatorAddress.Hex(),
+							res.ValidatorAddress.Hex(),
+						)
+					}
+				} else if strings.Compare(test.expected.What, "ValidatorMaxTotalDelegation") == 0 ||
+					strings.Compare(test.expected.What, "ValidatorTotalDelegation") == 0 ||
+					strings.Compare(test.expected.What, "ValidatorCommissionRate") == 0 {
+					if !bytes.Equal(test.expected.ValidatorAddress[:], res.ValidatorAddress[:]) {
+						t.Errorf(
+							"Unequal value for validator address %s and %s",
+							test.expected.ValidatorAddress.Hex(),
+							res.ValidatorAddress.Hex(),
+						)
+					}
+				} else if strings.Compare(test.expected.What, "BalanceAvailableForRedelegation") == 0 {
+					if !bytes.Equal(test.expected.DelegatorAddress[:], res.DelegatorAddress[:]) {
+						t.Errorf(
+							"Unequal value for delegator address %s and %s",
+							test.expected.DelegatorAddress.Hex(),
+							res.DelegatorAddress.Hex(),
+						)
+					}
+				} else if strings.Compare(test.expected.What, "SlashingHeightFromBlockForValidator") == 0 {
+					if !bytes.Equal(test.expected.ValidatorAddress[:], res.ValidatorAddress[:]) {
+						t.Errorf(
+							"Unequal value for validator address %s and %s",
+							test.expected.ValidatorAddress.Hex(),
+							res.ValidatorAddress.Hex(),
+						)
+					}
+					if test.expected.BlockNumber.Cmp(res.BlockNumber) != 0 {
+						t.Errorf(
+							"Unequal value for block number %d and %d",
+							test.expected.BlockNumber,
+							res.BlockNumber,
+						)
+					}
+				} else {
+					t.Fatalf("Got %s as what", test.expected.What)
+				}
+			}
+		}
+	})
+}
+
+func TestParseRoStakeMsgs(t *testing.T) {
+	for _, test := range ParseRoStakeMsgTests {
+		testParseRoStakeMsg(test, t)
 	}
 }

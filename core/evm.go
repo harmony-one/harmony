@@ -32,6 +32,7 @@ import (
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking"
+	"github.com/harmony-one/harmony/staking/slash"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -43,6 +44,9 @@ type ChainContext interface {
 
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash, uint64) *block.Header
+
+	// GetHeaderByNumber retrieves a block header from the database by number
+	GetHeaderByNumber(number uint64) *block.Header
 
 	// ReadDelegationsByDelegator returns the validators list of a delegator
 	ReadDelegationsByDelegator(common.Address) (stakingTypes.DelegationIndexes, error)
@@ -98,6 +102,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		GasLimit:              header.GasLimit(),
 		GasPrice:              new(big.Int).Set(msg.GasPrice()),
 		ShardID:               chain.ShardID(),
+		FetchStakingInfo:      FetchStakingInfoFn(header, chain),
 	}
 }
 
@@ -295,12 +300,21 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 
 		// Add log if everything is good
-		db.AddLog(&types.Log{
-			Address:     collectRewards.DelegatorAddress,
-			Topics:      []common.Hash{staking.CollectRewardsTopic},
-			Data:        totalRewards.Bytes(),
-			BlockNumber: ref.Number().Uint64(),
-		})
+		if chain.Config().IsROStakingPrecompile(ref.Epoch()) {
+			db.AddLog(&types.Log{
+				Address:     collectRewards.DelegatorAddress,
+				Topics:      []common.Hash{staking.CollectRewardsTopicV2},
+				Data:        common.LeftPadBytes(totalRewards.Bytes(), 32),
+				BlockNumber: ref.Number().Uint64(),
+			})
+		} else {
+			db.AddLog(&types.Log{
+				Address:     collectRewards.DelegatorAddress,
+				Topics:      []common.Hash{staking.CollectRewardsTopic},
+				Data:        totalRewards.Bytes(),
+				BlockNumber: ref.Number().Uint64(),
+			})
+		}
 
 		//add rosetta log
 		if rosettaTracer != nil {
@@ -499,5 +513,139 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int, 
 	}
 	if txType == types.SameShardTx {
 		db.AddBalance(recipient, amount)
+	}
+}
+
+// FetchStakingInfoFn is the EVM implementation of the read only staking precompile
+// avoid import cycle by putting this function here
+func FetchStakingInfoFn(ref *block.Header, chain ChainContext) vm.RoStakingPrecompileFunc {
+	return func(db vm.StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error) {
+		switch roStakeMsg.What {
+		case "DelegationByDelegatorAndValidator":
+			{
+				// either we iterate over ReadDelegationsByDelegator
+				// or over wrapper.Delegations. since ReadDelegationsByDelegator
+				// is only written at the end of a block, prefer wrapper.Delegations
+				wrapper, err := db.ValidatorWrapper(roStakeMsg.ValidatorAddress, true, false)
+				if err != nil {
+					return nil, err
+				}
+				for _, delegation := range wrapper.Delegations {
+					if bytes.Equal(
+						delegation.DelegatorAddress[:],
+						roStakeMsg.DelegatorAddress[:],
+					) {
+						return common.LeftPadBytes(
+							delegation.Amount.Bytes(), 32,
+						), nil
+					}
+				}
+				return big.NewInt(0).Bytes(), nil
+			}
+		case "ValidatorMaxTotalDelegation":
+			{
+				wrapper, err := db.ValidatorWrapper(roStakeMsg.ValidatorAddress, true, false)
+				if err != nil {
+					return nil, err
+				}
+				return common.LeftPadBytes(
+					wrapper.MaxTotalDelegation.Bytes(), 32,
+				), nil
+			}
+		case "ValidatorTotalDelegation":
+			{
+				wrapper, err := db.ValidatorWrapper(roStakeMsg.ValidatorAddress, true, false)
+				if err != nil {
+					return nil, err
+				}
+				return common.LeftPadBytes(
+					wrapper.TotalDelegation().Bytes(), 32,
+				), nil
+			}
+		case "BalanceAvailableForRedelegation":
+			{
+				delegations, err := chain.ReadDelegationsByDelegatorAt(
+					roStakeMsg.DelegatorAddress,
+					big.NewInt(0).Sub(ref.Number(), big.NewInt(1)),
+				)
+				if err != nil {
+					return nil, err
+				}
+				redelegationTotal := big.NewInt(0)
+				for _, delegationIndex := range delegations {
+					wrapper, err := db.ValidatorWrapper(delegationIndex.ValidatorAddress, true, false)
+					if err != nil {
+						return nil, err
+					}
+					if uint64(len(wrapper.Delegations)) > delegationIndex.Index {
+						delegation := wrapper.Delegations[delegationIndex.Index]
+						for _, undelegation := range delegation.Undelegations {
+							if undelegation.Epoch.Cmp(ref.Epoch()) < 1 { // Undelegation.Epoch < currentEpoch
+								redelegationTotal.Add(redelegationTotal, undelegation.Amount)
+							}
+						}
+					}
+				}
+				return common.LeftPadBytes(
+					redelegationTotal.Bytes(), 32,
+				), nil
+			}
+		case "ValidatorCommissionRate":
+			{
+				wrapper, err := db.ValidatorWrapper(roStakeMsg.ValidatorAddress, true, false)
+				if err != nil {
+					return nil, err
+				}
+				// Solidity doesn't support float directly, so just return the bytes
+				// the bytes can't be an exact number but can be used for comparison
+				// for example, a 1.1 commission rate shows up as 1100000000000000000
+				// divide by 1e18 (in Python) to get the actual rate 1.1
+				return common.LeftPadBytes(
+					wrapper.CommissionRates.Rate.Bytes(), 32,
+				), nil
+			}
+		// for provided block number,
+		// read the header, if within range
+		// then find the slashes of said header
+		// iterate over them and check if offender
+		// return height of the evidence
+		case "SlashingHeightFromBlockForValidator":
+			{
+				var header *block.Header
+				slashes := slash.Records{}
+				minBlockNum := big.NewInt(0).Sub(ref.Number(), common.Big257)
+				// TODO confirm below
+				// current header's slashes haven't been applied yet
+				// so it doesn't make sense to return them here
+				if roStakeMsg.BlockNumber.Cmp(minBlockNum) > 0 &&
+					roStakeMsg.BlockNumber.Cmp(ref.Number()) < 0 {
+					header = chain.GetHeaderByNumber(roStakeMsg.BlockNumber.Uint64())
+				}
+				if header == nil {
+					return nil, errors.New("cannot find header for block")
+				}
+				if s := header.Slashes(); len(s) > 0 {
+					if err := rlp.DecodeBytes(s, &slashes); err != nil {
+						return nil, err
+					}
+				}
+				if len(slashes) > 0 {
+					for _, slash := range slashes {
+						if bytes.Equal(
+							slash.Evidence.Offender.Bytes(),
+							roStakeMsg.ValidatorAddress.Bytes(),
+						) {
+							return common.LeftPadBytes(
+								new(big.Int).SetUint64(slash.Evidence.Height).Bytes(), 32,
+							), nil
+						}
+					}
+				}
+				return common.LeftPadBytes(
+					common.Big0.Bytes(), 32,
+				), nil
+			}
+		}
+		return nil, nil
 	}
 }

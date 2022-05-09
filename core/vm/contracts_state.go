@@ -10,45 +10,46 @@ import (
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
-// WriteCapablePrecompiledContractsStaking lists out the write capable precompiled contracts
+// StateDependentPrecompiledContractsStaking lists out the write capable precompiled contracts
 // which are available after the StakingPrecompileEpoch
-// for now, we have only one contract at 252 or 0xfc - which is the staking precompile
-var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
+var StateDependentPrecompiledContractsStaking = map[common.Address]StateDependentPrecompiledContract{
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
-// WriteCapablePrecompiledContract represents the interface for Native Go contracts
-// which are available as a precompile in the EVM
-// As with (read-only) PrecompiledContracts, these need a RequiredGas function
-// Note that these contracts have the capability to alter the state
-// while those in contracts.go do not
-type WriteCapablePrecompiledContract interface {
-	// RequiredGas calculates the contract gas use
-	RequiredGas(evm *EVM, contract *Contract, input []byte) (uint64, error)
-	// use a different name from read-only contracts to be safe
-	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
+// StateDependentPrecompiledContractsStaking lists out the write capable precompiled contracts
+// which are available after the ROStakingPrecompileEpoch
+var StateDependentPrecompiledContractsRoStaking = map[common.Address]StateDependentPrecompiledContract{
+	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
+	common.BytesToAddress([]byte{250}): &roStakingPrecompile{},
 }
 
-// RunWriteCapablePrecompiledContract runs and evaluates the output of a write capable precompiled contract.
-func RunWriteCapablePrecompiledContract(
-	p WriteCapablePrecompiledContract,
+// StateDependentPrecompiledContract represents the interface for Native Go contracts
+// which are available as a precompile in the EVM
+// As with (other) PrecompiledContracts, these need a RequiredGas function
+// These contracts may alter the state and/or read from it
+type StateDependentPrecompiledContract interface {
+	// RequiredGas calculates the contract gas use
+	RequiredGas(evm *EVM, contract *Contract, input []byte, readOnly bool) (uint64, error)
+	// use a different name from read-only contracts to be safe
+	RunStateDependent(evm *EVM, contract *Contract, input []byte) ([]byte, error)
+}
+
+// RunStateDependentPrecompiledContract runs and evaluates the output of a write capable precompiled contract.
+func RunStateDependentPrecompiledContract(
+	p StateDependentPrecompiledContract,
 	evm *EVM,
 	contract *Contract,
 	input []byte,
 	readOnly bool,
 ) ([]byte, error) {
-	// immediately error out if readOnly
-	if readOnly {
-		return nil, errWriteProtection
-	}
-	gas, err := p.RequiredGas(evm, contract, input)
+	gas, err := p.RequiredGas(evm, contract, input, readOnly)
 	if err != nil {
 		return nil, err
 	}
 	if !contract.UseGas(gas) {
 		return nil, ErrOutOfGas
 	}
-	return p.RunWriteCapable(evm, contract, input)
+	return p.RunStateDependent(evm, contract, input)
 }
 
 type stakingPrecompile struct{}
@@ -61,7 +62,12 @@ func (c *stakingPrecompile) RequiredGas(
 	evm *EVM,
 	contract *Contract,
 	input []byte,
+	readOnly bool,
 ) (uint64, error) {
+	// immediately error out if readOnly
+	if readOnly {
+		return 0, errWriteProtection
+	}
 	// if invalid data or invalid shard
 	// set payload to blank and charge minimum gas
 	var payload []byte = make([]byte, 0)
@@ -99,14 +105,14 @@ func (c *stakingPrecompile) RequiredGas(
 	}
 }
 
-// RunWriteCapable runs the actual contract (that is it performs the staking)
-func (c *stakingPrecompile) RunWriteCapable(
+// RunStateDependent runs the actual contract (that is it performs the staking)
+func (c *stakingPrecompile) RunStateDependent(
 	evm *EVM,
 	contract *Contract,
 	input []byte,
 ) ([]byte, error) {
 	if evm.Context.ShardID != shard.BeaconChainShardID {
-		return nil, errors.New("Staking not supported on this shard")
+		return nil, errors.New("staking not supported on this shard")
 	}
 	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
 	if err != nil {
@@ -119,6 +125,14 @@ func (c *stakingPrecompile) RunWriteCapable(
 	}
 
 	if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
+		// after the ro staking precompile fork, ensure msg.value is not sent
+		// the other option was to enforce sending msg.value, but that does
+		// not work well with redelegation of locked tockens
+		if evm.chainRules.IsROStakingPrecompile {
+			if contract.Value().Cmp(common.Big0) > 0 {
+				return nil, errors.New("this precompile cannot accept funds")
+			}
+		}
 		if err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
 			return nil, err
 		} else {
@@ -149,4 +163,30 @@ func (c *stakingPrecompile) RunWriteCapable(
 	//	}
 	//}
 	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
+}
+
+type roStakingPrecompile struct{}
+
+func (c *roStakingPrecompile) RequiredGas(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+	readOnly bool,
+) (uint64, error) {
+	return GasQuickStep, nil
+}
+
+func (c *roStakingPrecompile) RunStateDependent(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) ([]byte, error) {
+	if evm.Context.ShardID != shard.BeaconChainShardID {
+		return nil, errors.New("staking not supported on this shard")
+	}
+	roStakeMsg, err := staking.ParseReadOnlyStakeMsg(input)
+	if err != nil {
+		return nil, err
+	}
+	return evm.FetchStakingInfo(evm.StateDB, roStakeMsg)
 }

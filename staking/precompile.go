@@ -12,10 +12,9 @@ import (
 )
 
 var abiStaking abi.ABI
+var abiRoStaking abi.ABI
 
 func init() {
-	// for commission rates => solidity does not support floats directly
-	// so send commission rates as string
 	StakingABIJSON := `
 	[
 	  {
@@ -100,7 +99,140 @@ func init() {
 	//"stateMutability": "nonpayable",
 	//"type": "function"
 	//}
+	ReadOnlyStakingABIJSON := `
+	[
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "delegatorAddress",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "getBalanceAvailableForRedelegation",
+	    "outputs": [
+	      {
+	        "internalType": "uint256",
+	        "name": "",
+	        "type": "uint256"
+	      }
+	    ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "delegatorAddress",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "getDelegationByDelegatorAndValidator",
+	    "outputs": [
+	      {
+	        "internalType": "uint256",
+	        "name": "",
+	        "type": "uint256"
+	      }
+	    ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      },
+	      {
+	        "internalType": "uint256",
+	        "name": "blockNumber",
+	        "type": "uint256"
+	      }
+	    ],
+	    "name": "getSlashingHeightFromBlockForValidator",
+	    "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "getValidatorCommissionRate",
+	    "outputs": [
+	      {
+	        "internalType": "uint256",
+	        "name": "",
+	        "type": "uint256"
+	      }
+	    ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "getValidatorMaxTotalDelegation",
+	    "outputs": [
+	      {
+	        "internalType": "uint256",
+	        "name": "",
+	        "type": "uint256"
+	      }
+	    ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  },
+	  {
+	    "inputs": [
+	      {
+	        "internalType": "address",
+	        "name": "validatorAddress",
+	        "type": "address"
+	      }
+	    ],
+	    "name": "getValidatorTotalDelegation",
+	    "outputs": [
+	      {
+	        "internalType": "uint256",
+	        "name": "",
+	        "type": "uint256"
+	      }
+	    ],
+	    "stateMutability": "view",
+	    "type": "function"
+	  }
+	]
+	`
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
+	var err error
+	abiRoStaking, err = abi.JSON(strings.NewReader(ReadOnlyStakingABIJSON))
+	if err != nil {
+		panic(err)
+	}
 }
 
 // contractCaller (and not Contract) is used here to avoid import cycle
@@ -233,4 +365,89 @@ func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, erro
 	} else {
 		return bigInt, nil
 	}
+}
+
+func ParseUint64FromKey(args map[string]interface{}, key string) (uint64, error) {
+	value, ok := args[key].(uint64)
+	if !ok {
+		return 0, errors.Errorf(
+			"Cannot parse uint64 from %v", args[key])
+	} else {
+		return value, nil
+	}
+}
+
+func ParseReadOnlyStakeMsg(input []byte) (*stakingTypes.ReadOnlyStakeMsg, error) {
+	method, err := abiRoStaking.MethodById(input)
+	if err != nil {
+		return nil, err
+	}
+	input = input[4:]                // drop the method selector
+	args := map[string]interface{}{} // store into map
+	if err = method.Inputs.UnpackIntoMap(args, input); err != nil {
+		return nil, err
+	}
+	switch method.Name {
+	case "getDelegationByDelegatorAndValidator":
+		{
+			delegatorAddress, err := ParseAddressFromKey(args, "delegatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			msg, err := makeRoStakeMsgWithValidator(
+				args,
+				method.Name[3:],
+			)
+			if err != nil {
+				return nil, err
+			}
+			msg.DelegatorAddress = delegatorAddress
+			return msg, nil
+		}
+	case "getValidatorCommissionRate":
+		return makeRoStakeMsgWithValidator(args, method.Name[3:])
+	case "getValidatorMaxTotalDelegation":
+		return makeRoStakeMsgWithValidator(args, method.Name[3:])
+	case "getValidatorTotalDelegation":
+		return makeRoStakeMsgWithValidator(args, method.Name[3:])
+	case "getSlashingHeightFromBlockForValidator":
+		msg, err := makeRoStakeMsgWithValidator(
+			args,
+			method.Name[3:],
+		)
+		if err != nil {
+			return nil, err
+		}
+		blockNumber, err := ParseBigIntFromKey(args, "blockNumber")
+		if err != nil {
+			return nil, err
+		}
+		msg.BlockNumber = blockNumber
+		return msg, nil
+	case "getBalanceAvailableForRedelegation":
+		{
+			delegatorAddress, err := ParseAddressFromKey(args, "delegatorAddress")
+			if err != nil {
+				return nil, err
+			}
+			return &stakingTypes.ReadOnlyStakeMsg{
+				DelegatorAddress: delegatorAddress,
+				What:             method.Name[3:],
+			}, nil
+		}
+	}
+	return nil, errors.New("invalid method name")
+}
+
+func makeRoStakeMsgWithValidator(args map[string]interface{}, what string) (
+	*stakingTypes.ReadOnlyStakeMsg, error,
+) {
+	validatorAddress, err := ParseAddressFromKey(args, "validatorAddress")
+	if err != nil {
+		return nil, err
+	}
+	return &stakingTypes.ReadOnlyStakeMsg{
+		ValidatorAddress: validatorAddress,
+		What:             what,
+	}, nil
 }
