@@ -21,16 +21,12 @@ var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePre
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
-var (
-	// reserve 250 for read only staking precompile and 251 for epoch
-	crossShardXferPrecompileAddress = common.BytesToAddress([]byte{249})
-)
-
 // WriteCapablePrecompiledContractsCrossXfer lists out the write capable precompiled contracts
 // which are available after the CrossShardXferPrecompileEpoch
 // It includes the staking precompile and the cross-shard transfer precompile
 var WriteCapablePrecompiledContractsCrossXfer = map[common.Address]WriteCapablePrecompiledContract{
-	crossShardXferPrecompileAddress:    &crossShardXferPrecompile{address: crossShardXferPrecompileAddress},
+	// reserve 250 for read only staking precompile and 251 for epoch
+	common.BytesToAddress([]byte{249}): &crossShardXferPrecompile{},
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
@@ -43,7 +39,7 @@ type WriteCapablePrecompiledContract interface {
 	// RequiredGas calculates the contract gas use
 	RequiredGas(evm *EVM, contract *Contract, input []byte) (uint64, error)
 	// use a different name from read-only contracts to be safe
-	RunWriteCapable(evm *EVM, contract *Contract, input []byte, value *big.Int) ([]byte, error)
+	RunWriteCapable(evm *EVM, contract *Contract, input []byte) ([]byte, error)
 }
 
 // RunWriteCapablePrecompiledContract runs and evaluates the output of a write capable precompiled contract.
@@ -53,7 +49,6 @@ func RunWriteCapablePrecompiledContract(
 	contract *Contract,
 	input []byte,
 	readOnly bool,
-	value *big.Int,
 ) ([]byte, error) {
 	// immediately error out if readOnly
 	if readOnly {
@@ -66,7 +61,7 @@ func RunWriteCapablePrecompiledContract(
 	if !contract.UseGas(gas) {
 		return nil, ErrOutOfGas
 	}
-	return p.RunWriteCapable(evm, contract, input, value)
+	return p.RunWriteCapable(evm, contract, input)
 }
 
 type stakingPrecompile struct{}
@@ -122,7 +117,6 @@ func (c *stakingPrecompile) RunWriteCapable(
 	evm *EVM,
 	contract *Contract,
 	input []byte,
-	value *big.Int,
 ) ([]byte, error) {
 	if evm.Context.ShardID != shard.BeaconChainShardID {
 		return nil, errors.New("Staking not supported on this shard")
@@ -212,9 +206,7 @@ func init() {
 	}
 }
 
-type crossShardXferPrecompile struct {
-	address common.Address
-}
+type crossShardXferPrecompile struct{}
 
 // RequiredGas returns the gas required to execute the pre-compiled contract.
 //
@@ -225,10 +217,11 @@ func (c *crossShardXferPrecompile) RequiredGas(
 	contract *Contract,
 	input []byte,
 ) (uint64, error) {
-	// we just charge the intrinsic gas here
-	// using data that includes: fromAddress, toAddress, fromShardID, toShardID, value
+	// We charge gas here to make sure contracts using `delegatecall`
+	// are not able to subsidize the base gas for cross shard transfers by EOAs
 	var payload []byte = make([]byte, 0)
-	fromAddress, toAddress, fromShardID, toShardID, value, err := parseCrossShardXferData(evm, contract, input)
+	fromAddress, toAddress, fromShardID, toShardID, value, err :=
+		parseCrossShardXferData(evm, contract, input)
 	if err == nil {
 		data := struct {
 			fromAddress common.Address
@@ -265,18 +258,14 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 	evm *EVM,
 	contract *Contract,
 	input []byte,
-	sentValue *big.Int,
 ) ([]byte, error) {
-	fromAddress, toAddress, fromShardID, toShardID, value, err := parseCrossShardXferData(evm, contract, input)
+	fromAddress, toAddress, fromShardID, toShardID, value, err :=
+		parseCrossShardXferData(evm, contract, input)
 	if err != nil {
 		return nil, err
 	}
-	// validate not a contract
+	// validate not a contract (toAddress can still be a contract)
 	if len(evm.StateDB.GetCode(fromAddress)) > 0 && !evm.IsValidator(evm.StateDB, fromAddress) {
-		return nil, errors.New("cross shard xfer not yet implemented for contracts")
-	}
-	// validate not a contract
-	if len(evm.StateDB.GetCode(toAddress)) > 0 && !evm.IsValidator(evm.StateDB, toAddress) {
 		return nil, errors.New("cross shard xfer not yet implemented for contracts")
 	}
 	// can't have too many shards
@@ -288,16 +277,16 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 		return nil, errors.New("from and to shard id can't be equal")
 	}
 	// make sure nobody sends extra or less money
-	// no need to check `nil` because that only happens in readOnly
-	// which has already been checked
-	if sentValue.Cmp(value) != 0 {
+	if contract.Value().Cmp(value) != 0 {
 		return nil, errors.New("argument value and msg.value not equal")
 	}
 	// now do the actual transfer
 	// step 1 -> remove funds from the precompile address
-	evm.Transfer(evm.StateDB, c.address, toAddress, value, types.SubtractionOnly)
+	evm.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
 	// step 2 -> make a cross link
 	// note that the transaction hash is added by state_processor.go to this receipt
+	// and that the receiving shard does not care about the `From` but we use the original
+	// instead of the precompile address for consistency
 	evm.CXReceipt = &types.CXReceipt{
 		From:      fromAddress,
 		To:        &toAddress,

@@ -20,7 +20,6 @@ type writeCapablePrecompileTest struct {
 	input, expected []byte
 	name            string
 	expectedError   error
-	p               *WriteCapablePrecompiledContract
 	value           *big.Int
 }
 
@@ -68,13 +67,13 @@ func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 
 func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, env *EVM, p WriteCapablePrecompiledContract) {
 	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
-		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), new(big.Int), 0)
+		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), test.value, 0)
 		gas, err := p.RequiredGas(env, contract, test.input)
 		if err != nil {
 			t.Error(err)
 		}
 		contract.Gas = gas
-		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false, test.value); err != nil {
+		if res, err := RunWriteCapablePrecompiledContract(p, env, contract, test.input, false); err != nil {
 			if test.expectedError != nil {
 				if test.expectedError.Error() != err.Error() {
 					t.Errorf("Expected error %v, got %v", test.expectedError, err)
@@ -86,7 +85,7 @@ func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, e
 			if test.expectedError != nil {
 				t.Errorf("Expected an error %v but instead got result %v", test.expectedError, res)
 			}
-			if bytes.Compare(res, test.expected) != 0 {
+			if !bytes.Equal(res, test.expected) {
 				t.Errorf("Expected %v, got %v", test.expected, res)
 			}
 		}
@@ -210,7 +209,7 @@ func TestStakingPrecompiles(t *testing.T) {
 func TestWriteCapablePrecompilesReadOnly(t *testing.T) {
 	p := &stakingPrecompile{}
 	expectedError := errWriteProtection
-	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true, nil)
+	res, err := RunWriteCapablePrecompiledContract(p, nil, nil, []byte{}, true)
 	if err != nil {
 		if err.Error() != expectedError.Error() {
 			t.Errorf("Expected error %v, got %v", expectedError, err)
