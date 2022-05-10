@@ -299,6 +299,9 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var cxReceipt *types.CXReceipt
 	// Do not create cxReceipt if EVM call failed
 	if txType == types.SubtractionOnly && !failedExe {
+		if vmenv.CXReceipt != nil {
+			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
+		}
 		cxReceipt = &types.CXReceipt{
 			TxHash:    tx.Hash(),
 			From:      msg.From(),
@@ -306,9 +309,6 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 			ShardID:   tx.ShardID(),
 			ToShardID: tx.ToShardID(),
 			Amount:    msg.Value(),
-		}
-		if vmenv.CXReceipt != nil {
-			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
 		}
 	} else {
 		if !failedExe {
