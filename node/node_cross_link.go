@@ -68,7 +68,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			existingCLs[pending.Hash()] = struct{}{}
 		}
 
-		crosslinks := []types.CrossLink{}
+		var crosslinks []types.CrossLink
 		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -76,7 +76,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
-		candidates := []types.CrossLink{}
+		var candidates []types.CrossLink
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 
