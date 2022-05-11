@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -408,6 +409,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
 	}
+	currentNode.RegisterService(service.CrosslinkSending, crosslink_sending.New(currentNode, currentNode.Blockchain()))
 	if hc.Pprof.Enabled {
 		setupPprofService(currentNode, hc)
 	}
