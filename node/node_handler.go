@@ -222,10 +222,7 @@ func (node *Node) BroadcastCrossLinkFromBeaconToNonBeaconChains() { // leader of
 	if !node.IsRunningBeaconChain() {
 		return
 	}
-	if !node.IsCurrentlyLeader() {
-		return
-	}
-	if rand.Intn(100) != 0 {
+	if !(node.IsCurrentlyLeader() || rand.Intn(100) == 0) {
 		return
 	}
 
