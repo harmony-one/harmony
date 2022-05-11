@@ -229,4 +229,13 @@ func init() {
 		confTree.Set("Version", "2.5.1")
 		return confTree
 	}
+
+	migrations["2.5.1"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.DisablePrivateIPScan") == nil {
+			confTree.Set("P2P.DisablePrivateIPScan", defaultConfig.P2P.DisablePrivateIPScan)
+		}
+
+		confTree.Set("Version", "2.5.2")
+		return confTree
+	}
 }
