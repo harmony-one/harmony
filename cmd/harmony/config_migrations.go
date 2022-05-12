@@ -92,6 +92,14 @@ func init() {
 			confTree.Set("HTTP.RosettaPort", defaultConfig.HTTP.RosettaPort)
 		}
 
+		if confTree.Get("RPCOpt.EthRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.EthRPCsEnabled", defaultConfig.RPCOpt.EthRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.StakingRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.StakingRPCsEnabled", defaultConfig.RPCOpt.StakingRPCsEnabled)
+		}
+
 		if confTree.Get("RPCOpt.RateLimterEnabled") == nil {
 			confTree.Set("RPCOpt.RateLimterEnabled", defaultConfig.RPCOpt.RateLimterEnabled)
 		}

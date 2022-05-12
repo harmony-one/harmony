@@ -72,7 +72,7 @@ func (n Version) Namespace() string {
 
 // StartServers starts the http & ws servers
 func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
-	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
+	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.StakingRPCsEnabled, config.EthRPCsEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 
 	if config.HTTPEnabled {
@@ -141,30 +141,40 @@ func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, rat
 }
 
 // getAPIs returns all the API methods for the RPC interface
-func getAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
+func getAPIs(hmy *hmy.Harmony, debugEnable bool, stakingRPCsEnable bool, ethRPCsEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
 	publicAPIs := []rpc.API{
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
-		NewPublicHarmonyAPI(hmy, Eth),
 		NewPublicBlockchainAPI(hmy, V1, rateLimiterEnable, ratelimit),
 		NewPublicBlockchainAPI(hmy, V2, rateLimiterEnable, ratelimit),
-		NewPublicBlockchainAPI(hmy, Eth, rateLimiterEnable, ratelimit),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
-		NewPublicContractAPI(hmy, Eth),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
-		NewPublicTransactionAPI(hmy, Eth),
 		NewPublicPoolAPI(hmy, V1),
 		NewPublicPoolAPI(hmy, V2),
-		NewPublicPoolAPI(hmy, Eth),
-		NewPublicStakingAPI(hmy, V1),
-		NewPublicStakingAPI(hmy, V2),
 		// Legacy methods (subject to removal)
 		v1.NewPublicLegacyAPI(hmy, "hmy"),
-		eth.NewPublicEthService(hmy, "eth"),
 		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
+	}
+
+	if stakingRPCsEnable {
+		publicAPIs = append(publicAPIs,
+			NewPublicStakingAPI(hmy, V1),
+			NewPublicStakingAPI(hmy, V2),
+		)
+	}
+
+	if ethRPCsEnable {
+		publicAPIs = append(publicAPIs,
+			NewPublicHarmonyAPI(hmy, Eth),
+			NewPublicBlockchainAPI(hmy, Eth, rateLimiterEnable, ratelimit),
+			NewPublicContractAPI(hmy, Eth),
+			NewPublicTransactionAPI(hmy, Eth),
+			NewPublicPoolAPI(hmy, Eth),
+			eth.NewPublicEthService(hmy, "eth"),
+		)
 	}
 
 	publicDebugAPIs := []rpc.API{

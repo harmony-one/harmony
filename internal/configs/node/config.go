@@ -111,6 +111,9 @@ type RPCServerConfig struct {
 
 	DebugEnabled bool
 
+	EthRPCsEnabled     bool
+	StakingRPCsEnabled bool
+
 	RateLimiterEnabled bool
 	RequestsPerSecond  int
 }
