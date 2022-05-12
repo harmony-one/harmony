@@ -463,3 +463,35 @@ func (ms msgStorage) LoadNonceToShard() (nonce uint64, toShard uint32) {
 	toShard = binary.BigEndian.Uint32(buf[8 : 8+4])
 	return
 }
+
+func RecvCXMessage(db StateDB, m types.CXMessage) error {
+	mAddr, _ := messageAddrAndPayloadHash(m)
+
+	var gasBudgetKey common.Hash
+	copy(gasBudgetKey[:], mAddr[:])
+
+	storedOldGasBudget := db.GetState(routerAddress, gasBudgetKey)
+	oldGasBudget := readBig(storedOldGasBudget[:])
+	if oldGasBudget.Cmp(&big.Int{}) != 0 {
+		// Message has already been received. Make sure the new budget is
+		// at least as big as the old one, record the new budget, and give
+		// the additonal funds to gasLeftoverTo.
+		if oldGasBudget.Cmp(m.GasBudget) > 0 {
+			return fmt.Errorf(
+				"Received re-transmitted message with a reduced gasBudget (old: %v, new: %v",
+				oldGasBudget, m.GasBudget,
+			)
+		}
+
+		var storedNewGasBudget common.Hash
+		m.GasBudget.FillBytes(storedNewGasBudget[:])
+		db.SetState(routerAddress, gasBudgetKey, storedNewGasBudget)
+
+		gasBudgetDiff := (&big.Int{}).Sub(m.GasBudget, oldGasBudget)
+		db.AddBalance(m.GasLeftoverTo, gasBudgetDiff)
+
+		return nil
+	}
+
+	panic("TODO")
+}
