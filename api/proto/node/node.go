@@ -110,6 +110,13 @@ func ConstructSlashMessage(witnesses slash.Records) []byte {
 	return byteBuffer.Bytes()
 }
 
+func ConstructCrossLinkMessageFromCrossLinks(crosslinks []*types.CrossLink) []byte {
+	byteBuffer := bytes.NewBuffer(crossLinkH)
+	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
+	byteBuffer.Write(crosslinksData)
+	return byteBuffer.Bytes()
+}
+
 // ConstructCrossLinkMessage constructs cross link message to send to beacon chain
 func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) []byte {
 	byteBuffer := bytes.NewBuffer(crossLinkH)
