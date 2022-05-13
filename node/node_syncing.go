@@ -52,7 +52,7 @@ func (node *Node) BeaconSyncHook() {
 	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
 		//       not have much idle resources.
-		node.BroadcastCrossLink()
+		node.BroadcastCrossLinkFromShardsToBeacon()
 	}
 }
 
@@ -235,7 +235,7 @@ func (node *Node) doBeaconSyncing() {
 						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
 							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
-								node.BroadcastCrossLink()
+								node.BroadcastCrossLinkFromShardsToBeacon()
 							}
 						}
 					}
