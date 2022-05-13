@@ -473,9 +473,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
 		case proto_node.CrossLink:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
-			// only beacon chain node process crosslink messages
-			if !node.IsRunningBeaconChain() ||
-				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		default:

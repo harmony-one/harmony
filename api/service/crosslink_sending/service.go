@@ -2,25 +2,29 @@ package crosslink_sending
 
 import (
 	"github.com/harmony-one/harmony/core"
+	"github.com/harmony-one/harmony/shard"
 )
 
-type BroadcastCrossLinkFromBeaconToNonBeaconChains interface {
-	BroadcastCrossLinkFromBeaconToNonBeaconChains()
+type broadcast interface {
+	BroadcastCrossLinkFromBeaconToShards()
+	BroadcastCrossLinkFromShardsToBeacon()
 }
 
 type Service struct {
-	node    BroadcastCrossLinkFromBeaconToNonBeaconChains
+	node    broadcast
 	bc      *core.BlockChain
 	ch      chan core.ChainEvent
 	closeCh chan struct{}
+	beacon  bool
 }
 
-func New(node BroadcastCrossLinkFromBeaconToNonBeaconChains, bc *core.BlockChain) *Service {
+func New(node broadcast, bc *core.BlockChain) *Service {
 	return &Service{
 		node:    node,
 		bc:      bc,
 		ch:      make(chan core.ChainEvent, 1),
 		closeCh: make(chan struct{}),
+		beacon:  bc.ShardID() == shard.BeaconChainShardID,
 	}
 }
 
@@ -38,7 +42,11 @@ func (s *Service) run() {
 			if !ok {
 				return
 			}
-			go s.node.BroadcastCrossLinkFromBeaconToNonBeaconChains()
+			if s.beacon {
+				go s.node.BroadcastCrossLinkFromBeaconToShards()
+			} else {
+				go s.node.BroadcastCrossLinkFromShardsToBeacon()
+			}
 		case <-s.closeCh:
 			return
 		}
