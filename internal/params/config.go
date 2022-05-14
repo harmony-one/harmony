@@ -65,7 +65,7 @@ var (
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
-		SlotsLimitedEpoch:          EpochTBD,        // epoch to enable HIP-16
+		SlotsLimitedEpoch:          big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
