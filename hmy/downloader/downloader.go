@@ -32,8 +32,10 @@ type (
 		ctx       context.Context
 		cancel    func()
 
-		evtDownloadFinished event.Feed // channel for each download task finished
-		evtDownloadStarted  event.Feed // channel for each download has started
+		evtDownloadFinished           event.Feed // channel for each download task finished
+		evtDownloadFinishedSubscribed bool
+		evtDownloadStarted            event.Feed // channel for each download has started
+		evtDownloadStartedSubscribed  bool
 
 		status status
 		config Config
@@ -127,11 +129,13 @@ func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 
 // SubscribeDownloadStarted subscribe download started
 func (d *Downloader) SubscribeDownloadStarted(ch chan struct{}) event.Subscription {
+	d.evtDownloadStartedSubscribed = true
 	return d.evtDownloadStarted.Subscribe(ch)
 }
 
-// SubscribeDownloadFinishedEvent subscribe the download finished
+// SubscribeDownloadFinished subscribe the download finished
 func (d *Downloader) SubscribeDownloadFinished(ch chan struct{}) event.Subscription {
+	d.evtDownloadFinishedSubscribed = true
 	return d.evtDownloadFinished.Subscribe(ch)
 }
 
@@ -251,12 +255,16 @@ func (d *Downloader) doDownload(initSync bool) (n int, err error) {
 
 func (d *Downloader) startSyncing() {
 	d.status.startSyncing()
-	d.evtDownloadStarted.Send(struct{}{})
+	if d.evtDownloadStartedSubscribed {
+		d.evtDownloadStarted.Send(struct{}{})
+	}
 }
 
 func (d *Downloader) finishSyncing() {
 	d.status.finishSyncing()
-	d.evtDownloadFinished.Send(struct{}{})
+	if d.evtDownloadFinishedSubscribed {
+		d.evtDownloadFinished.Send(struct{}{})
+	}
 }
 
 var emptySigVerifyErr *sigVerifyErr

@@ -60,6 +60,7 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
 	}
 
@@ -551,6 +552,11 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	p2pDisablePrivateIPScanFlag = cli.BoolFlag{
+		Name:     "p2p.no-private-ip-scan",
+		Usage:    "disable scanning of private ip4/6 addresses by DHT",
+		DefValue: defaultConfig.P2P.DisablePrivateIPScan,
+	}
 	maxConnPerIPFlag = cli.IntFlag{
 		Name:     "p2p.security.max-conn-per-ip",
 		Usage:    "maximum number of connections allowed per node",
@@ -586,6 +592,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
 		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
+		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
 }
 
