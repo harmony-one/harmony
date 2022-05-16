@@ -216,8 +216,8 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	)
 }
 
-// BroadcastCrossLinkFromBeaconToShards is called by consensus leader to
-// send the new header as cross link to beacon chain.
+// BroadcastCrossLinkFromBeaconToShards is called by consensus leader or 1% validators to
+// send last cross link to shard chains.
 func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 	if !node.IsRunningBeaconChain() {
 		return
