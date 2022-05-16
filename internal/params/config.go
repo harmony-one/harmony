@@ -48,6 +48,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(191),
 		FiveSecondsEpoch:           big.NewInt(230),
 		TwoSecondsEpoch:            big.NewInt(366), // Around Tuesday Dec 8th 2020, 8AM PST
+		ExtraCommitEpoch:           EpochTBD,
 		SixtyPercentEpoch:          big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
 		RedelegationEpoch:          big.NewInt(290),
 		NoEarlyUnlockEpoch:         big.NewInt(530), // Around Monday Apr 12th 2021, 22:30 UTC
@@ -83,6 +84,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(16500),
 		TwoSecondsEpoch:            big.NewInt(73000),
+		ExtraCommitEpoch:           EpochTBD,
 		SixtyPercentEpoch:          big.NewInt(73282),
 		RedelegationEpoch:          big.NewInt(36500),
 		NoEarlyUnlockEpoch:         big.NewInt(73580),
@@ -119,6 +121,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(0),
+		ExtraCommitEpoch:           big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(0),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
@@ -155,6 +158,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(0),
+		ExtraCommitEpoch:           big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(4),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
@@ -191,6 +195,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(0),
+		ExtraCommitEpoch:           big.NewInt(0),
 		SixtyPercentEpoch:          big.NewInt(10),
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
@@ -226,6 +231,7 @@ var (
 		QuickUnlockEpoch:           big.NewInt(0),
 		FiveSecondsEpoch:           big.NewInt(0),
 		TwoSecondsEpoch:            big.NewInt(3),
+		ExtraCommitEpoch:           big.NewInt(4),
 		SixtyPercentEpoch:          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:          big.NewInt(0),
 		NoEarlyUnlockEpoch:         big.NewInt(0),
@@ -263,6 +269,7 @@ var (
 		big.NewInt(0),                      // QuickUnlockEpoch
 		big.NewInt(0),                      // FiveSecondsEpoch
 		big.NewInt(0),                      // TwoSecondsEpoch
+		big.NewInt(0),                      // ExtraCommitEpoch
 		big.NewInt(0),                      // SixtyPercentEpoch
 		big.NewInt(0),                      // RedelegationEpoch
 		big.NewInt(0),                      // NoEarlyUnlockEpoch
@@ -300,6 +307,7 @@ var (
 		big.NewInt(0),        // QuickUnlockEpoch
 		big.NewInt(0),        // FiveSecondsEpoch
 		big.NewInt(0),        // TwoSecondsEpoch
+		big.NewInt(0),        // ExtraCommitEpoch
 		big.NewInt(0),        // SixtyPercentEpoch
 		big.NewInt(0),        // RedelegationEpoch
 		big.NewInt(0),        // NoEarlyUnlockEpoch
@@ -383,6 +391,9 @@ type ChainConfig struct {
 	// TwoSecondsEpoch is the epoch when block time is reduced to 2 seconds
 	// and block rewards adjusted to 7 ONE/block
 	TwoSecondsEpoch *big.Int `json:"two-seconds-epoch,omitempty"`
+
+	// ExtraCommitEpoch is the epoch when v4 block is enabled with extra commit field
+	ExtraCommitEpoch *big.Int `json:"extra-commit-epoch,omitempty"`
 
 	// SixtyPercentEpoch is the epoch when internal voting power reduced from 68% to 60%
 	SixtyPercentEpoch *big.Int `json:"sixty-percent-epoch,omitempty"`
@@ -513,6 +524,11 @@ func (c *ChainConfig) IsFiveSeconds(epoch *big.Int) bool {
 // IsTwoSeconds determines whether it is the epoch to change to 3 seconds block time
 func (c *ChainConfig) IsTwoSeconds(epoch *big.Int) bool {
 	return isForked(c.TwoSecondsEpoch, epoch)
+}
+
+// IsExtraCommit determines whether it is the epoch to update to block v4 with extra commit
+func (c *ChainConfig) IsExtraCommit(epoch *big.Int) bool {
+	return isForked(c.ExtraCommitEpoch, epoch)
 }
 
 // IsSixtyPercent determines whether it is the epoch to reduce internal voting power to 60%

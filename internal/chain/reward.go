@@ -7,6 +7,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/bls/ffi/go/bls"
+	bls2 "github.com/harmony-one/harmony/crypto/bls"
+
 	"github.com/harmony-one/harmony/internal/params"
 	lru "github.com/hashicorp/golang-lru"
 
@@ -301,6 +304,100 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
+// ConstructCrossLink ...
+func ConstructCrossLink(bc engine.ChainReader, header *block.Header, parentHeader *block.Header) *types.CrossLink {
+	if parentHeader == nil {
+		// This shouldn't happen. But just to be protective.
+		utils.Logger().Error().Msg("Nil parent header in crosslink construction")
+		return nil
+	}
+	isExtraCommitEpoch := bc.Config().IsExtraCommit(parentHeader.Epoch())
+
+	if isExtraCommitEpoch {
+		grandParentHeader := bc.GetHeaderByHash(parentHeader.ParentHash())
+		if grandParentHeader != nil {
+			shouldProcessExtraCommit := bc.Config().IsExtraCommit(grandParentHeader.Epoch())
+			if shouldProcessExtraCommit {
+				grandParentBlockNum := big.NewInt(0)
+				grandParentViewID := big.NewInt(0)
+				grandParentEpoch := big.NewInt(0)
+				if grandParentHeader != nil {
+					grandParentBlockNum = grandParentHeader.Number()
+					grandParentViewID = grandParentHeader.ViewID()
+					grandParentEpoch = grandParentHeader.Epoch()
+				} else {
+					// No crosslink is needed if the grand parent block is nil
+					return nil
+				}
+				grandParentSig := parentHeader.LastCommitSignature()
+				grandParentBitmap := parentHeader.LastCommitBitmap()
+				grandParentExtraSig := header.ExtraCommitSignature()
+				grandParentExtraBitmap := header.ExtraCommitBitmap()
+
+				sig := &bls.Sign{}
+				err := sig.Deserialize(grandParentSig[:])
+				if err != nil {
+					// This shouldn't happen
+					utils.Logger().Error().Hex("sig", grandParentSig[:]).
+						Msg("Failed to deserialize sig")
+					return nil
+				}
+
+				if len(grandParentExtraSig) != 0 {
+					extraSig := &bls.Sign{}
+					err = extraSig.Deserialize(grandParentExtraSig[:])
+					if err != nil {
+						// This shouldn't happen
+						utils.Logger().Error().Hex("extra sig", grandParentExtraSig[:]).
+							Msg("Failed to deserialize extra sig")
+						return nil
+					}
+					sig.Add(extraSig)
+				}
+
+				bitmap := append(grandParentBitmap[:0:0], grandParentBitmap...)
+				if len(grandParentExtraBitmap) != 0 {
+					if len(bitmap) != len(grandParentExtraBitmap) {
+						// This shouldn't happen
+						utils.Logger().Error().Hex("bitmap", bitmap).
+							Hex("extraBitmap", grandParentExtraBitmap).
+							Msg("extra bitmap length mismatch")
+						return nil
+					}
+
+					for i := 0; i < len(bitmap); i++ {
+						bitmap[i] = bitmap[i] | grandParentExtraBitmap[i]
+					}
+				}
+
+				var serializedSig bls2.SerializedSignature
+				copy(serializedSig[:], sig.Serialize())
+
+				return &types.CrossLink{
+					HashF:        grandParentHeader.Hash(),
+					BlockNumberF: grandParentBlockNum,
+					ViewIDF:      grandParentViewID,
+					SignatureF:   serializedSig,
+					BitmapF:      bitmap,
+					ShardIDF:     header.ShardID(),
+					EpochF:       grandParentEpoch,
+				}
+			} else {
+				// If the grand parent block not in extra commit epoch. The crosslink is skipped
+				// Note this is the only block where the crosslink is skipped due to the change on
+				// crosslink covering parent block (before extra commit) v.s. grand parent block.
+				utils.Logger().Info().Msg("Skipping crosslink for the single block")
+				return nil
+			}
+		} else {
+			utils.Logger().Error().Msg("Nil grant parent header in crosslink construction")
+			return nil
+		}
+	}
+	newCrossLink := types.NewCrossLink(header, parentHeader)
+	return &newCrossLink
+}
+
 func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
 	defaultReward numeric.Dec) (reward.Reader, error) {
 	newRewards, payouts :=
@@ -314,7 +411,7 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
-		if i < 0 {
+		if i <= 0 {
 			continue
 		}
 
@@ -327,7 +424,10 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		}
 
 		// Put shard 0 signatures as a crosslink for easy and consistent processing as other shards' crosslinks
-		allCrossLinks = append(allCrossLinks, *types.NewCrossLink(curHeader, bc.GetHeaderByHash(curHeader.ParentHash())))
+		cl := ConstructCrossLink(bc, curHeader, bc.GetHeaderByHash(curHeader.ParentHash()))
+		if cl != nil {
+			allCrossLinks = append(allCrossLinks, *cl)
+		}
 
 		// Put the real crosslinks in the list
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
@@ -496,7 +596,7 @@ func distributeRewardBeforeAggregateEpoch(bc engine.ChainReader, state *state.DB
 	// Take care of my own beacon chain committee, _ is missing, for slashing
 	parentE, members, payable, missing, err := ballotResultBeaconchain(beaconChain, header)
 	if err != nil {
-		return network.EmptyPayout, errors.Wrapf(err, "shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
+		return network.EmptyPayout, errors.Wrapf(err, "[distributeRewardBeforeAggregateEpoch] shard 0 block %d reward error with bitmap %x", header.Number(), header.LastCommitBitmap())
 	}
 	subComm := shard.Committee{ShardID: shard.BeaconChainShardID, Slots: members}
 
@@ -583,7 +683,7 @@ func processOneCrossLink(bc engine.ChainReader, state *state.DB, cxLink types.Cr
 	utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTimeLocal).Milliseconds()).Msg("Shard Chain Reward (BlockSigners)")
 
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
+		return nil, nil, errors.Wrapf(err, "[processOneCrossLink] shard %d block %d reward error with bitmap %x", shardID, cxLink.BlockNum(), cxLink.Bitmap())
 	}
 
 	staked := subComm.StakedValidators()

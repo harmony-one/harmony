@@ -28,6 +28,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	v4 "github.com/harmony-one/harmony/block/v4"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
@@ -143,7 +145,7 @@ type Body struct {
 func NewBodyForMatchingHeader(h *block.Header) (*Body, error) {
 	var bi BodyInterface
 	switch h.Header.(type) {
-	case *v3.Header:
+	case *v4.Header, *v3.Header:
 		bi = new(BodyV2)
 	case *v2.Header, *v1.Header:
 		bi = new(BodyV1)
@@ -229,6 +231,8 @@ type Block struct {
 
 	// Commit Signatures/Bitmap
 	commitSigAndBitmap []byte
+	// Extra commit Signatures/Bitmap
+	extraCommitSigAndBitmap []byte
 }
 
 func (b *Block) String() string {
@@ -256,7 +260,7 @@ func (b *Block) SetLastCommitSig(sig []byte, signers []byte) {
 	b.header.SetLastCommitBitmap(signers)
 }
 
-// SetCurrentCommitSig sets the commit group signature that signed on this block.
+// SetCurrentCommitSig sets the commit signature that signed on this block.
 func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
 	if len(sigAndBitmap) <= 96 {
 		utils.Logger().Warn().
@@ -270,6 +274,22 @@ func (b *Block) SetCurrentCommitSig(sigAndBitmap []byte) {
 // GetCurrentCommitSig get the commit group signature that signed on this block.
 func (b *Block) GetCurrentCommitSig() []byte {
 	return b.commitSigAndBitmap
+}
+
+// SetExtraCommitSig sets the extra commit signature that signed on previous block.
+func (b *Block) SetExtraCommitSig(extraSigAndBitmap []byte) {
+	if len(extraSigAndBitmap) <= 96 {
+		utils.Logger().Warn().
+			Int("srcLen", len(extraSigAndBitmap)).
+			Int("dstLen", len(b.header.ExtraCommitSignature())).
+			Msg("no extra commit in this block")
+	}
+	b.extraCommitSigAndBitmap = extraSigAndBitmap
+}
+
+// GetExtraCommitSig get the extra commit signature that signed on previous block.
+func (b *Block) GetExtraCommitSig() []byte {
+	return b.extraCommitSigAndBitmap
 }
 
 // DeprecatedTd is an old relic for extracting the TD of a block. It is in the
@@ -423,7 +443,7 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	var eb interface{}
 
 	switch h := b.header.Header.(type) {
-	case *v3.Header:
+	case *v4.Header, *v3.Header:
 		eb = extblockV2{b.header, b.transactions, b.stakingTransactions, b.uncles, b.incomingReceipts}
 	case *v2.Header, *v1.Header:
 		eb = extblockV1{b.header, b.transactions, b.uncles, b.incomingReceipts}

@@ -41,6 +41,8 @@ type VoteTally struct {
 	Prepare    *tallyAndQuorum
 	Commit     *tallyAndQuorum
 	ViewChange *tallyAndQuorum
+	// Record keeping for the voting power of previous block for extra commits received at current block
+	CommitInPreviousBlock *tallyAndQuorum
 }
 
 type stakedVoteWeight struct {
@@ -49,7 +51,7 @@ type stakedVoteWeight struct {
 	DependencyInjectionReader
 	roster    votepower.Roster
 	voteTally VoteTally
-	lastPower map[Phase]numeric.Dec
+	lastPower map[SigType]numeric.Dec
 }
 
 // Policy ..
@@ -59,10 +61,12 @@ func (v *stakedVoteWeight) Policy() Policy {
 
 // AddNewVote ..
 func (v *stakedVoteWeight) AddNewVote(
-	p Phase, pubKeys []*bls_cosi.PublicKeyWrapper,
+	p SigType, pubKeys []*bls_cosi.PublicKeyWrapper,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64) (*votepower.Ballot, error) {
-
+	if p == CommitInPreviousBlock {
+		return nil, errors.New("Signature type can not be CommitInPreviousBlock.")
+	}
 	pubKeysBytes := make([]bls.SerializedPublicKey, len(pubKeys))
 	signerAddr := common.Address{}
 	for i, pubKey := range pubKeys {
@@ -109,6 +113,8 @@ func (v *stakedVoteWeight) AddNewVote(
 			return v.voteTally.Commit
 		case ViewChange:
 			return v.voteTally.ViewChange
+		case ExtraCommit: // For ExtraCommit sigs, the voting power is accumulated in CommitInPreviousBlock tally.
+			return v.voteTally.CommitInPreviousBlock
 		default:
 			// Should not happen
 			return nil
@@ -127,7 +133,8 @@ func (v *stakedVoteWeight) AddNewVote(
 		}
 	}
 	utils.Logger().Info().
-		Str("phase", p.String()).
+		Str("sig-type", p.String()).
+		Uint64("block-num", height).
 		Int64("signer-count", v.SignersCount(p)).
 		Str("new-power-added", additionalVotePower.String()).
 		Str("total-power-of-signers", tallyQuorum.tally.String()).
@@ -136,7 +143,7 @@ func (v *stakedVoteWeight) AddNewVote(
 }
 
 // IsQuorumAchieved ..
-func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
+func (v *stakedVoteWeight) IsQuorumAchieved(p SigType) bool {
 	switch p {
 	case Prepare:
 		return v.voteTally.Prepare.quorumAchieved
@@ -144,6 +151,8 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 		return v.voteTally.Commit.quorumAchieved
 	case ViewChange:
 		return v.voteTally.ViewChange.quorumAchieved
+	case CommitInPreviousBlock:
+		return v.voteTally.CommitInPreviousBlock.quorumAchieved
 	default:
 		// Should not happen
 		return false
@@ -161,20 +170,6 @@ func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 		return false
 	}
 	return (*currentTotalPower).GT(threshold)
-}
-
-func (v *stakedVoteWeight) currentTotalPower(p Phase) (*numeric.Dec, error) {
-	switch p {
-	case Prepare:
-		return &v.voteTally.Prepare.tally, nil
-	case Commit:
-		return &v.voteTally.Commit.tally, nil
-	case ViewChange:
-		return &v.voteTally.ViewChange.tally, nil
-	default:
-		// Should not happen
-		return nil, errors.New("wrong phase is provided")
-	}
 }
 
 // ComputeTotalPowerByMask computes the total power indicated by bitmap mask
@@ -201,6 +196,11 @@ func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 // IsAllSigsCollected ..
 func (v *stakedVoteWeight) IsAllSigsCollected() bool {
 	return v.voteTally.Commit.tally.Equal(numeric.NewDec(1))
+}
+
+// IsAllSigsCollectedInPreviousBlock ..
+func (v *stakedVoteWeight) IsAllSigsCollectedInPreviousBlock() bool {
+	return v.voteTally.CommitInPreviousBlock.tally.Equal(numeric.NewDec(1))
 }
 
 func (v *stakedVoteWeight) SetVoters(
@@ -319,9 +319,10 @@ func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
 
 func newVoteTally() VoteTally {
 	return VoteTally{
-		Prepare:    &tallyAndQuorum{numeric.NewDec(0), false},
-		Commit:     &tallyAndQuorum{numeric.NewDec(0), false},
-		ViewChange: &tallyAndQuorum{numeric.NewDec(0), false},
+		Prepare:               &tallyAndQuorum{numeric.NewDec(0), false},
+		Commit:                &tallyAndQuorum{numeric.NewDec(0), false},
+		ViewChange:            &tallyAndQuorum{numeric.NewDec(0), false},
+		CommitInPreviousBlock: &tallyAndQuorum{numeric.NewDec(0), false},
 	}
 }
 
@@ -329,7 +330,8 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 	v.lastPower[Prepare] = v.voteTally.Prepare.tally
 	v.lastPower[Commit] = v.voteTally.Commit.tally
 
-	v.reset([]Phase{Prepare, Commit})
+	v.reset([]SigType{Prepare, Commit, ExtraCommit})
+	v.voteTally.CommitInPreviousBlock = v.voteTally.Commit // Keep the current commit as commit in previous block so we can handle extra commit
 	v.voteTally.Prepare = &tallyAndQuorum{numeric.NewDec(0), false}
 	v.voteTally.Commit = &tallyAndQuorum{numeric.NewDec(0), false}
 }
@@ -337,11 +339,11 @@ func (v *stakedVoteWeight) ResetPrepareAndCommitVotes() {
 func (v *stakedVoteWeight) ResetViewChangeVotes() {
 	v.lastPower[ViewChange] = v.voteTally.ViewChange.tally
 
-	v.reset([]Phase{ViewChange})
+	v.reset([]SigType{ViewChange})
 	v.voteTally.ViewChange = &tallyAndQuorum{numeric.NewDec(0), false}
 }
 
-func (v *stakedVoteWeight) CurrentTotalPower(p Phase) (*numeric.Dec, error) {
+func (v *stakedVoteWeight) CurrentTotalPower(p SigType) (*numeric.Dec, error) {
 	if power, ok := v.lastPower[p]; ok {
 		return &power, nil
 	} else {

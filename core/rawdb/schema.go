@@ -48,6 +48,7 @@ var (
 	shardStatePrefix             = []byte("ss") // shardStatePrefix + num (uint64 big endian) + hash -> shardState
 	lastCommitsKey               = []byte("LastCommits")
 	blockCommitSigPrefix         = []byte("block-sig-")
+	blockExtraCommitSigPrefix    = []byte("block-extra-sig-")
 	pendingCrosslinkKey          = []byte("pendingCL")        // prefix for shard last pending crosslink
 	pendingSlashingKey           = []byte("pendingSC")        // prefix for shard last pending slashing record
 	preimagePrefix               = []byte("secure-key-")      // preimagePrefix + hash -> preimage
@@ -226,4 +227,8 @@ func blockRewardAccumKey(number uint64) []byte {
 
 func blockCommitSigKey(number uint64) []byte {
 	return append(blockCommitSigPrefix, encodeBlockNumber(number)...)
+}
+
+func blockExtraCommitSigKey(number uint64) []byte {
+	return append(blockExtraCommitSigPrefix, encodeBlockNumber(number)...)
 }

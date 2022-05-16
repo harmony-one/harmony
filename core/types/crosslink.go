@@ -27,7 +27,7 @@ type CrossLink struct {
 }
 
 // NewCrossLink returns a new cross link object
-func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
+func NewCrossLink(header *block.Header, parentHeader *block.Header) CrossLink {
 	parentBlockNum := big.NewInt(0)
 	parentViewID := big.NewInt(0)
 	parentEpoch := big.NewInt(0)
@@ -36,7 +36,7 @@ func NewCrossLink(header *block.Header, parentHeader *block.Header) *CrossLink {
 		parentViewID = parentHeader.ViewID()
 		parentEpoch = parentHeader.Epoch()
 	}
-	return &CrossLink{
+	return CrossLink{
 		HashF:        header.ParentHash(),
 		BlockNumberF: parentBlockNum,
 		ViewIDF:      parentViewID,

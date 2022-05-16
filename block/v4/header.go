@@ -1,4 +1,4 @@
-package v0
+package v3
 
 import (
 	"io"
@@ -6,17 +6,17 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/rs/zerolog"
+
 	blockif "github.com/harmony-one/harmony/block/interface"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/rs/zerolog"
 )
 
-// Header is the V1 block header.
+// Header is the V4 block header.
 type Header struct {
 	fields headerFields
 }
@@ -42,26 +42,33 @@ func NewHeader() *Header {
 }
 
 type headerFields struct {
-	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
-	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
-	Number      *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
-	Time        *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
+	ParentHash          common.Hash    `json:"parentHash"       gencodec:"required"`
+	Coinbase            common.Address `json:"miner"            gencodec:"required"`
+	Root                common.Hash    `json:"stateRoot"        gencodec:"required"`
+	TxHash              common.Hash    `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash         common.Hash    `json:"receiptsRoot"     gencodec:"required"`
+	OutgoingReceiptHash common.Hash    `json:"outgoingReceiptsRoot"     gencodec:"required"`
+	IncomingReceiptHash common.Hash    `json:"incomingReceiptsRoot" gencodec:"required"`
+	Bloom               ethtypes.Bloom `json:"logsBloom"        gencodec:"required"`
+	Number              *big.Int       `json:"number"           gencodec:"required"`
+	GasLimit            uint64         `json:"gasLimit"         gencodec:"required"`
+	GasUsed             uint64         `json:"gasUsed"          gencodec:"required"`
+	Time                *big.Int       `json:"timestamp"        gencodec:"required"`
+	Extra               []byte         `json:"extraData"        gencodec:"required"`
+	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
-	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
-	ShardID             uint32      `json:"shardID"          gencodec:"required"`
-	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	ShardStateHash      common.Hash `json:"shardStateRoot"`
-	ShardState          []byte      `json:"shardState"`
+	ViewID               *big.Int `json:"viewID"           gencodec:"required"`
+	Epoch                *big.Int `json:"epoch"            gencodec:"required"`
+	ShardID              uint32   `json:"shardID"          gencodec:"required"`
+	LastCommitSignature  [96]byte `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap     []byte   `json:"lastCommitBitmap"     gencodec:"required"`  // Contains which validator signed
+	ExtraCommitSignature [96]byte `json:"extraCommitSignature"  gencodec:"required"` // Introduced in header v4
+	ExtraCommitBitmap    []byte   `json:"extraCommitBitmap"     gencodec:"required"` // Introduced in header v4. Contains which validator signed late
+	Vrf                  []byte   `json:"vrf"`
+	Vdf                  []byte   `json:"vdf"`
+	ShardState           []byte   `json:"shardState"`
+	CrossLinks           []byte   `json:"crossLink"`
+	Slashes              []byte   `json:"slashes"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -75,8 +82,8 @@ func (h *Header) SetParentHash(newParentHash common.Hash) {
 	h.fields.ParentHash = newParentHash
 }
 
-// Coinbase is the address of the node that proposed this block and all
-// transactions in it.
+// Coinbase is now the first 20 bytes of the SHA256 hash of the leader's
+// public BLS key. This is required for EVM compatibility.
 func (h *Header) Coinbase() common.Address {
 	return h.fields.Coinbase
 }
@@ -118,30 +125,22 @@ func (h *Header) SetReceiptHash(newReceiptHash common.Hash) {
 
 // OutgoingReceiptHash is the egress transaction receipt trie hash.
 func (h *Header) OutgoingReceiptHash() common.Hash {
-	return ethtypes.EmptyRootHash
+	return h.fields.OutgoingReceiptHash
 }
 
 // SetOutgoingReceiptHash sets the egress transaction receipt trie hash.
 func (h *Header) SetOutgoingReceiptHash(newOutgoingReceiptHash common.Hash) {
-	if newOutgoingReceiptHash != ethtypes.EmptyRootHash {
-		h.Logger(utils.Logger()).Warn().
-			Hex("outgoingReceiptHash", newOutgoingReceiptHash[:]).
-			Msg("cannot store outgoing receipt root hash in v0 header")
-	}
+	h.fields.OutgoingReceiptHash = newOutgoingReceiptHash
 }
 
 // IncomingReceiptHash is the ingress transaction receipt trie hash.
 func (h *Header) IncomingReceiptHash() common.Hash {
-	return ethtypes.EmptyRootHash
+	return h.fields.IncomingReceiptHash
 }
 
 // SetIncomingReceiptHash sets the ingress transaction receipt trie hash.
 func (h *Header) SetIncomingReceiptHash(newIncomingReceiptHash common.Hash) {
-	if newIncomingReceiptHash != ethtypes.EmptyRootHash {
-		h.Logger(utils.Logger()).Warn().
-			Hex("incomingReceiptHash", newIncomingReceiptHash[:]).
-			Msg("cannot store incoming receipt root hash in v0 header")
-	}
+	h.fields.IncomingReceiptHash = newIncomingReceiptHash
 }
 
 // Bloom is the Bloom filter that indexes accounts and topics logged by smart
@@ -297,72 +296,70 @@ func (h *Header) SetLastCommitBitmap(newLastCommitBitmap []byte) {
 	h.fields.LastCommitBitmap = append(newLastCommitBitmap[:0:0], newLastCommitBitmap...)
 }
 
+// ExtraCommitSignature is the FBFT commit group signature for the second-to-last block.
 func (h *Header) ExtraCommitSignature() [96]byte {
-	h.Logger(utils.Logger()).Error().
-		Msg("ExtraCommitSignature not supported in V0 header")
-	return [96]byte{}
+	return h.fields.ExtraCommitSignature
 }
 
+// SetExtraCommitSignature sets the FBFT commit group signature for the second-to-last
+// block.
 func (h *Header) SetExtraCommitSignature(newExtraCommitSignature [96]byte) {
-	h.Logger(utils.Logger()).Error().
-		Msg("SetExtraCommitSignature not supported in V0 header")
+	h.fields.ExtraCommitSignature = newExtraCommitSignature
 }
 
+// ExtraCommitBitmap is the signatory bitmap of the second-to-last block.  Bit
+// positions index into committee member array.
+//
+// The returned slice is a copy; the caller may do anything with it.
 func (h *Header) ExtraCommitBitmap() []byte {
-	h.Logger(utils.Logger()).Error().
-		Msg("ExtraCommitBitmap not supported in V0 header")
-	return nil
+	return append(h.fields.ExtraCommitBitmap[:0:0], h.fields.ExtraCommitBitmap...)
 }
 
+// SetExtraCommitBitmap sets the signatory bitmap of the second-to-last block.
+//
+// It stores a copy; the caller may freely modify the original.
 func (h *Header) SetExtraCommitBitmap(newExtraCommitBitmap []byte) {
-	h.Logger(utils.Logger()).Error().
-		Msg("SetExtraCommitBitmap not supported in V0 header")
+	h.fields.ExtraCommitBitmap = append(newExtraCommitBitmap[:0:0], newExtraCommitBitmap...)
 }
 
 // ShardStateHash is the shard state hash.
 func (h *Header) ShardStateHash() common.Hash {
-	return h.fields.ShardStateHash
+	return common.Hash{}
 }
 
 // SetShardStateHash sets the shard state hash.
 func (h *Header) SetShardStateHash(newShardStateHash common.Hash) {
-	h.fields.ShardStateHash = newShardStateHash
+	h.Logger(utils.Logger()).Warn().
+		Str("shardStateHash", newShardStateHash.Hex()).
+		Msg("cannot store ShardStateHash in V4 header")
 }
 
 // Vrf is the output of the VRF for the epoch.
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) Vrf() []byte {
-	return nil
+	return append(h.fields.Vrf[:0:0], h.fields.Vrf...)
 }
 
 // SetVrf sets the output of the VRF for the epoch.
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetVrf(newVrf []byte) {
-	if len(newVrf) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("vrf", newVrf).
-			Msg("cannot store VRF in v0 header")
-	}
+	h.fields.Vrf = append(newVrf[:0:0], newVrf...)
 }
 
 // Vdf is the output of the VDF for the epoch.
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) Vdf() []byte {
-	return nil
+	return append(h.fields.Vdf[:0:0], h.fields.Vdf...)
 }
 
 // SetVdf sets the output of the VDF for the epoch.
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetVdf(newVdf []byte) {
-	if len(newVdf) > 0 {
-		h.Logger(utils.Logger()).Warn().
-			Hex("vdf", newVdf).
-			Msg("annot store VDF in v0 header")
-	}
+	h.fields.Vdf = append(newVdf[:0:0], newVdf...)
 }
 
 // ShardState is the RLP-encoded form of shard state (list of committees) for
@@ -386,9 +383,7 @@ func (h *Header) SetShardState(newShardState []byte) {
 //
 // The returned slice is a copy; the caller may do anything with it.
 func (h *Header) CrossLinks() []byte {
-	h.Logger(utils.Logger()).Error().
-		Msg("No crosslinks in V0 header")
-	return nil
+	return append(h.fields.CrossLinks[:0:0], h.fields.CrossLinks...)
 }
 
 // SetCrossLinks sets the RLP-encoded form of non-beacon block headers chosen to
@@ -396,36 +391,17 @@ func (h *Header) CrossLinks() []byte {
 //
 // It stores a copy; the caller may freely modify the original.
 func (h *Header) SetCrossLinks(newCrossLinks []byte) {
-	h.Logger(utils.Logger()).Warn().
-		Hex("crossLinks", newCrossLinks).
-		Msg("cannot store cross-chain links in V0 header")
+	h.fields.CrossLinks = append(newCrossLinks[:0:0], newCrossLinks...)
 }
 
-// Slashes is the RLP-encoded form of []slash.Record,
-// The returned slice is a copy; the caller may do anything with it
+// Slashes ..
 func (h *Header) Slashes() []byte {
-	h.Logger(utils.Logger()).Error().
-		Msg("No slashes in V0 header")
-	return nil
+	return append(h.fields.Slashes[:0:0], h.fields.Slashes...)
 }
 
-// SetSlashes sets the RLP-encoded form of slashes
-// It stores a copy; the caller may freely modify the original.
+// SetSlashes ..
 func (h *Header) SetSlashes(newSlashes []byte) {
-	h.Logger(utils.Logger()).Error().
-		Hex("slashes", newSlashes).
-		Msg("cannot store slashes in V0 header")
-}
-
-// field type overrides for gencodec
-type headerMarshaling struct {
-	Difficulty *hexutil.Big
-	Number     *hexutil.Big
-	GasLimit   hexutil.Uint64
-	GasUsed    hexutil.Uint64
-	Time       *hexutil.Big
-	Extra      hexutil.Bytes
-	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	h.fields.Slashes = append(newSlashes[:0:0], newSlashes...)
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
@@ -438,7 +414,10 @@ func (h *Header) Hash() common.Hash {
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
 	// TODO: update with new fields
-	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra())+(h.Number().BitLen()+h.Time().BitLen())/8)
+	return common.StorageSize(unsafe.Sizeof(*h)) +
+		common.StorageSize(len(h.Extra())+(h.Number().BitLen()+
+			h.Time().BitLen())/8,
+		)
 }
 
 // Logger returns a sub-logger with block contexts added.

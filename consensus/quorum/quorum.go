@@ -18,27 +18,33 @@ import (
 )
 
 // Phase is a phase that needs quorum to proceed
-type Phase byte
+type SigType byte
 
 const (
 	// Prepare ..
-	Prepare Phase = iota
+	Prepare SigType = iota
 	// Commit ..
 	Commit
 	// ViewChange ..
 	ViewChange
+	// CommitInPreviousBlock ..
+	CommitInPreviousBlock
+	// ExtraCommit ..
+	ExtraCommit
 )
 
 var (
-	phaseNames = map[Phase]string{
-		Prepare:    "Prepare",
-		Commit:     "Commit",
-		ViewChange: "viewChange",
+	phaseNames = map[SigType]string{
+		Prepare:               "Prepare",
+		Commit:                "Commit",
+		ViewChange:            "viewChange",
+		CommitInPreviousBlock: "CommitInPreviousBlock",
+		ExtraCommit:           "ExtraCommit",
 	}
 	errPhaseUnknown = errors.New("invariant of known phase violated")
 )
 
-func (p Phase) String() string {
+func (p SigType) String() string {
 	if name, ok := phaseNames[p]; ok {
 		return name
 	}
@@ -84,23 +90,23 @@ type SignatoryTracker interface {
 	ParticipantTracker
 	// This func shouldn't be called directly from outside of quorum. Use AddNewVote instead.
 	submitVote(
-		p Phase, pubkeys []bls.SerializedPublicKey,
+		p SigType, pubkeys []bls.SerializedPublicKey,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	// Caller assumes concurrency protection
-	SignersCount(Phase) int64
-	reset([]Phase)
+	SignersCount(SigType) int64
+	reset([]SigType)
 }
 
 // SignatureReader ..
 type SignatureReader interface {
 	SignatoryTracker
-	ReadAllBallots(Phase) []*votepower.Ballot
-	ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot
+	ReadAllBallots(SigType) []*votepower.Ballot
+	ReadBallot(p SigType, pubkey bls.SerializedPublicKey) *votepower.Ballot
 	TwoThirdsSignersCount() int64
 	// 96 bytes aggregated signature
-	AggregateVotes(p Phase) *bls_core.Sign
+	AggregateVotes(p SigType) *bls_core.Sign
 }
 
 // DependencyInjectionWriter ..
@@ -121,18 +127,19 @@ type Decider interface {
 	SetVoters(subCommittee *shard.Committee, epoch *big.Int) (*TallyResult, error)
 	Policy() Policy
 	AddNewVote(
-		p Phase, pubkeys []*bls_cosi.PublicKeyWrapper,
+		p SigType, pubkeys []*bls_cosi.PublicKeyWrapper,
 		sig *bls_core.Sign, headerHash common.Hash,
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
-	IsQuorumAchieved(Phase) bool
+	IsQuorumAchieved(SigType) bool
 	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
+	IsAllSigsCollectedInPreviousBlock() bool
 	ResetPrepareAndCommitVotes()
 	ResetViewChangeVotes()
-	CurrentTotalPower(p Phase) (*numeric.Dec, error)
+	CurrentTotalPower(p SigType) (*numeric.Dec, error)
 }
 
 // Registry ..
@@ -158,10 +165,12 @@ type Transition struct {
 // and values are BLS private key signed signatures
 type cIdentities struct {
 	// Public keys of the committee including leader and validators
-	publicKeys  []bls.PublicKeyWrapper
-	keyIndexMap map[bls.SerializedPublicKey]int
-	prepare     *votepower.Round
-	commit      *votepower.Round
+	publicKeys            []bls.PublicKeyWrapper
+	keyIndexMap           map[bls.SerializedPublicKey]int
+	prepare               *votepower.Round
+	commit                *votepower.Round
+	commitInPreviousBlock *votepower.Round
+	extraCommit           *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
@@ -171,7 +180,7 @@ type depInject struct {
 	publicKeyProvider func() (multibls.PublicKeys, error)
 }
 
-func (s *cIdentities) AggregateVotes(p Phase) *bls_core.Sign {
+func (s *cIdentities) AggregateVotes(p SigType) *bls_core.Sign {
 	ballots := s.ReadAllBallots(p)
 	sigs := make([]*bls_core.Sign, 0, len(ballots))
 	collectedKeys := map[bls_cosi.SerializedPublicKey]struct{}{}
@@ -268,7 +277,7 @@ func (s *cIdentities) ParticipantsCount() int64 {
 	return int64(len(s.publicKeys))
 }
 
-func (s *cIdentities) SignersCount(p Phase) int64 {
+func (s *cIdentities) SignersCount(p SigType) int64 {
 	switch p {
 	case Prepare:
 		return int64(len(s.prepare.BallotBox))
@@ -276,6 +285,10 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 		return int64(len(s.commit.BallotBox))
 	case ViewChange:
 		return int64(len(s.viewChange.BallotBox))
+	case CommitInPreviousBlock:
+		return int64(len(s.commitInPreviousBlock.BallotBox))
+	case ExtraCommit:
+		return int64(len(s.extraCommit.BallotBox))
 	default:
 		return 0
 
@@ -283,7 +296,7 @@ func (s *cIdentities) SignersCount(p Phase) int64 {
 }
 
 func (s *cIdentities) submitVote(
-	p Phase, pubkeys []bls.SerializedPublicKey,
+	p SigType, pubkeys []bls.SerializedPublicKey,
 	sig *bls_core.Sign, headerHash common.Hash,
 	height, viewID uint64,
 ) (*votepower.Ballot, error) {
@@ -296,6 +309,13 @@ func (s *cIdentities) submitVote(
 
 		if ballet := s.ReadBallot(p, pubKey); ballet != nil {
 			return nil, errors.Errorf("vote is already submitted %x", pubKey)
+		}
+
+		if p == ExtraCommit {
+			// If it's extra commit signatures, also check on commitInPreviousBlock sigs for dups.
+			if ballet := s.ReadBallot(CommitInPreviousBlock, pubKey); ballet != nil {
+				return nil, errors.Errorf("vote is already submitted %x", pubKey)
+			}
 		}
 	}
 
@@ -317,6 +337,8 @@ func (s *cIdentities) submitVote(
 			s.commit.BallotBox[pubKey] = ballot
 		case ViewChange:
 			s.viewChange.BallotBox[pubKey] = ballot
+		case ExtraCommit:
+			s.extraCommit.BallotBox[pubKey] = ballot
 		default:
 			return nil, errors.Wrapf(errPhaseUnknown, "given: %s", p.String())
 		}
@@ -324,13 +346,20 @@ func (s *cIdentities) submitVote(
 	return ballot, nil
 }
 
-func (s *cIdentities) reset(ps []Phase) {
+func (s *cIdentities) reset(ps []SigType) {
 	for i := range ps {
 		switch m := votepower.NewRound(); ps[i] {
 		case Prepare:
 			s.prepare = m
 		case Commit:
+			// Move current commit to commitInPreviousBlock and reset both commit/extraCommit.
+			s.commitInPreviousBlock = s.commit
+			if s.commitInPreviousBlock == nil {
+				s.commitInPreviousBlock = votepower.NewRound()
+			}
 			s.commit = m
+		case ExtraCommit:
+			s.extraCommit = m
 		case ViewChange:
 			s.viewChange = m
 		}
@@ -341,7 +370,7 @@ func (s *cIdentities) TwoThirdsSignersCount() int64 {
 	return s.ParticipantsCount()*2/3 + 1
 }
 
-func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votepower.Ballot {
+func (s *cIdentities) ReadBallot(p SigType, pubkey bls.SerializedPublicKey) *votepower.Ballot {
 	ballotBox := map[bls.SerializedPublicKey]*votepower.Ballot{}
 
 	switch p {
@@ -351,6 +380,10 @@ func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votep
 		ballotBox = s.commit.BallotBox
 	case ViewChange:
 		ballotBox = s.viewChange.BallotBox
+	case CommitInPreviousBlock:
+		ballotBox = s.commitInPreviousBlock.BallotBox
+	case ExtraCommit:
+		ballotBox = s.extraCommit.BallotBox
 	}
 
 	payload, ok := ballotBox[pubkey]
@@ -360,7 +393,7 @@ func (s *cIdentities) ReadBallot(p Phase, pubkey bls.SerializedPublicKey) *votep
 	return payload
 }
 
-func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
+func (s *cIdentities) ReadAllBallots(p SigType) []*votepower.Ballot {
 	m := map[bls.SerializedPublicKey]*votepower.Ballot{}
 	switch p {
 	case Prepare:
@@ -369,6 +402,8 @@ func (s *cIdentities) ReadAllBallots(p Phase) []*votepower.Ballot {
 		m = s.commit.BallotBox
 	case ViewChange:
 		m = s.viewChange.BallotBox
+	case ExtraCommit:
+		m = s.extraCommit.BallotBox
 	}
 	ballots := make([]*votepower.Ballot, 0, len(m))
 	for i := range m {
@@ -412,7 +447,7 @@ func NewDecider(p Policy, shardID uint32) Decider {
 			DependencyInjectionWriter:  c.DependencyInjectionWriter,
 			DependencyInjectionReader:  c.DependencyInjectionReader,
 			SignatureReader:            c,
-			lastPowerSignersCountCache: make(map[Phase]int64),
+			lastPowerSignersCountCache: make(map[SigType]int64),
 		}
 	case SuperMajorityStake:
 		return &stakedVoteWeight{
@@ -421,7 +456,7 @@ func NewDecider(p Policy, shardID uint32) Decider {
 			DependencyInjectionReader: c.DependencyInjectionWriter.(DependencyInjectionReader),
 			roster:                    *votepower.NewRoster(shardID),
 			voteTally:                 newVoteTally(),
-			lastPower:                 make(map[Phase]numeric.Dec),
+			lastPower:                 make(map[SigType]numeric.Dec),
 		}
 	default:
 		// Should not be possible

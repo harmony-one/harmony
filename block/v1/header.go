@@ -293,6 +293,28 @@ func (h *Header) SetLastCommitBitmap(newLastCommitBitmap []byte) {
 	h.fields.LastCommitBitmap = append(newLastCommitBitmap[:0:0], newLastCommitBitmap...)
 }
 
+func (h *Header) ExtraCommitSignature() [96]byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("ExtraCommitSignature not supported in V1 header")
+	return [96]byte{}
+}
+
+func (h *Header) SetExtraCommitSignature(newExtraCommitSignature [96]byte) {
+	h.Logger(utils.Logger()).Error().
+		Msg("SetExtraCommitSignature not supported in V1 header")
+}
+
+func (h *Header) ExtraCommitBitmap() []byte {
+	h.Logger(utils.Logger()).Error().
+		Msg("ExtraCommitBitmap not supported in V1 header")
+	return nil
+}
+
+func (h *Header) SetExtraCommitBitmap(newExtraCommitBitmap []byte) {
+	h.Logger(utils.Logger()).Error().
+		Msg("SetExtraCommitBitmap not supported in V1 header")
+}
+
 // ShardStateHash is the shard state hash.
 func (h *Header) ShardStateHash() common.Hash {
 	return h.fields.ShardStateHash

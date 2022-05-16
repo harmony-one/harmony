@@ -32,23 +32,23 @@ func TestAddNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	nodeconfig.SetNetworkType(nodeconfig.Devnet)
-	node := New(host, consensus, testDBFactory, nil, nil, nil)
+	node := New(host, consensusObj, testDBFactory, nil, nil, nil)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
@@ -79,25 +79,25 @@ func TestVerifyNewBlock(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, archiveMode, nil)
+	node := New(host, consensusObj, testDBFactory, nil, archiveMode, nil)
 
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := node.Worker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,
@@ -125,26 +125,26 @@ func TestVerifyVRF(t *testing.T) {
 	decider := quorum.NewDecider(
 		quorum.SuperMajorityVote, shard.BeaconChainShardID,
 	)
-	consensus, err := consensus.New(
+	consensusObj, err := consensus.New(
 		host, shard.BeaconChainShardID, leader, multibls.GetPrivateKeys(blsKey), decider,
 	)
 	if err != nil {
-		t.Fatalf("Cannot craeate consensus: %v", err)
+		t.Fatalf("Cannot craeate consensusObj: %v", err)
 	}
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, archiveMode, nil)
+	node := New(host, consensusObj, testDBFactory, nil, archiveMode, nil)
 
-	consensus.Blockchain = node.Blockchain()
+	consensusObj.Blockchain = node.Blockchain()
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
 		txs, stks, common.Address{},
 	)
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 
 	ecdsaAddr := pubKey.GetAddress()

@@ -27,7 +27,7 @@ const (
 
 // WaitForConsensusReadyV2 listen for the readiness signal from consensus and generate new block for consensus.
 // only leader will receive the ready signal
-func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{}) {
+func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalType, commitSigsChan chan consensus.CommitSigBitmaps, stopChan chan struct{}, stoppedChan chan struct{}) {
 	go func() {
 		// Setup stoppedChan
 		defer close(stoppedChan)
@@ -57,7 +57,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 						Msg("PROPOSING NEW BLOCK ------------------------------------------------")
 
 					// Prepare last commit signatures
-					newCommitSigsChan := make(chan []byte)
+					newCommitSigsChan := make(chan consensus.CommitSigBitmaps)
 
 					go func() {
 						waitTime := 0 * time.Second
@@ -73,14 +73,21 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 							}
 							sigs, err := node.Consensus.BlockCommitSigs(node.Blockchain().CurrentBlock().NumberU64())
 
+							parentHeader := node.Consensus.Blockchain.GetHeaderByHash(node.Blockchain().CurrentBlock().ParentHash())
+							if parentHeader != nil &&
+								node.Consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
+								// Extra commit sig logic only works starting from block 2 since genesis block doesn't have signatures.
+								sigs.ShouldProcessExtraCommit = true
+							}
+
 							if err != nil {
 								utils.Logger().Error().Err(err).Msg("[ProposeNewBlock] Cannot get commit signatures from last block")
 							} else {
-								newCommitSigsChan <- sigs
+								newCommitSigsChan <- *sigs
 							}
 						case commitSigs := <-commitSigsChan:
 							utils.Logger().Info().Msg("[ProposeNewBlock] received commit sigs asynchronously")
-							if len(commitSigs) > bls.BLSSignatureSizeInBytes {
+							if len(commitSigs.CommitSigBitmap) > bls.BLSSignatureSizeInBytes {
 								newCommitSigsChan <- commitSigs
 							}
 						}
@@ -123,7 +130,7 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 }
 
 // ProposeNewBlock proposes a new block...
-func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) {
+func (node *Node) ProposeNewBlock(commitSigs chan consensus.CommitSigBitmaps) (*types.Block, error) {
 	currentHeader := node.Blockchain().CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("ProposeNewBlock", nowEpoch, blockNow)

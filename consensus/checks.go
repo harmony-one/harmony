@@ -55,13 +55,24 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 	return true
 }
 
-func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
+func (consensus *Consensus) isCurrentBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
 	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.blockNum {
 		consensus.getLogger().Debug().
 			Uint64("blockNum", consensus.blockNum).
 			Str("recvMsg", recvMsg.String()).
 			Msg("BlockNum/viewID not match")
+		return false
+	}
+	return true
+}
+
+func (consensus *Consensus) isLatestCommittedBlockNumAndViewID(recvMsg *FBFTMessage) bool {
+	if recvMsg.ViewID != consensus.GetLatestCommittedBlockViewID() || recvMsg.BlockNum != consensus.blockNum-1 {
+		consensus.getLogger().Debug().
+			Uint64("blockNum", consensus.blockNum).
+			Str("recvMsg", recvMsg.String()).
+			Msg("BlockNum/viewID not match for previous block")
 		return false
 	}
 	return true

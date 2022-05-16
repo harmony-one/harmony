@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"log"
 
+	"github.com/harmony-one/harmony/internal/chain"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/proto"
 	"github.com/harmony-one/harmony/block"
@@ -122,7 +124,10 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 		if parentHeader == nil {
 			continue
 		}
-		crosslinks = append(crosslinks, types.NewCrossLink(header, parentHeader))
+		crosslink := chain.ConstructCrossLink(bc, header, parentHeader)
+		if crosslinks != nil {
+			crosslinks = append(crosslinks, crosslink)
+		}
 	}
 	crosslinksData, _ := rlp.EncodeToBytes(crosslinks)
 	byteBuffer.Write(crosslinksData)

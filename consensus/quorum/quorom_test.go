@@ -16,13 +16,13 @@ import (
 )
 
 func TestPhaseStrings(t *testing.T) {
-	phases := []Phase{
+	phases := []SigType{
 		Prepare,
 		Commit,
 		ViewChange,
 	}
 
-	expectations := make(map[Phase]string)
+	expectations := make(map[SigType]string)
 	expectations[Prepare] = "Prepare"
 	expectations[Commit] = "Commit"
 	expectations[ViewChange] = "viewChange"

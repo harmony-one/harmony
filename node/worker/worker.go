@@ -468,7 +468,7 @@ func (w *Worker) verifySlashes(
 
 // FinalizeNewBlock generate a new block for the next consensus round.
 func (w *Worker) FinalizeNewBlock(
-	commitSigs chan []byte, viewID func() uint64, coinbase common.Address,
+	commitSigs chan consensus.CommitSigBitmaps, viewID func() uint64, coinbase common.Address,
 	crossLinks types.CrossLinks, shardState *shard.State,
 ) (*types.Block, error) {
 	w.current.header.SetCoinbase(coinbase)
@@ -532,20 +532,43 @@ func (w *Worker) FinalizeNewBlock(
 	go func() {
 		select {
 		case sigs := <-commitSigs:
-			sig, signers, err := bls.SeparateSigAndMask(sigs)
+			commitSigfailure := false
+			sig, signers, err := bls.SeparateSigAndMask(sigs.CommitSigBitmap)
+
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("Failed to parse commit sigs")
-				sigsReady <- false
+				commitSigfailure = true
+			} else {
+				// Put sig, signers, viewID, coinbase into header
+				if len(sig) > 0 && len(signers) > 0 {
+					sig2 := copyHeader.LastCommitSignature()
+					copy(sig2[:], sig[:])
+					utils.Logger().Info().Hex("sigs", sig).Hex("bitmap", signers).Msg("Setting commit sigs")
+					copyHeader.SetLastCommitSignature(sig2)
+					copyHeader.SetLastCommitBitmap(signers)
+				}
 			}
-			// Put sig, signers, viewID, coinbase into header
-			if len(sig) > 0 && len(signers) > 0 {
-				sig2 := copyHeader.LastCommitSignature()
-				copy(sig2[:], sig[:])
-				utils.Logger().Info().Hex("sigs", sig).Hex("bitmap", signers).Msg("Setting commit sigs")
-				copyHeader.SetLastCommitSignature(sig2)
-				copyHeader.SetLastCommitBitmap(signers)
+
+			extraCommitSigfailure := false
+			if sigs.ShouldProcessExtraCommit && len(sigs.ExtraCommitSigBitmap) != 0 {
+				sig, signers, err = bls.SeparateSigAndMask(sigs.ExtraCommitSigBitmap)
+
+				if err != nil {
+					utils.Logger().Error().Err(err).Msg("Failed to parse extra commit sigs")
+					extraCommitSigfailure = false
+				} else {
+					// Put sig, signers, viewID, coinbase into header
+					if len(sig) > 0 && len(signers) > 0 {
+						sig2 := copyHeader.ExtraCommitSignature()
+						copy(sig2[:], sig[:])
+						utils.Logger().Info().Hex("sigs", sig).Hex("bitmap", signers).Msg("Setting extra commit sigs")
+						copyHeader.SetExtraCommitSignature(sig2)
+						copyHeader.SetExtraCommitBitmap(signers)
+					}
+				}
 			}
-			sigsReady <- true
+
+			sigsReady <- !commitSigfailure && !extraCommitSigfailure
 		case <-time.After(consensus.CommitSigReceiverTimeout):
 			// Exit goroutine
 			utils.Logger().Warn().Msg("Timeout waiting for commit sigs")

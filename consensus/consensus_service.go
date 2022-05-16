@@ -141,9 +141,11 @@ func (consensus *Consensus) UpdateBitmaps() {
 	members := consensus.Decider.Participants()
 	prepareBitmap, _ := bls_cosi.NewMask(members, nil)
 	commitBitmap, _ := bls_cosi.NewMask(members, nil)
+	extraCommitBitmap, _ := bls_cosi.NewMask(members, nil)
 	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.extraCommitBitmap = extraCommitBitmap
 	consensus.multiSigMutex.Lock()
 	consensus.multiSigBitmap = multiSigBitmap
 	consensus.multiSigMutex.Unlock()
@@ -161,6 +163,9 @@ func (consensus *Consensus) ResetState() {
 	}
 	if consensus.commitBitmap != nil {
 		consensus.commitBitmap.Clear()
+	}
+	if consensus.extraCommitBitmap != nil {
+		consensus.extraCommitBitmap.Clear()
 	}
 	consensus.aggregatedPrepareSig = nil
 	consensus.aggregatedCommitSig = nil
@@ -227,7 +232,8 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		return nil
 	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.GetCurBlockViewID() {
+	} else if msg.ViewID < consensus.GetLatestCommittedBlockViewID() {
+		// Allow the previous block to be valid for extra commit sigs
 		return errors.New("view ID belongs to the past")
 	}
 	return nil

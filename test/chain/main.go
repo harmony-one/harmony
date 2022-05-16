@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/big"
 
+	"github.com/harmony-one/harmony/consensus"
+
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -127,9 +129,9 @@ func fundFaucetContract(chain *core.BlockChain) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := contractworker.
 		FinalizeNewBlock(commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil)
@@ -176,9 +178,9 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	commitSigs := make(chan []byte)
+	commitSigs := make(chan consensus.CommitSigBitmaps)
 	go func() {
-		commitSigs <- []byte{}
+		commitSigs <- consensus.CommitSigBitmaps{}
 	}()
 	block, _ := contractworker.FinalizeNewBlock(
 		commitSigs, func() uint64 { return 0 }, common.Address{}, nil, nil,

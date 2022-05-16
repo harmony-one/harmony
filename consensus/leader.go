@@ -111,7 +111,7 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	if !consensus.isRightBlockNumAndViewID(recvMsg) {
+	if !consensus.isCurrentBlockNumAndViewID(recvMsg) {
 		return
 	}
 
@@ -195,8 +195,25 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+
+	// Must have the corresponding block to verify commit signature.
+	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		consensus.getLogger().Info().
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[OnCommit] Failed finding a matching block for committed message")
+		return
+	}
+
 	//// Read - Start
-	if !consensus.isRightBlockNumAndViewID(recvMsg) {
+	if !consensus.isCurrentBlockNumAndViewID(recvMsg) {
+		if consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch()) &&
+			consensus.isLatestCommittedBlockNumAndViewID(recvMsg) && !blockObj.IsLastBlockInEpoch() {
+			// If it's the block in extra commit epoch and not the epoch block, process it for the extra commit sig.
+			consensus.processExtraCommit(recvMsg)
+		}
 		return
 	}
 	// proceed only when the message is not received before
@@ -230,16 +247,6 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 		return
 	}
 
-	// Must have the corresponding block to verify commit signature.
-	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
-	if blockObj == nil {
-		consensus.getLogger().Info().
-			Uint64("blockNum", recvMsg.BlockNum).
-			Uint64("viewID", recvMsg.ViewID).
-			Str("blockHash", recvMsg.BlockHash.Hex()).
-			Msg("[OnCommit] Failed finding a matching block for committed message")
-		return
-	}
 	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
 		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
 	logger = logger.With().
@@ -299,32 +306,127 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 	//// Read - End
 
 	if !quorumWasMet && quorumIsMet {
+		isExtraCommitEpoch := consensus.Blockchain.Config().IsExtraCommit(blockObj.Epoch())
 		logger.Info().Msg("[OnCommit] 2/3 Enough commits received")
 		consensus.FBFTLog.MarkBlockVerified(blockObj)
 
-		if !blockObj.IsLastBlockInEpoch() {
-			// only do early commit if it's not epoch block to avoid problems
+		if !blockObj.IsLastBlockInEpoch() && !isExtraCommitEpoch {
+			// only do early commit if it's not epoch block and not extra commit epoch to avoid problems
 			consensus.preCommitAndPropose(blockObj)
 		}
 
-		go func(viewID uint64) {
-			waitTime := 1000 * time.Millisecond
-			maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
-			if maxWaitTime > waitTime {
-				waitTime = maxWaitTime
-			}
-			consensus.getLogger().Info().Str("waitTime", waitTime.String()).
-				Msg("[OnCommit] Starting Grace Period")
-			time.Sleep(waitTime)
-			logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
+		// Extra commit logic won't be enabled for epoch block to avoid problems between epoch transition.
+		if !isExtraCommitEpoch || blockObj.IsLastBlockInEpoch() {
+			go func(viewID uint64) {
+				waitTime := 1000 * time.Millisecond
+				maxWaitTime := time.Until(consensus.NextBlockDue) - 200*time.Millisecond
+				if maxWaitTime > waitTime {
+					waitTime = maxWaitTime
+				}
+				consensus.getLogger().Info().Str("waitTime", waitTime.String()).
+					Msg("[OnCommit] Starting Grace Period")
+				time.Sleep(waitTime)
+				logger.Info().Msg("[OnCommit] Commit Grace Period Ended")
 
-			consensus.mutex.Lock()
-			defer consensus.mutex.Unlock()
-			if viewID == consensus.GetCurBlockViewID() {
-				consensus.finalCommit()
-			}
-		}(viewID)
+				consensus.mutex.Lock()
+				defer consensus.mutex.Unlock()
+				if viewID == consensus.GetCurBlockViewID() {
+					consensus.finalCommit()
+				}
+			}(viewID)
+		} else {
+			// Directly final commit in extra commit epoch since we don't need to wait for the sigs beyond 2/3 commit.
+			consensus.finalCommit()
+		}
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
+	}
+}
+
+func (consensus *Consensus) processExtraCommit(recvMsg *FBFTMessage) {
+	// No need to lock as it's already locked on the caller onCommit()
+	if consensus.Decider.IsAllSigsCollectedInPreviousBlock() {
+		return
+	}
+
+	// proceed only when the message is not received before
+	for _, signer := range recvMsg.SenderPubkeys {
+		signed1 := consensus.Decider.ReadBallot(quorum.CommitInPreviousBlock, signer.Bytes)
+		signed2 := consensus.Decider.ReadBallot(quorum.ExtraCommit, signer.Bytes)
+		if signed1 != nil || signed2 != nil {
+			consensus.getLogger().Debug().
+				Str("validatorPubKey", signer.Bytes.Hex()).
+				Bool("inLastCommit", signed1 != nil).
+				Bool("inExtraCommit", signed2 != nil).
+				Msg("[processExtraCommit] Already received commit message from the validator")
+			return
+		}
+	}
+
+	extraCommitBitmap := consensus.extraCommitBitmap
+	signerCount :=
+		consensus.Decider.SignersCount(quorum.CommitInPreviousBlock) + consensus.Decider.SignersCount(quorum.ExtraCommit)
+	//// Read - End
+
+	// Verify the signature on commitPayload is correct
+	logger := consensus.getLogger().With().
+		Str("recvMsg", recvMsg.String()).
+		Int64("[processExtraCommit] numReceivedSoFar", signerCount).Logger()
+
+	logger.Debug().Msg("[processExtraCommit] Received new extra commit message")
+	var sign bls_core.Sign
+	if err := sign.Deserialize(recvMsg.Payload); err != nil {
+		logger.Debug().Msg("[processExtraCommit] Failed to deserialize bls signature")
+		return
+	}
+
+	// Must have the corresponding block to verify commit signature.
+	blockObj := consensus.FBFTLog.GetBlockByHash(recvMsg.BlockHash)
+	if blockObj == nil {
+		consensus.getLogger().Info().
+			Uint64("blockNum", recvMsg.BlockNum).
+			Uint64("viewID", recvMsg.ViewID).
+			Str("blockHash", recvMsg.BlockHash.Hex()).
+			Msg("[processExtraCommit] Failed finding a matching block for committed message")
+		return
+	}
+	commitPayload := signature.ConstructCommitPayload(consensus.Blockchain,
+		blockObj.Epoch(), blockObj.Hash(), blockObj.NumberU64(), blockObj.Header().ViewID().Uint64())
+	logger = logger.With().
+		Uint64("MsgViewID", recvMsg.ViewID).
+		Uint64("MsgBlockNum", recvMsg.BlockNum).
+		Logger()
+
+	signerPubKey := &bls_core.PublicKey{}
+	if recvMsg.HasSingleSender() {
+		signerPubKey = recvMsg.SenderPubkeys[0].Object
+	} else {
+		for _, pubKey := range recvMsg.SenderPubkeys {
+			signerPubKey.Add(pubKey.Object)
+		}
+	}
+	if !sign.VerifyHash(signerPubKey, commitPayload) {
+		logger.Error().Msg("[processExtraCommit] Cannot verify commit message")
+		return
+	}
+
+	//// Write - Start
+	if _, err := consensus.Decider.AddNewVote(
+		quorum.ExtraCommit, recvMsg.SenderPubkeys,
+		&sign, recvMsg.BlockHash,
+		recvMsg.BlockNum, recvMsg.ViewID,
+	); err != nil {
+		return
+	}
+	// Set the bitmap indicating that this validator signed.
+	if err := extraCommitBitmap.SetKeysAtomic(recvMsg.SenderPubkeys, true); err != nil {
+		consensus.getLogger().Warn().Err(err).
+			Msg("[processExtraCommit] commitBitmap.SetKey failed")
+		return
+	}
+	//// Write - End
+
+	if consensus.Decider.IsAllSigsCollectedInPreviousBlock() {
+		logger.Info().Msg("[processExtraCommit] 100% Enough commits received")
 	}
 }

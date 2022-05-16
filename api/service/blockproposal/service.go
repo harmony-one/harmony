@@ -11,13 +11,13 @@ type Service struct {
 	stopChan              chan struct{}
 	stoppedChan           chan struct{}
 	readySignal           chan consensus.ProposalType
-	commitSigsChan        chan []byte
+	commitSigsChan        chan consensus.CommitSigBitmaps
 	messageChan           chan *msg_pb.Message
-	waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})
+	waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan consensus.CommitSigBitmaps, stopChan chan struct{}, stoppedChan chan struct{})
 }
 
 // New returns a block proposal service.
-func New(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan []byte, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
+func New(readySignal chan consensus.ProposalType, commitSigsChan chan consensus.CommitSigBitmaps, waitForConsensusReady func(readySignal chan consensus.ProposalType, commitSigsChan chan consensus.CommitSigBitmaps, stopChan chan struct{}, stoppedChan chan struct{})) *Service {
 	return &Service{readySignal: readySignal, commitSigsChan: commitSigsChan, waitForConsensusReady: waitForConsensusReady}
 }
 

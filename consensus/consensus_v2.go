@@ -153,6 +153,8 @@ func (consensus *Consensus) finalCommit() {
 		network.Bytes,
 		network.FBFTMsg
 	commitSigAndBitmap := FBFTMsg.Payload
+	extraCommitSigAndBitmap := FBFTMsg.ExtraData
+
 	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 	// find correct block content
 	curBlockHash := consensus.blockHash
@@ -168,8 +170,6 @@ func (consensus *Consensus) finalCommit() {
 		consensus.getLogger().Warn().Err(err).Msg("[finalCommit] failed verifying last commit sig")
 		return
 	}
-	consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
-	consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
 
 	// Send committed message before block insertion.
 	// if leader successfully finalizes the block, send committed message to validators
@@ -209,6 +209,23 @@ func (consensus *Consensus) finalCommit() {
 	}
 
 	block.SetCurrentCommitSig(commitSigAndBitmap)
+
+	commitSigBitmap := CommitSigBitmaps{CommitSigBitmap: commitSigAndBitmap}
+	parentHeader := consensus.Blockchain.GetBlockByHash(block.ParentHash())
+	if consensus.Blockchain.Config().IsExtraCommit(parentHeader.Epoch()) && parentHeader.Number().Uint64() > 1 {
+		// Extra commit sig logic only works starting from block 2 since genesis block doesn't have signatures.
+		commitSigBitmap.ShouldProcessExtraCommit = true
+		// Fill in this field when parent block is in the ExtraCommit epoch
+		commitSigBitmap.ExtraCommitSigBitmap = extraCommitSigAndBitmap
+		block.SetExtraCommitSig(commitSigBitmap.ExtraCommitSigBitmap)
+	}
+
+	if !commitSigBitmap.ShouldProcessExtraCommit {
+		// Only need to override commit sig before extra commit epoch
+		consensus.getLogger().Info().Hex("new", commitSigAndBitmap).Msg("[finalCommit] Overriding commit signatures!!")
+		consensus.Blockchain.WriteCommitSig(block.NumberU64(), commitSigAndBitmap)
+	}
+
 	err = consensus.commitBlock(block, FBFTMsg)
 
 	if err != nil || consensus.blockNum-beforeCatchupNum != 1 {
@@ -252,7 +269,7 @@ func (consensus *Consensus) finalCommit() {
 			// pipelining
 			go func() {
 				select {
-				case consensus.CommitSigChannel <- commitSigAndBitmap:
+				case consensus.CommitSigChannel <- commitSigBitmap:
 				case <-time.After(CommitSigSenderTimeout):
 					utils.Logger().Error().Err(err).Msg("[finalCommit] channel not received after 6s for commitSigAndBitmap")
 				}
@@ -263,9 +280,9 @@ func (consensus *Consensus) finalCommit() {
 
 // BlockCommitSigs returns the byte array of aggregated
 // commit signature and bitmap signed on the block
-func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
+func (consensus *Consensus) BlockCommitSigs(blockNum uint64) (*CommitSigBitmaps, error) {
 	if consensus.blockNum <= 1 {
-		return nil, nil
+		return &CommitSigBitmaps{}, nil
 	}
 	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
 	if err != nil ||
@@ -276,15 +293,23 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 		if len(msgs) != 1 {
 			consensus.getLogger().Error().
 				Int("numCommittedMsg", len(msgs)).
-				Msg("GetLastCommitSig failed with wrong number of committed message")
+				Msg("BlockCommitSigs failed with wrong number of committed message")
 			return nil, errors.Errorf(
-				"GetLastCommitSig failed with wrong number of committed message %d", len(msgs),
+				"BlockCommitSigs failed with wrong number of committed message %d", len(msgs),
 			)
 		}
 		lastCommits = msgs[0].Payload
 	}
 
-	return lastCommits, nil
+	result := &CommitSigBitmaps{CommitSigBitmap: lastCommits}
+
+	// Try to read and use extra commit stored in DB if any
+	extraCommits, err := consensus.Blockchain.ReadExtraCommitSig(blockNum)
+	if err == nil || len(extraCommits) >= bls.BLSSignatureSizeInBytes {
+		result.ExtraCommitSigBitmap = extraCommits
+	}
+
+	return result, nil
 }
 
 // Start waits for the next new block and run consensus
@@ -549,6 +574,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		network.Bytes,
 		network.FBFTMsg
 	bareMinimumCommit := FBFTMsg.Payload
+	extraCommit := FBFTMsg.ExtraData
 	consensus.FBFTLog.AddVerifiedMessage(FBFTMsg)
 
 	if err := consensus.verifyLastCommitSig(bareMinimumCommit, blk); err != nil {
@@ -557,6 +583,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 
 	go func() {
 		blk.SetCurrentCommitSig(bareMinimumCommit)
+		blk.SetExtraCommitSig(extraCommit)
 
 		// Send committed message to validators since 2/3 commit is already collected
 		if err := consensus.msgSender.SendWithRetry(
@@ -634,6 +661,7 @@ func (consensus *Consensus) tryCatchup() error {
 			return nil
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
+		blk.SetExtraCommitSig(msg.ExtraData)
 
 		if err := consensus.VerifyBlock(blk); err != nil {
 			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")

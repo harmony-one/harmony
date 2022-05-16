@@ -161,6 +161,23 @@ type Header interface {
 	// It stores a copy; the caller may freely modify the original.
 	SetLastCommitBitmap(newLastCommitBitmap []byte)
 
+	// ExtraCommitSignature is the FBFT commit group signature for the second-to-last block.
+	ExtraCommitSignature() [96]byte
+
+	// SetExtraCommitSignature sets the FBFT commit group signature for the second-to-last block.
+	SetExtraCommitSignature(newExtraCommitSignature [96]byte)
+
+	// ExtraCommitBitmap is the signatory bitmap of the second-to-last block.  Bit
+	// positions index into committee member array.
+	//
+	// The returned slice is a copy; the caller may do anything with it.
+	ExtraCommitBitmap() []byte
+
+	// SetExtraCommitBitmap sets the extra signatory bitmap of the second-to-last block.
+	//
+	// It stores a copy; the caller may freely modify the original.
+	SetExtraCommitBitmap(newExtraCommitBitmap []byte)
+
 	// ShardStateHash is the shard state hash.
 	ShardStateHash() common.Hash
 

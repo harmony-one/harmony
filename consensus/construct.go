@@ -124,6 +124,7 @@ func (consensus *Consensus) construct(
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Prepare)
 	case msg_pb.MessageType_COMMITTED:
 		consensusMsg.Payload = consensus.constructQuorumSigAndBitmap(quorum.Commit)
+		consensusMsg.ExtraData = consensus.constructQuorumSigAndBitmap(quorum.ExtraCommit)
 	}
 
 	var marshaledMessage []byte
@@ -162,7 +163,7 @@ func (consensus *Consensus) construct(
 
 // constructQuorumSigAndBitmap constructs the aggregated sig and bitmap as
 // a byte slice in format of: [[aggregated sig], [sig bitmap]]
-func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
+func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.SigType) []byte {
 	buffer := bytes.Buffer{}
 	// 96 bytes aggregated signature
 	aggSig := consensus.Decider.AggregateVotes(p)
@@ -172,6 +173,13 @@ func (consensus *Consensus) constructQuorumSigAndBitmap(p quorum.Phase) []byte {
 		buffer.Write(consensus.prepareBitmap.Bitmap)
 	} else if p == quorum.Commit {
 		buffer.Write(consensus.commitBitmap.Bitmap)
+	} else if p == quorum.ExtraCommit {
+		// If there is no extra commit sig, just return empty bytes which is totally valid
+		// and will be recognized by the validators as no extra commit sig in block.
+		if len(consensus.Decider.ReadAllBallots(p)) == 0 {
+			return []byte{}
+		}
+		buffer.Write(consensus.extraCommitBitmap.Bitmap)
 	} else {
 		utils.Logger().Error().
 			Str("phase", p.String()).
