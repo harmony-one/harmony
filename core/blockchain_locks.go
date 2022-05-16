@@ -63,6 +63,11 @@ func (b *BlockChainWithLocks) CommitOffChainData(batch rawdb.DatabaseWriter, blo
 	return b.bc.CommitOffChainData(batch, block, receipts, cxReceipts, stakeMsgs, payout, state)
 }
 
+// SubscribeTraceEvent registers a subscription of ChainEvent.
+func (bc *BlockChainWithLocks) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	return bc.bc.SubscribeTraceEvent(ch)
+}
+
 func (b *BlockChainWithLocks) ValidateNewBlock(block *types.Block) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()

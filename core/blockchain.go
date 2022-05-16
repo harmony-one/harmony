@@ -1761,7 +1761,7 @@ func (bc *BlockChainWithoutLocks) SubscribeRemovedLogsEvent(ch chan<- RemovedLog
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
-func (bc *BlockChain) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+func (bc *BlockChainWithoutLocks) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
 	bc.trace = true
 	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }

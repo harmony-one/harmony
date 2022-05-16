@@ -214,4 +214,5 @@ type BlockChain interface {
 		payout reward.Reader,
 		state *state.DB,
 	) (status WriteStatus, err error)
+	SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription
 }
