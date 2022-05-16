@@ -65,6 +65,7 @@ var (
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
+		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 	}
 
@@ -99,6 +100,7 @@ var (
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
 		StakingPrecompileEpoch:     big.NewInt(75175),
+		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
 	}
 
@@ -134,7 +136,8 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
-		SlotsLimitedEpoch:          EpochTBD,      // epoch to enable HIP-16
+		ChainIdFixEpoch:            big.NewInt(0),
+		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -169,6 +172,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
+		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
@@ -204,6 +208,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
 		StakingPrecompileEpoch:     big.NewInt(2),
+		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
@@ -238,6 +243,7 @@ var (
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		StakingPrecompileEpoch:     big.NewInt(2),
+		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
 	}
 
@@ -274,6 +280,7 @@ var (
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
+		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
 	}
 
@@ -310,6 +317,7 @@ var (
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
+		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
 	}
 
@@ -429,13 +437,16 @@ type ChainConfig struct {
 	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
 	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
 
+	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
+	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
+
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
 	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -445,6 +456,7 @@ func (c *ChainConfig) String() string {
 		c.ReceiptLogEpoch,
 		c.SHA3Epoch,
 		c.StakingPrecompileEpoch,
+		c.ChainIdFixEpoch,
 	)
 }
 
@@ -596,6 +608,11 @@ func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
 }
 
+// IsChainIdFixEpoch returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
+func (c *ChainConfig) IsChainIdFixEpoch(epoch *big.Int) bool {
+	return isForked(c.ChainIdFixEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -644,9 +661,9 @@ func isForked(s, epoch *big.Int) bool {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                                                                              *big.Int
-	EthChainID                                                                                           *big.Int
-	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile bool
+	ChainID                                                                                                                 *big.Int
+	EthChainID                                                                                                              *big.Int
+	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3, IsStakingPrecompile, IsChainIdFixEpoch bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -676,5 +693,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsPrevVRF:           c.IsPrevVRF(epoch),
 		IsSHA3:              c.IsSHA3(epoch),
 		IsStakingPrecompile: c.IsStakingPrecompile(epoch),
+		IsChainIdFixEpoch:   c.IsChainIdFixEpoch(epoch),
 	}
 }
