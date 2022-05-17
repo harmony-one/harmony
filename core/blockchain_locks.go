@@ -25,8 +25,9 @@ import (
 )
 
 type BlockChainWithLocks struct {
-	bc   *BlockChainWithoutLocks
-	lock sync.RWMutex
+	bc     *BlockChainWithoutLocks
+	lock   sync.RWMutex
+	clLock sync.RWMutex
 }
 
 func newBlockchainWithLocks(bc *BlockChainWithoutLocks) *BlockChainWithLocks {
@@ -444,32 +445,32 @@ func (b *BlockChainWithLocks) WriteEpochVdfBlockNum(epoch *big.Int, blockNum *bi
 }
 
 func (b *BlockChainWithLocks) WriteCrossLinks(batch rawdb.DatabaseWriter, cls []types.CrossLink) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.WriteCrossLinks(batch, cls)
 }
 
 func (b *BlockChainWithLocks) DeleteCrossLinks(cls []types.CrossLink) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.DeleteCrossLinks(cls)
 }
 
 func (b *BlockChainWithLocks) ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	b.clLock.RLock()
+	defer b.clLock.RUnlock()
 	return b.bc.ReadCrossLink(shardID, blockNum)
 }
 
 func (b *BlockChainWithLocks) LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.LastContinuousCrossLink(batch, shardID)
 }
 
 func (b *BlockChainWithLocks) ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	b.clLock.RLock()
+	defer b.clLock.RUnlock()
 	return b.bc.ReadShardLastCrossLink(shardID)
 }
 
@@ -480,26 +481,26 @@ func (b *BlockChainWithLocks) DeleteFromPendingSlashingCandidates(processed slas
 }
 
 func (b *BlockChainWithLocks) ReadPendingSlashingCandidates() slash.Records {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	b.clLock.RLock()
+	defer b.clLock.RUnlock()
 	return b.bc.ReadPendingSlashingCandidates()
 }
 
 func (b *BlockChainWithLocks) ReadPendingCrossLinks() ([]types.CrossLink, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	b.clLock.RLock()
+	defer b.clLock.RUnlock()
 	return b.bc.ReadPendingCrossLinks()
 }
 
 func (b *BlockChainWithLocks) CachePendingCrossLinks(crossLinks []types.CrossLink) error {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
+	b.clLock.RLock()
+	defer b.clLock.RUnlock()
 	return b.bc.CachePendingCrossLinks(crossLinks)
 }
 
 func (b *BlockChainWithLocks) SavePendingCrossLinks() error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.SavePendingCrossLinks()
 }
 
@@ -510,14 +511,14 @@ func (b *BlockChainWithLocks) AddPendingSlashingCandidates(candidates slash.Reco
 }
 
 func (b *BlockChainWithLocks) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.AddPendingCrossLinks(pendingCLs)
 }
 
 func (b *BlockChainWithLocks) DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.clLock.Lock()
+	defer b.clLock.Unlock()
 	return b.bc.DeleteFromPendingCrossLinks(crossLinks)
 }
 

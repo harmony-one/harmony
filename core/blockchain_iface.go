@@ -36,6 +36,8 @@ import (
 // included in the canonical one where as GetBlockByNumber always represents the
 // canonical chain.
 type BlockChain interface {
+	CrosslinkRead
+	CrosslinkWrite
 	ValidateNewBlock(block *types.Block) error
 	SetHead(head uint64) error
 	ShardID() uint32
@@ -114,23 +116,13 @@ type BlockChain interface {
 	WriteEpochVrfBlockNums(epoch *big.Int, vrfNumbers []uint64) error
 	ReadEpochVdfBlockNum(epoch *big.Int) (*big.Int, error)
 	WriteEpochVdfBlockNum(epoch *big.Int, blockNum *big.Int) error
-	WriteCrossLinks(batch rawdb.DatabaseWriter, cls []types.CrossLink) error
-	DeleteCrossLinks(cls []types.CrossLink) error
-	ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error)
-	LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error
-	ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error)
 	DeleteFromPendingSlashingCandidates(
 		processed slash.Records,
 	) error
-	ReadPendingSlashingCandidates() slash.Records
-	ReadPendingCrossLinks() ([]types.CrossLink, error)
-	CachePendingCrossLinks(crossLinks []types.CrossLink) error
-	SavePendingCrossLinks() error
+
 	AddPendingSlashingCandidates(
 		candidates slash.Records,
 	) error
-	AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error)
-	DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error)
 	IsSameLeaderAsPreviousBlock(block *types.Block) bool
 	GetVMConfig() *vm.Config
 	ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error)
@@ -215,4 +207,21 @@ type BlockChain interface {
 		state *state.DB,
 	) (status WriteStatus, err error)
 	SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription
+}
+
+type CrosslinkRead interface {
+	ReadCrossLink(shardID uint32, blockNum uint64) (*types.CrossLink, error)
+	LastContinuousCrossLink(batch rawdb.DatabaseWriter, shardID uint32) error
+	ReadShardLastCrossLink(shardID uint32) (*types.CrossLink, error)
+	ReadPendingSlashingCandidates() slash.Records
+	ReadPendingCrossLinks() ([]types.CrossLink, error)
+	CachePendingCrossLinks(crossLinks []types.CrossLink) error
+}
+
+type CrosslinkWrite interface {
+	WriteCrossLinks(batch rawdb.DatabaseWriter, cls []types.CrossLink) error
+	DeleteCrossLinks(cls []types.CrossLink) error
+	SavePendingCrossLinks() error
+	AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error)
+	DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error)
 }
