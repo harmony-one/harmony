@@ -533,26 +533,18 @@ func (b *BlockChainWithLocks) GetVMConfig() *vm.Config {
 }
 
 func (b *BlockChainWithLocks) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
 	return b.bc.ReadCXReceipts(shardID, blockNum, blockHash)
 }
 
 func (b *BlockChainWithLocks) CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
 	return b.bc.CXMerkleProof(toShardID, block)
 }
 
 func (b *BlockChainWithLocks) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
 	return b.bc.WriteCXReceiptsProofSpent(db, cxps)
 }
 
 func (b *BlockChainWithLocks) IsSpent(cxp *types.CXReceiptsProof) bool {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
 	return b.bc.IsSpent(cxp)
 }
 
