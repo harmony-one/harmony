@@ -29,8 +29,10 @@ var mainnetAllowlist = Allowlist{
 }
 
 var testnetAllowlist = Allowlist{
-	MaxLimitPerShard: 0,
-	BLSPublicKeys:    _BLS([]string{}),
+	MaxLimitPerShard: 4,
+	BLSPublicKeys: _BLS([]string{
+		"7915b9cbae9d675af510cb252362b80ae6d68a3684bbea203bc30d2f5fda25ffcedfa3cf2a6c1d3051469379920a418d",
+	}),
 }
 
 var localnetAllowlist = Allowlist{

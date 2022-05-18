@@ -33,6 +33,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.TestnetChainConfig.IsAllowlistEpoch(epoch):
+		return testnetV3_3
 	case params.TestnetChainConfig.IsSlotsLimited(epoch):
 		return testnetV3_2
 	case params.TestnetChainConfig.IsSixtyPercent(epoch):
@@ -122,3 +124,4 @@ var testnetV2 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), 
 var testnetV3 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.90"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
 var testnetV3_1 = MustNewInstance(4, 30, 8, 0, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
 var testnetV3_2 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var testnetV3_3 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.60"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
