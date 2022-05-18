@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -133,6 +134,24 @@ func (cs CXReceipts) GetToShardReceipts(shardID uint32) CXReceipts {
 		}
 	}
 	return cxs
+}
+
+// Extract all of the receipts which are for cross shard messages (as opposed to
+// simple transfers), and sort them by GasPrice (in descending order), returning
+// the result.
+func (cs CXReceipts) MessagesByPrice() CXMessagesByPrice {
+	var msgs CXMessagesByPrice
+	for _, r := range cs {
+		msg, ok := r.ToCXMessage()
+		if ok {
+			msgs = append(msgs, msg)
+		}
+	}
+	sort.Slice(msgs, func(i, j int) bool {
+		// N.B. we use > because we want to sort in *descending* order.
+		return msgs[i].GasPrice.Cmp(msgs[j].GasPrice) > 0
+	})
+	return msgs
 }
 
 // CXMerkleProof represents the merkle proof of a collection of ordered cross shard transactions

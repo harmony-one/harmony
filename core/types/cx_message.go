@@ -35,3 +35,6 @@ type CXMessageReceipt struct {
 	GasLeftoverTo                 common.Address
 	Nonce                         uint64
 }
+
+// A slice of CXMessage, sorted by GasPrice in descending order.
+type CXMessagesByPrice []CXMessage
