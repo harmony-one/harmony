@@ -331,6 +331,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		DebugEnabled:       hc.RPCOpt.DebugEnabled,
 		EthRPCsEnabled:     hc.RPCOpt.EthRPCsEnabled,
 		StakingRPCsEnabled: hc.RPCOpt.StakingRPCsEnabled,
+		LegacyRPCsEnabled:  hc.RPCOpt.LegacyRPCsEnabled,
+		RpcFilterFile:      hc.RPCOpt.RpcFilterFile,
 		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
 	}

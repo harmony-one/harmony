@@ -66,6 +66,8 @@ Version = "1.0.2"
   DebugEnabled = false
   EthRPCsEnabled = true
   StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -133,6 +135,8 @@ Version = "1.0.3"
   DebugEnabled = false
   EthRPCsEnabled = true
   StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
@@ -200,6 +204,8 @@ Version = "1.0.4"
   DebugEnabled = false
   EthRPCsEnabled = true
   StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [Sync]
   Concurrency = 6
@@ -279,6 +285,8 @@ Version = "1.0.4"
   DebugEnabled = false
   EthRPCsEnabled = true
   StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [Sync]
   Concurrency = 6

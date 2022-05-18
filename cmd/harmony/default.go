@@ -49,6 +49,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DebugEnabled:       false,
 		EthRPCsEnabled:     true,
 		StakingRPCsEnabled: true,
+		LegacyRPCsEnabled:  true,
+		RpcFilterFile:      "",
 		RateLimterEnabled:  true,
 		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},

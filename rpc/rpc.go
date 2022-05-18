@@ -8,6 +8,7 @@ import (
 
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	eth "github.com/harmony-one/harmony/rpc/eth"
@@ -71,30 +72,40 @@ func (n Version) Namespace() string {
 }
 
 // StartServers starts the http & ws servers
-func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig) error {
-	apis = append(apis, getAPIs(hmy, config.DebugEnabled, config.StakingRPCsEnabled, config.EthRPCsEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
+func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerConfig, rpcOpt harmony.RpcOptConfig) error {
+	apis = append(apis, getAPIs(hmy, config)...)
 	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
-
+	// load method filter from file (if exist)
+	var rmf rpc.RpcMethodFilter
+	rpcFilterFilePath := strings.Trim(rpcOpt.RpcFilterFile, " ")
+	if len(rpcFilterFilePath) > 0 {
+		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
+			return err
+		}
+	} else {
+		rmf.ExposeAll()
+	}
+	fmt.Println("start servers: ", rmf)
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
-		if err := startHTTP(apis); err != nil {
+		if err := startHTTP(apis, &rmf); err != nil {
 			return err
 		}
 
 		httpAuthEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPAuthPort)
-		if err := startAuthHTTP(authApis); err != nil {
+		if err := startAuthHTTP(authApis, &rmf); err != nil {
 			return err
 		}
 	}
 
 	if config.WSEnabled {
 		wsEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSPort)
-		if err := startWS(apis); err != nil {
+		if err := startWS(apis, &rmf); err != nil {
 			return err
 		}
 
 		wsAuthEndpoint = fmt.Sprintf("%v:%v", config.WSIp, config.WSAuthPort)
-		if err := startAuthWS(authApis); err != nil {
+		if err := startAuthWS(authApis, &rmf); err != nil {
 			return err
 		}
 	}
@@ -141,35 +152,40 @@ func getAuthAPIs(hmy *hmy.Harmony, debugEnable bool, rateLimiterEnable bool, rat
 }
 
 // getAPIs returns all the API methods for the RPC interface
-func getAPIs(hmy *hmy.Harmony, debugEnable bool, stakingRPCsEnable bool, ethRPCsEnable bool, rateLimiterEnable bool, ratelimit int) []rpc.API {
+func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 	publicAPIs := []rpc.API{
 		// Public methods
 		NewPublicHarmonyAPI(hmy, V1),
 		NewPublicHarmonyAPI(hmy, V2),
-		NewPublicBlockchainAPI(hmy, V1, rateLimiterEnable, ratelimit),
-		NewPublicBlockchainAPI(hmy, V2, rateLimiterEnable, ratelimit),
+		NewPublicBlockchainAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
+		NewPublicBlockchainAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
 		NewPublicContractAPI(hmy, V1),
 		NewPublicContractAPI(hmy, V2),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
 		NewPublicPoolAPI(hmy, V1),
 		NewPublicPoolAPI(hmy, V2),
-		// Legacy methods (subject to removal)
-		v1.NewPublicLegacyAPI(hmy, "hmy"),
-		v2.NewPublicLegacyAPI(hmy, "hmyv2"),
 	}
 
-	if stakingRPCsEnable {
+	// Legacy methods (subject to removal)
+	if config.LegacyRPCsEnabled {
+		publicAPIs = append(publicAPIs,
+			v1.NewPublicLegacyAPI(hmy, "hmy"),
+			v2.NewPublicLegacyAPI(hmy, "hmyv2"),
+		)
+	}
+
+	if config.StakingRPCsEnabled {
 		publicAPIs = append(publicAPIs,
 			NewPublicStakingAPI(hmy, V1),
 			NewPublicStakingAPI(hmy, V2),
 		)
 	}
 
-	if ethRPCsEnable {
+	if config.EthRPCsEnabled {
 		publicAPIs = append(publicAPIs,
 			NewPublicHarmonyAPI(hmy, Eth),
-			NewPublicBlockchainAPI(hmy, Eth, rateLimiterEnable, ratelimit),
+			NewPublicBlockchainAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
 			NewPublicContractAPI(hmy, Eth),
 			NewPublicTransactionAPI(hmy, Eth),
 			NewPublicPoolAPI(hmy, Eth),
@@ -188,16 +204,16 @@ func getAPIs(hmy *hmy.Harmony, debugEnable bool, stakingRPCsEnable bool, ethRPCs
 		NewPrivateDebugAPI(hmy, V2),
 	}
 
-	if debugEnable {
+	if config.DebugEnabled {
 		apis := append(publicAPIs, publicDebugAPIs...)
 		return append(apis, privateAPIs...)
 	}
 	return publicAPIs
 }
 
-func startHTTP(apis []rpc.API) (err error) {
+func startHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
-		httpEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+		httpEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
 	if err != nil {
 		return err
@@ -212,9 +228,9 @@ func startHTTP(apis []rpc.API) (err error) {
 	return nil
 }
 
-func startAuthHTTP(apis []rpc.API) (err error) {
+func startAuthHTTP(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
 	httpListener, httpHandler, err = rpc.StartHTTPEndpoint(
-		httpAuthEndpoint, apis, HTTPModules, httpOrigins, httpVirtualHosts, httpTimeouts,
+		httpAuthEndpoint, apis, HTTPModules, rmf, httpOrigins, httpVirtualHosts, httpTimeouts,
 	)
 	if err != nil {
 		return err
@@ -229,8 +245,8 @@ func startAuthHTTP(apis []rpc.API) (err error) {
 	return nil
 }
 
-func startWS(apis []rpc.API) (err error) {
-	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, wsOrigins, true)
+func startWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsEndpoint, apis, WSModules, rmf, wsOrigins, true)
 	if err != nil {
 		return err
 	}
@@ -242,8 +258,8 @@ func startWS(apis []rpc.API) (err error) {
 	return nil
 }
 
-func startAuthWS(apis []rpc.API) (err error) {
-	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsAuthEndpoint, apis, WSModules, wsOrigins, true)
+func startAuthWS(apis []rpc.API, rmf *rpc.RpcMethodFilter) (err error) {
+	wsListener, wsHandler, err = rpc.StartWSEndpoint(wsAuthEndpoint, apis, WSModules, rmf, wsOrigins, true)
 	if err != nil {
 		return err
 	}

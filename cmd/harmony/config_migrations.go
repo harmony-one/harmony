@@ -100,6 +100,14 @@ func init() {
 			confTree.Set("RPCOpt.StakingRPCsEnabled", defaultConfig.RPCOpt.StakingRPCsEnabled)
 		}
 
+		if confTree.Get("RPCOpt.LegacyRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.LegacyRPCsEnabled", defaultConfig.RPCOpt.LegacyRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.RpcFilterFile") == nil {
+			confTree.Set("RPCOpt.RpcFilterFile", defaultConfig.RPCOpt.RpcFilterFile)
+		}
+
 		if confTree.Get("RPCOpt.RateLimterEnabled") == nil {
 			confTree.Set("RPCOpt.RateLimterEnabled", defaultConfig.RPCOpt.RateLimterEnabled)
 		}
