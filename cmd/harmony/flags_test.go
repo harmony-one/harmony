@@ -659,7 +659,7 @@ func TestRPCOptFlags(t *testing.T) {
 		},
 
 		{
-			args: []string{"--rpc.filterspath='./rmf.toml'"},
+			args: []string{"--rpc.filterspath=./rmf.toml"},
 			expConfig: harmonyconfig.RpcOptConfig{
 				DebugEnabled:       false,
 				EthRPCsEnabled:     true,

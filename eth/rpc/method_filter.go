@@ -118,11 +118,19 @@ func Match(pattern string, value string) bool {
 			isAllowed, _ := regexp.MatchString(matchPattern, value)
 			return isAllowed
 		default:
-			return strings.EqualFold(matchPattern, value)
+			isAllowed, _ := regexp.MatchString(matchPattern, value)
+			return isAllowed
 		}
 	}
-	// by default we use wildcard as match type
-	return MatchWildCard(pattern, value)
+	// auto detect simple checking  or wildcard
+	if regexp.MustCompile(`^[a-zA-Z0-9_]+$`).MatchString(pattern) {
+		return strings.EqualFold(pattern, value)
+	} else if regexp.MustCompile(`^[a-zA-Z0-9_*?]+$`).MatchString(pattern) {
+		return MatchWildCard(pattern, value)
+	}
+	// by default we use regex matching
+	allowed, _ := regexp.MatchString(pattern, value)
+	return allowed
 }
 
 // MatchSimple - finds whether the text matches/satisfies the pattern string.
