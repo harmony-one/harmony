@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.1" // bump from 2.5.0 for AccountSlots
+const tomlConfigVersion = "2.5.2" // bump from 2.5.1 for DisablePrivateIPScan
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -25,11 +25,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:            nodeconfig.DefaultP2PPort,
-		IP:              nodeconfig.DefaultPublicListenIP,
-		KeyFile:         "./.hmykey",
-		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
+		Port:                 nodeconfig.DefaultP2PPort,
+		IP:                   nodeconfig.DefaultPublicListenIP,
+		KeyFile:              "./.hmykey",
+		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan: false,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
