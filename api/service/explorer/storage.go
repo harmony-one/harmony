@@ -57,13 +57,16 @@ type (
 )
 
 func newStorage(hc *harmonyconfig.HarmonyConfig, bc *core2.BlockChain, dbPath string) (*storage, error) {
-	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
 	var db database
 	var err error
 
 	if hc.General.UseTiKV {
-		db, err = newExplorerTiKv(hc.TiKV.PDAddr, fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID))
+		dbPath = fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID)
+		readOnly := hc.TiKV.Role == "Reader"
+		utils.Logger().Info().Msg("explorer storage in tikv: " + dbPath)
+		db, err = newExplorerTiKv(hc.TiKV.PDAddr, dbPath, readOnly)
 	} else {
+		utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
 		db, err = newExplorerLvlDB(dbPath)
 	}
 

@@ -47,9 +47,9 @@ func newExplorerLvlDB(dbPath string) (database, error) {
 	return &explorerDB{db}, nil
 }
 
-func newExplorerTiKv(pdAddr []string, dbPath string) (database, error) {
+func newExplorerTiKv(pdAddr []string, dbPath string, readOnly bool) (database, error) {
 	prefixStr := append([]byte(path.Base(dbPath)), '/')
-	db, err := remote.NewRemoteDatabase(pdAddr, false)
+	db, err := remote.NewRemoteDatabase(pdAddr, readOnly)
 	if err != nil {
 		return nil, err
 	}
