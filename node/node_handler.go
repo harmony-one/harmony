@@ -3,14 +3,11 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
-
-	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -105,7 +102,6 @@ func (node *Node) HandleNodeMessage(
 			proto_node.CrossLink,
 			proto_node.CrosslinkHeartbeat:
 			// skip first byte which is blockMsgType
-			fmt.Println("node.processSkippedMsgTypeByteValue", int(actionType) == int(proto_node.CrosslinkHeartbeat))
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}
 	default:
@@ -296,6 +292,7 @@ func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 		hb := types.CrosslinkHeartbeat{
 			ShardID:   lastLink.ShardID(),
 			BlockID:   lastLink.BlockNum(),
+			Epoch:     lastLink.Epoch().Uint64(),
 			PublicKey: privToSing.Pub.Object.Serialize(),
 			Signature: nil,
 		}
@@ -306,14 +303,6 @@ func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 			continue
 		}
 		hb.Signature = privToSing.Pri.SignHash(rs).Serialize()
-
-		sig := &ffi_bls.Sign{}
-		err = sig.Deserialize(hb.Signature)
-		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to deserialize crosslinks")
-			continue
-		}
-
 		bts := proto_node.ConstructCrossLinkHeartBeatMessage(hb)
 		node.host.SendMessageToGroups(
 			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID))},
