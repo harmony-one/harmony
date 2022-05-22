@@ -82,7 +82,7 @@ func checkFilters(filters []string, value string) bool {
 	return false
 }
 
-// MatchRegex -  finds whether the text matches/satisfies the regex pattern string.
+// Match -  finds whether the text matches/satisfies the pattern string.
 // pattern can include match type (ex: regex:^[a-z]bc )
 func Match(pattern string, value string) bool {
 	parts := strings.SplitN(pattern, ":", 2)
@@ -131,7 +131,7 @@ func MatchSimple(pattern, name string) bool {
 	return deepMatchRune([]rune(name), []rune(pattern), true)
 }
 
-// Match -  finds whether the text matches/satisfies the pattern string.
+// MatchWildCard -  finds whether the text matches/satisfies the wildcard pattern string.
 // supports  '*' and '?' wildcards in the pattern string.
 func MatchWildCard(pattern, name string) (matched bool) {
 	if pattern == "" {
