@@ -3,10 +3,15 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/crypto/bls"
+
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
+
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/block"
@@ -40,6 +45,8 @@ func (node *Node) processSkippedMsgTypeByteValue(
 		node.ProcessReceiptMessage(content)
 	case proto_node.CrossLink:
 		node.ProcessCrossLinkMessage(content)
+	case proto_node.CrosslinkHeartbeat:
+		node.ProcessCrossLinkHeartbeatMessage(content)
 	default:
 		utils.Logger().Error().
 			Int("message-iota-value", int(cat)).
@@ -95,8 +102,10 @@ func (node *Node) HandleNodeMessage(
 		case
 			proto_node.SlashCandidate,
 			proto_node.Receipt,
-			proto_node.CrossLink:
+			proto_node.CrossLink,
+			proto_node.CrosslinkHeartbeat:
 			// skip first byte which is blockMsgType
+			fmt.Println("node.processSkippedMsgTypeByteValue", int(actionType) == int(proto_node.CrosslinkHeartbeat))
 			node.processSkippedMsgTypeByteValue(blockMsgType, msgPayload[1:])
 		}
 	default:
@@ -218,8 +227,8 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	)
 }
 
-// BroadcastCrossLinkFromBeaconToShards is called by consensus leader to
-// send the new header as cross link to beacon chain.
+// BroadcastCrossLinkFromBeaconToShards is called by consensus leader or 1% validators to
+// send last cross link to shard chains.
 func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 	if !node.IsRunningBeaconChain() {
 		return
@@ -245,19 +254,67 @@ func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 		return
 	}
 
-	utils.Logger().Info().Msgf(
-		"Construct and Broadcasting new crosslink to beacon chain groupID %s",
-		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
-	)
+	epoch := node.Blockchain().CurrentBlock().Epoch()
+	state, err := node.Blockchain().ReadShardState(epoch)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to read shard state")
+		return
+	}
+
+	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to read committee")
+		return
+	}
+	pubs, err := committee.BLSPublicKeys()
+	if err != nil {
+		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get committee pub keys")
+		return
+	}
+
+	var privToSing *bls.PrivateKeyWrapper
+	for _, pub := range pubs {
+		for _, priv := range node.Consensus.GetPrivateKeys() {
+			if priv.Pub != nil && pub.Bytes == priv.Pub.Bytes {
+				privToSing = &priv
+				break
+			}
+		}
+	}
+
+	if privToSing == nil {
+		return
+	}
 
 	for _, shardID := range []uint32{1, 2, 3} {
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLink] failed to get crosslinks")
+			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
 			continue
 		}
-		bts := proto_node.ConstructCrossLinkMessageFromCrossLinks([]*types.CrossLink{lastLink})
 
+		hb := types.CrosslinkHeartbeat{
+			ShardID:   lastLink.ShardID(),
+			BlockID:   lastLink.BlockNum(),
+			PublicKey: privToSing.Pub.Object.Serialize(),
+			Signature: nil,
+		}
+
+		rs, err := rlp.EncodeToBytes(hb)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to encode signal")
+			continue
+		}
+		hb.Signature = privToSing.Pri.SignHash(rs).Serialize()
+
+		sig := &ffi_bls.Sign{}
+		err = sig.Deserialize(hb.Signature)
+		if err != nil {
+			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to deserialize crosslinks")
+			continue
+		}
+
+		bts := proto_node.ConstructCrossLinkHeartBeatMessage(hb)
 		node.host.SendMessageToGroups(
 			[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(shardID))},
 			p2p.ConstructMessage(bts),
