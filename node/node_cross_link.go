@@ -53,6 +53,14 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	return nil
 }
 
+// ProcessCrossLinkHeartbeatMessage process crosslink heart beat signal.
+func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
+	if node.IsRunningBeaconChain() {
+		return
+	}
+	// process in next pr.
+}
+
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {

@@ -130,17 +130,25 @@ type CrossLinks []CrossLink
 // Sort crosslinks by shardID and then tie break by blockNum then by viewID
 func (cls CrossLinks) Sort() {
 	sort.Slice(cls, func(i, j int) bool {
-		return cls[i].ShardID() < cls[j].ShardID() ||
-			(cls[i].ShardID() == cls[j].ShardID() && cls[i].Number().Cmp(cls[j].Number()) < 0) ||
-			(cls[i].ShardID() == cls[j].ShardID() && cls[i].Number() == cls[j].Number() && cls[i].ViewID().Cmp(cls[j].ViewID()) < 0)
+		if s1, s2 := cls[i].ShardID(), cls[j].ShardID(); s1 != s2 {
+			return s1 < s2
+		}
+		if s1, s2 := cls[i].Number(), cls[j].Number(); s1.Cmp(s2) != 0 {
+			return s1.Cmp(s2) < 0
+		}
+		return cls[i].ViewID().Cmp(cls[j].ViewID()) < 0
 	})
 }
 
 // IsSorted checks whether the cross links are sorted
 func (cls CrossLinks) IsSorted() bool {
 	return sort.SliceIsSorted(cls, func(i, j int) bool {
-		return cls[i].ShardID() < cls[j].ShardID() ||
-			(cls[i].ShardID() == cls[j].ShardID() && cls[i].Number().Cmp(cls[j].Number()) < 0) ||
-			(cls[i].ShardID() == cls[j].ShardID() && cls[i].Number() == cls[j].Number() && cls[i].ViewID().Cmp(cls[j].ViewID()) < 0)
+		if s1, s2 := cls[i].ShardID(), cls[j].ShardID(); s1 != s2 {
+			return s1 < s2
+		}
+		if s1, s2 := cls[i].Number(), cls[j].Number(); s1.Cmp(s2) != 0 {
+			return s1.Cmp(s2) < 0
+		}
+		return cls[i].ViewID().Cmp(cls[j].ViewID()) < 0
 	})
 }
