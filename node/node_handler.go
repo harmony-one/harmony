@@ -356,17 +356,6 @@ func getCrosslinkHeadersForShards(beacon *core.BlockChain, shardChain *core.Bloc
 			}
 		}
 	}
-
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
-	for i, header := range headers {
-		utils.Logger().Debug().Msgf(
-			"[BroadcastCrossLink] Broadcasting %d",
-			header.Number().Uint64(),
-		)
-		if i == len(headers)-1 {
-			latestSentCrosslink.Set(shardID, header.Number().Uint64())
-		}
-	}
 	return headers, nil
 }
 

@@ -1,9 +1,12 @@
 package node
 
 import (
+	"fmt"
+	"math/big"
+
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/harmony-one/harmony/core/rawdb"
+	ffi_bls "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -59,7 +62,87 @@ func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		return
 	}
-	// process in next pr.
+
+	if err := node.processCrossLinkHeartbeatMessage(msgPayload); err != nil {
+		fmt.Println("Err: ", err)
+	}
+}
+
+func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
+	fmt.Println("ProcessCrossLinkHeartbeatMessage==")
+	hb := types.CrosslinkHeartbeat{}
+	err := rlp.DecodeBytes(msgPayload, &hb)
+	if err != nil {
+		return err
+	}
+	shardID := node.Blockchain().CurrentBlock().ShardID()
+	if hb.ShardID != shardID {
+		return errors.Errorf("invalid shard id: expected %d, got %d", shardID, hb.ShardID)
+	}
+
+	// Outdated signal.
+	fmt.Printf("ProcessCrossLinkHeartbeatMessage?? %d %d\n", hb.BlockID, latestSentCrosslink.Get(hb.ShardID))
+	if hb.BlockID <= latestSentCrosslink.Get(hb.ShardID) {
+		return nil
+	}
+
+	fmt.Println("ProcessCrossLinkHeartbeatMessage==22")
+	sig := &ffi_bls.Sign{}
+	err = sig.Deserialize(hb.Signature)
+	if err != nil {
+		return err
+	}
+
+	hb.Signature = nil
+	serialized, err := rlp.EncodeToBytes(hb)
+	if err != nil {
+		return err
+	}
+
+	pub := ffi_bls.PublicKey{}
+	err = pub.Deserialize(hb.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ProcessCrossLinkHeartbeatMessage==333")
+	ok := sig.VerifyHash(&pub, serialized)
+	if !ok {
+		return errors.New("invalid signature")
+	}
+
+	state, err := node.EpochChain().ReadShardState(big.NewInt(int64(hb.Epoch)))
+	if err != nil {
+		return err
+	}
+
+	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
+	if err != nil {
+		return err
+	}
+	pubs, err := committee.BLSPublicKeys()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("ProcessCrossLinkHeartbeatMessage==444")
+	keyExists := false
+	for _, row := range pubs {
+		if pub.IsEqual(row.Object) {
+			keyExists = true
+			break
+		}
+	}
+
+	if !keyExists {
+		return errors.New("pub key doesn't exist")
+	}
+
+	fmt.Println("ProcessCrossLinkHeartbeatMessage==5555")
+	latestSentCrosslink.Set(hb.ShardID, hb.BlockID)
+
+	fmt.Printf("Set: %d %d\n", hb.ShardID, hb.BlockID)
+	return nil
 }
 
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
@@ -129,53 +212,56 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		Len, _ := node.Blockchain().AddPendingCrossLinks(candidates)
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Add pending crosslinks,  total pending: %d", Len)
-	} else {
-		var crosslinks []types.CrossLink
-		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
-			utils.Logger().Error().
-				Err(err).
-				Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
-			return
-		}
-		shardID := node.Blockchain().ShardID()
-		lastCl, _ := node.Blockchain().ReadShardLastCrossLink(shardID)
-
-		clToWrite := lastCl
-		for _, crosslink := range crosslinks {
-			if crosslink.ShardID() != shardID {
-				continue
+	}
+	/*
+		else {
+			var crosslinks []types.CrossLink
+			if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
+				utils.Logger().Error().
+					Err(err).
+					Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
+				return
 			}
+			shardID := node.Blockchain().ShardID()
+			lastCl, _ := node.Blockchain().ReadShardLastCrossLink(shardID)
 
-			err := node.EpochChain().Engine().VerifyCrossLink(node.EpochChain(), crosslink)
-			if err != nil {
-				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
-				utils.Logger().Info().
-					Str("cross-link-issue", err.Error()).
-					Msgf("[ProcessingCrossLink] Failed to verify "+
-						"new cross link for blockNum %d epochNum %d shard %d skipped: %v",
-						crosslink.BlockNum(), crosslink.Epoch().Uint64(), crosslink.ShardID(), crosslink)
-				continue
-			}
+			clToWrite := lastCl
+			for _, crosslink := range crosslinks {
+				if crosslink.ShardID() != shardID {
+					continue
+				}
 
-			if clToWrite == nil {
-				clToWrite = &crosslink
-			} else {
-				if crosslink.BlockNum() > clToWrite.BlockNum() {
+				err := node.EpochChain().Engine().VerifyCrossLink(node.EpochChain(), crosslink)
+				if err != nil {
+					nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
+					utils.Logger().Info().
+						Str("cross-link-issue", err.Error()).
+						Msgf("[ProcessingCrossLink] Failed to verify "+
+							"new cross link for blockNum %d epochNum %d shard %d skipped: %v",
+							crosslink.BlockNum(), crosslink.Epoch().Uint64(), crosslink.ShardID(), crosslink)
+					continue
+				}
+
+				if clToWrite == nil {
 					clToWrite = &crosslink
+				} else {
+					if crosslink.BlockNum() > clToWrite.BlockNum() {
+						clToWrite = &crosslink
+					}
+				}
+			}
+			if clToWrite != nil && clToWrite != lastCl {
+				err := rawdb.WriteShardLastCrossLink(node.Blockchain().ChainDb(), shardID, clToWrite.Serialize())
+				if err != nil {
+					utils.Logger().Info().
+						Str("cross-link-issue", err.Error()).
+						Msgf("[ProcessingCrossLink] Failed to save crosslink: "+
+							"blockNum %d epochNum %d shard %d skipped: %v",
+							clToWrite.BlockNum(), clToWrite.Epoch().Uint64(), clToWrite.ShardID(), clToWrite)
 				}
 			}
 		}
-		if clToWrite != nil && clToWrite != lastCl {
-			err := rawdb.WriteShardLastCrossLink(node.Blockchain().ChainDb(), shardID, clToWrite.Serialize())
-			if err != nil {
-				utils.Logger().Info().
-					Str("cross-link-issue", err.Error()).
-					Msgf("[ProcessingCrossLink] Failed to save crosslink: "+
-						"blockNum %d epochNum %d shard %d skipped: %v",
-						clToWrite.BlockNum(), clToWrite.Epoch().Uint64(), clToWrite.ShardID(), clToWrite)
-			}
-		}
-	}
+	*/
 }
 
 // VerifyCrossLink verifies the header is valid
