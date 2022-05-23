@@ -85,7 +85,6 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 	} else {
 		rmf.ExposeAll()
 	}
-	fmt.Println("start servers: ", rmf)
 	if config.HTTPEnabled {
 		httpEndpoint = fmt.Sprintf("%v:%v", config.HTTPIp, config.HTTPPort)
 		if err := startHTTP(apis, &rmf); err != nil {
