@@ -479,7 +479,7 @@ func RecvCXMessage(db StateDB, m types.CXMessage) error {
 		// the additonal funds to gasLeftoverTo.
 		if oldGasBudget.Cmp(m.GasBudget) > 0 {
 			return fmt.Errorf(
-				"Received re-transmitted message with a reduced gasBudget (old: %v, new: %v",
+				"Received re-transmitted message with a reduced gasBudget (old: %v, new: %v)",
 				oldGasBudget, m.GasBudget,
 			)
 		}
