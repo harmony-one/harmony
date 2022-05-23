@@ -309,6 +309,7 @@ func (node *Node) BroadcastCrossLinkFromBeaconToShards() { // leader of 0 shard
 	}
 }
 
+// getCrosslinkHeadersForShards get headers required for crosslink creation.
 func getCrosslinkHeadersForShards(beacon *core.BlockChain, shardChain *core.BlockChain, curBlock *types.Block, shardID uint32) ([]*block.Header, error) {
 	var headers []*block.Header
 	lastLink, err := beacon.ReadShardLastCrossLink(shardID)
