@@ -38,3 +38,17 @@ type CXMessageReceipt struct {
 
 // A slice of CXMessage, sorted by GasPrice in descending order.
 type CXMessagesByPrice []CXMessage
+
+func (msgs CXMessagesByPrice) Peek() *CXMessage {
+	if len(msgs) == 0 {
+		return nil
+	}
+	return &msgs[0]
+}
+
+func (msgs *CXMessagesByPrice) Shift() {
+	if msgs == nil || len(*msgs) == 0 {
+		return
+	}
+	*msgs = (*msgs)[1:]
+}

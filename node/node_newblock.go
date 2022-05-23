@@ -206,7 +206,8 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		// Try commit normal and staking transactions based on the current state
 		// The successfully committed transactions will be put in the proposed block
 		if err := node.Worker.CommitTransactions(
-			pendingPlainTxs, pendingStakingTxs, beneficiary,
+			// TODO: actually pass in some receipts.
+			pendingPlainTxs, nil, pendingStakingTxs, beneficiary,
 		); err != nil {
 			utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 			return nil, err

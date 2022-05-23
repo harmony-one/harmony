@@ -317,6 +317,10 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	return receipt, cxReceipts, vmenv.StakeMsgs, result.UsedGas, err
 }
 
+func ApplyCXMessage(gp *GasPool, statedb *state.DB, msg types.CXMessage) error {
+	panic("TODO")
+}
+
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database
 // and uses the input parameters for its environment. It returns the receipt
 // for the staking transaction, gas used and an error if the transaction failed,
@@ -364,7 +368,8 @@ func ApplyStakingTransaction(
 	return receipt, gas, nil
 }
 
-// ApplyIncomingReceipt will add amount into ToAddress in the receipt
+// ApplyIncomingReceipt will add amount into ToAddress for each receipt that represents
+// a simple balance transfer (cross-shard messages are ignored).
 func ApplyIncomingReceipt(
 	config *params.ChainConfig, db *state.DB,
 	header *block.Header, cxp *types.CXReceiptsProof,
@@ -378,6 +383,10 @@ func ApplyIncomingReceipt(
 			return errors.Errorf(
 				"ApplyIncomingReceipts: Invalid incomingReceipt! %v", cx,
 			)
+		}
+		if cx.MessageReceipt != nil {
+			// It's a message; ignore it.
+			continue
 		}
 		utils.Logger().Info().Interface("receipt", cx).
 			Msgf("ApplyIncomingReceipts: ADDING BALANCE %d", cx.Amount)

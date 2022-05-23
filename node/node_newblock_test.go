@@ -47,7 +47,7 @@ func TestFinalizeNewBlockAsync(t *testing.T) {
 	txs := make(map[common.Address]types.Transactions)
 	stks := staking.StakingTransactions{}
 	node.Worker.CommitTransactions(
-		txs, stks, common.Address{},
+		txs, nil, stks, common.Address{},
 	)
 	commitSigs := make(chan []byte)
 	go func() {

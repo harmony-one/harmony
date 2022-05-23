@@ -122,7 +122,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	txmap := make(map[common.Address]types.Transactions)
 	txmap[FaucetAddress] = txs
 	err := contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, nil, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)
@@ -168,7 +168,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	txmap[FaucetAddress] = types.Transactions{callfaucettx}
 
 	err = contractworker.CommitTransactions(
-		txmap, nil, testUserAddress,
+		txmap, nil, nil, testUserAddress,
 	)
 	if err != nil {
 		fmt.Println(err)

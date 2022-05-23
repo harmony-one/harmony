@@ -66,6 +66,7 @@ type Worker struct {
 // CommitSortedTransactions commits transactions for new block.
 func (w *Worker) CommitSortedTransactions(
 	txs *types.TransactionsByPriceAndNonce,
+	cxMsgs types.CXMessagesByPrice,
 	coinbase common.Address,
 ) {
 	for {
@@ -80,11 +81,22 @@ func (w *Worker) CommitSortedTransactions(
 			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
 			break
 		}
-		// Retrieve the next transaction and abort if all done
+		// Retrieve the next candidates and abort if all done
 		tx := txs.Peek()
-		if tx == nil {
+		msg := cxMsgs.Peek()
+		if tx == nil && msg == nil {
 			break
 		}
+
+		// If the message has a higher price than the normal transaction
+		// (or we're out of normal transactions), process the message.
+		// Otherwise, process the transaction.
+		if tx == nil || msg.GasPrice.Cmp(tx.GasPrice()) > 0 {
+			w.commitMessage(msg, coinbase)
+			cxMsgs.Shift()
+			continue
+		}
+
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		// We use the eip155 signer regardless of the current hf.
@@ -143,7 +155,9 @@ func (w *Worker) CommitSortedTransactions(
 // CommitTransactions commits transactions for new block.
 func (w *Worker) CommitTransactions(
 	pendingNormal map[common.Address]types.Transactions,
-	pendingStaking staking.StakingTransactions, coinbase common.Address,
+	pendingCXMsgs []*types.CXReceiptsProof,
+	pendingStaking staking.StakingTransactions,
+	coinbase common.Address,
 ) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
@@ -152,7 +166,12 @@ func (w *Worker) CommitTransactions(
 	// HARMONY TXNS
 	normalTxns := types.NewTransactionsByPriceAndNonce(w.current.signer, w.current.ethSigner, pendingNormal)
 
-	w.CommitSortedTransactions(normalTxns, coinbase)
+	var receipts types.CXReceipts
+	for _, receiptsProof := range pendingCXMsgs {
+		receipts = append(receipts, receiptsProof.Receipts...)
+	}
+
+	w.CommitSortedTransactions(normalTxns, receipts.MessagesByPrice(), coinbase)
 
 	// STAKING - only beaconchain process staking transaction
 	if w.chain.ShardID() == shard.BeaconChainShardID {
@@ -264,7 +283,19 @@ func (w *Worker) commitTransaction(
 	return nil
 }
 
-// CommitReceipts commits a list of already verified incoming cross shard receipts
+func (w *Worker) commitMessage(msg *types.CXMessage, coinbase common.Address) {
+	snap := w.current.state.Snapshot()
+	err := vm.RecvCXMessage(w.current.state, *msg)
+	if err != nil {
+		w.current.state.RevertToSnapshot(snap)
+		return
+	}
+	panic("TODO")
+}
+
+// CommitReceipts commits a list of already verified incoming cross shard receipts.
+// cross shard messages messages will be ignored; they should be passed to
+// CommitTransactions.
 func (w *Worker) CommitReceipts(receiptsList []*types.CXReceiptsProof) error {
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit())
