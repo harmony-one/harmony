@@ -1,6 +1,6 @@
 package consensus
 
-// GetConsensusPhase returns the current phase of the consensus
+// GetConsensusPhase returns the current phase of the consensus.
 func (consensus *Consensus) GetConsensusPhase() string {
 	return consensus.phase.String()
 }
