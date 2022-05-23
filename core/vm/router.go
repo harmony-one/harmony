@@ -3,8 +3,9 @@ package vm
 import (
 	"encoding/binary"
 	"fmt"
-	"golang.org/x/crypto/sha3"
 	"math/big"
+
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
