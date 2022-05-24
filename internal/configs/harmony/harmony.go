@@ -166,9 +166,13 @@ type WsConfig struct {
 }
 
 type RpcOptConfig struct {
-	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
-	RateLimterEnabled bool // Enable Rate limiter for RPC
-	RequestsPerSecond int  // for RPC rate limiter
+	DebugEnabled       bool   // Enables PrivateDebugService APIs, including the EVM tracer
+	EthRPCsEnabled     bool   // Expose Eth RPCs
+	StakingRPCsEnabled bool   // Expose Staking RPCs
+	LegacyRPCsEnabled  bool   // Expose Legacy RPCs
+	RpcFilterFile      string // Define filters to enable/disable RPC exposure
+	RateLimterEnabled  bool   // Enable Rate limiter for RPC
+	RequestsPerSecond  int    // for RPC rate limiter
 }
 
 type DevnetConfig struct {

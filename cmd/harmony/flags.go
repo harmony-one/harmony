@@ -82,6 +82,10 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcEthRPCsEnabledFlag,
+		rpcStakingRPCsEnabledFlag,
+		rpcLegacyRPCsEnabledFlag,
+		rpcFilterFileFlag,
 		rpcRateLimiterEnabledFlag,
 		rpcRateLimitFlag,
 	}
@@ -718,6 +722,34 @@ var (
 		Hidden:   true,
 	}
 
+	rpcEthRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.eth",
+		Usage:    "enable eth apis",
+		DefValue: defaultConfig.RPCOpt.EthRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcStakingRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.staking",
+		Usage:    "enable staking apis",
+		DefValue: defaultConfig.RPCOpt.StakingRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcLegacyRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.legacy",
+		Usage:    "enable legacy apis",
+		DefValue: defaultConfig.RPCOpt.LegacyRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcFilterFileFlag = cli.StringFlag{
+		Name:     "rpc.filterspath",
+		Usage:    "toml file path for method exposure filters",
+		DefValue: defaultConfig.RPCOpt.RpcFilterFile,
+		Hidden:   true,
+	}
+
 	rpcRateLimiterEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.ratelimiter",
 		Usage:    "enable rate limiter for RPCs",
@@ -734,6 +766,18 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
+		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcStakingRPCsEnabledFlag) {
+		config.RPCOpt.StakingRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcStakingRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcLegacyRPCsEnabledFlag) {
+		config.RPCOpt.LegacyRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcLegacyRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcFilterFileFlag) {
+		config.RPCOpt.RpcFilterFile = cli.GetStringFlagValue(cmd, rpcFilterFileFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
 		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)

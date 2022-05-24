@@ -74,9 +74,13 @@ func TestHarmonyFlags(t *testing.T) {
 					RosettaPort:    9700,
 				},
 				RPCOpt: harmonyconfig.RpcOptConfig{
-					DebugEnabled:      false,
-					RateLimterEnabled: true,
-					RequestsPerSecond: 1000,
+					DebugEnabled:       false,
+					EthRPCsEnabled:     true,
+					StakingRPCsEnabled: true,
+					LegacyRPCsEnabled:  true,
+					RpcFilterFile:      "",
+					RateLimterEnabled:  true,
+					RequestsPerSecond:  1000,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -620,36 +624,104 @@ func TestRPCOptFlags(t *testing.T) {
 		{
 			args: []string{"--rpc.debug"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      true,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       true,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.eth=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     false,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.staking=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: false,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.legacy=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  false,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.filterspath=./rmf.toml"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./rmf.toml",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  2000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: false,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  false,
+				RequestsPerSecond:  2000,
 			},
 		},
 	}
