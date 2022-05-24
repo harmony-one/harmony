@@ -135,99 +135,13 @@ func lookupDelegatorShares(
 	return result, nil
 }
 
-// AccumulateRewardsAndCountSigs credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward
-// This func also do IncrementValidatorSigningCounts for validators
-func AccumulateRewardsAndCountSigs(
+// Handle block rewards during pre-staking era
+func accumulateRewardsAndCountSigsBeforeStaking(
 	bc engine.ChainReader, state *state.DB,
 	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
 ) (reward.Reader, error) {
-	blockNum := header.Number().Uint64()
-
-	if blockNum == 0 || (bc.Config().IsStaking(header.Epoch()) &&
-		bc.CurrentHeader().ShardID() != shard.BeaconChainShardID) {
-		// Block here until the commit sigs are ready or timeout.
-		// sigsReady signal indicates that the commit sigs are already populated in the header object.
-		if err := waitForCommitSigs(sigsReady); err != nil {
-			return network.EmptyPayout, err
-		}
-		return network.EmptyPayout, nil
-	}
-
-	// After staking
-	if headerE := header.Epoch(); bc.Config().IsStaking(headerE) &&
-		bc.CurrentHeader().ShardID() == shard.BeaconChainShardID {
-		defaultReward := stakingReward.StakedBlocks
-
-		// the block reward is adjusted accordingly based on 5s and 3s block time forks
-		if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
-			// Testnet:
-			// This is testnet requiring the one-off forking logic
-			if blockNum > 634644 {
-				defaultReward = stakingReward.FiveSecStakedBlocks
-				if blockNum > 636507 {
-					defaultReward = stakingReward.StakedBlocks
-					if blockNum > 639341 {
-						defaultReward = stakingReward.FiveSecStakedBlocks
-					}
-				}
-			}
-			if bc.Config().IsTwoSeconds(header.Epoch()) {
-				defaultReward = stakingReward.TwoSecStakedBlocks
-			}
-		} else {
-			// Mainnet (other nets):
-			if bc.Config().IsTwoSeconds(header.Epoch()) {
-				defaultReward = stakingReward.TwoSecStakedBlocks
-			} else if bc.Config().IsFiveSeconds(header.Epoch()) {
-				defaultReward = stakingReward.FiveSecStakedBlocks
-			}
-		}
-
-		// Following is commented because the new econ-model has a flat-rate block reward
-		// of 28 ONE per block assuming 4 shards and 8s block time:
-		//// TODO Use cached result in off-chain db instead of full computation
-		//_, percentageStaked, err := network.WhatPercentStakedNow(
-		//	beaconChain, header.Time().Int64(),
-		//)
-		//if err != nil {
-		//	return network.EmptyPayout, err
-		//}
-		//howMuchOff, adjustBy := network.Adjustment(*percentageStaked)
-		//defaultReward = defaultReward.Add(adjustBy)
-		//utils.Logger().Info().
-		//	Str("percentage-token-staked", percentageStaked.String()).
-		//	Str("how-much-off", howMuchOff.String()).
-		//	Str("adjusting-by", adjustBy.String()).
-		//	Str("block-reward", defaultReward.String()).
-		//	Msg("dynamic adjustment of block-reward ")
-
-		// If too much is staked, then possible to have negative reward,
-		// not an error, just a possible economic situation, hence we return
-		if defaultReward.IsNegative() {
-			return network.EmptyPayout, nil
-		}
-
-		// Handle rewards for shardchain
-		if bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
-			// Block here until the commit sigs are ready or timeout.
-			// sigsReady signal indicates that the commit sigs are already populated in the header object.
-			if err := waitForCommitSigs(sigsReady); err != nil {
-				return network.EmptyPayout, err
-			}
-
-			// Only do reward distribution at the 63th block in the modulus
-			if blockNum%RewardFrequency != RewardFrequency-1 {
-				return network.EmptyPayout, nil
-			}
-			return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
-		} else {
-			return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
-		}
-	}
-
-	// Before staking
 	parentHeader := bc.GetHeaderByHash(header.ParentHash())
+
 	if parentHeader == nil {
 		return network.EmptyPayout, errors.Errorf(
 			"cannot find parent block header in DB at parent hash %s",
@@ -286,6 +200,90 @@ func AccumulateRewardsAndCountSigs(
 	}
 
 	return network.NewPreStakingEraRewarded(totalAmount), nil
+}
+
+// getDefaultStakingReward returns the static default reward based on the the block production interval and the chain.
+func getDefaultStakingReward(bc engine.ChainReader, epoch *big.Int, blockNum uint64) numeric.Dec {
+	defaultReward := stakingReward.StakedBlocks
+
+	// the block reward is adjusted accordingly based on 5s and 3s block time forks
+	if bc.Config().ChainID == params.TestnetChainID && bc.Config().FiveSecondsEpoch.Cmp(big.NewInt(16500)) == 0 {
+		// Testnet:
+		// This is testnet requiring the one-off forking logic
+		if blockNum > 634644 {
+			defaultReward = stakingReward.FiveSecStakedBlocks
+			if blockNum > 636507 {
+				defaultReward = stakingReward.StakedBlocks
+				if blockNum > 639341 {
+					defaultReward = stakingReward.FiveSecStakedBlocks
+				}
+			}
+		}
+		if bc.Config().IsTwoSeconds(epoch) {
+			defaultReward = stakingReward.TwoSecStakedBlocks
+		}
+	} else {
+		// Mainnet (other nets):
+		if bc.Config().IsTwoSeconds(epoch) {
+			defaultReward = stakingReward.TwoSecStakedBlocks
+		} else if bc.Config().IsFiveSeconds(epoch) {
+			defaultReward = stakingReward.FiveSecStakedBlocks
+		}
+	}
+
+	return defaultReward
+}
+
+// AccumulateRewardsAndCountSigs credits the coinbase of the given block with the mining reward and
+// also does IncrementValidatorSigningCounts for validators.
+// param sigsReady: Signal indicating that commit sigs are already populated in the header object.
+func AccumulateRewardsAndCountSigs(
+	bc engine.ChainReader, state *state.DB,
+	header *block.Header, beaconChain engine.ChainReader, sigsReady chan bool,
+) (reward.Reader, error) {
+	blockNum := header.Number().Uint64()
+	epoch := header.Epoch()
+	isBeaconChain := bc.CurrentHeader().ShardID() == shard.BeaconChainShardID
+
+	if blockNum == 0 {
+		err := waitForCommitSigs(sigsReady) // wait for commit signatures, or timeout and return err.
+		return network.EmptyPayout, err
+	}
+
+	// Pre-staking era
+	if !bc.Config().IsStaking(epoch) {
+		return accumulateRewardsAndCountSigsBeforeStaking(bc, state, header, beaconChain, sigsReady)
+	}
+
+	// Rewards are accumulated only in the beaconchain, so just wait for commit sigs and return.
+	if !isBeaconChain {
+		err := waitForCommitSigs(sigsReady)
+		return network.EmptyPayout, err
+	}
+
+	defaultReward := getDefaultStakingReward(bc, epoch, blockNum)
+	if defaultReward.IsNegative() { // TODO: Figure out whether that's possible.
+		return network.EmptyPayout, nil
+	}
+
+	// Handle rewards on pre-aggregated rewards era.
+	if !bc.Config().IsAggregatedRewardEpoch(header.Epoch()) {
+		return distributeRewardBeforeAggregateEpoch(bc, state, header, beaconChain, defaultReward, sigsReady)
+	}
+
+	// Aggregated Rewards Era: Rewards are aggregated every 64 blocks.
+
+	// Wait for commit signatures, or timeout and return err.
+	if err := waitForCommitSigs(sigsReady); err != nil {
+		return network.EmptyPayout, err
+	}
+
+	// Only do reward distribution at the 63th block in the modulus.
+	if blockNum%RewardFrequency != RewardFrequency-1 {
+		return network.EmptyPayout, nil
+	}
+
+	return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
 }
 
 func waitForCommitSigs(sigsReady chan bool) error {
