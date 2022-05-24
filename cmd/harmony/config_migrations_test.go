@@ -67,6 +67,7 @@ Version = "1.0.2"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -132,6 +133,7 @@ Version = "1.0.3"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -209,6 +211,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -293,6 +296,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true

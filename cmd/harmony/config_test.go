@@ -83,6 +83,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [Sync]
   Downloader = false

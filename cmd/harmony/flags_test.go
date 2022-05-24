@@ -101,9 +101,10 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile:  "./.hmy/blacklist.txt",
-					RosettaFixFile: "",
-					AccountSlots:   16,
+					BlacklistFile:     "./.hmy/blacklist.txt",
+					RosettaFixFile:    "",
+					AccountSlots:      16,
+					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -801,9 +802,10 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
-				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
-				AccountSlots:   defaultConfig.TxPool.AccountSlots,
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
@@ -812,6 +814,7 @@ func TestTxPoolFlags(t *testing.T) {
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
 				AccountSlots:   16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
@@ -820,6 +823,7 @@ func TestTxPoolFlags(t *testing.T) {
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
 				AccountSlots:   16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
@@ -828,6 +832,16 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountSlots:   5,
 				BlacklistFile:  "blacklist.file",
 				RosettaFixFile: "rosettafix.file",
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+			},
+		},
+		{
+			args: []string{"--txpool.locals", "locals.txt"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: "locals.txt",
 			},
 		},
 	}
