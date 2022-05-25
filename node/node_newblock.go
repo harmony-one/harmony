@@ -171,6 +171,9 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		}
 	}
 
+	// Prepare cross shard transaction receipts
+	receiptsList := node.proposeReceiptsProof()
+
 	if !shard.Schedule.IsLastBlock(header.Number().Uint64()) {
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
@@ -206,8 +209,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		// Try commit normal and staking transactions based on the current state
 		// The successfully committed transactions will be put in the proposed block
 		if err := node.Worker.CommitTransactions(
-			// TODO: actually pass in some receipts.
-			pendingPlainTxs, nil, pendingStakingTxs, beneficiary,
+			pendingPlainTxs, receiptsList, pendingStakingTxs, beneficiary,
 		); err != nil {
 			utils.Logger().Error().Err(err).Msg("cannot commit transactions")
 			return nil, err
@@ -215,8 +217,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		utils.AnalysisEnd("proposeNewBlockChooseFromTxnPool")
 	}
 
-	// Prepare cross shard transaction receipts
-	receiptsList := node.proposeReceiptsProof()
 	if len(receiptsList) != 0 {
 		if err := node.Worker.CommitReceipts(receiptsList); err != nil {
 			return nil, err
