@@ -17,7 +17,7 @@ var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePre
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 	// TODO(isd): we probably want to have this in a separate set; this map is used
 	// by pre-router H1 deployments.
-	routerAddress: &routerPrecompile{},
+	RouterAddress: &routerPrecompile{},
 }
 
 // WriteCapablePrecompiledContract represents the interface for Native Go contracts

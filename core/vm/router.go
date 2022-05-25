@@ -11,7 +11,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 )
 
-var routerAddress = common.BytesToAddress([]byte{1, 0})
+var RouterAddress = common.BytesToAddress([]byte{1, 0})
 
 // routerPrecompile implements the router contract used for cross-shard messaging
 // (via the WriteCapablePrecompiledContract interface).
@@ -331,7 +331,7 @@ func storePayload(db StateDB, hash common.Hash, data []byte) {
 	for len(data) > 0 {
 		var val common.Hash
 		copy(val[:], data[:])
-		db.SetState(routerAddress, key, val)
+		db.SetState(RouterAddress, key, val)
 		if len(data) < len(val[:]) {
 			data = nil
 		} else {
@@ -385,7 +385,7 @@ func loadPayload(db StateDB, hash common.Hash, length int) []byte {
 	offset := readBig(hash[:])
 	key := hash
 	for len(buf) > 0 {
-		word := db.GetState(routerAddress, key)
+		word := db.GetState(RouterAddress, key)
 		copy(buf, word[:])
 		if len(buf) < len(word) {
 			buf = nil
@@ -399,11 +399,11 @@ func loadPayload(db StateDB, hash common.Hash, length int) []byte {
 }
 
 func (ms msgStorage) StoreWord(n uint8, w common.Hash) {
-	ms.db.SetState(routerAddress, ms.wordAddr(n), w)
+	ms.db.SetState(RouterAddress, ms.wordAddr(n), w)
 }
 
 func (ms msgStorage) LoadWord(n uint8) common.Hash {
-	return ms.db.GetState(routerAddress, ms.wordAddr(n))
+	return ms.db.GetState(RouterAddress, ms.wordAddr(n))
 }
 
 func (ms msgStorage) StoreAddr(n uint8, addr common.Address) {
@@ -471,7 +471,7 @@ func RecvCXMessage(db StateDB, m types.CXMessage) error {
 	var gasBudgetKey common.Hash
 	copy(gasBudgetKey[:], mAddr[:])
 
-	storedOldGasBudget := db.GetState(routerAddress, gasBudgetKey)
+	storedOldGasBudget := db.GetState(RouterAddress, gasBudgetKey)
 	oldGasBudget := readBig(storedOldGasBudget[:])
 	if oldGasBudget.Cmp(&big.Int{}) != 0 {
 		// Message has already been received. Make sure the new budget is
@@ -486,7 +486,7 @@ func RecvCXMessage(db StateDB, m types.CXMessage) error {
 
 		var storedNewGasBudget common.Hash
 		m.GasBudget.FillBytes(storedNewGasBudget[:])
-		db.SetState(routerAddress, gasBudgetKey, storedNewGasBudget)
+		db.SetState(RouterAddress, gasBudgetKey, storedNewGasBudget)
 
 		gasBudgetDiff := (&big.Int{}).Sub(m.GasBudget, oldGasBudget)
 		db.AddBalance(m.GasLeftoverTo, gasBudgetDiff)
