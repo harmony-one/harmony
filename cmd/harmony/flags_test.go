@@ -811,27 +811,27 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AccountSlots:   5,
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
+				AccountSlots:      5,
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},

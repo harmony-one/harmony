@@ -1056,8 +1056,6 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
 		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
-	} else if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
-		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
 	}
 }
 
