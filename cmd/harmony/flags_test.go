@@ -105,9 +105,10 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile:  "./.hmy/blacklist.txt",
-					RosettaFixFile: "",
-					AccountSlots:   16,
+					BlacklistFile:     "./.hmy/blacklist.txt",
+					RosettaFixFile:    "",
+					AccountSlots:      16,
+					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -873,33 +874,46 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
-				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
-				AccountSlots:   defaultConfig.TxPool.AccountSlots,
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AccountSlots:   5,
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
+				AccountSlots:      5,
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+			},
+		},
+		{
+			args: []string{"--txpool.locals", "locals.txt"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: "locals.txt",
 			},
 		},
 	}
