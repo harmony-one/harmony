@@ -234,7 +234,7 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 	}
 
 	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
-		// no need to broadcast crosslink if it's beacon chain or it's not crosslink epoch
+		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
 		return
 	}
 
