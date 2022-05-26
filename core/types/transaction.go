@@ -57,6 +57,7 @@ const (
 	Delegate
 	Undelegate
 	CollectRewards
+	CXMessageRecvTx
 )
 
 // StakingTypeMap is the map from staking type to transactionType
@@ -124,6 +125,8 @@ func (txType TransactionType) String() string {
 		return "Undelegate"
 	} else if txType == CollectRewards {
 		return "CollectRewards"
+	} else if txType == CXMessageRecvTx {
+		return "CXMessageRecvTx"
 	}
 	return "Unknown"
 }

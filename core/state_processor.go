@@ -22,12 +22,14 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
+	cxmessagereceiver "github.com/harmony-one/harmony/contracts/cx-message-receiver"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
@@ -317,8 +319,101 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	return receipt, cxReceipts, vmenv.StakeMsgs, result.UsedGas, err
 }
 
-func ApplyCXMessage(gp *GasPool, statedb *state.DB, msg types.CXMessage) error {
+func ApplyCXMessage(
+	config *params.ChainConfig,
+	bc ChainContext,
+	gp *GasPool,
+	statedb *state.DB,
+	gasUsed *uint64,
+	msg *types.CXMessage,
+) error {
 	panic("TODO")
+}
+
+// Wrapper around types.CXMessage that implements the Message interface.
+type cxMessageMessage struct {
+	cxMsg *types.CXMessage
+}
+
+func newCXMessageMessage(cxMsg *types.CXMessage) *cxMessageMessage {
+	panic("TODO: newCXMessageMessage()")
+}
+
+// statically assert that we actually satisfy the interface:
+var _ Message = &cxMessageMessage{}
+
+func (*cxMessageMessage) From() common.Address {
+	// Cross shard messages always appear to come from the router.
+	// The actual sender is passed as an argument to recvCrossShardMessage.
+	return vm.RouterAddress
+}
+
+func (m *cxMessageMessage) To() *common.Address {
+	return &m.cxMsg.To
+}
+
+func (m *cxMessageMessage) GasPrice() *big.Int {
+	return m.cxMsg.GasPrice
+}
+
+func (m *cxMessageMessage) Gas() uint64 {
+	// XXX TODO(isd): make sure my understanding of what this is supposed to
+	// do is correct. I *think* this is the amount of gas available to the
+	// call, so should be the same as the gas limit. But I need to verify
+	// this assumption.
+	//
+	// XXX: *somewhere* we need to check that GasLimit is in-bounds for
+	// uint64, but it probably shouldn't be here, since we have no good
+	// way to report an error.
+	return m.cxMsg.GasLimit.Uint64()
+}
+
+func (m *cxMessageMessage) Value() *big.Int {
+	return m.cxMsg.Value
+}
+
+func (m *cxMessageMessage) Nonce() uint64 {
+	// XXX TODO(isd): I am unsure exactly how Message.Nonce() is used,
+	// and don't know that using the cx message nonce is actually correct.
+	// check. See also comments in CheckNonce(), below.
+	return m.cxMsg.Nonce
+}
+
+func (*cxMessageMessage) CheckNonce() bool {
+	// TODO(isd): under what circumstances should this actually be checked?
+	// I don't really understand what the invariants are, but I strongly suspect
+	// that CXMessage's nonce is not actually what's expected here.
+	return false
+}
+
+func (m *cxMessageMessage) Data() []byte {
+	// TODO: define txer and opts for generated code; see the way mockContractTxer
+	// is used in ./vm/router_test.go for inspiration.
+	var (
+		opts *bind.TransactOpts
+		txer *cxmessagereceiver.CXMessageReceiverTransactor
+	)
+	txer.RecvCrossShardMessage(
+		opts,
+		m.cxMsg.From,
+		m.cxMsg.FromShard,
+		m.cxMsg.Payload,
+	)
+	// TODO: extract the encoded method and return it.
+	panic("TODO: Data()")
+}
+
+func (*cxMessageMessage) Type() types.TransactionType {
+	return types.CXMessageRecvTx
+}
+
+func (*cxMessageMessage) BlockNum() *big.Int {
+	// What to do here? The message doesn't actually have an associated
+	// block number, but from what I can tell Transaction.AsMessage
+	// doesn't actually fill in the field, so maybe it's safe to just
+	// return nil here to indicate that it is unknown? If so, this is
+	// undocumented. TODO: figure it out.
+	panic("TODO: BlockNum()")
 }
 
 // ApplyStakingTransaction attempts to apply a staking transaction to the given state database

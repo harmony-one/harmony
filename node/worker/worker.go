@@ -285,7 +285,16 @@ func (w *Worker) commitTransaction(
 
 func (w *Worker) commitMessage(msg *types.CXMessage, coinbase common.Address) {
 	snap := w.current.state.Snapshot()
-	err := vm.RecvCXMessage(w.current.state, *msg)
+	gasUsed := w.current.header.GasUsed()
+	err := core.ApplyCXMessage(
+		w.config,
+		w.chain,
+		w.current.gasPool,
+		w.current.state,
+		&gasUsed,
+		msg,
+	)
+	w.current.header.SetGasUsed(gasUsed)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return
