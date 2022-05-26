@@ -83,6 +83,10 @@ func (s *PublicContractService) Call(
 		return nil, err
 	}
 
+	// If the result contains a revert reason, try to unpack and return it.
+	if len(result.Revert()) > 0 {
+		return nil, newRevertError(&result)
+	}
 	// If VM returns error, still return the ReturnData, which is the contract error message
 	return result.ReturnData, nil
 }
