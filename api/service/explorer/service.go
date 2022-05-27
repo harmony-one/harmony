@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/RoaringBitmap/roaring/roaring64"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"net"
 	"net/http"
@@ -335,6 +336,10 @@ func (s *Service) NotifyService(params map[string]interface{}) {}
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
+}
+
+func (s *Service) GetCheckpointBitmap() *roaring64.Bitmap {
+	return s.storage.rb.Clone()
 }
 
 func defaultDBPath(ip, port string) string {

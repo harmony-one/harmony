@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/RoaringBitmap/roaring/roaring64"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"os"
 	"sync"
@@ -34,6 +35,7 @@ type (
 	storage struct {
 		db database
 		bc *core.BlockChain
+		rb *roaring64.Bitmap
 
 		// TODO: optimize this with priority queue
 		tm      *taskManager
@@ -75,10 +77,16 @@ func newStorage(hc *harmonyconfig.HarmonyConfig, bc *core2.BlockChain, dbPath st
 		return nil, err
 	}
 
+	bitmap, err := readCheckpointBitmap(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return &storage{
 		db:        db,
 		bc:        bc,
-		tm:        newTaskManager(),
+		rb:        bitmap,
+		tm:        newTaskManager(bitmap),
 		resultC:   make(chan blockResult, numWorker),
 		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
@@ -92,6 +100,7 @@ func (s *storage) Start() {
 }
 
 func (s *storage) Close() {
+	_ = writeCheckpointBitmap(s.db, s.rb)
 	close(s.closeC)
 }
 
@@ -195,14 +204,18 @@ type taskManager struct {
 	blocksLP []*types.Block // blocks with low priorities
 	lock     sync.Mutex
 
+	rb             *roaring64.Bitmap
+	rbChangedCount int
+
 	C chan struct{}
 	T chan *traceResult
 }
 
-func newTaskManager() *taskManager {
+func newTaskManager(bitmap *roaring64.Bitmap) *taskManager {
 	return &taskManager{
-		C: make(chan struct{}, numWorker),
-		T: make(chan *traceResult, numWorker),
+		rb: bitmap,
+		C:  make(chan struct{}, numWorker),
+		T:  make(chan *traceResult, numWorker),
 	}
 }
 
@@ -256,6 +269,27 @@ func (tm *taskManager) PullTask() *types.Block {
 		return b
 	}
 	return nil
+}
+
+func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	if tm.rb.CheckedAdd(blockNum) {
+		tm.rbChangedCount++
+
+		if tm.rbChangedCount == 100 {
+			tm.rbChangedCount = 0
+			_ = writeCheckpointBitmap(btc, tm.rb)
+		}
+	}
+}
+
+func (tm *taskManager) hasBlockDone(blockNum uint64) bool {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	return tm.rb.Contains(blockNum)
 }
 
 func (s *storage) makeWorkersAndStart() {
@@ -334,9 +368,8 @@ LOOP:
 }
 
 func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
-	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
-	if is || err != nil {
-		return nil, err
+	if bc.tm.hasBlockDone(b.NumberU64()) {
+		return nil, nil
 	}
 	btc := bc.db.NewBatch()
 
@@ -346,7 +379,7 @@ func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 	for _, stk := range b.StakingTransactions() {
 		bc.computeStakingTx(btc, b, stk)
 	}
-	_ = writeCheckpoint(btc, b.NumberU64())
+	bc.tm.markBlockDone(btc, b.NumberU64())
 	return &blockResult{
 		btc: btc,
 		bn:  b.NumberU64(),

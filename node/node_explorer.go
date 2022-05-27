@@ -172,8 +172,17 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 						// shall be unreachable
 						utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
 					}
-					for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
+
+					if block.NumberU64() == 0 {
+						return
+					}
+					bitmap := exp.GetCheckpointBitmap()
+					for blockHeight := block.NumberU64() - 1; blockHeight >= 0; blockHeight-- {
+						if bitmap.Contains(blockHeight) {
+							continue
+						}
+
+						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(blockHeight))
 					}
 				}()
 			})

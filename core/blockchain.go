@@ -1378,8 +1378,15 @@ func (bc *BlockChain) GetMaxGarbageCollectedBlockNumber() int64 {
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
+	if bc.redisPreempt != nil && !bc.tikvPreemptMaster(bc.rangeBlock(chain)) {
+		return len(chain), nil
+	}
+
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
+	if bc.redisPreempt != nil && err != nil {
+		_, _ = bc.redisPreempt.Unlock()
+	}
 	return n, err
 }
 
@@ -1387,10 +1394,6 @@ func (bc *BlockChain) InsertChain(chain types.Blocks, verifyHeaders bool) (int, 
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
 func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, []interface{}, []*types.Log, error) {
-	if !bc.tikvPreemptMaster(bc.maxBlock(chain)) {
-		return len(chain), nil, nil, nil
-	}
-
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -3269,7 +3272,7 @@ func (bc *BlockChain) tikvCleanCache() {
 	}
 }
 
-func (bc *BlockChain) tikvPreemptMaster(toBlock uint64) bool {
+func (bc *BlockChain) tikvPreemptMaster(fromBlock, toBlock uint64) bool {
 	for {
 		if ok, _ := bc.redisPreempt.TryLock(60); ok {
 			return true
@@ -3283,15 +3286,21 @@ func (bc *BlockChain) tikvPreemptMaster(toBlock uint64) bool {
 	}
 }
 
-func (bc *BlockChain) maxBlock(blocks types.Blocks) uint64 {
-	max := uint64(0)
+func (bc *BlockChain) rangeBlock(blocks types.Blocks) (uint64, uint64) {
+	if len(blocks) == 0 {
+		return 0, 0
+	}
+	max := blocks[0].NumberU64()
+	min := max
 	for _, tmpBlock := range blocks {
 		if tmpBlock.NumberU64() > max {
 			max = tmpBlock.NumberU64()
+		} else if tmpBlock.NumberU64() < min {
+			min = tmpBlock.NumberU64()
 		}
 	}
 
-	return max
+	return min, max
 }
 
 func (bc *BlockChain) RedisPreempt() *redis_helper.RedisPreempt {

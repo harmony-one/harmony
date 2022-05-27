@@ -147,10 +147,15 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 			}
 		}()
 
-		data := c.l2Cache.Get(context.Background(), keyStr)
+		timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelFunc()
+
+		data := c.l2Cache.Get(timeoutCtx, keyStr)
 		if data.Err() == nil {
 			atomic.AddUint64(&c.l2HitCount, 1)
 			return data.Bytes()
+		} else {
+			log.Printf("[Get WARN]Redis Error: %v", data.Err())
 		}
 
 		if !c.l2ReadOnly {
@@ -180,7 +185,13 @@ func (c *StateDBCacheDatabase) Put(key []byte, value []byte) (err error) {
 					c.l1Cache.Set(key, value)
 				}
 				if !c.l2ReadOnly {
-					c.l2Cache.SetEX(context.Background(), string(key), value, c.l2ExpiredTime)
+					timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancelFunc()
+
+					res := c.l2Cache.SetEX(timeoutCtx, string(key), value, c.l2ExpiredTime)
+					if res.Err() == nil {
+						log.Printf("[Put WARN]Redis Error: %v", res.Err())
+					}
 				}
 			}
 		}()
@@ -257,7 +268,10 @@ func (c *StateDBCacheDatabase) cacheWrite(b ethdb.Batch) error {
 			return err
 		}
 
-		_, _ = pipeline.Exec(context.Background())
+		_, err = pipeline.Exec(context.Background())
+		if err != nil {
+			log.Printf("[BatchWrite WARN]Redis Error: %v", err)
+		}
 	}
 
 	return b.Replay(c.l1Cache)

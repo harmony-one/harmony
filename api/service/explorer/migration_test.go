@@ -40,11 +40,6 @@ type migrationDBFactory struct {
 
 func (f *migrationDBFactory) makeDB(numAddr int) database {
 	db := newTestLevelDB(f.t, 0)
-	for i := 0; i != 10000; i++ {
-		if err := writeCheckpoint(db, uint64(i)); err != nil {
-			f.t.Fatal(err)
-		}
-	}
 	for i := 0; i != numAddr; i++ {
 		addr := f.newAddress()
 		addrInfo := &Address{ID: string(addr)}
