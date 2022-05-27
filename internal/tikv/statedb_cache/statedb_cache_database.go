@@ -154,7 +154,7 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 		if data.Err() == nil {
 			atomic.AddUint64(&c.l2HitCount, 1)
 			return data.Bytes()
-		} else {
+		} else if data.Err() != redis.Nil {
 			log.Printf("[Get WARN]Redis Error: %v", data.Err())
 		}
 
