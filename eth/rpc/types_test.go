@@ -153,3 +153,30 @@ func TestBlockNumberOrHash_WithNumber_MarshalAndUnmarshal(t *testing.T) {
 		})
 	}
 }
+
+func TestBlockNumberOrHash_Unmarshal_Compatibility(t *testing.T) {
+	tests := []struct {
+		name   string
+		number int64
+	}{
+		{"max", math.MaxInt64},
+		{"pending", int64(PendingBlockNumber)},
+		{"latest", int64(LatestBlockNumber)},
+		{"earliest", int64(EarliestBlockNumber)},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			input, _ := json.Marshal(test.number)
+			var unmarshalled BlockNumberOrHash
+			err := json.Unmarshal([]byte(input), &unmarshalled)
+			if err != nil {
+				t.Fatal("cannot unmarshal:", err)
+			}
+			if number, isNumber := unmarshalled.Number(); !isNumber || int64(number) != test.number {
+				t.Fatalf("wrong result: expected %v, got %v", test.number, unmarshalled)
+			}
+		})
+	}
+}

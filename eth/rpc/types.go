@@ -130,7 +130,6 @@ type BlockNumberOrHash struct {
 }
 
 func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
-	fmt.Println("UnmarshalJSON: bnh")
 	type erased BlockNumberOrHash
 	e := erased{}
 	err := json.Unmarshal(data, &e)
@@ -144,9 +143,14 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var input string
-	err = json.Unmarshal(data, &input)
-	if err != nil {
-		return err
+	if err := json.Unmarshal(data, &input); err != nil {
+		var numInput int64 // old hmy rpc use number type as input
+		if err := json.Unmarshal(data, &numInput); err != nil {
+			return err
+		}
+		bn := BlockNumber(numInput)
+		bnh.BlockNumber = &bn
+		return nil
 	}
 	switch input {
 	case "earliest":
