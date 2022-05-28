@@ -82,7 +82,7 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 		6:  {`"0x12"`, false, BlockNumberOrHashWithNumber(18)},
 		7:  {`"0x7fffffffffffffff"`, false, BlockNumberOrHashWithNumber(math.MaxInt64)},
 		8:  {`"0x8000000000000000"`, true, BlockNumberOrHash{}},
-		9:  {"0", true, BlockNumberOrHash{}},
+		9:  {"0", false, BlockNumberOrHashWithNumber(0)}, // different from eth, because we need to keep compatibility with old hmy rpc
 		10: {`"ff"`, true, BlockNumberOrHash{}},
 		11: {`"pending"`, false, BlockNumberOrHashWithNumber(PendingBlockNumber)},
 		12: {`"latest"`, false, BlockNumberOrHashWithNumber(LatestBlockNumber)},
