@@ -56,7 +56,7 @@ func (ct *mockContractTxer) EstimateGas(ctx context.Context, call ethereum.CallM
 
 func newTestRouterTxer() (*router.RouterTransactor, *mockContractTxer) {
 	mockTxer := &mockContractTxer{}
-	routerTxer, err := router.NewRouterTransactor(routerAddress, mockTxer)
+	routerTxer, err := router.NewRouterTransactor(RouterAddress, mockTxer)
 	if err != nil {
 		panic(err)
 	}
@@ -396,7 +396,7 @@ func testCallRouter(
 
 	contract := NewContract(
 		AccountRef(callerAddr),
-		AccountRef(routerAddress),
+		AccountRef(RouterAddress),
 		value,
 		7000000)
 	_, err = RunWriteCapablePrecompiledContract(&routerPrecompile{}, evm, contract, mtx.Data, false)
