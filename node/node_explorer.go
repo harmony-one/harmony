@@ -177,12 +177,10 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 						return
 					}
 					bitmap := exp.GetCheckpointBitmap()
-					for blockHeight := block.NumberU64() - 1; blockHeight >= 0; blockHeight-- {
-						if bitmap.Contains(blockHeight) {
-							continue
-						}
-
-						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(blockHeight))
+					bitmap.Flip(0, block.NumberU64())
+					iterator := bitmap.ReverseIterator()
+					for iterator.HasNext() {
+						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(iterator.Next()))
 					}
 				}()
 			})

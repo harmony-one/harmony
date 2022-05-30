@@ -10,23 +10,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap/buffer"
-	"math/big"
 )
 
 const (
 	LegAddressPrefix = "ad_"
-	CheckpointPrefix = "dc"
 	CheckpointBitmap = "checkpoint_bitmap"
 	TracePrefix      = "tr_"
 
 	oneAddrByteLen = 42 // byte size of string "one1..."
 )
-
-// Common schema
-// GetCheckpointKey ...
-func GetCheckpointKey(blockNum *big.Int) []byte {
-	return []byte(fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum))
-}
 
 func readCheckpointBitmap(db databaseReader) (*roaring64.Bitmap, error) {
 	bitmapByte, err := db.Get([]byte(CheckpointBitmap))
