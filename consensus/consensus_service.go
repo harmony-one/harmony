@@ -580,7 +580,7 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
+		Uint64("myBlock", consensus.BlockNum()).
 		Uint64("myViewID", consensus.GetCurBlockViewID()).
 		Str("phase", consensus.phase.String()).
 		Str("mode", consensus.current.Mode().String()).

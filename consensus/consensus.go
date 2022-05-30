@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -195,6 +196,10 @@ func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 
 func (consensus *Consensus) IsBackup() bool {
 	return consensus.isBackup
+}
+
+func (consensus *Consensus) BlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
 }
 
 // New create a new Consensus record

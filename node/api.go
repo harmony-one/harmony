@@ -125,7 +125,7 @@ func (node *Node) GetConsensusCurViewID() uint64 {
 
 // GetConsensusBlockNum returns the current block number of the consensus
 func (node *Node) GetConsensusBlockNum() uint64 {
-	return node.Consensus.GetBlockNum()
+	return node.Consensus.BlockNum()
 }
 
 // GetConsensusInternal returns consensus internal data

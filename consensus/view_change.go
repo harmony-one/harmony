@@ -285,7 +285,7 @@ func (consensus *Consensus) startViewChange() {
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
 		nextViewID,
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.priKey,
 		members); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
@@ -299,7 +299,7 @@ func (consensus *Consensus) startViewChange() {
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
 		if err := consensus.msgSender.SendWithRetry(
-			consensus.blockNum,
+			consensus.BlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -325,7 +325,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	}
 
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum,
+		consensus.BlockNum(),
 		msg_pb.MessageType_NEWVIEW,
 		[]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -471,10 +471,10 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		Msg("[onNewView] Received NewView Message")
 
 	// change view and leaderKey to keep in sync with network
-	if consensus.blockNum != recvMsg.BlockNum {
+	if consensus.BlockNum() != recvMsg.BlockNum {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("myBlockNum", consensus.BlockNum()).
 			Msg("[onNewView] Invalid block number")
 		return
 	}
