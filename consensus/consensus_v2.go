@@ -443,7 +443,7 @@ func (consensus *Consensus) Close() error {
 
 // waitForCommit wait extra 2 seconds for commit phase to finish
 func (consensus *Consensus) waitForCommit() {
-	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
+	if consensus.Mode() != Normal || consensus.phase.Get() != FBFTCommit {
 		return
 	}
 	// We only need to wait consensus is in normal commit phase

@@ -45,7 +45,7 @@ type Consensus struct {
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase FBFTPhase
+	phase *LockedFBFTPhase
 	// current indicates what state a node is in
 	current State
 	// isBackup declarative the node is in backup mode
@@ -209,7 +209,7 @@ func New(
 	consensus.BlockNumLowChan = make(chan struct{}, 1)
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
+	consensus.phase = NewLockedFBFTPhase(FBFTAnnounce)
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()
