@@ -169,6 +169,12 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
+func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	return consensus.LeaderPubKey
+}
+
 func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
 	return consensus.priKey
 }
