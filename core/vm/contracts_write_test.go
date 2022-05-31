@@ -3,7 +3,6 @@ package vm
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -66,7 +65,7 @@ func CalculateMigrationGasFn() CalculateMigrationGasFunc {
 }
 
 func testWriteCapablePrecompile(test writeCapablePrecompileTest, t *testing.T, env *EVM, p WriteCapablePrecompiledContract) {
-	t.Run(fmt.Sprintf("%s", test.name), func(t *testing.T) {
+	t.Run(test.name, func(t *testing.T) {
 		contract := NewContract(AccountRef(common.HexToAddress("1337")), AccountRef(common.HexToAddress("1338")), test.value, 0)
 		gas, err := p.RequiredGas(env, contract, test.input)
 		if err != nil {
