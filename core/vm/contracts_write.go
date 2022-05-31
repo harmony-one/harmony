@@ -230,6 +230,12 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 	contract *Contract,
 	input []byte,
 ) ([]byte, error) {
+	// make sure that cxReceipt is already nil to
+	// prevent multiple calls to the precompile
+	// in the same transaction
+	if evm.CXReceipt != nil {
+		return nil, errors.New("cannot call cross shard precompile again in same tx")
+	}
 	fromAddress, toAddress, fromShardID, toShardID, value, err :=
 		parseCrossShardXferData(evm, contract, input)
 	if err != nil {
@@ -257,22 +263,16 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 		return nil, errors.New("not enough balance received")
 	}
 	evm.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
-	// make sure that cxreceipt is already nil to prevent multiple calls to the precompile
-	// in the same transaction
-	if evm.CXReceipt == nil {
-		// step 2 -> make a cross link
-		// note that the transaction hash is added by state_processor.go to this receipt
-		// and that the receiving shard does not care about the `From` but we use the original
-		// instead of the precompile address for consistency
-		evm.CXReceipt = &types.CXReceipt{
-			From:      fromAddress,
-			To:        &toAddress,
-			ShardID:   fromShardID,
-			ToShardID: toShardID,
-			Amount:    value,
-		}
-	} else {
-		return nil, errors.New("cannot call cross shard precompile again in same tx")
+	// step 2 -> make a cross link
+	// note that the transaction hash is added by state_processor.go to this receipt
+	// and that the receiving shard does not care about the `From` but we use the original
+	// instead of the precompile address for consistency
+	evm.CXReceipt = &types.CXReceipt{
+		From:      fromAddress,
+		To:        &toAddress,
+		ShardID:   fromShardID,
+		ToShardID: toShardID,
+		Amount:    value,
 	}
 	return nil, nil
 }
