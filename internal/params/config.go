@@ -140,7 +140,7 @@ var (
 		StakingPrecompileEpoch:        big.NewInt(2), // same as staking
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: EpochTBD,
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -177,7 +177,7 @@ var (
 		StakingPrecompileEpoch:        big.NewInt(2),
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: EpochTBD,
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -214,7 +214,7 @@ var (
 		StakingPrecompileEpoch:        big.NewInt(2),
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: EpochTBD,
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -250,7 +250,7 @@ var (
 		StakingPrecompileEpoch:        big.NewInt(2),
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: EpochTBD,
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...
