@@ -7,6 +7,7 @@ import (
 	"github.com/harmony-one/harmony/internal/tikv/common"
 	"github.com/tikv/client-go/v2/config"
 	"github.com/tikv/client-go/v2/rawkv"
+	"runtime/trace"
 	"sync/atomic"
 )
 
@@ -52,6 +53,9 @@ func (d *RemoteDatabase) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, common.ErrEmptyKey
 	}
+
+	region := trace.StartRegion(context.Background(), "tikv Get")
+	defer region.End()
 
 	get, err := d.client.Get(context.Background(), key)
 	if err != nil {
