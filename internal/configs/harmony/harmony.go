@@ -46,12 +46,13 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port            int
-	IP              string
-	KeyFile         string
-	DHTDataStore    *string `toml:",omitempty"`
-	DiscConcurrency int     // Discovery Concurrency value
-	MaxConnsPerIP   int
+	Port                 int
+	IP                   string
+	KeyFile              string
+	DHTDataStore         *string `toml:",omitempty"`
+	DiscConcurrency      int     // Discovery Concurrency value
+	MaxConnsPerIP        int
+	DisablePrivateIPScan bool
 }
 
 type GeneralConfig struct {
@@ -96,9 +97,10 @@ type BlsConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile  string
-	RosettaFixFile string
-	AccountSlots   uint64
+	BlacklistFile     string
+	RosettaFixFile    string
+	AccountSlots      uint64
+	LocalAccountsFile string
 }
 
 type PprofConfig struct {
@@ -165,9 +167,13 @@ type WsConfig struct {
 }
 
 type RpcOptConfig struct {
-	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
-	RateLimterEnabled bool // Enable Rate limiter for RPC
-	RequestsPerSecond int  // for RPC rate limiter
+	DebugEnabled       bool   // Enables PrivateDebugService APIs, including the EVM tracer
+	EthRPCsEnabled     bool   // Expose Eth RPCs
+	StakingRPCsEnabled bool   // Expose Staking RPCs
+	LegacyRPCsEnabled  bool   // Expose Legacy RPCs
+	RpcFilterFile      string // Define filters to enable/disable RPC exposure
+	RateLimterEnabled  bool   // Enable Rate limiter for RPC
+	RequestsPerSecond  int    // for RPC rate limiter
 }
 
 type DevnetConfig struct {

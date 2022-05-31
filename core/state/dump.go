@@ -35,6 +35,7 @@ type DumpConfig struct {
 	SkipCode          bool
 	SkipStorage       bool
 	OnlyWithAddresses bool
+	HoldStorage       bool
 	Start             []byte
 	End               []byte
 	StateStart        []byte
@@ -169,7 +170,7 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 	c.OnRoot(s.trie.Hash())
 
 	hasEnd := len(conf.End) > 0
-	stateStart := conf.Start
+	stateStart := conf.StateStart
 	hasStateEnd := len(conf.StateEnd) > 0
 	it := trie.NewIterator(s.trie.NodeIterator(conf.Start))
 	for it.Next() {
@@ -211,12 +212,14 @@ func (s *DB) DumpToCollector(c DumpCollector, conf *DumpConfig) (nextKey []byte)
 				}
 				key := s.trie.GetKey(storageIt.Key)
 				c.OnAccountState(addr, storageIt.Key, key, storageIt.Value)
-				_, content, _, err := rlp.Split(storageIt.Value)
-				if err != nil {
-					log.Error("Failed to decode the value returned by iterator", "error", err)
-					continue
+				if conf.HoldStorage {
+					_, content, _, err := rlp.Split(storageIt.Value)
+					if err != nil {
+						log.Error("Failed to decode the value returned by iterator", "error", err)
+						continue
+					}
+					account.Storage[common.BytesToHash(s.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(content)
 				}
-				account.Storage[common.BytesToHash(s.trie.GetKey(storageIt.Key))] = common.Bytes2Hex(content)
 			}
 			stateStart = nil
 			hasStateEnd = false

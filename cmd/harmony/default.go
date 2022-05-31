@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.1" // bump from 2.5.0 for AccountSlots
+const tomlConfigVersion = "2.5.2" // bump from 2.5.1 for DisablePrivateIPScan
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -25,11 +25,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:            nodeconfig.DefaultP2PPort,
-		IP:              nodeconfig.DefaultPublicListenIP,
-		KeyFile:         "./.hmykey",
-		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
+		Port:                 nodeconfig.DefaultP2PPort,
+		IP:                   nodeconfig.DefaultPublicListenIP,
+		KeyFile:              "./.hmykey",
+		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan: false,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -46,9 +47,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
-		DebugEnabled:      false,
-		RateLimterEnabled: true,
-		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
+		DebugEnabled:       false,
+		EthRPCsEnabled:     true,
+		StakingRPCsEnabled: true,
+		LegacyRPCsEnabled:  true,
+		RpcFilterFile:      "",
+		RateLimterEnabled:  true,
+		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
@@ -64,9 +69,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigFile:    "",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile:  "./.hmy/blacklist.txt",
-		RosettaFixFile: "",
-		AccountSlots:   16,
+		BlacklistFile:     "./.hmy/blacklist.txt",
+		RosettaFixFile:    "",
+		AccountSlots:      16,
+		LocalAccountsFile: "./.hmy/locals.txt",
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

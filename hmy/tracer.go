@@ -418,7 +418,7 @@ func (hmy *Harmony) TraceBlock(ctx context.Context, block *types.Block, config *
 	default:
 	}
 
-	if *config.Tracer == "ParityBlockTracer" {
+	if config != nil && config.Tracer != nil && *config.Tracer == "ParityBlockTracer" {
 		return hmy.traceBlockNoThread(ctx, block, config)
 	}
 	// Create the parent state database

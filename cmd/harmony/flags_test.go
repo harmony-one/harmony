@@ -58,11 +58,12 @@ func TestHarmonyFlags(t *testing.T) {
 					ServerPort: nodeconfig.DefaultDNSPort,
 				},
 				P2P: harmonyconfig.P2pConfig{
-					Port:            9000,
-					IP:              defaultConfig.P2P.IP,
-					KeyFile:         defaultConfig.P2P.KeyFile,
-					DiscConcurrency: 5,
-					MaxConnsPerIP:   5,
+					Port:                 9000,
+					IP:                   defaultConfig.P2P.IP,
+					KeyFile:              defaultConfig.P2P.KeyFile,
+					DiscConcurrency:      5,
+					MaxConnsPerIP:        5,
+					DisablePrivateIPScan: false,
 				},
 				HTTP: harmonyconfig.HttpConfig{
 					Enabled:        true,
@@ -73,9 +74,13 @@ func TestHarmonyFlags(t *testing.T) {
 					RosettaPort:    9700,
 				},
 				RPCOpt: harmonyconfig.RpcOptConfig{
-					DebugEnabled:      false,
-					RateLimterEnabled: true,
-					RequestsPerSecond: 1000,
+					DebugEnabled:       false,
+					EthRPCsEnabled:     true,
+					StakingRPCsEnabled: true,
+					LegacyRPCsEnabled:  true,
+					RpcFilterFile:      "",
+					RateLimterEnabled:  true,
+					RequestsPerSecond:  1000,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -100,9 +105,10 @@ func TestHarmonyFlags(t *testing.T) {
 					KMSConfigFile:    "config.json",
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
-					BlacklistFile:  "./.hmy/blacklist.txt",
-					RosettaFixFile: "",
-					AccountSlots:   16,
+					BlacklistFile:     "./.hmy/blacklist.txt",
+					RosettaFixFile:    "",
+					AccountSlots:      16,
+					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -375,30 +381,44 @@ func TestP2PFlags(t *testing.T) {
 			args: []string{"--p2p.port", "9001", "--p2p.keyfile", "./key.file", "--p2p.dht.datastore",
 				defDataStore},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:          9001,
-				IP:            nodeconfig.DefaultPublicListenIP,
-				KeyFile:       "./key.file",
-				DHTDataStore:  &defDataStore,
-				MaxConnsPerIP: 10,
+				Port:                 9001,
+				IP:                   nodeconfig.DefaultPublicListenIP,
+				KeyFile:              "./key.file",
+				DHTDataStore:         &defDataStore,
+				MaxConnsPerIP:        10,
+				DisablePrivateIPScan: false,
 			},
 		},
 		{
 			args: []string{"--port", "9001", "--key", "./key.file"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:          9001,
-				IP:            nodeconfig.DefaultPublicListenIP,
-				KeyFile:       "./key.file",
-				MaxConnsPerIP: 10,
+				Port:                 9001,
+				IP:                   nodeconfig.DefaultPublicListenIP,
+				KeyFile:              "./key.file",
+				MaxConnsPerIP:        10,
+				DisablePrivateIPScan: false,
 			},
 		},
 		{
 			args: []string{"--p2p.port", "9001", "--p2p.disc.concurrency", "5", "--p2p.security.max-conn-per-ip", "5"},
 			expConfig: harmonyconfig.P2pConfig{
-				Port:            9001,
-				IP:              nodeconfig.DefaultPublicListenIP,
-				KeyFile:         "./.hmykey",
-				DiscConcurrency: 5,
-				MaxConnsPerIP:   5,
+				Port:                 9001,
+				IP:                   nodeconfig.DefaultPublicListenIP,
+				KeyFile:              "./.hmykey",
+				DiscConcurrency:      5,
+				MaxConnsPerIP:        5,
+				DisablePrivateIPScan: false,
+			},
+		},
+		{
+			args: []string{"--p2p.no-private-ip-scan"},
+			expConfig: harmonyconfig.P2pConfig{
+				Port:                 nodeconfig.DefaultP2PPort,
+				IP:                   nodeconfig.DefaultPublicListenIP,
+				KeyFile:              "./.hmykey",
+				DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
+				MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
+				DisablePrivateIPScan: true,
 			},
 		},
 	}
@@ -605,36 +625,104 @@ func TestRPCOptFlags(t *testing.T) {
 		{
 			args: []string{"--rpc.debug"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      true,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       true,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.eth=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     false,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.staking=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: false,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.legacy=false"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  false,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
+			},
+		},
+
+		{
+			args: []string{"--rpc.filterspath=./rmf.toml"},
+			expConfig: harmonyconfig.RpcOptConfig{
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "./rmf.toml",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 1000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  1000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: true,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  true,
+				RequestsPerSecond:  2000,
 			},
 		},
 
 		{
 			args: []string{"--rpc.ratelimiter=false", "--rpc.ratelimit", "2000"},
 			expConfig: harmonyconfig.RpcOptConfig{
-				DebugEnabled:      false,
-				RateLimterEnabled: false,
-				RequestsPerSecond: 2000,
+				DebugEnabled:       false,
+				EthRPCsEnabled:     true,
+				StakingRPCsEnabled: true,
+				LegacyRPCsEnabled:  true,
+				RpcFilterFile:      "",
+				RateLimterEnabled:  false,
+				RequestsPerSecond:  2000,
 			},
 		},
 	}
@@ -786,33 +874,46 @@ func TestTxPoolFlags(t *testing.T) {
 		{
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  defaultConfig.TxPool.BlacklistFile,
-				RosettaFixFile: defaultConfig.TxPool.RosettaFixFile,
-				AccountSlots:   defaultConfig.TxPool.AccountSlots,
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
-				AccountSlots:   16, // default
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				AccountSlots:      16, // default
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
 			args: []string{"--txpool.accountslots", "5", "--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
 			expConfig: harmonyconfig.TxPoolConfig{
-				AccountSlots:   5,
-				BlacklistFile:  "blacklist.file",
-				RosettaFixFile: "rosettafix.file",
+				AccountSlots:      5,
+				BlacklistFile:     "blacklist.file",
+				RosettaFixFile:    "rosettafix.file",
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+			},
+		},
+		{
+			args: []string{"--txpool.locals", "locals.txt"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: "locals.txt",
 			},
 		},
 	}

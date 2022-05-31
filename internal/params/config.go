@@ -65,7 +65,8 @@ var (
 		SHA3Epoch:                     big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:                 big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		StakingPrecompileEpoch:        big.NewInt(871), // Around Tue Feb 11 2022
-		SlotsLimitedEpoch:             EpochTBD,        // epoch to enable HIP-16
+		ChainIdFixEpoch:               EpochTBD,
+		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
 
@@ -100,6 +101,7 @@ var (
 		SHA3Epoch:                     big.NewInt(74570),
 		HIP6And8Epoch:                 big.NewInt(74570),
 		StakingPrecompileEpoch:        big.NewInt(75175),
+		ChainIdFixEpoch:               EpochTBD,
 		SlotsLimitedEpoch:             big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
@@ -136,8 +138,9 @@ var (
 		SHA3Epoch:                     big.NewInt(0),
 		HIP6And8Epoch:                 big.NewInt(0),
 		StakingPrecompileEpoch:        big.NewInt(2), // same as staking
-		SlotsLimitedEpoch:             EpochTBD,      // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: big.NewInt(1), // cross tx + 1
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -172,8 +175,9 @@ var (
 		SHA3Epoch:                     big.NewInt(0),
 		HIP6And8Epoch:                 big.NewInt(0),
 		StakingPrecompileEpoch:        big.NewInt(2),
-		SlotsLimitedEpoch:             EpochTBD,      // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: big.NewInt(1), // cross tx + 1
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -208,8 +212,9 @@ var (
 		SHA3Epoch:                     big.NewInt(0),
 		HIP6And8Epoch:                 big.NewInt(0),
 		StakingPrecompileEpoch:        big.NewInt(2),
-		SlotsLimitedEpoch:             EpochTBD,      // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: big.NewInt(1), // cross tx + 1
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -243,8 +248,9 @@ var (
 		SHA3Epoch:                     big.NewInt(0),
 		HIP6And8Epoch:                 EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		StakingPrecompileEpoch:        big.NewInt(2),
-		SlotsLimitedEpoch:             EpochTBD,      // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch: big.NewInt(1), // cross tx + 1
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -280,6 +286,7 @@ var (
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
+		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 	}
@@ -317,6 +324,7 @@ var (
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
 		big.NewInt(0),        // StakingPrecompileEpoch
+		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 	}
@@ -437,6 +445,9 @@ type ChainConfig struct {
 	// StakingPrecompileEpoch is the first epoch to support the staking precompiles
 	StakingPrecompileEpoch *big.Int `json:"staking-precompile-epoch,omitempty"`
 
+	// ChainIdFixEpoch is the first epoch to return ethereum compatible chain id by ChainID() op code
+	ChainIdFixEpoch *big.Int `json:"chain-id-fix-epoch,omitempty"`
+
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
 	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
 
@@ -446,7 +457,7 @@ type ChainConfig struct {
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v CrossShardXferPrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -456,6 +467,7 @@ func (c *ChainConfig) String() string {
 		c.ReceiptLogEpoch,
 		c.SHA3Epoch,
 		c.StakingPrecompileEpoch,
+		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
 	)
 }
@@ -614,6 +626,11 @@ func (c *ChainConfig) IsCrossShardXferPrecompile(epoch *big.Int) bool {
 	return isForked(c.CrossShardXferPrecompileEpoch, epoch)
 }
 
+// IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
+func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
+	return isForked(c.ChainIdFixEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -665,7 +682,7 @@ type Rules struct {
 	ChainID    *big.Int
 	EthChainID *big.Int
 	IsCrossLink, IsEIP155, IsS3, IsReceiptLog, IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
-	IsStakingPrecompile, IsCrossShardXferPrecompile bool
+	IsStakingPrecompile, IsCrossShardXferPrecompile, IsChainIdFix bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -700,6 +717,7 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsPrevVRF:                  c.IsPrevVRF(epoch),
 		IsSHA3:                     c.IsSHA3(epoch),
 		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
+		IsChainIdFix:               c.IsChainIdFix(epoch),
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 	}
 }

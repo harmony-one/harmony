@@ -27,10 +27,10 @@ import (
 func newTestServer() *Server {
 	server := NewServer()
 	server.idgen = sequentialIDGenerator()
-	if err := server.RegisterName("test", new(testService)); err != nil {
+	if err := server.RegisterName("test", new(testService), nil); err != nil {
 		panic(err)
 	}
-	if err := server.RegisterName("nftest", new(notificationTestService)); err != nil {
+	if err := server.RegisterName("nftest", new(notificationTestService), nil); err != nil {
 		panic(err)
 	}
 	return server
