@@ -1838,6 +1838,11 @@ func (bc *BlockChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []com
 	return bc.hc.GetBlockHashesFromHash(hash, max)
 }
 
+// GetCanonicalHash returns the canonical hash for a given block number
+func (bc *BlockChain) GetCanonicalHash(number uint64) common.Hash {
+	return bc.hc.GetCanonicalHash(number)
+}
+
 // GetAncestor retrieves the Nth ancestor of a given block. It assumes that either the given block or
 // a close ancestor of it is canonical. maxNonCanonical points to a downwards counter limiting the
 // number of blocks to be individually checked before we reach the canonical chain.

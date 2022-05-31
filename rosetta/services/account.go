@@ -60,7 +60,7 @@ func (s *AccountAPI) AccountBalance(
 		})
 	}
 	blockNum := rpc.BlockNumber(block.Header().Header.Number().Int64())
-	balance := new(big.Int)
+	var balance *big.Int
 
 	if request.AccountIdentifier.SubAccount != nil {
 		// indicate it may be a request for delegated balance
@@ -69,7 +69,7 @@ func (s *AccountAPI) AccountBalance(
 			return nil, rosettaError
 		}
 	} else {
-		balance, err = s.hmy.GetBalance(ctx, addr, blockNum)
+		balance, err = s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 		if err != nil {
 			return nil, common.NewError(common.SanityCheckError, map[string]interface{}{
 				"message": "invalid address",

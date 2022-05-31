@@ -18,6 +18,7 @@ package rpc
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -81,7 +82,7 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 		6:  {`"0x12"`, false, BlockNumberOrHashWithNumber(18)},
 		7:  {`"0x7fffffffffffffff"`, false, BlockNumberOrHashWithNumber(math.MaxInt64)},
 		8:  {`"0x8000000000000000"`, true, BlockNumberOrHash{}},
-		9:  {"0", true, BlockNumberOrHash{}},
+		9:  {"0", false, BlockNumberOrHashWithNumber(0)}, // different from eth, because we need to keep compatibility with old hmy rpc
 		10: {`"ff"`, true, BlockNumberOrHash{}},
 		11: {`"pending"`, false, BlockNumberOrHashWithNumber(PendingBlockNumber)},
 		12: {`"latest"`, false, BlockNumberOrHashWithNumber(LatestBlockNumber)},
@@ -120,5 +121,62 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 			num != expectedNum || numOk != expectedNumOk {
 			t.Errorf("Test %d got unexpected value, want %v, got %v", i, test.expected, bnh)
 		}
+	}
+}
+
+func TestBlockNumberOrHash_WithNumber_MarshalAndUnmarshal(t *testing.T) {
+	tests := []struct {
+		name   string
+		number int64
+	}{
+		{"max", math.MaxInt64},
+		{"pending", int64(PendingBlockNumber)},
+		{"latest", int64(LatestBlockNumber)},
+		{"earliest", int64(EarliestBlockNumber)},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			bnh := BlockNumberOrHashWithNumber(BlockNumber(test.number))
+			marshalled, err := json.Marshal(bnh)
+			if err != nil {
+				t.Fatal("cannot marshal:", err)
+			}
+			var unmarshalled BlockNumberOrHash
+			err = json.Unmarshal(marshalled, &unmarshalled)
+			if err != nil {
+				t.Fatal("cannot unmarshal:", err)
+			}
+			if !reflect.DeepEqual(bnh, unmarshalled) {
+				t.Fatalf("wrong result: expected %v, got %v", bnh, unmarshalled)
+			}
+		})
+	}
+}
+
+func TestBlockNumberOrHash_Unmarshal_Compatibility(t *testing.T) {
+	tests := []struct {
+		name   string
+		number int64
+	}{
+		{"max", math.MaxInt64},
+		{"pending", int64(PendingBlockNumber)},
+		{"latest", int64(LatestBlockNumber)},
+		{"earliest", int64(EarliestBlockNumber)},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			input, _ := json.Marshal(test.number)
+			var unmarshalled BlockNumberOrHash
+			err := json.Unmarshal([]byte(input), &unmarshalled)
+			if err != nil {
+				t.Fatal("cannot unmarshal:", err)
+			}
+			if number, isNumber := unmarshalled.Number(); !isNumber || int64(number) != test.number {
+				t.Fatalf("wrong result: expected %v, got %v", test.number, unmarshalled)
+			}
+		})
 	}
 }
