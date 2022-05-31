@@ -217,40 +217,11 @@ func (c *crossShardXferPrecompile) RequiredGas(
 	contract *Contract,
 	input []byte,
 ) (uint64, error) {
-	// We charge gas here to make sure contracts using `delegatecall`
-	// are not able to subsidize the base gas for cross shard transfers by EOAs
-	var payload []byte = make([]byte, 0)
-	fromAddress, toAddress, fromShardID, toShardID, value, err :=
-		parseCrossShardXferData(evm, contract, input)
-	if err == nil {
-		data := struct {
-			fromAddress common.Address
-			toAddress   common.Address
-			fromShardID uint32
-			toShardID   uint32
-			value       *big.Int
-		}{
-			fromAddress: fromAddress,
-			toAddress:   toAddress,
-			fromShardID: fromShardID,
-			toShardID:   toShardID,
-			value:       value,
-		}
-		if encoded, err := rlp.EncodeToBytes(data); err == nil {
-			payload = encoded
-		}
-	}
-	if gas, err := IntrinsicGas(
-		payload,
-		false,                                   // contractCreation
-		evm.ChainConfig().IsS3(evm.EpochNumber), // homestead
-		evm.ChainConfig().IsIstanbul(evm.EpochNumber), // istanbul
-		false, // isValidatorCreation
-	); err != nil {
-		return 0, err // ErrOutOfGas occurs when gas payable > uint64
-	} else {
-		return gas, nil
-	}
+	// multiple instances of the precompile in one transaction
+	// are blocked, so there is no way for a smart contract
+	// to subsidize this transaction by an EOA via delegatecall
+	// therefore no need to charge any gas
+	return 0, nil
 }
 
 // RunWriteCapable runs the actual contract
@@ -282,6 +253,9 @@ func (c *crossShardXferPrecompile) RunWriteCapable(
 	}
 	// now do the actual transfer
 	// step 1 -> remove funds from the precompile address
+	if !evm.CanTransfer(evm.StateDB, contract.Address(), value) {
+		return nil, errors.New("not enough balance received")
+	}
 	evm.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
 	// make sure that cxreceipt is already nil to prevent multiple calls to the precompile
 	// in the same transaction
