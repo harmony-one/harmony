@@ -110,7 +110,7 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		}
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return hc, nil
 }
 
@@ -460,6 +460,10 @@ func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
 	return hash
 }
 
+func (hc *HeaderChain) GetCanonicalHash(number uint64) common.Hash {
+	return rawdb.ReadCanonicalHash(hc.chainDb, number)
+}
+
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
 func (hc *HeaderChain) CurrentHeader() *block.Header {
@@ -474,6 +478,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *block.Header) error {
 
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
+	headHeaderGauge.Update(head.Number().Int64())
 	return nil
 }
 
@@ -530,7 +535,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) error {
 		hc.currentHeader.Store(hc.genesisHeader)
 	}
 	hc.currentHeaderHash = hc.CurrentHeader().Hash()
-
+	headHeaderGauge.Update(hc.CurrentHeader().Number().Int64())
 	return nil
 }
 

@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.3.0"
+const tomlConfigVersion = "2.5.3" // bump from 2.5.2 for rpc filters
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -21,13 +21,16 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsBeaconArchival: false,
 		IsOffline:        false,
 		DataDir:          "./",
+		TraceEnable:      false,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:            nodeconfig.DefaultP2PPort,
-		IP:              nodeconfig.DefaultPublicListenIP,
-		KeyFile:         "./.hmykey",
-		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
+		Port:                 nodeconfig.DefaultP2PPort,
+		IP:                   nodeconfig.DefaultPublicListenIP,
+		KeyFile:              "./.hmykey",
+		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan: false,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -38,14 +41,19 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RosettaPort:    nodeconfig.DefaultRosettaPort,
 	},
 	WS: harmonyconfig.WsConfig{
-		Enabled: true,
-		IP:      "127.0.0.1",
-		Port:    nodeconfig.DefaultWSPort,
+		Enabled:  true,
+		IP:       "127.0.0.1",
+		Port:     nodeconfig.DefaultWSPort,
+		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
-		DebugEnabled:      false,
-		RateLimterEnabled: true,
-		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
+		DebugEnabled:       false,
+		EthRPCsEnabled:     true,
+		StakingRPCsEnabled: true,
+		LegacyRPCsEnabled:  true,
+		RpcFilterFile:      "./.hmy/rpc_filter.txt",
+		RateLimterEnabled:  true,
+		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
@@ -64,7 +72,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DbDir: "./db/mmr",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile: "./.hmy/blacklist.txt",
+		BlacklistFile:     "./.hmy/blacklist.txt",
+		RosettaFixFile:    "",
+		AccountSlots:      16,
+		LocalAccountsFile: "./.hmy/locals.txt",
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
@@ -76,15 +87,24 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
-		Folder:     "./latest",
-		FileName:   "harmony.log",
-		RotateSize: 100,
-		Verbosity:  3,
+		Folder:       "./latest",
+		FileName:     "harmony.log",
+		RotateSize:   100,
+		RotateCount:  0,
+		RotateMaxAge: 0,
+		Verbosity:    3,
 		VerbosePrints: harmonyconfig.LogVerbosePrints{
 			Config: true,
 		},
 	},
 	DNSSync: getDefaultDNSSyncConfig(defNetworkType),
+	ShardData: harmonyconfig.ShardDataConfig{
+		EnableShardData: false,
+		DiskCount:       8,
+		ShardCount:      4,
+		CacheTime:       10,
+		CacheSize:       512,
+	},
 }
 
 var defaultMmrConfig = harmonyconfig.MmrConfig{
@@ -99,6 +119,7 @@ var defaultDevnetConfig = harmonyconfig.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
+	SlotsLimit:  0, // 0 means no limit
 }
 
 var defaultRevertConfig = harmonyconfig.RevertConfig{
@@ -141,25 +162,25 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      8,
+		DiscBatch:      3,
 	}
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     false,
-		Concurrency:    4,
-		MinPeers:       4,
-		InitStreams:    4,
-		DiscSoftLowCap: 4,
-		DiscHardLowCap: 4,
+		Downloader:     true,
+		Concurrency:    2,
+		MinPeers:       2,
+		InitStreams:    2,
+		DiscSoftLowCap: 2,
+		DiscHardLowCap: 2,
 		DiscHighCap:    1024,
-		DiscBatch:      8,
+		DiscBatch:      3,
 	}
 
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{

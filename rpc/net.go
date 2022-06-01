@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
@@ -60,6 +60,8 @@ func (s *PublicNetService) PeerCount(ctx context.Context) (interface{}, error) {
 
 // Version returns the network version, i.e. ChainID identifying which network we are using
 func (s *PublicNetService) Version(ctx context.Context) interface{} {
+	timer := DoMetricRPCRequest(NetVersion)
+	defer DoRPCRequestDuration(NetVersion, timer)
 	switch s.version {
 	case Eth:
 		return nodeconfig.GetDefaultConfig().GetNetworkType().ChainConfig().EthCompatibleChainID.String()

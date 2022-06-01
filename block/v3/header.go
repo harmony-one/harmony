@@ -70,7 +70,7 @@ type headerFields struct {
 	Vdf                 []byte   `json:"vdf"`
 	ShardState          []byte   `json:"shardState"`
 	CrossLinks          []byte   `json:"crossLink"`
-	Slashes             []byte   `json:slashes`
+	Slashes             []byte   `json:"slashes"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block

@@ -356,7 +356,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
-	consensus.getLogger().Info().
+	consensus.getLogger().Debug().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
 		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
@@ -366,7 +366,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	newLeaderKey := recvMsg.LeaderPubkey
 	newLeaderPriKey, err := consensus.GetLeaderPrivateKey(newLeaderKey.Object)
 	if err != nil {
-		consensus.getLogger().Info().
+		consensus.getLogger().Debug().
 			Err(err).
 			Interface("SenderPubkeys", recvMsg.SenderPubkeys).
 			Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
@@ -453,7 +453,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 // from the new leader
 func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	consensus.mutex.Lock()
-	consensus.mutex.Unlock()
+	defer consensus.mutex.Unlock()
 
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).

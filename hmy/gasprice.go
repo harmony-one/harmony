@@ -23,8 +23,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,7 +34,7 @@ import (
 
 const sampleNumber = 3 // Number of transactions sampled in a block
 
-var DefaultMaxPrice = big.NewInt(1 * params.Ether)
+var DefaultMaxPrice = big.NewInt(5e11) // 500 gwei is the max suggested limit
 
 type GasPriceConfig struct {
 	Blocks     int

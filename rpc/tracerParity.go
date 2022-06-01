@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
 
@@ -19,14 +19,22 @@ type PublicParityTracerService struct {
 }
 
 func (s *PublicParityTracerService) Transaction(ctx context.Context, hash common.Hash) (interface{}, error) {
+	timer := DoMetricRPCRequest(Transaction)
+	defer DoRPCRequestDuration(Transaction, timer)
 	return s.TraceTransaction(ctx, hash, &hmy.TraceConfig{Tracer: &parityTraceGO})
 }
 
 // trace_block RPC
 func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockNumber) (interface{}, error) {
+	timer := DoMetricRPCRequest(Block)
+	defer DoRPCRequestDuration(Block, timer)
+
 	block := s.hmy.BlockChain.GetBlockByNumber(uint64(number))
 	if block == nil {
 		return nil, nil
+	}
+	if results, err := s.hmy.NodeAPI.GetTraceResultByHash(block.Hash()); err == nil {
+		return results, nil
 	}
 	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceGO})
 	if err != nil {

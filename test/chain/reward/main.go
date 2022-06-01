@@ -121,17 +121,15 @@ func main() {
 	}
 	for i := 0; i < 100000; i++ {
 		validator.Delegations = append(validator.Delegations, staking.Delegation{
-			common2.Address{},
-			big.NewInt(int64(rand.Intn(100))),
-			big.NewInt(0),
-			nil,
+			Amount: big.NewInt(int64(rand.Intn(100))),
+			Reward: big.NewInt(0),
 		})
 	}
 
 	statedb.UpdateValidatorWrapper(msg.ValidatorAddress, validator)
 
 	startTime := time.Now()
-	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress)
+	validator, _ = statedb.ValidatorWrapper(msg.ValidatorAddress, true, false)
 	endTime := time.Now()
 	fmt.Printf("Time required to read validator: %f seconds\n", endTime.Sub(startTime).Seconds())
 

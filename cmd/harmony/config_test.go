@@ -62,6 +62,8 @@ Version = "1.0.4"
   FileName = "harmony.log"
   Folder = "./latest"
   RotateSize = 100
+  RotateCount = 0
+  RotateMaxAge = 0
   Verbosity = 3
 
 [Network]
@@ -81,6 +83,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [Sync]
   Downloader = false
@@ -93,6 +96,13 @@ Version = "1.0.4"
   LegacyClient = true
   LegacyServer = true
   MinPeers = 6
+
+[ShardData]
+  EnableShardData = false
+  DiskCount = 8
+  ShardCount = 4
+  CacheTime = 10
+  CacheSize = 512
 
 [WS]
   Enabled = true

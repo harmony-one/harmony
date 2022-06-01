@@ -1,7 +1,7 @@
 syntax = "proto3";
 package harmony.stream.sync.message ;
 
-option go_package = "message";
+option go_package = "./;message";
 
 message Message {
   oneof req_or_resp {

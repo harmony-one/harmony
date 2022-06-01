@@ -101,7 +101,7 @@ func (b *BlockGen) AddTxWithChain(bc *BlockChain, tx *types.Transaction) {
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 	coinbase := b.header.Coinbase()
 	gasUsed := b.header.GasUsed()
-	receipt, _, _, err := ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
+	receipt, _, _, _, err := ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
 	b.header.SetGasUsed(gasUsed)
 	b.header.SetCoinbase(coinbase)
 	if err != nil {

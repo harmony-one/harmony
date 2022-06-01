@@ -339,7 +339,7 @@ func (c *Committee) BLSPublicKeys() ([]bls.PublicKeyWrapper, error) {
 			return nil, err
 		}
 
-		slice[j] = bls.PublicKeyWrapper{c.Slots[j].BLSPublicKey, pubKey}
+		slice[j] = bls.PublicKeyWrapper{Bytes: c.Slots[j].BLSPublicKey, Object: pubKey}
 	}
 
 	return slice, nil

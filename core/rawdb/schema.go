@@ -72,6 +72,8 @@ var (
 	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix = []byte("blk-rwd-")
+	// key of SnapdbInfo
+	snapdbInfoKey = []byte("SnapdbInfo")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of
@@ -87,6 +89,11 @@ func encodeBlockNumber(number uint64) []byte {
 	enc := make([]byte, 8)
 	binary.BigEndian.PutUint64(enc, number)
 	return enc
+}
+
+// decodeBlockNumber decodes a block number as big endian uint64
+func decodeBlockNumber(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b)
 }
 
 // headerKey = headerPrefix + num (uint64 big endian) + hash

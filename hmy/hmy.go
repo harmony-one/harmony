@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -90,6 +91,7 @@ type NodeAPI interface {
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
+	GetTraceResultByHash(hash common.Hash) (json.RawMessage, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64, uint64)
@@ -155,9 +157,9 @@ func New(
 
 	// Setup gas price oracle
 	gpoParams := GasPriceConfig{
-		Blocks:     20,
-		Percentile: 60,
-		Default:    big.NewInt(1e10),
+		Blocks:     20,               // take all eligible txs past 20 blocks and sort them
+		Percentile: 40,               // get the 40th percentile when sorted in an ascending manner
+		Default:    big.NewInt(3e10), // minimum of 30 gwei
 	}
 	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo

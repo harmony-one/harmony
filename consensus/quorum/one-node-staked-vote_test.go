@@ -45,7 +45,7 @@ func generateRandomSlot() (shard.Slot, bls_core.SecretKey) {
 	key := bls.SerializedPublicKey{}
 	key.FromLibBLSPublicKey(secretKey.GetPublicKey())
 	stake := numeric.NewDecFromBigInt(big.NewInt(int64(stakeGen.Int63n(maxStakeGen))))
-	return shard.Slot{addr, key, &stake}, secretKey
+	return shard.Slot{EcdsaAddress: addr, BLSPublicKey: key, EffectiveStake: &stake}, secretKey
 }
 
 // 50 Harmony Nodes, 50 Staked Nodes
@@ -73,7 +73,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
-		shard.BeaconChainShardID, slotList,
+		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Base Case")
@@ -102,7 +102,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
 	decider.UpdateParticipants(pubKeys)
 	tally, err := decider.SetVoters(&shard.Committee{
-		shard.BeaconChainShardID, slotList,
+		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
 	if err != nil {
 		panic("Unable to SetVoters for Edge Case")

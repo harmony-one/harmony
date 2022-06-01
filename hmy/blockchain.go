@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/bloombits"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -16,6 +15,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/eth/rpc"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -161,18 +161,7 @@ func (hmy *Harmony) GetPreStakingBlockRewards(
 		txFee := new(big.Int).Mul(tx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
 		txFees = new(big.Int).Add(txFee, txFees)
 	}
-	for _, stx := range blk.StakingTransactions() {
-		dbsTx, _, _, receiptIndex := rawdb.ReadStakingTransaction(hmy.ChainDb(), stx.Hash())
-		if dbsTx == nil {
-			return nil, fmt.Errorf("could not find receipt for tx: %v", stx.Hash().String())
-		}
-		if len(receipts) <= int(receiptIndex) {
-			return nil, fmt.Errorf("invalid receipt indext %v (>= num receipts: %v) for tx: %v",
-				receiptIndex, len(receipts), stx.Hash().String())
-		}
-		txFee := new(big.Int).Mul(stx.GasPrice(), big.NewInt(int64(receipts[receiptIndex].GasUsed)))
-		txFees = new(big.Int).Add(txFee, txFees)
-	}
+
 	if amt, ok := rewards[blk.Header().Coinbase()]; ok {
 		rewards[blk.Header().Coinbase()] = new(big.Int).Add(amt, txFees)
 	} else {
@@ -220,9 +209,30 @@ func (hmy *Harmony) GetCurrentBadBlocks() []core.BadBlock {
 	return hmy.BlockChain.BadBlocks()
 }
 
+func (hmy *Harmony) BlockByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*types.Block, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok {
+		return hmy.BlockByNumber(ctx, blockNr)
+	}
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		header := hmy.BlockChain.GetHeaderByHash(hash)
+		if header == nil {
+			return nil, errors.New("header for hash not found")
+		}
+		if blockNrOrHash.RequireCanonical && hmy.BlockChain.GetCanonicalHash(header.Number().Uint64()) != hash {
+			return nil, errors.New("hash is not currently canonical")
+		}
+		block := hmy.BlockChain.GetBlock(hash, header.Number().Uint64())
+		if block == nil {
+			return nil, errors.New("header found, but block body is missing")
+		}
+		return block, nil
+	}
+	return nil, errors.New("invalid arguments; neither block nor hash specified")
+}
+
 // GetBalance returns balance of an given address.
-func (hmy *Harmony) GetBalance(ctx context.Context, address common.Address, blockNum rpc.BlockNumber) (*big.Int, error) {
-	s, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
+func (hmy *Harmony) GetBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*big.Int, error) {
+	s, _, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if s == nil || err != nil {
 		return nil, err
 	}
@@ -277,6 +287,27 @@ func (hmy *Harmony) StateAndHeaderByNumber(ctx context.Context, blockNum rpc.Blo
 	}
 	stateDb, err := hmy.BlockChain.StateAt(header.Root())
 	return stateDb, header, err
+}
+
+func (hmy *Harmony) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.DB, *block.Header, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok {
+		return hmy.StateAndHeaderByNumber(ctx, blockNr)
+	}
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		header, err := hmy.HeaderByHash(ctx, hash)
+		if err != nil {
+			return nil, nil, err
+		}
+		if header == nil {
+			return nil, nil, errors.New("header for hash not found")
+		}
+		if blockNrOrHash.RequireCanonical && hmy.BlockChain.GetCanonicalHash(header.Number().Uint64()) != hash {
+			return nil, nil, errors.New("hash is not currently canonical")
+		}
+		stateDb, err := hmy.BlockChain.StateAt(header.Root())
+		return stateDb, header, err
+	}
+	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
 // GetLeaderAddress returns the one address of the leader, given the coinbaseAddr.

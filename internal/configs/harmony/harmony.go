@@ -29,6 +29,7 @@ type HarmonyConfig struct {
 	Legacy     *LegacyConfig     `toml:",omitempty"`
 	Prometheus *PrometheusConfig `toml:",omitempty"`
 	DNSSync    DnsSync
+	ShardData  ShardDataConfig
 }
 
 type DnsSync struct {
@@ -46,22 +47,34 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port            int
-	IP              string
-	KeyFile         string
-	DHTDataStore    *string `toml:",omitempty"`
-	DiscConcurrency int     // Discovery Concurrency value
+	Port                 int
+	IP                   string
+	KeyFile              string
+	DHTDataStore         *string `toml:",omitempty"`
+	DiscConcurrency      int     // Discovery Concurrency value
+	MaxConnsPerIP        int
+	DisablePrivateIPScan bool
 }
 
 type GeneralConfig struct {
-	NodeType         string
-	NoStaking        bool
-	ShardID          int
-	IsArchival       bool
-	IsBackup         bool
-	IsBeaconArchival bool
-	IsOffline        bool
-	DataDir          string
+	NodeType               string
+	NoStaking              bool
+	ShardID                int
+	IsArchival             bool
+	IsBackup               bool
+	IsBeaconArchival       bool
+	IsOffline              bool
+	DataDir                string
+	TraceEnable            bool
+	EnablePruneBeaconChain bool
+}
+
+type ShardDataConfig struct {
+	EnableShardData bool
+	DiskCount       int
+	ShardCount      int
+	CacheTime       int
+	CacheSize       int
 }
 
 type ConsensusConfig struct {
@@ -89,7 +102,10 @@ type MmrConfig struct {
 }
 
 type TxPoolConfig struct {
-	BlacklistFile string
+	BlacklistFile     string
+	RosettaFixFile    string
+	AccountSlots      uint64
+	LocalAccountsFile string
 }
 
 type PprofConfig struct {
@@ -105,6 +121,8 @@ type LogConfig struct {
 	Folder        string
 	FileName      string
 	RotateSize    int
+	RotateCount   int
+	RotateMaxAge  int
 	Verbosity     int
 	VerbosePrints LogVerbosePrints
 	Context       *LogContext `toml:",omitempty"`
@@ -147,21 +165,27 @@ type HttpConfig struct {
 }
 
 type WsConfig struct {
-	Enabled bool
-	IP      string
-	Port    int
+	Enabled  bool
+	IP       string
+	Port     int
+	AuthPort int
 }
 
 type RpcOptConfig struct {
-	DebugEnabled      bool // Enables PrivateDebugService APIs, including the EVM tracer
-	RateLimterEnabled bool // Enable Rate limiter for RPC
-	RequestsPerSecond int  // for RPC rate limiter
+	DebugEnabled       bool   // Enables PrivateDebugService APIs, including the EVM tracer
+	EthRPCsEnabled     bool   // Expose Eth RPCs
+	StakingRPCsEnabled bool   // Expose Staking RPCs
+	LegacyRPCsEnabled  bool   // Expose Legacy RPCs
+	RpcFilterFile      string // Define filters to enable/disable RPC exposure
+	RateLimterEnabled  bool   // Enable Rate limiter for RPC
+	RequestsPerSecond  int    // for RPC rate limiter
 }
 
 type DevnetConfig struct {
 	NumShards   int
 	ShardSize   int
 	HmyNodeSize int
+	SlotsLimit  int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 }
 
 // TODO: make `revert` to a separate command

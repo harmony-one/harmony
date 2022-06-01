@@ -4,11 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"reflect"
 	"time"
+
+	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +20,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/types"
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/chain"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -38,6 +43,10 @@ type PublicBlockchainService struct {
 	limiter         *rate.Limiter
 	rpcBlockFactory rpc_common.BlockFactory
 	helper          *bcServiceHelper
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterGetStakingNetworkInfo    *rate.Limiter
+	limiterGetSuperCommittees       *rate.Limiter
+	limiterGetCurrentUtilityMetrics *rate.Limiter
 }
 
 const (
@@ -49,17 +58,20 @@ const (
 func NewPublicBlockchainAPI(hmy *hmy.Harmony, version Version, limiterEnable bool, limit int) rpc.API {
 	var limiter *rate.Limiter
 	if limiterEnable {
-		limiter := rate.NewLimiter(rate.Limit(limit), 1)
-		strLimit := fmt.Sprintf("%d", int64(limiter.Limit()))
+		limiter = rate.NewLimiter(rate.Limit(limit), limit)
+		name := reflect.TypeOf(limiter).Elem().Name()
 		rpcRateLimitCounterVec.With(prometheus.Labels{
-			"rate_limit": strLimit,
+			"limiter_name": name,
 		}).Add(float64(0))
 	}
 
 	s := &PublicBlockchainService{
-		hmy:     hmy,
-		version: version,
-		limiter: limiter,
+		hmy:                             hmy,
+		version:                         version,
+		limiter:                         limiter,
+		limiterGetStakingNetworkInfo:    rate.NewLimiter(5, 10),
+		limiterGetSuperCommittees:       rate.NewLimiter(5, 10),
+		limiterGetCurrentUtilityMetrics: rate.NewLimiter(5, 10),
 	}
 	s.helper = s.newHelper()
 
@@ -114,7 +126,7 @@ func (s *PublicBlockchainService) getBalanceByBlockNumber(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 	if err != nil {
 		return nil, err
 	}
@@ -140,18 +152,18 @@ func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{},
 	}
 }
 
-func (s *PublicBlockchainService) wait(ctx context.Context) error {
-	if s.limiter != nil {
+func (s *PublicBlockchainService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
 		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
 		defer cancel()
-		if !s.limiter.Allow() {
-			strLimit := fmt.Sprintf("%d", int64(s.limiter.Limit()))
+		if !limiter.Allow() {
+			name := reflect.TypeOf(limiter).Elem().Name()
 			rpcRateLimitCounterVec.With(prometheus.Labels{
-				"rate_limit": strLimit,
+				"limiter_name": name,
 			}).Inc()
 		}
 
-		return s.limiter.Wait(deadlineCtx)
+		return limiter.Wait(deadlineCtx)
 	}
 	return nil
 }
@@ -165,9 +177,9 @@ func (s *PublicBlockchainService) GetBlockByNumber(
 	timer := DoMetricRPCRequest(GetBlockByNumber)
 	defer DoRPCRequestDuration(GetBlockByNumber, timer)
 
-	err = s.wait(ctx)
+	err = s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetBlockByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetBlockByNumber, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -218,9 +230,9 @@ func (s *PublicBlockchainService) GetBlockByHash(
 	timer := DoMetricRPCRequest(GetBlockByHash)
 	defer DoRPCRequestDuration(GetBlockByHash, timer)
 
-	err = s.wait(ctx)
+	err = s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetBlockByHash, FailedNumber)
+		DoMetricRPCQueryInfo(GetBlockByHash, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -321,6 +333,9 @@ func (s *PublicBlockchainService) GetBlocks(
 
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockchainService) IsLastBlock(ctx context.Context, blockNum uint64) (bool, error) {
+	timer := DoMetricRPCRequest(IsLastBlock)
+	defer DoRPCRequestDuration(IsLastBlock, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return false, ErrNotBeaconShard
 	}
@@ -329,6 +344,9 @@ func (s *PublicBlockchainService) IsLastBlock(ctx context.Context, blockNum uint
 
 // EpochLastBlock returns epoch last block.
 func (s *PublicBlockchainService) EpochLastBlock(ctx context.Context, epoch uint64) (uint64, error) {
+	timer := DoMetricRPCRequest(EpochLastBlock)
+	defer DoRPCRequestDuration(EpochLastBlock, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return 0, ErrNotBeaconShard
 	}
@@ -339,6 +357,9 @@ func (s *PublicBlockchainService) EpochLastBlock(ctx context.Context, epoch uint
 func (s *PublicBlockchainService) GetBlockSigners(
 	ctx context.Context, blockNumber BlockNumber,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetBlockSigners)
+	defer DoRPCRequestDuration(GetBlockSigners, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum == rpc.PendingBlockNumber {
@@ -369,6 +390,9 @@ func (s *PublicBlockchainService) GetBlockSigners(
 func (s *PublicBlockchainService) GetBlockSignerKeys(
 	ctx context.Context, blockNumber BlockNumber,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetBlockSignerKeys)
+	defer DoRPCRequestDuration(GetBlockSignerKeys, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 	if blockNum == rpc.PendingBlockNumber {
@@ -391,10 +415,82 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 	return s.helper.GetBLSSigners(bn)
 }
 
+// GetBlockReceipts returns all transaction receipts for a particular block.
+func (s *PublicBlockchainService) GetBlockReceipts(
+	ctx context.Context, blockHash common.Hash,
+) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetBlockReceipts)
+	defer DoRPCRequestDuration(GetBlockReceipts, timer)
+
+	block, err := s.hmy.GetBlock(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	rmap := make(map[common.Hash]*types.Receipt, len(receipts))
+	for _, r := range receipts {
+		rmap[r.TxHash] = r
+	}
+
+	txns := make([]types.CoreTransaction, 0,
+		block.Transactions().Len()+block.StakingTransactions().Len())
+	for _, tx := range block.Transactions() {
+		txns = append(txns, tx)
+	}
+	for _, tx := range block.StakingTransactions() {
+		txns = append(txns, tx)
+	}
+
+	if len(txns) != len(rmap) {
+		return nil, fmt.Errorf(
+			"transactions (%d) and receipts (%d) count mismatch",
+			len(txns), len(rmap))
+	}
+
+	rpcr := make([]StructuredResponse, 0, len(txns))
+
+	for i, tx := range txns {
+		index := uint64(i)
+
+		r, err := interface{}(nil), error(nil)
+		switch s.version {
+		case V1:
+			r, err = v1.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case V2:
+			r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case Eth:
+			if tx, ok := tx.(*types.Transaction); ok {
+				r, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+			}
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		sr, err := NewStructuredResponse(r)
+		if err != nil {
+			return nil, err
+		}
+		rpcr = append(rpcr, sr)
+	}
+
+	return rpcr, nil
+}
+
 // IsBlockSigner returns true if validator with address signed blockNum block.
 func (s *PublicBlockchainService) IsBlockSigner(
 	ctx context.Context, blockNumber BlockNumber, address string,
 ) (bool, error) {
+	timer := DoMetricRPCRequest(IsBlockSigner)
+	defer DoRPCRequestDuration(IsBlockSigner, timer)
+
 	// Process arguments based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -423,6 +519,9 @@ func (s *PublicBlockchainService) IsBlockSigner(
 func (s *PublicBlockchainService) GetSignedBlocks(
 	ctx context.Context, address string,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetSignedBlocks)
+	defer DoRPCRequestDuration(GetSignedBlocks, timer)
+
 	// Fetch the number of signed blocks within default period
 	curEpoch := s.hmy.CurrentBlock().Epoch()
 	var totalSigned uint64
@@ -474,6 +573,9 @@ func (s *PublicBlockchainService) GetSignedBlocks(
 
 // GetEpoch returns current epoch.
 func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetEpoch)
+	defer DoRPCRequestDuration(GetEpoch, timer)
+
 	// Fetch Header
 	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	if err != nil {
@@ -494,6 +596,9 @@ func (s *PublicBlockchainService) GetEpoch(ctx context.Context) (interface{}, er
 
 // GetLeader returns current shard leader.
 func (s *PublicBlockchainService) GetLeader(ctx context.Context) (string, error) {
+	timer := DoMetricRPCRequest(GetLeader)
+	defer DoRPCRequestDuration(GetLeader, timer)
+
 	// Fetch Header
 	blk := s.hmy.BlockChain.CurrentBlock()
 	// Response output is the same for all versions
@@ -508,9 +613,9 @@ func (s *PublicBlockchainService) GetShardingStructure(
 	timer := DoMetricRPCRequest(GetShardingStructure)
 	defer DoRPCRequestDuration(GetShardingStructure, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetShardingStructure, FailedNumber)
+		DoMetricRPCQueryInfo(GetShardingStructure, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -565,9 +670,9 @@ func (s *PublicBlockchainService) LatestHeader(ctx context.Context) (StructuredR
 	timer := DoMetricRPCRequest(LatestHeader)
 	defer DoRPCRequestDuration(LatestHeader, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(LatestHeader, FailedNumber)
+		DoMetricRPCQueryInfo(LatestHeader, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -600,9 +705,9 @@ func (s *PublicBlockchainService) GetLastCrossLinks(
 	timer := DoMetricRPCRequest(GetLastCrossLinks)
 	defer DoRPCRequestDuration(GetLastCrossLinks, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetLastCrossLinks, FailedNumber)
+		DoMetricRPCQueryInfo(GetLastCrossLinks, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -638,9 +743,9 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	timer := DoMetricRPCRequest(GetHeaderByNumber)
 	defer DoRPCRequestDuration(GetHeaderByNumber, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetHeaderByNumber, FailedNumber)
+		DoMetricRPCQueryInfo(GetHeaderByNumber, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -663,6 +768,132 @@ func (s *PublicBlockchainService) GetHeaderByNumber(
 	return nil, err
 }
 
+// Result structs for GetProof
+type AccountResult struct {
+	Address      common.Address  `json:"address"`
+	AccountProof []string        `json:"accountProof"`
+	Balance      *hexutil.Big    `json:"balance"`
+	CodeHash     common.Hash     `json:"codeHash"`
+	Nonce        hexutil.Uint64  `json:"nonce"`
+	StorageHash  common.Hash     `json:"storageHash"`
+	StorageProof []StorageResult `json:"storageProof"`
+}
+
+type StorageResult struct {
+	Key   string       `json:"key"`
+	Value *hexutil.Big `json:"value"`
+	Proof []string     `json:"proof"`
+}
+
+// GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
+func (s *PublicBlockchainService) GetProof(
+	ctx context.Context, address common.Address, storageKeys []string, blockNrOrHash rpc.BlockNumberOrHash) (ret *AccountResult, err error) {
+	timer := DoMetricRPCRequest(GetProof)
+	defer DoRPCRequestDuration(GetProof, timer)
+
+	defer func() {
+		if ret == nil || err != nil {
+			DoMetricRPCQueryInfo(GetProof, FailedNumber)
+		}
+	}()
+
+	err = s.wait(s.limiter, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetProof, RateLimitedNumber)
+		return
+	}
+
+	state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if state == nil || err != nil {
+		return nil, err
+	}
+
+	storageTrie := state.StorageTrie(address)
+	storageHash := types.EmptyRootHash
+	codeHash := state.GetCodeHash(address)
+	storageProof := make([]StorageResult, len(storageKeys))
+
+	// if we have a storageTrie, (which means the account exists), we can update the storagehash
+	if storageTrie != nil {
+		storageHash = storageTrie.Hash()
+	} else {
+		// no storageTrie means the account does not exist, so the codeHash is the hash of an empty bytearray.
+		codeHash = crypto.Keccak256Hash(nil)
+	}
+
+	// create the proof for the storageKeys
+	for i, key := range storageKeys {
+		if storageTrie != nil {
+			proof, storageError := state.GetStorageProof(address, common.HexToHash(key))
+			if storageError != nil {
+				err = storageError
+				return
+			}
+			storageProof[i] = StorageResult{key, (*hexutil.Big)(state.GetState(address, common.HexToHash(key)).Big()), toHexSlice(proof)}
+		} else {
+			storageProof[i] = StorageResult{key, &hexutil.Big{}, []string{}}
+		}
+	}
+
+	// create the accountProof
+	accountProof, err := state.GetProof(address)
+	if err != nil {
+		return
+	}
+
+	ret, err = &AccountResult{
+		Address:      address,
+		AccountProof: toHexSlice(accountProof),
+		Balance:      (*hexutil.Big)(state.GetBalance(address)),
+		CodeHash:     codeHash,
+		Nonce:        hexutil.Uint64(state.GetNonce(address)),
+		StorageHash:  storageHash,
+		StorageProof: storageProof,
+	}, state.Error()
+	return
+}
+
+// toHexSlice creates a slice of hex-strings based on []byte.
+func toHexSlice(b [][]byte) []string {
+	r := make([]string, len(b))
+	for i := range b {
+		r[i] = hexutil.Encode(b[i])
+	}
+	return r
+}
+
+// GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
+func (s *PublicBlockchainService) GetHeaderByNumberRLPHex(
+	ctx context.Context, blockNumber BlockNumber,
+) (string, error) {
+	timer := DoMetricRPCRequest(GetHeaderByNumberRLPHex)
+	defer DoRPCRequestDuration(GetHeaderByNumberRLPHex, timer)
+
+	err := s.wait(s.limiter, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, RateLimitedNumber)
+		return "", err
+	}
+
+	// Process number based on version
+	blockNum := blockNumber.EthBlockNumber()
+
+	// Ensure valid block number
+	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetHeaderByNumberRLPHex, FailedNumber)
+		return "", ErrRequestedBlockTooHigh
+	}
+
+	// Fetch Header
+	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
+	if header != nil && err == nil {
+		// Response output is the same for all versions
+		val, _ := rlp.EncodeToBytes(header)
+		return hex.EncodeToString(val), nil
+	}
+	return "", err
+}
+
 // GetCurrentUtilityMetrics ..
 func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	ctx context.Context,
@@ -670,9 +901,9 @@ func (s *PublicBlockchainService) GetCurrentUtilityMetrics(
 	timer := DoMetricRPCRequest(GetCurrentUtilityMetrics)
 	defer DoRPCRequestDuration(GetCurrentUtilityMetrics, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetCurrentUtilityMetrics, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, FailedNumber)
+		DoMetricRPCQueryInfo(GetCurrentUtilityMetrics, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -699,9 +930,9 @@ func (s *PublicBlockchainService) GetSuperCommittees(
 	timer := DoMetricRPCRequest(GetSuperCommittees)
 	defer DoRPCRequestDuration(GetSuperCommittees, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetSuperCommittees, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetSuperCommittees, FailedNumber)
+		DoMetricRPCQueryInfo(GetSuperCommittees, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -728,9 +959,9 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 	timer := DoMetricRPCRequest(GetCurrentBadBlocks)
 	defer DoRPCRequestDuration(GetCurrentBadBlocks, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiter, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetCurrentBadBlocks, FailedNumber)
+		DoMetricRPCQueryInfo(GetCurrentBadBlocks, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -753,6 +984,8 @@ func (s *PublicBlockchainService) GetCurrentBadBlocks(
 func (s *PublicBlockchainService) GetTotalSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
+	timer := DoMetricRPCRequest(GetTotalSupply)
+	defer DoRPCRequestDuration(GetTotalSupply, timer)
 	return stakingReward.GetTotalTokens(s.hmy.BlockChain)
 }
 
@@ -760,6 +993,8 @@ func (s *PublicBlockchainService) GetTotalSupply(
 func (s *PublicBlockchainService) GetCirculatingSupply(
 	ctx context.Context,
 ) (numeric.Dec, error) {
+	timer := DoMetricRPCRequest(GetCirculatingSupply)
+	defer DoRPCRequestDuration(GetCirculatingSupply, timer)
 	return chain.GetCirculatingSupply(s.hmy.BlockChain)
 }
 
@@ -770,9 +1005,9 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	timer := DoMetricRPCRequest(GetStakingNetworkInfo)
 	defer DoRPCRequestDuration(GetStakingNetworkInfo, timer)
 
-	err := s.wait(ctx)
+	err := s.wait(s.limiterGetStakingNetworkInfo, ctx)
 	if err != nil {
-		DoMetricRPCQueryInfo(GetStakingNetworkInfo, FailedNumber)
+		DoMetricRPCQueryInfo(GetStakingNetworkInfo, RateLimitedNumber)
 		return nil, err
 	}
 
@@ -817,15 +1052,30 @@ func (s *PublicBlockchainService) GetStakingNetworkInfo(
 	})
 }
 
+const (
+	// If peer have block height difference smaller or equal to 10 blocks, the node is considered inSync
+	inSyncTolerance = 10
+)
+
 // InSync returns if shard chain is syncing
 func (s *PublicBlockchainService) InSync(ctx context.Context) (bool, error) {
-	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	timer := DoMetricRPCRequest(InSync)
+	defer DoRPCRequestDuration(InSync, timer)
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BlockChain.ShardID())
+	if !inSync && diff <= inSyncTolerance {
+		inSync = true
+	}
 	return inSync, nil
 }
 
 // BeaconInSync returns if beacon chain is syncing
 func (s *PublicBlockchainService) BeaconInSync(ctx context.Context) (bool, error) {
-	inSync, _, _ := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	timer := DoMetricRPCRequest(BeaconInSync)
+	defer DoRPCRequestDuration(BeaconInSync, timer)
+	inSync, _, diff := s.hmy.NodeAPI.SyncStatus(s.hmy.BeaconChain.ShardID())
+	if !inSync && diff <= inSyncTolerance {
+		inSync = true
+	}
 	return inSync, nil
 }
 
@@ -905,6 +1155,8 @@ func isBlockGreaterThanLatest(hmy *hmy.Harmony, blockNum rpc.BlockNumber) bool {
 }
 
 func (s *PublicBlockchainService) SetNodeToBackupMode(ctx context.Context, isBackup bool) (bool, error) {
+	timer := DoMetricRPCRequest(SetNodeToBackupMode)
+	defer DoRPCRequestDuration(SetNodeToBackupMode, timer)
 	return s.hmy.NodeAPI.SetNodeBackupMode(isBackup), nil
 }
 

@@ -419,3 +419,27 @@ func FindCommonAncestor(db DatabaseReader, a, b *block.Header) *block.Header {
 	}
 	return a
 }
+
+func IteratorBlocks(iterator DatabaseIterator, cb func(blockNum uint64, hash common.Hash) bool) (minKey []byte, maxKey []byte) {
+	iter := iterator.NewIteratorWithPrefix(headerPrefix)
+	defer iter.Release()
+
+	minKey = headerPrefix
+	for iter.Next() {
+		// headerKey = headerPrefix + num (uint64 big endian) + hash
+		key := iter.Key()
+		if len(key) != len(headerPrefix)+8+32 {
+			continue
+		}
+
+		maxKey = key
+		blockNum := decodeBlockNumber(key[len(headerPrefix) : len(headerPrefix)+8])
+		hash := common.BytesToHash(key[len(headerPrefix)+8:])
+
+		if !cb(blockNum, hash) {
+			return
+		}
+	}
+
+	return
+}

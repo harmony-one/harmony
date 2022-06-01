@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/reward"
+
 	"github.com/harmony-one/harmony/consensus"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -41,9 +43,12 @@ type environment struct {
 	txs        []*types.Transaction
 	stakingTxs []*staking.StakingTransaction
 	receipts   []*types.Receipt
+	logs       []*types.Log
+	reward     reward.Reader
 	outcxs     []*types.CXReceipt       // cross shard transaction receipts (source shard)
 	incxs      []*types.CXReceiptsProof // cross shard receipts and its proof (desitinatin shard)
 	slashes    slash.Records
+	stakeMsgs  []staking.StakeMsg
 }
 
 // Worker is the main object which takes care of submitting new work to consensus engine
@@ -64,6 +69,12 @@ func (w *Worker) CommitSortedTransactions(
 	coinbase common.Address,
 ) {
 	for {
+		if w.current.gasPool.Gas() < 30000000 {
+			// Temporary solution to reduce the fullness of the block. Break here when the available gas left hit 30M.
+			// Effectively making the gas limit 50M (since 80M is the default gas limit)
+			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("[Temp Gas Limit] Not enough gas for further transactions")
+			break
+		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
 			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
@@ -97,7 +108,7 @@ func (w *Worker) CommitSortedTransactions(
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs))
-		_, err := w.commitTransaction(tx, coinbase)
+		err := w.commitTransaction(tx, coinbase)
 
 		sender, _ := common2.AddressToBech32(from)
 		switch err {
@@ -161,7 +172,7 @@ func (w *Worker) CommitTransactions(
 			// Start executing the transaction
 			w.current.state.Prepare(tx.Hash(), common.Hash{}, len(w.current.txs)+len(w.current.stakingTxs))
 			// THESE CODE ARE DUPLICATED AS ABOVE>>
-			if _, err := w.commitStakingTransaction(tx, coinbase); err != nil {
+			if err := w.commitStakingTransaction(tx, coinbase); err != nil {
 				txID := tx.Hash().Hex()
 				utils.Logger().Error().Err(err).
 					Str("stakingTxID", txID).
@@ -186,7 +197,7 @@ func (w *Worker) CommitTransactions(
 
 func (w *Worker) commitStakingTransaction(
 	tx *staking.StakingTransaction, coinbase common.Address,
-) ([]*types.Log, error) {
+) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
 	receipt, _, err := core.ApplyStakingTransaction(
@@ -199,15 +210,17 @@ func (w *Worker) commitStakingTransaction(
 		utils.Logger().Error().
 			Err(err).Interface("stkTxn", tx).
 			Msg("Staking transaction failed commitment")
-		return nil, err
+		return err
 	}
 	if receipt == nil {
-		return nil, fmt.Errorf("nil staking receipt")
+		return fmt.Errorf("nil staking receipt")
 	}
 
 	w.current.stakingTxs = append(w.current.stakingTxs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
-	return receipt.Logs, nil
+	w.current.logs = append(w.current.logs, receipt.Logs...)
+
+	return nil
 }
 
 var (
@@ -216,10 +229,10 @@ var (
 
 func (w *Worker) commitTransaction(
 	tx *types.Transaction, coinbase common.Address,
-) ([]*types.Log, error) {
+) error {
 	snap := w.current.state.Snapshot()
 	gasUsed := w.current.header.GasUsed()
-	receipt, cx, _, err := core.ApplyTransaction(
+	receipt, cx, stakeMsgs, _, err := core.ApplyTransaction(
 		w.config,
 		w.chain,
 		&coinbase,
@@ -236,20 +249,22 @@ func (w *Worker) commitTransaction(
 		utils.Logger().Error().
 			Err(err).Interface("txn", tx).
 			Msg("Transaction failed commitment")
-		return nil, errNilReceipt
+		return errNilReceipt
 	}
 	if receipt == nil {
 		utils.Logger().Warn().Interface("tx", tx).Interface("cx", cx).Msg("Receipt is Nil!")
-		return nil, errNilReceipt
+		return errNilReceipt
 	}
 
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+	w.current.logs = append(w.current.logs, receipt.Logs...)
+	w.current.stakeMsgs = append(w.current.stakeMsgs, stakeMsgs...)
 
 	if cx != nil {
 		w.current.outcxs = append(w.current.outcxs, cx)
 	}
-	return receipt.Logs, nil
+	return nil
 }
 
 // CommitReceipts commits a list of already verified incoming cross shard receipts
@@ -314,6 +329,19 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 
 	w.current = env
 	return nil
+}
+
+// GetCurrentResult gets the current block processing result.
+func (w *Worker) GetCurrentResult() *core.ProcessorResult {
+	return &core.ProcessorResult{
+		Receipts:   w.current.receipts,
+		CxReceipts: w.current.outcxs,
+		Logs:       w.current.logs,
+		UsedGas:    w.current.header.GasUsed(),
+		Reward:     w.current.reward,
+		State:      w.current.state,
+		StakeMsgs:  w.current.stakeMsgs,
+	}
 }
 
 // GetCurrentState gets the current state.
@@ -497,7 +525,7 @@ func (w *Worker) FinalizeNewBlock(
 			return nil, err
 		}
 	}
-	state := w.current.state.Copy()
+	state := w.current.state
 	copyHeader := types.CopyHeader(w.current.header)
 
 	sigsReady := make(chan bool)
@@ -524,7 +552,7 @@ func (w *Worker) FinalizeNewBlock(
 		}
 	}()
 
-	block, _, err := w.engine.Finalize(
+	block, payout, err := w.engine.Finalize(
 		w.chain, copyHeader, state, w.current.txs, w.current.receipts,
 		w.current.outcxs, w.current.incxs, w.current.stakingTxs,
 		w.current.slashes, sigsReady, viewID,
@@ -532,6 +560,7 @@ func (w *Worker) FinalizeNewBlock(
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot finalize block")
 	}
+	w.current.reward = payout
 	return block, nil
 }
 

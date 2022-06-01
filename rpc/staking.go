@@ -3,12 +3,15 @@ package rpc
 import (
 	"context"
 	"math/big"
+	"reflect"
 
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 	"github.com/harmony-one/harmony/shard"
@@ -29,6 +32,10 @@ type PublicStakingService struct {
 	version Version
 
 	validatorInfoCache *lru.Cache // cache for detailed validator information per page and block
+	// TEMP SOLUTION to rpc node spamming issue
+	limiterGetAllValidatorInformation  *rate.Limiter
+	limiterGetAllDelegationInformation *rate.Limiter
+	limiterGetDelegationsByValidator   *rate.Limiter
 }
 
 // NewPublicStakingAPI creates a new API for the RPC interface
@@ -38,12 +45,31 @@ func NewPublicStakingAPI(hmy *hmy.Harmony, version Version) rpc.API {
 		Namespace: version.Namespace(),
 		Version:   APIVersion,
 		Service: &PublicStakingService{
-			hmy:                hmy,
-			version:            version,
-			validatorInfoCache: viCache,
+			hmy:                                hmy,
+			version:                            version,
+			validatorInfoCache:                 viCache,
+			limiterGetAllValidatorInformation:  rate.NewLimiter(1, 3),
+			limiterGetAllDelegationInformation: rate.NewLimiter(1, 3),
+			limiterGetDelegationsByValidator:   rate.NewLimiter(5, 20),
 		},
 		Public: true,
 	}
+}
+
+func (s *PublicStakingService) wait(limiter *rate.Limiter, ctx context.Context) error {
+	if limiter != nil {
+		deadlineCtx, cancel := context.WithTimeout(ctx, DefaultRateLimiterWaitTimeout)
+		defer cancel()
+		if !limiter.Allow() {
+			name := reflect.TypeOf(limiter).Elem().Name()
+			rpcRateLimitCounterVec.With(prometheus.Labels{
+				"limiter_name": name,
+			}).Inc()
+		}
+
+		return limiter.Wait(deadlineCtx)
+	}
+	return nil
 }
 
 // getBalanceByBlockNumber returns balance by block number at given eth blockNum without checks
@@ -54,7 +80,7 @@ func (s *PublicStakingService) getBalanceByBlockNumber(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +92,9 @@ func (s *PublicStakingService) getBalanceByBlockNumber(
 func (s *PublicStakingService) GetTotalStaking(
 	ctx context.Context,
 ) (*big.Int, error) {
+	timer := DoMetricRPCRequest(GetTotalStaking)
+	defer DoRPCRequestDuration(GetTotalStaking, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -79,6 +108,9 @@ func (s *PublicStakingService) GetTotalStaking(
 func (s *PublicStakingService) GetMedianRawStakeSnapshot(
 	ctx context.Context,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetMedianRawStakeSnapshot)
+	defer DoRPCRequestDuration(GetMedianRawStakeSnapshot, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -97,6 +129,9 @@ func (s *PublicStakingService) GetMedianRawStakeSnapshot(
 func (s *PublicStakingService) GetElectedValidatorAddresses(
 	ctx context.Context,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetElectedValidatorAddresses)
+	defer DoRPCRequestDuration(GetElectedValidatorAddresses, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -116,6 +151,9 @@ func (s *PublicStakingService) GetElectedValidatorAddresses(
 func (s *PublicStakingService) GetValidators(
 	ctx context.Context, epoch int64,
 ) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetValidators)
+	defer DoRPCRequestDuration(GetValidators, timer)
+
 	// Fetch the Committee
 	cmt, err := s.hmy.GetValidators(big.NewInt(epoch))
 	if err != nil {
@@ -167,6 +205,9 @@ func (s *PublicStakingService) GetValidators(
 func (s *PublicStakingService) GetAllValidatorAddresses(
 	ctx context.Context,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetAllValidatorAddresses)
+	defer DoRPCRequestDuration(GetAllValidatorAddresses, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}
@@ -186,6 +227,9 @@ func (s *PublicStakingService) GetAllValidatorAddresses(
 func (s *PublicStakingService) GetValidatorKeys(
 	ctx context.Context, epoch int64,
 ) ([]string, error) {
+	timer := DoMetricRPCRequest(GetValidatorKeys)
+	defer DoRPCRequestDuration(GetValidatorKeys, timer)
+
 	// Fetch the Committee
 	cmt, err := s.hmy.GetValidators(big.NewInt(epoch))
 	if err != nil {
@@ -201,12 +245,17 @@ func (s *PublicStakingService) GetValidatorKeys(
 }
 
 // GetAllValidatorInformation returns information about all validators.
-// If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicStakingService) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformation)
 	defer DoRPCRequestDuration(GetAllValidatorInformation, timer)
+
+	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllValidatorInformation, RateLimitedNumber)
+		return nil, err
+	}
 
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllValidatorInformation, FailedNumber)
@@ -230,6 +279,12 @@ func (s *PublicStakingService) GetAllValidatorInformationByBlockNumber(
 ) (interface{}, error) {
 	timer := DoMetricRPCRequest(GetAllValidatorInformationByBlockNumber)
 	defer DoRPCRequestDuration(GetAllValidatorInformationByBlockNumber, timer)
+
+	err := s.wait(s.limiterGetAllValidatorInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllValidatorInformationByBlockNumber, RateLimitedNumber)
+		return nil, err
+	}
 
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
@@ -282,25 +337,22 @@ func (s *PublicStakingService) getPagedValidatorInformationCached(ctx context.Co
 func (s *PublicStakingService) getAllValidatorInformation(
 	ctx context.Context, page int, blockNum uint64,
 ) (interface{}, error) {
-	if page < -1 {
-		return nil, errors.Errorf("page given %d cannot be less than -1", page)
+	if page < 0 {
+		return nil, errors.Errorf("page given %d cannot be less than 0", page)
 	}
 
 	// Get all validators
 	addresses := s.hmy.GetAllValidatorAddresses()
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
+	if len(addresses) <= page*validatorsPageSize {
 		return []StructuredResponse{}, nil
 	}
 
 	// Set page start
-	validatorsNum := len(addresses)
 	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
+	validatorsNum := validatorsPageSize
+	start = page * validatorsPageSize
+	if len(addresses)-start < validatorsPageSize {
+		validatorsNum = len(addresses) - start
 	}
 
 	// Fetch block
@@ -402,6 +454,9 @@ func (s *PublicStakingService) GetValidatorInformationByBlockNumber(
 func (s *PublicStakingService) GetValidatorSelfDelegation(
 	ctx context.Context, address string,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetValidatorSelfDelegation)
+	defer DoRPCRequestDuration(GetValidatorSelfDelegation, timer)
+
 	// Ensure node is for beacon shard
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
@@ -429,6 +484,9 @@ func (s *PublicStakingService) GetValidatorSelfDelegation(
 func (s *PublicStakingService) GetValidatorTotalDelegation(
 	ctx context.Context, address string,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetValidatorTotalDelegation)
+	defer DoRPCRequestDuration(GetValidatorTotalDelegation, timer)
+
 	// Ensure node is for beacon shard
 	if s.hmy.ShardID != shard.BeaconChainShardID {
 		return nil, ErrNotBeaconShard
@@ -458,7 +516,6 @@ func (s *PublicStakingService) GetValidatorTotalDelegation(
 
 // GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
 // starting at `page*validatorsPageSize`.
-// If page is -1, return all instead of `validatorsPageSize` elements.
 // TODO(dm): optimize with single flight
 func (s *PublicStakingService) GetAllDelegationInformation(
 	ctx context.Context, page int,
@@ -466,11 +523,17 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 	timer := DoMetricRPCRequest(GetAllDelegationInformation)
 	defer DoRPCRequestDuration(GetAllDelegationInformation, timer)
 
+	err := s.wait(s.limiterGetAllDelegationInformation, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetAllDelegationInformation, RateLimitedNumber)
+		return nil, err
+	}
+
 	if !isBeaconShard(s.hmy) {
 		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
-	if page < -1 {
+	if page < 0 {
 		return make([][]StructuredResponse, 0), nil
 	}
 
@@ -478,26 +541,22 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 	addresses := s.hmy.GetAllValidatorAddresses()
 
 	// Return nothing if no delegation on page
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
+	if len(addresses) <= page*validatorsPageSize {
 		return make([][]StructuredResponse, 0), nil
 	}
 
 	// Set page start
-	validatorsNum := len(addresses)
 	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
+	validatorsNum := validatorsPageSize
+	start = page * validatorsPageSize
+	if len(addresses)-start < validatorsPageSize {
+		validatorsNum = len(addresses) - start
 	}
 
 	// Fetch all delegations
 	validators := make([][]StructuredResponse, validatorsNum)
-	var err error
 	for i := start; i < start+validatorsNum; i++ {
-		validators[i-start], err = s.GetDelegationsByValidator(ctx, addresses[i].String())
+		validators[i-start], err = s.getDelegationByValidatorHelper(addresses[i].String())
 		if err != nil {
 			DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
 			return nil, err
@@ -564,6 +623,9 @@ func (s *PublicStakingService) GetDelegationsByDelegator(
 func (s *PublicStakingService) GetDelegationsByDelegatorByBlockNumber(
 	ctx context.Context, aol AddressOrList, blockNumber BlockNumber,
 ) (interface{}, error) {
+	timer := DoMetricRPCRequest(GetDelegationsByDelegatorByBlockNumber)
+	defer DoRPCRequestDuration(GetDelegationsByDelegatorByBlockNumber, timer)
+
 	// Process number based on version
 	blockNum := blockNumber.EthBlockNumber()
 
@@ -642,6 +704,15 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 		return nil, ErrNotBeaconShard
 	}
 
+	err := s.wait(s.limiterGetDelegationsByValidator, ctx)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetDelegationsByValidator, RateLimitedNumber)
+		return nil, err
+	}
+	return s.getDelegationByValidatorHelper(address)
+}
+
+func (s *PublicStakingService) getDelegationByValidatorHelper(address string) ([]StructuredResponse, error) {
 	// Fetch delegations
 	validatorAddress, err := internal_common.ParseAddr(address)
 	if err != nil {
@@ -650,16 +721,15 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 	delegations := s.hmy.GetDelegationsByValidator(validatorAddress)
 
 	// Format response
-	result := []StructuredResponse{}
-	for i := range delegations {
-		delegation := delegations[i]
-		undelegations := make([]Undelegation, len(delegation.Undelegations))
+	result := make([]StructuredResponse, 0, len(delegations))
+	for _, delegation := range delegations {
+		undelegations := make([]Undelegation, 0, len(delegation.Undelegations))
 
-		for j := range delegation.Undelegations {
-			undelegations[j] = Undelegation{
-				Amount: delegation.Undelegations[j].Amount,
-				Epoch:  delegation.Undelegations[j].Epoch,
-			}
+		for _, undelegation := range delegation.Undelegations {
+			undelegations = append(undelegations, Undelegation{
+				Amount: undelegation.Amount,
+				Epoch:  undelegation.Epoch,
+			})
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
@@ -670,17 +740,13 @@ func (s *PublicStakingService) GetDelegationsByValidator(
 		}
 
 		// Response output is the same for all versions
-		del, err := NewStructuredResponse(Delegation{
+		del := Delegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
-		})
-		if err != nil {
-			DoMetricRPCQueryInfo(GetDelegationsByValidator, FailedNumber)
-			return nil, err
-		}
+		}.IntoStructuredResponse()
 		result = append(result, del)
 	}
 	return result, nil
@@ -744,6 +810,9 @@ func (s *PublicStakingService) GetDelegationByDelegatorAndValidator(
 func (s *PublicStakingService) GetAvailableRedelegationBalance(
 	ctx context.Context, address string,
 ) (*big.Int, error) {
+	timer := DoMetricRPCRequest(GetAvailableRedelegationBalance)
+	defer DoRPCRequestDuration(GetAvailableRedelegationBalance, timer)
+
 	if !isBeaconShard(s.hmy) {
 		return nil, ErrNotBeaconShard
 	}

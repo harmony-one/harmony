@@ -64,9 +64,14 @@ Version = "1.0.2"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -132,9 +137,14 @@ Version = "1.0.3"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -200,6 +210,10 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [Sync]
   Concurrency = 6
@@ -215,6 +229,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -280,6 +295,10 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = "./.hmy/rpc_filter.txt"
 
 [Sync]
   Concurrency = 6
@@ -293,8 +312,16 @@ Version = "1.0.4"
   LegacyServer = true
   MinPeers = 6
 
+[ShardData]
+  EnableShardData = false
+  DiskCount = 8
+  ShardCount = 4
+  CacheTime = 10
+  CacheSize = 512
+
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true

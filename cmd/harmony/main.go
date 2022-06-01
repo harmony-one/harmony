@@ -15,14 +15,17 @@ import (
 	"syscall"
 	"time"
 
+	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
+
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/harmony-one/bls/ffi/go/bls"
 
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/pprof"
@@ -98,11 +101,15 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(dumpConfigLegacyCmd)
+	rootCmd.AddCommand(dumpDBCmd)
 
 	if err := registerRootCmdFlags(); err != nil {
 		os.Exit(2)
 	}
 	if err := registerDumpConfigFlags(); err != nil {
+		os.Exit(2)
+	}
+	if err := registerDumpDBFlags(); err != nil {
 		os.Exit(2)
 	}
 }
@@ -229,14 +236,17 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applyRevertFlags(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
+	applyShardDataFlags(cmd, config)
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
 	rotateSize := config.Log.RotateSize
+	rotateCount := config.Log.RotateCount
+	rotateMaxAge := config.Log.RotateMaxAge
 	verbosity := config.Log.Verbosity
 
-	utils.AddLogFile(logPath, rotateSize)
+	utils.AddLogFile(logPath, rotateSize, rotateCount, rotateMaxAge)
 	utils.SetLogVerbosity(log.Lvl(verbosity))
 	if config.Log.Context != nil {
 		ip := config.Log.Context.IP
@@ -318,7 +328,12 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		WSEnabled:          hc.WS.Enabled,
 		WSIp:               hc.WS.IP,
 		WSPort:             hc.WS.Port,
+		WSAuthPort:         hc.WS.AuthPort,
 		DebugEnabled:       hc.RPCOpt.DebugEnabled,
+		EthRPCsEnabled:     hc.RPCOpt.EthRPCsEnabled,
+		StakingRPCsEnabled: hc.RPCOpt.StakingRPCsEnabled,
+		LegacyRPCsEnabled:  hc.RPCOpt.LegacyRPCsEnabled,
+		RpcFilterFile:      hc.RPCOpt.RpcFilterFile,
 		RateLimiterEnabled: hc.RPCOpt.RateLimterEnabled,
 		RequestsPerSecond:  hc.RPCOpt.RequestsPerSecond,
 	}
@@ -349,6 +364,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				sigAndBitMap := append(lastSig[:], curBlock.Header().LastCommitBitmap()...)
 				chain.WriteCommitSig(curBlock.NumberU64()-1, sigAndBitMap)
 			}
+			fmt.Printf("Revert finished. Current block: %v\n", chain.CurrentBlock().NumberU64())
+			utils.Logger().Warn().
+				Uint64("Current Block", chain.CurrentBlock().NumberU64()).
+				Msg("Revert finished.")
+			os.Exit(1)
 		}
 	}
 
@@ -470,7 +490,7 @@ func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 		}
 
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, dnConfig.SlotsLimit, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
@@ -578,13 +598,14 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 		Port:            strconv.Itoa(hc.P2P.Port),
 		ConsensusPubKey: nodeConfig.ConsensusPriKey[0].Pub.Object,
 	}
-
 	myHost, err = p2p.NewHost(p2p.HostConfig{
-		Self:            &selfPeer,
-		BLSKey:          nodeConfig.P2PPriKey,
-		BootNodes:       hc.Network.BootNodes,
-		DataStoreFile:   hc.P2P.DHTDataStore,
-		DiscConcurrency: hc.P2P.DiscConcurrency,
+		Self:                 &selfPeer,
+		BLSKey:               nodeConfig.P2PPriKey,
+		BootNodes:            hc.Network.BootNodes,
+		DataStoreFile:        hc.P2P.DHTDataStore,
+		DiscConcurrency:      hc.P2P.DiscConcurrency,
+		MaxConnPerIP:         hc.P2P.MaxConnsPerIP,
+		DisablePrivateIPScan: hc.P2P.DisablePrivateIPScan,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create P2P network host")
@@ -606,6 +627,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	}
 
 	nodeConfig.NtpServer = hc.Sys.NtpServer
+
+	nodeConfig.TraceEnable = hc.General.TraceEnable
 
 	return nodeConfig, nil
 }
@@ -645,10 +668,26 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
 	}
 
-	// Current node.
-	chainDBFactory := &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	localAccounts, err := setupLocalAccounts(hc, blacklist)
+	if err != nil {
+		utils.Logger().Warn().Msgf("local accounts setup error: %s", err.Error())
+	}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, nodeConfig.ArchiveModes(), &hc)
+	// Current node.
+	var chainDBFactory shardchain.DBFactory
+	if hc.ShardData.EnableShardData {
+		chainDBFactory = &shardchain.LDBShardFactory{
+			RootDir:    nodeConfig.DBDir,
+			DiskCount:  hc.ShardData.DiskCount,
+			ShardCount: hc.ShardData.ShardCount,
+			CacheTime:  hc.ShardData.CacheTime,
+			CacheSize:  hc.ShardData.CacheSize,
+		}
+	} else {
+		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
+	}
+
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, localAccounts, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -786,10 +825,14 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 	node.RegisterService(service.Synchronize, s)
 
 	d := s.Downloaders.GetShardDownloader(node.Blockchain().ShardID())
-	node.Consensus.SetDownloader(d)
+	if hc.Sync.Downloader && hc.General.NodeType != nodeTypeExplorer {
+		node.Consensus.SetDownloader(d) // Set downloader when stream client is active
+	}
 }
 
 func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struct{}, error) {
+	rosetta_common.InitRosettaFile(hc.TxPool.RosettaFixFile)
+
 	utils.Logger().Debug().Msgf("Using blacklist file at `%s`", hc.TxPool.BlacklistFile)
 	dat, err := ioutil.ReadFile(hc.TxPool.BlacklistFile)
 	if err != nil {
@@ -809,9 +852,55 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 	return addrMap, nil
 }
 
+func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.Address]struct{}) ([]ethCommon.Address, error) {
+	file := hc.TxPool.LocalAccountsFile
+	// check if file exist
+	var fileData string
+	if _, err := os.Stat(file); err == nil {
+		b, err := ioutil.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		fileData = string(b)
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file path does not exist
+		return []ethCommon.Address{}, nil
+	} else {
+		// some other errors happened
+		return nil, err
+	}
+
+	localAccounts := make(map[ethCommon.Address]struct{})
+	lines := strings.Split(fileData, "\n")
+	for _, line := range lines {
+		if len(line) != 0 { // the file may have trailing empty string line
+			trimmedLine := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmedLine, "#") { //check the line is not commented
+				continue
+			}
+			addr, err := common.Bech32ToAddress(trimmedLine)
+			if err != nil {
+				return nil, err
+			}
+			// skip the blacklisted addresses
+			if _, exists := blacklist[addr]; exists {
+				utils.Logger().Warn().Msgf("local account with address %s is blacklisted", addr.String())
+				continue
+			}
+			localAccounts[addr] = struct{}{}
+		}
+	}
+	uniqueAddresses := make([]ethCommon.Address, 0, len(localAccounts))
+	for addr := range localAccounts {
+		uniqueAddresses = append(uniqueAddresses, addr)
+	}
+
+	return uniqueAddresses, nil
+}
+
 func listenOSSigAndShutDown(node *node.Node) {
 	// Prepare for graceful shutdown from os signals
-	osSignal := make(chan os.Signal)
+	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-osSignal
 	utils.Logger().Warn().Str("signal", sig.String()).Msg("Gracefully shutting down...")

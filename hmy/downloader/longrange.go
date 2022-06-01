@@ -19,9 +19,6 @@ import (
 func (d *Downloader) doLongRangeSync() (int, error) {
 	var totalInserted int
 
-	d.startSyncing()
-	defer d.finishSyncing()
-
 	for {
 		ctx, cancel := context.WithCancel(d.ctx)
 
@@ -71,6 +68,15 @@ func (lsi *lrSyncIter) doLongRangeSync() error {
 	if err != nil {
 		return err
 	}
+	if curBN := lsi.bc.CurrentBlock().NumberU64(); bn <= curBN {
+		lsi.logger.Info().Uint64("current number", curBN).Uint64("target number", bn).
+			Msg("early return of long range sync")
+		return nil
+	}
+
+	lsi.d.startSyncing()
+	defer lsi.d.finishSyncing()
+
 	lsi.logger.Info().Uint64("target number", bn).Msg("estimated remote current number")
 	lsi.d.status.setTargetBN(bn)
 

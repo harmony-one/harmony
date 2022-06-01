@@ -25,10 +25,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 )
 
@@ -72,27 +72,33 @@ func NewPublicTraceAPI(hmy *hmy.Harmony, version Version) rpc.API {
 // TraceChain returns the structured logs created during the execution of EVM
 // between two blocks (excluding start) and returns them as a JSON object.
 func (s *PublicTracerService) TraceChain(ctx context.Context, start, end rpc.BlockNumber, config *hmy.TraceConfig) (*rpc.Subscription, error) {
+	timer := DoMetricRPCRequest(TraceChain)
+	defer DoRPCRequestDuration(TraceChain, timer)
+
 	// TODO (JL): Make API available after DoS testing
 	return nil, ErrNotAvailable
-	if uint64(start) >= uint64(end) {
-		return nil, fmt.Errorf("start block can not be equal or greater than the end block")
-	}
+	/*
+		if uint64(start) >= uint64(end) {
+			return nil, fmt.Errorf("start block can not be equal or greater than the end block")
+		}
 
-	currentBlock := s.hmy.BlockChain.CurrentBlock().NumberU64()
-	if uint64(start) > currentBlock || uint64(end) > currentBlock {
-		return nil, ErrRequestedBlockTooHigh
-	}
+		currentBlock := s.hmy.BlockChain.CurrentBlock().NumberU64()
+		if uint64(start) > currentBlock || uint64(end) > currentBlock {
+			return nil, ErrRequestedBlockTooHigh
+		}
 
-	from := s.hmy.BlockChain.GetBlockByNumber(uint64(start))
-	if from == nil {
-		return nil, fmt.Errorf("start block #%d not found", start)
-	}
-	to := s.hmy.BlockChain.GetBlockByNumber(uint64(end))
-	if to == nil {
-		return nil, fmt.Errorf("end block #%d not found", end)
-	}
+		from := s.hmy.BlockChain.GetBlockByNumber(uint64(start))
+		if from == nil {
+			return nil, fmt.Errorf("start block #%d not found", start)
+		}
+		to := s.hmy.BlockChain.GetBlockByNumber(uint64(end))
+		if to == nil {
+			return nil, fmt.Errorf("end block #%d not found", end)
+		}
 
-	return s.hmy.TraceChain(ctx, from, to, config)
+		return s.hmy.TraceChain(ctx, from, to, config)
+
+	*/
 }
 
 // TraceBlockByNumber returns the structured logs created during the execution of
@@ -163,6 +169,7 @@ func (s *PublicTracerService) TraceTransaction(ctx context.Context, hash common.
 		return nil, err
 	}
 	// Trace the transaction and return
+	statedb.Prepare(tx.ConvertToEth().Hash(), block.Hash(), int(index))
 	return s.hmy.TraceTx(ctx, msg, vmctx, statedb, config)
 }
 

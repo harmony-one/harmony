@@ -37,6 +37,7 @@ import (
 	"github.com/harmony-one/harmony/staking"
 	"github.com/harmony-one/harmony/staking/effective"
 	stk "github.com/harmony-one/harmony/staking/types"
+	staketest "github.com/harmony-one/harmony/staking/types/test"
 	"github.com/pkg/errors"
 )
 
@@ -89,7 +90,8 @@ type DB struct {
 	// The refund counter, also used by state transitioning.
 	refund uint64
 
-	thash, bhash common.Hash
+	thash, bhash common.Hash // thash means hmy tx hash
+	ethTxHash    common.Hash // ethTxHash is eth tx hash, use by tracer
 	txIndex      int
 	logs         map[common.Hash][]*types.Log
 	logSize      uint
@@ -157,6 +159,7 @@ func (db *DB) Reset(root common.Hash) error {
 	db.stateValidators = make(map[common.Address]*stk.ValidatorWrapper)
 	db.thash = common.Hash{}
 	db.bhash = common.Hash{}
+	db.ethTxHash = common.Hash{}
 	db.txIndex = 0
 	db.logs = make(map[common.Hash][]*types.Log)
 	db.logSize = 0
@@ -261,6 +264,10 @@ func (db *DB) TxIndex() int {
 
 func (s *DB) TxHash() common.Hash {
 	return s.thash
+}
+
+func (s *DB) TxHashETH() common.Hash {
+	return s.ethTxHash
 }
 
 // BlockHash returns the current block hash set by Prepare.
@@ -633,6 +640,10 @@ func (db *DB) Copy() *DB {
 		}
 		state.stateObjectsDirty[addr] = struct{}{}
 	}
+	for addr, wrapper := range db.stateValidators {
+		copied := staketest.CopyValidatorWrapper(*wrapper)
+		state.stateValidators[addr] = &copied
+	}
 	for hash, logs := range db.logs {
 		cpy := make([]*types.Log, len(logs))
 		for i, l := range logs {
@@ -681,8 +692,8 @@ func (db *DB) GetRefund() uint64 {
 func (db *DB) Finalise(deleteEmptyObjects bool) {
 	// Commit validator changes in cache to stateObjects
 	// TODO: remove validator cache after commit
-	for addr, val := range db.stateValidators {
-		db.UpdateValidatorWrapper(addr, val)
+	for addr, wrapper := range db.stateValidators {
+		db.UpdateValidatorWrapper(addr, wrapper)
 	}
 
 	for addr := range db.journal.dirties {
@@ -742,6 +753,10 @@ func (db *DB) Prepare(thash, bhash common.Hash, ti int) {
 	db.txIndex = ti
 }
 
+func (db *DB) SetTxHashETH(ethTxHash common.Hash) {
+	db.ethTxHash = ethTxHash
+}
+
 func (db *DB) clearJournalAndRefund() {
 	if len(db.journal.entries) > 0 {
 		db.journal = newJournal()
@@ -796,35 +811,27 @@ var (
 	errAddressNotPresent = errors.New("address not present in state")
 )
 
-// ValidatorWrapper retrieves the existing validator in the cache.
-// The return value is a reference to the actual validator object in state.
-// The modification on it will be committed to the state object when Finalize()
-// is called.
+// ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
+// else it will return a copy of the wrapper - which needs to be explicitly committed
+// with UpdateValidatorWrapper
+// to conserve memory, the copy can optionally avoid deep copying delegations
+// Revert in UpdateValidatorWrapper does not work if sendOriginal == true
 func (db *DB) ValidatorWrapper(
 	addr common.Address,
+	sendOriginal bool,
+	copyDelegations bool,
 ) (*stk.ValidatorWrapper, error) {
+	// if cannot revert and ask for a copy
+	if sendOriginal && copyDelegations {
+		panic("'Cannot revert' must not expect copy of delegations")
+	}
+
 	// Read cache first
 	cached, ok := db.stateValidators[addr]
 	if ok {
-		return cached, nil
+		return copyValidatorWrapperIfNeeded(cached, sendOriginal, copyDelegations), nil
 	}
 
-	val, err := db.ValidatorWrapperCopy(addr)
-	if err != nil {
-		return nil, err
-	}
-	// populate cache if the validator is not in it
-	db.stateValidators[addr] = val
-	return val, nil
-
-}
-
-// ValidatorWrapperCopy retrieves the existing validator as a copy from state object.
-// Changes on the copy has to be explicitly commited with UpdateValidatorWrapper()
-// to take effect.
-func (db *DB) ValidatorWrapperCopy(
-	addr common.Address,
-) (*stk.ValidatorWrapper, error) {
 	by := db.GetCode(addr)
 	if len(by) == 0 {
 		return nil, errAddressNotPresent
@@ -837,7 +844,27 @@ func (db *DB) ValidatorWrapperCopy(
 			common2.MustAddressToBech32(addr),
 		)
 	}
-	return &val, nil
+	// populate cache because the validator is not in it
+	db.stateValidators[addr] = &val
+	return copyValidatorWrapperIfNeeded(&val, sendOriginal, copyDelegations), nil
+}
+
+func copyValidatorWrapperIfNeeded(
+	wrapper *stk.ValidatorWrapper,
+	sendOriginal bool,
+	copyDelegations bool,
+) *stk.ValidatorWrapper {
+	if sendOriginal {
+		return wrapper
+	} else {
+		if copyDelegations {
+			copied := staketest.CopyValidatorWrapper(*wrapper)
+			return &copied
+		} else {
+			copied := staketest.CopyValidatorWrapperNoDelegations(*wrapper)
+			return &copied
+		}
+	}
 }
 
 // UpdateValidatorWrapper updates staking information of
@@ -848,14 +875,39 @@ func (db *DB) UpdateValidatorWrapper(
 	if err := val.SanityCheck(); err != nil {
 		return err
 	}
-
 	by, err := rlp.EncodeToBytes(val)
 	if err != nil {
 		return err
 	}
+	// has revert in-built for the code field
 	db.SetCode(addr, by)
 	// update cache
 	db.stateValidators[addr] = val
+	return nil
+}
+
+// UpdateValidatorWrapperWithRevert updates staking information of
+// a given validator (including delegation info)
+func (db *DB) UpdateValidatorWrapperWithRevert(
+	addr common.Address, val *stk.ValidatorWrapper,
+) error {
+	if err := val.SanityCheck(); err != nil {
+		return err
+	}
+	// a copy of the existing store can be used for revert
+	// since we are replacing the existing with the new anyway
+	prev, err := db.ValidatorWrapper(addr, true, false)
+	if err != nil && err != errAddressNotPresent {
+		return err
+	}
+	if err := db.UpdateValidatorWrapper(addr, val); err != nil {
+		return err
+	}
+	// this will save the ValidatorWrapper as prev in validatorWrapperChange object
+	db.journal.append(validatorWrapperChange{
+		address: &addr,
+		prev:    prev,
+	})
 	return nil
 }
 
@@ -907,7 +959,7 @@ func (db *DB) AddReward(snapshot *stk.ValidatorWrapper, reward *big.Int, shareLo
 		return nil
 	}
 
-	curValidator, err := db.ValidatorWrapper(snapshot.Address)
+	curValidator, err := db.ValidatorWrapper(snapshot.Address, true, false)
 	if err != nil {
 		return errors.Wrapf(err, "failed to distribute rewards: validator does not exist")
 	}

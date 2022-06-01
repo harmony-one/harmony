@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
 	"github.com/harmony-one/harmony/core/types"
+	"github.com/harmony-one/harmony/eth/rpc"
 )
 
 // SendTx ...
@@ -44,7 +44,7 @@ func (hmy *Harmony) ResendCx(ctx context.Context, txID common.Hash) (uint64, boo
 	if tx.ShardID() == tx.ToShardID() || blk.Header().ShardID() != tx.ShardID() {
 		return 0, false
 	}
-	entry := core.CxEntry{blockHash, tx.ToShardID()}
+	entry := core.CxEntry{BlockHash: blockHash, ToShardID: tx.ToShardID()}
 	success := hmy.CxPool.Add(entry)
 	return blockNum, success
 }

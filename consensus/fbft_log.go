@@ -135,11 +135,11 @@ func (log *FBFTLog) MarkBlockVerified(block *types.Block) {
 }
 
 // IsBlockVerified checks whether the block is verified
-func (log *FBFTLog) IsBlockVerified(block *types.Block) bool {
+func (log *FBFTLog) IsBlockVerified(hash common.Hash) bool {
 	log.blockLock.RLock()
 	defer log.blockLock.RUnlock()
 
-	_, exist := log.verifiedBlocks[block.Hash()]
+	_, exist := log.verifiedBlocks[hash]
 	return exist
 }
 

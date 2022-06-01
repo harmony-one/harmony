@@ -367,7 +367,7 @@ func payoutUndelegations(
 	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
 	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 	for _, validator := range validators {
-		wrapper, err := state.ValidatorWrapper(validator)
+		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
@@ -409,7 +409,7 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 		return errors.New(msg)
 	}
 	for _, addr := range newShardState.StakedValidators().Addrs {
-		wrapper, err := state.ValidatorWrapper(addr)
+		wrapper, err := state.ValidatorWrapper(addr, true, false)
 		if err != nil {
 			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
@@ -477,6 +477,9 @@ func applySlashes(
 		return false
 	})
 
+	// The Leader of the block gets all slashing rewards.
+	slashRewardBeneficiary := header.Coinbase()
+
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
@@ -510,6 +513,7 @@ func applySlashes(
 			state,
 			records,
 			rate,
+			slashRewardBeneficiary,
 		); err != nil {
 			return errors.New("[Finalize] could not apply slash")
 		}
@@ -721,7 +725,8 @@ func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint
 		return shardState, nil
 
 	} else {
-		shardState, err := chain.ReadShardState(epoch)
+		//shardState, err := chain.ReadShardState(epoch)
+		shardState, err := committee.WithStakingEnabled.ReadFromDB(epoch, chain)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
 		}

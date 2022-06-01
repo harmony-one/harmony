@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/blake2b"
@@ -112,6 +113,44 @@ var PrecompiledContractsSHA3FIPS = map[common.Address]PrecompiledContract{
 
 	common.BytesToAddress([]byte{253}): &sha3fip{},
 	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+}
+
+// PrecompiledContractsStaking contains the default set of pre-compiled Ethereum
+// contracts used in the Istanbul release. plus VRF, SHA3FIPS-202 and staking precompiles
+// These are available in the EVM after the StakingPrecompileEpoch
+var PrecompiledContractsStaking = map[common.Address]PrecompiledContract{
+	common.BytesToAddress([]byte{1}): &ecrecover{},
+	common.BytesToAddress([]byte{2}): &sha256hash{},
+	common.BytesToAddress([]byte{3}): &ripemd160hash{},
+	common.BytesToAddress([]byte{4}): &dataCopy{},
+	common.BytesToAddress([]byte{5}): &bigModExp{},
+	common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+	common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+	common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+	common.BytesToAddress([]byte{9}): &blake2F{},
+
+	common.BytesToAddress([]byte{251}): &epoch{},
+	// marked nil to ensure no overwrite
+	common.BytesToAddress([]byte{252}): nil, // used by WriteCapablePrecompiledContractsStaking
+	common.BytesToAddress([]byte{253}): &sha3fip{},
+	common.BytesToAddress([]byte{254}): &ecrecoverPublicKey{},
+	common.BytesToAddress([]byte{255}): &vrf{},
+}
+
+func init() {
+	// check that there is no overlap, and panic if there is
+	readOnlyContracts := PrecompiledContractsStaking
+	writeCapableContracts := WriteCapablePrecompiledContractsStaking
+	for address, readOnlyContract := range readOnlyContracts {
+		if readOnlyContract != nil && writeCapableContracts[address] != nil {
+			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))
+		}
+	}
+	for address, writeCapableContract := range writeCapableContracts {
+		if writeCapableContract != nil && readOnlyContracts[address] != nil {
+			panic(fmt.Errorf("Address %v is included in both readOnlyContracts and writeCapableContracts", address))
+		}
+	}
 }
 
 // RunPrecompiledContract runs and evaluates the output of a precompiled contract.
@@ -538,6 +577,23 @@ func (c *blake2F) Run(input []byte) ([]byte, error) {
 		binary.LittleEndian.PutUint64(output[offset:offset+8], h[i])
 	}
 	return output, nil
+}
+
+// epoch returns the current epoch, implemented as a native contract
+type epoch struct{}
+
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+//
+// This method does not require any overflow checking as the input size gas costs
+// required for anything significant is so high it's impossible to pay for.
+func (c *epoch) RequiredGas(input []byte) uint64 {
+	return GasQuickStep
+}
+
+func (c *epoch) Run(input []byte) ([]byte, error) {
+	// Note the input was overwritten with the epoch of the current block
+	// So just format and return
+	return common.LeftPadBytes(input, 32), nil
 }
 
 // VRF implemented as a native contract.

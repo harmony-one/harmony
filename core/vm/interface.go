@@ -42,8 +42,9 @@ type StateDB interface {
 	SetCode(common.Address, []byte)
 	GetCodeSize(common.Address) int
 
-	ValidatorWrapperCopy(common.Address) (*staking.ValidatorWrapper, error)
+	ValidatorWrapper(common.Address, bool, bool) (*staking.ValidatorWrapper, error)
 	UpdateValidatorWrapper(common.Address, *staking.ValidatorWrapper) error
+	UpdateValidatorWrapperWithRevert(common.Address, *staking.ValidatorWrapper) error
 	SetValidatorFlag(common.Address)
 	UnsetValidatorFlag(common.Address)
 	IsValidator(common.Address) bool
@@ -79,6 +80,7 @@ type StateDB interface {
 	TxIndex() int
 	BlockHash() common.Hash
 	TxHash() common.Hash
+	TxHashETH() common.Hash // used by tracer
 }
 
 // CallContext provides a basic interface for the EVM calling conventions. The EVM

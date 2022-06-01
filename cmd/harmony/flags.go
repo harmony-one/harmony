@@ -7,10 +7,11 @@ import (
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
+	"github.com/spf13/cobra"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/internal/cli"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -28,6 +29,8 @@ var (
 		legacyShardIDFlag,
 		legacyIsArchiveFlag,
 		legacyDataDirFlag,
+
+		taraceFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -57,6 +60,8 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		p2pDisablePrivateIPScanFlag,
+		maxConnPerIPFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -72,10 +77,15 @@ var (
 		wsEnabledFlag,
 		wsIPFlag,
 		wsPortFlag,
+		wsAuthPortFlag,
 	}
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcEthRPCsEnabledFlag,
+		rpcStakingRPCsEnabledFlag,
+		rpcLegacyRPCsEnabledFlag,
+		rpcFilterFileFlag,
 		rpcRateLimiterEnabledFlag,
 		rpcRateLimitFlag,
 	}
@@ -120,8 +130,11 @@ var (
 	}
 
 	txPoolFlags = []cli.Flag{
+		tpAccountSlotsFlag,
+		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
+		localAccountsFileFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -136,6 +149,8 @@ var (
 	logFlags = []cli.Flag{
 		logFolderFlag,
 		logRotateSizeFlag,
+		logRotateCountFlag,
+		logRotateMaxAgeFlag,
 		logFileNameFlag,
 		logContextIPFlag,
 		logContextPortFlag,
@@ -206,6 +221,14 @@ var (
 		syncDiscHardLowFlag,
 		syncDiscHighFlag,
 		syncDiscBatchFlag,
+	}
+
+	shardDataFlags = []cli.Flag{
+		enableShardDataFlag,
+		diskCountFlag,
+		shardCountFlag,
+		cacheTimeFlag,
+		cacheSizeFlag,
 	}
 )
 
@@ -281,6 +304,12 @@ var (
 		DefValue:   defaultConfig.General.DataDir,
 		Deprecated: "use --datadir",
 	}
+
+	taraceFlag = cli.BoolFlag{
+		Name:     "tracing",
+		Usage:    "indicates if full transaction tracing should be enabled",
+		DefValue: defaultConfig.General.TraceEnable,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -306,6 +335,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
+	flags = append(flags, shardDataFlags...)
 
 	return flags
 }
@@ -347,6 +377,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, taraceFlag) {
+		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
@@ -523,6 +557,16 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	p2pDisablePrivateIPScanFlag = cli.BoolFlag{
+		Name:     "p2p.no-private-ip-scan",
+		Usage:    "disable scanning of private ip4/6 addresses by DHT",
+		DefValue: defaultConfig.P2P.DisablePrivateIPScan,
+	}
+	maxConnPerIPFlag = cli.IntFlag{
+		Name:     "p2p.security.max-conn-per-ip",
+		Usage:    "maximum number of connections allowed per node",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
 )
 
 func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -549,6 +593,14 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, p2pDiscoveryConcurrencyFlag) {
 		config.P2P.DiscConcurrency = cli.GetIntFlagValue(cmd, p2pDiscoveryConcurrencyFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
+		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
+		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
 }
 
@@ -640,6 +692,11 @@ var (
 		Usage:    "port for websocket endpoint",
 		DefValue: defaultConfig.WS.Port,
 	}
+	wsAuthPortFlag = cli.IntFlag{
+		Name:     "ws.auth-port",
+		Usage:    "port for websocket auth endpoint",
+		DefValue: defaultConfig.WS.AuthPort,
+	}
 )
 
 func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -652,6 +709,9 @@ func applyWSFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, wsPortFlag) {
 		config.WS.Port = cli.GetIntFlagValue(cmd, wsPortFlag)
 	}
+	if cli.IsFlagChanged(cmd, wsAuthPortFlag) {
+		config.WS.AuthPort = cli.GetIntFlagValue(cmd, wsAuthPortFlag)
+	}
 }
 
 // rpc opt flags
@@ -660,6 +720,34 @@ var (
 		Name:     "rpc.debug",
 		Usage:    "enable private debug apis",
 		DefValue: defaultConfig.RPCOpt.DebugEnabled,
+		Hidden:   true,
+	}
+
+	rpcEthRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.eth",
+		Usage:    "enable eth apis",
+		DefValue: defaultConfig.RPCOpt.EthRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcStakingRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.staking",
+		Usage:    "enable staking apis",
+		DefValue: defaultConfig.RPCOpt.StakingRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcLegacyRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.legacy",
+		Usage:    "enable legacy apis",
+		DefValue: defaultConfig.RPCOpt.LegacyRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcFilterFileFlag = cli.StringFlag{
+		Name:     "rpc.filterspath",
+		Usage:    "toml file path for method exposure filters",
+		DefValue: defaultConfig.RPCOpt.RpcFilterFile,
 		Hidden:   true,
 	}
 
@@ -679,6 +767,18 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
+		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcStakingRPCsEnabledFlag) {
+		config.RPCOpt.StakingRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcStakingRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcLegacyRPCsEnabledFlag) {
+		config.RPCOpt.LegacyRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcLegacyRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcFilterFileFlag) {
+		config.RPCOpt.RpcFilterFile = cli.GetStringFlagValue(cmd, rpcFilterFileFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
 		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)
@@ -969,10 +1069,20 @@ func applyConsensusFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig
 
 // transaction pool flags
 var (
+	tpAccountSlotsFlag = cli.IntFlag{
+		Name:     "txpool.accountslots",
+		Usage:    "number of executable transaction slots guaranteed per account",
+		DefValue: int(defaultConfig.TxPool.AccountSlots),
+	}
 	tpBlacklistFileFlag = cli.StringFlag{
 		Name:     "txpool.blacklist",
 		Usage:    "file of blacklisted wallet addresses",
 		DefValue: defaultConfig.TxPool.BlacklistFile,
+	}
+	rosettaFixFileFlag = cli.StringFlag{
+		Name:     "txpool.rosettafixfile",
+		Usage:    "file of rosetta fix file",
+		DefValue: defaultConfig.TxPool.RosettaFixFile,
 	}
 	legacyTPBlacklistFileFlag = cli.StringFlag{
 		Name:       "blacklist",
@@ -980,13 +1090,31 @@ var (
 		DefValue:   defaultConfig.TxPool.BlacklistFile,
 		Deprecated: "use --txpool.blacklist",
 	}
+	localAccountsFileFlag = cli.StringFlag{
+		Name:     "txpool.locals",
+		Usage:    "file of local wallet addresses",
+		DefValue: defaultConfig.TxPool.LocalAccountsFile,
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, rosettaFixFileFlag) {
+		config.TxPool.RosettaFixFile = cli.GetStringFlagValue(cmd, rosettaFixFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, tpAccountSlotsFlag) {
+		value := cli.GetIntFlagValue(cmd, tpAccountSlotsFlag) // int, so fits in uint64 when positive
+		if value <= 0 {
+			panic("Must provide positive for txpool.accountslots")
+		}
+		config.TxPool.AccountSlots = uint64(cli.GetIntFlagValue(cmd, tpAccountSlotsFlag))
+	}
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, legacyTPBlacklistFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
+		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
 	}
 }
 
@@ -1068,6 +1196,16 @@ var (
 		Usage:    "rotation log size in megabytes",
 		DefValue: defaultConfig.Log.RotateSize,
 	}
+	logRotateCountFlag = cli.IntFlag{
+		Name:     "log.rotate-count",
+		Usage:    "maximum number of old log files to retain",
+		DefValue: defaultConfig.Log.RotateCount,
+	}
+	logRotateMaxAgeFlag = cli.IntFlag{
+		Name:     "log.rotate-max-age",
+		Usage:    "maximum number of days to retain old log files",
+		DefValue: defaultConfig.Log.RotateMaxAge,
+	}
 	logFileNameFlag = cli.StringFlag{
 		Name:     "log.name",
 		Usage:    "log file name (e.g. harmony.log)",
@@ -1128,6 +1266,14 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, logRotateSizeFlag)
 	} else if cli.IsFlagChanged(cmd, legacyLogRotateSizeFlag) {
 		config.Log.RotateSize = cli.GetIntFlagValue(cmd, legacyLogRotateSizeFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateCountFlag) {
+		config.Log.RotateCount = cli.GetIntFlagValue(cmd, logRotateCountFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, logRotateMaxAgeFlag) {
+		config.Log.RotateMaxAge = cli.GetIntFlagValue(cmd, logRotateMaxAgeFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, logFileNameFlag) {
@@ -1365,6 +1511,7 @@ func applyLegacyMiscFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfi
 		config.HTTP.AuthPort = nodeconfig.GetRPCAuthHTTPPortFromBase(legacyPort)
 		config.HTTP.RosettaPort = nodeconfig.GetRosettaHTTPPortFromBase(legacyPort)
 		config.WS.Port = nodeconfig.GetWSPortFromBase(legacyPort)
+		config.WS.AuthPort = nodeconfig.GetWSAuthPortFromBase(legacyPort)
 
 		legPortStr := strconv.Itoa(legacyPort)
 		syncPort, _ := strconv.Atoi(legacysync.GetSyncingPort(legPortStr))
@@ -1558,5 +1705,52 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDiscBatchFlag) {
 		config.Sync.DiscBatch = cli.GetIntFlagValue(cmd, syncDiscBatchFlag)
+	}
+}
+
+// shard data flags
+var (
+	enableShardDataFlag = cli.BoolFlag{
+		Name:     "sharddata.enable",
+		Usage:    "whether use multi-database mode of levelDB",
+		DefValue: defaultConfig.ShardData.EnableShardData,
+	}
+	diskCountFlag = cli.IntFlag{
+		Name:     "sharddata.disk_count",
+		Usage:    "the count of disks you want to storage block data",
+		DefValue: defaultConfig.ShardData.DiskCount,
+	}
+	shardCountFlag = cli.IntFlag{
+		Name:     "sharddata.shard_count",
+		Usage:    "the count of shards you want to split in each disk",
+		DefValue: defaultConfig.ShardData.ShardCount,
+	}
+	cacheTimeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_time",
+		Usage:    "local cache save time (minute)",
+		DefValue: defaultConfig.ShardData.CacheTime,
+	}
+	cacheSizeFlag = cli.IntFlag{
+		Name:     "sharddata.cache_size",
+		Usage:    "local cache storage size (MB)",
+		DefValue: defaultConfig.ShardData.CacheSize,
+	}
+)
+
+func applyShardDataFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, enableShardDataFlag) {
+		cfg.ShardData.EnableShardData = cli.GetBoolFlagValue(cmd, enableShardDataFlag)
+	}
+	if cli.IsFlagChanged(cmd, diskCountFlag) {
+		cfg.ShardData.DiskCount = cli.GetIntFlagValue(cmd, diskCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, shardCountFlag) {
+		cfg.ShardData.ShardCount = cli.GetIntFlagValue(cmd, shardCountFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheTimeFlag) {
+		cfg.ShardData.CacheTime = cli.GetIntFlagValue(cmd, cacheTimeFlag)
+	}
+	if cli.IsFlagChanged(cmd, cacheSizeFlag) {
+		cfg.ShardData.CacheSize = cli.GetIntFlagValue(cmd, cacheSizeFlag)
 	}
 }

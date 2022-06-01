@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	goversion "github.com/hashicorp/go-version"
+	"github.com/pelletier/go-toml"
+
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-	goversion "github.com/hashicorp/go-version"
-	"github.com/pelletier/go-toml"
 )
 
 const legacyConfigVersion = "1.0.4"
@@ -201,4 +202,62 @@ func init() {
 		confTree.Set("Version", "2.3.0")
 		return confTree
 	}
+
+	migrations["2.3.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.MaxConnsPerIP") == nil {
+			confTree.Set("P2P.MaxConnsPerIP", defaultConfig.P2P.MaxConnsPerIP)
+		}
+
+		confTree.Set("Version", "2.4.0")
+		return confTree
+	}
+
+	migrations["2.4.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("WS.AuthPort") == nil {
+			confTree.Set("WS.AuthPort", defaultConfig.WS.AuthPort)
+		}
+
+		confTree.Set("Version", "2.5.0")
+		return confTree
+	}
+
+	migrations["2.5.0"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.AccountSlots") == nil {
+			confTree.Set("TxPool.AccountSlots", defaultConfig.TxPool.AccountSlots)
+		}
+
+		confTree.Set("Version", "2.5.1")
+		return confTree
+	}
+
+	migrations["2.5.1"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("P2P.DisablePrivateIPScan") == nil {
+			confTree.Set("P2P.DisablePrivateIPScan", defaultConfig.P2P.DisablePrivateIPScan)
+		}
+
+		confTree.Set("Version", "2.5.2")
+		return confTree
+	}
+
+	migrations["2.5.2"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("RPCOpt.EthRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.EthRPCsEnabled", defaultConfig.RPCOpt.EthRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.StakingRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.StakingRPCsEnabled", defaultConfig.RPCOpt.StakingRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.LegacyRPCsEnabled") == nil {
+			confTree.Set("RPCOpt.LegacyRPCsEnabled", defaultConfig.RPCOpt.LegacyRPCsEnabled)
+		}
+
+		if confTree.Get("RPCOpt.RpcFilterFile") == nil {
+			confTree.Set("RPCOpt.RpcFilterFile", defaultConfig.RPCOpt.RpcFilterFile)
+		}
+
+		confTree.Set("Version", "2.5.3")
+		return confTree
+	}
+
 }

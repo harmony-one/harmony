@@ -49,6 +49,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -59,8 +61,25 @@ import (
 )
 
 var (
-	// blockInsertTimer
-	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
+	headBlockGauge     = metrics.NewRegisteredGauge("chain/head/block", nil)
+	headHeaderGauge    = metrics.NewRegisteredGauge("chain/head/header", nil)
+	headFastBlockGauge = metrics.NewRegisteredGauge("chain/head/receipt", nil)
+
+	accountReadTimer   = metrics.NewRegisteredTimer("chain/account/reads", nil)
+	accountHashTimer   = metrics.NewRegisteredTimer("chain/account/hashes", nil)
+	accountUpdateTimer = metrics.NewRegisteredTimer("chain/account/updates", nil)
+	accountCommitTimer = metrics.NewRegisteredTimer("chain/account/commits", nil)
+
+	storageReadTimer   = metrics.NewRegisteredTimer("chain/storage/reads", nil)
+	storageHashTimer   = metrics.NewRegisteredTimer("chain/storage/hashes", nil)
+	storageUpdateTimer = metrics.NewRegisteredTimer("chain/storage/updates", nil)
+	storageCommitTimer = metrics.NewRegisteredTimer("chain/storage/commits", nil)
+
+	blockInsertTimer     = metrics.NewRegisteredTimer("chain/inserts", nil)
+	blockValidationTimer = metrics.NewRegisteredTimer("chain/validation", nil)
+	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
+	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
+
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
@@ -115,14 +134,17 @@ type CacheConfig struct {
 // included in the canonical one where as GetBlockByNumber always represents the
 // canonical chain.
 type BlockChain struct {
-	chainConfig *params.ChainConfig // Chain & network configuration
-	cacheConfig *CacheConfig        // Cache configuration for pruning
+	chainConfig            *params.ChainConfig // Chain & network configuration
+	cacheConfig            *CacheConfig        // Cache configuration for pruning
+	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
+	trace         bool       // atomic?
+	traceFeed     event.Feed // send trace_block result to explorer
 	rmLogsFeed    event.Feed
 	chainFeed     event.Feed
 	chainSideFeed event.Feed
@@ -148,19 +170,19 @@ type BlockChain struct {
 	futureBlocks                  *lru.Cache     // future blocks are blocks added for later processing
 	shardStateCache               *lru.Cache
 	lastCommitsCache              *lru.Cache
-	epochCache                    *lru.Cache    // Cache epoch number → first block number
-	randomnessCache               *lru.Cache    // Cache for vrf/vdf
-	validatorSnapshotCache        *lru.Cache    // Cache for validator snapshot
-	validatorStatsCache           *lru.Cache    // Cache for validator stats
-	validatorListCache            *lru.Cache    // Cache of validator list
-	validatorListByDelegatorCache *lru.Cache    // Cache of validator list by delegator
-	pendingCrossLinksCache        *lru.Cache    // Cache of last pending crosslinks
-	blockAccumulatorCache         *lru.Cache    // Cache of block accumulators
-	quit                          chan struct{} // blockchain quit channel
-	running                       int32         // running must be called atomically
+	epochCache                    *lru.Cache        // Cache epoch number → first block number
+	randomnessCache               *lru.Cache        // Cache for vrf/vdf
+	validatorSnapshotCache        *lru.Cache        // Cache for validator snapshot
+	validatorStatsCache           *lru.Cache        // Cache for validator stats
+	validatorListCache            *lru.Cache        // Cache of validator list
+	validatorListByDelegatorCache *lru.Cache        // Cache of validator list by delegator
+	pendingCrossLinksCache        *lru.Cache        // Cache of last pending crosslinks
+	blockAccumulatorCache         *lru.Cache        // Cache of block accumulators
+	quit                          chan struct{}     // blockchain quit channel
+	running                       int32             // running must be called atomically
+	blockchainPruner              *blockchainPruner // use to prune beacon chain
 	// procInterrupt must be atomically called
-	procInterrupt int32          // interrupt signaler for block processing
-	wg            sync.WaitGroup // chain processing wait group for shutting down
+	procInterrupt int32 // interrupt signaler for block processing
 
 	engine                 consensus_engine.Engine
 	processor              Processor // block processor interface
@@ -226,6 +248,7 @@ func NewBlockChain(
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
+		blockchainPruner:              newBlockchainPruner(db),
 		engine:                        engine,
 		vmConfig:                      vmConfig,
 		badBlocks:                     badBlocks,
@@ -258,15 +281,15 @@ func NewBlockChain(
 // ValidateNewBlock validates new block.
 func (bc *BlockChain) ValidateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
-
 	if err != nil {
 		return err
 	}
 
 	// NOTE Order of mutating state here matters.
 	// Process block using the parent state as reference point.
-	receipts, cxReceipts, _, usedGas, _, err := bc.processor.Process(
-		block, state, bc.vmConfig,
+	// Do not read cache from processor.
+	receipts, cxReceipts, _, _, usedGas, _, _, err := bc.processor.Process(
+		block, state, bc.vmConfig, false,
 	)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
@@ -327,6 +350,7 @@ func (bc *BlockChain) loadLastState() error {
 	}
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(currentBlock)
+	headBlockGauge.Update(int64(currentBlock.NumberU64()))
 
 	// We don't need the following as we want the current header and block to be consistent
 	// Restore the last known head header
@@ -343,9 +367,11 @@ func (bc *BlockChain) loadLastState() error {
 
 	// Restore the last known head fast block
 	bc.currentFastBlock.Store(currentBlock)
+	headFastBlockGauge.Update(int64(currentBlock.NumberU64()))
 	if head := rawdb.ReadHeadFastBlockHash(bc.db); head != (common.Hash{}) {
 		if block := bc.GetBlockByHash(head); block != nil {
 			bc.currentFastBlock.Store(block)
+			headFastBlockGauge.Update(int64(block.NumberU64()))
 		}
 	}
 
@@ -407,24 +433,31 @@ func (bc *BlockChain) SetHead(head uint64) error {
 
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number().Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
+		newHeadBlock := bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64())
+		bc.currentBlock.Store(newHeadBlock)
+		headBlockGauge.Update(int64(newHeadBlock.NumberU64()))
 	}
 	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 			// Rewound state missing, rolled back to before pivot, reset to genesis
 			bc.currentBlock.Store(bc.genesisBlock)
+			headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number().Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64()))
+		newHeadFastBlock := bc.GetBlock(currentHeader.Hash(), currentHeader.Number().Uint64())
+		bc.currentFastBlock.Store(newHeadFastBlock)
+		headFastBlockGauge.Update(int64(newHeadFastBlock.NumberU64()))
 	}
 	// If either blocks reached nil, reset to the genesis state
 	if currentBlock := bc.CurrentBlock(); currentBlock == nil {
 		bc.currentBlock.Store(bc.genesisBlock)
+		headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	}
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock == nil {
 		bc.currentFastBlock.Store(bc.genesisBlock)
+		headFastBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	}
 	currentBlock := bc.CurrentBlock()
 	currentFastBlock := bc.CurrentFastBlock()
@@ -529,8 +562,9 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 		return err
 	}
 	bc.currentBlock.Store(bc.genesisBlock)
+	headBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	bc.currentFastBlock.Store(bc.genesisBlock)
-
+	headFastBlockGauge.Update(int64(bc.genesisBlock.NumberU64()))
 	return nil
 }
 
@@ -650,6 +684,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 	}
 
 	bc.currentBlock.Store(block)
+	headBlockGauge.Update(int64(block.NumberU64()))
 
 	// If the block is better than our head or is on a different chain, force update heads
 	if updateHeads {
@@ -661,6 +696,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) error {
 		}
 
 		bc.currentFastBlock.Store(block)
+		headFastBlockGauge.Update(int64(block.NumberU64()))
 	}
 	return nil
 }
@@ -840,6 +876,9 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
+
 	if err := bc.SavePendingCrossLinks(); err != nil {
 		utils.Logger().Error().Err(err).Msg("Failed to save pending cross links")
 	}
@@ -848,8 +887,6 @@ func (bc *BlockChain) Stop() {
 	bc.scope.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
-
-	bc.wg.Wait()
 
 	// Ensure the state of a recent block is also stored to disk before exiting.
 	// We're writing three different states to catch different restart scenarios:
@@ -934,6 +971,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 			newFastBlock := bc.GetBlock(currentFastBlock.ParentHash(), currentFastBlock.NumberU64()-1)
 			if newFastBlock != nil {
 				bc.currentFastBlock.Store(newFastBlock)
+				headFastBlockGauge.Update(int64(newFastBlock.NumberU64()))
 				rawdb.WriteHeadFastBlockHash(bc.db, newFastBlock.Hash())
 			}
 		}
@@ -941,6 +979,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) error {
 			newBlock := bc.GetBlock(currentBlock.ParentHash(), currentBlock.NumberU64()-1)
 			if newBlock != nil {
 				bc.currentBlock.Store(newBlock)
+				headBlockGauge.Update(int64(newBlock.NumberU64()))
 				if err := rawdb.WriteHeadBlockHash(bc.db, newBlock.Hash()); err != nil {
 					return err
 				}
@@ -1023,9 +1062,6 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
 func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(blockChain); i++ {
 		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].ParentHash() != blockChain[i-1].Hash() {
@@ -1040,6 +1076,9 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].ParentHash().Bytes()[:4])
 		}
 	}
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	var (
 		stats = struct{ processed, ignored int32 }{}
@@ -1105,6 +1144,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 		if bc.GetTd(currentFastBlock.Hash(), currentFastBlock.NumberU64()).Cmp(td) < 0 {
 			rawdb.WriteHeadFastBlockHash(bc.db, head.Hash())
 			bc.currentFastBlock.Store(head)
+			headFastBlockGauge.Update(int64(head.NumberU64()))
 		}
 	}
 	bc.mu.Unlock()
@@ -1128,8 +1168,8 @@ var lastWrite uint64
 // but does not write any state. This is used to construct competing side forks
 // up to the point where they exceed the canonical total difficulty.
 func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
 		return err
@@ -1145,12 +1185,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
+	stakeMsgs []staking.StakeMsg,
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	// Make sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
@@ -1236,7 +1274,8 @@ func (bc *BlockChain) WriteBlockWithState(
 	// Write offchain data
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
-		cxReceipts, paid, state,
+		cxReceipts, stakeMsgs,
+		paid, state,
 	); err != nil {
 		return status, err
 	}
@@ -1253,6 +1292,20 @@ func (bc *BlockChain) WriteBlockWithState(
 	}
 	if err := rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages()); err != nil {
 		return NonStatTy, err
+	}
+
+	if bc.IsEnablePruneBeaconChainFeature() {
+		if block.Number().Cmp(big.NewInt(pruneBeaconChainBlockBefore)) > 0 && block.Epoch().Cmp(big.NewInt(pruneBeaconChainBeforeEpoch)) > 0 {
+			maxBlockNum := big.NewInt(0).Sub(block.Number(), big.NewInt(pruneBeaconChainBlockBefore)).Uint64()
+			maxEpoch := big.NewInt(0).Sub(block.Epoch(), big.NewInt(pruneBeaconChainBeforeEpoch))
+			go func() {
+				err := bc.blockchainPruner.Start(maxBlockNum, maxEpoch)
+				if err != nil {
+					utils.Logger().Info().Err(err).Msg("pruneBeaconChain init error")
+					return
+				}
+			}()
+		}
 	}
 
 	if err := batch.Write(); err != nil {
@@ -1313,9 +1366,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].ParentHash().Bytes()[:4])
 		}
 	}
-	// Pre-checks passed, start the full block imports
-	bc.wg.Add(1)
-	defer bc.wg.Done()
 
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
@@ -1446,17 +1496,43 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
-
+		vmConfig := bc.vmConfig
+		if bc.trace {
+			ev := TraceEvent{
+				Tracer: &tracers.ParityBlockTracer{
+					Hash:   block.Hash(),
+					Number: block.NumberU64(),
+				},
+			}
+			vmConfig = vm.Config{
+				Debug:  true,
+				Tracer: ev.Tracer,
+			}
+			events = append(events, ev)
+		}
 		// Process block using the parent state as reference point.
-		receipts, cxReceipts, logs, usedGas, payout, err := bc.processor.Process(
-			block, state, bc.vmConfig,
+		substart := time.Now()
+		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
+			block, state, vmConfig, true,
 		)
+		state = newState // update state in case the new state is cached.
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 
+		// Update the metrics touched during block processing
+		accountReadTimer.Update(state.AccountReads)           // Account reads are complete, we can mark them
+		storageReadTimer.Update(state.StorageReads)           // Storage reads are complete, we can mark them
+		accountUpdateTimer.Update(state.AccountUpdates)       // Account updates are complete, we can mark them
+		storageUpdateTimer.Update(state.StorageUpdates)       // Storage updates are complete, we can mark them
+		triehash := state.AccountHashes + state.StorageHashes // Save to not double count in validation
+		trieproc := state.AccountReads + state.AccountUpdates
+		trieproc += state.StorageReads + state.StorageUpdates
+		blockExecutionTimer.Update(time.Since(substart) - trieproc - triehash)
+
 		// Validate the state using the default validator
+		substart = time.Now()
 		if err := bc.Validator().ValidateState(
 			block, state, receipts, cxReceipts, usedGas,
 		); err != nil {
@@ -1465,9 +1541,15 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		}
 		proctime := time.Since(bstart)
 
+		// Update the metrics touched during block validation
+		accountHashTimer.Update(state.AccountHashes) // Account hashes are complete, we can mark them
+		storageHashTimer.Update(state.StorageHashes) // Storage hashes are complete, we can mark them
+		blockValidationTimer.Update(time.Since(substart) - (state.AccountHashes + state.StorageHashes - triehash))
+
 		// Write the block to the chain and get the status.
+		substart = time.Now()
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, payout, state,
+			block, receipts, cxReceipts, stakeMsgs, payout, state,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
@@ -1481,6 +1563,13 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 			Uint64("gas", block.GasUsed()).
 			Str("elapsed", common.PrettyDuration(time.Since(bstart)).String()).
 			Logger()
+
+		// Update the metrics touched during block commit
+		accountCommitTimer.Update(state.AccountCommits) // Account commits are complete, we can mark them
+		storageCommitTimer.Update(state.StorageCommits) // Storage commits are complete, we can mark them
+
+		blockWriteTimer.Update(time.Since(substart) - state.AccountCommits - state.StorageCommits)
+		blockInsertTimer.UpdateSince(bstart)
 
 		switch status {
 		case CanonStatTy:
@@ -1587,6 +1676,9 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
+
+		case TraceEvent:
+			bc.traceFeed.Send(ev)
 		}
 	}
 }
@@ -1693,9 +1785,6 @@ func (bc *BlockChain) InsertHeaderChain(chain []*block.Header, checkFreq int) (i
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
-	bc.wg.Add(1)
-	defer bc.wg.Done()
-
 	whFunc := func(header *block.Header) error {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
@@ -1749,6 +1838,11 @@ func (bc *BlockChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []com
 	return bc.hc.GetBlockHashesFromHash(hash, max)
 }
 
+// GetCanonicalHash returns the canonical hash for a given block number
+func (bc *BlockChain) GetCanonicalHash(number uint64) common.Hash {
+	return bc.hc.GetCanonicalHash(number)
+}
+
 // GetAncestor retrieves the Nth ancestor of a given block. It assumes that either the given block or
 // a close ancestor of it is canonical. maxNonCanonical points to a downwards counter limiting the
 // number of blocks to be individually checked before we reach the canonical chain.
@@ -1776,6 +1870,12 @@ func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
+}
+
+// SubscribeChainEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	bc.trace = true
+	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
@@ -2311,7 +2411,7 @@ func (bc *BlockChain) ReadValidatorInformationAtState(
 	if state == nil {
 		return nil, errors.New("empty state")
 	}
-	wrapper, err := state.ValidatorWrapper(addr)
+	wrapper, err := state.ValidatorWrapper(addr, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -2407,7 +2507,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 			}
 			// This means it's already in staking epoch
 			if currentEpochSuperCommittee.Epoch != nil {
-				wrapper, err := state.ValidatorWrapper(currentValidator)
+				wrapper, err := state.ValidatorWrapper(currentValidator, true, false)
 				if err != nil {
 					return nil, err
 				}
@@ -2473,12 +2573,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
 			newEpochSuperCommittee.Epoch, key,
 		); err == nil {
-			wrapper := snapshot.Validator
-			spread := numeric.ZeroDec()
-			if len(wrapper.SlotPubKeys) > 0 {
-				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-					QuoInt64(int64(len(wrapper.SlotPubKeys)))
-			}
+			spread := snapshot.RawStakePerSlot()
 			for i := range stats.MetricsPerShard {
 				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}
@@ -2488,7 +2583,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		// compute APR for validators in current committee only
 		if currentEpochSuperCommittee.Epoch != nil {
 			if _, ok := existing.LookupSet[key]; ok {
-				wrapper, err := state.ValidatorWrapper(key)
+				wrapper, err := state.ValidatorWrapper(key, true, false)
 				if err != nil {
 					return nil, err
 				}
@@ -2521,7 +2616,7 @@ func (bc *BlockChain) ComputeAndUpdateAPR(
 		}
 	} else {
 		// only insert if APR for current epoch does not exists
-		aprEntry := staking.APREntry{now, *aprComputed}
+		aprEntry := staking.APREntry{Epoch: now, Value: *aprComputed}
 		l := len(stats.APRs)
 		// first time inserting apr for validator or
 		// apr for current epoch does not exists
@@ -2554,12 +2649,12 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 	// Read all validator's current data and snapshot them
 	for i := range allValidators {
 		// The snapshot will be captured in the state after the last epoch block is finalized
-		validator, err := state.ValidatorWrapper(allValidators[i])
+		validator, err := state.ValidatorWrapper(allValidators[i], true, false)
 		if err != nil {
 			return err
 		}
 
-		snapshot := &staking.ValidatorSnapshot{validator, epoch}
+		snapshot := &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}
 		if err := bc.WriteValidatorSnapshot(batch, snapshot); err != nil {
 			return err
 		}
@@ -2571,10 +2666,9 @@ func (bc *BlockChain) UpdateValidatorSnapshots(
 // ReadValidatorList reads the addresses of current all validators
 func (bc *BlockChain) ReadValidatorList() ([]common.Address, error) {
 	if cached, ok := bc.validatorListCache.Get("validatorList"); ok {
-		by := cached.([]byte)
-		m := []common.Address{}
-		if err := rlp.DecodeBytes(by, &m); err != nil {
-			return nil, err
+		m, ok := cached.([]common.Address)
+		if !ok {
+			return nil, errors.New("failed to get validator list")
 		}
 		return m, nil
 	}
@@ -2589,10 +2683,7 @@ func (bc *BlockChain) WriteValidatorList(
 	if err := rawdb.WriteValidatorList(db, addrs); err != nil {
 		return err
 	}
-	bytes, err := rlp.EncodeToBytes(addrs)
-	if err == nil {
-		bc.validatorListCache.Add("validatorList", bytes)
-	}
+	bc.validatorListCache.Add("validatorList", addrs)
 	return nil
 }
 
@@ -2674,9 +2765,10 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 // Note: this should only be called within the blockchain insert process.
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, block *types.Block,
+	stakeMsgs []staking.StakeMsg,
 	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
-	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, state)
+	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, stakeMsgs, state)
 	if err != nil {
 		utils.Logger().Warn().Msgf("oops, prepareStakingMetaData failed, err: %+v", err)
 		return newValidators, err
@@ -2700,18 +2792,18 @@ func (bc *BlockChain) UpdateStakingMetaData(
 			}
 
 			// Update validator snapshot for the new validator
-			validator, err := state.ValidatorWrapper(addr)
+			validator, err := state.ValidatorWrapper(addr, true, false)
 			if err != nil {
 				return newValidators, err
 			}
 
-			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, epoch}); err != nil {
+			if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: epoch}); err != nil {
 				return newValidators, err
 			}
 			// For validator created at exactly the last block of an epoch, we should create the snapshot
 			// for next epoch too.
 			if newEpoch.Cmp(epoch) > 0 {
-				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{validator, newEpoch}); err != nil {
+				if err := bc.WriteValidatorSnapshot(batch, &staking.ValidatorSnapshot{Validator: validator, Epoch: newEpoch}); err != nil {
 					return newValidators, err
 				}
 			}
@@ -2740,13 +2832,27 @@ func (bc *BlockChain) UpdateStakingMetaData(
 // newValidators - the addresses of the newly created validators
 // newDelegations - the map of delegator address and their updated delegation indexes
 func (bc *BlockChain) prepareStakingMetaData(
-	block *types.Block, state *state.DB,
-) (newValidators []common.Address,
-	newDelegations map[common.Address]staking.DelegationIndexes,
-	err error,
+	block *types.Block, stakeMsgs []staking.StakeMsg, state *state.DB,
+) ([]common.Address,
+	map[common.Address]staking.DelegationIndexes,
+	error,
 ) {
-	newDelegations = map[common.Address]staking.DelegationIndexes{}
+	var newValidators []common.Address
+	newDelegations := map[common.Address]staking.DelegationIndexes{}
 	blockNum := block.Number()
+	for _, stakeMsg := range stakeMsgs {
+		if delegate, ok := stakeMsg.(*staking.Delegate); ok {
+			if err := processDelegateMetadata(delegate,
+				newDelegations,
+				state,
+				bc,
+				blockNum); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			panic("Only *staking.Delegate stakeMsgs are supported at the moment")
+		}
+	}
 	for _, txn := range block.StakingTransactions() {
 		payload, err := txn.RLPEncodeStakeMsg()
 		if err != nil {
@@ -2770,9 +2876,9 @@ func (bc *BlockChain) prepareStakingMetaData(
 
 			// Add self delegation into the index
 			selfIndex := staking.DelegationIndex{
-				createValidator.ValidatorAddress,
-				uint64(0),
-				blockNum,
+				ValidatorAddress: createValidator.ValidatorAddress,
+				Index:            uint64(0),
+				BlockNum:         blockNum,
 			}
 			delegations, ok := newDelegations[createValidator.ValidatorAddress]
 			if !ok {
@@ -2782,27 +2888,19 @@ func (bc *BlockChain) prepareStakingMetaData(
 					return nil, nil, err
 				}
 			}
-
 			delegations = append(delegations, selfIndex)
 			newDelegations[createValidator.ValidatorAddress] = delegations
 		case staking.DirectiveEditValidator:
 		case staking.DirectiveDelegate:
 			delegate := decodePayload.(*staking.Delegate)
-
-			delegations, ok := newDelegations[delegate.DelegatorAddress]
-			if !ok {
-				// If the cache doesn't have it, load it from DB for the first time.
-				delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-			if delegations, err = bc.addDelegationIndex(
-				delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
-			); err != nil {
+			if err := processDelegateMetadata(delegate,
+				newDelegations,
+				state,
+				bc,
+				blockNum); err != nil {
 				return nil, nil, err
 			}
-			newDelegations[delegate.DelegatorAddress] = delegations
+
 		case staking.DirectiveUndelegate:
 		case staking.DirectiveCollectRewards:
 		default:
@@ -2810,6 +2908,27 @@ func (bc *BlockChain) prepareStakingMetaData(
 	}
 
 	return newValidators, newDelegations, nil
+}
+
+func processDelegateMetadata(delegate *staking.Delegate,
+	newDelegations map[common.Address]staking.DelegationIndexes,
+	state *state.DB, bc *BlockChain, blockNum *big.Int,
+) (err error) {
+	delegations, ok := newDelegations[delegate.DelegatorAddress]
+	if !ok {
+		// If the cache doesn't have it, load it from DB for the first time.
+		delegations, err = bc.ReadDelegationsByDelegator(delegate.DelegatorAddress)
+		if err != nil {
+			return err
+		}
+	}
+	if delegations, err = bc.addDelegationIndex(
+		delegations, delegate.DelegatorAddress, delegate.ValidatorAddress, state, blockNum,
+	); err != nil {
+		return err
+	}
+	newDelegations[delegate.DelegatorAddress] = delegations
+	return nil
 }
 
 // ReadBlockRewardAccumulator must only be called on beaconchain
@@ -2867,7 +2986,7 @@ func (bc *BlockChain) addDelegationIndex(
 
 	// Found the delegation from state and add the delegation index
 	// Note this should read from the state of current block in concern
-	wrapper, err := state.ValidatorWrapper(validatorAddress)
+	wrapper, err := state.ValidatorWrapper(validatorAddress, true, false)
 	if err != nil {
 		return delegations, err
 	}
@@ -2877,9 +2996,9 @@ func (bc *BlockChain) addDelegationIndex(
 		) {
 			// TODO(audit): change the way of indexing if we allow delegation deletion.
 			delegations = append(delegations, staking.DelegationIndex{
-				validatorAddress,
-				uint64(i),
-				blockNum,
+				ValidatorAddress: validatorAddress,
+				Index:            uint64(i),
+				BlockNum:         blockNum,
 			})
 		}
 	}
@@ -3028,6 +3147,15 @@ func (bc *BlockChain) SuperCommitteeForNextEpoch(
 
 	}
 	return nextCommittee, err
+}
+
+func (bc *BlockChain) EnablePruneBeaconChainFeature() {
+	bc.pruneBeaconChainEnable = true
+}
+
+// IsEnablePruneBeaconChainFeature returns is enable prune BeaconChain feature
+func (bc *BlockChain) IsEnablePruneBeaconChainFeature() bool {
+	return bc.pruneBeaconChainEnable
 }
 
 var (

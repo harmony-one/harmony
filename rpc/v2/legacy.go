@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
 )
@@ -38,7 +38,7 @@ func (s *PublicLegacyService) GetBalance(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumber(-1))
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber))
 	if err != nil {
 		return nil, err
 	}
