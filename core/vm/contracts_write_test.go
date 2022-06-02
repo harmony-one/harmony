@@ -242,6 +242,9 @@ func testCrossShardXferPrecompile(test writeCapablePrecompileTest, t *testing.T)
 	var env = NewEVM(Context{
 		NumShards: 4,
 		Transfer:  transfer,
+		CanTransfer: func(_ StateDB, _ common.Address, _ *big.Int) bool {
+			return true
+		},
 	}, state, params.TestChainConfig, Config{})
 	p := &crossShardXferPrecompile{}
 	testWriteCapablePrecompile(test, t, env, p)
