@@ -6,7 +6,7 @@ import (
 )
 
 type broadcast interface {
-	BroadcastCrossLinkFromBeaconToShards()
+	BroadcastCrosslinkHeartbeatSignalFromBeaconToShards()
 	BroadcastCrossLinkFromShardsToBeacon()
 }
 
@@ -43,7 +43,7 @@ func (s *Service) run() {
 				return
 			}
 			if s.beacon {
-				go s.node.BroadcastCrossLinkFromBeaconToShards()
+				go s.node.BroadcastCrosslinkHeartbeatSignalFromBeaconToShards()
 			} else {
 				go s.node.BroadcastCrossLinkFromShardsToBeacon()
 			}

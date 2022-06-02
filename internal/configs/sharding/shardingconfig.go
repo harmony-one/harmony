@@ -72,6 +72,8 @@ type Instance interface {
 
 	// Count of blocks per epoch
 	BlocksPerEpoch() uint64
+	// HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
+	SlotsLimit() int
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

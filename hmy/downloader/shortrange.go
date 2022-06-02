@@ -61,15 +61,18 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 
 	blocks, stids, err := sh.getBlocksByHashes(hashChain, whitelist)
 	if err != nil {
+		d.logger.Warn().Err(err).Msg("getBlocksByHashes failed")
 		if !errors.Is(err, context.Canceled) {
 			sh.removeStreams(whitelist) // Remote nodes cannot provide blocks with target hashes
 		}
 		return 0, errors.Wrap(err, "getBlocksByHashes")
 	}
+	d.logger.Info().Int("num blocks", len(blocks)).Msg("getBlockByHashes result")
 
 	n, err := verifyAndInsertBlocks(d.bc, blocks)
 	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
 	if err != nil {
+		d.logger.Warn().Err(err).Int("blocks inserted", n).Msg("Insert block failed")
 		if sh.blameAllStreams(blocks, n, err) {
 			sh.removeStreams(whitelist) // Data provided by remote nodes is corrupted
 		} else {
@@ -79,6 +82,8 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		}
 		return n, err
 	}
+	d.logger.Info().Err(err).Int("blocks inserted", n).Msg("Insert block success")
+
 	return len(blocks), nil
 }
 
@@ -98,25 +103,37 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 	wg.Add(sh.config.Concurrency)
 
 	for i := 0; i != sh.config.Concurrency; i++ {
-		go func() {
+		go func(index int) {
 			defer wg.Done()
 
 			hashes, stid, err := sh.doGetBlockHashesRequest(bns)
 			if err != nil {
+				sh.logger.Warn().Err(err).Str("StreamID", string(stid)).
+					Msg("doGetBlockHashes return error")
 				return
 			}
+			sh.logger.Info().
+				Str("StreamID", string(stid)).
+				Int("hashes", len(hashes)).
+				Interface("hashes", hashes).Int("index", index).
+				Msg("GetBlockHashesRequests response")
 			results.addResult(hashes, stid)
-		}()
+		}(i)
 	}
 	wg.Wait()
 
 	select {
 	case <-sh.ctx.Done():
+		sh.logger.Info().Err(sh.ctx.Err()).Int("num blocks", results.numBlocksWithResults()).
+			Msg("short range sync get hashes timed out")
 		return nil, nil, sh.ctx.Err()
 	default:
 	}
 
+	sh.logger.Info().Msg("compute longest hash chain")
 	hashChain, wl := results.computeLongestHashChain()
+	sh.logger.Info().Int("hashChain size", len(hashChain)).Int("whitelist", len(wl)).
+		Msg("computeLongestHashChain result")
 	return hashChain, wl, nil
 }
 
@@ -138,7 +155,7 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 
 	wg.Add(concurrency)
 	for i := 0; i != concurrency; i++ {
-		go func() {
+		go func(index int) {
 			defer wg.Done()
 			defer cancel() // it's ok to cancel context more than once
 
@@ -163,13 +180,15 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 				}
 				blocks, stid, err := sh.doGetBlocksByHashesRequest(ctx, hashes, wl)
 				if err != nil {
-					sh.logger.Err(err).Msg("getBlocksByHashes worker failed")
+					sh.logger.Err(err).Str("StreamID", string(stid)).Msg("getBlocksByHashes worker failed")
 					m.handleResultError(hashes, stid)
 				} else {
+					sh.logger.Info().Str("StreamID", string(stid)).Int("blocks", len(blocks)).
+						Int("index", index).Msg("doGetBlocksByHashesRequest response")
 					m.addResult(hashes, blocks, stid)
 				}
 			}
-		}()
+		}(i)
 	}
 	wg.Wait()
 
@@ -178,6 +197,9 @@ func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.
 	}
 	select {
 	case <-sh.ctx.Done():
+		res, _, _ := m.getResults()
+		sh.logger.Info().Err(sh.ctx.Err()).Int("num blocks", len(res)).
+			Msg("short range sync get blocks timed out")
 		return nil, nil, sh.ctx.Err()
 	default:
 	}
@@ -318,6 +340,19 @@ func (res *blockHashResults) computeLongestHashChain() ([]common.Hash, []sttypes
 		sts = append(sts, st)
 	}
 	return hashChain, sts
+}
+
+func (res *blockHashResults) numBlocksWithResults() int {
+	res.lock.Lock()
+	defer res.lock.Unlock()
+
+	cnt := 0
+	for _, result := range res.results {
+		if len(result) != 0 {
+			cnt++
+		}
+	}
+	return cnt
 }
 
 func countHashMaxVote(m map[sttypes.StreamID]common.Hash, whitelist map[sttypes.StreamID]struct{}) (common.Hash, map[sttypes.StreamID]struct{}) {

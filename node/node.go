@@ -945,6 +945,7 @@ func (node *Node) StartPubSub() error {
 		}
 	}()
 
+	node.TraceLoopForExplorer()
 	return nil
 }
 
@@ -966,6 +967,7 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
+	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 ) *Node {
@@ -1042,6 +1044,7 @@ func New(
 		}
 		if harmonyconfig != nil {
 			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
+			txPoolConfig.Locals = append(txPoolConfig.Locals, localAccounts...)
 		}
 
 		txPoolConfig.Blacklist = blacklist

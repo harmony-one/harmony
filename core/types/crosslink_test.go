@@ -38,3 +38,11 @@ func TestCrosslinks_Sorting(t *testing.T) {
 
 	require.True(t, bb.IsSorted())
 }
+
+func TestBigNumberInequality(t *testing.T) {
+	type A struct {
+		X int
+	}
+	require.False(t, big.NewInt(1) == big.NewInt(1))
+	require.False(t, &A{} == &A{})
+}

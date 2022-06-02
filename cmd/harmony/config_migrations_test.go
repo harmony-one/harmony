@@ -64,9 +64,14 @@ Version = "1.0.2"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -129,9 +134,14 @@ Version = "1.0.3"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -194,6 +204,10 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [Sync]
   Concurrency = 6
@@ -209,6 +223,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true
@@ -271,6 +286,10 @@ Version = "1.0.4"
 
 [RPCOpt]
   DebugEnabled = false
+  EthRPCsEnabled = true
+  StakingRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RpcFilterFile = ""
 
 [Sync]
   Concurrency = 6
@@ -293,6 +312,7 @@ Version = "1.0.4"
 
 [TxPool]
   BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
 
 [WS]
   Enabled = true

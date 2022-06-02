@@ -80,12 +80,13 @@ const (
 
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
-	Self            *Peer
-	BLSKey          libp2p_crypto.PrivKey
-	BootNodes       []string
-	DataStoreFile   *string
-	DiscConcurrency int
-	MaxConnPerIP    int
+	Self                 *Peer
+	BLSKey               libp2p_crypto.PrivKey
+	BootNodes            []string
+	DataStoreFile        *string
+	DiscConcurrency      int
+	MaxConnPerIP         int
+	DisablePrivateIPScan bool
 }
 
 // NewHost ..
@@ -114,9 +115,10 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	disc, err := discovery.NewDHTDiscovery(p2pHost, discovery.DHTConfig{
-		BootNodes:       cfg.BootNodes,
-		DataStoreFile:   cfg.DataStoreFile,
-		DiscConcurrency: cfg.DiscConcurrency,
+		BootNodes:            cfg.BootNodes,
+		DataStoreFile:        cfg.DataStoreFile,
+		DiscConcurrency:      cfg.DiscConcurrency,
+		DisablePrivateIPScan: cfg.DisablePrivateIPScan,
 	})
 	if err != nil {
 		cancel()

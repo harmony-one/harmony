@@ -33,6 +33,9 @@ func (s *PublicParityTracerService) Block(ctx context.Context, number rpc.BlockN
 	if block == nil {
 		return nil, nil
 	}
+	if results, err := s.hmy.NodeAPI.GetTraceResultByHash(block.Hash()); err == nil {
+		return results, nil
+	}
 	results, err := s.hmy.TraceBlock(ctx, block, &hmy.TraceConfig{Tracer: &parityTraceGO})
 	if err != nil {
 		return results, err
