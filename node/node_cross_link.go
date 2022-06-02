@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"math/big"
+	"sync/atomic"
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -69,7 +70,6 @@ func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
 }
 
 func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
-	fmt.Println("ProcessCrossLinkHeartbeatMessage==")
 	hb := types.CrosslinkHeartbeat{}
 	err := rlp.DecodeBytes(msgPayload, &hb)
 	if err != nil {
@@ -81,12 +81,11 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	// Outdated signal.
-	fmt.Printf("ProcessCrossLinkHeartbeatMessage?? %d %d\n", hb.BlockID, latestSentCrosslink.Get(hb.ShardID))
-	if hb.BlockID <= latestSentCrosslink.Get(hb.ShardID) {
+	fmt.Printf("ProcessCrossLinkHeartbeatMessage?? %d %d\n", hb.BlockNum, atomic.LoadUint64(&latestSentCrosslink))
+	if hb.BlockNum <= atomic.LoadUint64(&latestSentCrosslink) {
 		return nil
 	}
 
-	fmt.Println("ProcessCrossLinkHeartbeatMessage==22")
 	sig := &ffi_bls.Sign{}
 	err = sig.Deserialize(hb.Signature)
 	if err != nil {
@@ -105,7 +104,6 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return err
 	}
 
-	fmt.Println("ProcessCrossLinkHeartbeatMessage==333")
 	ok := sig.VerifyHash(&pub, serialized)
 	if !ok {
 		return errors.New("invalid signature")
@@ -125,7 +123,6 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return err
 	}
 
-	fmt.Println("ProcessCrossLinkHeartbeatMessage==444")
 	keyExists := false
 	for _, row := range pubs {
 		if pub.IsEqual(row.Object) {
@@ -138,10 +135,9 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("pub key doesn't exist")
 	}
 
-	fmt.Println("ProcessCrossLinkHeartbeatMessage==5555")
-	latestSentCrosslink.Set(hb.ShardID, hb.BlockID)
+	atomic.StoreUint64(&latestSentCrosslink, hb.BlockNum)
 
-	fmt.Printf("Set: %d %d\n", hb.ShardID, hb.BlockID)
+	fmt.Printf("Set: %d %d\n", hb.ShardID, hb.BlockNum)
 	return nil
 }
 
