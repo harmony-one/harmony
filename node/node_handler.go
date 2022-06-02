@@ -238,31 +238,11 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 		return
 	}
 
-	epoch := node.Blockchain().CurrentBlock().Epoch()
-	state, err := node.Blockchain().ReadShardState(epoch)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to read shard state")
-		return
-	}
-
-	committee, err := state.FindCommitteeByID(shard.BeaconChainShardID)
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to read committee")
-		return
-	}
-	pubs, err := committee.BLSPublicKeys()
-	if err != nil {
-		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get committee pub keys")
-		return
-	}
-
 	var privToSing *bls.PrivateKeyWrapper
-	for _, pub := range pubs {
-		for _, priv := range node.Consensus.GetPrivateKeys() {
-			if priv.Pub != nil && pub.Bytes == priv.Pub.Bytes {
-				privToSing = &priv
-				break
-			}
+	for _, priv := range node.Consensus.GetPrivateKeys() {
+		if node.Consensus.IsValidatorInCommittee(priv.Pub.Bytes) {
+			privToSing = &priv
+			break
 		}
 	}
 
@@ -281,7 +261,7 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 			ShardID:   lastLink.ShardID(),
 			BlockNum:  lastLink.BlockNum(),
 			Epoch:     lastLink.Epoch().Uint64(),
-			PublicKey: privToSing.Pub.Object.Serialize(),
+			PublicKey: privToSing.Pub.Bytes[:],
 			Signature: nil,
 		}
 
