@@ -64,10 +64,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(101),
 		SHA3Epoch:                  big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
 		HIP6And8Epoch:              big.NewInt(725), // Around Mon Oct 11 2021, 19:00 UTC
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
+		CrossChainEpoch:            EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -100,10 +100,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(74570),
 		HIP6And8Epoch:              big.NewInt(74570),
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(75175),
 		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
+		CrossChainEpoch:            EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -137,10 +137,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(2), // same as staking
 		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -174,10 +174,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(2),
 		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -211,10 +211,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              big.NewInt(0),
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(2),
 		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -247,10 +247,10 @@ var (
 		ReceiptLogEpoch:            big.NewInt(0),
 		SHA3Epoch:                  big.NewInt(0),
 		HIP6And8Epoch:              EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		CrossChainEpoch:            EpochTBD,
 		StakingPrecompileEpoch:     big.NewInt(2),
 		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
+		CrossChainEpoch:            big.NewInt(0),
 	}
 
 	// AllProtocolChanges ...
@@ -285,10 +285,10 @@ var (
 		big.NewInt(0),                      // ReceiptLogEpoch
 		big.NewInt(0),                      // SHA3Epoch
 		big.NewInt(0),                      // HIP6And8Epoch
-		big.NewInt(0),                      // CrossChainEpoch
 		big.NewInt(0),                      // StakingPrecompileEpoch
 		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
+		big.NewInt(0),                      // CrossChainEpoch
 	}
 
 	// TestChainConfig ...
@@ -323,10 +323,10 @@ var (
 		big.NewInt(0),        // ReceiptLogEpoch
 		big.NewInt(0),        // SHA3Epoch
 		big.NewInt(0),        // HIP6And8Epoch
-		big.NewInt(0),        // CrossChainEpoch
 		big.NewInt(0),        // StakingPrecompileEpoch
 		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
+		big.NewInt(0),        // CrossChainEpoch
 	}
 
 	// TestRules ...

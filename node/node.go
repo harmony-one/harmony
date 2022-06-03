@@ -123,8 +123,9 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync       *abool.AtomicBool
-	proposedBlock  map[uint64]*types.Block
+	IsInSync      *abool.AtomicBool
+	proposedBlock map[uint64]*types.Block
+
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
 

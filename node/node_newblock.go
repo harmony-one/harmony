@@ -132,7 +132,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	node.Worker.UpdateCurrent()
 
 	header := node.Worker.GetCurrentHeader()
-
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
 	leaderKey := node.Consensus.LeaderPubKey

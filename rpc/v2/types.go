@@ -663,43 +663,6 @@ func blockWithTxHashFromBlock(b *types.Block) *BlockWithTxHash {
 	return blk
 }
 
-func NewBlockHeader(
-	head *block.Header,
-) (*BlockHeader, error) {
-	lastSig := head.LastCommitSignature()
-	blk := &BlockHeader{
-		ParentHash:           head.ParentHash(),
-		Miner:                head.Coinbase(),
-		StateRoot:            head.Root(),
-		TransactionsRoot:     head.TxHash(),
-		ReceiptsRoot:         head.ReceiptHash(),
-		OutgoingReceiptsRoot: head.OutgoingReceiptHash(),
-		IncomingReceiptsRoot: head.IncomingReceiptHash(),
-		LogsBloom:            head.Bloom(),
-
-		Number:    head.Number(),
-		GasLimit:  head.GasLimit(),
-		GasUsed:   head.GasUsed(),
-		Timestamp: head.Time(),
-		ExtraData: hexutil.Bytes(head.Extra()),
-		MixHash:   head.MixDigest(),
-
-		ViewID:  head.ViewID(),
-		Epoch:   head.Epoch(),
-		ShardID: head.ShardID(),
-
-		LastCommitSignature: hexutil.Bytes(lastSig[:]),
-		LastCommitBitmap:    head.LastCommitBitmap(),
-		Vrf:                 head.Vrf(),
-		Vdf:                 head.Vdf(),
-		ShardState:          head.ShardState(),
-		CrossLink:           head.CrossLinks(),
-		Slashes:             head.Slashes(),
-		MmrRoot:             head.MMRRoot(),
-	}
-	return blk, nil
-}
-
 // NewBlockWithFullTx return a block with the transaction that will serialize to the RPC representation
 func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 	head := b.Header()
@@ -742,6 +705,43 @@ func blockWithFullTxFromBlock(b *types.Block) (*BlockWithFullTx, error) {
 			return nil, err
 		}
 		blk.Transactions = append(blk.Transactions, fmtTx)
+	}
+	return blk, nil
+}
+
+func NewBlockHeader(
+	head *block.Header,
+) (*BlockHeader, error) {
+	lastSig := head.LastCommitSignature()
+	blk := &BlockHeader{
+		ParentHash:           head.ParentHash(),
+		Miner:                head.Coinbase(),
+		StateRoot:            head.Root(),
+		TransactionsRoot:     head.TxHash(),
+		ReceiptsRoot:         head.ReceiptHash(),
+		OutgoingReceiptsRoot: head.OutgoingReceiptHash(),
+		IncomingReceiptsRoot: head.IncomingReceiptHash(),
+		LogsBloom:            head.Bloom(),
+
+		Number:    head.Number(),
+		GasLimit:  head.GasLimit(),
+		GasUsed:   head.GasUsed(),
+		Timestamp: head.Time(),
+		ExtraData: hexutil.Bytes(head.Extra()),
+		MixHash:   head.MixDigest(),
+
+		ViewID:  head.ViewID(),
+		Epoch:   head.Epoch(),
+		ShardID: head.ShardID(),
+
+		LastCommitSignature: hexutil.Bytes(lastSig[:]),
+		LastCommitBitmap:    head.LastCommitBitmap(),
+		Vrf:                 head.Vrf(),
+		Vdf:                 head.Vdf(),
+		ShardState:          head.ShardState(),
+		CrossLink:           head.CrossLinks(),
+		Slashes:             head.Slashes(),
+		MmrRoot:             head.MMRRoot(),
 	}
 	return blk, nil
 }
