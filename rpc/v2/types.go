@@ -73,7 +73,7 @@ type BlockHeader struct {
 	ShardState           hexutil.Bytes  `json:"shardState"`
 	CrossLink            hexutil.Bytes  `json:"crossLink"`
 	Slashes              hexutil.Bytes  `json:"slashes"`
-	MmrRoot              hexutil.Bytes  `json:"mmrRoot"`
+	MmrRoot              common.Hash    `json:"mmrRoot"`
 }
 
 // BlockWithFullTx represents a block that will serialize to the RPC representation of a block

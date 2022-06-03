@@ -69,6 +69,9 @@ type ChainReader interface {
 
 	// ReadCommitSig read the commit sig of a given block number
 	ReadCommitSig(blockNum uint64) ([]byte, error)
+
+	// HeaderTrieAt returns a new mutable trie based on a particular point in time.
+	HeaderTrieAt(root common.Hash) (*types.HeaderTrie, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

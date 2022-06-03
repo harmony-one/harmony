@@ -785,6 +785,35 @@ type StorageResult struct {
 	Proof []string     `json:"proof"`
 }
 
+// GetMMRProof returns block header proof at given point
+func (s *PublicBlockchainService) GetMMRProof(
+	ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash, mmrPoint rpc.MMRProofPoint) ([]string, error) {
+	block, err := s.hmy.BlockByNumberOrHash(ctx, blockNrOrHash)
+	if err != nil {
+		return nil, err
+	}
+	mmrRoot, ok := mmrPoint.MMRRootHash()
+	if !ok {
+		mmrBlock, err := s.hmy.BlockByNumberOrHash(ctx, rpc.BlockNumberOrHash{
+			BlockNumber: mmrPoint.BlockNumber,
+			BlockHash:   mmrPoint.BlockHash,
+		})
+		if err != nil {
+			return nil, err
+		}
+		mmrRoot = mmrBlock.Header().MMRRoot()
+	}
+	headerTrie, err := s.hmy.BlockChain.HeaderTrieAt(mmrRoot)
+	if err != nil {
+		return nil, err
+	}
+	proof, err := headerTrie.Prove(block.Number())
+	if err != nil {
+		return nil, err
+	}
+	return toHexSlice(proof), nil
+}
+
 // GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
 func (s *PublicBlockchainService) GetProof(
 	ctx context.Context, address common.Address, storageKeys []string, blockNrOrHash rpc.BlockNumberOrHash) (ret *AccountResult, err error) {

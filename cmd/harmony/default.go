@@ -68,9 +68,6 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigSrcType: kmsConfigTypeShared,
 		KMSConfigFile:    "",
 	},
-	MMR: harmonyconfig.MmrConfig{
-		DbDir: "./db/mmr",
-	},
 	TxPool: harmonyconfig.TxPoolConfig{
 		BlacklistFile:     "./.hmy/blacklist.txt",
 		RosettaFixFile:    "",
@@ -105,10 +102,6 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		CacheTime:       10,
 		CacheSize:       512,
 	},
-}
-
-var defaultMmrConfig = harmonyconfig.MmrConfig{
-	DbDir: "./db/mmr",
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{

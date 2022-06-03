@@ -533,6 +533,11 @@ func (bc *BlockChain) StateAt(root common.Hash) (*state.DB, error) {
 	return state.New(root, bc.stateCache)
 }
 
+// HeaderTrieAt returns a new mutable trie based on a particular point in time.
+func (bc *BlockChain) HeaderTrieAt(root common.Hash) (*types.HeaderTrie, error) {
+	return types.NewHeaderTrie(root, bc.stateCache.TrieDB())
+}
+
 // Reset purges the entire blockchain, restoring it to its genesis state.
 func (bc *BlockChain) Reset() error {
 	return bc.ResetWithGenesisBlock(bc.genesisBlock)
@@ -1188,6 +1193,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	stakeMsgs []staking.StakeMsg,
 	paid reward.Reader,
 	state *state.DB,
+	headerTrie *types.HeaderTrie,
 ) (status WriteStatus, err error) {
 	// Make sure no inconsistent state is leaked during insertion
 	bc.mu.Lock()
@@ -1206,7 +1212,7 @@ func (bc *BlockChain) WriteBlockWithState(
 
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
+	if isLastBlockInEpoch := block.IsLastBlockInEpoch(); bc.cacheConfig.Disabled || isLastBlockInEpoch {
 		if err := triedb.Commit(root, false); err != nil {
 			if isUnrecoverableErr(err) {
 				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
@@ -1214,10 +1220,24 @@ func (bc *BlockChain) WriteBlockWithState(
 			}
 			return NonStatTy, err
 		}
+		if headerTrie != nil && isLastBlockInEpoch {
+			if _, err := headerTrie.Commit(nil); err != nil {
+				if isUnrecoverableErr(err) {
+					fmt.Printf("Unrecoverable error when committing headerTrie: %v\nExitting\n", err)
+					os.Exit(1)
+				}
+				return NonStatTy, err
+			}
+		}
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
 		bc.triegc.Push(root, -int64(block.NumberU64()))
+		if headerTrie != nil {
+			trieHash := headerTrie.Hash()
+			triedb.Reference(trieHash, common.Hash{})
+			bc.triegc.Push(trieHash, -int64(block.NumberU64()))
+		}
 
 		if current := block.NumberU64(); current > triesInMemory {
 			// If we exceeded our memory allowance, flush matured singleton nodes to disk
@@ -1496,6 +1516,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
+		var headerTrie *types.HeaderTrie
+		if bc.ShardID() == shard.BeaconChainShardID && bc.Config().IsCrossChain(block.Epoch()) {
+			headerTrie, err = bc.HeaderTrieAt(parent.Header().MMRRoot())
+			if err != nil {
+				return i, events, coalescedLogs, err
+			}
+			headerTrie.Insert(parent.Header())
+		}
 		vmConfig := bc.vmConfig
 		if bc.trace {
 			ev := TraceEvent{
@@ -1549,7 +1577,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, stakeMsgs, payout, state,
+			block, receipts, cxReceipts, stakeMsgs, payout, state, headerTrie,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err

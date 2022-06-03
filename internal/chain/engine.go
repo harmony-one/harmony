@@ -241,6 +241,20 @@ func GetLeaderPubKeyFromCoinbase(
 	)
 }
 
+func (e *engineImpl) verifyMMRRoot(chain engine.ChainReader, parent, header *block.Header) error {
+	if chain.ShardID() == shard.BeaconChainShardID && chain.Config().IsCrossChain(header.Epoch()) {
+		headerTrie, err := chain.HeaderTrieAt(parent.MMRRoot())
+		if err != nil {
+			return err
+		}
+		headerTrie.Insert(parent)
+		if headerTrie.Hash() != header.Hash() {
+			return errors.New("invalid MMRRoot")
+		}
+	}
+	return nil
+}
+
 // VerifySeal implements Engine, checking whether the given block's parent block satisfies
 // the PoS difficulty requirements, i.e. >= 2f+1 valid signatures from the committee
 // Note that each block header contains the bls signature of the parent block
@@ -256,6 +270,10 @@ func (e *engineImpl) VerifySeal(chain engine.ChainReader, header *block.Header) 
 	parentHeader := chain.GetHeader(parentHash, header.Number().Uint64()-1)
 	if parentHeader == nil {
 		return errors.New("[VerifySeal] no parent header found")
+	}
+
+	if err := e.verifyMMRRoot(chain, parentHeader, header); err != nil {
+		return err
 	}
 
 	pas := payloadArgsFromHeader(parentHeader)

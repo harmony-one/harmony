@@ -315,3 +315,5 @@ func (cr *fakeChainReader) ReadValidatorStats(
 }
 
 func (cr *fakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }
+
+func (cr *fakeChainReader) HeaderTrieAt(root common.Hash) (*types.HeaderTrie, error) { return nil, nil }

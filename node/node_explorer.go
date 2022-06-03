@@ -146,12 +146,6 @@ func (node *Node) TraceLoopForExplorer() {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
-	if node.Blockchain().Config().IsCrossChain(block.Epoch()) {
-		// compute new MMR root by linking parentHash and insert the MMR root to header
-		if err := node.computeAndUpdateNewMMRRoot(block.Header(), block.Header().IsLastBlockInEpoch()); err != nil {
-			panic("[AddNewBlockForExplorer] Failed setting MMRRoot")
-		}
-	}
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
 		if block.IsLastBlockInEpoch() {
 			node.Consensus.UpdateConsensusInformation()

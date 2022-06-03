@@ -218,3 +218,30 @@ func BlockNumberOrHashWithHash(hash common.Hash, canonical bool) BlockNumberOrHa
 		RequireCanonical: canonical,
 	}
 }
+
+type MMRProofPoint struct {
+	BlockNumber *BlockNumber `json:"blockNumber,omitempty"`
+	BlockHash   *common.Hash `json:"blockHash,omitempty"`
+	MMRRoot     *common.Hash `json:"mmrRoot,omitempty"`
+}
+
+func (p *MMRProofPoint) Number() (BlockNumber, bool) {
+	if p.BlockNumber != nil {
+		return *p.BlockNumber, true
+	}
+	return BlockNumber(0), false
+}
+
+func (p *MMRProofPoint) Hash() (common.Hash, bool) {
+	if p.BlockHash != nil {
+		return *p.BlockHash, true
+	}
+	return common.Hash{}, false
+}
+
+func (p *MMRProofPoint) MMRRootHash() (common.Hash, bool) {
+	if p.MMRRoot != nil {
+		return *p.MMRRoot, true
+	}
+	return common.Hash{}, false
+}

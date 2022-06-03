@@ -86,9 +86,7 @@ type ConfigType struct {
 	P2PPriKey       p2p_crypto.PrivKey   `json:"-"`
 	ConsensusPriKey multibls.PrivateKeys `json:"-"`
 	// Database directory
-	DBDir string
-	// MMR DB directory
-	MmrDbDir         string
+	DBDir            string
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
 	DNSZone          string

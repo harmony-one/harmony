@@ -1003,21 +1003,6 @@ func legacyApplyKMSSourceVal(src string, config *harmonyconfig.HarmonyConfig) {
 	}
 }
 
-// mmr flags
-var (
-	mmrDbDirFlag = cli.StringFlag{
-		Name:     "mmr.dbdir",
-		Usage:    "directory to store the mmr db files",
-		DefValue: defaultMmrConfig.DbDir,
-	}
-)
-
-func applyMmrFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
-	if cli.IsFlagChanged(cmd, mmrDbDirFlag) {
-		config.MMR.DbDir = cli.GetStringFlagValue(cmd, mmrDbDirFlag)
-	}
-}
-
 // consensus flags
 var (
 	consensusMinPeersFlag = cli.IntFlag{
