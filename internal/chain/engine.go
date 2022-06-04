@@ -248,7 +248,7 @@ func (e *engineImpl) verifyMMRRoot(chain engine.ChainReader, parent, header *blo
 			return err
 		}
 		headerTrie.Insert(parent)
-		if headerTrie.Hash() != header.Hash() {
+		if headerTrie.Hash() != header.MMRRoot() {
 			return errors.New("invalid MMRRoot")
 		}
 	}

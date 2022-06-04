@@ -910,6 +910,9 @@ func (bc *BlockChain) Stop() {
 						Str("hash", recent.Hash().Hex()).
 						Str("root", recent.Root().Hex()).
 						Msg("Writing cached state to disk")
+					if err := triedb.Commit(recent.MMRRoot(), true); err != nil {
+						utils.Logger().Error().Err(err).Msg("Failed to commit recent MMR trie")
+					}
 					if err := triedb.Commit(recent.Root(), true); err != nil {
 						utils.Logger().Error().Err(err).Msg("Failed to commit recent state trie")
 					}
@@ -1209,35 +1212,33 @@ func (bc *BlockChain) WriteBlockWithState(
 	if err != nil {
 		return NonStatTy, err
 	}
-
+	if _, err := headerTrie.Commit(nil); err != nil {
+		return NonStatTy, err
+	}
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if isLastBlockInEpoch := block.IsLastBlockInEpoch(); bc.cacheConfig.Disabled || isLastBlockInEpoch {
-		if err := triedb.Commit(root, false); err != nil {
-			if isUnrecoverableErr(err) {
-				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
-				os.Exit(1)
-			}
+	commit := func(hash common.Hash, report bool) error {
+		err := triedb.Commit(root, report)
+		if err != nil && isUnrecoverableErr(err) {
+			fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
+			os.Exit(1)
+		}
+		return err
+	}
+	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
+		if err := commit(headerTrie.Hash(), false); err != nil {
 			return NonStatTy, err
 		}
-		if headerTrie != nil && isLastBlockInEpoch {
-			if _, err := headerTrie.Commit(nil); err != nil {
-				if isUnrecoverableErr(err) {
-					fmt.Printf("Unrecoverable error when committing headerTrie: %v\nExitting\n", err)
-					os.Exit(1)
-				}
-				return NonStatTy, err
-			}
+		if err := commit(root, false); err != nil {
+			return NonStatTy, err
 		}
 	} else {
 		// Full but not archive node, do proper garbage collection
 		triedb.Reference(root, common.Hash{}) // metadata reference to keep trie alive
 		bc.triegc.Push(root, -int64(block.NumberU64()))
-		if headerTrie != nil {
-			trieHash := headerTrie.Hash()
-			triedb.Reference(trieHash, common.Hash{})
-			bc.triegc.Push(trieHash, -int64(block.NumberU64()))
-		}
+		trieHash := headerTrie.Hash()
+		triedb.Reference(trieHash, common.Hash{})
+		bc.triegc.Push(trieHash, -int64(block.NumberU64()))
 
 		if current := block.NumberU64(); current > triesInMemory {
 			// If we exceeded our memory allowance, flush matured singleton nodes to disk
@@ -1265,7 +1266,8 @@ func (bc *BlockChain) WriteBlockWithState(
 							Msg("State in memory for too long, committing")
 					}
 					// Flush an entire trie and restart the counters
-					triedb.Commit(header.Root(), true)
+					commit(header.MMRRoot(), true)
+					commit(header.Root(), true)
 					lastWrite = chosen
 					bc.gcproc = 0
 				}
@@ -1516,12 +1518,11 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
-		var headerTrie *types.HeaderTrie
+		headerTrie, err := bc.HeaderTrieAt(parent.Header().MMRRoot())
+		if err != nil {
+			return i, events, coalescedLogs, err
+		}
 		if bc.ShardID() == shard.BeaconChainShardID && bc.Config().IsCrossChain(block.Epoch()) {
-			headerTrie, err = bc.HeaderTrieAt(parent.Header().MMRRoot())
-			if err != nil {
-				return i, events, coalescedLogs, err
-			}
 			headerTrie.Insert(parent.Header())
 		}
 		vmConfig := bc.vmConfig

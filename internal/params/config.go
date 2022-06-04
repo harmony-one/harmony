@@ -250,7 +250,7 @@ var (
 		StakingPrecompileEpoch:     big.NewInt(2),
 		ChainIdFixEpoch:            big.NewInt(0),
 		SlotsLimitedEpoch:          EpochTBD, // epoch to enable HIP-16
-		CrossChainEpoch:            big.NewInt(0),
+		CrossChainEpoch:            big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...

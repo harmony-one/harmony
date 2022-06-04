@@ -32,6 +32,7 @@ type Block struct {
 	Timestamp        hexutil.Uint64      `json:"timestamp"`
 	TransactionsRoot common.Hash         `json:"transactionsRoot"`
 	ReceiptsRoot     common.Hash         `json:"receiptsRoot"`
+	MMRRoot          common.Hash         `json:"mmrRoot"`
 	Uncles           []common.Hash       `json:"uncles"`
 }
 
@@ -184,6 +185,7 @@ func newBlock(b *types.Block) *Block {
 		Timestamp:        hexutil.Uint64(head.Time().Uint64()),
 		TransactionsRoot: head.TxHash(),
 		ReceiptsRoot:     head.ReceiptHash(),
+		MMRRoot:          head.MMRRoot(),
 		Uncles:           []common.Hash{},
 	}
 }

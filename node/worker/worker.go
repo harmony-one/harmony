@@ -322,16 +322,12 @@ func (w *Worker) makeCurrent(parent *types.Block, header *block.Header) error {
 	}
 	// only shard0 has mmr root
 	if w.chain.ShardID() == shard.BeaconChainShardID && w.chain.Config().IsCrossChain(header.Epoch()) {
-		if !w.chain.Config().IsCrossChain(parent.Epoch()) {
-			header.SetMMRRoot(common.Hash{})
-		} else {
-			headeTrie, err := w.chain.HeaderTrieAt(parent.Header().MMRRoot())
-			if err != nil {
-				return err
-			}
-			headeTrie.Insert(parent.Header())
-			header.SetMMRRoot(headeTrie.Hash())
+		headeTrie, err := w.chain.HeaderTrieAt(parent.Header().MMRRoot())
+		if err != nil {
+			return err
 		}
+		headeTrie.Insert(parent.Header())
+		header.SetMMRRoot(headeTrie.Hash())
 	}
 	env := &environment{
 		signer:    types.NewEIP155Signer(w.config.ChainID),
