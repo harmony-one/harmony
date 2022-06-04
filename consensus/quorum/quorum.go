@@ -250,7 +250,7 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	return found, &s.publicKeys[idx]
 }
 
-// NthNextHmy return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number
+// NthNextHmyExt return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number
 func (s *cIdentities) NthNextHmyExt(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
 	found := false
 
