@@ -122,6 +122,9 @@ func (bc *testBlockChain) ReadValidatorStats(addr common.Address) (*staking.Vali
 func (bc *testBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *block.Header, isVerify bool) (*shard.State, error) {
 	return nil, nil
 }
+func (bc *testBlockChain) HeaderTrieAt(root common.Hash) (*types.HeaderTrie, error) {
+	return nil, nil
+}
 
 type dummyEngine struct{}
 
