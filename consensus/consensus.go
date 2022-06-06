@@ -132,7 +132,7 @@ type Consensus struct {
 	// finality of previous consensus in the unit of milliseconds
 	finality int64
 	// finalityCounter keep tracks of the finality time
-	finalityCounter int64
+	finalityCounter atomic.Value //int64
 
 	dHelper *downloadHelper
 }
