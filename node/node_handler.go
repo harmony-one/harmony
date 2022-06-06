@@ -341,7 +341,7 @@ func getCrosslinkHeadersForShards(beacon *core.BlockChain, shardChain *core.Bloc
 }
 
 // VerifyNewBlock is called by consensus participants to verify the block (account model) they are
-// running consensus on
+// running consensus on.
 func (node *Node) VerifyNewBlock(newBlock *types.Block) error {
 	if newBlock == nil || newBlock.Header() == nil {
 		return errors.New("nil header or block asked to verify")
