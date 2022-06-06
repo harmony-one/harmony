@@ -68,7 +68,7 @@ var (
 	syncH               = []byte{nodeB, blockB, syncB}
 	crossLinkH          = []byte{nodeB, blockB, crossLinkB}
 	cxReceiptH          = []byte{nodeB, blockB, receiptB}
-	crossLinkHeardBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
+	crossLinkHeartBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
 )
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
@@ -114,7 +114,7 @@ func ConstructSlashMessage(witnesses slash.Records) []byte {
 }
 
 func ConstructCrossLinkHeartBeatMessage(hb types.CrosslinkHeartbeat) []byte {
-	byteBuffer := bytes.NewBuffer(crossLinkHeardBeatH)
+	byteBuffer := bytes.NewBuffer(crossLinkHeartBeatH)
 	data, _ := rlp.EncodeToBytes(hb)
 	byteBuffer.Write(data)
 	return byteBuffer.Bytes()
