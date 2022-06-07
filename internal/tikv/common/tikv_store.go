@@ -17,6 +17,7 @@ type TiKVStore interface {
 	NewIterator(start, end []byte) ethdb.Iterator
 }
 
+// TiKVStoreWrapper simple wrapper to covert to ethdb.KeyValueStore
 type TiKVStoreWrapper struct {
 	TiKVStore
 }

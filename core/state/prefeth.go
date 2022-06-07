@@ -18,13 +18,15 @@ type prefetchJob struct {
 	start, end  []byte
 }
 
-// Prefetch
+// Prefetch If redis is empty, the hit rate will be too low and the synchronization block speed will be slow
+// this function will parallel load the latest block statedb to redis
 func (s *DB) Prefetch(parallel int) {
 	wg := sync.WaitGroup{}
 
 	jobChan := make(chan *prefetchJob, 10000)
 	waitWorker := int64(parallel)
 
+	// start parallel workers
 	for i := 0; i < parallel; i++ {
 		go func() {
 			defer wg.Done()
@@ -38,6 +40,7 @@ func (s *DB) Prefetch(parallel int) {
 		wg.Add(1)
 	}
 
+	// add first jobs
 	for i := 0; i < 255; i++ {
 		start := []byte{byte(i)}
 		end := []byte{byte(i + 1)}
@@ -53,6 +56,7 @@ func (s *DB) Prefetch(parallel int) {
 		}
 	}
 
+	// wait all worker done
 	start := time.Now()
 	log.Println("Prefetch start")
 	var sleepCount int
@@ -72,8 +76,10 @@ func (s *DB) Prefetch(parallel int) {
 	log.Println("Prefetch end, use", end.Sub(start))
 }
 
+// prefetchWorker used to process one job
 func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 	if job.account == nil {
+		// scan one account
 		nodeIterator := s.trie.NodeIterator(job.start)
 		it := trie.NewIterator(nodeIterator)
 
@@ -82,6 +88,7 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 				return
 			}
 
+			// build account data from main trie tree
 			var data Account
 			if err := rlp.DecodeBytes(it.Value, &data); err != nil {
 				panic(err)
@@ -93,21 +100,27 @@ func (s *DB) prefetchWorker(job *prefetchJob, jobs chan *prefetchJob) {
 				obj.Code(s.db)
 			}
 
+			// build account trie tree
 			storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(nil))
 			storageJob := &prefetchJob{
 				accountAddr: addrBytes,
 				account:     &data,
 			}
+
+			// fetch data
 			s.prefetchAccountStorage(jobs, storageJob, storageIt)
 		}
 	} else {
+		// scan main trie tree
 		obj := newObject(s, common.BytesToAddress(job.accountAddr), *job.account)
 		storageIt := trie.NewIterator(obj.getTrie(s.db).NodeIterator(job.start))
 
+		// fetch data
 		s.prefetchAccountStorage(jobs, job, storageIt)
 	}
 }
 
+// bytesMiddle get the binary middle value of a and b
 func (s *DB) bytesMiddle(a, b []byte) []byte {
 	if a == nil && b == nil {
 		return []byte{128}
@@ -141,6 +154,7 @@ func (s *DB) bytesMiddle(a, b []byte) []byte {
 	return aI.Bytes()
 }
 
+// prefetchAccountStorage used for fetch account storage
 func (s *DB) prefetchAccountStorage(jobs chan *prefetchJob, job *prefetchJob, it *trie.Iterator) {
 	start := time.Now()
 	count := 0
@@ -152,6 +166,7 @@ func (s *DB) prefetchAccountStorage(jobs chan *prefetchJob, job *prefetchJob, it
 
 		count++
 
+		// if fetch one account job used more than 15s, then split the job
 		if count%10000 == 0 && time.Now().Sub(start) > 15*time.Second {
 			middle := s.bytesMiddle(it.Key, job.end)
 			startJob := &prefetchJob{

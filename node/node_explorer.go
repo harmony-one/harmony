@@ -159,6 +159,7 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 		// Clean up the blocks to avoid OOM.
 		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
 
+		// if in tikv mode, only master writer node need dump all explorer block
 		if !node.HarmonyConfig.General.UseTiKV || node.Blockchain().RedisPreempt().LastLockStatus() {
 			// Do dump all blocks from state syncing for explorer one time
 			// TODO: some blocks can be dumped before state syncing finished.
@@ -176,8 +177,12 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 					if block.NumberU64() == 0 {
 						return
 					}
+
+					// get checkpoint bitmap and flip all bit
 					bitmap := exp.GetCheckpointBitmap()
 					bitmap.Flip(0, block.NumberU64())
+
+					// find all not processed block and dump it
 					iterator := bitmap.ReverseIterator()
 					for iterator.HasNext() {
 						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(iterator.Next()))
@@ -190,13 +195,9 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	}
 }
 
-func (node *Node) AddNewBlockForTiKV(block *types.Block) {
-	// Clean up the blocks to avoid OOM.
-	node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
-}
-
 // ExplorerMessageHandler passes received message in node_handler to explorer service.
 func (node *Node) commitBlockForExplorer(block *types.Block) {
+	// if in tikv mode, only master writer node need dump explorer block
 	if !node.HarmonyConfig.General.UseTiKV || (node.HarmonyConfig.TiKV.Role == "Writer" && node.Blockchain().RedisPreempt().LastLockStatus()) {
 		if block.ShardID() != node.NodeConfig.ShardID {
 			return

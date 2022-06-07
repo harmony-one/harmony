@@ -16,11 +16,13 @@ type cacheWrapper struct {
 	*fastcache.Cache
 }
 
+// Put inserts the given value into the key-value data store.
 func (c *cacheWrapper) Put(key []byte, value []byte) error {
 	c.Cache.Set(key, value)
 	return nil
 }
 
+// Delete removes the key from the key-value data store.
 func (c *cacheWrapper) Delete(key []byte) error {
 	c.Cache.Del(key)
 	return nil
@@ -32,11 +34,13 @@ type redisPipelineWrapper struct {
 	expiredTime time.Duration
 }
 
+// Put inserts the given value into the key-value data store.
 func (c *redisPipelineWrapper) Put(key []byte, value []byte) error {
 	c.SetEX(context.Background(), string(key), value, c.expiredTime)
 	return nil
 }
 
+// Delete removes the key from the key-value data store.
 func (c *redisPipelineWrapper) Delete(key []byte) error {
 	c.Del(context.Background(), string(key))
 	return nil
@@ -74,7 +78,10 @@ type StateDBCacheDatabase struct {
 }
 
 func NewStateDBCacheDatabase(remoteDB common.TiKVStore, config StateDBCacheConfig, readOnly bool) (*StateDBCacheDatabase, error) {
-	cache := fastcache.LoadFromFileOrNew(config.CachePersistencePath, int(config.CacheSizeInMB)*1024*1024) // 10GB
+	// create or load memory cache from file
+	cache := fastcache.LoadFromFileOrNew(config.CachePersistencePath, int(config.CacheSizeInMB)*1024*1024)
+
+	// create options
 	option := &redis.ClusterOptions{
 		Addrs:       config.RedisServerAddr,
 		PoolSize:    32,
@@ -86,12 +93,14 @@ func NewStateDBCacheDatabase(remoteDB common.TiKVStore, config StateDBCacheConfi
 		option.ReadOnly = true
 	}
 
+	// check redis connection
 	rdb := redis.NewClusterClient(option)
 	err := rdb.Ping(context.Background()).Err()
 	if err != nil {
 		return nil, err
 	}
 
+	// reload redis cluster slots status
 	rdb.ReloadState(context.Background())
 
 	db := &StateDBCacheDatabase{
@@ -105,10 +114,13 @@ func NewStateDBCacheDatabase(remoteDB common.TiKVStore, config StateDBCacheConfi
 	}
 
 	if !readOnly {
+		// Read a copy of the memory hit data into redis to improve the hit rate
+		// refresh read time to prevent recycling by lru
 		db.l2ExpiredRefresh = make(chan string, 100000)
 		go db.startL2ExpiredRefresh()
 	}
 
+	// print debug info
 	if config.DebugHitRate {
 		go func() {
 			for range time.Tick(5 * time.Second) {
@@ -120,21 +132,27 @@ func NewStateDBCacheDatabase(remoteDB common.TiKVStore, config StateDBCacheConfi
 	return db, nil
 }
 
+// Has retrieves if a key is present in the key-value data store.
 func (c *StateDBCacheDatabase) Has(key []byte) (bool, error) {
 	return c.remoteDB.Has(key)
 }
 
+// Get retrieves the given key if it's present in the key-value data store.
 func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 	if c.enableReadCache {
 		var ok bool
+
+		// first, get data from memory cache
 		keyStr := string(key)
 		if ret, ok = c.l1Cache.HasGet(nil, key); ok {
 			if !c.l2ReadOnly {
 				select {
+				// refresh read time to prevent recycling by lru
 				case c.l2ExpiredRefresh <- keyStr:
 				default:
 				}
 			}
+
 			atomic.AddUint64(&c.l1HitCount, 1)
 			return ret, nil
 		}
@@ -142,6 +160,7 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 		defer func() {
 			if err == nil {
 				if len(ret) < 64*1024 {
+					// set data to memory db if loaded from redis cache or leveldb
 					c.l1Cache.Set(key, ret)
 				}
 			}
@@ -150,6 +169,7 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 		timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelFunc()
 
+		// load data from redis cache
 		data := c.l2Cache.Get(timeoutCtx, keyStr)
 		if data.Err() == nil {
 			atomic.AddUint64(&c.l2HitCount, 1)
@@ -160,6 +180,7 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 
 		if !c.l2ReadOnly {
 			defer func() {
+				// set data to redis db if loaded from leveldb
 				if err == nil {
 					c.l2Cache.SetEX(context.Background(), keyStr, ret, c.l2ExpiredTime)
 				}
@@ -177,17 +198,20 @@ func (c *StateDBCacheDatabase) Get(key []byte) (ret []byte, err error) {
 	return
 }
 
+// Put inserts the given value into the key-value data store.
 func (c *StateDBCacheDatabase) Put(key []byte, value []byte) (err error) {
 	if c.enableReadCache {
 		defer func() {
 			if err == nil {
 				if len(value) < 64*1024 {
+					// memory db only accept the small data
 					c.l1Cache.Set(key, value)
 				}
 				if !c.l2ReadOnly {
 					timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 					defer cancelFunc()
 
+					// send the data to redis
 					res := c.l2Cache.SetEX(timeoutCtx, string(key), value, c.l2ExpiredTime)
 					if res.Err() == nil {
 						log.Printf("[Put WARN]Redis Error: %v", res.Err())
@@ -200,6 +224,7 @@ func (c *StateDBCacheDatabase) Put(key []byte, value []byte) (err error) {
 	return c.remoteDB.Put(key, value)
 }
 
+// Delete removes the key from the key-value data store.
 func (c *StateDBCacheDatabase) Delete(key []byte) (err error) {
 	if c.enableReadCache {
 		defer func() {
@@ -215,10 +240,13 @@ func (c *StateDBCacheDatabase) Delete(key []byte) (err error) {
 	return c.remoteDB.Delete(key)
 }
 
+// NewBatch creates a write-only database that buffers changes to its host db
+// until a final write is called.
 func (c *StateDBCacheDatabase) NewBatch() ethdb.Batch {
 	return newStateDBCacheBatch(c, c.remoteDB.NewBatch())
 }
 
+// Stat returns a particular internal stat of the database.
 func (c *StateDBCacheDatabase) Stat(property string) (string, error) {
 	switch property {
 	case "tikv.save.cache":
@@ -235,6 +263,7 @@ func (c *StateDBCacheDatabase) NewIterator(start, end []byte) ethdb.Iterator {
 	return c.remoteDB.NewIterator(start, end)
 }
 
+// Close disconnect the redis and save memory cache to file
 func (c *StateDBCacheDatabase) Close() error {
 	if atomic.CompareAndSwapUint64(&c.isClose, 0, 1) {
 		err := c.l1Cache.SaveToFileConcurrent(c.config.CachePersistencePath, runtime.NumCPU())
@@ -259,6 +288,7 @@ func (c *StateDBCacheDatabase) Close() error {
 	return nil
 }
 
+// cacheWrite write batch to cache
 func (c *StateDBCacheDatabase) cacheWrite(b ethdb.Batch) error {
 	if !c.l2ReadOnly {
 		pipeline := c.l2Cache.Pipeline()
@@ -283,6 +313,7 @@ func (c *StateDBCacheDatabase) refreshL2ExpiredTime() {
 	c.l2NextExpiredTime = time.Unix(unix, 0)
 }
 
+// startL2ExpiredRefresh batch refresh redis cache
 func (c *StateDBCacheDatabase) startL2ExpiredRefresh() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -313,6 +344,7 @@ func (c *StateDBCacheDatabase) startL2ExpiredRefresh() {
 	}
 }
 
+// print stats to stdout
 func (c *StateDBCacheDatabase) cacheStatusPrint() {
 	var state = &fastcache.Stats{}
 	state.Reset()

@@ -7,6 +7,7 @@ import (
 
 var redisInstance *redis.ClusterClient
 
+// Init used to init redis instance in tikv mode
 func Init(serverAddr []string) error {
 	option := &redis.ClusterOptions{
 		Addrs:    serverAddr,
@@ -23,6 +24,7 @@ func Init(serverAddr []string) error {
 	return nil
 }
 
+// Close disconnect redis instance in tikv mode
 func Close() error {
 	if redisInstance != nil {
 		return redisInstance.Close()

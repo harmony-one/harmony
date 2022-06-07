@@ -12,7 +12,9 @@ import (
 
 var secureKeyPrefix = []byte("secure-key-")
 
+// DiffAndCleanCache clean block tire data from redis, Used to reduce redis storage and increase hit rate
 func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
+	// create difference iterator
 	it, _ := trie.NewDifferenceIterator(to.trie.NodeIterator(nil), s.trie.NodeIterator(nil))
 	db, err := tikv_manage.GetDefaultTiKVFactory().NewCacheStateDB(shardId)
 	if err != nil {
@@ -24,9 +26,12 @@ func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
 	count := uint64(0)
 	for it.Next(true) {
 		if !it.Leaf() {
+			// delete it if trie leaf node
 			atomic.AddUint64(&count, 1)
 			_ = batch.Delete(it.Hash().Bytes())
 		} else {
+
+			// build account data
 			addrBytes := s.trie.GetKey(it.LeafKey())
 			addr := common.BytesToAddress(addrBytes)
 
@@ -41,14 +46,17 @@ func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
 				continue
 			}
 
+			// if account not changed, skip
 			if bytes.Compare(fromAccount.Root.Bytes(), toAccount.Root.Bytes()) == 0 {
 				continue
 			}
 
+			// create account difference iterator
 			fromAccountTrie := newObject(s, addr, fromAccount).getTrie(s.db)
 			toAccountTrie := newObject(to, addr, toAccount).getTrie(to.db)
 			accountIt, _ := trie.NewDifferenceIterator(toAccountTrie.NodeIterator(nil), fromAccountTrie.NodeIterator(nil))
 
+			// parallel to delete data
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

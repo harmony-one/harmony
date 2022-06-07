@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
+// NopRemoteBatch on readonly mode, write operator will be reject
 type NopRemoteBatch struct {
 }
 

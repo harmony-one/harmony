@@ -39,6 +39,7 @@ type explorerDB struct {
 	db ethdb.KeyValueStore
 }
 
+// newExplorerLvlDB new explorer storage using leveldb
 func newExplorerLvlDB(dbPath string) (database, error) {
 	db, err := leveldb.New(dbPath, 16, 500, "explorer_db")
 	if err != nil {
@@ -47,6 +48,7 @@ func newExplorerLvlDB(dbPath string) (database, error) {
 	return &explorerDB{db}, nil
 }
 
+// newExplorerTiKv new explorer storage using leveldb
 func newExplorerTiKv(pdAddr []string, dbPath string, readOnly bool) (database, error) {
 	prefixStr := append([]byte(path.Base(dbPath)), '/')
 	db, err := remote.NewRemoteDatabase(pdAddr, readOnly)

@@ -338,6 +338,7 @@ func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
 }
 
+// GetCheckpointBitmap get explorer checkpoint bitmap
 func (s *Service) GetCheckpointBitmap() *roaring64.Bitmap {
 	return s.storage.rb.Clone()
 }

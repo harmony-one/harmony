@@ -33,6 +33,7 @@ type TiKvFactory struct {
 	CacheConfig statedb_cache.StateDBCacheConfig
 }
 
+// getStateDB create statedb storage use tikv
 func (f *TiKvFactory) getRemoteDB(shardID uint32) (*prefix.PrefixDatabase, error) {
 	key := fmt.Sprintf("remote_%d_%s", shardID, f.Role)
 	if db, ok := f.cacheDBMap.Load(key); ok {
@@ -54,6 +55,7 @@ func (f *TiKvFactory) getRemoteDB(shardID uint32) (*prefix.PrefixDatabase, error
 	}
 }
 
+// getStateDB create statedb storage with local memory cahce
 func (f *TiKvFactory) getStateDB(shardID uint32) (*statedb_cache.StateDBCacheDatabase, error) {
 	key := fmt.Sprintf("state_db_%d_%s", shardID, f.Role)
 	if db, ok := f.cacheDBMap.Load(key); ok {
@@ -92,7 +94,7 @@ func (f *TiKvFactory) NewChainDB(shardID uint32) (ethdb.Database, error) {
 	return rawdb.NewDatabase(database), nil
 }
 
-// NewStateDB
+// NewStateDB create shard tikv database
 func (f *TiKvFactory) NewStateDB(shardID uint32) (ethdb.Database, error) {
 	var database ethdb.KeyValueStore
 
@@ -106,10 +108,12 @@ func (f *TiKvFactory) NewStateDB(shardID uint32) (ethdb.Database, error) {
 	return rawdb.NewDatabase(database), nil
 }
 
+// NewCacheStateDB create shard statedb storage with memory cache
 func (f *TiKvFactory) NewCacheStateDB(shardID uint32) (*statedb_cache.StateDBCacheDatabase, error) {
 	return f.getStateDB(shardID)
 }
 
+// CloseAllDB close all tikv database
 func (f *TiKvFactory) CloseAllDB() {
 	f.cacheDBMap.Range(func(_, value interface{}) bool {
 		if closer, ok := value.(io.Closer); ok {

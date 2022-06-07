@@ -33,10 +33,12 @@ func NewRemoteDatabase(pdAddr []string, readOnly bool) (*RemoteDatabase, error) 
 	return db, nil
 }
 
+// ReadOnly set storage to readonly mode
 func (d *RemoteDatabase) ReadOnly() {
 	d.readOnly = true
 }
 
+// Has retrieves if a key is present in the key-value data store.
 func (d *RemoteDatabase) Has(key []byte) (bool, error) {
 	data, err := d.Get(key)
 	if err != nil {
@@ -49,6 +51,7 @@ func (d *RemoteDatabase) Has(key []byte) (bool, error) {
 	}
 }
 
+// Get retrieves the given key if it's present in the key-value data store.
 func (d *RemoteDatabase) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, common.ErrEmptyKey
@@ -73,6 +76,7 @@ func (d *RemoteDatabase) Get(key []byte) ([]byte, error) {
 	return get, nil
 }
 
+// Put inserts the given value into the key-value data store.
 func (d *RemoteDatabase) Put(key []byte, value []byte) error {
 	if len(key) == 0 {
 		return common.ErrEmptyKey
@@ -88,6 +92,7 @@ func (d *RemoteDatabase) Put(key []byte, value []byte) error {
 	return d.client.Put(context.Background(), key, value)
 }
 
+// Delete removes the key from the key-value data store.
 func (d *RemoteDatabase) Delete(key []byte) error {
 	if len(key) == 0 {
 		return common.ErrEmptyKey
@@ -99,6 +104,8 @@ func (d *RemoteDatabase) Delete(key []byte) error {
 	return d.client.Delete(context.Background(), key)
 }
 
+// NewBatch creates a write-only database that buffers changes to its host db
+// until a final write is called.
 func (d *RemoteDatabase) NewBatch() ethdb.Batch {
 	if d.readOnly {
 		return newNopRemoteBatch(d)
@@ -111,14 +118,17 @@ func (d *RemoteDatabase) NewIterator(start, end []byte) ethdb.Iterator {
 	return newRemoteIterator(d, start, end)
 }
 
+// Stat returns a particular internal stat of the database.
 func (d *RemoteDatabase) Stat(property string) (string, error) {
 	return "", common.ErrNotFound
 }
 
+// Compact tikv current not supprot manual compact
 func (d *RemoteDatabase) Compact(start []byte, limit []byte) error {
 	return nil
 }
 
+// Close disconnect the tikv
 func (d *RemoteDatabase) Close() error {
 	if atomic.CompareAndSwapUint64(&d.isClose, 0, 1) {
 		return d.client.Close()

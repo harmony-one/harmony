@@ -110,6 +110,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 
 	var stateCache state.Database
 	if sc.harmonyconfig.General.UseTiKV {
+		// used for tikv mode, init state db using tikv storage
 		stateDB, err := tikv_manage.GetDefaultTiKVFactory().NewStateDB(shardID)
 		if err != nil {
 			return nil, err
@@ -129,6 +130,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 	sc.pool[shardID] = bc
 
 	if sc.harmonyconfig.General.UseTiKV {
+		// init the tikv mode
 		bc.InitTiKV(sc.harmonyconfig.TiKV)
 	}
 

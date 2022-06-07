@@ -20,6 +20,7 @@ const (
 	oneAddrByteLen = 42 // byte size of string "one1..."
 )
 
+// readCheckpointBitmap read explorer checkpoint bitmap from storage
 func readCheckpointBitmap(db databaseReader) (*roaring64.Bitmap, error) {
 	bitmapByte, err := db.Get([]byte(CheckpointBitmap))
 	if err != nil {
@@ -38,6 +39,7 @@ func readCheckpointBitmap(db databaseReader) (*roaring64.Bitmap, error) {
 	return rb, nil
 }
 
+// writeCheckpointBitmap write explorer checkpoint bitmap to storage
 func writeCheckpointBitmap(db databaseWriter, rb *roaring64.Bitmap) error {
 	bitmapByte, err := rb.MarshalBinary()
 	if err != nil {

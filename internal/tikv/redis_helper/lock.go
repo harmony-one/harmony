@@ -14,6 +14,7 @@ type RedisPreempt struct {
 	lastLockStatus           bool
 }
 
+// CreatePreempt used to create a redis preempt instance
 func CreatePreempt(key string) *RedisPreempt {
 	p := &RedisPreempt{
 		key: key,
@@ -23,6 +24,7 @@ func CreatePreempt(key string) *RedisPreempt {
 	return p
 }
 
+// init redis preempt instance and some script
 func (p *RedisPreempt) init() {
 	byt := make([]byte, 18)
 	_, _ = rand.Read(byt)
@@ -43,12 +45,14 @@ func (p *RedisPreempt) init() {
 	`)
 }
 
+// TryLock attempt to lock the master for ttlSecond
 func (p *RedisPreempt) TryLock(ttlSecond int) (ok bool, err error) {
 	ok, err = p.lockScript.Run(context.Background(), redisInstance, []string{p.key}, p.password, ttlSecond).Bool()
 	p.lastLockStatus = ok
 	return
 }
 
+// Unlock try to release the master permission
 func (p *RedisPreempt) Unlock() (bool, error) {
 	if p == nil {
 		return false, nil
@@ -57,6 +61,7 @@ func (p *RedisPreempt) Unlock() (bool, error) {
 	return p.unlockScript.Run(context.Background(), redisInstance, []string{p.key}, p.password).Bool()
 }
 
+// LastLockStatus get the last preempt status
 func (p *RedisPreempt) LastLockStatus() bool {
 	if p == nil {
 		return false

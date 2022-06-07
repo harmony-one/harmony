@@ -929,6 +929,7 @@ func (pool *TxPool) pendingEpoch() *big.Int {
 func (pool *TxPool) add(tx types.PoolTransaction, local bool) (replaced bool, err error) {
 	defer func() {
 		if err == nil && pool.config.AddEvent != nil {
+			// used for tikv mode, writer will publish txpool change to all reader, this makes the state consistent
 			pool.config.AddEvent(tx, local)
 		}
 	}()

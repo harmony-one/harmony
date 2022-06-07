@@ -63,11 +63,13 @@ func newStorage(hc *harmonyconfig.HarmonyConfig, bc *core2.BlockChain, dbPath st
 	var err error
 
 	if hc.General.UseTiKV {
+		// init the storage using tikv
 		dbPath = fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID)
 		readOnly := hc.TiKV.Role == "Reader"
 		utils.Logger().Info().Msg("explorer storage in tikv: " + dbPath)
 		db, err = newExplorerTiKv(hc.TiKV.PDAddr, dbPath, readOnly)
 	} else {
+		// or leveldb
 		utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
 		db, err = newExplorerLvlDB(dbPath)
 	}
@@ -77,6 +79,8 @@ func newStorage(hc *harmonyconfig.HarmonyConfig, bc *core2.BlockChain, dbPath st
 		return nil, err
 	}
 
+	// load checkpoint roaring bitmap from storage
+	// roaring bitmap is a very high compression bitmap, in our scene, 1 million blocks use almost 1kb storage
 	bitmap, err := readCheckpointBitmap(db)
 	if err != nil {
 		return nil, err
@@ -271,6 +275,7 @@ func (tm *taskManager) PullTask() *types.Block {
 	return nil
 }
 
+// markBlockDone mark block processed done
 func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
@@ -278,6 +283,7 @@ func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
 	if tm.rb.CheckedAdd(blockNum) {
 		tm.rbChangedCount++
 
+		// every 100 change write once
 		if tm.rbChangedCount == 100 {
 			tm.rbChangedCount = 0
 			_ = writeCheckpointBitmap(btc, tm.rb)
@@ -285,6 +291,7 @@ func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
 	}
 }
 
+// markBlockDone check block is processed done
 func (tm *taskManager) hasBlockDone(blockNum uint64) bool {
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
