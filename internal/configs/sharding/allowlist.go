@@ -24,12 +24,14 @@ func BLS(pubkeys []string) []bls_cosi.PublicKeyWrapper {
 }
 
 // each time to update the allowlist, it requires a hardfork.
-var mainnetAllowlist = Allowlist{
+// keep same version of mainnet Instance
+var mainnetAllowlisV3_TBD = Allowlist{
 	MaxLimitPerShard: 0,
 	BLSPublicKeys:    BLS([]string{}),
 }
 
-var testnetAllowlist = Allowlist{
+// keep same version of testnet Instance
+var testnetAllowlistV3_3 = Allowlist{
 	MaxLimitPerShard: 4,
 	BLSPublicKeys: BLS([]string{
 		"7915b9cbae9d675af510cb252362b80ae6d68a3684bbea203bc30d2f5fda25ffcedfa3cf2a6c1d3051469379920a418d",
