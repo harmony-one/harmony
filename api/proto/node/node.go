@@ -42,30 +42,33 @@ type BlockMessageType int
 
 // Block sync message subtype
 const (
-	Sync           BlockMessageType = iota
-	CrossLink                       // used for crosslink from beacon chain to shard chain
-	Receipt                         // cross-shard transaction receipts
-	SlashCandidate                  // A report of a double-signing event
+	Sync               BlockMessageType = iota
+	CrossLink                           // used for crosslink from beacon chain to shard chain
+	Receipt                             // cross-shard transaction receipts
+	SlashCandidate                      // A report of a double-signing event
+	CrosslinkHeartbeat                  // Heart beat signal for crosslinks. Needed for epoch chain.
 )
 
 var (
 	// B suffix means Byte
-	nodeB      = byte(proto.Node)
-	blockB     = byte(Block)
-	slashB     = byte(SlashCandidate)
-	txnB       = byte(Transaction)
-	sendB      = byte(Send)
-	stakingB   = byte(Staking)
-	syncB      = byte(Sync)
-	crossLinkB = byte(CrossLink)
-	receiptB   = byte(Receipt)
+	nodeB               = byte(proto.Node)
+	blockB              = byte(Block)
+	slashB              = byte(SlashCandidate)
+	txnB                = byte(Transaction)
+	sendB               = byte(Send)
+	stakingB            = byte(Staking)
+	syncB               = byte(Sync)
+	crossLinkB          = byte(CrossLink)
+	crossLinkHeardBeatB = byte(CrosslinkHeartbeat)
+	receiptB            = byte(Receipt)
 	// H suffix means header
-	slashH           = []byte{nodeB, blockB, slashB}
-	transactionListH = []byte{nodeB, txnB, sendB}
-	stakingTxnListH  = []byte{nodeB, stakingB, sendB}
-	syncH            = []byte{nodeB, blockB, syncB}
-	crossLinkH       = []byte{nodeB, blockB, crossLinkB}
-	cxReceiptH       = []byte{nodeB, blockB, receiptB}
+	slashH              = []byte{nodeB, blockB, slashB}
+	transactionListH    = []byte{nodeB, txnB, sendB}
+	stakingTxnListH     = []byte{nodeB, stakingB, sendB}
+	syncH               = []byte{nodeB, blockB, syncB}
+	crossLinkH          = []byte{nodeB, blockB, crossLinkB}
+	cxReceiptH          = []byte{nodeB, blockB, receiptB}
+	crossLinkHeartBeatH = []byte{nodeB, blockB, crossLinkHeardBeatB}
 )
 
 // ConstructTransactionListMessageAccount constructs serialized transactions in account model
@@ -107,6 +110,13 @@ func ConstructSlashMessage(witnesses slash.Records) []byte {
 	byteBuffer := bytes.NewBuffer(slashH)
 	slashData, _ := rlp.EncodeToBytes(witnesses)
 	byteBuffer.Write(slashData)
+	return byteBuffer.Bytes()
+}
+
+func ConstructCrossLinkHeartBeatMessage(hb types.CrosslinkHeartbeat) []byte {
+	byteBuffer := bytes.NewBuffer(crossLinkHeartBeatH)
+	data, _ := rlp.EncodeToBytes(hb)
+	byteBuffer.Write(data)
 	return byteBuffer.Bytes()
 }
 

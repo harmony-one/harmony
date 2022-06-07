@@ -168,6 +168,10 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
+func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
+	return consensus.priKey
+}
+
 // GetLeaderPrivateKey returns leader private key if node is the leader
 func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
 	for i, key := range consensus.priKey {

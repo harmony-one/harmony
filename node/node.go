@@ -465,6 +465,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
+		case proto_node.CrosslinkHeartbeat:
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
