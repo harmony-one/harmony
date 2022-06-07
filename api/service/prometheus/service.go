@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +31,8 @@ type Config struct {
 	Legacy     bool   // legacy or not, legacy is harmony internal node
 	NodeType   string // node type, validator or exlorer node
 	Shard      uint32 // shard id, used as job suffix
-	Instance   string //identifier of the instance in prometheus metrics
+	Instance   string // identifier of the instance in prometheus metrics
+	TikvRole   string // use for tikv explorer node
 }
 
 func (p Config) String() string {
@@ -63,8 +65,9 @@ var (
 func (s *Service) getJobName() string {
 	var node string
 
-	// legacy nodes are harmony nodes: s0,s1,s2,s3
-	if s.config.Legacy {
+	if s.config.TikvRole != "" { // tikv node must be explorer node, eg: te_reader0, te_writer0
+		node = "te_" + strings.ToLower(s.config.TikvRole)
+	} else if s.config.Legacy { // legacy nodes are harmony nodes: s0,s1,s2,s3
 		node = "s"
 	} else {
 		if s.config.NodeType == "validator" {

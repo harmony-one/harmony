@@ -818,6 +818,11 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 		Shard:      sid,
 		Instance:   myHost.GetID().Pretty(),
 	}
+
+	if hc.General.UseTiKV {
+		prometheusConfig.TikvRole = hc.TiKV.Role
+	}
+
 	p := prometheus.NewService(prometheusConfig)
 	node.RegisterService(service.Prometheus, p)
 }
