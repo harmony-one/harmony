@@ -4,7 +4,7 @@ import "sync"
 
 type ConnectCallbacks struct {
 	cbs []ConnectCallback
-	mu  sync.Mutex
+	mu  sync.RWMutex
 }
 
 func (a *ConnectCallbacks) Add(cb ConnectCallback) {
@@ -14,8 +14,8 @@ func (a *ConnectCallbacks) Add(cb ConnectCallback) {
 }
 
 func (a *ConnectCallbacks) GetAll() []ConnectCallback {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	out := make([]ConnectCallback, len(a.cbs))
 	copy(out, a.cbs)
 	return out
@@ -23,7 +23,7 @@ func (a *ConnectCallbacks) GetAll() []ConnectCallback {
 
 type DisconnectCallbacks struct {
 	cbs []DisconnectCallback
-	mu  sync.Mutex
+	mu  sync.RWMutex
 }
 
 func (a *DisconnectCallbacks) Add(cb DisconnectCallback) {
@@ -33,8 +33,8 @@ func (a *DisconnectCallbacks) Add(cb DisconnectCallback) {
 }
 
 func (a *DisconnectCallbacks) GetAll() []DisconnectCallback {
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	out := make([]DisconnectCallback, len(a.cbs))
 	copy(out, a.cbs)
 	return out
