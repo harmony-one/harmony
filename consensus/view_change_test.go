@@ -111,7 +111,7 @@ func TestGetNextLeaderKeyShouldSucceed(t *testing.T) {
 		wrappedBLSKeys = append(wrappedBLSKeys, wrapped)
 	}
 
-	consensus.Decider.UpdateParticipants(wrappedBLSKeys)
+	consensus.Decider.UpdateParticipants(wrappedBLSKeys, []bls.PublicKeyWrapper{})
 	assert.Equal(t, keyCount, consensus.Decider.ParticipantsCount())
 
 	consensus.LeaderPubKey = &wrappedBLSKeys[0]

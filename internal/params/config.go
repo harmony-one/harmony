@@ -67,6 +67,7 @@ var (
 		StakingPrecompileEpoch:     big.NewInt(871), // Around Tue Feb 11 2022
 		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
+		AllowlistEpoch:             EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -102,6 +103,7 @@ var (
 		StakingPrecompileEpoch:     big.NewInt(75175),
 		ChainIdFixEpoch:            EpochTBD,
 		SlotsLimitedEpoch:          big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
+		AllowlistEpoch:             big.NewInt(75877), // around Fri, 10 Jun 2022 06:10:18 GMT with average block time 2.0065s
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -282,6 +284,7 @@ var (
 		big.NewInt(0),                      // StakingPrecompileEpoch
 		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
+		big.NewInt(0),                      // AllowlistEpoch
 	}
 
 	// TestChainConfig ...
@@ -319,6 +322,7 @@ var (
 		big.NewInt(0),        // StakingPrecompileEpoch
 		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
+		big.NewInt(0),        // AllowlistEpoch
 	}
 
 	// TestRules ...
@@ -442,6 +446,8 @@ type ChainConfig struct {
 
 	// SlotsLimitedEpoch is the first epoch to enable HIP-16.
 	SlotsLimitedEpoch *big.Int `json:"slots-limit-epoch,omitempty"`
+	// AllowlistEpoch is the first epoch to support allowlist of HIP18
+	AllowlistEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
@@ -611,6 +617,11 @@ func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 // IsChainIdFixEpoch returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFixEpoch(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
+}
+
+// IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
+func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
+	return isForked(c.AllowlistEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

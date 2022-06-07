@@ -8,6 +8,7 @@ import (
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	harmony_bls "github.com/harmony-one/harmony/crypto/bls"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
+	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/stretchr/testify/assert"
 
@@ -63,7 +64,7 @@ func TestAddingQuoromParticipants(t *testing.T) {
 		blsKeys = append(blsKeys, wrapper)
 	}
 
-	decider.UpdateParticipants(blsKeys)
+	decider.UpdateParticipants(blsKeys, []bls.PublicKeyWrapper{})
 	assert.Equal(t, keyCount, decider.ParticipantsCount())
 }
 
@@ -86,7 +87,7 @@ func TestSubmitVote(test *testing.T) {
 	pubKeyWrapper2 := bls.PublicKeyWrapper{Object: blsPriKey2.GetPublicKey()}
 	pubKeyWrapper2.Bytes.FromLibBLSPublicKey(pubKeyWrapper2.Object)
 
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	if _, err := decider.submitVote(
 		Prepare,
@@ -143,7 +144,7 @@ func TestSubmitVoteAggregateSig(test *testing.T) {
 	pubKeyWrapper3 := bls.PublicKeyWrapper{Object: blsPriKey3.GetPublicKey()}
 	pubKeyWrapper3.Bytes.FromLibBLSPublicKey(pubKeyWrapper3.Object)
 
-	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2})
+	decider.UpdateParticipants([]bls.PublicKeyWrapper{pubKeyWrapper1, pubKeyWrapper2}, []bls.PublicKeyWrapper{})
 
 	decider.submitVote(
 		Prepare,
@@ -221,7 +222,7 @@ func TestAddNewVote(test *testing.T) {
 		pubKeys = append(pubKeys, wrapper)
 	}
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -326,7 +327,7 @@ func TestAddNewVoteAggregateSig(test *testing.T) {
 	// make all external keys belong to same account
 	slotList[3].EcdsaAddress = slotList[4].EcdsaAddress
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -410,7 +411,7 @@ func TestAddNewVoteInvalidAggregateSig(test *testing.T) {
 	slotList[5].EcdsaAddress = slotList[7].EcdsaAddress
 	slotList[6].EcdsaAddress = slotList[7].EcdsaAddress
 
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -545,5 +546,50 @@ func TestInvalidAggregateSig(test *testing.T) {
 	}
 	if !aggSig.VerifyHash(aggPubKey, blockHash[:]) {
 		test.Error("Expect aggregate signature verification to succeed with correctly matched keys and sigs")
+	}
+}
+
+func TestNthNextHmyExt(test *testing.T) {
+	numHmyNodes := 10
+	numAllExtNodes := 10
+	numAllowlistExtNodes := numAllExtNodes / 2
+	allowlist := shardingconfig.Allowlist{MaxLimitPerShard: numAllowlistExtNodes - 1}
+	blsKeys := []harmony_bls.PublicKeyWrapper{}
+	for i := 0; i < numHmyNodes+numAllExtNodes; i++ {
+		blsKey := harmony_bls.RandPrivateKey()
+		wrapper := harmony_bls.PublicKeyWrapper{Object: blsKey.GetPublicKey()}
+		wrapper.Bytes.FromLibBLSPublicKey(wrapper.Object)
+		blsKeys = append(blsKeys, wrapper)
+	}
+	allowlistLeaders := blsKeys[len(blsKeys)-allowlist.MaxLimitPerShard:]
+	allLeaders := append(blsKeys[:numHmyNodes], allowlistLeaders...)
+
+	decider := NewDecider(SuperMajorityVote, shard.BeaconChainShardID)
+	fakeInstance := shardingconfig.MustNewInstance(2, 20, numHmyNodes, 0, numeric.OneDec(), nil, nil, allowlist, nil, 0)
+
+	decider.UpdateParticipants(blsKeys, allowlistLeaders)
+	for i := 0; i < len(allLeaders); i++ {
+		leader := allLeaders[i]
+		for j := 0; j < len(allLeaders)*2; j++ {
+			expectNextLeader := allLeaders[(i+j)%len(allLeaders)]
+			found, nextLeader := decider.NthNextHmyExt(fakeInstance, &leader, j)
+			if !found {
+				test.Fatal("next leader not found")
+			}
+			if expectNextLeader.Bytes != nextLeader.Bytes {
+				test.Fatal("next leader is not expected")
+			}
+
+			preJ := -j
+			preIndex := (i + len(allLeaders) + preJ%len(allLeaders)) % len(allLeaders)
+			expectPreLeader := allLeaders[preIndex]
+			found, preLeader := decider.NthNextHmyExt(fakeInstance, &leader, preJ)
+			if !found {
+				test.Fatal("previous leader not found")
+			}
+			if expectPreLeader.Bytes != preLeader.Bytes {
+				test.Fatal("previous leader is not expected")
+			}
+		}
 	}
 }
