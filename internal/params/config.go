@@ -68,6 +68,7 @@ var (
 		ChainIdFixEpoch:               EpochTBD,
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
+		AllowlistEpoch:                EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -101,9 +102,10 @@ var (
 		SHA3Epoch:                     big.NewInt(74570),
 		HIP6And8Epoch:                 big.NewInt(74570),
 		StakingPrecompileEpoch:        big.NewInt(75175),
-		ChainIdFixEpoch:               EpochTBD,
+		ChainIdFixEpoch:               big.NewInt(75877), // around Fri, 10 Jun 2022 06:10:18 GMT with average block time 2.0065s
 		SlotsLimitedEpoch:             big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
+		AllowlistEpoch:                big.NewInt(75877), // around Fri, 10 Jun 2022 06:10:18 GMT with average block time 2.0065s
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -141,6 +143,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -178,6 +181,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -215,6 +219,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -251,6 +256,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -289,6 +295,7 @@ var (
 		big.NewInt(0),                      // ChainIdFixEpoch
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
+		big.NewInt(0),                      // AllowlistEpoch
 	}
 
 	// TestChainConfig ...
@@ -327,6 +334,7 @@ var (
 		big.NewInt(0),        // ChainIdFixEpoch
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
+		big.NewInt(0),        // AllowlistEpoch
 	}
 
 	// TestRules ...
@@ -453,6 +461,9 @@ type ChainConfig struct {
 
 	// CrossShardXferPrecompileEpoch is the first epoch to feature cross shard transfer precompile
 	CrossShardXferPrecompileEpoch *big.Int `json:"cross-shard-xfer-precompile-epoch,omitempty"`
+
+	// AllowlistEpoch is the first epoch to support allowlist of HIP18
+	AllowlistEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
@@ -629,6 +640,11 @@ func (c *ChainConfig) IsCrossShardXferPrecompile(epoch *big.Int) bool {
 // IsChainIdFix returns whether epoch is either equal to the ChainId Fix fork epoch or greater.
 func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 	return isForked(c.ChainIdFixEpoch, epoch)
+}
+
+// IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
+func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
+	return isForked(c.AllowlistEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

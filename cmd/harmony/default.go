@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.2" // bump from 2.5.1 for DisablePrivateIPScan
+const tomlConfigVersion = "2.5.3" // bump from 2.5.2 for rpc filters
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -51,7 +51,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		EthRPCsEnabled:     true,
 		StakingRPCsEnabled: true,
 		LegacyRPCsEnabled:  true,
-		RpcFilterFile:      "",
+		RpcFilterFile:      "./.hmy/rpc_filter.txt",
 		RateLimterEnabled:  true,
 		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},

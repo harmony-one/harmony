@@ -343,7 +343,7 @@ func (c *CallAPIService) getStorageAt(
 		})
 	}
 
-	res, err := contractAPI.GetStorageAt(ctx, args.Addr, args.Key, rpc2.BlockNumber(args.BlockNum))
+	res, err := contractAPI.GetStorageAt(ctx, args.Addr, args.Key, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)))
 	if err != nil {
 		return nil, common.NewError(common.ErrCallExecute, map[string]interface{}{
 			"message": errors.WithMessage(err, "get storage at error").Error(),
@@ -366,7 +366,7 @@ func (c *CallAPIService) getCode(
 			"message": errors.WithMessage(err, "invalid parameters").Error(),
 		})
 	}
-	code, err := contractAPI.GetCode(ctx, args.Addr, rpc2.BlockNumber(args.BlockNum))
+	code, err := contractAPI.GetCode(ctx, args.Addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)))
 	if err != nil {
 		return nil, common.NewError(common.ErrCallExecute, map[string]interface{}{
 			"message": errors.WithMessage(err, "get code error").Error(),
@@ -389,7 +389,7 @@ func (c *CallAPIService) call(
 			"message": errors.WithMessage(err, "invalid parameters").Error(),
 		})
 	}
-	data, err := contractAPI.Call(ctx, args.CallArgs, rpc2.BlockNumber(args.BlockNum))
+	data, err := contractAPI.Call(ctx, args.CallArgs, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(args.BlockNum)))
 	if err != nil {
 		return nil, common.NewError(common.ErrCallExecute, map[string]interface{}{
 			"message": errors.WithMessage(err, "call smart contract error").Error(),

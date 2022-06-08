@@ -76,5 +76,5 @@ var partnerReshardingEpoch = []*big.Int{
 	params.PartnerChainConfig.StakingEpoch,
 }
 
-var partnerV0 = MustNewInstance(2, 5, 5, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
-var partnerV1 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV0 = MustNewInstance(2, 5, 5, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())
+var partnerV1 = MustNewInstance(2, 5, 4, 0, numeric.MustNewDecFromStr("0.9"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, partnerReshardingEpoch, PartnerSchedule.BlocksPerEpoch())

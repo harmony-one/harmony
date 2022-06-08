@@ -19,7 +19,7 @@ type RpcMethodFilter struct {
 // ExposeAll - init Allow and Deny array in a way to expose all APIs
 func (rmf *RpcMethodFilter) ExposeAll() error {
 	rmf.Allow = rmf.Allow[:0]
-	rmf.Allow = rmf.Deny[:0]
+	rmf.Deny = rmf.Deny[:0]
 	rmf.Allow = append(rmf.Allow, "*")
 	return nil
 }
@@ -39,7 +39,7 @@ func (rmf *RpcMethodFilter) LoadRpcMethodFiltersFromFile(file string) error {
 		return rmf.LoadRpcMethodFilters(b)
 	} else if errors.Is(err, os.ErrNotExist) {
 		// file path does not exist
-		return fmt.Errorf("rpc filter file doesn't exist")
+		return rmf.ExposeAll()
 	} else {
 		// some other errors happened
 		return fmt.Errorf("rpc filter file stat error - %s", err.Error())

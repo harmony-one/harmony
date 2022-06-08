@@ -465,6 +465,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
+		case proto_node.CrosslinkHeartbeat:
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
@@ -1170,7 +1172,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}

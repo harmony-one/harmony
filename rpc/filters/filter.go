@@ -19,6 +19,7 @@ package filters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -146,6 +147,11 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	if f.end == -1 {
 		end = head
 	}
+
+	if int64(end) >= f.begin && int64(end)-f.begin > rpcGetLogsLimit {
+		return nil, fmt.Errorf("GetLogs query must be smaller than size %v", rpcGetLogsLimit)
+	}
+
 	// Gather all indexed logs, and finish with non indexed ones
 	var (
 		logs []*types.Log

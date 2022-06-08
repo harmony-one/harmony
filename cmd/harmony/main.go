@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
@@ -408,6 +409,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
 		currentNode.RegisterExplorerServices()
 	}
+	currentNode.RegisterService(service.CrosslinkSending, crosslink_sending.New(currentNode, currentNode.Blockchain()))
 	if hc.Pprof.Enabled {
 		setupPprofService(currentNode, hc)
 	}
@@ -489,7 +491,7 @@ func nodeconfigSetShardSchedule(config harmonyconfig.HarmonyConfig) {
 		}
 
 		devnetConfig, err := shardingconfig.NewInstance(
-			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, dnConfig.SlotsLimit, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, nil, shardingconfig.VLBPE)
+			uint32(dnConfig.NumShards), dnConfig.ShardSize, dnConfig.HmyNodeSize, dnConfig.SlotsLimit, numeric.OneDec(), genesis.HarmonyAccounts, genesis.FoundationalNodeAccounts, shardingconfig.Allowlist{}, nil, shardingconfig.VLBPE)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "ERROR invalid devnet sharding config: %s",
 				err)
