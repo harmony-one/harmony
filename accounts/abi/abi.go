@@ -19,9 +19,11 @@ package abi
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -276,4 +278,36 @@ func UnpackRevert(data []byte) (string, error) {
 		return "", err
 	}
 	return unpacked[0].(string), nil
+}
+
+// ParseAddressFromKey pulls out the address value from a map with provided key,
+// and validates the data type for it
+func ParseAddressFromKey(args map[string]interface{}, key string) (common.Address, error) {
+	if address, ok := args[key].(common.Address); ok {
+		return address, nil
+	} else {
+		return common.Address{}, errors.Errorf("Cannot parse address from %v", args[key])
+	}
+}
+
+// ParseBigIntFromKey pulls out the *big.Int value from a map with provided key,
+// and validates the data type for it
+func ParseBigIntFromKey(args map[string]interface{}, key string) (*big.Int, error) {
+	bigInt, ok := args[key].(*big.Int)
+	if !ok {
+		return nil, errors.Errorf(
+			"Cannot parse BigInt from %v", args[key])
+	} else {
+		return bigInt, nil
+	}
+}
+
+// ParseUint32FromKey pulls out the uint64 value from a map with provided key,
+// and validates the data type for it
+func ParseUint32FromKey(args map[string]interface{}, key string) (uint32, error) {
+	if val, ok := args[key].(uint32); ok {
+		return val, nil
+	} else {
+		return 0, errors.Errorf("Cannot parse uint32 from %v", args[key])
+	}
 }
