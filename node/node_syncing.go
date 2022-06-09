@@ -224,17 +224,7 @@ func (node *Node) doBeaconSyncing() {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
-			for beaconBlock := range node.BeaconBlockChannel {
-				if node.epochSync != nil {
-					if beaconBlock.NumberU64() >= node.Beaconchain().CurrentBlock().NumberU64()+1 {
-						if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
-							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
-								node.BroadcastCrossLinkFromShardsToBeacon()
-							}
-						}
-					}
-				}
+			for _ = range node.BeaconBlockChannel {
 			}
 		}(node)
 	}

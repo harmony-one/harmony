@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -213,6 +214,10 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		return
 	}
 
+	for _, h := range headers {
+		fmt.Println("Sending header ", h.Header.Number().Uint64())
+	}
+
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
@@ -329,16 +334,6 @@ func getCrosslinkHeadersForShards(beacon *core.BlockChain, shardChain *core.Bloc
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
-	for i, header := range headers {
-		utils.Logger().Debug().Msgf(
-			"[BroadcastCrossLink] Broadcasting %d",
-			header.Number().Uint64(),
-		)
-		if i == len(headers)-1 {
-			atomic.StoreUint64(latestSentCrosslink, header.Number().Uint64())
-		}
-	}
 	return headers, nil
 }
 

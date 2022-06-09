@@ -45,8 +45,7 @@ func (s *Service) run() {
 			if s.beacon {
 				go s.node.BroadcastCrosslinkHeartbeatSignalFromBeaconToShards()
 			} else {
-				// TODO: this should be uncommented for beacon sync, no need to have it now.
-				//go s.node.BroadcastCrossLinkFromShardsToBeacon()
+				go s.node.BroadcastCrossLinkFromShardsToBeacon()
 			}
 		case <-s.closeCh:
 			return
