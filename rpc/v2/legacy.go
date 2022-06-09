@@ -38,7 +38,7 @@ func (s *PublicLegacyService) GetBalance(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumber(-1))
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber))
 	if err != nil {
 		return nil, err
 	}

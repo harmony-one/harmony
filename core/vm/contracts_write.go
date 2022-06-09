@@ -2,9 +2,13 @@ package vm
 
 import (
 	"errors"
+	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/accounts/abi"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
@@ -14,6 +18,15 @@ import (
 // which are available after the StakingPrecompileEpoch
 // for now, we have only one contract at 252 or 0xfc - which is the staking precompile
 var WriteCapablePrecompiledContractsStaking = map[common.Address]WriteCapablePrecompiledContract{
+	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
+}
+
+// WriteCapablePrecompiledContractsCrossXfer lists out the write capable precompiled contracts
+// which are available after the CrossShardXferPrecompileEpoch
+// It includes the staking precompile and the cross-shard transfer precompile
+var WriteCapablePrecompiledContractsCrossXfer = map[common.Address]WriteCapablePrecompiledContract{
+	// reserve 250 for read only staking precompile and 251 for epoch
+	common.BytesToAddress([]byte{249}): &crossShardXferPrecompile{},
 	common.BytesToAddress([]byte{252}): &stakingPrecompile{},
 }
 
@@ -149,4 +162,144 @@ func (c *stakingPrecompile) RunWriteCapable(
 	//	}
 	//}
 	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
+}
+
+var abiCrossShardXfer abi.ABI
+
+func init() {
+	// msg.Value is used for transfer and is also a parameter
+	// otherwise it might be possible for a user to retrieve money from the precompile
+	// that was sent by someone else prior to the hard fork
+	// contract.Caller is used as fromAddress, not a parameter
+	// originating ShardID is pulled from the EVM object, not a parameter
+	crossShardXferABIJSON := `
+	[
+	  {
+	    "inputs": [
+		  {
+	        "internalType": "uint256",
+	        "name": "value",
+	        "type": "uint256"
+	      },
+		  {
+	        "internalType": "address",
+	        "name": "to",
+	        "type": "address"
+	      },
+		  {
+	        "internalType": "uint64",
+	        "name": "toShardID",
+	        "type": "uint32"
+	      }
+	    ],
+	    "name": "crossShardTransfer",
+	    "outputs": [],
+	    "stateMutability": "payable",
+	    "type": "function"
+	  }
+	]`
+	var err error
+	abiCrossShardXfer, err = abi.JSON(strings.NewReader(crossShardXferABIJSON))
+	if err != nil {
+		// means an error in the code
+		panic("Invalid cross shard transfer ABI JSON")
+	}
+}
+
+type crossShardXferPrecompile struct{}
+
+// RequiredGas returns the gas required to execute the pre-compiled contract.
+//
+// This method does not require any overflow checking as the input size gas costs
+// required for anything significant is so high it's impossible to pay for.
+func (c *crossShardXferPrecompile) RequiredGas(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) (uint64, error) {
+	// multiple instances of the precompile in one transaction
+	// are blocked, so there is no way for a smart contract
+	// to subsidize this transaction by an EOA via delegatecall
+	// therefore no need to charge any gas
+	return 0, nil
+}
+
+// RunWriteCapable runs the actual contract
+func (c *crossShardXferPrecompile) RunWriteCapable(
+	evm *EVM,
+	contract *Contract,
+	input []byte,
+) ([]byte, error) {
+	// make sure that cxReceipt is already nil to
+	// prevent multiple calls to the precompile
+	// in the same transaction
+	if evm.CXReceipt != nil {
+		return nil, errors.New("cannot call cross shard precompile again in same tx")
+	}
+	fromAddress, toAddress, fromShardID, toShardID, value, err :=
+		parseCrossShardXferData(evm, contract, input)
+	if err != nil {
+		return nil, err
+	}
+	// validate not a contract (toAddress can still be a contract)
+	if len(evm.StateDB.GetCode(fromAddress)) > 0 && !evm.IsValidator(evm.StateDB, fromAddress) {
+		return nil, errors.New("cross shard xfer not yet implemented for contracts")
+	}
+	// can't have too many shards
+	if toShardID >= evm.Context.NumShards {
+		return nil, errors.New("toShardId out of bounds")
+	}
+	// not for simple transfers
+	if fromShardID == toShardID {
+		return nil, errors.New("from and to shard id can't be equal")
+	}
+	// make sure nobody sends extra or less money
+	if contract.Value().Cmp(value) != 0 {
+		return nil, errors.New("argument value and msg.value not equal")
+	}
+	// now do the actual transfer
+	// step 1 -> remove funds from the precompile address
+	if !evm.CanTransfer(evm.StateDB, contract.Address(), value) {
+		return nil, errors.New("not enough balance received")
+	}
+	evm.Transfer(evm.StateDB, contract.Address(), toAddress, value, types.SubtractionOnly)
+	// step 2 -> make a cross link
+	// note that the transaction hash is added by state_processor.go to this receipt
+	// and that the receiving shard does not care about the `From` but we use the original
+	// instead of the precompile address for consistency
+	evm.CXReceipt = &types.CXReceipt{
+		From:      fromAddress,
+		To:        &toAddress,
+		ShardID:   fromShardID,
+		ToShardID: toShardID,
+		Amount:    value,
+	}
+	return nil, nil
+}
+
+// parseCrossShardXferData does a simple parse with only data types validation
+func parseCrossShardXferData(evm *EVM, contract *Contract, input []byte) (
+	common.Address, common.Address, uint32, uint32, *big.Int, error) {
+	method, err := abiCrossShardXfer.MethodById(input)
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, nil, err
+	}
+	input = input[4:]
+	args := map[string]interface{}{}
+	if err = method.Inputs.UnpackIntoMap(args, input); err != nil {
+		return common.Address{}, common.Address{}, 0, 0, nil, err
+	}
+	value, err := abi.ParseBigIntFromKey(args, "value")
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, nil, err
+	}
+	toAddress, err := abi.ParseAddressFromKey(args, "to")
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, nil, err
+	}
+	toShardID, err := abi.ParseUint32FromKey(args, "toShardID")
+	if err != nil {
+		return common.Address{}, common.Address{}, 0, 0, nil, err
+	}
+	return contract.Caller(), toAddress, evm.ShardID, toShardID, value, nil
 }

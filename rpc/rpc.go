@@ -77,7 +77,7 @@ func StartServers(hmy *hmy.Harmony, apis []rpc.API, config nodeconfig.RPCServerC
 	authApis := append(apis, getAuthAPIs(hmy, config.DebugEnabled, config.RateLimiterEnabled, config.RequestsPerSecond)...)
 	// load method filter from file (if exist)
 	var rmf rpc.RpcMethodFilter
-	rpcFilterFilePath := strings.Trim(rpcOpt.RpcFilterFile, " ")
+	rpcFilterFilePath := strings.TrimSpace(rpcOpt.RpcFilterFile)
 	if len(rpcFilterFilePath) > 0 {
 		if err := rmf.LoadRpcMethodFiltersFromFile(rpcFilterFilePath); err != nil {
 			return err

@@ -71,7 +71,7 @@ func setupBaseCase() (Decider, *TallyResult, shard.SlotList, map[string]secretKe
 	}
 
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))
@@ -100,7 +100,7 @@ func setupEdgeCase() (Decider, *TallyResult, shard.SlotList, secretKeyMap) {
 	}
 
 	decider := NewDecider(SuperMajorityStake, shard.BeaconChainShardID)
-	decider.UpdateParticipants(pubKeys)
+	decider.UpdateParticipants(pubKeys, []bls.PublicKeyWrapper{})
 	tally, err := decider.SetVoters(&shard.Committee{
 		ShardID: shard.BeaconChainShardID, Slots: slotList,
 	}, big.NewInt(3))

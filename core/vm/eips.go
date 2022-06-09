@@ -83,7 +83,7 @@ func enable1344(jt *JumpTable) {
 // opChainID implements CHAINID opcode
 func opChainID(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	var chainID *big.Int
-	if interpreter.evm.chainConfig.IsChainIdFixEpoch(interpreter.evm.EpochNumber) {
+	if interpreter.evm.chainConfig.IsChainIdFix(interpreter.evm.EpochNumber) {
 		chainID = interpreter.intPool.get().Set(interpreter.evm.chainConfig.EthCompatibleChainID)
 	} else {
 		chainID = interpreter.intPool.get().Set(interpreter.evm.chainConfig.ChainID)

@@ -82,7 +82,7 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 
 	// Outdated signal.
 	fmt.Printf("ProcessCrossLinkHeartbeatMessage?? %d %d\n", hb.BlockNum, atomic.LoadUint64(&latestSentCrosslink))
-	if hb.BlockNum <= atomic.LoadUint64(&latestSentCrosslink) {
+	if hb.LatestContinuousBlockNum <= atomic.LoadUint64(&latestSentCrosslink) {
 		return nil
 	}
 

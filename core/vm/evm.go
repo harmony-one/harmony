@@ -70,7 +70,7 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 	if contract.CodeAddr != nil {
 		precompiles := PrecompiledContractsHomestead
 		// assign empty write capable precompiles till they are available in the fork
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -86,6 +86,9 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 		if evm.chainRules.IsStakingPrecompile {
 			precompiles = PrecompiledContractsStaking
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
+		}
+		if evm.chainRules.IsCrossShardXferPrecompile {
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
 		}
 		if p := precompiles[*contract.CodeAddr]; p != nil {
 			if _, ok := p.(*vrf); ok {
@@ -111,8 +114,10 @@ func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, err
 			}
 			return RunPrecompiledContract(p, input, contract)
 		}
-		if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
-			return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+		if len(writeCapablePrecompiles) > 0 {
+			if p := writeCapablePrecompiles[*contract.CodeAddr]; p != nil {
+				return RunWriteCapablePrecompiledContract(p, evm, contract, input, readOnly)
+			}
 		}
 	}
 	for _, interpreter := range evm.interpreters {
@@ -174,8 +179,8 @@ type Context struct {
 	CollectRewards        CollectRewardsFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
-	// staking precompile checks this before proceeding forward
-	ShardID uint32
+	ShardID   uint32 // Used by staking and cross shard transfer precompile
+	NumShards uint32 // Used by cross shard transfer precompile
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -216,6 +221,7 @@ type EVM struct {
 	// stored temporarily by stakingPrecompile and cleared immediately after return
 	// (although the EVM object itself is ephemeral)
 	StakeMsgs []stakingTypes.StakeMsg
+	CXReceipt *types.CXReceipt
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should
@@ -297,7 +303,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	)
 	if !evm.StateDB.Exist(addr) && txType != types.SubtractionOnly {
 		precompiles := PrecompiledContractsHomestead
-		writeCapablePrecompiles := make(map[common.Address]WriteCapablePrecompiledContract)
+		var writeCapablePrecompiles map[common.Address]WriteCapablePrecompiledContract
 		if evm.ChainConfig().IsS3(evm.EpochNumber) {
 			precompiles = PrecompiledContractsByzantium
 		}
@@ -314,8 +320,10 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			precompiles = PrecompiledContractsStaking
 			writeCapablePrecompiles = WriteCapablePrecompiledContractsStaking
 		}
-
-		if writeCapablePrecompiles[addr] == nil && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
+		if evm.chainRules.IsCrossShardXferPrecompile {
+			writeCapablePrecompiles = WriteCapablePrecompiledContractsCrossXfer
+		}
+		if (len(writeCapablePrecompiles) == 0 || writeCapablePrecompiles[addr] == nil) && precompiles[addr] == nil && evm.ChainConfig().IsS3(evm.EpochNumber) && value.Sign() == 0 {
 			// Calling a non existing account, don't do anything, but ping the tracer
 			if evm.vmConfig.Debug && evm.depth == 0 {
 				evm.vmConfig.Tracer.CaptureStart(evm, caller.Address(), addr, false, input, gas, value)

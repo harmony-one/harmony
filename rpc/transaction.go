@@ -70,13 +70,11 @@ func (s *PublicTransactionService) GetAccountNonce(
 // more granular transaction counts queries
 // Note that the return type is an interface to account for the different versions
 func (s *PublicTransactionService) GetTransactionCount(
-	ctx context.Context, addr string, blockNumber BlockNumber,
+	ctx context.Context, addr string, blockNrOrHash rpc.BlockNumberOrHash,
 ) (response interface{}, err error) {
 	timer := DoMetricRPCRequest(GetTransactionCount)
 	defer DoRPCRequestDuration(GetTransactionCount, timer)
 
-	// Process arguments based on version
-	blockNum := blockNumber.EthBlockNumber()
 	address, err := internal_common.ParseAddr(addr)
 	if err != nil {
 		return nil, err
@@ -84,7 +82,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 
 	// Fetch transaction count
 	var nonce uint64
-	if blockNum == rpc.PendingBlockNumber {
+	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
 		// Ask transaction pool for the nonce which includes pending transactions
 		nonce, err = s.hmy.GetPoolNonce(ctx, address)
 		if err != nil {
@@ -92,7 +90,7 @@ func (s *PublicTransactionService) GetTransactionCount(
 		}
 	} else {
 		// Resolve block number and use its state to ask for the nonce
-		state, _, err := s.hmy.StateAndHeaderByNumber(ctx, blockNum)
+		state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return nil, err
 		}
@@ -165,12 +163,15 @@ func (s *PublicTransactionService) GetStakingTransactionsCount(
 // EstimateGas returns an estimate of the amount of gas needed to execute the
 // given transaction against the current pending block.
 func (s *PublicTransactionService) EstimateGas(
-	ctx context.Context, args CallArgs,
+	ctx context.Context, args CallArgs, blockNrOrHash *rpc.BlockNumberOrHash,
 ) (hexutil.Uint64, error) {
 	timer := DoMetricRPCRequest(RpcEstimateGas)
 	defer DoRPCRequestDuration(RpcEstimateGas, timer)
-
-	gas, err := EstimateGas(ctx, s.hmy, args, nil)
+	bNrOrHash := rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber)
+	if blockNrOrHash != nil {
+		bNrOrHash = *blockNrOrHash
+	}
+	gas, err := EstimateGas(ctx, s.hmy, args, bNrOrHash, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -836,14 +837,13 @@ func returnHashesWithPagination(hashes []common.Hash, pageIndex uint32, pageSize
 }
 
 // EstimateGas - estimate gas cost for a given operation
-func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *big.Int) (uint64, error) {
+func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, blockNrOrHash rpc.BlockNumberOrHash, gasCap *big.Int) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
 		lo  uint64 = params.TxGas - 1
 		hi  uint64
 		cap uint64
 	)
-	blockNum := rpc.LatestBlockNumber
 	// Use zero address if sender unspecified.
 	if args.From == nil {
 		args.From = new(common.Address)
@@ -854,7 +854,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	} else {
 
 		// Retrieve the block to act as the gas ceiling
-		blk, err := hmy.BlockByNumber(ctx, blockNum)
+		blk, err := hmy.BlockByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return 0, err
 		}
@@ -862,7 +862,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	}
 	// Recap the highest gas limit with account's available balance.
 	if args.GasPrice != nil && args.GasPrice.ToInt().BitLen() != 0 {
-		state, _, err := hmy.StateAndHeaderByNumber(ctx, blockNum)
+		state, _, err := hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 		if err != nil {
 			return 0, err
 		}
@@ -898,7 +898,7 @@ func EstimateGas(ctx context.Context, hmy *hmy.Harmony, args CallArgs, gasCap *b
 	executable := func(gas uint64) (bool, *core.ExecutionResult, error) {
 		args.Gas = (*hexutil.Uint64)(&gas)
 
-		result, err := DoEVMCall(ctx, hmy, args, blockNum, 0)
+		result, err := DoEVMCall(ctx, hmy, args, blockNrOrHash, 0)
 		if err != nil {
 			if errors.Is(err, core.ErrIntrinsicGas) {
 				return true, nil, nil // Special case, raise gas limit

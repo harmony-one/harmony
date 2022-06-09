@@ -33,13 +33,13 @@ func NewPublicLegacyAPI(hmy *hmy.Harmony, namespace string) rpc.API {
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (s *PublicLegacyService) GetBalance(
-	ctx context.Context, address string, blockNr rpc.BlockNumber,
+	ctx context.Context, address string, blockNrOrHash rpc.BlockNumberOrHash,
 ) (*hexutil.Big, error) {
 	addr, err := internal_common.ParseAddr(address)
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNr)
+	balance, err := s.hmy.GetBalance(ctx, addr, blockNrOrHash)
 	if err != nil {
 		return nil, err
 	}
