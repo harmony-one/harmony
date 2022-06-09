@@ -3,6 +3,7 @@ package quorum
 import (
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -75,8 +76,9 @@ type ParticipantTracker interface {
 	ParticipantsCount() int64
 	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
+	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
-	UpdateParticipants(pubKeys []bls.PublicKeyWrapper)
+	UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper)
 }
 
 // SignatoryTracker ..
@@ -160,8 +162,10 @@ type cIdentities struct {
 	// Public keys of the committee including leader and validators
 	publicKeys  []bls.PublicKeyWrapper
 	keyIndexMap map[bls.SerializedPublicKey]int
-	prepare     *votepower.Round
-	commit      *votepower.Round
+	// every element is a index of publickKeys
+	allowlistIndex []int
+	prepare        *votepower.Round
+	commit         *votepower.Round
 	// viewIDSigs: every validator
 	// sign on |viewID|blockHash| in view changing message
 	viewChange *votepower.Round
@@ -246,6 +250,41 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 	return found, &s.publicKeys[idx]
 }
 
+// NthNextHmyExt return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number
+func (s *cIdentities) NthNextHmyExt(instance shardingconfig.Instance, pubKey *bls.PublicKeyWrapper, next int) (bool, *bls.PublicKeyWrapper) {
+	found := false
+
+	idx := s.IndexOf(pubKey.Bytes)
+	if idx != -1 {
+		found = true
+	}
+	numHmyNodes := instance.NumHarmonyOperatedNodesPerShard()
+	// sanity check to avoid out of bound access
+	if numHmyNodes <= 0 || numHmyNodes > len(s.publicKeys) {
+		numHmyNodes = len(s.publicKeys)
+	}
+	nth := idx
+	if idx >= numHmyNodes {
+		nth = sort.SearchInts(s.allowlistIndex, idx) + numHmyNodes
+	}
+
+	numExtNodes := instance.ExternalAllowlistLimit()
+	if numExtNodes > len(s.allowlistIndex) {
+		numExtNodes = len(s.allowlistIndex)
+	}
+
+	totalNodes := numHmyNodes + numExtNodes
+	// (totalNodes + next%totalNodes) can convert negitive 'next' to positive
+	nth = (nth + totalNodes + next%totalNodes) % totalNodes
+	if nth < numHmyNodes {
+		idx = nth
+	} else {
+		// find index of external slot key
+		idx = s.allowlistIndex[nth-numHmyNodes]
+	}
+	return found, &s.publicKeys[idx]
+}
+
 // FirstParticipant returns the first participant of the shard
 func (s *cIdentities) FirstParticipant(instance shardingconfig.Instance) *bls.PublicKeyWrapper {
 	return &s.publicKeys[0]
@@ -255,11 +294,17 @@ func (s *cIdentities) Participants() multibls.PublicKeys {
 	return s.publicKeys
 }
 
-func (s *cIdentities) UpdateParticipants(pubKeys []bls.PublicKeyWrapper) {
+func (s *cIdentities) UpdateParticipants(pubKeys, allowlist []bls.PublicKeyWrapper) {
 	keyIndexMap := map[bls.SerializedPublicKey]int{}
 	for i := range pubKeys {
 		keyIndexMap[pubKeys[i].Bytes] = i
 	}
+	for _, key := range allowlist {
+		if i, exist := keyIndexMap[key.Bytes]; exist {
+			s.allowlistIndex = append(s.allowlistIndex, i)
+		}
+	}
+	sort.Ints(s.allowlistIndex)
 	s.publicKeys = pubKeys
 	s.keyIndexMap = keyIndexMap
 }

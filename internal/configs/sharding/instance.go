@@ -3,6 +3,7 @@ package shardingconfig
 import (
 	"math/big"
 
+	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/genesis"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
@@ -32,14 +33,17 @@ type instance struct {
 	fnAccounts                      []genesis.DeployAccount
 	reshardingEpoch                 []*big.Int
 	blocksPerEpoch                  uint64
+	slotsLimit                      int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
+	allowlist                       Allowlist
 }
 
 // NewInstance creates and validates a new sharding configuration based
 // upon given parameters.
 func NewInstance(
-	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard int, harmonyVotePercent numeric.Dec,
+	numShards uint32, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit int, harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
+	allowlist Allowlist,
 	reshardingEpoch []*big.Int, blocksE uint64,
 ) (Instance, error) {
 	if numShards < 1 {
@@ -65,6 +69,9 @@ func NewInstance(
 			numNodesPerShard,
 		)
 	}
+	if slotsLimit < 0 {
+		return nil, errors.Errorf("SlotsLimit cannot be negative %d", slotsLimit)
+	}
 	if harmonyVotePercent.LT(numeric.ZeroDec()) ||
 		harmonyVotePercent.GT(numeric.OneDec()) {
 		return nil, errors.Errorf("" +
@@ -80,8 +87,10 @@ func NewInstance(
 		externalVotePercent:             numeric.OneDec().Sub(harmonyVotePercent),
 		hmyAccounts:                     hmyAccounts,
 		fnAccounts:                      fnAccounts,
+		allowlist:                       allowlist,
 		reshardingEpoch:                 reshardingEpoch,
 		blocksPerEpoch:                  blocksE,
+		slotsLimit:                      slotsLimit,
 	}, nil
 }
 
@@ -90,15 +99,17 @@ func NewInstance(
 // It is intended to be used for static initialization.
 func MustNewInstance(
 	numShards uint32,
-	numNodesPerShard, numHarmonyOperatedNodesPerShard int,
+	numNodesPerShard, numHarmonyOperatedNodesPerShard int, slotsLimitPercent float32,
 	harmonyVotePercent numeric.Dec,
 	hmyAccounts []genesis.DeployAccount,
 	fnAccounts []genesis.DeployAccount,
+	allowlist Allowlist,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
 ) Instance {
+	slotsLimit := int(float32(numNodesPerShard-numHarmonyOperatedNodesPerShard) * slotsLimitPercent)
 	sc, err := NewInstance(
-		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, harmonyVotePercent,
-		hmyAccounts, fnAccounts, reshardingEpoch, blocksPerEpoch,
+		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit, harmonyVotePercent,
+		hmyAccounts, fnAccounts, allowlist, reshardingEpoch, blocksPerEpoch,
 	)
 	if err != nil {
 		panic(err)
@@ -114,6 +125,11 @@ func (sc instance) BlocksPerEpoch() uint64 {
 // NumShards returns the number of shards in the network.
 func (sc instance) NumShards() uint32 {
 	return sc.numShards
+}
+
+// SlotsLimit returns the max slots per shard limit for each validator
+func (sc instance) SlotsLimit() int {
+	return sc.slotsLimit
 }
 
 // HarmonyVotePercent returns total percentage of voting power harmony nodes possess.
@@ -173,4 +189,14 @@ func (sc instance) ReshardingEpoch() []*big.Int {
 // ReshardingEpoch returns the list of epoch number
 func (sc instance) GetNetworkID() NetworkID {
 	return DevNet
+}
+
+// ExternalAllowlist returns the list of external leader keys in allowlist(HIP18)
+func (sc instance) ExternalAllowlist() []bls.PublicKeyWrapper {
+	return sc.allowlist.BLSPublicKeys
+}
+
+// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard
+func (sc instance) ExternalAllowlistLimit() int {
+	return sc.allowlist.MaxLimitPerShard
 }

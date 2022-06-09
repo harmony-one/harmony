@@ -22,6 +22,7 @@ const (
 	Pprof
 	Prometheus
 	Synchronize
+	CrosslinkSending
 )
 
 func (t Type) String() string {
@@ -42,6 +43,8 @@ func (t Type) String() string {
 		return "Prometheus"
 	case Synchronize:
 		return "Synchronize"
+	case CrosslinkSending:
+		return "CrosslinkSending"
 	default:
 		return "Unknown"
 	}

@@ -53,6 +53,14 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	return nil
 }
 
+// ProcessCrossLinkHeartbeatMessage process crosslink heart beat signal.
+func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
+	if node.IsRunningBeaconChain() {
+		return
+	}
+	// process in next pr.
+}
+
 // ProcessCrossLinkMessage verify and process Node/CrossLink message into crosslink when it's valid
 func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
@@ -68,7 +76,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			existingCLs[pending.Hash()] = struct{}{}
 		}
 
-		crosslinks := []types.CrossLink{}
+		var crosslinks []types.CrossLink
 		if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
 			utils.Logger().Error().
 				Err(err).
@@ -76,7 +84,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 			return
 		}
 
-		candidates := []types.CrossLink{}
+		var candidates []types.CrossLink
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Received crosslinks: %d", len(crosslinks))
 

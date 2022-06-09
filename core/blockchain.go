@@ -49,6 +49,8 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
+
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/shard/committee"
 	"github.com/harmony-one/harmony/staking/apr"
 	"github.com/harmony-one/harmony/staking/effective"
@@ -147,6 +149,8 @@ type BlockChain struct {
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
 	hc            *HeaderChain
+	trace         bool       // atomic?
+	traceFeed     event.Feed // send trace_block result to explorer
 	rmLogsFeed    event.Feed
 	chainFeed     event.Feed
 	chainSideFeed event.Feed
@@ -1527,11 +1531,24 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
-
+		vmConfig := bc.vmConfig
+		if bc.trace {
+			ev := TraceEvent{
+				Tracer: &tracers.ParityBlockTracer{
+					Hash:   block.Hash(),
+					Number: block.NumberU64(),
+				},
+			}
+			vmConfig = vm.Config{
+				Debug:  true,
+				Tracer: ev.Tracer,
+			}
+			events = append(events, ev)
+		}
 		// Process block using the parent state as reference point.
 		substart := time.Now()
 		receipts, cxReceipts, stakeMsgs, logs, usedGas, payout, newState, err := bc.processor.Process(
-			block, state, bc.vmConfig, true,
+			block, state, vmConfig, true,
 		)
 		state = newState // update state in case the new state is cached.
 		if err != nil {
@@ -1694,6 +1711,9 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
+
+		case TraceEvent:
+			bc.traceFeed.Send(ev)
 		}
 	}
 }
@@ -1853,6 +1873,11 @@ func (bc *BlockChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []com
 	return bc.hc.GetBlockHashesFromHash(hash, max)
 }
 
+// GetCanonicalHash returns the canonical hash for a given block number
+func (bc *BlockChain) GetCanonicalHash(number uint64) common.Hash {
+	return bc.hc.GetCanonicalHash(number)
+}
+
 // GetAncestor retrieves the Nth ancestor of a given block. It assumes that either the given block or
 // a close ancestor of it is canonical. maxNonCanonical points to a downwards counter limiting the
 // number of blocks to be individually checked before we reach the canonical chain.
@@ -1880,6 +1905,12 @@ func (bc *BlockChain) Engine() consensus_engine.Engine { return bc.engine }
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
+}
+
+// SubscribeChainEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
+	bc.trace = true
+	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
@@ -2593,12 +2624,7 @@ func (bc *BlockChain) UpdateValidatorVotingPower(
 		if snapshot, err := bc.ReadValidatorSnapshotAtEpoch(
 			newEpochSuperCommittee.Epoch, key,
 		); err == nil {
-			wrapper := snapshot.Validator
-			spread := numeric.ZeroDec()
-			if len(wrapper.SlotPubKeys) > 0 {
-				spread = numeric.NewDecFromBigInt(wrapper.TotalDelegation()).
-					QuoInt64(int64(len(wrapper.SlotPubKeys)))
-			}
+			spread := snapshot.RawStakePerSlot()
 			for i := range stats.MetricsPerShard {
 				stats.MetricsPerShard[i].Vote.RawStake = spread
 			}

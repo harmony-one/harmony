@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/hmy/tracers"
 	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -214,6 +215,15 @@ func (s *Service) GetNormalTxHashesByAccount(address string) ([]ethCommon.Hash, 
 // GetStakingTxHashesByAccount get the staking transaction hashes by account
 func (s *Service) GetStakingTxHashesByAccount(address string) ([]ethCommon.Hash, []TxType, error) {
 	return s.storage.GetStakingTxsByAddress(address)
+}
+
+func (s *Service) GetTraceResultByHash(hash ethCommon.Hash) (json.RawMessage, error) {
+	return s.storage.GetTraceResultByHash(hash)
+}
+
+// DumpTraceResult instruct the explorer storage to trace data in explorer DB
+func (s *Service) DumpTraceResult(data *tracers.TraceBlockStorage) {
+	s.storage.DumpTraceResult(data)
 }
 
 // DumpNewBlock instruct the explorer storage to dump block data in explorer DB

@@ -24,18 +24,6 @@ func TestValidateContractAddress(t *testing.T) {
 	}
 }
 
-func TestParseBigIntFromKey(t *testing.T) {
-	args := map[string]interface{}{}
-	expectedError := errors.New("Cannot parse BigInt from <nil>")
-	if _, err := ParseBigIntFromKey(args, "PotentialBigInt"); err != nil {
-		if expectedError.Error() != err.Error() {
-			t.Errorf("Expected error %v, got %v", expectedError, err)
-		}
-	} else {
-		t.Errorf("Expected error %v, got result", expectedError)
-	}
-}
-
 type parseTest struct {
 	input         []byte
 	name          string

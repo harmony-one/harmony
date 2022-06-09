@@ -94,6 +94,7 @@ type ConfigType struct {
 	WebHooks         struct {
 		Hooks *webhooks.Hooks
 	}
+	TraceEnable bool
 }
 
 // RPCServerConfig is the config for rpc listen addresses
@@ -109,6 +110,12 @@ type RPCServerConfig struct {
 	WSAuthPort int
 
 	DebugEnabled bool
+
+	EthRPCsEnabled     bool
+	StakingRPCsEnabled bool
+	LegacyRPCsEnabled  bool
+
+	RpcFilterFile string
 
 	RateLimiterEnabled bool
 	RequestsPerSecond  int

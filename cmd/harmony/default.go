@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.1" // bump from 2.5.0 for AccountSlots
+const tomlConfigVersion = "2.5.3" // bump from 2.5.2 for rpc filters
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -21,14 +21,16 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		IsBeaconArchival: false,
 		IsOffline:        false,
 		DataDir:          "./",
+		TraceEnable:      false,
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:            nodeconfig.DefaultP2PPort,
-		IP:              nodeconfig.DefaultPublicListenIP,
-		KeyFile:         "./.hmykey",
-		DiscConcurrency: nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:   nodeconfig.DefaultMaxConnPerIP,
+		Port:                 nodeconfig.DefaultP2PPort,
+		IP:                   nodeconfig.DefaultPublicListenIP,
+		KeyFile:              "./.hmykey",
+		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan: false,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
@@ -45,9 +47,13 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		AuthPort: nodeconfig.DefaultAuthWSPort,
 	},
 	RPCOpt: harmonyconfig.RpcOptConfig{
-		DebugEnabled:      false,
-		RateLimterEnabled: true,
-		RequestsPerSecond: nodeconfig.DefaultRPCRateLimit,
+		DebugEnabled:       false,
+		EthRPCsEnabled:     true,
+		StakingRPCsEnabled: true,
+		LegacyRPCsEnabled:  true,
+		RpcFilterFile:      "./.hmy/rpc_filter.txt",
+		RateLimterEnabled:  true,
+		RequestsPerSecond:  nodeconfig.DefaultRPCRateLimit,
 	},
 	BLSKeys: harmonyconfig.BlsConfig{
 		KeyDir:   "./.hmy/blskeys",
@@ -63,9 +69,10 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		KMSConfigFile:    "",
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
-		BlacklistFile:  "./.hmy/blacklist.txt",
-		RosettaFixFile: "",
-		AccountSlots:   16,
+		BlacklistFile:     "./.hmy/blacklist.txt",
+		RosettaFixFile:    "",
+		AccountSlots:      16,
+		LocalAccountsFile: "./.hmy/locals.txt",
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
@@ -105,6 +112,7 @@ var defaultDevnetConfig = harmonyconfig.DevnetConfig{
 	NumShards:   2,
 	ShardSize:   10,
 	HmyNodeSize: 10,
+	SlotsLimit:  0, // 0 means no limit
 }
 
 var defaultRevertConfig = harmonyconfig.RevertConfig{

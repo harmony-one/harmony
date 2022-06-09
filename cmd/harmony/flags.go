@@ -29,6 +29,8 @@ var (
 		legacyShardIDFlag,
 		legacyIsArchiveFlag,
 		legacyDataDirFlag,
+
+		taraceFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -58,6 +60,7 @@ var (
 		p2pDHTDataStoreFlag,
 		p2pDiscoveryConcurrencyFlag,
 		legacyKeyFileFlag,
+		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
 	}
 
@@ -79,6 +82,10 @@ var (
 
 	rpcOptFlags = []cli.Flag{
 		rpcDebugEnabledFlag,
+		rpcEthRPCsEnabledFlag,
+		rpcStakingRPCsEnabledFlag,
+		rpcLegacyRPCsEnabledFlag,
+		rpcFilterFileFlag,
 		rpcRateLimiterEnabledFlag,
 		rpcRateLimitFlag,
 	}
@@ -127,6 +134,7 @@ var (
 		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
+		localAccountsFileFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -296,6 +304,12 @@ var (
 		DefValue:   defaultConfig.General.DataDir,
 		Deprecated: "use --datadir",
 	}
+
+	taraceFlag = cli.BoolFlag{
+		Name:     "tracing",
+		Usage:    "indicates if full transaction tracing should be enabled",
+		DefValue: defaultConfig.General.TraceEnable,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -363,6 +377,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, isOfflineFlag) {
 		config.General.IsOffline = cli.GetBoolFlagValue(cmd, isOfflineFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, taraceFlag) {
+		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {
@@ -539,6 +557,11 @@ var (
 		Usage:    "the pubsub's DHT discovery concurrency num (default with raw libp2p dht option)",
 		DefValue: defaultConfig.P2P.DiscConcurrency,
 	}
+	p2pDisablePrivateIPScanFlag = cli.BoolFlag{
+		Name:     "p2p.no-private-ip-scan",
+		Usage:    "disable scanning of private ip4/6 addresses by DHT",
+		DefValue: defaultConfig.P2P.DisablePrivateIPScan,
+	}
 	maxConnPerIPFlag = cli.IntFlag{
 		Name:     "p2p.security.max-conn-per-ip",
 		Usage:    "maximum number of connections allowed per node",
@@ -574,6 +597,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
 		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {
+		config.P2P.DisablePrivateIPScan = cli.GetBoolFlagValue(cmd, p2pDisablePrivateIPScanFlag)
 	}
 }
 
@@ -696,6 +723,34 @@ var (
 		Hidden:   true,
 	}
 
+	rpcEthRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.eth",
+		Usage:    "enable eth apis",
+		DefValue: defaultConfig.RPCOpt.EthRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcStakingRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.staking",
+		Usage:    "enable staking apis",
+		DefValue: defaultConfig.RPCOpt.StakingRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcLegacyRPCsEnabledFlag = cli.BoolFlag{
+		Name:     "rpc.legacy",
+		Usage:    "enable legacy apis",
+		DefValue: defaultConfig.RPCOpt.LegacyRPCsEnabled,
+		Hidden:   true,
+	}
+
+	rpcFilterFileFlag = cli.StringFlag{
+		Name:     "rpc.filterspath",
+		Usage:    "toml file path for method exposure filters",
+		DefValue: defaultConfig.RPCOpt.RpcFilterFile,
+		Hidden:   true,
+	}
+
 	rpcRateLimiterEnabledFlag = cli.BoolFlag{
 		Name:     "rpc.ratelimiter",
 		Usage:    "enable rate limiter for RPCs",
@@ -712,6 +767,18 @@ var (
 func applyRPCOptFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, rpcDebugEnabledFlag) {
 		config.RPCOpt.DebugEnabled = cli.GetBoolFlagValue(cmd, rpcDebugEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcEthRPCsEnabledFlag) {
+		config.RPCOpt.EthRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcEthRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcStakingRPCsEnabledFlag) {
+		config.RPCOpt.StakingRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcStakingRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcLegacyRPCsEnabledFlag) {
+		config.RPCOpt.LegacyRPCsEnabled = cli.GetBoolFlagValue(cmd, rpcLegacyRPCsEnabledFlag)
+	}
+	if cli.IsFlagChanged(cmd, rpcFilterFileFlag) {
+		config.RPCOpt.RpcFilterFile = cli.GetStringFlagValue(cmd, rpcFilterFileFlag)
 	}
 	if cli.IsFlagChanged(cmd, rpcRateLimiterEnabledFlag) {
 		config.RPCOpt.RateLimterEnabled = cli.GetBoolFlagValue(cmd, rpcRateLimiterEnabledFlag)
@@ -1008,6 +1075,11 @@ var (
 		DefValue:   defaultConfig.TxPool.BlacklistFile,
 		Deprecated: "use --txpool.blacklist",
 	}
+	localAccountsFileFlag = cli.StringFlag{
+		Name:     "txpool.locals",
+		Usage:    "file of local wallet addresses",
+		DefValue: defaultConfig.TxPool.LocalAccountsFile,
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -1025,6 +1097,9 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)
 	} else if cli.IsFlagChanged(cmd, legacyTPBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, legacyTPBlacklistFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
+		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
 	}
 }
 

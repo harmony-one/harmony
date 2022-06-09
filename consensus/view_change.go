@@ -213,10 +213,19 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 		Msg("[getNextLeaderKey] got leaderPubKey from coinbase")
 	// wasFound, next := consensus.Decider.NthNext(lastLeaderPubKey, gap)
 	// FIXME: rotate leader on harmony nodes only before fully externalization
-	wasFound, next := consensus.Decider.NthNextHmy(
-		shard.Schedule.InstanceForEpoch(epoch),
-		lastLeaderPubKey,
-		gap)
+	var wasFound bool
+	var next *bls.PublicKeyWrapper
+	if consensus.Blockchain != nil && consensus.Blockchain.Config().IsAllowlistEpoch(epoch) {
+		wasFound, next = consensus.Decider.NthNextHmyExt(
+			shard.Schedule.InstanceForEpoch(epoch),
+			lastLeaderPubKey,
+			gap)
+	} else {
+		wasFound, next = consensus.Decider.NthNextHmy(
+			shard.Schedule.InstanceForEpoch(epoch),
+			lastLeaderPubKey,
+			gap)
+	}
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).

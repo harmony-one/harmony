@@ -103,6 +103,22 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalText implements encoding.TextMarshaler. It marshals:
+// - "latest", "earliest" or "pending" as strings
+// - other numbers as hex
+func (bn BlockNumber) MarshalText() ([]byte, error) {
+	switch bn {
+	case EarliestBlockNumber:
+		return []byte("earliest"), nil
+	case LatestBlockNumber:
+		return []byte("latest"), nil
+	case PendingBlockNumber:
+		return []byte("pending"), nil
+	default:
+		return hexutil.Uint64(bn).MarshalText()
+	}
+}
+
 func (bn BlockNumber) Int64() int64 {
 	return (int64)(bn)
 }
@@ -127,9 +143,14 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var input string
-	err = json.Unmarshal(data, &input)
-	if err != nil {
-		return err
+	if err := json.Unmarshal(data, &input); err != nil {
+		var numInput int64 // old hmy rpc use number type as input
+		if err := json.Unmarshal(data, &numInput); err != nil {
+			return err
+		}
+		bn := BlockNumber(numInput)
+		bnh.BlockNumber = &bn
+		return nil
 	}
 	switch input {
 	case "earliest":

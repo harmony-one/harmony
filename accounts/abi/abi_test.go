@@ -1143,3 +1143,39 @@ func TestUnpackRevert(t *testing.T) {
 		})
 	}
 }
+
+func TestParseBigIntFromKey(t *testing.T) {
+	args := map[string]interface{}{}
+	expectedError := errors.New("Cannot parse BigInt from <nil>")
+	if _, err := ParseBigIntFromKey(args, "PotentialBigInt"); err != nil {
+		if expectedError.Error() != err.Error() {
+			t.Errorf("Expected error %v, got %v", expectedError, err)
+		}
+	} else {
+		t.Errorf("Expected error %v, got result", expectedError)
+	}
+}
+
+func TestParseAddressFromKey(t *testing.T) {
+	args := map[string]interface{}{}
+	expectedError := errors.New("Cannot parse address from <nil>")
+	if _, err := ParseAddressFromKey(args, "PotentialAddress"); err != nil {
+		if expectedError.Error() != err.Error() {
+			t.Errorf("Expected error %v, got %v", expectedError, err)
+		}
+	} else {
+		t.Errorf("Expected error %v, got result", expectedError)
+	}
+}
+
+func TestParseUint32FromKey(t *testing.T) {
+	args := map[string]interface{}{}
+	expectedError := errors.New("Cannot parse uint32 from <nil>")
+	if _, err := ParseUint32FromKey(args, "PotentialUint32"); err != nil {
+		if expectedError.Error() != err.Error() {
+			t.Errorf("Expected error %v, got %v", expectedError, err)
+		}
+	} else {
+		t.Errorf("Expected error %v, got result", expectedError)
+	}
+}

@@ -299,9 +299,30 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	var cxReceipt *types.CXReceipt
 	// Do not create cxReceipt if EVM call failed
 	if txType == types.SubtractionOnly && !failedExe {
-		cxReceipt = &types.CXReceipt{TxHash: tx.Hash(), From: msg.From(), To: msg.To(), ShardID: tx.ShardID(), ToShardID: tx.ToShardID(), Amount: msg.Value()}
+		if vmenv.CXReceipt != nil {
+			return nil, nil, nil, 0, errors.New("cannot have cross shard receipt via precompile and directly")
+		}
+		cxReceipt = &types.CXReceipt{
+			TxHash:    tx.Hash(),
+			From:      msg.From(),
+			To:        msg.To(),
+			ShardID:   tx.ShardID(),
+			ToShardID: tx.ToShardID(),
+			Amount:    msg.Value(),
+		}
 	} else {
-		cxReceipt = nil
+		if !failedExe {
+			if vmenv.CXReceipt != nil {
+				cxReceipt = vmenv.CXReceipt
+				// this tx.Hash needs to be the "original" tx.Hash
+				// since, in effect, we have added
+				// support for cross shard txs
+				// to eth txs
+				cxReceipt.TxHash = tx.HashByType()
+			}
+		} else {
+			cxReceipt = nil
+		}
 	}
 
 	return receipt, cxReceipt, vmenv.StakeMsgs, result.UsedGas, err
