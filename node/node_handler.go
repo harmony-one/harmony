@@ -265,11 +265,11 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 		}
 
 		hb := types.CrosslinkHeartbeat{
-			ShardID:   lastLink.ShardID(),
-			BlockNum:  lastLink.BlockNum(),
-			Epoch:     lastLink.Epoch().Uint64(),
-			PublicKey: privToSing.Pub.Bytes[:],
-			Signature: nil,
+			ShardID:                  lastLink.ShardID(),
+			LatestContinuousBlockNum: lastLink.BlockNum(),
+			Epoch:                    lastLink.Epoch().Uint64(),
+			PublicKey:                privToSing.Pub.Bytes[:],
+			Signature:                nil,
 		}
 
 		rs, err := rlp.EncodeToBytes(hb)

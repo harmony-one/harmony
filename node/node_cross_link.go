@@ -81,7 +81,6 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	// Outdated signal.
-	fmt.Printf("ProcessCrossLinkHeartbeatMessage?? %d %d\n", hb.BlockNum, atomic.LoadUint64(&latestSentCrosslink))
 	if hb.LatestContinuousBlockNum <= atomic.LoadUint64(&latestSentCrosslink) {
 		return nil
 	}
@@ -135,9 +134,8 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("pub key doesn't exist")
 	}
 
-	atomic.StoreUint64(&latestSentCrosslink, hb.BlockNum)
+	atomic.StoreUint64(&latestSentCrosslink, hb.LatestContinuousBlockNum)
 
-	fmt.Printf("Set: %d %d\n", hb.ShardID, hb.BlockNum)
 	return nil
 }
 
