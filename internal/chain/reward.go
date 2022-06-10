@@ -284,7 +284,13 @@ func AccumulateRewardsAndCountSigs(
 		return network.EmptyPayout, nil
 	}
 
-	return distributeRewardAfterAggregateEpoch(bc, state, header, beaconChain, defaultReward)
+	// Get crosslinks for all shards for the last 64 blocks.
+	cxLinks, err := generateCrosslinks(bc, header)
+	if err != nil {
+		return network.EmptyPayout, nil
+	}
+
+	return distributeRewardAfterAggregateEpoch(bc, state, cxLinks, defaultReward)
 }
 
 func waitForCommitSigs(sigsReady chan bool) error {
@@ -300,60 +306,49 @@ func waitForCommitSigs(sigsReady chan bool) error {
 	return nil
 }
 
-// Calculates total stake of slotlist; both self-delegated and externally delegated.
-func getTotalDelegatedStake(bc engine.ChainReader, slotList shard.SlotList) (numeric.Dec, error) {
-	totalStake := numeric.NewDec(0)
-	for _, validator := range slotList {
-		snapshot, err := bc.ReadValidatorSnapshot(validator.EcdsaAddress)
-		if err != nil {
-			return numeric.ZeroDec(), err
-		}
-		totalDelegation := numeric.NewDecFromBigInt(snapshot.Validator.TotalDelegation())
-		totalStake = totalStake.Add(totalDelegation)
-	}
-
-	return totalStake, nil
-}
-
 // Used to calculate rewards based on the amount of signatures included in the
 // block. That way, leaders are incentivised to include as many signatures as
 // possible. Issuance based rewards formula is calculated as:
-//     I * (x / X)^2 where:
-//     x: Delelegated stake of signers.
-//             X: Total delegated stake of committee in the shard.
+//     I * singersShare ^ 2 where:
+//     signersShare: The percentage of stake of the validators whose sigs are included in the block.
 //     I: A reward limit that the dynamic reward cannot exceed.
 func calculateIssuanceRewards(bc engine.ChainReader, cxLink types.CrossLink) (numeric.Dec, error) {
-	shardID := cxLink.ShardID()
-	epoch := cxLink.Epoch()
-	shardState, _ := bc.ReadShardState(epoch)
+	I := stakingReward.IssuanceRewardLimit
+	shardID, epoch := cxLink.ShardID(), cxLink.Epoch()
 
+	shardState, _ := bc.ReadShardState(epoch)
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
 		return numeric.ZeroDec(), err
 	}
-	signed, _, err := availability.BlockSigners(cxLink.Bitmap(), subComm)
+
+	bitmap := cxLink.Bitmap()
+	payableSigners, _, err := availability.BlockSigners(bitmap, subComm)
 	if err != nil {
 		return numeric.ZeroDec(), err
 	}
 
-	I := numeric.NewDec(2)
-	stakeOfSigners, err := getTotalDelegatedStake(bc, signed)
-	stakeOfCommittee, err := getTotalDelegatedStake(bc, subComm.Slots)
-	stakePercentage := stakeOfSigners.Quo(stakeOfCommittee)
+	// No computational overhead, since this function implements caching.
+	votingPower, err := lookupVotingPower(
+		epoch, subComm,
+	)
 
-	return I.Mul(stakePercentage.Mul(stakePercentage)), nil
+	signersPercent := numeric.ZeroDec()
+	for j := range payableSigners {
+		voter := votingPower.Voters[payableSigners[j].BLSPublicKey]
+		signersPercent = signersPercent.Add(voter.OverallPercent)
+	}
+
+	// I * signersPercent ^ 2
+	return I.Mul(signersPercent.Mul(signersPercent)), nil
 }
 
-func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, header *block.Header, beaconChain engine.ChainReader,
-	defaultReward numeric.Dec) (reward.Reader, error) {
-	newRewards, payouts :=
-		big.NewInt(0), []reward.Payout{}
-
-	allPayables := []slotPayable{}
+// Generates a list of crosslinks for each shard for all blocks in [currBlock - 63, currBlock].
+// Accepts the ChainReader and the header of the current block since it's not yet accessible from the bc.
+func generateCrosslinks(bc engine.ChainReader, header *block.Header) (types.CrossLinks, error) {
 	curBlockNum := header.Number().Uint64()
-
 	allCrossLinks := types.CrossLinks{}
-	startTime := time.Now()
+
 	// loop through [0...63] position in the modulus index of the 64 blocks
 	// Note the current block is at position 63 of the modulus.
 	for i := curBlockNum - RewardFrequency + 1; i <= curBlockNum; i++ {
@@ -376,14 +371,24 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		if cxLinks := curHeader.CrossLinks(); len(cxLinks) > 0 {
 			crossLinks := types.CrossLinks{}
 			if err := rlp.DecodeBytes(cxLinks, &crossLinks); err != nil {
-				return network.EmptyPayout, err
+				return nil, err
 			}
 			allCrossLinks = append(allCrossLinks, crossLinks...)
 		}
 	}
 
-	for i := range allCrossLinks {
-		cxLink := allCrossLinks[i]
+	return allCrossLinks, nil
+}
+
+// Distributes rewards on validators and their delegators.
+// If dynamicRewardsEpoch is not enabled then it uses the defaultReward argument,
+// otherwise it calculates the rerards dynamically for each crossLin individually
+func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB, allCrossLinks types.CrossLinks, defaultReward numeric.Dec) (reward.Reader, error) {
+	newRewards, payouts := big.NewInt(0), []reward.Payout{}
+	allPayables := []slotPayable{}
+	startTime := time.Now()
+
+	for i, cxLink := range allCrossLinks {
 		if !bc.Config().IsStaking(cxLink.Epoch()) {
 			continue
 		}
@@ -392,14 +397,15 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 		// enabled, then instead of the default reward, the reward of each block
 		// is calculated dynamically.
 		var reward numeric.Dec
+
 		if bc.Config().IsDynamicIssuanceRewardsEpoch(cxLink.Epoch()) {
 			issuanceRewards, err := calculateIssuanceRewards(bc, cxLink)
 			if err != nil {
 				utils.Logger().Info().Msg(fmt.Sprintf("Dynamic Issuance rewards for shard %d block %d. Error: %v", cxLink.ShardID(), cxLink.BlockNum(), err))
 				return network.EmptyPayout, err
 			}
-			transactionRewards := stakingReward.TransactionsRewardLimit
 
+			transactionRewards := stakingReward.TransactionsRewardLimit
 			reward = issuanceRewards.Add(transactionRewards)
 		} else {
 			reward = defaultReward
