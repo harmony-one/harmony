@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -180,6 +179,9 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	if node.IsRunningBeaconChain() {
 		return
 	}
+	if !(node.Consensus.IsLeader() || rand.Intn(100) == 0) {
+		return
+	}
 	curBlock := node.Blockchain().CurrentBlock()
 	if curBlock == nil {
 		return
@@ -212,10 +214,6 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	if len(headers) == 0 {
 		utils.Logger().Info().Msg("[BroadcastCrossLink] no crosslinks to broadcast")
 		return
-	}
-
-	for _, h := range headers {
-		fmt.Println("Sending header ", h.Header.Number().Uint64())
 	}
 
 	node.host.SendMessageToGroups(

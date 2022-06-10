@@ -49,11 +49,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 // BeaconSyncHook is the hook function called after inserted beacon in downloader
 // TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
 func (node *Node) BeaconSyncHook() {
-	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
-		//       not have much idle resources.
-		node.BroadcastCrossLinkFromShardsToBeacon()
-	}
+	node.BroadcastCrossLinkFromShardsToBeacon()
 }
 
 // GenerateRandomString generates a random string with given length

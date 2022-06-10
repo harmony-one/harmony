@@ -1,7 +1,6 @@
 package node
 
 import (
-	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -65,7 +64,8 @@ func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
 	}
 
 	if err := node.processCrossLinkHeartbeatMessage(msgPayload); err != nil {
-		fmt.Println("Err: ", err)
+		utils.Logger().Err(err).
+			Msg("[ProcessCrossLinkHeartbeatMessage] failed process crosslink heartbeat signal")
 	}
 }
 
@@ -135,7 +135,6 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	atomic.StoreUint64(&latestSentCrosslink, hb.LatestContinuousBlockNum)
-
 	return nil
 }
 
@@ -207,55 +206,6 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 		utils.Logger().Debug().
 			Msgf("[ProcessingCrossLink] Add pending crosslinks,  total pending: %d", Len)
 	}
-	/*
-		else {
-			var crosslinks []types.CrossLink
-			if err := rlp.DecodeBytes(msgPayload, &crosslinks); err != nil {
-				utils.Logger().Error().
-					Err(err).
-					Msg("[ProcessingCrossLink] Crosslink Message Broadcast Unable to Decode")
-				return
-			}
-			shardID := node.Blockchain().ShardID()
-			lastCl, _ := node.Blockchain().ReadShardLastCrossLink(shardID)
-
-			clToWrite := lastCl
-			for _, crosslink := range crosslinks {
-				if crosslink.ShardID() != shardID {
-					continue
-				}
-
-				err := node.EpochChain().Engine().VerifyCrossLink(node.EpochChain(), crosslink)
-				if err != nil {
-					nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "invalid_crosslink"}).Inc()
-					utils.Logger().Info().
-						Str("cross-link-issue", err.Error()).
-						Msgf("[ProcessingCrossLink] Failed to verify "+
-							"new cross link for blockNum %d epochNum %d shard %d skipped: %v",
-							crosslink.BlockNum(), crosslink.Epoch().Uint64(), crosslink.ShardID(), crosslink)
-					continue
-				}
-
-				if clToWrite == nil {
-					clToWrite = &crosslink
-				} else {
-					if crosslink.BlockNum() > clToWrite.BlockNum() {
-						clToWrite = &crosslink
-					}
-				}
-			}
-			if clToWrite != nil && clToWrite != lastCl {
-				err := rawdb.WriteShardLastCrossLink(node.Blockchain().ChainDb(), shardID, clToWrite.Serialize())
-				if err != nil {
-					utils.Logger().Info().
-						Str("cross-link-issue", err.Error()).
-						Msgf("[ProcessingCrossLink] Failed to save crosslink: "+
-							"blockNum %d epochNum %d shard %d skipped: %v",
-							clToWrite.BlockNum(), clToWrite.Epoch().Uint64(), clToWrite.ShardID(), clToWrite)
-				}
-			}
-		}
-	*/
 }
 
 // VerifyCrossLink verifies the header is valid
