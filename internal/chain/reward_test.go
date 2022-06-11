@@ -22,153 +22,106 @@ import (
 )
 
 var (
-	bigOne       = big.NewInt(1e18)
-	tenKOnes     = new(big.Int).Mul(big.NewInt(10_000), bigOne)
-	twentyKOnes  = new(big.Int).Mul(big.NewInt(20_000), bigOne)
-	thirtyKOnes  = new(big.Int).Mul(big.NewInt(30_000), bigOne)
-	fourtyKOnes  = new(big.Int).Mul(big.NewInt(40_000), bigOne)
-	hundredKOnes = new(big.Int).Mul(big.NewInt(100_000), bigOne)
+	EPOCH  = big.NewInt(1000) // epoch where voting power of harmony nodes sums up to 49%
+	bigOne = big.NewInt(1e18)
+
+	twentyKOnes      = new(big.Int).Mul(big.NewInt(20_000), bigOne)
+	fourtyKOnes      = new(big.Int).Mul(big.NewInt(40_000), bigOne)
+	asDecTwentyKOnes = numeric.NewDecFromBigInt(twentyKOnes)
+	asDecFourtyKOnes = numeric.NewDecFromBigInt(fourtyKOnes)
+	asDecZero        = numeric.ZeroDec()
 )
 
 var (
-	addrA = makeTestAddress("A")
-	addrB = makeTestAddress("B")
-	addrC = makeTestAddress("C")
-	addrD = makeTestAddress("D")
-	addrE = makeTestAddress("E")
-	addrF = makeTestAddress("F")
-	addrG = makeTestAddress("G")
-	addrH = makeTestAddress("H")
-	addrI = makeTestAddress("I")
-)
+	// Test addresses
+	addrA   = makeTestAddress("A")
+	addrB   = makeTestAddress("B")
+	addrC   = makeTestAddress("C")
+	addrD   = makeTestAddress("D")
+	addrE   = makeTestAddress("E")
+	blsKeys = genKeyPairs(5)
 
-var (
-	// Test delegations
-	// Total delegated stake of all validators: 30 + 70 + 900 = 1000KOnes
-	delegations1 = map[common.Address]*big.Int{
-		addrA: tenKOnes,
-		addrB: tenKOnes,
-		addrC: tenKOnes,
-	}
+	bc = generateMockBCWithValidators([]Validator{
+		{address: addrA},
+		{address: addrB},
+		{address: addrC},
+		{address: addrD},
+		{address: addrE},
+	})
 
-	delegations2 = map[common.Address]*big.Int{
-		addrD: tenKOnes,
-		addrE: twentyKOnes,
-		addrF: fourtyKOnes,
-	}
-
-	delegations3 = map[common.Address]*big.Int{
-		addrG: new(big.Int).Set(hundredKOnes).Mul(hundredKOnes, big.NewInt(3)),
-		addrH: new(big.Int).Set(hundredKOnes).Mul(hundredKOnes, big.NewInt(3)),
-		addrI: new(big.Int).Set(hundredKOnes).Mul(hundredKOnes, big.NewInt(3)),
-	}
-
-	// Test validators
-	v1 = Validator{
-		address:     addrA,
-		delegations: delegations1,
-	}
-
-	v2 = Validator{
-		address:     addrD,
-		delegations: delegations2,
-	}
-
-	v3 = Validator{
-		address:     addrG,
-		delegations: delegations3,
-	}
-
-	// Test Slotlist
-	s1 = shard.Slot{
-		EcdsaAddress: addrA,
-		BLSPublicKey: bls.SerializedPublicKey{},
-	}
-	s2 = shard.Slot{
-		EcdsaAddress: addrD,
-		BLSPublicKey: bls.SerializedPublicKey{},
-	}
-	s3 = shard.Slot{
-		EcdsaAddress: addrG,
-		BLSPublicKey: bls.SerializedPublicKey{},
+	slotList = shard.SlotList{
+		// External validators
+		shard.Slot{
+			EcdsaAddress:   addrA,
+			BLSPublicKey:   blsKeys[0].Pub(),
+			EffectiveStake: &asDecTwentyKOnes,
+		},
+		shard.Slot{
+			EcdsaAddress:   addrB,
+			BLSPublicKey:   blsKeys[1].Pub(),
+			EffectiveStake: &asDecTwentyKOnes,
+		},
+		shard.Slot{
+			EcdsaAddress:   addrC,
+			BLSPublicKey:   blsKeys[2].Pub(),
+			EffectiveStake: &asDecFourtyKOnes,
+		},
+		// Harmony nodes, since they don't contain any effective stake
+		shard.Slot{
+			EcdsaAddress: addrD,
+			BLSPublicKey: blsKeys[3].Pub(),
+		},
+		shard.Slot{
+			EcdsaAddress: addrE,
+			BLSPublicKey: blsKeys[4].Pub(),
+		},
 	}
 )
 
+// Note: some testcases are not real-life applicable according to BFT.
+// Just testing the reward calculation formula.
 func TestCalculateIssuanceRewards(t *testing.T) {
 	testcases := []struct {
 		signersIdx []int
 		expected   numeric.Dec
 	}{
-		// Some testcases are not real-life applicable according to BFT.
-		// Just testing the reward calculation formula.
+		// Issuance based rewards formula: (Overall Percent)^2 * 6
 		{
-			expected:   numeric.ZeroDec(),
-			signersIdx: []int{},
+			// Overall: 0.25*0.51 (theirs) + 0.49*0.5 (ours) = 37.25%
+			expected:   numeric.MustNewDecFromStr("0.8325375").MulInt(bigOne),
+			signersIdx: []int{0, 4},
 		},
 		{
-			expected:   numeric.MustNewDecFromStr("0.0018"),
-			signersIdx: []int{0},
+			// Overall: 0.5*0.51 (theirs) + 0.5*0.49 (ours) = 50%
+			expected:   numeric.MustNewDecFromStr("1.5").MulInt(bigOne),
+			signersIdx: []int{0, 1, 4},
 		},
 		{
-			expected:   numeric.MustNewDecFromStr("0.02"),
-			signersIdx: []int{0, 1},
+			// Overall: 0*0.51 (theirs) + 1*0.49 (ours) = 49%
+			expected:   numeric.MustNewDecFromStr("1.4406").MulInt(bigOne),
+			signersIdx: []int{3, 4},
 		},
 		{
-			expected:   numeric.MustNewDecFromStr("2"),
-			signersIdx: []int{0, 1, 2},
+			// Overall: 1*0.51 (theirs) + 1*0.49 (ours)= 100%
+			expected:   numeric.MustNewDecFromStr("6").MulInt(bigOne),
+			signersIdx: []int{0, 1, 2, 3, 4},
 		},
 	}
 
-	bc := generateMockBCWithValidators([]Validator{v1, v2, v3})
-
 	cxLink := types.CrossLink{}
-	cxLink.EpochF = big.NewInt(0)
+	cxLink.EpochF = EPOCH
 
 	for i, testcase := range testcases {
 		bitmap, _ := indexesToBitMap(testcase.signersIdx, 3)
 		cxLink.BitmapF = bitmap
 
 		res, err := calculateIssuanceRewards(bc, cxLink)
-
 		if err != nil {
 			t.Errorf("Issuance rewards calculation failed for testcase: %v. Error: %v/", i, err)
 		}
 
 		if !res.Equal(testcase.expected) {
 			t.Errorf("Issuance rewards were not calculated properly for tescase %v. Expected/Actual: %v/%v", i, testcase.expected, res)
-		}
-	}
-}
-
-func TestGetTotalDelegatedStake(t *testing.T) {
-	testcases := []struct {
-		expected *big.Int
-		slotlist shard.SlotList
-	}{
-		{
-			expected: big.NewInt(0),
-			slotlist: shard.SlotList{},
-		},
-		{
-			expected: thirtyKOnes,
-			slotlist: shard.SlotList{s1},
-		},
-		{
-			expected: hundredKOnes,
-			slotlist: shard.SlotList{s1, s2},
-		},
-	}
-
-	bc := generateMockBCWithValidators([]Validator{v1, v2, v3})
-
-	for i, testcase := range testcases {
-		res, err := getTotalDelegatedStake(bc, testcase.slotlist)
-		if err != nil {
-			t.Errorf("getTotalDelegatedStake returned error for testcase %d", i)
-		}
-
-		if !res.Equal(numeric.NewDecFromBigInt(testcase.expected)) {
-			t.Errorf("Total stake was not calculated properly for tescase %d. Expected/Actual: %v/%v", i, testcase.expected, res)
 		}
 	}
 }
@@ -251,9 +204,9 @@ func (kp blsKeyPair) Sign(block *types.Block) []byte {
 
 func makeTestShardState() *shard.State {
 	return &shard.State{
-		Epoch: big.NewInt(0),
+		Epoch: EPOCH,
 		Shards: []shard.Committee{
-			{ShardID: 0, Slots: shard.SlotList{s1, s2, s3}},
+			{ShardID: 0, Slots: slotList},
 		},
 	}
 }

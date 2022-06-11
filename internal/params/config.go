@@ -656,7 +656,7 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 // IsDynamicIssuanceRewardsEpoch returns whether reward is calculated
 // dynamically using the issuance of a block.
 func (c *ChainConfig) IsDynamicIssuanceRewardsEpoch(epoch *big.Int) bool {
-	return isForked(c.DynamicIssuanceRewardsEpoch, epoch)
+	return true //isForked(c.DynamicIssuanceRewardsEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.

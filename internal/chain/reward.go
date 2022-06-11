@@ -307,22 +307,25 @@ func waitForCommitSigs(sigsReady chan bool) error {
 }
 
 // Used to calculate rewards based on the amount of signatures included in the
-// block. That way, leaders are incentivised to include as many signatures as
+// block. That way leaders are incentivised to include as many signatures as
 // possible. Issuance based rewards formula is calculated as:
 //     I * singersShare ^ 2 where:
 //     signersShare: The percentage of stake of the validators whose sigs are included in the block.
 //     I: A reward limit that the dynamic reward cannot exceed.
 func calculateIssuanceRewards(bc engine.ChainReader, cxLink types.CrossLink) (numeric.Dec, error) {
-	I := stakingReward.IssuanceRewardLimit
 	shardID, epoch := cxLink.ShardID(), cxLink.Epoch()
+	bitmap := cxLink.Bitmap()
 
-	shardState, _ := bc.ReadShardState(epoch)
+	shardState, err := bc.ReadShardState(epoch)
+	if err != nil {
+		return numeric.ZeroDec(), err
+	}
+
 	subComm, err := shardState.FindCommitteeByID(shardID)
 	if err != nil {
 		return numeric.ZeroDec(), err
 	}
 
-	bitmap := cxLink.Bitmap()
 	payableSigners, _, err := availability.BlockSigners(bitmap, subComm)
 	if err != nil {
 		return numeric.ZeroDec(), err
@@ -332,6 +335,9 @@ func calculateIssuanceRewards(bc engine.ChainReader, cxLink types.CrossLink) (nu
 	votingPower, err := lookupVotingPower(
 		epoch, subComm,
 	)
+	if err != nil {
+		return numeric.ZeroDec(), err
+	}
 
 	signersPercent := numeric.ZeroDec()
 	for j := range payableSigners {
@@ -339,8 +345,7 @@ func calculateIssuanceRewards(bc engine.ChainReader, cxLink types.CrossLink) (nu
 		signersPercent = signersPercent.Add(voter.OverallPercent)
 	}
 
-	// I * signersPercent ^ 2
-	return I.Mul(signersPercent.Mul(signersPercent)), nil
+	return stakingReward.IssuanceRewardLimit.Mul(signersPercent.Mul(signersPercent)), nil
 }
 
 // Generates a list of crosslinks for each shard for all blocks in [currBlock - 63, currBlock].
@@ -411,7 +416,6 @@ func distributeRewardAfterAggregateEpoch(bc engine.ChainReader, state *state.DB,
 			reward = defaultReward
 		}
 
-		utils.Logger().Info().Msg(fmt.Sprintf("allCrossLinks shard %d block %d", cxLink.ShardID(), cxLink.BlockNum()))
 		payables, _, err := processOneCrossLink(bc, state, cxLink, reward, i)
 
 		if err != nil {
