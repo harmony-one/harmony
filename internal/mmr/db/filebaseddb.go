@@ -12,6 +12,7 @@ package db
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -160,7 +161,7 @@ func (db *Filebaseddb) getNodes() map[int64][]byte {
 	for i := int64(0); i < nodeLength; i++ {
 		nodeValue, ok := db.Get(i)
 		if !ok {
-			panic(errors.New("Error reading filebased db node index " + string(i)))
+			panic(fmt.Errorf("Error reading filebased db node index %d", i))
 		}
 		nodes[nodeLength] = nodeValue
 	}
