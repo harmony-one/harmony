@@ -313,7 +313,7 @@ var (
 	}
 	mmrDBFlag = cli.BoolFlag{
 		Name:     "mmrDB",
-		Usage:    "save MMR to file",
+		Usage:    "enable MMR file database",
 		DefValue: defaultConfig.General.MmrDBEnable,
 	}
 )
