@@ -102,10 +102,10 @@ var (
 		SHA3Epoch:                     big.NewInt(74570),
 		HIP6And8Epoch:                 big.NewInt(74570),
 		StakingPrecompileEpoch:        big.NewInt(75175),
-		ChainIdFixEpoch:               big.NewInt(75877), // around Fri, 10 Jun 2022 06:10:18 GMT with average block time 2.0065s
 		SlotsLimitedEpoch:             big.NewInt(75684), // epoch to enable HIP-16, around Mon, 02 May 2022 08:18:45 UTC with 2s block time
-		CrossShardXferPrecompileEpoch: big.NewInt(75877),
-		AllowlistEpoch:                big.NewInt(75877), // around Fri, 10 Jun 2022 06:10:18 GMT with average block time 2.0065s
+		ChainIdFixEpoch:               big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
+		CrossShardXferPrecompileEpoch: big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
+		AllowlistEpoch:                big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
