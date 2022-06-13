@@ -69,6 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -106,6 +107,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
 		CrossShardXferPrecompileEpoch: big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
 		AllowlistEpoch:                big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -144,6 +146,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -182,6 +185,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -220,6 +224,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -257,6 +262,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		DynamicIssuanceRewardsEpoch:   EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -656,7 +662,7 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 // IsDynamicIssuanceRewardsEpoch returns whether reward is calculated
 // dynamically using the issuance of a block.
 func (c *ChainConfig) IsDynamicIssuanceRewardsEpoch(epoch *big.Int) bool {
-	return true //isForked(c.DynamicIssuanceRewardsEpoch, epoch)
+	return isForked(c.DynamicIssuanceRewardsEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
