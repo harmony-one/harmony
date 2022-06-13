@@ -17,6 +17,7 @@ type HarmonyConfig struct {
 	WS         WsConfig
 	RPCOpt     RpcOptConfig
 	BLSKeys    BlsConfig
+	MMR        MmrConfig
 	TxPool     TxPoolConfig
 	Pprof      PprofConfig
 	Log        LogConfig
@@ -94,6 +95,10 @@ type BlsConfig struct {
 	KMSEnabled       bool
 	KMSConfigSrcType string
 	KMSConfigFile    string
+}
+
+type MmrConfig struct {
+	DbDir string
 }
 
 type TxPoolConfig struct {

@@ -15,6 +15,7 @@ import (
 	v1 "github.com/harmony-one/harmony/block/v1"
 	v2 "github.com/harmony-one/harmony/block/v2"
 	v3 "github.com/harmony-one/harmony/block/v3"
+	v4 "github.com/harmony-one/harmony/block/v4"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/taggedrlp"
 	"github.com/pkg/errors"
@@ -165,4 +166,6 @@ func init() {
 	HeaderRegistry.MustAddFactory(func() interface{} { return v2.NewHeader() })
 	HeaderRegistry.MustRegister("v3", v3.NewHeader())
 	HeaderRegistry.MustAddFactory(func() interface{} { return v3.NewHeader() })
+	HeaderRegistry.MustRegister("v4", v4.NewHeader())
+	HeaderRegistry.MustAddFactory(func() interface{} { return v4.NewHeader() })
 }

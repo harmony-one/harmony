@@ -146,7 +146,6 @@ func (node *Node) TraceLoopForExplorer() {
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
-
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
 		if block.IsLastBlockInEpoch() {
 			node.Consensus.UpdateConsensusInformation()

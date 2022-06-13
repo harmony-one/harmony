@@ -88,6 +88,9 @@ func TestHarmonyFlags(t *testing.T) {
 					Port:     9800,
 					AuthPort: 9801,
 				},
+				MMR: harmonyconfig.MmrConfig{
+					DbDir: "./db/mmr",
+				},
 				Consensus: &harmonyconfig.ConsensusConfig{
 					MinPeers:     6,
 					AggregateSig: true,

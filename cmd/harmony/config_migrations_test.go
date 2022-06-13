@@ -77,6 +77,9 @@ Version = "1.0.2"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
+
+[MMR]
+  DbDir = "./db/mmr"
 `)
 
 	V1_0_3ConfigDefault = []byte(`
@@ -147,6 +150,9 @@ Version = "1.0.3"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
+
+[MMR]
+  DbDir = "./db/mmr"
 `)
 
 	V1_0_4ConfigDefault = []byte(`
@@ -229,6 +235,9 @@ Version = "1.0.4"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
+
+[MMR]
+  DbDir = "./db/mmr"
 `)
 
 	V1_0_4ConfigDownloaderOn = []byte(`
@@ -318,6 +327,9 @@ Version = "1.0.4"
   Enabled = true
   IP = "127.0.0.1"
   Port = 9800
+
+[MMR]
+  DbDir = "./db/mmr"
 `)
 )
 
