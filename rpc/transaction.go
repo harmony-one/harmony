@@ -973,25 +973,3 @@ func (e *revertError) ErrorCode() int {
 func (e *revertError) ErrorData() interface{} {
 	return e.reason
 }
-
-type MmrProofReponse struct {
-	Root     string   `json:"root"`
-	Width    int64    `json:"width"`
-	Index    int64    `json:"index"`
-	Peaks    []string `json:"peaks"`
-	Siblings []string `json:"siblings"`
-}
-
-func (s *PublicTransactionService) GetTxMmrProof(ctx context.Context, hash common.Hash, withRespectToBlockNumber uint64) (MmrProofReponse, error) {
-	_, blockHash, blockNumber, _ := rawdb.ReadTransaction(s.hmy.ChainDb(), hash)
-	mmrProof := s.hmy.NodeAPI.GetProof(hash, blockHash, blockNumber, withRespectToBlockNumber)
-	peaks := []string{}
-	for i := range mmrProof.Peaks {
-		peaks = append(peaks, common.Bytes2Hex(mmrProof.Peaks[i]))
-	}
-	siblings := []string{}
-	for i := range mmrProof.Siblings {
-		siblings = append(siblings, common.Bytes2Hex(mmrProof.Siblings[i]))
-	}
-	return MmrProofReponse{common.Bytes2Hex(mmrProof.Root), mmrProof.Width, mmrProof.Index, peaks, siblings}, nil
-}

@@ -129,9 +129,14 @@ function launch_localnet() {
       args=("${args[@]}" --run.legacy)
       ;;
     esac
-
+    if [ $((i%2)) -eq 0 ];then
+      MMR="--mmrDB"
+    else
+      MMR=""
+    fi
+    echo $i $MMR =
     # Start the node
-    ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
+    ${DRYRUN} "${ROOT}/bin/harmony" $MMR "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"
 }
 

@@ -315,3 +315,7 @@ func (cr *fakeChainReader) ReadValidatorStats(
 }
 
 func (cr *fakeChainReader) ReadCommitSig(blockNum uint64) ([]byte, error) { return nil, nil }
+
+func (cr *fakeChainReader) GetNewMMRRoot(newHeader *block.Header) (common.Hash, error) {
+	return common.Hash{}, nil
+}

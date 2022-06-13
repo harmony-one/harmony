@@ -69,6 +69,8 @@ type ChainReader interface {
 
 	// ReadCommitSig read the commit sig of a given block number
 	ReadCommitSig(blockNum uint64) ([]byte, error)
+
+	GetNewMMRRoot(newHeader *block.Header) (common.Hash, error)
 }
 
 // Engine is an algorithm agnostic consensus engine.

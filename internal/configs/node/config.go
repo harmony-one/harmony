@@ -86,9 +86,7 @@ type ConfigType struct {
 	P2PPriKey       p2p_crypto.PrivKey   `json:"-"`
 	ConsensusPriKey multibls.PrivateKeys `json:"-"`
 	// Database directory
-	DBDir string
-	// MMR DB directory
-	MmrDbDir         string
+	DBDir            string
 	networkType      NetworkType
 	shardingSchedule shardingconfig.Schedule
 	DNSZone          string
@@ -97,6 +95,7 @@ type ConfigType struct {
 		Hooks *webhooks.Hooks
 	}
 	TraceEnable bool
+	MmrDbEnable bool
 }
 
 // RPCServerConfig is the config for rpc listen addresses

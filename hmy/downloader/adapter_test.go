@@ -123,6 +123,10 @@ func (bc *testBlockChain) SuperCommitteeForNextEpoch(beacon engine.ChainReader, 
 	return nil, nil
 }
 
+func (bc *testBlockChain) GetNewMMRRoot(newHeader *block.Header) (common.Hash, error) {
+	return common.Hash{}, nil
+}
+
 type dummyEngine struct{}
 
 func (e *dummyEngine) VerifyHeader(engine.ChainReader, *block.Header, bool) error {

@@ -452,14 +452,6 @@ func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 		}
 		node.BroadcastCXReceipts(newBlock)
 	} else {
-		// update mmr tree with latest block data
-		if node.Blockchain().Config().IsCrossChain(newBlock.Epoch()) {
-			// non-explorer nodes also need to maintain the MMR database, uncomment later
-			// compute new MMR root by linking parentHash and insert the MMR root to header
-			if err := node.computeAndUpdateNewMMRRoot(newBlock.Header(), newBlock.Header().IsLastBlockInEpoch()); err != nil {
-				return errors.New("[PostConsensusProcessing] Failed setting MMRRoot")
-			}
-		}
 		if node.Consensus.Mode() != consensus.Listening {
 			utils.Logger().Info().
 				Uint64("blockNum", newBlock.NumberU64()).

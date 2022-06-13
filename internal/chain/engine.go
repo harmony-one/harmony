@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -67,12 +68,25 @@ func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 	e.beacon = beaconchain
 }
 
+func verifyMMR(chain engine.ChainReader, header *block.Header) error {
+	if chain.Config().IsCrossChain(header.Epoch()) {
+		if mmrRoot, err := chain.GetNewMMRRoot(header); err != nil || mmrRoot != header.MMRRoot() {
+			fmt.Println(err, header)
+			return engine.ErrInvalidMMRRoot
+		}
+	}
+	return nil
+}
+
 // VerifyHeader checks whether a header conforms to the consensus rules of the bft engine.
 // Note that each block header contains the bls signature of the parent block
 func (e *engineImpl) VerifyHeader(chain engine.ChainReader, header *block.Header, seal bool) error {
 	parentHeader := chain.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
 	if parentHeader == nil {
 		return engine.ErrUnknownAncestor
+	}
+	if err := verifyMMR(chain, header); err != nil {
+		return err
 	}
 	if seal {
 		if err := e.VerifySeal(chain, header); err != nil {

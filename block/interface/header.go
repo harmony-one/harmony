@@ -239,8 +239,8 @@ type Header interface {
 
 	// MMRRoot is the root of the Merkle Mountain Range tree formed
 	// using the block hashes of the current epoch
-	MMRRoot() []byte
+	MMRRoot() common.Hash
 
 	// SetMMRRoot sets the updated MMR root after appending the parentHash
-	SetMMRRoot(newMMRRoot []byte)
+	SetMMRRoot(newMMRRoot common.Hash)
 }

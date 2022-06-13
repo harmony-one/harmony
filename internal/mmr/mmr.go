@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/zmitton/go-merklemountainrange/db"
+	"github.com/harmony-one/harmony/internal/mmr/db"
 	"github.com/zmitton/go-merklemountainrange/digest"
 	"github.com/zmitton/go-merklemountainrange/position"
 	"golang.org/x/crypto/sha3"
@@ -25,10 +25,9 @@ type MmrProof struct {
 }
 
 type Mmr struct {
-	digest  digest.Digest
-	db      db.Db
-	Epoch   *big.Int
-	ShardID uint32
+	digest digest.Digest
+	db     db.Db
+	Epoch  *big.Int
 }
 
 func Keccak256(data []byte) []byte {
@@ -37,12 +36,12 @@ func Keccak256(data []byte) []byte {
 	return hash.Sum(nil)
 }
 
-func New(_digest digest.Digest, _db db.Db, epoch *big.Int, shardID uint32) *Mmr {
-	return &Mmr{digest: _digest, db: _db, Epoch: epoch, ShardID: shardID}
+func New(_db db.Db, epoch *big.Int) *Mmr {
+	return &Mmr{digest: Keccak256, db: _db, Epoch: epoch}
 }
 
 func FromSerialized(_digest digest.Digest, serializedDb []byte) *Mmr {
-	return New(_digest, db.FromSerialized(serializedDb), big.NewInt(0), 0) /*uses a memoryBasedDb*/
+	return New(db.FromSerialized(serializedDb), big.NewInt(0)) /*uses a memoryBasedDb*/
 }
 
 func (mmr *Mmr) GetNodeLength() int64 {
@@ -142,7 +141,7 @@ func (mmr *Mmr) GetProof(leafIndexes []int64, referenceTreeLength ...int64) *Mmr
 	for _, position := range positions {
 		db.Set(mmr.getNodeValue(position), position.Index)
 	}
-	return New(mmr.digest, db, mmr.Epoch, mmr.ShardID)
+	return New(db, mmr.Epoch)
 }
 
 func (mmr *Mmr) GetPeaks() [][]byte {
@@ -257,4 +256,17 @@ func (mmr *Mmr) Delete(leafIndex int64) {
 }
 func (mmr *Mmr) Db() db.Db {
 	return mmr.db
+}
+
+// make a memory copy
+func (mmr *Mmr) Copy(to db.Db) {
+	size := mmr.GetNodeLength()
+	for i := int64(0); i < size; i++ {
+		nodeValue, ok := mmr.db.Get(i)
+		if !ok {
+			panic("cannot fetch node at index")
+		}
+		to.Set(nodeValue, i)
+	}
+	to.SetLeafLength(mmr.GetLeafLength())
 }

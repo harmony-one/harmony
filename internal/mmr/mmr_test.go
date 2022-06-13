@@ -1,32 +1,31 @@
 package mmr
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"testing"
 
-	"github.com/zmitton/go-merklemountainrange/db"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/harmony-one/harmony/internal/mmr/db"
 	"github.com/zmitton/go-merklemountainrange/position"
 )
 
+type MmrProofX struct {
+	Root     []byte
+	Width    uint64
+	Index    uint64
+	Peaks    [][]byte
+	Siblings [][]byte
+}
+
 func TestMMR(t *testing.T) {
 	memoryBasedDb1 := db.NewMemorybaseddb(0, map[int64][]byte{})
-	memoryBasedMmr1 := New(Keccak256, memoryBasedDb1, big.NewInt(0), 0)
+	memoryBasedMmr1 := New(memoryBasedDb1, big.NewInt(0))
 
-	blockHashes := []string{
-		"61ce03ef5efa374b0d0d527ea38c3d13cb05cf765a4f898e91a5de1f6b224cdd",
-		"43fb38c1bb9b26da76ce8188fa0f5835cc0636bed903bd710d221cd0c8403aa0",
-		"c72b3724cae29c8e5e2e2902328dc3a3e7718d32dcf07996ceac104241fe8a4c",
-		"f41f573a8cc4e8af006d5f7f418ca7ac2527f75bf7f202a9a0ec2c8a69c8bd18",
-		"67616b79a0d9df8e1ccddfeed8876351cc8a6c448289eacef1f57d9c1e27df20",
-	}
-
-	for i := range blockHashes {
-		hash := blockHashes[i]
-		if data, err := hex.DecodeString(hash); err == nil {
-			memoryBasedMmr1.Append(data, int64(i))
-		}
+	for i := 0; i < 32768; i++ {
+		hash := Keccak256([]byte(hexutil.EncodeUint64(uint64(i))))
+		memoryBasedMmr1.Append(hash, int64(i))
 	}
 
 	// val, _ := memoryBasedMmr1.GetUnverified(3)
@@ -40,6 +39,7 @@ func TestMMR(t *testing.T) {
 		// if i != 3 {
 		// 	continue
 		// }
+		fmt.Println("-------------", i, l)
 		fmt.Println(position.ProofPositions([]int64{i}, l))
 		fmt.Println("Node: ", fmt.Sprintf("%x", memoryBasedMmr1.Get(i)))
 		fmt.Println("Position: ", position.GetNodePosition(i).Index)
@@ -49,7 +49,15 @@ func TestMMR(t *testing.T) {
 		fmt.Println("index: ", index)
 		fmt.Println("Peaks: ", fmt.Sprintf("%x", peaks))
 		fmt.Println("Siblings: ", fmt.Sprintf("%x", siblings))
-		fmt.Println("====================================================")
+		proof := MmrProofX{
+			Root:     root,
+			Width:    uint64(width),
+			Index:    uint64(index),
+			Peaks:    peaks,
+			Siblings: siblings,
+		}
+		b, err := rlp.EncodeToBytes(proof)
+		fmt.Println("====================================================", len(b), err)
 		// break
 		// indices := []int64{i}
 		// positions := position.ProofPositions(indices, l)

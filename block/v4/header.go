@@ -61,17 +61,17 @@ type headerFields struct {
 	Extra               []byte         `json:"extraData"        gencodec:"required"`
 	MixDigest           common.Hash    `json:"mixHash"          gencodec:"required"`
 	// Additional Fields
-	ViewID              *big.Int `json:"viewID"           gencodec:"required"`
-	Epoch               *big.Int `json:"epoch"            gencodec:"required"`
-	ShardID             uint32   `json:"shardID"          gencodec:"required"`
-	LastCommitSignature [96]byte `json:"lastCommitSignature"  gencodec:"required"`
-	LastCommitBitmap    []byte   `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
-	Vrf                 []byte   `json:"vrf"`
-	Vdf                 []byte   `json:"vdf"`
-	ShardState          []byte   `json:"shardState"`
-	CrossLinks          []byte   `json:"crossLink"`
-	Slashes             []byte   `json:slashes`
-	MMRRoot             []byte   `json:mmrRoot`
+	ViewID              *big.Int    `json:"viewID"           gencodec:"required"`
+	Epoch               *big.Int    `json:"epoch"            gencodec:"required"`
+	ShardID             uint32      `json:"shardID"          gencodec:"required"`
+	LastCommitSignature [96]byte    `json:"lastCommitSignature"  gencodec:"required"`
+	LastCommitBitmap    []byte      `json:"lastCommitBitmap"     gencodec:"required"` // Contains which validator signed
+	Vrf                 []byte      `json:"vrf"`
+	Vdf                 []byte      `json:"vdf"`
+	ShardState          []byte      `json:"shardState"`
+	CrossLinks          []byte      `json:"crossLink"`
+	Slashes             []byte      `json:"slashes"`
+	MMRRoot             common.Hash `json:"mmrRoot"`
 }
 
 // ParentHash is the header hash of the parent block.  For the genesis block
@@ -383,13 +383,13 @@ func (h *Header) SetSlashes(newSlashes []byte) {
 
 // MMRRoot is the root of the Merkle Mountain Range tree formed
 // using the block hashes of the current epoch
-func (h *Header) MMRRoot() []byte {
-	return append(h.fields.MMRRoot[:0:0], h.fields.MMRRoot...)
+func (h *Header) MMRRoot() common.Hash {
+	return h.fields.MMRRoot
 }
 
 // SetMMRRoot sets the updated MMR root after appending the parentHash
-func (h *Header) SetMMRRoot(newMMRRoot []byte) {
-	h.fields.MMRRoot = append(newMMRRoot[:0:0], newMMRRoot...)
+func (h *Header) SetMMRRoot(newMMRRoot common.Hash) {
+	h.fields.MMRRoot = newMMRRoot
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

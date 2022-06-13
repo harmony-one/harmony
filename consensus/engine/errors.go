@@ -40,4 +40,6 @@ var (
 
 	// ErrInvalidConsensusMessage is returned is the consensus message received is invalid
 	ErrInvalidConsensusMessage = errors.New("invalid consensus message")
+	// ErrInvalidConsensusMessage is returned is the consensus message received is invalid
+	ErrInvalidMMRRoot = errors.New("invalid MMRRoot")
 )

@@ -67,6 +67,7 @@ type GeneralConfig struct {
 	DataDir                string
 	TraceEnable            bool
 	EnablePruneBeaconChain bool
+	MmrDBEnable            bool
 }
 
 type ShardDataConfig struct {

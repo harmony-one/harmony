@@ -105,8 +105,13 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
 		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
 		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
 	}
+
+	var mmrDbFunc core.OpenMmrDB
+	if mmrDbFunc, err = sc.dbFactory.MmrDB(shardID); err != nil {
+		return nil, errors.Wrap(err, "cannot open mmr database")
+	}
 	bc, err := core.NewBlockChain(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
+		db, mmrDbFunc, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
 	)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")

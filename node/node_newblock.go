@@ -142,6 +142,14 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		err         error
 	)
 
+	if node.Blockchain().Config().IsCrossChain(header.Epoch()) {
+		mmrRoot, err := node.Blockchain().GetNewMMRRoot(header)
+		if err != nil {
+			return nil, err
+		}
+		header.SetMMRRoot(mmrRoot)
+	}
+
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := leaderKey.Object.GetAddress()
@@ -286,15 +294,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	); err != nil {
 		return nil, err
 	}
-
-	if node.Blockchain().Config().IsCrossChain(header.Epoch()) {
-		// compute new MMR root by linking parentHash and insert the MMR root to header
-		isLastBlockOfEpoch := (len(shardState.Shards) > 0)
-		if err := node.computeAndUpdateNewMMRRoot(header, isLastBlockOfEpoch); err != nil {
-			return nil, errors.New("[ProposeNewBlock] Failed setting MMRRoot")
-		}
-	}
-
 	viewIDFunc := func() uint64 {
 		return node.Consensus.GetCurBlockViewID()
 	}
