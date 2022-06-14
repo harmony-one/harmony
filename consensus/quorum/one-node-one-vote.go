@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -56,7 +57,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool {
 	if mask == nil {
 		return false
 	}
@@ -74,7 +75,10 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 }
 
 // QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
+func (v *uniformVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= sixtyPercentHeight {
+		return sixtyPercent
+	}
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 

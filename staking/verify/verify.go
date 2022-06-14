@@ -41,7 +41,7 @@ func AggregateSigForCommittee(
 		return err
 	}
 
-	if !decider.IsQuorumAchievedByMask(mask) {
+	if !decider.IsQuorumAchievedByMask(mask, blockNum) {
 		return errQuorumVerifyAggSign
 	}
 

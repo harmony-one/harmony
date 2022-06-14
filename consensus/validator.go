@@ -214,7 +214,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
 		return
 	}
-	if !consensus.Decider.IsQuorumAchievedByMask(mask) {
+	if !consensus.Decider.IsQuorumAchievedByMask(mask, recvMsg.BlockNum) {
 		consensus.getLogger().Warn().Msgf("[OnPrepared] Quorum Not achieved.")
 		return
 	}

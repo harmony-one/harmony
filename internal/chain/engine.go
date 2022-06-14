@@ -585,7 +585,7 @@ func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, 
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	if !qrVerifier.IsQuorumAchievedByMask(mask) {
+	if !qrVerifier.IsQuorumAchievedByMask(mask, pas.number) {
 		return errors.New("not enough signature collected")
 	}
 	commitPayload := pas.constructPayload(chain)

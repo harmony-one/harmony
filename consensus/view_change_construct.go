@@ -274,7 +274,7 @@ func (vc *viewChange) ProcessViewChangeMsg(
 			return err
 		}
 
-		if !decider.IsQuorumAchievedByMask(mask) {
+		if !decider.IsQuorumAchievedByMask(mask, recvMsg.BlockNum) {
 			return errNoQuorum
 		}
 
