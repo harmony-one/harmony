@@ -234,9 +234,9 @@ func (node *Node) doBeaconSyncing() {
 							node.beaconSync.AddLastMileBlock(beaconBlock)
 						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
-							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
-								node.BroadcastCrossLinkFromShardsToBeacon()
-							}
+							// if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
+							node.BroadcastCrossLinkFromShardsToBeacon()
+							// }
 						}
 					}
 				}
