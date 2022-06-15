@@ -48,10 +48,13 @@ func (sv *stakeVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint
 		return false
 	}
 	vp := sv.r.VotePowerByMask(mask)
-	return vp.GT(sv.threshold())
+	return vp.GT(sv.threshold(height))
 }
 
-func (sv *stakeVerifier) threshold() numeric.Dec {
+func (sv *stakeVerifier) threshold(height uint64) numeric.Dec {
+	if fixed := tryFixedThreshold(height); fixed != nil {
+		return *fixed
+	}
 	return twoThird
 }
 

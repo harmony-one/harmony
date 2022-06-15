@@ -29,6 +29,13 @@ var (
 	fixedThresholdHeight = uint64(26481647)
 )
 
+func tryFixedThreshold(height uint64) *numeric.Dec {
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
+		return &fixedThreshold
+	}
+	return nil
+}
+
 // TallyResult is the result of when we calculate voting power,
 // recall that it happens to us at epoch change
 type TallyResult struct {
@@ -200,8 +207,8 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
-		return fixedThreshold
+	if fixed := tryFixedThreshold(height); fixed != nil {
+		return *fixed
 	}
 	return twoThird
 }

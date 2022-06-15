@@ -13,7 +13,6 @@ import (
 	"github.com/harmony-one/harmony/consensus/votepower"
 
 	bls_cosi "github.com/harmony-one/harmony/crypto/bls"
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/harmony-one/harmony/shard"
@@ -76,8 +75,8 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height u
 
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
-		return fixedThreshold
+	if fixed := tryFixedThreshold(height); fixed != nil {
+		return *fixed
 	}
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
