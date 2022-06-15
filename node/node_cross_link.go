@@ -134,6 +134,8 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 		return errors.New("pub key doesn't exist")
 	}
 
+	utils.Logger().Info().
+		Msgf("[ProcessCrossLinkHeartbeatMessage] storing latestSentCrosslink to %d", hb.LatestContinuousBlockNum)
 	atomic.StoreUint64(&latestSentCrosslink, hb.LatestContinuousBlockNum)
 	return nil
 }

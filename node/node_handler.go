@@ -216,6 +216,10 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		return
 	}
 
+	for _, h := range headers {
+		utils.Logger().Info().Msgf("[BroadcastCrossLink] header shard %d blockNum %d", h.ShardID(), h.Number().Uint64())
+	}
+
 	node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
