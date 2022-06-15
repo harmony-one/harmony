@@ -175,6 +175,11 @@ const (
 	Sha3FipsGas     uint64 = 30 // Once per SHA3-256 operation.
 	Sha3FipsWordGas uint64 = 6  // Once per word of the SHA3-256 operation's data.
 
+	// ValidatorInformationGas for a single piece of information (no loops)
+	ValidatorInformationGas             uint64 = 500
+	ValidatorInformationGasLoops        uint64 = 5000
+	ValidatorInformationGasLoopsComplex uint64 = 10000
+	DelegatorInformationGas             uint64 = 5000
 )
 
 // nolint

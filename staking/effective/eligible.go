@@ -34,6 +34,14 @@ func (e Eligibility) String() string {
 	}
 }
 
+func (e Eligibility) Byte() byte {
+	return byte(e)
+}
+
+func (e Eligibility) Bytes() []byte {
+	return []byte{e.Byte()}
+}
+
 // Candidacy is a more semantically meaningful
 // value that is derived from core protocol logic but
 // meant more for the presentation of user, like at RPC

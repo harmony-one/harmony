@@ -100,139 +100,175 @@ func init() {
 	//"type": "function"
 	//}
 	ReadOnlyStakingABIJSON := `
-	[
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "delegatorAddress",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "getBalanceAvailableForRedelegation",
-	    "outputs": [
-	      {
-	        "internalType": "uint256",
-	        "name": "",
-	        "type": "uint256"
-	      }
-	    ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "delegatorAddress",
-	        "type": "address"
-	      },
-	      {
-	        "internalType": "address",
-	        "name": "validatorAddress",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "getDelegationByDelegatorAndValidator",
-	    "outputs": [
-	      {
-	        "internalType": "uint256",
-	        "name": "",
-	        "type": "uint256"
-	      }
-	    ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "validatorAddress",
-	        "type": "address"
-	      },
-	      {
-	        "internalType": "uint256",
-	        "name": "blockNumber",
-	        "type": "uint256"
-	      }
-	    ],
-	    "name": "getSlashingHeightFromBlockForValidator",
-	    "outputs": [
+    [
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "delegatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getBalanceAvailableForRedelegation",
+        "outputs": [
           {
             "internalType": "uint256",
             "name": "",
             "type": "uint256"
           }
         ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "validatorAddress",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "getValidatorCommissionRate",
-	    "outputs": [
-	      {
-	        "internalType": "uint256",
-	        "name": "",
-	        "type": "uint256"
-	      }
-	    ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "validatorAddress",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "getValidatorMaxTotalDelegation",
-	    "outputs": [
-	      {
-	        "internalType": "uint256",
-	        "name": "",
-	        "type": "uint256"
-	      }
-	    ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  },
-	  {
-	    "inputs": [
-	      {
-	        "internalType": "address",
-	        "name": "validatorAddress",
-	        "type": "address"
-	      }
-	    ],
-	    "name": "getValidatorTotalDelegation",
-	    "outputs": [
-	      {
-	        "internalType": "uint256",
-	        "name": "",
-	        "type": "uint256"
-	      }
-	    ],
-	    "stateMutability": "view",
-	    "type": "function"
-	  }
-	]
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "delegatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getBalanceDelegatedByDelegator",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "delegatorAddress",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getDelegationByDelegatorAndValidator",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getMedianRawStakeSnapshot",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getTotalStakingSnapshot",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getValidatorCommissionRate",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getValidatorMaxTotalDelegation",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getValidatorStatus",
+        "outputs": [
+          {
+            "internalType": "uint8",
+            "name": "",
+            "type": "uint8"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "validatorAddress",
+            "type": "address"
+          }
+        ],
+        "name": "getValidatorTotalDelegation",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ]
 	`
 	abiStaking, _ = abi.JSON(strings.NewReader(StakingABIJSON))
-	var err error
-	abiRoStaking, err = abi.JSON(strings.NewReader(ReadOnlyStakingABIJSON))
-	if err != nil {
-		panic(err)
-	}
+	abiRoStaking, _ = abi.JSON(strings.NewReader(ReadOnlyStakingABIJSON))
 }
 
 // contractCaller (and not Contract) is used here to avoid import cycle
@@ -410,31 +446,20 @@ func ParseReadOnlyStakeMsg(input []byte) (*stakingTypes.ReadOnlyStakeMsg, error)
 		return makeRoStakeMsgWithValidator(args, method.Name[3:])
 	case "getValidatorTotalDelegation":
 		return makeRoStakeMsgWithValidator(args, method.Name[3:])
-	case "getSlashingHeightFromBlockForValidator":
-		msg, err := makeRoStakeMsgWithValidator(
-			args,
-			method.Name[3:],
-		)
-		if err != nil {
-			return nil, err
-		}
-		blockNumber, err := ParseBigIntFromKey(args, "blockNumber")
-		if err != nil {
-			return nil, err
-		}
-		msg.BlockNumber = blockNumber
-		return msg, nil
+	case "getValidatorStatus":
+		return makeRoStakeMsgWithValidator(args, method.Name[3:])
 	case "getBalanceAvailableForRedelegation":
-		{
-			delegatorAddress, err := ParseAddressFromKey(args, "delegatorAddress")
-			if err != nil {
-				return nil, err
-			}
-			return &stakingTypes.ReadOnlyStakeMsg{
-				DelegatorAddress: delegatorAddress,
-				What:             method.Name[3:],
-			}, nil
-		}
+		return makeRoStakeMsgWithDelegator(args, method.Name[3:])
+	case "getBalanceDelegatedByDelegator":
+		return makeRoStakeMsgWithDelegator(args, method.Name[3:])
+	case "getTotalStakingSnapshot":
+		return &stakingTypes.ReadOnlyStakeMsg{
+			What: method.Name[3:],
+		}, nil
+	case "getMedianRawStakeSnapshot":
+		return &stakingTypes.ReadOnlyStakeMsg{
+			What: method.Name[3:],
+		}, nil
 	}
 	return nil, errors.New("invalid method name")
 }
@@ -448,6 +473,19 @@ func makeRoStakeMsgWithValidator(args map[string]interface{}, what string) (
 	}
 	return &stakingTypes.ReadOnlyStakeMsg{
 		ValidatorAddress: validatorAddress,
+		What:             what,
+	}, nil
+}
+
+func makeRoStakeMsgWithDelegator(args map[string]interface{}, what string) (
+	*stakingTypes.ReadOnlyStakeMsg, error,
+) {
+	delegatorAddress, err := ParseAddressFromKey(args, "delegatorAddress")
+	if err != nil {
+		return nil, err
+	}
+	return &stakingTypes.ReadOnlyStakeMsg{
+		DelegatorAddress: delegatorAddress,
 		What:             what,
 	}, nil
 }

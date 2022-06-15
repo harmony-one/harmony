@@ -268,5 +268,4 @@ type ReadOnlyStakeMsg struct {
 	DelegatorAddress common.Address
 	ValidatorAddress common.Address
 	What             string
-	BlockNumber      *big.Int
 }

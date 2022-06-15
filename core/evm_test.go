@@ -1,6 +1,7 @@
 package core
 
 import (
+	bytes_mod "bytes"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	chain2 "github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
+	"github.com/harmony-one/harmony/staking/effective"
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -77,6 +79,9 @@ func TestRoStaking(t *testing.T) {
 	delegate := sampleDelegate(*key)
 	// add undelegations in epoch0
 	wrapper, err := db.ValidatorWrapper(createValidator.ValidatorAddress, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	wrapper.Delegations[0].Undelegations = []staking.Undelegation{
 		{
 			Amount: new(big.Int).Mul(big.NewInt(denominations.One), big.NewInt(10000)),
@@ -87,6 +92,9 @@ func TestRoStaking(t *testing.T) {
 	header2 := blockfactory.NewTestHeader().With().Number(big.NewInt(1)).Header()
 	ctx2 := NewEVMContext(msg, header2, chain, nil)
 	err = db.UpdateValidatorWrapper(wrapper.Address, wrapper)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = ctx2.Delegate(db, nil, &delegate)
 	if err != nil {
 		t.Fatalf("Got error %v in Delegate", err)
@@ -98,7 +106,7 @@ func TestRoStaking(t *testing.T) {
 		ValidatorAddress: delegate.ValidatorAddress,
 		What:             "DelegationByDelegatorAndValidator",
 	}
-	bytes, err := ctx.FetchStakingInfo(db, readOnlyMsg)
+	bytes, err := ctx.RoStakingInfo(db, readOnlyMsg)
 	if err != nil {
 		t.Errorf("Could not determine DelegationByDelegatorAndValidator %s", err)
 	} else {
@@ -113,7 +121,7 @@ func TestRoStaking(t *testing.T) {
 		ValidatorAddress: delegate.ValidatorAddress,
 		What:             "ValidatorMaxTotalDelegation",
 	}
-	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	bytes, err = ctx.RoStakingInfo(db, readOnlyMsg)
 	if err != nil {
 		t.Errorf("Could not determine ValidatorMaxTotalDelegation %s", err)
 	} else {
@@ -128,7 +136,7 @@ func TestRoStaking(t *testing.T) {
 		ValidatorAddress: delegate.ValidatorAddress,
 		What:             "ValidatorTotalDelegation",
 	}
-	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	bytes, err = ctx.RoStakingInfo(db, readOnlyMsg)
 	if err != nil {
 		t.Errorf("Could not determine ValidatorTotalDelegation %s", err)
 	} else {
@@ -144,7 +152,7 @@ func TestRoStaking(t *testing.T) {
 		ValidatorAddress: delegate.ValidatorAddress,
 		What:             "ValidatorCommissionRate",
 	}
-	bytes, err = ctx.FetchStakingInfo(db, readOnlyMsg)
+	bytes, err = ctx.RoStakingInfo(db, readOnlyMsg)
 	if err != nil {
 		t.Errorf("Could not determine ValidatorCommissionRate %s", err)
 	} else {
@@ -170,7 +178,7 @@ func TestRoStaking(t *testing.T) {
 		DelegatorAddress: delegate.DelegatorAddress,
 		What:             "BalanceAvailableForRedelegation",
 	}
-	bytes, err = ctx2.FetchStakingInfo(db, readOnlyMsg)
+	bytes, err = ctx2.RoStakingInfo(db, readOnlyMsg)
 	if err != nil {
 		t.Errorf("Could not determine BalanceAvailableForRedelegation %s", err)
 	} else {
@@ -183,12 +191,46 @@ func TestRoStaking(t *testing.T) {
 
 	readOnlyMsg = &staking.ReadOnlyStakeMsg{
 		ValidatorAddress: delegate.ValidatorAddress,
-		What:             "SlashingHeightFromBlockForValidator",
-		BlockNumber:      common.Big1,
+		What:             "ValidatorStatus",
 	}
-	bytes, err = ctx2.FetchStakingInfo(db, readOnlyMsg)
-	if err.Error() != "cannot find header for block" || err == nil {
-		t.Errorf("Unexpected error in SlashingHeightFromBlockForValidator %s", err)
+	bytes, err = ctx2.RoStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine ValidatorStatus %s", err)
+	} else if !bytes_mod.Equal(bytes, effective.Active.Bytes()) {
+		t.Errorf("Unexpected validator status: actual %v expected %v", bytes, effective.Active.Bytes())
+	}
+
+	readOnlyMsg = &staking.ReadOnlyStakeMsg{
+		DelegatorAddress: delegate.DelegatorAddress,
+		What:             "BalanceDelegatedByDelegator",
+	}
+	bytes, err = ctx2.RoStakingInfo(db, readOnlyMsg)
+	if err != nil {
+		t.Errorf("Could not determine BalanceDelegatedByDelegator %s", err)
+	} else {
+		actualAmount := new(big.Int).SetBytes(bytes)
+		// re read from state
+		wrapper, _ := db.ValidatorWrapper(wrapper.Address, true, false)
+		expectedAmount := wrapper.Delegations[0].Amount
+		if actualAmount.Cmp(expectedAmount) != 0 {
+			t.Errorf("Unequal expected: %d, actual: %d", expectedAmount, actualAmount)
+		}
+	}
+
+	// for below tests, need to write validator list to disk
+	err = chain.WriteValidatorList(database, []common.Address{wrapper.Address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thisState, err := chain.StateAt(chain.CurrentBlock().Root())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := thisState.UpdateValidatorWrapper(
+		wrapper.Address,
+		wrapper,
+	); err != nil {
+		t.Fatal(err)
 	}
 }
 

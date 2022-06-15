@@ -17,6 +17,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/crypto/hash"
 	"github.com/harmony-one/harmony/numeric"
@@ -1724,6 +1725,30 @@ func (chain *fakeChainContext) Engine() consensus_engine.Engine {
 	return nil
 }
 
+func (chain *fakeChainContext) ValidatorCandidates() []common.Address {
+	vs, _ := chain.ReadValidatorList()
+	return vs
+}
+
+func (chain *fakeChainContext) CurrentBlock() *types.Block {
+	return nil
+}
+
+func (chain *fakeChainContext) ReadValidatorInformation(address common.Address) (*staking.ValidatorWrapper, error) {
+	if wrapper, ok := chain.vWrappers[address]; ok {
+		return wrapper, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (chain *fakeChainContext) ReadValidatorInformationAtState(address common.Address, state *state.DB) (*staking.ValidatorWrapper, error) {
+	return chain.ReadValidatorInformation(address)
+}
+
+func (chain *fakeChainContext) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
+}
+
 func (chain *fakeChainContext) Config() *params.ChainConfig {
 	config := &params.ChainConfig{}
 	config.MinCommissionRateEpoch = big.NewInt(0)
@@ -1801,6 +1826,27 @@ func (chain *fakeErrChainContext) ReadValidatorSnapshot(common.Address) (*stakin
 
 func (chain *fakeErrChainContext) GetHeaderByNumber(number uint64) *block.Header {
 	return nil
+}
+
+func (chain *fakeErrChainContext) ValidatorCandidates() []common.Address {
+	vs, _ := chain.ReadValidatorList()
+	return vs
+}
+
+func (chain *fakeErrChainContext) CurrentBlock() *types.Block {
+	return nil
+}
+
+func (chain *fakeErrChainContext) ReadValidatorInformation(address common.Address) (*staking.ValidatorWrapper, error) {
+	return nil, errors.New("not found")
+}
+
+func (chain *fakeErrChainContext) ReadValidatorInformationAtState(address common.Address, state *state.DB) (*staking.ValidatorWrapper, error) {
+	return chain.ReadValidatorInformation(address)
+}
+
+func (chain *fakeErrChainContext) StateAt(root common.Hash) (*state.DB, error) {
+	return nil, nil
 }
 
 func makeIdentityStr(item interface{}) string {

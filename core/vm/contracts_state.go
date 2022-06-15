@@ -112,7 +112,15 @@ func (c *stakingPrecompile) RunStateDependent(
 	input []byte,
 ) ([]byte, error) {
 	if evm.Context.ShardID != shard.BeaconChainShardID {
-		return nil, errors.New("staking not supported on this shard")
+		return nil, errors.New("precompile is non-payable")
+	}
+	// after the ro staking precompile fork, ensure msg.value is not sent
+	// the other option was to enforce sending msg.value, but that does
+	// not work well with redelegation of locked tockens
+	if evm.chainRules.IsROStakingPrecompile {
+		if contract.Value().Cmp(common.Big0) > 0 {
+			return nil, errors.New("this precompile cannot accept funds")
+		}
 	}
 	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
 	if err != nil {
@@ -125,14 +133,6 @@ func (c *stakingPrecompile) RunStateDependent(
 	}
 
 	if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-		// after the ro staking precompile fork, ensure msg.value is not sent
-		// the other option was to enforce sending msg.value, but that does
-		// not work well with redelegation of locked tockens
-		if evm.chainRules.IsROStakingPrecompile {
-			if contract.Value().Cmp(common.Big0) > 0 {
-				return nil, errors.New("this precompile cannot accept funds")
-			}
-		}
 		if err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
 			return nil, err
 		} else {
@@ -169,11 +169,11 @@ type roStakingPrecompile struct{}
 
 func (c *roStakingPrecompile) RequiredGas(
 	evm *EVM,
-	contract *Contract,
+	_ *Contract,
 	input []byte,
-	readOnly bool,
+	_ bool,
 ) (uint64, error) {
-	return GasQuickStep, nil
+	return evm.RoStakingGas(evm.StateDB, input)
 }
 
 func (c *roStakingPrecompile) RunStateDependent(
@@ -181,6 +181,9 @@ func (c *roStakingPrecompile) RunStateDependent(
 	contract *Contract,
 	input []byte,
 ) ([]byte, error) {
+	if contract.Value().Cmp(common.Big0) != 0 {
+		return nil, errors.New("precompile is non payable")
+	}
 	if evm.Context.ShardID != shard.BeaconChainShardID {
 		return nil, errors.New("staking not supported on this shard")
 	}
@@ -188,5 +191,5 @@ func (c *roStakingPrecompile) RunStateDependent(
 	if err != nil {
 		return nil, err
 	}
-	return evm.FetchStakingInfo(evm.StateDB, roStakeMsg)
+	return evm.RoStakingInfo(evm.StateDB, roStakeMsg)
 }

@@ -222,6 +222,15 @@ var ParseRoStakeMsgTests = []parseRoTest{
 		},
 	},
 	{
+		input:         []byte{90, 112, 28, 167, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55},
+		name:          "getBalanceDelegatedByDelegator",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			DelegatorAddress: common.HexToAddress("0x1337"),
+			What:             "BalanceDelegatedByDelegator",
+		},
+	},
+	{
 		input:         []byte{55, 162, 85, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
 		name:          "getDelegationByDelegatorAndValidatorSuccess",
 		expectedError: nil,
@@ -250,13 +259,28 @@ var ParseRoStakeMsgTests = []parseRoTest{
 		},
 	},
 	{
-		input:         []byte{41, 202, 19, 238, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53},
-		name:          "getSlashingHeightFromBlockForValidator",
+		input:         []byte{163, 16, 98, 79, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 56},
+		name:          "getValidatorStatus",
 		expectedError: nil,
 		expected: &stakingTypes.ReadOnlyStakeMsg{
 			ValidatorAddress: common.HexToAddress("0x1338"),
-			What:             "SlashingHeightFromBlockForValidator",
-			BlockNumber:      big.NewInt(53),
+			What:             "ValidatorStatus",
+		},
+	},
+	{
+		input:         []byte{75, 21, 53, 214},
+		name:          "getTotalStakingSnapshot",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			What: "TotalStakingSnapshot",
+		},
+	},
+	{
+		input:         []byte{255, 69, 95, 178},
+		name:          "getMedianRawStakeSnapshot",
+		expectedError: nil,
+		expected: &stakingTypes.ReadOnlyStakeMsg{
+			What: "MedianRawStakeSnapshot",
 		},
 	},
 	{
@@ -265,7 +289,7 @@ var ParseRoStakeMsgTests = []parseRoTest{
 		expectedError: errors.New("no method with id: 0x29cabfee"),
 	},
 	{
-		input:         []byte{41, 202, 19, 238},
+		input:         []byte{62, 128, 166, 177},
 		name:          "MissingDataFailure",
 		expectedError: errors.New("abi: attempting to unmarshall an empty string while arguments are expected"),
 	},
@@ -314,6 +338,7 @@ func testParseRoStakeMsg(test parseRoTest, t *testing.T) {
 					}
 				} else if strings.Compare(test.expected.What, "ValidatorMaxTotalDelegation") == 0 ||
 					strings.Compare(test.expected.What, "ValidatorTotalDelegation") == 0 ||
+					strings.Compare(test.expected.What, "ValidatorStatus") == 0 ||
 					strings.Compare(test.expected.What, "ValidatorCommissionRate") == 0 {
 					if !bytes.Equal(test.expected.ValidatorAddress[:], res.ValidatorAddress[:]) {
 						t.Errorf(
@@ -322,7 +347,8 @@ func testParseRoStakeMsg(test parseRoTest, t *testing.T) {
 							res.ValidatorAddress.Hex(),
 						)
 					}
-				} else if strings.Compare(test.expected.What, "BalanceAvailableForRedelegation") == 0 {
+				} else if strings.Compare(test.expected.What, "BalanceAvailableForRedelegation") == 0 ||
+					strings.Compare(test.expected.What, "BalanceDelegatedByDelegator") == 0 {
 					if !bytes.Equal(test.expected.DelegatorAddress[:], res.DelegatorAddress[:]) {
 						t.Errorf(
 							"Unequal value for delegator address %s and %s",
@@ -338,13 +364,8 @@ func testParseRoStakeMsg(test parseRoTest, t *testing.T) {
 							res.ValidatorAddress.Hex(),
 						)
 					}
-					if test.expected.BlockNumber.Cmp(res.BlockNumber) != 0 {
-						t.Errorf(
-							"Unequal value for block number %d and %d",
-							test.expected.BlockNumber,
-							res.BlockNumber,
-						)
-					}
+				} else if strings.Compare(test.expected.What, "TotalStakingSnapshot") == 0 ||
+					strings.Compare(test.expected.What, "MedianRawStakeSnapshot") == 0 {
 				} else {
 					t.Fatalf("Got %s as what", test.expected.What)
 				}

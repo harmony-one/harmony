@@ -64,7 +64,8 @@ type (
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 	// Read only staking precompile
-	RoStakingPrecompileFunc func(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error)
+	RoStakingInfoFunc func(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error)
+	RoStakingGasFunc  func(db StateDB, input []byte) (uint64, error)
 )
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
@@ -183,7 +184,8 @@ type Context struct {
 	ShardID uint32
 
 	// read only staking precompile
-	FetchStakingInfo RoStakingPrecompileFunc
+	RoStakingInfo RoStakingInfoFunc
+	RoStakingGas  RoStakingGasFunc
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides

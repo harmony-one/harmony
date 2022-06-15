@@ -212,13 +212,18 @@ var StakingPrecompileTests = []writeCapablePrecompileTest{
 	//},
 }
 
-func FetchStakingInfoFn(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error) {
+func RoStakingInfoFn(db StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error) {
 	return nil, nil
+}
+
+func RoStakingGasFn(db StateDB, input []byte) (uint64, error) {
+	return 0, nil
 }
 
 func TestRoStakingPrecompile(t *testing.T) {
 	var env = NewEVM(Context{
-		FetchStakingInfo: FetchStakingInfoFn,
+		RoStakingInfo: RoStakingInfoFn,
+		RoStakingGas:  RoStakingGasFn,
 	}, nil, params.TestChainConfig, Config{})
 	p := &roStakingPrecompile{}
 	input := []byte{102, 54, 146, 228, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 55}

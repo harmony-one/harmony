@@ -19,6 +19,7 @@ package core
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -27,12 +28,14 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/shard/committee"
 	staking "github.com/harmony-one/harmony/staking"
-	"github.com/harmony-one/harmony/staking/slash"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
 
@@ -64,6 +67,12 @@ type ChainContext interface {
 	Config() *params.ChainConfig
 
 	ShardID() uint32 // this is implemented by blockchain.go already
+
+	CurrentBlock() *types.Block
+	ReadValidatorInformation(common.Address) (*stakingTypes.ValidatorWrapper, error)
+	ReadValidatorInformationAtState(common.Address, *state.DB) (*stakingTypes.ValidatorWrapper, error)
+	StateAt(common.Hash) (*state.DB, error)
+	ValidatorCandidates() []common.Address
 }
 
 // NewEVMContext creates a new context for use in the EVM.
@@ -92,17 +101,18 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Undelegate:      UndelegateFn(header, chain),
 		CollectRewards:  CollectRewardsFn(header, chain),
 		//MigrateDelegations:    MigrateDelegationsFn(header, chain),
-		CalculateMigrationGas: CalculateMigrationGasFn(chain),
-		Origin:                msg.From(),
-		Coinbase:              beneficiary,
-		BlockNumber:           header.Number(),
-		EpochNumber:           header.Epoch(),
-		VRF:                   vrf,
-		Time:                  header.Time(),
-		GasLimit:              header.GasLimit(),
-		GasPrice:              new(big.Int).Set(msg.GasPrice()),
-		ShardID:               chain.ShardID(),
-		FetchStakingInfo:      FetchStakingInfoFn(header, chain),
+		// CalculateMigrationGas: CalculateMigrationGasFn(chain),
+		Origin:        msg.From(),
+		Coinbase:      beneficiary,
+		BlockNumber:   header.Number(),
+		EpochNumber:   header.Epoch(),
+		VRF:           vrf,
+		Time:          header.Time(),
+		GasLimit:      header.GasLimit(),
+		GasPrice:      new(big.Int).Set(msg.GasPrice()),
+		ShardID:       chain.ShardID(),
+		RoStakingInfo: RoStakingInfoFn(header, chain),
+		RoStakingGas:  RoStakingGasFn(header, chain),
 	}
 }
 
@@ -300,6 +310,8 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 
 		// Add log if everything is good
+		// Changed as a result of https://github.com/harmony-one/harmony/pull/3906#issuecomment-1080642074
+		// To be in line with expectations for events to contain params as well
 		if chain.Config().IsROStakingPrecompile(ref.Epoch()) {
 			db.AddLog(&types.Log{
 				Address:     collectRewards.DelegatorAddress,
@@ -518,7 +530,7 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *big.Int, 
 
 // FetchStakingInfoFn is the EVM implementation of the read only staking precompile
 // avoid import cycle by putting this function here
-func FetchStakingInfoFn(ref *block.Header, chain ChainContext) vm.RoStakingPrecompileFunc {
+func RoStakingInfoFn(ref *block.Header, chain ChainContext) vm.RoStakingInfoFunc {
 	return func(db vm.StateDB, roStakeMsg *stakingTypes.ReadOnlyStakeMsg) ([]byte, error) {
 		switch roStakeMsg.What {
 		case "DelegationByDelegatorAndValidator":
@@ -604,48 +616,94 @@ func FetchStakingInfoFn(ref *block.Header, chain ChainContext) vm.RoStakingPreco
 					wrapper.CommissionRates.Rate.Bytes(), 32,
 				), nil
 			}
-		// for provided block number,
-		// read the header, if within range
-		// then find the slashes of said header
-		// iterate over them and check if offender
-		// return height of the evidence
-		case "SlashingHeightFromBlockForValidator":
+		case "ValidatorStatus":
 			{
-				var header *block.Header
-				slashes := slash.Records{}
-				minBlockNum := big.NewInt(0).Sub(ref.Number(), common.Big257)
-				// TODO confirm below
-				// current header's slashes haven't been applied yet
-				// so it doesn't make sense to return them here
-				if roStakeMsg.BlockNumber.Cmp(minBlockNum) > 0 &&
-					roStakeMsg.BlockNumber.Cmp(ref.Number()) < 0 {
-					header = chain.GetHeaderByNumber(roStakeMsg.BlockNumber.Uint64())
+				wrapper, err := db.ValidatorWrapper(roStakeMsg.ValidatorAddress, true, false)
+				if err != nil {
+					return nil, err
 				}
-				if header == nil {
-					return nil, errors.New("cannot find header for block")
+				return wrapper.Status.Bytes(), nil
+			}
+		case "BalanceDelegatedByDelegator":
+			{
+				delegations, err := chain.ReadDelegationsByDelegator(roStakeMsg.DelegatorAddress)
+				if err != nil {
+					return nil, err
 				}
-				if s := header.Slashes(); len(s) > 0 {
-					if err := rlp.DecodeBytes(s, &slashes); err != nil {
+				answer := big.NewInt(0)
+				for _, delegation := range delegations {
+					wrapper, err := db.ValidatorWrapper(delegation.ValidatorAddress, true, false)
+					if err != nil {
 						return nil, err
 					}
+					answer = answer.Add(answer, wrapper.Delegations[delegation.Index].Amount)
 				}
-				if len(slashes) > 0 {
-					for _, slash := range slashes {
-						if bytes.Equal(
-							slash.Evidence.Offender.Bytes(),
-							roStakeMsg.ValidatorAddress.Bytes(),
-						) {
-							return common.LeftPadBytes(
-								new(big.Int).SetUint64(slash.Evidence.Height).Bytes(), 32,
-							), nil
-						}
+				return common.LeftPadBytes(answer.Bytes(), 32), nil
+			}
+		case "MedianRawStakeSnapshot":
+			{
+				epoch := big.NewInt(0).Add(ref.Epoch(), big.NewInt(1))
+				instance := shard.Schedule.InstanceForEpoch(epoch)
+				res, err := committee.NewEPoSRound(epoch, chain, chain.Config().IsEPoSBound35(epoch), instance.SlotsLimit(), int(instance.NumShards()))
+				if err != nil {
+					return nil, err
+				}
+				return res.MedianStake.Bytes(), nil
+			}
+		case "TotalStakingSnapshot":
+			{
+				candidates := chain.ValidatorCandidates()
+				fmt.Println(len(candidates))
+				staked := big.NewInt(0)
+				for i := range candidates {
+					snapshot, _ := chain.ReadValidatorSnapshot(candidates[i])
+					validator, _ := chain.ReadValidatorInformation(candidates[i])
+					if !committee.IsEligibleForEPoSAuction(
+						snapshot, validator,
+					) {
+						continue
 					}
+					staked = staked.Add(staked, validator.TotalDelegation())
 				}
-				return common.LeftPadBytes(
-					common.Big0.Bytes(), 32,
-				), nil
+				return common.LeftPadBytes(staked.Bytes(), 32), nil
 			}
 		}
-		return nil, nil
+		return nil, errors.New("invalid ro staking message")
+	}
+}
+
+func RoStakingGasFn(ref *block.Header, chain ChainContext) vm.RoStakingGasFunc {
+	return func(db vm.StateDB, input []byte) (uint64, error) {
+		if chain.ShardID() == shard.BeaconChainShardID {
+			roStakeMsg, err := staking.ParseReadOnlyStakeMsg(input)
+			if err == nil {
+				switch roStakeMsg.What {
+				case "DelegationByDelegatorAndValidator":
+					return params.ValidatorInformationGasLoops, nil
+				case "ValidatorMaxTotalDelegation":
+					// no loops
+					return params.ValidatorInformationGas, nil
+				case "ValidatorTotalDelegation":
+					return params.ValidatorInformationGasLoops, nil
+				case "ValidatorCommissionRate":
+					return params.ValidatorInformationGas, nil
+				case "ValidatorStatus":
+					return params.ValidatorInformationGas, nil
+				case "TotalStakingSnapshot":
+					// loop over each validator's delegations
+					return params.ValidatorInformationGasLoops * uint64(len(chain.ValidatorCandidates())), nil
+				case "MedianRawStakeSnapshot":
+					// loop over each validator but more complex than just adding things up
+					return params.ValidatorInformationGasLoopsComplex * uint64(len(chain.ValidatorCandidates())), nil
+				case "BalanceAvailableForRedelegation":
+					return params.DelegatorInformationGas, nil
+				case "BalanceDelegatedByDelegator":
+					return params.DelegatorInformationGas, nil
+				}
+			}
+		} else {
+			return params.TxGas, errors.New("not beacon shard")
+		}
+		return params.TxGas, errors.New("unknown operation")
 	}
 }
