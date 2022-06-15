@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	twoThird           = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	sixtyPercent       = numeric.MustNewDecFromStr("0.6")
-	sixtyPercentHeight = uint64(26481647)
+	twoThird = numeric.NewDec(2).Quo(numeric.NewDec(3))
+	// fix testnet temporary
+	fixedThreshold       = numeric.MustNewDecFromStr("0.51")
+	fixedThresholdHeight = uint64(26481647)
 )
 
 // TallyResult is the result of when we calculate voting power,
@@ -199,8 +200,8 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 
 // QuorumThreshold ..
 func (v *stakedVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= sixtyPercentHeight {
-		return sixtyPercent
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
+		return fixedThreshold
 	}
 	return twoThird
 }

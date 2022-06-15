@@ -76,8 +76,8 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height u
 
 // QuorumThreshold ..
 func (v *uniformVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= sixtyPercentHeight {
-		return sixtyPercent
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
+		return fixedThreshold
 	}
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
