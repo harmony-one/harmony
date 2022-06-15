@@ -167,7 +167,7 @@ func (s *PublicTransactionService) EstimateGas(
 ) (hexutil.Uint64, error) {
 	timer := DoMetricRPCRequest(RpcEstimateGas)
 	defer DoRPCRequestDuration(RpcEstimateGas, timer)
-	bNrOrHash := rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber)
+	bNrOrHash := rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber)
 	if blockNrOrHash != nil {
 		bNrOrHash = *blockNrOrHash
 	}
