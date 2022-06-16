@@ -342,17 +342,21 @@ func (node *Node) StartGRPCSyncClient() {
 			Msg("SupportBeaconSyncing")
 		go node.doBeaconSyncing()
 	}
+}
 
+// NodeSyncing makes sure to start all the processes needed to sync the node based on different configuration factors.
+func (node *Node) NodeSyncing() {
 	if node.HarmonyConfig.General.UseTiKV {
-		node.syncFromTiKVWriter()
+		node.syncFromTiKVWriter() // this is for both reader and backup writers
 
-		if node.HarmonyConfig.TiKV.Role == "Writer" {
-			node.supportSyncing()
-		} else {
+		if node.HarmonyConfig.TiKV.Role == "Reader" {
 			node.Consensus.UpdateConsensusInformation()
 		}
-	} else {
-		node.supportSyncing()
+		if node.HarmonyConfig.TiKV.Role == "Writer" {
+			node.supportSyncing() // the writer needs to be in sync with it's other peers
+		}
+	} else if !node.HarmonyConfig.General.IsOffline && node.HarmonyConfig.DNSSync.Client {
+		node.supportSyncing() // for non-writer-reader mode a.k.a tikv nodes
 	}
 }
 

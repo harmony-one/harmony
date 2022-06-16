@@ -57,7 +57,12 @@ type Service struct {
 
 // New returns explorer service.
 func New(harmonyConfig *harmonyconfig.HarmonyConfig, selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
-	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
+	pathIP := selfPeer.IP
+	if harmonyConfig.General.UseTiKV {
+		pathIP = nodeconfig.DefaultPublicListenIP // using the same pathIP for the TIKV mode, so it remains constant across readers and writers, since this is used as prefix for the DB keys
+	}
+
+	dbPath := defaultDBPath(pathIP, selfPeer.Port)
 	storage, err := newStorage(harmonyConfig, bc, dbPath)
 	if err != nil {
 		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")

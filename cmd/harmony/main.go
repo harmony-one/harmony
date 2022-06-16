@@ -434,6 +434,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		currentNode.StartGRPCSyncClient()
 	}
 
+	currentNode.NodeSyncing()
+
 	if err := currentNode.StartServices(); err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(-1)
