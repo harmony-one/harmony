@@ -29,11 +29,11 @@ func CreateStagedSync(
 	ctx := context.Background()
 	db := memdb.New()
 
-	headersCfg := NewStageHeadersCfg(ctx,db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx,db)
-	taskQueueCfg := NewStageTasksQueueCfg(ctx,db)
-	bodiesCfg := NewStageBodiesCfg(ctx,db)
-	finishCfg := NewStageFinishCfg(ctx,db)
+	headersCfg := NewStageHeadersCfg(ctx, db)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, db)
+	taskQueueCfg := NewStageTasksQueueCfg(ctx, db)
+	bodiesCfg := NewStageBodiesCfg(ctx, db)
+	finishCfg := NewStageFinishCfg(ctx, db)
 
 	stages := DefaultStages(ctx,
 		headersCfg,
@@ -75,54 +75,64 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 
 	for {
 		start := time.Now()
-
 		otherHeight := s.getMaxPeerHeight(s.IsBeacon())
 		currentHeight := s.Blockchain().CurrentBlock().NumberU64()
 		if currentHeight >= otherHeight {
 			utils.Logger().Info().
-				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+				Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
 			break
 		}
-		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-
-		startHash := s.Blockchain().CurrentBlock().Hash()
-		size := uint32(otherHeight - currentHeight)
-		if size > SyncLoopBatchSize {
-			size = SyncLoopBatchSize
-		}
-
-		// Do one step of staged sync
-		_, syncErr := s.StageLoopStep(startHash[:], size, initialCycle)
-
-		if syncErr != nil {
-			utils.Logger().Error().Err(syncErr).
-				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-			s.purgeOldBlocksFromCache()
-			break
-		}
-		initialCycle = false
-		s.purgeOldBlocksFromCache()
-
-		if loopMinTime != 0 {
-			waitTime := loopMinTime - time.Since(start)
-			utils.Logger().Info().
-				Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d, currentHeight: %d)",
-					waitTime, s.IsBeacon(), s.Blockchain().ShardID(), currentHeight)
-			c := time.After(waitTime)
-			select {
-			case <-s.Context().Done():
-				return
-			case <-c:
+		var syncErr error
+		for {
+			currentHeight = s.Blockchain().CurrentBlock().NumberU64()
+			if currentHeight >= otherHeight {
+				break
 			}
+			utils.Logger().Info().
+				Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
+
+			startHash := s.Blockchain().CurrentBlock().Hash()
+			size := uint32(otherHeight - currentHeight)
+			if size > SyncLoopBatchSize {
+				size = SyncLoopBatchSize
+			}
+
+			// Do one step of staged sync
+			_, syncErr = s.StageLoopStep(startHash[:], size, initialCycle)
+
+			if syncErr != nil {
+				utils.Logger().Error().Err(syncErr).
+					Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+						s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
+				s.purgeOldBlocksFromCache()
+				break
+			}
+			initialCycle = false
+			s.purgeOldBlocksFromCache()
+
+			if loopMinTime != 0 {
+				waitTime := loopMinTime - time.Since(start)
+				utils.Logger().Info().
+					Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d, currentHeight: %d)",
+						waitTime, s.IsBeacon(), s.Blockchain().ShardID(), currentHeight)
+				c := time.After(waitTime)
+				select {
+				case <-s.Context().Done():
+					return
+				case <-c:
+				}
+			}
+
+		}
+		if syncErr!=nil {
+			break
 		}
 	}
 	if consensus != nil {
 		if err := s.addConsensusLastMile(s.Blockchain(), consensus); err != nil {
-			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
+			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {

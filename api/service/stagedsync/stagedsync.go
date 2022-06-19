@@ -402,12 +402,12 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 		return err
 	}
 
-	fmt.Println("STAGE ------------------->",stage.ID,": executing ...")
+	fmt.Println("STAGE ------------------->", stage.ID, ": executing ...")
 	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
-		fmt.Println("STAGE ------------------->",stage.ID,": failed:", err)
+		fmt.Println("STAGE ------------------->", stage.ID, ": failed:", err)
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
-	fmt.Println("STAGE ------------------->",stage.ID,": executed successfully")
+	fmt.Println("STAGE ------------------->", stage.ID, ": executed successfully")
 
 	took := time.Since(start)
 	if took > 60*time.Second {
@@ -572,7 +572,7 @@ func (ss *StagedSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	utils.Logger().Debug().
 		Int("total", len(pc.newBlocks)).
 		Uint64("blockHeight", block.NumberU64()).
-		Msg("[SYNC] new block received")
+		Msg("[STAGED_SYNC] new block received")
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
@@ -588,10 +588,10 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	utils.Logger().Debug().
 		Int("len", len(peers)).
 		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] CreateSyncConfig: len of peers")
+		Msg("[STAGED_SYNC] CreateSyncConfig: len of peers")
 
 	if len(peers) == 0 {
-		return errors.New("[SYNC] no peers to connect to")
+		return errors.New("[STAGED_SYNC] no peers to connect to")
 	}
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()
@@ -619,7 +619,7 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	utils.Logger().Info().
 		Int("len", len(ss.syncConfig.peers)).
 		Bool("isBeacon", isBeacon).
-		Msg("[SYNC] Finished making connection to peers")
+		Msg("[STAGED_SYNC] Finished making connection to peers")
 
 	return nil
 }
@@ -691,19 +691,19 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 				utils.Logger().Warn().
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
-					Msg("[SYNC] getConsensusHashes Nil Response")
+					Msg("[STAGED_SYNC] getConsensusHashes Nil Response")
 				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			utils.Logger().Info().Uint32("queried blockHash size", size).
 				Int("got blockHashSize", len(response.Payload)).
 				Str("PeerIP", peerConfig.ip).
-				Msg("[SYNC] GetBlockHashes")
+				Msg("[STAGED_SYNC] GetBlockHashes")
 			if len(response.Payload) > int(size+1) {
 				utils.Logger().Warn().
 					Uint32("requestSize", size).
 					Int("respondSize", len(response.Payload)).
-					Msg("[SYNC] getConsensusHashes: receive more blockHashes than requested!")
+					Msg("[STAGED_SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
 			} else {
 				peerConfig.blockHashes = response.Payload
@@ -715,7 +715,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 	if err := ss.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
 		return err
 	}
-	utils.Logger().Info().Msg("[SYNC] Finished getting consensus block hashes")
+	utils.Logger().Info().Msg("[STAGED_SYNC] Finished getting consensus block hashes")
 	return nil
 }
 
@@ -728,13 +728,13 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 					Err(err).
 					Int("taskIndex", id).
 					Str("taskBlock", hex.EncodeToString(blockHash)).
-					Msg("[SYNC] generateStateSyncTaskQueue: cannot add task")
+					Msg("[STAGED_SYNC] generateStateSyncTaskQueue: cannot add task")
 			}
 		}
 		brk = true
 		return
 	})
-	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[SYNC] generateStateSyncTaskQueue: finished")
+	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[STAGED_SYNC] generateStateSyncTaskQueue: finished")
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -753,7 +753,7 @@ func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
 					if err == queue.ErrDisposed {
 						continue
 					}
-					utils.Logger().Error().Err(err).Msg("[SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
+					utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
 					break
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
@@ -761,14 +761,14 @@ func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
 					utils.Logger().Warn().Err(err).
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
-						Msg("[SYNC] downloadBlocks: GetBlocks failed")
+						Msg("[STAGED_SYNC] downloadBlocks: GetBlocks failed")
 					ss.syncConfig.RemovePeer(peerConfig)
 					return
 				}
 				if len(payload) == 0 {
 					count++
 					utils.Logger().Error().Int("failNumber", count).
-						Msg("[SYNC] downloadBlocks: no more retrievable blocks")
+						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
 					if count > downloadBlocksRetryLimit {
 						break
 					}
@@ -803,7 +803,7 @@ func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
 		return
 	})
 	wg.Wait()
-	utils.Logger().Info().Msg("[SYNC] downloadBlocks: finished")
+	utils.Logger().Info().Msg("[STAGED_SYNC] downloadBlocks: finished")
 }
 
 func (ss *StagedSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
@@ -933,7 +933,7 @@ func (ss *StagedSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash)
 		Hex("parentHash", parentHash[:]).
 		Hex("hash", hash[:]).
 		Int("maxCount", maxCount).
-		Msg("[SYNC] Find block with matching parenthash")
+		Msg("[STAGED_SYNC] Find block with matching parenthash")
 	return candidateBlocks[maxFirstID]
 }
 
@@ -964,7 +964,7 @@ func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.H
 // UpdateBlockAndStatus ...
 func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
-		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
+		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[STAGED_SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
 
@@ -984,19 +984,19 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockCha
 			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
-			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[Sync] VerifyHeaderSignature")
+			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[STAGED_SYNC] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {
-			utils.Logger().Error().Err(err).Msgf("[SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
+			utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
 
 			if !verifyAllSig {
-				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
 					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Err(rbErr).Msg("[SYNC] UpdateBlockAndStatus: failed to rollback")
+						utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 						return err
 					}
 				}
@@ -1010,7 +1010,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockCha
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
+				"[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
@@ -1021,7 +1021,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockCha
 		Uint64("blockEpoch", block.Epoch().Uint64()).
 		Str("blockHex", block.Hash().Hex()).
 		Uint32("ShardID", block.ShardID()).
-		Msg("[SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
+		Msg("[STAGED_SYNC] UpdateBlockAndStatus: New Block Added to Blockchain")
 
 	for i, tx := range block.StakingTransactions() {
 		utils.Logger().Info().
@@ -1102,7 +1102,7 @@ func (ss *StagedSync) RegisterNodeInfo() int {
 	utils.Logger().Debug().
 		Int("registrationNumber", registrationNumber).
 		Int("activePeerNumber", len(ss.syncConfig.peers)).
-		Msg("[SYNC] node registration to peers")
+		Msg("[STAGED_SYNC] node registration to peers")
 
 	count := 0
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
@@ -1115,18 +1115,18 @@ func (ss *StagedSync) RegisterNodeInfo() int {
 			logger.Debug().
 				Str("selfport", ss.selfport).
 				Str("selfsyncport", GetSyncingPort(ss.selfport)).
-				Msg("[SYNC] skip self")
+				Msg("[STAGED_SYNC] skip self")
 			return
 		}
 		err := peerConfig.registerToBroadcast(ss.selfPeerHash[:], ss.selfip, ss.selfport)
 		if err != nil {
 			logger.Debug().
 				Hex("selfPeerHash", ss.selfPeerHash[:]).
-				Msg("[SYNC] register failed to peer")
+				Msg("[STAGED_SYNC] register failed to peer")
 			return
 		}
 
-		logger.Debug().Msg("[SYNC] register success")
+		logger.Debug().Msg("[STAGED_SYNC] register success")
 		count++
 		return
 	})
@@ -1146,15 +1146,15 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		go func() {
 			defer wg.Done()
 			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]getMaxPeerHeight")
+			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
-				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
+				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]GetBlockChainHeight failed")
 				ss.syncConfig.RemovePeer(peerConfig)
 				return
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
-				Msg("[SYNC] getMaxPeerHeight")
+				Msg("[STAGED_SYNC] getMaxPeerHeight")
 
 			lock.Lock()
 			if response != nil {
@@ -1192,12 +1192,12 @@ func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 // 		currentHeight := bc.CurrentBlock().NumberU64()
 // 		if currentHeight >= otherHeight {
 // 			utils.Logger().Info().
-// 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 				Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 // 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 // 			break
 // 		}
 // 		utils.Logger().Info().
-// 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 			Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 // 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 // 		startHash := bc.CurrentBlock().Hash()
@@ -1208,7 +1208,7 @@ func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 // 		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
 // 		if err != nil {
 // 			utils.Logger().Error().Err(err).
-// 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 				Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
 // 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 // 			ss.purgeOldBlocksFromCache()
 // 			break
@@ -1217,7 +1217,7 @@ func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 // 	}
 // 	if consensus != nil {
 // 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
-// 			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
+// 			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")
 // 		}
 // 		// TODO: move this to explorer handler code.
 // 		if ss.isExplorer {
@@ -1314,7 +1314,7 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 		utils.Logger().Info().
 			Uint64("OtherHeight", otherHeight1).
 			Uint64("lastHeight", lastHeight).
-			Msg("[SYNC] Checking sync status")
+			Msg("[STAGED_SYNC] Checking sync status")
 		return SyncCheckResult{
 			IsInSync:    !wasOutOfSync,
 			OtherHeight: otherHeight1,
@@ -1333,7 +1333,7 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 		Uint64("OtherHeight2", otherHeight2).
 		Uint64("lastHeight", lastHeight).
 		Uint64("currentHeight", currentHeight).
-		Msg("[SYNC] Checking sync status")
+		Msg("[STAGED_SYNC] Checking sync status")
 	// Only confirm out of sync when the node has lower height and didn't move in heights for 2 consecutive checks
 	heightDiff := otherHeight2 - lastHeight
 	if otherHeight2 < lastHeight {

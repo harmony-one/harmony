@@ -182,7 +182,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 		}
 	}
 	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
-		Msg("[SYNC] remove GRPC peer")
+		Msg("[STAGED_SYNC] remove GRPC peer")
 }
 
 // CloseConnections close grpc connections for state sync clients
@@ -245,7 +245,7 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
 
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] before cleanUpPeers")
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] before cleanUpPeers")
 	for i := 0; i < len(sc.peers); i++ {
 		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
@@ -257,7 +257,7 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] post cleanUpPeers")
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] post cleanUpPeers")
 }
 
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
@@ -281,7 +281,7 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() error {
 		Str("targetPeerIP", sc.peers[maxFirstID].ip).
 		Int("maxCount", maxCount).
 		Int("hashSize", len(sc.peers[maxFirstID].blockHashes)).
-		Msg("[SYNC] block consensus hashes")
+		Msg("[STAGED_SYNC] block consensus hashes")
 
 	sc.cleanUpPeers(maxFirstID)
 	return nil
