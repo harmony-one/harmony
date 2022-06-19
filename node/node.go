@@ -30,6 +30,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -73,6 +74,20 @@ type syncConfig struct {
 	withSig bool
 }
 
+type ISync interface {
+	UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error
+	AddLastMileBlock(block *types.Block)
+	GetActivePeerNumber() int
+	CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error
+	SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
+	IsInSync() bool
+	IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool)
+	AddNewBlock(peerHash []byte, block *types.Block)
+	RegisterNodeInfo() int
+	GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
+}
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -94,10 +109,11 @@ type Node struct {
 	Worker, BeaconWorker *worker.Worker
 	downloaderServer     *downloader.Server
 	// Syncing component.
-	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *legacysync.StateSync
-	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
-	SyncingPeerProvider    SyncingPeerProvider
+	syncID                            [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
+	stateSync, beaconSync             *legacysync.StateSync
+	stateStagedSync, beaconStagedSync *stagedsync.StagedSync
+	peerRegistrationRecord            map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
+	SyncingPeerProvider               SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
 	host p2p.Host
 	// Service manager.
@@ -147,6 +163,23 @@ func (node *Node) Blockchain() *core.BlockChain {
 			Msg("cannot get shard chain")
 	}
 	return bc
+}
+
+// Blockchain returns the blockchain for the node's current shard.
+func (node *Node) SyncInstance(isBeacon bool) ISync {
+	if isBeacon {
+		var syncInstance ISync
+		if syncInstance = node.beaconSync; node.NodeConfig.StagedSync == true {
+			syncInstance = node.beaconStagedSync
+		}
+		return syncInstance
+	}
+
+	var syncInstance ISync
+	if syncInstance = node.stateSync; node.NodeConfig.StagedSync == true {
+		syncInstance = node.stateStagedSync
+	}
+	return syncInstance
 }
 
 // Beaconchain returns the beaconchain from node.

@@ -143,6 +143,7 @@ var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        false,
 		Downloader:     false,
+		StagedSync:     false,
 		Concurrency:    6,
 		MinPeers:       6,
 		InitStreams:    8,
@@ -155,6 +156,7 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
+		StagedSync:     true,
 		Concurrency:    2,
 		MinPeers:       2,
 		InitStreams:    2,
@@ -166,7 +168,8 @@ var (
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     true,
+		Downloader:     false,
+		StagedSync:     true,
 		Concurrency:    2,
 		MinPeers:       2,
 		InitStreams:    2,
@@ -179,6 +182,7 @@ var (
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     true,
+		StagedSync:     true,
 		Concurrency:    4,
 		MinPeers:       4,
 		InitStreams:    4,

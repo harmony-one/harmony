@@ -535,7 +535,7 @@ func (c *Client) dispatch(codec ServerCodec) {
 		close(c.didClose)
 	}()
 
-	// Spawn the initial read loop.
+	// Exec the initial read loop.
 	go c.read(codec)
 
 	for {

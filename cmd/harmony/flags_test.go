@@ -1322,6 +1322,7 @@ func TestSyncFlags(t *testing.T) {
 				cfgSync := defaultMainnetSyncConfig
 				cfgSync.Enabled = true
 				cfgSync.Downloader = true
+				cfgSync.StagedSync = false
 				cfgSync.Concurrency = 10
 				cfgSync.MinPeers = 10
 				cfgSync.InitStreams = 10

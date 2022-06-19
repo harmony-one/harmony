@@ -207,6 +207,7 @@ type SyncConfig struct {
 	// TODO: Remove this bool after stream sync is fully up.
 	Enabled        bool // enable the stream sync protocol
 	Downloader     bool // start the sync downloader client
+	StagedSync     bool // use staged sync 
 	Concurrency    int  // concurrency used for stream sync protocol
 	MinPeers       int  // minimum streams to start a sync task.
 	InitStreams    int  // minimum streams in bootstrap to start sync loop.

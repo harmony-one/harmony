@@ -1,183 +1,36 @@
-package legacysync
+package stagedsync
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/rand"
-	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/math"
-
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/pkg/errors"
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
-	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
-	"github.com/pkg/errors"
+	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-// Constants for syncing.
-const (
-	downloadBlocksRetryLimit        = 10 // downloadBlocks service retry limit
-	RegistrationNumber              = 3
-	SyncingPortDifference           = 3000
-	inSyncThreshold                 = 0   // when peerBlockHeight - myBlockHeight <= inSyncThreshold, it's ready to join consensus
-	SyncLoopBatchSize        uint32 = 30  // maximum size for one query of block hashes
-	verifyHeaderBatchSize    uint64 = 100 // block chain header verification batch size (not used for now)
-	LastMileBlocksSize              = 50
-
-	// after cutting off a number of connected peers, the result number of peers
-	// shall be between numPeersLowBound and numPeersHighBound
-	NumPeersLowBound  = 3
-	numPeersHighBound = 5
-
-	downloadTaskBatch = 5
-)
-
-// SyncPeerConfig is peer config to sync.
-type SyncPeerConfig struct {
-	ip          string
-	port        string
-	peerHash    []byte
-	client      *downloader.Client
-	blockHashes [][]byte       // block hashes before node doing sync
-	newBlocks   []*types.Block // blocks after node doing sync
-	mux         sync.Mutex
-}
-
-// GetClient returns client pointer of downloader.Client
-func (peerConfig *SyncPeerConfig) GetClient() *downloader.Client {
-	return peerConfig.client
-}
-
-// IsEqual checks the equality between two sync peers
-func (peerConfig *SyncPeerConfig) IsEqual(pc2 *SyncPeerConfig) bool {
-	return peerConfig.ip == pc2.ip && peerConfig.port == pc2.port
-}
-
-// SyncBlockTask is the task struct to sync a specific block.
-type SyncBlockTask struct {
-	index     int
-	blockHash []byte
-}
-
-type syncBlockTasks []SyncBlockTask
-
-func (tasks syncBlockTasks) blockHashes() [][]byte {
-	hashes := make([][]byte, 0, len(tasks))
-	for _, task := range tasks {
-		hash := make([]byte, len(task.blockHash))
-		copy(hash, task.blockHash)
-		hashes = append(hashes, task.blockHash)
-	}
-	return hashes
-}
-
-func (tasks syncBlockTasks) blockHashesStr() []string {
-	hashes := make([]string, 0, len(tasks))
-	for _, task := range tasks {
-		hash := hex.EncodeToString(task.blockHash)
-		hashes = append(hashes, hash)
-	}
-	return hashes
-}
-
-func (tasks syncBlockTasks) indexes() []int {
-	indexes := make([]int, 0, len(tasks))
-	for _, task := range tasks {
-		indexes = append(indexes, task.index)
-	}
-	return indexes
-}
-
-// SyncConfig contains an array of SyncPeerConfig.
-type SyncConfig struct {
-	// mtx locks peers, and *SyncPeerConfig pointers in peers.
-	// SyncPeerConfig itself is guarded by its own mutex.
-	mtx sync.RWMutex
-
-	peers []*SyncPeerConfig
-}
-
-// AddPeer adds the given sync peer.
-func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
-	sc.mtx.Lock()
-	defer sc.mtx.Unlock()
-
-	// Ensure no duplicate peers
-	for _, p2 := range sc.peers {
-		if peer.IsEqual(p2) {
-			return
-		}
-	}
-	sc.peers = append(sc.peers, peer)
-}
-
-// ForEachPeer calls the given function with each peer.
-// It breaks the iteration iff the function returns true.
-func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
-	sc.mtx.RLock()
-	peers := make([]*SyncPeerConfig, len(sc.peers))
-	copy(peers, sc.peers)
-	sc.mtx.RUnlock()
-
-	for _, peer := range peers {
-		if f(peer) {
-			break
-		}
-	}
-}
-
-// RemovePeer removes a peer from SyncConfig
-func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
-	sc.mtx.Lock()
-	defer sc.mtx.Unlock()
-
-	peer.client.Close()
-	for i, p := range sc.peers {
-		if p == peer {
-			sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
-			break
-		}
-	}
-	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
-		Msg("[SYNC] remove GRPC peer")
-}
-
-// CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
-	stateSync := &StateSync{}
-	stateSync.blockChain = bc
-	stateSync.selfip = ip
-	stateSync.selfport = port
-	stateSync.selfPeerHash = peerHash
-	stateSync.commonBlocks = make(map[int]*types.Block)
-	stateSync.lastMileBlocks = []*types.Block{}
-	stateSync.isExplorer = isExplorer
-	stateSync.syncConfig = &SyncConfig{}
-
-	stateSync.syncStatus = newSyncStatus(role)
-	return stateSync
-}
-
-// StateSync is the struct that implements StateSyncInterface.
-type StateSync struct {
-	blockChain         *core.BlockChain
+type StagedSync struct {
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
@@ -188,11 +41,484 @@ type StateSync struct {
 	stateSyncTaskQueue *queue.Queue
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
+	syncStatus         syncStatus
 
-	syncStatus syncStatus
+	ctx context.Context
+	bc  *core.BlockChain
+	// consensus *consensus.Consensus
+	// worker    *worker.Worker
+	isBeacon bool
+	db       kv.RwDB
+
+	unwindPoint     *uint64 // used to run stages
+	prevUnwindPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
+	badBlock        common.Hash
+
+	stages       []*Stage
+	unwindOrder  []*Stage
+	pruningOrder []*Stage
+	currentStage uint
+	timings      []Timing
+	logPrefixes  []string
 }
 
-func (ss *StateSync) purgeAllBlocksFromCache() {
+// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
+// The block is encoded as block + commit signature
+type BlockWithSig struct {
+	Block              *types.Block
+	CommitSigAndBitmap []byte
+}
+
+type Timing struct {
+	isUnwind bool
+	isPrune  bool
+	stage    SyncStage
+	took     time.Duration
+}
+
+func (s *StagedSync) Len() int                 { return len(s.stages) }
+func (s *StagedSync) Context() context.Context { return s.ctx }
+func (s *StagedSync) IsBeacon() bool           { return s.isBeacon }
+func (s *StagedSync) IsExplorer() bool         { return s.isExplorer }
+
+// func (s *StagedSync) Consensus() *consensus.Consensus { return s.consensus }
+func (s *StagedSync) Blockchain() *core.BlockChain { return s.bc }
+
+// func (s *StagedSync) Worker() *worker.Worker          { return s.worker }
+func (s *StagedSync) DB() kv.RwDB              { return s.db }
+func (s *StagedSync) PrevUnwindPoint() *uint64 { return s.prevUnwindPoint }
+
+func (s *StagedSync) NewUnwindState(id SyncStage, unwindPoint, currentProgress uint64) *UnwindState {
+	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
+}
+
+func (s *StagedSync) PruneStageState(id SyncStage, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*PruneState, error) {
+	var pruneProgress uint64
+	var err error
+	useExternalTx := tx != nil
+	if useExternalTx {
+		pruneProgress, err = GetStagePruneProgress(tx, id)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err = db.View(context.Background(), func(tx kv.Tx) error {
+			pruneProgress, err = GetStagePruneProgress(tx, id)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return &PruneState{id, forwardProgress, pruneProgress, s}, nil
+}
+
+func (s *StagedSync) NextStage() {
+	if s == nil {
+		return
+	}
+	s.currentStage++
+}
+
+// IsBefore returns true if stage1 goes before stage2 in staged sync
+func (s *StagedSync) IsBefore(stage1, stage2 SyncStage) bool {
+	idx1 := -1
+	idx2 := -1
+	for i, stage := range s.stages {
+		if stage.ID == stage1 {
+			idx1 = i
+		}
+
+		if stage.ID == stage2 {
+			idx2 = i
+		}
+	}
+
+	return idx1 < idx2
+}
+
+// IsAfter returns true if stage1 goes after stage2 in staged sync
+func (s *StagedSync) IsAfter(stage1, stage2 SyncStage) bool {
+	idx1 := -1
+	idx2 := -1
+	for i, stage := range s.stages {
+		if stage.ID == stage1 {
+			idx1 = i
+		}
+
+		if stage.ID == stage2 {
+			idx2 = i
+		}
+	}
+
+	return idx1 > idx2
+}
+
+func (s *StagedSync) UnwindTo(unwindPoint uint64, badBlock common.Hash) {
+	log.Info("UnwindTo", "block", unwindPoint, "bad_block_hash", badBlock.String())
+	s.unwindPoint = &unwindPoint
+	s.badBlock = badBlock
+}
+
+func (s *StagedSync) IsDone() bool {
+	return s.currentStage >= uint(len(s.stages)) && s.unwindPoint == nil
+}
+
+func (s *StagedSync) LogPrefix() string {
+	if s == nil {
+		return ""
+	}
+	return s.logPrefixes[s.currentStage]
+}
+
+func (s *StagedSync) SetCurrentStage(id SyncStage) error {
+	for i, stage := range s.stages {
+		if stage.ID == id {
+			s.currentStage = uint(i)
+			return nil
+		}
+	}
+	return fmt.Errorf("stage not found with id: %v", id)
+}
+
+func New(ctx context.Context,
+	ip string,
+	port string,
+	peerHash [20]byte,
+	bc *core.BlockChain,
+	role nodeconfig.Role,
+	isBeacon bool,
+	isExplorer bool,
+	db kv.RwDB,
+	stagesList []*Stage,
+	unwindOrder UnwindOrder,
+	pruneOrder PruneOrder) *StagedSync {
+	unwindStages := make([]*Stage, len(stagesList))
+	for i, stageIndex := range unwindOrder {
+		for _, s := range stagesList {
+			if s.ID == stageIndex {
+				unwindStages[i] = s
+				break
+			}
+		}
+	}
+	pruneStages := make([]*Stage, len(stagesList))
+	for i, stageIndex := range pruneOrder {
+		for _, s := range stagesList {
+			if s.ID == stageIndex {
+				pruneStages[i] = s
+				break
+			}
+		}
+	}
+	logPrefixes := make([]string, len(stagesList))
+	for i := range stagesList {
+		logPrefixes[i] = fmt.Sprintf("%d/%d %s", i+1, len(stagesList), stagesList[i].ID)
+	}
+
+	return &StagedSync{
+		ctx:            ctx,
+		selfip:         ip,
+		selfport:       port,
+		selfPeerHash:   peerHash,
+		bc:             bc,
+		isBeacon:       isBeacon,
+		isExplorer:     isExplorer,
+		db:             db,
+		stages:         stagesList,
+		currentStage:   0,
+		unwindOrder:    unwindStages,
+		pruningOrder:   pruneStages,
+		logPrefixes:    logPrefixes,
+		syncStatus:     NewSyncStatus(role),
+		commonBlocks:   make(map[int]*types.Block),
+		lastMileBlocks: []*types.Block{},
+		syncConfig:     &SyncConfig{},
+	}
+}
+
+func (s *StagedSync) StageState(stage SyncStage, tx kv.Tx, db kv.RoDB) (*StageState, error) {
+	var blockNum uint64
+	var err error
+	useExternalTx := tx != nil
+	if useExternalTx {
+		blockNum, err = GetStageProgress(tx, stage)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		if err = db.View(context.Background(), func(tx kv.Tx) error {
+			blockNum, err = GetStageProgress(tx, stage)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return &StageState{s, stage, blockNum}, nil
+}
+
+func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool, startHash []byte, size uint32) error {
+	s.prevUnwindPoint = nil
+	s.timings = s.timings[:0]
+
+	for !s.IsDone() {
+		var badBlockUnwind bool
+		if s.unwindPoint != nil {
+			for j := 0; j < len(s.unwindOrder); j++ {
+				if s.unwindOrder[j] == nil || s.unwindOrder[j].Disabled || s.unwindOrder[j].Handler.Unwind == nil {
+					continue
+				}
+				if err := s.unwindStage(firstCycle, s.unwindOrder[j], db, tx); err != nil {
+					return err
+				}
+			}
+			s.prevUnwindPoint = s.unwindPoint
+			s.unwindPoint = nil
+			if s.badBlock != (common.Hash{}) {
+				badBlockUnwind = true
+			}
+			s.badBlock = common.Hash{}
+			if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
+				return err
+			}
+			// If there were unwinds at the start, a heavier but invalid chain may be present, so
+			// we relax the rules for Stage1
+			firstCycle = false
+		}
+
+		stage := s.stages[s.currentStage]
+
+		if stage.Disabled {
+			log.Trace(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription))
+
+			s.NextStage()
+			continue
+		}
+
+		s.syncStatus.currentCycle.StartHash = startHash
+		s.syncStatus.currentCycle.Size = size
+
+		if err := s.runStage(stage, db, tx, firstCycle, badBlockUnwind); err != nil {
+			return err
+		}
+
+		s.NextStage()
+	}
+
+	for i := 0; i < len(s.pruningOrder); i++ {
+		if s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled || s.pruningOrder[i].Handler.Prune == nil {
+			continue
+		}
+		if err := s.pruneStage(firstCycle, s.pruningOrder[i], db, tx); err != nil {
+			return err
+		}
+	}
+	if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
+		return err
+	}
+
+	if err := printLogs(tx, s.timings); err != nil {
+		return err
+	}
+	s.currentStage = 0
+	return nil
+}
+
+func ByteCount(b uint64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%dB", b)
+	}
+	div, exp := uint64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%cB",
+		float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func printLogs(tx kv.RwTx, timings []Timing) error {
+	var logCtx []interface{}
+	count := 0
+	for i := range timings {
+		if timings[i].took < 50*time.Millisecond {
+			continue
+		}
+		count++
+		if count == 50 {
+			break
+		}
+		if timings[i].isUnwind {
+			logCtx = append(logCtx, "Unwind "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
+		} else if timings[i].isPrune {
+			logCtx = append(logCtx, "Prune "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
+		} else {
+			logCtx = append(logCtx, string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
+		}
+	}
+	if len(logCtx) > 0 {
+		log.Info("Timings (slower than 50ms)", logCtx...)
+	}
+
+	if tx == nil {
+		return nil
+	}
+
+	if len(logCtx) > 0 { // also don't print this logs if everything is fast
+		buckets := []string{
+			"freelist",
+			kv.PlainState,
+			kv.AccountChangeSet,
+			kv.StorageChangeSet,
+			kv.EthTx,
+			kv.Log,
+		}
+		bucketSizes := make([]interface{}, 0, 2*len(buckets))
+		for _, bucket := range buckets {
+			sz, err1 := tx.BucketSize(bucket)
+			if err1 != nil {
+				return err1
+			}
+			bucketSizes = append(bucketSizes, bucket, ByteCount(sz))
+		}
+		log.Info("Tables", bucketSizes...)
+	}
+	tx.CollectMetrics()
+	return nil
+}
+
+func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, badBlockUnwind bool) (err error) {
+	start := time.Now()
+	stageState, err := s.StageState(stage.ID, tx, db)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("STAGE ------------------->",stage.ID,": executing ...")
+	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
+		fmt.Println("STAGE ------------------->",stage.ID,": failed:", err)
+		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+	}
+	fmt.Println("STAGE ------------------->",stage.ID,": executed successfully")
+
+	took := time.Since(start)
+	if took > 60*time.Second {
+		logPrefix := s.LogPrefix()
+		log.Info(fmt.Sprintf("[%s] DONE", logPrefix), "in", took)
+	}
+	s.timings = append(s.timings, Timing{stage: stage.ID, took: took})
+	return nil
+}
+
+func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+	start := time.Now()
+	log.Trace("Unwind...", "stage", stage.ID)
+	stageState, err := s.StageState(stage.ID, tx, db)
+	if err != nil {
+		return err
+	}
+
+	unwind := s.NewUnwindState(stage.ID, *s.unwindPoint, stageState.BlockNumber)
+	unwind.BadBlock = s.badBlock
+
+	if stageState.BlockNumber <= unwind.UnwindPoint {
+		return nil
+	}
+
+	if err = s.SetCurrentStage(stage.ID); err != nil {
+		return err
+	}
+
+	err = stage.Handler.Unwind(firstCycle, unwind, stageState, tx)
+	if err != nil {
+		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+	}
+
+	took := time.Since(start)
+	if took > 60*time.Second {
+		logPrefix := s.LogPrefix()
+		log.Info(fmt.Sprintf("[%s] Unwind done", logPrefix), "in", took)
+	}
+	s.timings = append(s.timings, Timing{isUnwind: true, stage: stage.ID, took: took})
+	return nil
+}
+
+func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+	start := time.Now()
+	log.Trace("Prune...", "stage", stage.ID)
+
+	stageState, err := s.StageState(stage.ID, tx, db)
+	if err != nil {
+		return err
+	}
+
+	prune, err := s.PruneStageState(stage.ID, stageState.BlockNumber, tx, db)
+	if err != nil {
+		return err
+	}
+	if err = s.SetCurrentStage(stage.ID); err != nil {
+		return err
+	}
+
+	err = stage.Handler.Prune(firstCycle, prune, tx)
+	if err != nil {
+		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
+	}
+
+	took := time.Since(start)
+	if took > 60*time.Second {
+		logPrefix := s.LogPrefix()
+		log.Info(fmt.Sprintf("[%s] Prune done", logPrefix), "in", took)
+	}
+	s.timings = append(s.timings, Timing{isPrune: true, stage: stage.ID, took: took})
+	return nil
+}
+
+// DisableAllStages - including their unwinds
+func (s *StagedSync) DisableAllStages() []SyncStage {
+	var backupEnabledIds []SyncStage
+	for i := range s.stages {
+		if !s.stages[i].Disabled {
+			backupEnabledIds = append(backupEnabledIds, s.stages[i].ID)
+		}
+	}
+	for i := range s.stages {
+		s.stages[i].Disabled = true
+	}
+	return backupEnabledIds
+}
+
+func (s *StagedSync) DisableStages(ids ...SyncStage) {
+	for i := range s.stages {
+		for _, id := range ids {
+			if s.stages[i].ID != id {
+				continue
+			}
+			s.stages[i].Disabled = true
+		}
+	}
+}
+
+func (s *StagedSync) EnableStages(ids ...SyncStage) {
+	for i := range s.stages {
+		for _, id := range ids {
+			if s.stages[i].ID != id {
+				continue
+			}
+			s.stages[i].Disabled = false
+		}
+	}
+}
+
+func (ss *StagedSync) purgeAllBlocksFromCache() {
 	ss.lastMileMux.Lock()
 	ss.lastMileBlocks = nil
 	ss.lastMileMux.Unlock()
@@ -208,7 +534,7 @@ func (ss *StateSync) purgeAllBlocksFromCache() {
 	})
 }
 
-func (ss *StateSync) purgeOldBlocksFromCache() {
+func (ss *StagedSync) purgeOldBlocksFromCache() {
 	ss.syncMux.Lock()
 	defer ss.syncMux.Unlock()
 	ss.commonBlocks = make(map[int]*types.Block)
@@ -220,7 +546,7 @@ func (ss *StateSync) purgeOldBlocksFromCache() {
 
 // AddLastMileBlock add the latest a few block into queue for syncing
 // only keep the latest blocks with size capped by LastMileBlocksSize
-func (ss *StateSync) AddLastMileBlock(block *types.Block) {
+func (ss *StagedSync) AddLastMileBlock(block *types.Block) {
 	ss.lastMileMux.Lock()
 	defer ss.lastMileMux.Unlock()
 	if ss.lastMileBlocks != nil {
@@ -231,29 +557,8 @@ func (ss *StateSync) AddLastMileBlock(block *types.Block) {
 	}
 }
 
-// CloseConnections close grpc connections for state sync clients
-func (sc *SyncConfig) CloseConnections() {
-	sc.mtx.RLock()
-	defer sc.mtx.RUnlock()
-	for _, pc := range sc.peers {
-		pc.client.Close()
-	}
-}
-
-// FindPeerByHash returns the peer with the given hash, or nil if not found.
-func (sc *SyncConfig) FindPeerByHash(peerHash []byte) *SyncPeerConfig {
-	sc.mtx.RLock()
-	defer sc.mtx.RUnlock()
-	for _, pc := range sc.peers {
-		if bytes.Equal(pc.peerHash, peerHash) {
-			return pc
-		}
-	}
-	return nil
-}
-
 // AddNewBlock will add newly received block into state syncing queue
-func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
+func (ss *StagedSync) AddNewBlock(peerHash []byte, block *types.Block) {
 	pc := ss.syncConfig.FindPeerByHash(peerHash)
 	if pc == nil {
 		// Received a block with no active peer; just ignore.
@@ -270,48 +575,8 @@ func (ss *StateSync) AddNewBlock(peerHash []byte, block *types.Block) {
 		Msg("[SYNC] new block received")
 }
 
-// CreateTestSyncPeerConfig used for testing.
-func CreateTestSyncPeerConfig(client *downloader.Client, blockHashes [][]byte) *SyncPeerConfig {
-	return &SyncPeerConfig{
-		client:      client,
-		blockHashes: blockHashes,
-	}
-}
-
-// CompareSyncPeerConfigByblockHashes compares two SyncPeerConfig by blockHashes.
-func CompareSyncPeerConfigByblockHashes(a *SyncPeerConfig, b *SyncPeerConfig) int {
-	if len(a.blockHashes) != len(b.blockHashes) {
-		if len(a.blockHashes) < len(b.blockHashes) {
-			return -1
-		}
-		return 1
-	}
-	for id := range a.blockHashes {
-		if !reflect.DeepEqual(a.blockHashes[id], b.blockHashes[id]) {
-			return bytes.Compare(a.blockHashes[id], b.blockHashes[id])
-		}
-	}
-	return 0
-}
-
-// BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
-// The block is encoded as block + commit signature
-type BlockWithSig struct {
-	Block              *types.Block
-	CommitSigAndBitmap []byte
-}
-
-// GetBlocks gets blocks by calling grpc request to the corresponding peer.
-func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
-	response := peerConfig.client.GetBlocksAndSigs(hashes)
-	if response == nil {
-		return nil, ErrGetBlock
-	}
-	return response.Payload, nil
-}
-
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return err
@@ -405,7 +670,7 @@ func calcNumPeersWithBound(size int, lowBound, highBound int) int {
 }
 
 // GetActivePeerNumber returns the number of active peers
-func (ss *StateSync) GetActivePeerNumber() int {
+func (ss *StagedSync) GetActivePeerNumber() int {
 	if ss.syncConfig == nil {
 		return 0
 	}
@@ -413,89 +678,8 @@ func (ss *StateSync) GetActivePeerNumber() int {
 	return len(ss.syncConfig.peers)
 }
 
-// getHowManyMaxConsensus returns max number of consensus nodes and the first ID of consensus group.
-// Assumption: all peers are sorted by CompareSyncPeerConfigByBlockHashes first.
-// Caller shall ensure mtx is locked for reading.
-func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
-	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
-	curCount := 0
-	curFirstID := -1
-	maxCount := 0
-	maxFirstID := -1
-	for i := range sc.peers {
-		if curFirstID == -1 || CompareSyncPeerConfigByblockHashes(sc.peers[curFirstID], sc.peers[i]) != 0 {
-			curCount = 1
-			curFirstID = i
-		} else {
-			curCount++
-		}
-		if curCount >= maxCount {
-			maxCount = curCount
-			maxFirstID = curFirstID
-		}
-	}
-	return maxFirstID, maxCount
-}
-
-// InitForTesting used for testing.
-func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]byte) {
-	sc.mtx.RLock()
-	defer sc.mtx.RUnlock()
-	for i := range sc.peers {
-		sc.peers[i].blockHashes = blockHashes
-		sc.peers[i].client = client
-	}
-}
-
-// cleanUpPeers cleans up all peers whose blockHashes are not equal to
-// consensus block hashes.  Caller shall ensure mtx is locked for RW.
-func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
-	fixedPeer := sc.peers[maxFirstID]
-
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] before cleanUpPeers")
-	for i := 0; i < len(sc.peers); i++ {
-		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
-			// TODO: move it into a util delete func.
-			// See tip https://github.com/golang/go/wiki/SliceTricks
-			// Close the client and remove the peer out of the
-			sc.peers[i].client.Close()
-			copy(sc.peers[i:], sc.peers[i+1:])
-			sc.peers[len(sc.peers)-1] = nil
-			sc.peers = sc.peers[:len(sc.peers)-1]
-		}
-	}
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[SYNC] post cleanUpPeers")
-}
-
-// GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
-// Note that choosing the most common peer config does not guarantee that the blocks to be downloaded are the correct ones.
-// The subsequent node syncing steps of verifying the block header chain will give such confirmation later.
-// If later block header verification fails with the sync peer config chosen here, the entire sync loop gets retried with a new peer set.
-func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() error {
-	sc.mtx.Lock()
-	defer sc.mtx.Unlock()
-	// Sort all peers by the blockHashes.
-	sort.Slice(sc.peers, func(i, j int) bool {
-		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
-	})
-	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
-
-	if maxFirstID == -1 {
-		return errors.New("invalid peer index -1 for block hashes query")
-	}
-	utils.Logger().Info().
-		Int("maxFirstID", maxFirstID).
-		Str("targetPeerIP", sc.peers[maxFirstID].ip).
-		Int("maxCount", maxCount).
-		Int("hashSize", len(sc.peers[maxFirstID].blockHashes)).
-		Msg("[SYNC] block consensus hashes")
-
-	sc.cleanUpPeers(maxFirstID)
-	return nil
-}
-
 // getConsensusHashes gets all hashes needed to download.
-func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
+func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 	var wg sync.WaitGroup
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
@@ -535,7 +719,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
 	return nil
 }
 
-func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
+func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
@@ -554,7 +738,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
-func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
+func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
 	// Initialize blockchain
 	var wg sync.WaitGroup
 	count := 0
@@ -622,7 +806,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 	utils.Logger().Info().Msg("[SYNC] downloadBlocks: finished")
 }
 
-func (ss *StateSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
+func (ss *StagedSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
 	if len(payload) > len(tasks) {
 		utils.Logger().Warn().
 			Err(errors.New("unexpected number of block delivered")).
@@ -686,37 +870,6 @@ func RlpDecodeBlockOrBlockWithSig(payload []byte) (*types.Block, error) {
 	return nil, errors.New("failed to decode to either types.Block or BlockWithSig")
 }
 
-// downloadTaskQueue is wrapper around Queue with item to be SyncBlockTask
-type downloadTaskQueue struct {
-	q *queue.Queue
-}
-
-func (queue downloadTaskQueue) poll(num int64, timeOut time.Duration) (syncBlockTasks, error) {
-	items, err := queue.q.Poll(num, timeOut)
-	if err != nil {
-		return nil, err
-	}
-	tasks := make(syncBlockTasks, 0, len(items))
-	for _, item := range items {
-		task := item.(SyncBlockTask)
-		tasks = append(tasks, task)
-	}
-	return tasks, nil
-}
-
-func (queue downloadTaskQueue) put(tasks syncBlockTasks) error {
-	for _, task := range tasks {
-		if err := queue.q.Put(task); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (queue downloadTaskQueue) empty() bool {
-	return queue.q.Empty()
-}
-
 // CompareBlockByHash compares two block by hash, it will be used in sort the blocks
 func CompareBlockByHash(a *types.Block, b *types.Block) int {
 	ha := a.Hash()
@@ -746,7 +899,7 @@ func GetHowManyMaxConsensus(blocks []*types.Block) (int, int) {
 	return maxFirstID, maxCount
 }
 
-func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
+func (ss *StagedSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) *types.Block {
 	var (
 		candidateBlocks []*types.Block
 		candidateLock   sync.Mutex
@@ -784,7 +937,7 @@ func (ss *StateSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash) 
 	return candidateBlocks[maxFirstID]
 }
 
-func (ss *StateSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) *types.Block {
+func (ss *StagedSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) *types.Block {
 	for _, block := range ss.commonBlocks {
 		ph := block.ParentHash()
 		if bytes.Equal(ph[:], parentHash[:]) {
@@ -794,41 +947,11 @@ func (ss *StateSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) *
 	return nil
 }
 
-func (ss *StateSync) getCommonBlockIter(parentHash common.Hash) *commonBlockIter {
+func (ss *StagedSync) getCommonBlockIter(parentHash common.Hash) *commonBlockIter {
 	return newCommonBlockIter(ss.commonBlocks, parentHash)
 }
 
-type commonBlockIter struct {
-	parentToChild map[common.Hash]*types.Block
-	curParentHash common.Hash
-}
-
-func newCommonBlockIter(blocks map[int]*types.Block, startHash common.Hash) *commonBlockIter {
-	m := make(map[common.Hash]*types.Block)
-	for _, block := range blocks {
-		m[block.ParentHash()] = block
-	}
-	return &commonBlockIter{
-		parentToChild: m,
-		curParentHash: startHash,
-	}
-}
-
-func (iter *commonBlockIter) Next() *types.Block {
-	curBlock, ok := iter.parentToChild[iter.curParentHash]
-	if !ok || curBlock == nil {
-		return nil
-	}
-	iter.curParentHash = curBlock.Hash()
-	return curBlock
-}
-
-func (iter *commonBlockIter) HasNext() bool {
-	_, ok := iter.parentToChild[iter.curParentHash]
-	return ok
-}
-
-func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
+func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
 	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
 		if bytes.Equal(ph[:], parentHash[:]) {
@@ -839,7 +962,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
+func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
@@ -910,7 +1033,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 }
 
 // generateNewState will construct most recent state from downloaded blocks
-func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker) error {
+func (ss *StagedSync) generateNewState(bc *core.BlockChain) error {
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 
@@ -972,33 +1095,9 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 	return err
 }
 
-// ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) error {
-	// Gets consensus hashes.
-	if err := ss.getConsensusHashes(startHash, size); err != nil {
-		return errors.Wrap(err, "getConsensusHashes")
-	}
-	ss.generateStateSyncTaskQueue(bc)
-	// Download blocks.
-	if ss.stateSyncTaskQueue.Len() > 0 {
-		ss.downloadBlocks(bc)
-	}
-	return ss.generateNewState(bc, worker)
-}
-
-func (peerConfig *SyncPeerConfig) registerToBroadcast(peerHash []byte, ip, port string) error {
-	response := peerConfig.client.Register(peerHash, ip, port)
-	if response == nil || response.Type == pb.DownloaderResponse_FAIL {
-		return ErrRegistrationFail
-	} else if response.Type == pb.DownloaderResponse_SUCCESS {
-		return nil
-	}
-	return ErrRegistrationFail
-}
-
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
 // return number of successful registration
-func (ss *StateSync) RegisterNodeInfo() int {
+func (ss *StagedSync) RegisterNodeInfo() int {
 	registrationNumber := RegistrationNumber
 	utils.Logger().Debug().
 		Int("registrationNumber", registrationNumber).
@@ -1035,7 +1134,7 @@ func (ss *StateSync) RegisterNodeInfo() int {
 }
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
+func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) uint64 {
 	maxHeight := uint64(math.MaxUint64)
 	var (
 		wg   sync.WaitGroup
@@ -1072,67 +1171,63 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 }
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
-func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
+func (ss *StagedSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
 	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
-func (ss *StateSync) GetMaxPeerHeight() uint64 {
+func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 	return ss.getMaxPeerHeight(false)
 }
 
-// SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
+// // SyncLoop will keep syncing with peers until catches up
+// func (ss *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+// 	if !isBeacon {
+// 		ss.RegisterNodeInfo()
+// 	}
+// 	for {
+// 		otherHeight := ss.getMaxPeerHeight(isBeacon)
+// 		currentHeight := bc.CurrentBlock().NumberU64()
+// 		if currentHeight >= otherHeight {
+// 			utils.Logger().Info().
+// 				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
+// 			break
+// 		}
+// 		utils.Logger().Info().
+// 			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
-	utils.Logger().Info().Msgf("legacy sync is executing ...")
+// 		startHash := bc.CurrentBlock().Hash()
+// 		size := uint32(otherHeight - currentHeight)
+// 		if size > SyncLoopBatchSize {
+// 			size = SyncLoopBatchSize
+// 		}
+// 		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
+// 		if err != nil {
+// 			utils.Logger().Error().Err(err).
+// 				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+// 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
+// 			ss.purgeOldBlocksFromCache()
+// 			break
+// 		}
+// 		ss.purgeOldBlocksFromCache()
+// 	}
+// 	if consensus != nil {
+// 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
+// 			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
+// 		}
+// 		// TODO: move this to explorer handler code.
+// 		if ss.isExplorer {
+// 			consensus.UpdateConsensusInformation()
+// 		}
+// 	}
+// 	ss.purgeAllBlocksFromCache()
+// }
 
-	if !isBeacon {
-		ss.RegisterNodeInfo()
-	}
-	for {
-		otherHeight := ss.getMaxPeerHeight(isBeacon)
-		currentHeight := bc.CurrentBlock().NumberU64()
-		if currentHeight >= otherHeight {
-			utils.Logger().Info().
-				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-			break
-		}
-		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				isBeacon, bc.ShardID(), otherHeight, currentHeight)
-
-		startHash := bc.CurrentBlock().Hash()
-		size := uint32(otherHeight - currentHeight)
-		if size > SyncLoopBatchSize {
-			size = SyncLoopBatchSize
-		}
-		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
-		if err != nil {
-			utils.Logger().Error().Err(err).
-				Msgf("[SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-			ss.purgeOldBlocksFromCache()
-			break
-		}
-		ss.purgeOldBlocksFromCache()
-	}
-	if consensus != nil {
-		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
-			utils.Logger().Error().Err(err).Msg("[SYNC] Add consensus last mile")
-		}
-		// TODO: move this to explorer handler code.
-		if ss.isExplorer {
-			consensus.UpdateConsensusInformation()
-		}
-	}
-	utils.Logger().Info().Msgf("legacy sync is executed")
-	ss.purgeAllBlocksFromCache()
-}
-
-func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
+func (ss *StagedSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
 	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
 	if err != nil {
@@ -1158,33 +1253,6 @@ func GetSyncingPort(nodePort string) string {
 	return ""
 }
 
-const (
-	// syncStatusExpiration is the expiration time out of a sync status.
-	// If last sync result in memory is before the expiration, the sync status
-	// will be updated.
-	syncStatusExpiration = 6 * time.Second
-
-	// syncStatusExpirationNonValidator is the expiration of sync cache for non-validators.
-	// Compared with non-validator, the sync check is not as strict as validator nodes.
-	// TODO: add this field to harmony config
-	syncStatusExpirationNonValidator = 12 * time.Second
-)
-
-type (
-	syncStatus struct {
-		lastResult     SyncCheckResult
-		lastUpdateTime time.Time
-		lock           sync.RWMutex
-		expiration     time.Duration
-	}
-
-	SyncCheckResult struct {
-		IsInSync    bool
-		OtherHeight uint64
-		HeightDiff  uint64
-	}
-)
-
 func ParseResult(res interface{}) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
 	result, ok := res.(*SyncCheckResult)
 	if ok {
@@ -1195,92 +1263,47 @@ func ParseResult(res interface{}) (IsInSync bool, OtherHeight uint64, HeightDiff
 	return false, 0, 0
 }
 
-func newSyncStatus(role nodeconfig.Role) syncStatus {
-	expiration := getSyncStatusExpiration(role)
-	return syncStatus{
-		expiration: expiration,
-	}
-}
-
-func getSyncStatusExpiration(role nodeconfig.Role) time.Duration {
-	switch role {
-	case nodeconfig.Validator:
-		return syncStatusExpiration
-	case nodeconfig.ExplorerNode:
-		return syncStatusExpirationNonValidator
-	default:
-		return syncStatusExpirationNonValidator
-	}
-}
-
-func (status *syncStatus) Get(fallback func() SyncCheckResult) SyncCheckResult {
-	status.lock.RLock()
-	if !status.expired() {
-		result := status.lastResult
-		status.lock.RUnlock()
-		return result
-	}
-	status.lock.RUnlock()
-
-	status.lock.Lock()
-	defer status.lock.Unlock()
-	if status.expired() {
-		result := fallback()
-		status.update(result)
-	}
-	return status.lastResult
-}
-
-func (ss *StateSync) IsInSync() bool {
-	result := ss.GetSyncStatus()
-	return result.IsInSync
-}
-
-func (status *syncStatus) expired() bool {
-	return time.Since(status.lastUpdateTime) > status.expiration
-}
-
-func (status *syncStatus) update(result SyncCheckResult) {
-	status.lastUpdateTime = time.Now()
-	status.lastResult = result
-}
-
 // GetSyncStatus get the last sync status for other modules (E.g. RPC, explorer).
 // If the last sync result is not expired, return the sync result immediately.
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
-func (ss *StateSync) GetSyncStatus() SyncCheckResult {
+func (ss *StagedSync) GetSyncStatus() SyncCheckResult {
 	return ss.syncStatus.Get(func() SyncCheckResult {
 		return ss.isInSync(false)
 	})
 }
 
-func (ss *StateSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+func (ss *StagedSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
 	res := ss.syncStatus.Get(func() SyncCheckResult {
 		return ss.isInSync(false)
 	})
 	return ParseResult(res)
 }
 
+func (ss *StagedSync) IsInSync() bool {
+	result := ss.GetSyncStatus()
+	return result.IsInSync
+}
+
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
-func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
+func (ss *StagedSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 	result := ss.isInSync(true)
 	return result
 }
 
-func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+func (ss *StagedSync) GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
 	result := ss.isInSync(true)
 	return ParseResult(result)
 }
 
 // isInSync query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
+func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := ss.getMaxPeerHeight(false)
-	lastHeight := ss.blockChain.CurrentBlock().NumberU64()
+	lastHeight := ss.Blockchain().CurrentBlock().NumberU64()
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
 	if !doubleCheck {
@@ -1302,7 +1325,7 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 	time.Sleep(1 * time.Second)
 
 	otherHeight2 := ss.getMaxPeerHeight(false)
-	currentHeight := ss.blockChain.CurrentBlock().NumberU64()
+	currentHeight := ss.Blockchain().CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2
 	utils.Logger().Info().

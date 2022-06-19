@@ -81,6 +81,7 @@ type ConfigType struct {
 	RosettaServer   RosettaServerConfig // rosetta server port and ip
 	IsOffline       bool
 	Downloader      bool // Whether stream downloader is running; TODO: remove this after sync up
+	StagedSync      bool // use staged sync  
 	NtpServer       string
 	StringRole      string
 	P2PPriKey       p2p_crypto.PrivKey   `json:"-"`

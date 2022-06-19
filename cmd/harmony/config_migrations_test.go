@@ -298,6 +298,7 @@ Version = "1.0.4"
   DiscHighCap = 128
   DiscSoftLowCap = 8
   Downloader = true
+  StagedSync = true
   InitStreams = 8
   LegacyClient = true
   LegacyServer = true
