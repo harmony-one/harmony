@@ -22,12 +22,16 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"sync"
+	"sync/atomic"
+	"time"
 
+	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/utils"
 	staking "github.com/harmony-one/harmony/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/utils"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for
@@ -125,7 +129,34 @@ func (m *txSortedMap) Filter(filter func(types.PoolTransaction) bool) types.Pool
 	return removed
 }
 
-// Filter iterates over the list of transactions and removes all of them for which
+func (m *txSortedMap) reheap() {
+	*m.index = make([]uint64, 0, len(m.items))
+	for nonce := range m.items {
+		*m.index = append(*m.index, nonce)
+	}
+	heap.Init(m.index)
+	m.cache = nil
+}
+
+// filter is identical to Filter, but **does not** regenerate the heap. This method
+// should only be used if followed immediately by a call to Filter or reheap()
+func (m *txSortedMap) filter(filter func(types.PoolTransaction) bool) types.PoolTransactions {
+	var removed types.PoolTransactions
+
+	// Collect all the transactions to filter out
+	for nonce, tx := range m.items {
+		if filter(tx) {
+			removed = append(removed, tx)
+			delete(m.items, nonce)
+		}
+	}
+	if len(removed) > 0 {
+		m.cache = nil
+	}
+	return removed
+}
+
+// FilterWithError iterates over the list of transactions and removes all of them for which
 // the specified function evaluates to true. Return the filtered transactions and
 // corresponding errors.
 func (m *txSortedMap) FilterWithError(filter func(types.PoolTransaction) error) (types.PoolTransactions, []error) {
@@ -230,10 +261,7 @@ func (m *txSortedMap) Len() int {
 	return len(m.items)
 }
 
-// Flatten creates a nonce-sorted slice of transactions based on the loosely
-// sorted internal representation. The result of the sorting is cached in case
-// it's requested again before any modifications are made to the contents.
-func (m *txSortedMap) Flatten() types.PoolTransactions {
+func (m *txSortedMap) flatten() types.PoolTransactions {
 	// If the sorting was not cached yet, create and cache it
 	if m.cache == nil {
 		m.cache = make(types.PoolTransactions, 0, len(m.items))
@@ -242,10 +270,25 @@ func (m *txSortedMap) Flatten() types.PoolTransactions {
 		}
 		sort.Sort(types.PoolTxByNonce(m.cache))
 	}
+	return m.cache
+}
+
+// Flatten creates a nonce-sorted slice of transactions based on the loosely
+// sorted internal representation. The result of the sorting is cached in case
+// it's requested again before any modifications are made to the contents.
+func (m *txSortedMap) Flatten() types.PoolTransactions {
 	// Copy the cache to prevent accidental modifications
-	txs := make(types.PoolTransactions, len(m.cache))
-	copy(txs, m.cache)
+	cache := m.flatten()
+	txs := make(types.PoolTransactions, len(cache))
+	copy(txs, cache)
 	return txs
+}
+
+// LastElement returns the last element of a flattened list, thus, the
+// transaction with the highest nonce
+func (m *txSortedMap) LastElement() types.PoolTransaction {
+	cache := m.flatten()
+	return cache[len(cache)-1]
 }
 
 const stakingTxCheckThreshold = 10 // check staking transaction validation every 10 blocks
@@ -318,7 +361,52 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 	return l.txs.Forward(threshold)
 }
 
-// Filter out all invalid transactions from the txList. Return removed transactions, errors
+// Filter removes all transactions from the list with a cost or gas limit higher
+// than the provided thresholds. Every removed transaction is returned for any
+// post-removal maintenance. Strict-mode invalidated transactions are also
+// returned.
+//
+// This method uses the cached costcap and gascap to quickly decide if there's even
+// a point in calculating all the costs or if the balance covers all. If the threshold
+// is lower than the costgas cap, the caps will be reset to a new high after removing
+// the newly invalidated transactions.
+func (l *txList) Filter(costLimit *big.Int, gasLimit uint64) (types.PoolTransactions, types.PoolTransactions) {
+	// If all transactions are below the threshold, short circuit
+	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
+		return nil, nil
+	}
+	l.costcap = new(big.Int).Set(costLimit) // Lower the caps to the thresholds
+	l.gascap = gasLimit
+
+	// Filter out all the transactions above the account's funds
+	removed := l.txs.Filter(func(tx types.PoolTransaction) bool {
+		cost, err := tx.Cost()
+		if err != nil {
+			// If we can't decode tx we don't need it.
+			return true
+		}
+		return tx.GasLimit() > gasLimit || cost.Cmp(costLimit) > 0
+	})
+
+	if len(removed) == 0 {
+		return nil, nil
+	}
+	var invalids types.PoolTransactions
+	// If the list was strict, filter anything above the lowest nonce
+	if l.strict {
+		lowest := uint64(math.MaxUint64)
+		for _, tx := range removed {
+			if nonce := tx.Nonce(); lowest > nonce {
+				lowest = nonce
+			}
+		}
+		invalids = l.txs.filter(func(tx types.PoolTransaction) bool { return tx.Nonce() > lowest })
+	}
+	l.txs.reheap()
+	return removed, invalids
+}
+
+// FilterValid filters out all invalid transactions from the txList. Return removed transactions, errors
 // why the removed transactions are failed, and trailing transactions that are enqueued due
 // to high nonce because removing the invalid transaction.
 // Invalid transaction check as follows:
@@ -327,7 +415,7 @@ func (l *txList) Forward(threshold uint64) types.PoolTransactions {
 func (l *txList) FilterValid(txPool *TxPool, address common.Address, bn uint64) (types.PoolTransactions, []error, types.PoolTransactions) {
 	var invalids types.PoolTransactions
 
-	removed, errs := l.filterPrice(txPool, address)
+	removed, errs := l.filterPrice(txPool.currentState, txPool.currentMaxGas, address)
 	if bn >= l.lastStkCheck+stakingTxCheckThreshold {
 		l.lastStkCheck = bn
 
@@ -350,9 +438,9 @@ func (l *txList) FilterValid(txPool *TxPool, address common.Address, bn uint64) 
 
 // filterPrice returns all regular transactions from the list with a cost or gas limit higher
 // than the provided thresholds.
-func (l *txList) filterPrice(txPool *TxPool, address common.Address) (types.PoolTransactions, []error) {
-	costLimit := txPool.currentState.GetBalance(address)
-	gasLimit := txPool.currentMaxGas
+func (l *txList) filterPrice(currentState *state.DB, currentMaxGas uint64, address common.Address) (types.PoolTransactions, []error) {
+	costLimit := currentState.GetBalance(address)
+	gasLimit := currentMaxGas
 	// If all transactions are below the threshold, short circuit
 	if l.costcap.Cmp(costLimit) <= 0 && l.gascap <= gasLimit {
 		return nil, nil
@@ -444,89 +532,231 @@ func (l *txList) Flatten() types.PoolTransactions {
 	return l.txs.Flatten()
 }
 
+// LastElement returns the last element of a flattened list, thus, the
+// transaction with the highest nonce
+func (l *txList) LastElement() types.PoolTransaction {
+	return l.txs.LastElement()
+}
+
 // priceHeap is a heap.Interface implementation over transactions for retrieving
-// price-sorted transactions to discard when the pool fills up.
-type priceHeap []types.PoolTransaction
+// price-sorted transactions to discard when the pool fills up. If baseFee is set
+// then the heap is sorted based on the effective tip based on the given base fee.
+// If baseFee is nil then the sorting is based on gasFeeCap.
+type priceHeap struct {
+	baseFee *big.Int // heap should always be re-sorted after baseFee is changed
+	list    []types.PoolTransaction
+}
 
-func (h priceHeap) Len() int      { return len(h) }
-func (h priceHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *priceHeap) Len() int      { return len(h.list) }
+func (h *priceHeap) Swap(i, j int) { h.list[i], h.list[j] = h.list[j], h.list[i] }
 
-func (h priceHeap) Less(i, j int) bool {
-	// Sort primarily by price, returning the cheaper one
-	switch h[i].GasPrice().Cmp(h[j].GasPrice()) {
+func (h *priceHeap) Less(i, j int) bool {
+	switch h.cmp(h.list[i], h.list[j]) {
 	case -1:
 		return true
 	case 1:
 		return false
+	default:
+		return h.list[i].Nonce() > h.list[j].Nonce()
 	}
-	// If the prices match, stabilize via nonces (high nonce is worse)
-	return h[i].Nonce() > h[j].Nonce()
+}
+
+func (h *priceHeap) cmp(a, b types.PoolTransaction) int {
+	return a.GasPrice().Cmp(b.GasPrice())
 }
 
 func (h *priceHeap) Push(x interface{}) {
-	*h = append(*h, x.(types.PoolTransaction))
+	tx := x.(types.PoolTransaction)
+	h.list = append(h.list, tx)
 }
 
 func (h *priceHeap) Pop() interface{} {
-	old := *h
+	old := h.list
 	n := len(old)
 	x := old[n-1]
-	*h = old[0 : n-1]
+	old[n-1] = nil
+	h.list = old[0 : n-1]
 	return x
 }
 
 // txPricedList is a price-sorted heap to allow operating on transactions pool
-// contents in a price-incrementing way.
+// contents in a price-incrementing way. It's built opon the all transactions
+// in txpool but only interested in the remote part. It means only remote transactions
+// will be considered for tracking, sorting, eviction, etc.
+//
+// Two heaps are used for sorting: the urgent heap (based on effective tip in the next
+// block) and the floating heap (based on gasFeeCap). Always the bigger heap is chosen for
+// eviction. Transactions evicted from the urgent heap are first demoted into the floating heap.
+// In some cases (during a congestion, when blocks are full) the urgent heap can provide
+// better candidates for inclusion while in other cases (at the top of the baseFee peak)
+// the floating heap is better. When baseFee is decreasing they behave similarly.
 type txPricedList struct {
-	all    *txLookup  // Pointer to the map of all transactions
-	items  *priceHeap // Heap of prices of all the stored transactions
-	stales int        // Number of stale price points to (re-heap trigger)
+	// Number of stale price points to (re-heap trigger).
+	// This field is accessed atomically, and must be the first field
+	// to ensure it has correct alignment for atomic.AddInt64.
+	// See https://golang.org/pkg/sync/atomic/#pkg-note-BUG.
+	stales int64
+
+	all              *txLookup  // Pointer to the map of all transactions
+	urgent, floating priceHeap  // Heaps of prices of all the stored **remote** transactions
+	reheapMu         sync.Mutex // Mutex asserts that only one routine is reheaping the list
 }
+
+const (
+	// urgentRatio : floatingRatio is the capacity ratio of the two queues
+	urgentRatio   = 4
+	floatingRatio = 1
+)
 
 // newTxPricedList creates a new price-sorted transaction heap.
 func newTxPricedList(all *txLookup) *txPricedList {
 	return &txPricedList{
-		all:   all,
-		items: new(priceHeap),
+		all: all,
 	}
 }
 
 // Put inserts a new transaction into the heap.
-func (l *txPricedList) Put(tx types.PoolTransaction) {
-	heap.Push(l.items, tx)
+func (l *txPricedList) Put(tx types.PoolTransaction, local bool) {
+	if local {
+		return
+	}
+	// Insert every new transaction to the urgent heap first; Discard will balance the heaps
+	heap.Push(&l.urgent, tx)
 }
 
 // Removed notifies the prices transaction list that an old transaction dropped
 // from the pool. The list will just keep a counter of stale objects and update
 // the heap if a large enough ratio of transactions go stale.
-func (l *txPricedList) Removed() {
+func (l *txPricedList) Removed(count int) {
 	// Bump the stale counter, but exit if still too low (< 25%)
-	l.stales++
-	if l.stales <= len(*l.items)/4 {
+	stales := atomic.AddInt64(&l.stales, int64(count))
+	if int(stales) <= (len(l.urgent.list)+len(l.floating.list))/4 {
 		return
 	}
 	// Seems we've reached a critical number of stale transactions, reheap
-	reheap := make(priceHeap, 0, l.all.Count())
+	l.Reheap()
+}
 
-	l.stales, l.items = 0, &reheap
-	l.all.Range(func(hash common.Hash, tx types.PoolTransaction) bool {
-		*l.items = append(*l.items, tx)
+// Underpriced checks whether a transaction is cheaper than (or as cheap as) the
+// lowest priced (remote) transaction currently being tracked.
+func (l *txPricedList) Underpriced(tx types.PoolTransaction) bool {
+	// Note: with two queues, being underpriced is defined as being worse than the worst item
+	// in all non-empty queues if there is any. If both queues are empty then nothing is underpriced.
+	return (l.underpricedFor(&l.urgent, tx) || len(l.urgent.list) == 0) &&
+		(l.underpricedFor(&l.floating, tx) || len(l.floating.list) == 0) &&
+		(len(l.urgent.list) != 0 || len(l.floating.list) != 0)
+}
+
+// underpricedFor checks whether a transaction is cheaper than (or as cheap as) the
+// lowest priced (remote) transaction in the given heap.
+func (l *txPricedList) underpricedFor(h *priceHeap, tx types.PoolTransaction) bool {
+	// Discard stale price points if found at the heap start
+	for len(h.list) > 0 {
+		head := h.list[0]
+		if l.all.GetRemote(head.Hash()) == nil { // Removed or migrated
+			atomic.AddInt64(&l.stales, -1)
+			heap.Pop(h)
+			continue
+		}
+		break
+	}
+	// Check if the transaction is underpriced or not
+	if len(h.list) == 0 {
+		utils.Logger().Error().Msg("Pricing query for empty pool") // This cannot happen, print to catch programming errors
+		return false                                               // There is no remote transaction at all.
+	}
+	// If the remote transaction is even cheaper than the
+	// cheapest one tracked locally, reject it.
+	return h.cmp(h.list[0], tx) >= 0
+}
+
+// Discard finds a number of most underpriced transactions, removes them from the
+// priced list and returns them for further removal from the entire pool.
+//
+// Note local transaction won't be considered for eviction.
+func (l *txPricedList) Discard(slots int, force bool) (types.PoolTransactions, bool) {
+	drop := make(types.PoolTransactions, 0, slots) // Remote underpriced transactions to drop
+	for slots > 0 {
+		if len(l.urgent.list)*floatingRatio > len(l.floating.list)*urgentRatio || floatingRatio == 0 {
+			// Discard stale transactions if found during cleanup
+			tx := heap.Pop(&l.urgent).(types.PoolTransaction)
+			if l.all.GetRemote(tx.Hash()) == nil { // Removed or migrated
+				atomic.AddInt64(&l.stales, -1)
+				continue
+			}
+			// Non stale transaction found, move to floating heap
+			heap.Push(&l.floating, tx)
+		} else {
+			if len(l.floating.list) == 0 {
+				// Stop if both heaps are empty
+				break
+			}
+			// Discard stale transactions if found during cleanup
+			tx := heap.Pop(&l.floating).(types.PoolTransaction)
+			if l.all.GetRemote(tx.Hash()) == nil { // Removed or migrated
+				atomic.AddInt64(&l.stales, -1)
+				continue
+			}
+			// Non stale transaction found, discard it
+			drop = append(drop, tx)
+			slots -= numSlots(tx)
+		}
+	}
+	// If we still can't make enough room for the new transaction
+	if slots > 0 && !force {
+		for _, tx := range drop {
+			heap.Push(&l.urgent, tx)
+		}
+		return nil, false
+	}
+	return drop, true
+}
+
+// Reheap forcibly rebuilds the heap based on the current remote transaction set.
+func (l *txPricedList) Reheap() {
+	l.reheapMu.Lock()
+	defer l.reheapMu.Unlock()
+	start := time.Now()
+	atomic.StoreInt64(&l.stales, 0)
+	l.urgent.list = make([]types.PoolTransaction, 0, l.all.RemoteCount())
+	l.all.Range(func(hash common.Hash, tx types.PoolTransaction, local bool) bool {
+		l.urgent.list = append(l.urgent.list, tx)
 		return true
-	})
-	heap.Init(l.items)
+	}, false, true) // Only iterate remotes
+	heap.Init(&l.urgent)
+
+	// balance out the two heaps by moving the worse half of transactions into the
+	// floating heap
+	// Note: Discard would also do this before the first eviction but Reheap can do
+	// is more efficiently. Also, Underpriced would work suboptimally the first time
+	// if the floating queue was empty.
+	floatingCount := len(l.urgent.list) * floatingRatio / (urgentRatio + floatingRatio)
+	l.floating.list = make([]types.PoolTransaction, floatingCount)
+	for i := 0; i < floatingCount; i++ {
+		l.floating.list[i] = heap.Pop(&l.urgent).(types.PoolTransaction)
+	}
+	heap.Init(&l.floating)
+	reheapTimer.Update(time.Since(start))
+}
+
+// SetBaseFee updates the base fee and triggers a re-heap. Note that Removed is not
+// necessary to call right before SetBaseFee when processing a new block.
+func (l *txPricedList) SetBaseFee(baseFee *big.Int) {
+	l.urgent.baseFee = baseFee
+	l.Reheap()
 }
 
 // Cap finds all the transactions below the given price threshold, drops them
 // from the priced list and returns them for further removal from the entire pool.
-func (l *txPricedList) Cap(threshold *big.Int, local *accountSet) types.PoolTransactions {
+func (l *txPricedList) Cap(threshold *big.Int) types.PoolTransactions {
 	drop := make(types.PoolTransactions, 0, 128) // Remote underpriced transactions to drop
 	save := make(types.PoolTransactions, 0, 64)  // Local underpriced transactions to keep
 
-	for len(*l.items) > 0 {
+	for len(l.urgent.list) > 0 {
 		// Discard stale transactions if found during cleanup
-		tx := heap.Pop(l.items).(types.PoolTransaction)
+		tx := heap.Pop(&l.urgent).(types.PoolTransaction)
 		if l.all.Get(tx.Hash()) == nil {
-			l.stales--
+			atomic.AddInt64(&l.stales, -1)
 			continue
 		}
 		// Stop the discards if we've reached the threshold
@@ -534,68 +764,10 @@ func (l *txPricedList) Cap(threshold *big.Int, local *accountSet) types.PoolTran
 			save = append(save, tx)
 			break
 		}
-		// Non stale transaction found, discard unless local
-		if local.containsTx(tx) {
-			save = append(save, tx)
-		} else {
-			drop = append(drop, tx)
-		}
+		drop = append(drop, tx)
 	}
 	for _, tx := range save {
-		heap.Push(l.items, tx)
-	}
-	return drop
-}
-
-// Underpriced checks whether a transaction is cheaper than (or as cheap as) the
-// lowest priced transaction currently being tracked.
-func (l *txPricedList) Underpriced(tx types.PoolTransaction, local *accountSet) bool {
-	// Local transactions cannot be underpriced
-	if local.containsTx(tx) {
-		return false
-	}
-	// Discard stale price points if found at the heap start
-	for len(*l.items) > 0 {
-		head := types.PoolTransactions(*l.items)[0]
-		if l.all.Get(head.Hash()) == nil {
-			l.stales--
-			heap.Pop(l.items)
-			continue
-		}
-		break
-	}
-	// Check if the transaction is underpriced or not
-	if len(*l.items) == 0 {
-		utils.Logger().Error().Msg("Pricing query for empty pool") // This cannot happen, print to catch programming errors
-		return false
-	}
-	cheapest := types.PoolTransactions(*l.items)[0]
-	return cheapest.GasPrice().Cmp(tx.GasPrice()) >= 0
-}
-
-// Discard finds a number of most underpriced transactions, removes them from the
-// priced list and returns them for further removal from the entire pool.
-func (l *txPricedList) Discard(count int, local *accountSet) types.PoolTransactions {
-	drop := make(types.PoolTransactions, 0, count) // Remote underpriced transactions to drop
-	save := make(types.PoolTransactions, 0, 64)    // Local underpriced transactions to keep
-
-	for len(*l.items) > 0 && count > 0 {
-		// Discard stale transactions if found during cleanup
-		tx := heap.Pop(l.items).(types.PoolTransaction)
-		if l.all.Get(tx.Hash()) == nil {
-			l.stales--
-			continue
-		}
-		// Non stale transaction found, discard unless local
-		if local.containsTx(tx) {
-			save = append(save, tx)
-		} else {
-			drop = append(drop, tx)
-			count--
-		}
-	}
-	for _, tx := range save {
-		heap.Push(l.items, tx)
+		heap.Push(&l.urgent, tx)
 	}
 	return drop
 }

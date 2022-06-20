@@ -175,11 +175,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		// Prepare normal and staking transactions retrieved from transaction pool
 		utils.AnalysisStart("proposeNewBlockChooseFromTxnPool")
 
-		pendingPoolTxs, err := node.TxPool.Pending()
-		if err != nil {
-			utils.Logger().Err(err).Msg("Failed to fetch pending transactions")
-			return nil, err
-		}
+		pendingPoolTxs := node.TxPool.Pending()
 		pendingPlainTxs := map[common.Address]types.Transactions{}
 		pendingStakingTxs := staking.StakingTransactions{}
 		for addr, poolTxs := range pendingPoolTxs {

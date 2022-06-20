@@ -23,10 +23,12 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/pkg/errors"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -141,6 +143,14 @@ func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *
 	return signedTx
 }
 
+func pricedDataTransaction(nonce uint64, gaslimit uint64, gasprice *big.Int, key *ecdsa.PrivateKey, bytes uint64) *types.Transaction {
+	data := make([]byte, bytes)
+	rand.Read(data)
+
+	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, 0, big.NewInt(0), gaslimit, gasprice, data), types.HomesteadSigner{}, key)
+	return tx
+}
+
 func createBlockChain() *BlockChain {
 	key, _ := crypto.GenerateKey()
 	gspec := Genesis{
@@ -169,6 +179,8 @@ func setupTxPool() (*TxPool, *ecdsa.PrivateKey) {
 	key, _ := crypto.GenerateKey()
 	pool := NewTxPool(testTxPoolConfig, params.TestChainConfig, blockchain, dummyErrorSink)
 
+	// wait for the pool to initialize
+	<-pool.initDoneCh
 	return pool, key
 }
 
@@ -182,8 +194,10 @@ func validateTxPoolInternals(pool *TxPool) error {
 	if total := pool.all.Count(); total != pending+queued {
 		return fmt.Errorf("total transaction count %d != %d pending + %d queued", total, pending, queued)
 	}
-	if priced := pool.priced.items.Len() - pool.priced.stales; priced != pending+queued {
-		return fmt.Errorf("total priced transaction count %d != %d pending + %d queued", priced, pending, queued)
+	pool.priced.Reheap()
+	priced, remote := pool.priced.urgent.Len()+pool.priced.floating.Len(), pool.all.RemoteCount()
+	if priced != remote {
+		return fmt.Errorf("total priced transaction count %d != %d", priced, remote)
 	}
 	// Ensure the next nonce to assign is the correct one
 	for addr, txs := range pool.pending {
@@ -194,9 +208,37 @@ func validateTxPoolInternals(pool *TxPool) error {
 				last = nonce
 			}
 		}
-		if nonce := pool.pendingState.GetNonce(addr); nonce != last+1 {
+		if nonce := pool.pendingNonces.get(addr); nonce != last+1 {
 			return fmt.Errorf("pending nonce mismatch: have %v, want %v", nonce, last+1)
 		}
+	}
+	return nil
+}
+
+// validateEvents checks that the correct number of transaction addition events
+// were fired on the pool's event feed.
+func validateEvents(events chan NewTxsEvent, count int) error {
+	var received []types.PoolTransaction
+
+	for len(received) < count {
+		select {
+		case ev := <-events:
+			received = append(received, ev.Txs...)
+		case <-time.After(time.Second):
+			return fmt.Errorf("event #%d not fired", len(received))
+		}
+	}
+	if len(received) > count {
+		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
+	}
+	select {
+	case ev := <-events:
+		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
+
+	case <-time.After(50 * time.Millisecond):
+		// This branch should be "default", but it's a data race between goroutines,
+		// reading the event channel and pushing into it, so better wait a bit ensuring
+		// really nothing gets injected.
 	}
 	return nil
 }
@@ -252,31 +294,38 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	pool := NewTxPool(testTxPoolConfig, params.TestChainConfig, blockchain, dummyErrorSink)
 	defer pool.Stop()
 
-	nonce := pool.State().GetNonce(address)
+	nonce := pool.Nonce(address)
 	if nonce != 0 {
 		t.Fatalf("Invalid nonce, want 0, got %d", nonce)
 	}
 
-	pool.AddRemotes(types.PoolTransactions{tx0, tx1})
+	pool.AddRemotesSync([]types.PoolTransaction{tx0, tx1})
 
-	nonce = pool.State().GetNonce(address)
+	nonce = pool.Nonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
 
 	// trigger state change in the background
 	trigger = true
+	<-pool.requestReset(nil, nil)
 
-	pool.lockedReset(nil, nil)
-
-	_, err := pool.Pending()
-	if err != nil {
-		t.Fatalf("Could not fetch pending transactions: %v", err)
-	}
-	nonce = pool.State().GetNonce(address)
+	nonce = pool.Nonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
+}
+
+func testAddBalance(pool *TxPool, addr common.Address, amount *big.Int) {
+	pool.mu.Lock()
+	pool.currentState.AddBalance(addr, amount)
+	pool.mu.Unlock()
+}
+
+func testSetNonce(pool *TxPool, addr common.Address, nonce uint64) {
+	pool.mu.Lock()
+	pool.currentState.SetNonce(addr, nonce)
+	pool.mu.Unlock()
 }
 
 func TestInvalidTransactions(t *testing.T) {
@@ -288,36 +337,31 @@ func TestInvalidTransactions(t *testing.T) {
 	tx := transaction(0, 0, 100, key)
 	from, _ := deriveSender(tx)
 
-	pool.currentState.AddBalance(from, big.NewInt(1))
-	if err := pool.AddRemote(tx); err != ErrInsufficientFunds {
+	testAddBalance(pool, from, big.NewInt(1))
+	if err := pool.AddRemote(tx); !errors.Is(err, ErrInsufficientFunds) {
 		t.Error("expected", ErrInsufficientFunds)
 	}
 
 	balance := new(big.Int).Add(tx.Value(), new(big.Int).Mul(new(big.Int).SetUint64(tx.GasLimit()), tx.GasPrice()))
-	pool.currentState.AddBalance(from, balance)
-	if err := pool.AddRemote(tx); err != ErrIntrinsicGas {
+	testAddBalance(pool, from, balance)
+	if err := pool.AddRemote(tx); !errors.Is(err, ErrIntrinsicGas) {
 		t.Error("expected", ErrIntrinsicGas, "got", err)
 	}
 
-	pool.currentState.SetNonce(from, 1)
-	pool.currentState.AddBalance(from, big.NewInt(0xffffffffffffff))
+	testSetNonce(pool, from, 1)
+	testAddBalance(pool, from, big.NewInt(0xffffffffffffff))
 	tx = transaction(0, 0, 100000, key)
-	if err := pool.AddRemote(tx); err != ErrNonceTooLow {
+	if err := pool.AddRemote(tx); !errors.Is(err, ErrNonceTooLow) {
 		t.Error("expected", ErrNonceTooLow)
 	}
 
 	tx = transaction(0, 1, 100000, key)
 	pool.gasPrice = big.NewInt(300000000000)
-	if err := pool.AddRemote(tx); err != ErrUnderpriced {
+	if err := pool.AddRemote(tx); errors.Cause(err) != ErrUnderpriced {
 		t.Error("expected", ErrUnderpriced, "got", err)
 	}
 	if err := pool.AddLocal(tx); err != nil {
 		t.Error("expected", nil, "got", err)
-	}
-
-	tx = transaction(1, 0, 100, key)
-	if err := pool.AddRemote(tx); err != ErrInvalidShard {
-		t.Error("expected", ErrInvalidShard, "got", err)
 	}
 }
 
@@ -344,7 +388,7 @@ func TestErrorSink(t *testing.T) {
 	pool.currentState.SetNonce(from, 1)
 	pool.currentState.AddBalance(from, big.NewInt(0xffffffffffffff))
 	tx = transaction(0, 0, 100000, key)
-	if err := pool.AddRemote(tx); err != ErrNonceTooLow {
+	if err := pool.addRemoteSync(tx); errors.Cause(err) != ErrNonceTooLow {
 		t.Error("expected", ErrNonceTooLow)
 	}
 	if !testTxErrorSink.Contains(tx.Hash().String()) {
@@ -364,10 +408,10 @@ func TestErrorSink(t *testing.T) {
 	tx = transaction(0, 2, 100000, key)
 	pool.currentState.SetBalance(from, big.NewInt(0x0))
 	pool.currentState.SetBalance(fromStx, big.NewInt(0x0))
-	if err := pool.AddRemote(tx); err != ErrInsufficientFunds {
+	if err := pool.addRemoteSync(tx); errors.Cause(err) != ErrInsufficientFunds {
 		t.Error("expected", ErrInsufficientFunds)
 	}
-	if err := pool.AddRemote(stx); err != ErrInsufficientFunds {
+	if err := pool.addRemoteSync(stx); errors.Cause(err) != ErrInsufficientFunds {
 		t.Error("expected", ErrInsufficientFunds)
 	}
 	if !testTxErrorSink.Contains(tx.Hash().String()) {
@@ -379,10 +423,10 @@ func TestErrorSink(t *testing.T) {
 
 	pool.currentState.SetBalance(from, twelveKOnes)
 	pool.currentState.SetBalance(fromStx, twelveKOnes)
-	if err := pool.AddRemote(tx); err != nil {
+	if err := pool.addRemoteSync(tx); err != nil {
 		t.Error("expected successful transaction got", err)
 	}
-	if err := pool.AddRemote(stx); err != nil {
+	if err := pool.addRemoteSync(stx); err != nil {
 		t.Error("expected successful transaction got", err)
 	}
 	if testTxErrorSink.Contains(tx.Hash().String()) {
@@ -410,7 +454,7 @@ func TestCreateValidatorTransaction(t *testing.T) {
 	// Add additional create validator tx cost
 	pool.currentState.AddBalance(senderAddr, cost)
 
-	if err = pool.AddRemote(stx); err != nil {
+	if err = pool.addRemoteSync(stx); err != nil {
 		t.Error(err.Error())
 	}
 
@@ -441,7 +485,7 @@ func TestMixedTransactions(t *testing.T) {
 	txAddr, _ := deriveSender(tx)
 	pool.currentState.AddBalance(txAddr, big.NewInt(1503000000000000))
 
-	errs := pool.AddRemotes(types.PoolTransactions{stx, tx})
+	errs := pool.AddRemotesSync(types.PoolTransactions{stx, tx})
 	for _, err := range errs {
 		if err != nil {
 			t.Error(err)
@@ -476,20 +520,20 @@ func TestBlacklistedTransactions(t *testing.T) {
 	pool.currentState.AddBalance(goodFromAcc, big.NewInt(1503000000000000))
 
 	DefaultTxPoolConfig.Blacklist[bannedToAcc] = struct{}{}
-	err := pool.AddRemotes(types.PoolTransactions{badTx})
-	if err[0] != ErrBlacklistTo {
-		t.Error("expected", ErrBlacklistTo, "got", err[0])
+	err := pool.AddRemotesSync(types.PoolTransactions{badTx})
+	if cause := errors.Cause(err[0]); cause != ErrBlacklistTo {
+		t.Error("expected", ErrBlacklistTo, "got", cause)
 	}
 
 	delete(DefaultTxPoolConfig.Blacklist, bannedToAcc)
 	DefaultTxPoolConfig.Blacklist[bannedFromAcc] = struct{}{}
-	err = pool.AddRemotes(types.PoolTransactions{badTx})
-	if err[0] != ErrBlacklistFrom {
-		t.Error("expected", ErrBlacklistFrom, "got", err[0])
+	err = pool.AddRemotesSync(types.PoolTransactions{badTx})
+	if cause := errors.Cause(err[0]); cause != ErrBlacklistFrom {
+		t.Error("expected", ErrBlacklistFrom, "got", cause)
 	}
 
 	// to acc is same for bad and good tx, so keep off blacklist for valid tx check
-	err = pool.AddRemotes(types.PoolTransactions{goodTx})
+	err = pool.AddRemotesSync(types.PoolTransactions{goodTx})
 	if err[0] != nil {
 		t.Error("expected", nil, "got", err[0])
 	}
@@ -507,45 +551,52 @@ func TestTransactionQueue(t *testing.T) {
 	tx := transaction(0, 0, 100, key)
 	from, _ := deriveSender(tx)
 	pool.currentState.AddBalance(from, big.NewInt(30000000000000))
-	pool.lockedReset(nil, nil)
-	pool.enqueueTx(tx)
+	<-pool.requestReset(nil, nil)
 
-	pool.promoteExecutables([]common.Address{from})
+	_, err := pool.enqueueTx(tx.Hash(), tx, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	<-pool.requestPromoteExecutables(newAccountSet(big.NewInt(0), from))
 	if len(pool.pending) != 1 {
 		t.Error("expected valid txs to be 1 is", len(pool.pending))
 	}
 
 	tx = transaction(0, 1, 100, key)
 	from, _ = deriveSender(tx)
-	pool.currentState.SetNonce(from, 2)
-	pool.enqueueTx(tx)
-	pool.promoteExecutables([]common.Address{from})
+	testSetNonce(pool, from, 2)
+	pool.enqueueTx(tx.Hash(), tx, false, true)
+
+	<-pool.requestPromoteExecutables(newAccountSet(big.NewInt(0), from))
 	if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
 		t.Error("expected transaction to be in tx pool")
 	}
-
 	if len(pool.queue) > 0 {
 		t.Error("expected transaction queue to be empty. is", len(pool.queue))
 	}
+}
 
-	pool, key = setupTxPool()
+func TestTransactionQueue2(t *testing.T) {
+	t.Parallel()
+
+	pool, key := setupTxPool()
 	defer pool.Stop()
 
 	tx1 := transaction(0, 0, 100, key)
 	tx2 := transaction(0, 10, 100, key)
 	tx3 := transaction(0, 11, 100, key)
-	from, _ = deriveSender(tx1)
+	from, _ := deriveSender(tx1)
 	pool.currentState.AddBalance(from, big.NewInt(30000000000000))
-	pool.lockedReset(nil, nil)
+	pool.reset(nil, nil)
 
-	pool.enqueueTx(tx1)
-	pool.enqueueTx(tx2)
-	pool.enqueueTx(tx3)
+	pool.enqueueTx(tx1.Hash(), tx1, false, true)
+	pool.enqueueTx(tx2.Hash(), tx2, false, true)
+	pool.enqueueTx(tx3.Hash(), tx3, false, true)
 
 	pool.promoteExecutables([]common.Address{from})
-
 	if len(pool.pending) != 1 {
-		t.Error("expected tx pool to be 1, got", len(pool.pending))
+		t.Error("expected pending length to be 1, got", len(pool.pending))
 	}
 	if pool.queue[from].Len() != 2 {
 		t.Error("expected len(queue) == 2, got", pool.queue[from].Len())
@@ -558,12 +609,10 @@ func TestTransactionNegativeValue(t *testing.T) {
 	pool, key := setupTxPool()
 	defer pool.Stop()
 
-	tx, _ := types.SignTx(
-		types.NewTransaction(0, common.Address{}, 0, big.NewInt(-1), 100, big.NewInt(1), nil),
-		types.HomesteadSigner{}, key)
+	tx, _ := types.SignTx(types.NewTransaction(0, common.Address{}, 0, big.NewInt(-1), 100, big.NewInt(1), nil), types.HomesteadSigner{}, key)
 	from, _ := deriveSender(tx)
 	pool.currentState.AddBalance(from, big.NewInt(1))
-	if err := pool.AddRemote(tx); err != ErrNegativeValue {
+	if err := pool.AddRemote(tx); errors.Cause(err) != ErrNegativeValue {
 		t.Error("expected", ErrNegativeValue, "got", err)
 	}
 }
@@ -580,7 +629,7 @@ func TestTransactionChainFork(t *testing.T) {
 		statedb.AddBalance(addr, big.NewInt(9000000000000000000))
 
 		pool.chain = &testBlockChain{statedb, 1000000, new(event.Feed)}
-		pool.lockedReset(nil, nil)
+		<-pool.requestReset(nil, nil)
 	}
 	resetState()
 
@@ -609,7 +658,7 @@ func TestTransactionDoubleNonce(t *testing.T) {
 		statedb.AddBalance(addr, big.NewInt(1000000000000000000))
 
 		pool.chain = &testBlockChain{statedb, 1000000, new(event.Feed)}
-		pool.lockedReset(nil, nil)
+		<-pool.requestReset(nil, nil)
 	}
 	resetState()
 
@@ -686,16 +735,16 @@ func TestTransactionNonceRecovery(t *testing.T) {
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	pool.currentState.SetNonce(addr, n)
 	pool.currentState.AddBalance(addr, big.NewInt(3003000000000000))
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 
 	tx := transaction(0, n, 100000, key)
 	if err := pool.AddRemote(tx); err != nil {
 		t.Error(err)
 	}
 	// simulate some weird re-order of transactions and missing nonce(s)
-	pool.currentState.SetNonce(addr, n-1)
-	pool.lockedReset(nil, nil)
-	if fn := pool.pendingState.GetNonce(addr); fn != n-1 {
+	testSetNonce(pool, addr, n-1)
+	<-pool.requestReset(nil, nil)
+	if fn := pool.Nonce(addr); fn != n-1 {
 		t.Errorf("expected nonce to be %d, got %d", n-1, fn)
 	}
 }
@@ -710,7 +759,7 @@ func TestTransactionDropping(t *testing.T) {
 	defer pool.Stop()
 
 	account, _ := deriveSender(transaction(0, 0, 0, key))
-	pool.currentState.AddBalance(account, big.NewInt(30000000000000))
+	testAddBalance(pool, account, big.NewInt(30000000000000))
 
 	// Add some pending and some queued transactions
 	var (
@@ -721,12 +770,21 @@ func TestTransactionDropping(t *testing.T) {
 		tx11 = transaction(0, 11, 200, key)
 		tx12 = transaction(0, 12, 300, key)
 	)
-	pool.promoteTx(account, tx0)
-	pool.promoteTx(account, tx1)
-	pool.promoteTx(account, tx2)
-	pool.enqueueTx(tx10)
-	pool.enqueueTx(tx11)
-	pool.enqueueTx(tx12)
+	pool.all.Add(tx0, false)
+	pool.priced.Put(tx0, false)
+	pool.promoteTx(account, tx0.Hash(), tx0)
+
+	pool.all.Add(tx1, false)
+	pool.priced.Put(tx1, false)
+	pool.promoteTx(account, tx1.Hash(), tx1)
+
+	pool.all.Add(tx2, false)
+	pool.priced.Put(tx2, false)
+	pool.promoteTx(account, tx2.Hash(), tx2)
+
+	pool.enqueueTx(tx10.Hash(), tx10, false, true)
+	pool.enqueueTx(tx11.Hash(), tx11, false, true)
+	pool.enqueueTx(tx12.Hash(), tx12, false, true)
 
 	// Check that pre and post validations leave the pool as is
 	if pool.pending[account].Len() != 3 {
@@ -738,7 +796,7 @@ func TestTransactionDropping(t *testing.T) {
 	if pool.all.Count() != 6 {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 6)
 	}
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 	if pool.pending[account].Len() != 3 {
 		t.Errorf("pending transaction mismatch: have %d, want %d", pool.pending[account].Len(), 3)
 	}
@@ -750,7 +808,7 @@ func TestTransactionDropping(t *testing.T) {
 	}
 	// Reduce the balance of the account, and check that invalidated transactions are dropped
 	pool.currentState.AddBalance(account, big.NewInt(-23000000000000))
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
 		t.Errorf("funded pending transaction missing: %v", tx0)
@@ -774,8 +832,8 @@ func TestTransactionDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
 	}
 	// Reduce the block gas limit, check that invalidated transactions are dropped
-	pool.chain.(*testBlockChain).gasLimit = 100
-	pool.lockedReset(nil, nil)
+	atomic.StoreUint64(&pool.chain.(*testBlockChain).gasLimit, 100)
+	<-pool.requestReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
 		t.Errorf("funded pending transaction missing: %v", tx0)
@@ -831,7 +889,7 @@ func TestTransactionPostponing(t *testing.T) {
 			txs = append(txs, tx)
 		}
 	}
-	for i, err := range pool.AddRemotes(txs) {
+	for i, err := range pool.AddRemotesSync(txs) {
 		if err != nil {
 			t.Fatalf("tx %d: failed to add transactions: %v", i, err)
 		}
@@ -846,7 +904,7 @@ func TestTransactionPostponing(t *testing.T) {
 	if pool.all.Count() != len(txs) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), len(txs))
 	}
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 	if pending := pool.pending[accs[0]].Len() + pool.pending[accs[1]].Len(); pending != len(txs) {
 		t.Errorf("pending transaction mismatch: have %d, want %d", pending, len(txs))
 	}
@@ -860,7 +918,7 @@ func TestTransactionPostponing(t *testing.T) {
 	for _, addr := range accs {
 		pool.currentState.AddBalance(addr, big.NewInt(-30))
 	}
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 
 	// The first account's first transaction remains valid, check that subsequent
 	// ones are either filtered out, or queued up for later.
@@ -912,6 +970,66 @@ func TestTransactionPostponing(t *testing.T) {
 	}
 }
 
+// Tests that if the transaction pool has both executable and non-executable
+// transactions from an origin account, filling the nonce gap moves all queued
+// ones into the pending pool.
+func TestTransactionGapFilling(t *testing.T) {
+	t.Parallel()
+
+	// Create a test account and fund it
+	pool, key := setupTxPool()
+	defer pool.Stop()
+
+	account := crypto.PubkeyToAddress(key.PublicKey)
+	testAddBalance(pool, account, big.NewInt(9000000000000000000))
+
+	// Keep track of transaction events to ensure all executables get announced
+	events := make(chan NewTxsEvent, testTxPoolConfig.AccountQueue+5)
+	sub := pool.txFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	// Create a pending and a queued transaction with a nonce-gap in between
+	errs := pool.AddRemotesSync([]types.PoolTransaction{
+		transaction(0, 0, 1000000, key),
+		transaction(0, 2, 1000000, key),
+	})
+	for _, err := range errs {
+		if err != nil {
+			t.Fatalf("unexpected error on adding transaction: %q", err)
+		}
+	}
+	pending, queued := pool.Stats()
+	if pending != 1 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 1)
+	}
+	if queued != 1 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 1)
+	}
+	if err := validateEvents(events, 1); err != nil {
+		t.Fatalf("original event firing failed: %v", err)
+	}
+	if err := validateTxPoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+	// Fill the nonce gap and ensure all transactions become pending
+	if err := pool.addRemoteSync(transaction(0, 1, 100000, key)); err != nil {
+		t.Fatalf("failed to add gapped transaction: %v", err)
+	}
+	pending, queued = pool.Stats()
+	if pending != 3 {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 3)
+	}
+	if queued != 0 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+	}
+	if err := validateEvents(events, 2); err != nil {
+		t.Fatalf("gap-filling event firing failed: %v", err)
+	}
+	if err := validateTxPoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+}
+
 // Tests that if the transaction count belonging to a single account goes above
 // some threshold, the higher transactions are dropped to prevent DOS attacks.
 func TestTransactionQueueAccountLimiting(t *testing.T) {
@@ -926,7 +1044,7 @@ func TestTransactionQueueAccountLimiting(t *testing.T) {
 
 	// Keep queuing up transactions and make sure all above a limit are dropped
 	for i := uint64(1); i <= testTxPoolConfig.AccountQueue+5; i++ {
-		if err := pool.AddRemote(transaction(0, i, 100000, key)); err != nil {
+		if err := pool.addRemoteSync(transaction(0, i, 100000, key)); err != nil {
 			t.Fatalf("tx %d: failed to add transaction: %v", i, err)
 		}
 		if len(pool.pending) != 0 {
@@ -993,7 +1111,7 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 		nonces[addr]++
 	}
 	// Import the batch and verify that limits have been enforced
-	pool.AddRemotes(txs)
+	pool.AddRemotesSync(txs)
 
 	queued := 0
 	for addr, list := range pool.queue {
@@ -1042,7 +1160,9 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 //
 // This logic should not hold for local transactions, unless the local tracking
 // mechanism is disabled.
-func TestTransactionQueueTimeLimiting(t *testing.T) { testTransactionQueueTimeLimiting(t, false) }
+func TestTransactionQueueTimeLimiting(t *testing.T) {
+	testTransactionQueueTimeLimiting(t, false)
+}
 func TestTransactionQueueTimeLimitingNoLocals(t *testing.T) {
 	testTransactionQueueTimeLimiting(t, true)
 }
@@ -1050,7 +1170,7 @@ func TestTransactionQueueTimeLimitingNoLocals(t *testing.T) {
 func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	// Reduce the eviction interval to a testable amount
 	defer func(old time.Duration) { evictionInterval = old }(evictionInterval)
-	evictionInterval = time.Second
+	evictionInterval = time.Millisecond * 100
 
 	// Create the pool to test the non-expiration enforcement
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()))
@@ -1126,7 +1246,7 @@ func testTransactionLimitingEquivalency(t *testing.T, origin uint64) {
 	pool1.currentState.AddBalance(account1, big.NewInt(9000000000000000000))
 
 	for i := uint64(0); i < testTxPoolConfig.AccountQueue+5; i++ {
-		if err := pool1.AddRemote(transaction(0, origin+i, 100000, key1)); err != nil {
+		if err := pool1.addRemoteSync(transaction(0, origin+i, 100000, key1)); err != nil {
 			t.Fatalf("tx %d: failed to add transaction: %v", i, err)
 		}
 	}
@@ -1141,7 +1261,7 @@ func testTransactionLimitingEquivalency(t *testing.T, origin uint64) {
 	for i := uint64(0); i < testTxPoolConfig.AccountQueue+5; i++ {
 		txs = append(txs, transaction(0, origin+i, 100000, key2))
 	}
-	pool2.AddRemotes(txs)
+	pool2.AddRemotesSync(txs)
 
 	// Ensure the batch optimization honors the same pool mechanics
 	if len(pool1.pending) != len(pool2.pending) {
@@ -1195,7 +1315,7 @@ func TestTransactionPendingGlobalLimiting(t *testing.T) {
 		}
 	}
 	// Import the batch and verify that limits have been enforced
-	pool.AddRemotes(txs)
+	pool.AddRemotesSync(txs)
 
 	pending := 0
 	for _, list := range pool.pending {
@@ -1394,7 +1514,7 @@ func testTransactionJournaling(t *testing.T, nolocals bool) {
 	if err := pool.AddLocal(pricedTransaction(0, 2, 100000, big.NewInt(30000000000), local)); err != nil {
 		t.Fatalf("failed to add local transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 0, 100000, big.NewInt(30000000000), remote)); err != nil {
+	if err := pool.addRemoteSync(pricedTransaction(0, 0, 100000, big.NewInt(30000000000), remote)); err != nil {
 		t.Fatalf("failed to add remote transaction: %v", err)
 	}
 	pending, queued := pool.Stats()
@@ -1432,7 +1552,7 @@ func testTransactionJournaling(t *testing.T, nolocals bool) {
 	}
 	// Bump the nonce temporarily and ensure the newly invalidated transaction is removed
 	statedb.SetNonce(crypto.PubkeyToAddress(local.PublicKey), 2)
-	pool.lockedReset(nil, nil)
+	<-pool.requestReset(nil, nil)
 	time.Sleep(2 * config.Rejournal)
 	pool.Stop()
 
@@ -1486,7 +1606,7 @@ func TestTransactionStatusCheck(t *testing.T) {
 	txs = append(txs, pricedTransaction(0, 2, 100000, big.NewInt(30000000000), keys[2])) // Queued only
 
 	// Import the transaction and ensure they are correctly added
-	pool.AddRemotes(txs)
+	pool.AddRemotesSync(txs)
 
 	pending, queued := pool.Stats()
 	if pending != 2 {
@@ -1531,7 +1651,7 @@ func benchmarkPendingDemotion(b *testing.B, size int) {
 
 	for i := 0; i < size; i++ {
 		tx := transaction(0, uint64(i), 100000, key)
-		pool.promoteTx(account, tx)
+		pool.promoteTx(account, tx.Hash(), tx)
 	}
 	// Benchmark the speed of pool validation
 	b.ResetTimer()
@@ -1556,7 +1676,7 @@ func benchmarkFuturePromotion(b *testing.B, size int) {
 
 	for i := 0; i < size; i++ {
 		tx := transaction(0, uint64(1+i), 100000, key)
-		pool.enqueueTx(tx)
+		pool.enqueueTx(tx.Hash(), tx, false, true)
 	}
 	// Benchmark the speed of pool validation
 	b.ResetTimer()

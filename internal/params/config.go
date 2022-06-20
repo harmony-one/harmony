@@ -625,8 +625,8 @@ func (c *ChainConfig) IsHIP6And8Epoch(epoch *big.Int) bool {
 	return isForked(c.HIP6And8Epoch, epoch)
 }
 
-// IsStakingPrecompileEpoch determines whether staking
-// precompiles are available in the EVM
+// IsStakingPrecompile determines whether staking
+// precompiles are available in the EVM.
 func (c *ChainConfig) IsStakingPrecompile(epoch *big.Int) bool {
 	return isForked(c.StakingPrecompileEpoch, epoch)
 }
