@@ -16,6 +16,19 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv/memdb"
 )
 
+const (
+	CommonBlocksBucket   = "Blocks"
+	BlockHashesBucket    = "BlockHashes"
+	LastMileBlocksBucket = "LastMileBlocks" // last mile blocks to catch up with the consensus
+	StageProgressBucket  = "StageProgress"
+)
+
+var Buckets = []string{
+	CommonBlocksBucket,
+	LastMileBlocksBucket,
+	StageProgressBucket,
+}
+
 func CreateStagedSync(
 	ip string,
 	port string,
@@ -28,6 +41,9 @@ func CreateStagedSync(
 
 	ctx := context.Background()
 	db := memdb.New()
+	if errInitDB := initDB(ctx, db); errInitDB != nil {
+		return nil, errInitDB
+	}
 
 	headersCfg := NewStageHeadersCfg(ctx, db)
 	blockHashesCfg := NewStageBlockHashesCfg(ctx, db)
@@ -58,6 +74,24 @@ func CreateStagedSync(
 		DefaultUnwindOrder,
 		DefaultPruneOrder,
 	), nil
+}
+
+func initDB(ctx context.Context, db kv.RwDB) error {
+	for _, name := range Buckets {
+		tx, errRW := db.BeginRw(ctx)
+		if errRW != nil {
+			return errRW
+		}
+		defer tx.Rollback()
+		if err := tx.CreateBucket(name); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to initiate db: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // SyncLoop will keep syncing with peers until catches up
@@ -124,9 +158,12 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 				case <-c:
 				}
 			}
-
+			// if haven't get any new block
+			if currentHeight==s.Blockchain().CurrentBlock().NumberU64() {
+				break
+			}
 		}
-		if syncErr!=nil {
+		if syncErr != nil {
 			break
 		}
 	}

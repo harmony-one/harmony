@@ -196,6 +196,7 @@ func New(ctx context.Context,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
 	pruneOrder PruneOrder) *StagedSync {
+
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
 		for _, s := range stagesList {
@@ -313,7 +314,7 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool, startHash []by
 	}
 
 	for i := 0; i < len(s.pruningOrder); i++ {
-		if s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled || s.pruningOrder[i].Handler.Prune == nil {
+		if s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled {
 			continue
 		}
 		if err := s.pruneStage(firstCycle, s.pruningOrder[i], db, tx); err != nil {
@@ -402,12 +403,12 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 		return err
 	}
 
-	fmt.Println("STAGE ------------------->", stage.ID, ": executing ...")
+	fmt.Println("stage ", stage.ID, " executing ...")
 	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
-		fmt.Println("STAGE ------------------->", stage.ID, ": failed:", err)
+		fmt.Println("stage ", stage.ID, " failed:", err)
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
-	fmt.Println("STAGE ------------------->", stage.ID, ": executed successfully")
+	fmt.Println("stage ", stage.ID, " executed successfully")
 
 	took := time.Since(start)
 	if took > 60*time.Second {
@@ -679,7 +680,7 @@ func (ss *StagedSync) GetActivePeerNumber() int {
 }
 
 // getConsensusHashes gets all hashes needed to download.
-func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
+func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.RwTx) error {
 	var wg sync.WaitGroup
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
@@ -705,8 +706,14 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 					Int("respondSize", len(response.Payload)).
 					Msg("[STAGED_SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
+				for i, blk := range response.Payload[:size+1] {
+					tx.Append(BlockHashesBucket, blk, []byte(strconv.Itoa(i)))
+				}
 			} else {
 				peerConfig.blockHashes = response.Payload
+				for i, blk := range response.Payload {
+					tx.Append(BlockHashesBucket, blk, []byte(strconv.Itoa(i)))
+				}
 			}
 		}()
 		return
@@ -719,7 +726,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 	return nil
 }
 
-func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
+func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain,tx kv.RwTx) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {

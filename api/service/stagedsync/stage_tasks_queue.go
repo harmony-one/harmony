@@ -38,7 +38,7 @@ func (tq *StageTasksQueue) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 		defer tx.Rollback()
 	}
 
-	s.state.generateStateSyncTaskQueue(s.state.Blockchain())
+	s.state.generateStateSyncTaskQueue(s.state.Blockchain(), tx)
 
 	if !useExternalTx {
 		if err = tx.Commit(); err != nil {

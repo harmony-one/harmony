@@ -43,7 +43,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 
 	curCycle := s.state.syncStatus.CurrentCycle()
 	// Gets consensus hashes.
-	if err := s.state.getConsensusHashes(curCycle.StartHash, curCycle.Size); err != nil {
+	if err := s.state.getConsensusHashes(curCycle.StartHash, curCycle.Size, tx); err != nil {
 		return errors.Wrap(err, "getConsensusHashes")
 	}
 

@@ -134,10 +134,12 @@ func (node *Node) createStagedSync(bc *core.BlockChain, isBeacon bool) *stagedsy
 	role := node.NodeConfig.Role()
 	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
-	s, _ := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, role, isBeacon, isExplorer)
-
-	return s
+	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
+		node.GetSyncID(), bc, role, isBeacon, isExplorer); err != nil {
+		return nil
+	} else {
+		return s
+	}
 }
 
 // SyncingPeerProvider is an interface for getting the peers in the given shard.
