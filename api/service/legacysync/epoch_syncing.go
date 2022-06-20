@@ -118,8 +118,8 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		}
 
 		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				isBeacon, bc.ShardID(), maxHeight, height)
+			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d, peers count %d)",
+				isBeacon, bc.ShardID(), maxHeight, height, ss.syncConfig.PeersCount())
 
 		var heights []uint64
 		curEpoch := block.Epoch()

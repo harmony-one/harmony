@@ -141,6 +141,12 @@ func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
 	}
 }
 
+func (sc *SyncConfig) PeersCount() int {
+	sc.mtx.RLock()
+	defer sc.mtx.RUnlock()
+	return len(sc.peers)
+}
+
 // RemovePeer removes a peer from SyncConfig
 func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 	sc.mtx.Lock()
