@@ -165,7 +165,7 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 		}
 		payload = resp.Payload
 		peerCfg = peerConfig
-		return false
+		return true
 	})
 
 	if len(payload) == 0 {
