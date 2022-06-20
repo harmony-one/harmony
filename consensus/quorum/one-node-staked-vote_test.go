@@ -128,7 +128,7 @@ func TestPolicy(t *testing.T) {
 
 func TestQuorumThreshold(t *testing.T) {
 	expectedThreshold := numeric.NewDec(2).Quo(numeric.NewDec(3))
-	quorumThreshold := basicDecider.QuorumThreshold()
+	quorumThreshold := basicDecider.QuorumThreshold(0)
 	if !expectedThreshold.Equal(quorumThreshold) {
 		t.Errorf("Expected: %s, Got: %s", expectedThreshold.String(), quorumThreshold.String())
 	}

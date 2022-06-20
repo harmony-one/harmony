@@ -56,7 +56,7 @@ func (v *uniformVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool {
 	if mask == nil {
 		return false
 	}
@@ -74,7 +74,10 @@ func (v *uniformVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 }
 
 // QuorumThreshold ..
-func (v *uniformVoteWeight) QuorumThreshold() numeric.Dec {
+func (v *uniformVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
+	if fixed := tryFixedThreshold(height); fixed != nil {
+		return *fixed
+	}
 	return numeric.NewDec(v.TwoThirdsSignersCount())
 }
 
