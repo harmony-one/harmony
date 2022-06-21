@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -50,11 +51,12 @@ func TestProtocol_advertiseLoop(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	close(p.closeC)
 
-	if len(disc.advCnt) != len(p.supportedVersions()) {
-		t.Errorf("unexpected advertise topic count: %v / %v", len(disc.advCnt),
+	advCnt := disc.Extract()
+	if len(advCnt) != len(p.supportedVersions()) {
+		t.Errorf("unexpected advertise topic count: %v / %v", len(advCnt),
 			len(p.supportedVersions()))
 	}
-	for _, cnt := range disc.advCnt {
+	for _, cnt := range advCnt {
 		if cnt < 1 {
 			t.Errorf("unexpected discovery count: %v", cnt)
 		}
@@ -64,6 +66,7 @@ func TestProtocol_advertiseLoop(t *testing.T) {
 type testDiscovery struct {
 	advCnt map[string]int
 	sleep  time.Duration
+	mu     sync.Mutex
 }
 
 func newTestDiscovery(discInterval time.Duration) *testDiscovery {
@@ -82,8 +85,18 @@ func (disc *testDiscovery) Close() error {
 }
 
 func (disc *testDiscovery) Advertise(ctx context.Context, ns string) (time.Duration, error) {
+	disc.mu.Lock()
+	defer disc.mu.Unlock()
 	disc.advCnt[ns]++
 	return disc.sleep, nil
+}
+
+func (disc *testDiscovery) Extract() map[string]int {
+	disc.mu.Lock()
+	defer disc.mu.Unlock()
+	var out map[string]int
+	out, disc.advCnt = disc.advCnt, make(map[string]int)
+	return out
 }
 
 func (disc *testDiscovery) FindPeers(ctx context.Context, ns string, peerLimit int) (<-chan libp2p_peer.AddrInfo, error) {
