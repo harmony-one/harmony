@@ -227,15 +227,16 @@ func (node *Node) doBeaconSyncing() {
 			for beaconBlock := range node.BeaconBlockChannel {
 				if node.beaconSync != nil {
 					if beaconBlock.NumberU64() >= node.Beaconchain().CurrentBlock().NumberU64()+1 {
-						// have crosslinks broadcasted by only leader or 1% of validators to avoid p2p spamming
-						if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-							node.BroadcastCrossLinkFromShardsToBeacon()
-						}
 						err := node.beaconSync.UpdateBlockAndStatus(
 							beaconBlock, node.Beaconchain(), true,
 						)
 						if err != nil {
 							node.beaconSync.AddLastMileBlock(beaconBlock)
+						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
+							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
+							// if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
+							node.BroadcastCrossLinkFromShardsToBeacon()
+							// }
 						}
 					}
 				}
