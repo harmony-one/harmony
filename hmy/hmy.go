@@ -116,9 +116,6 @@ type NodeAPI interface {
 	GetConfig() commonRPC.Config
 	ShutDown()
 	GetLastSigningPower() (float64, error)
-
-	// mmr APIs
-	// GetProof(txHash common.Hash, blockHash common.Hash, blockNumber, withRespectTo uint64) mmr.MmrProof
 }
 
 // New creates a new Harmony object (including the

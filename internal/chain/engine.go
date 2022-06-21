@@ -2,7 +2,6 @@ package chain
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 	"sort"
 	"time"
@@ -71,7 +70,6 @@ func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 func verifyMMR(chain engine.ChainReader, header *block.Header) error {
 	if chain.Config().IsCrossChain(header.Epoch()) {
 		if mmrRoot, err := chain.GetNewMMRRoot(header); err != nil || mmrRoot != header.MMRRoot() {
-			fmt.Println(err, header)
 			return engine.ErrInvalidMMRRoot
 		}
 	}

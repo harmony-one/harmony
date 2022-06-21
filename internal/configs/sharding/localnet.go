@@ -19,11 +19,11 @@ type localnetSchedule struct{}
 const (
 	localnetV1Epoch = 1
 
-	localnetEpochBlock1      = 5
-	localnetBlocksPerEpoch   = 30
-	localnetBlocksPerEpochV2 = 60
+	localnetEpochBlock1      = 10
+	localnetBlocksPerEpoch   = 5
+	localnetBlocksPerEpochV2 = 10
 
-	localnetVdfDifficulty = 500 // This takes about 10s to finish the vdf
+	localnetVdfDifficulty = 5000 // This takes about 10s to finish the vdf
 )
 
 func (ls localnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
@@ -100,11 +100,12 @@ func (ls localnetSchedule) EpochLastBlock(epochNum uint64) uint64 {
 	case epochNum == 0:
 		return localnetEpochBlock1 - 1
 	default:
+		firstBlock2s := ls.twoSecondsFirstBlock()
 		switch {
 		case params.LocalnetChainConfig.IsTwoSeconds(big.NewInt(int64(epochNum))):
-			return localnetEpochBlock1 - 1 + ls.BlocksPerEpoch()*(epochNum-localnetV1Epoch+1)
+			return firstBlock2s - 1 + ls.BlocksPerEpoch()*(epochNum-params.LocalnetChainConfig.TwoSecondsEpoch.Uint64()+1)
 		default: // genesis
-			return localnetEpochBlock1 - 1 + blocks*(epochNum-localnetV1Epoch+1)
+			return localnetEpochBlock1 - 1 + blocks*epochNum
 		}
 	}
 }

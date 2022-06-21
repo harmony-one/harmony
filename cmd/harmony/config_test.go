@@ -107,8 +107,7 @@ Version = "1.0.4"
 [WS]
   Enabled = true
   IP = "127.0.0.1"
-  Port = 9800
-`
+  Port = 9800`
 	testDir := filepath.Join(testBaseDir, t.Name())
 	os.RemoveAll(testDir)
 	os.MkdirAll(testDir, 0777)

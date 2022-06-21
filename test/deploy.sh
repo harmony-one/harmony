@@ -129,6 +129,7 @@ function launch_localnet() {
       args=("${args[@]}" --run.legacy)
       ;;
     esac
+
     # Start the node
     ${DRYRUN} "${ROOT}/bin/harmony" "${args[@]}" "${extra_args[@]}" 2>&1 | tee -a "${LOG_FILE}" &
   done <"${config}"

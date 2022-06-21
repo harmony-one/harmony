@@ -69,7 +69,9 @@ type ChainReader interface {
 
 	// ReadCommitSig read the commit sig of a given block number
 	ReadCommitSig(blockNum uint64) ([]byte, error)
-
+	// GetNewMMRRoot calculate MMRRoot for the new block header
+	// use to validate a new header or prepare new block header for proposing new block.
+	// it also work if the newHeader lower than the head block.
 	GetNewMMRRoot(newHeader *block.Header) (common.Hash, error)
 }
 

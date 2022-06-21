@@ -38,8 +38,8 @@ var (
 	// ErrViewIDNotMatch is returned if the current viewID is not equal message's viewID
 	ErrViewIDNotMatch = errors.New("viewID not match")
 
-	// ErrInvalidConsensusMessage is returned is the consensus message received is invalid
+	// ErrInvalidConsensusMessage is returned if the consensus message received is invalid
 	ErrInvalidConsensusMessage = errors.New("invalid consensus message")
-	// ErrInvalidConsensusMessage is returned is the consensus message received is invalid
+	// ErrInvalidMMRRoot is returned if the MMRRoot of a block header is invalid
 	ErrInvalidMMRRoot = errors.New("invalid MMRRoot")
 )
