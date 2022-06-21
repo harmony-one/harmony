@@ -68,7 +68,7 @@ func (e *engineImpl) SetBeaconchain(beaconchain engine.ChainReader) {
 }
 
 func verifyMMR(chain engine.ChainReader, header *block.Header) error {
-	if chain.Config().IsCrossChain(header.Epoch()) {
+	if chain.Config().IsMMRHeaderEpoch(header.Epoch()) {
 		if mmrRoot, err := chain.GetNewMMRRoot(header); err != nil || mmrRoot != header.MMRRoot() {
 			return engine.ErrInvalidMMRRoot
 		}

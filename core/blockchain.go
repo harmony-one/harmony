@@ -1203,7 +1203,7 @@ func (bc *BlockChain) WriteBlockWithState(
 		return NonStatTy, errors.New("Hash of parent block doesn't match the current block hash")
 	}
 
-	if bc.Config().IsCrossChain(block.Epoch()) {
+	if bc.Config().IsMMRHeaderEpoch(block.Epoch()) {
 		if err := bc.mmr.computeAndCheckNewMMRRoot(block.Header()); err != nil {
 			return NonStatTy, err
 		}

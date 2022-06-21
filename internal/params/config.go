@@ -69,7 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -107,7 +107,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
 		CrossShardXferPrecompileEpoch: big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
 		AllowlistEpoch:                big.NewInt(75907), // around Wed, 15 Jun 2022 22:58:03 GMT with average block time 2.0065s
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -146,7 +146,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -185,7 +185,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -224,7 +224,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -262,7 +262,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		CrossChainEpoch:               EpochTBD,
+		MMRHeaderEpoch:                EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -278,7 +278,7 @@ var (
 		big.NewInt(0),                      // AggregatedRewardEpoch
 		big.NewInt(0),                      // StakingEpoch
 		big.NewInt(0),                      // PreStakingEpoch
-		big.NewInt(0),                      // CrossChainEpoch
+		big.NewInt(0),                      // MMRHeaderEpoch
 		big.NewInt(0),                      // QuickUnlockEpoch
 		big.NewInt(0),                      // FiveSecondsEpoch
 		big.NewInt(0),                      // TwoSecondsEpoch
@@ -318,7 +318,7 @@ var (
 		big.NewInt(0),        // AggregatedRewardEpoch
 		big.NewInt(0),        // StakingEpoch
 		big.NewInt(0),        // PreStakingEpoch
-		big.NewInt(0),        // CrossChainEpoch
+		big.NewInt(0),        // MMRHeaderEpoch
 		big.NewInt(0),        // QuickUnlockEpoch
 		big.NewInt(0),        // FiveSecondsEpoch
 		big.NewInt(0),        // TwoSecondsEpoch
@@ -397,8 +397,8 @@ type ChainConfig struct {
 	// PreStakingEpoch is the epoch we allow staking transactions
 	PreStakingEpoch *big.Int `json:"prestaking-epoch,omitempty"`
 
-	// CrossChainEpoch is the epoch we start adding MMR root to block header
-	CrossChainEpoch *big.Int `json:"crosschain-epoch,omitempty"`
+	// MMRHeaderEpoch is the epoch we start adding MMR root to block header
+	MMRHeaderEpoch *big.Int `json:"crosschain-epoch,omitempty"`
 
 	// QuickUnlockEpoch is the epoch when undelegation will be unlocked at the current epoch
 	QuickUnlockEpoch *big.Int `json:"quick-unlock-epoch,omitempty"`
@@ -594,9 +594,9 @@ func (c *ChainConfig) IsPreStaking(epoch *big.Int) bool {
 	return isForked(c.PreStakingEpoch, epoch)
 }
 
-// IsCrossChain determines whether it is the epoch to support MMR root in the block header
-func (c *ChainConfig) IsCrossChain(epoch *big.Int) bool {
-	return isForked(c.CrossChainEpoch, epoch)
+// IsMMRHeaderEpoch determines whether it is the epoch to support MMR root in the block header
+func (c *ChainConfig) IsMMRHeaderEpoch(epoch *big.Int) bool {
+	return isForked(c.MMRHeaderEpoch, epoch)
 }
 
 // IsQuickUnlock determines whether it's the epoch when the undelegation should be unlocked at end of current epoch

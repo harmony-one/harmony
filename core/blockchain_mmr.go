@@ -39,8 +39,8 @@ func newMMR(bc *BlockChain) *BlockchainMMR {
 	curHeader := bc.CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	initEpoch := curEpoch
-	if curEpoch.Cmp(bc.Config().CrossChainEpoch) < 0 {
-		initEpoch = bc.Config().CrossChainEpoch
+	if curEpoch.Cmp(bc.Config().MMRHeaderEpoch) < 0 {
+		initEpoch = bc.Config().MMRHeaderEpoch
 	}
 	bm := &BlockchainMMR{
 		bc:       bc,
@@ -48,7 +48,7 @@ func newMMR(bc *BlockChain) *BlockchainMMR {
 		MemMmrDB: newMemMmrDB(initEpoch),
 		quit:     bc.quit,
 	}
-	if bc.Config().IsCrossChain(curEpoch) && !curHeader.IsLastBlockInEpoch() {
+	if bc.Config().IsMMRHeaderEpoch(curEpoch) && !curHeader.IsLastBlockInEpoch() {
 		headers := make([]*block.Header, 0)
 		headers = append(headers, curHeader)
 		for header := curHeader; header.Epoch().Cmp(curEpoch) == 0; {

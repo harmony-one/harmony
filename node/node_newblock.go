@@ -141,7 +141,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		err         error
 	)
 
-	if node.Blockchain().Config().IsCrossChain(header.Epoch()) {
+	if node.Blockchain().Config().IsMMRHeaderEpoch(header.Epoch()) {
 		mmrRoot, err := node.Blockchain().GetNewMMRRoot(header)
 		if err != nil {
 			return nil, err
