@@ -7,8 +7,6 @@ import (
 	"math/big"
 	"sort"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -178,18 +176,9 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 	// TODO Check for duplicate BLS Keys
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
-	var lastStakedVoter *AccommodateHarmonyVote
 
 	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
 	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
-
-	// Testnet incident recovery
-	// Make harmony nodes having 70% voting power for epoch 73314
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
-		epoch.Cmp(big.NewInt(73490)) <= 0 {
-		harmonyPercent = numeric.MustNewDecFromStr("0.70")
-		externalPercent = numeric.MustNewDecFromStr("0.40") // Make sure consensus is always good.
-	}
 
 	for i := range staked {
 		member := AccommodateHarmonyVote{
@@ -210,7 +199,6 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 			member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
 			member.OverallPercent = member.GroupPercent.Mul(externalPercent)
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
-			lastStakedVoter = &member
 		} else { // Our node
 			member.IsHarmonyNode = true
 			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
@@ -222,25 +210,6 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 			roster.Voters[staked[i].BLSPublicKey] = &member
 		} else {
 			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.Hex()).Msg("Duplicate BLS key found")
-		}
-	}
-
-	if !(nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && epoch.Cmp(big.NewInt(73305)) >= 0 &&
-		epoch.Cmp(big.NewInt(73490)) <= 0) {
-
-		// NOTE Enforce voting power sums to one,
-		// give diff (expect tiny amt) to last staked voter
-		if diff := numeric.OneDec().Sub(
-			ourPercentage.Add(theirPercentage),
-		); !diff.IsZero() && lastStakedVoter != nil {
-			lastStakedVoter.OverallPercent =
-				lastStakedVoter.OverallPercent.Add(diff)
-			theirPercentage = theirPercentage.Add(diff)
-		}
-
-		if lastStakedVoter != nil &&
-			!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
-			return nil, ErrVotingPowerNotEqualOne
 		}
 	}
 
