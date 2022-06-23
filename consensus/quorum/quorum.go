@@ -128,8 +128,8 @@ type Decider interface {
 		height, viewID uint64,
 	) (*votepower.Ballot, error)
 	IsQuorumAchieved(Phase) bool
-	IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool
-	QuorumThreshold(height uint64) numeric.Dec
+	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
+	QuorumThreshold() numeric.Dec
 	AmIMemberOfCommitee() bool
 	IsAllSigsCollected() bool
 	ResetPrepareAndCommitVotes()

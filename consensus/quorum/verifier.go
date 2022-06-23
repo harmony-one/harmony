@@ -13,7 +13,7 @@ import (
 // Verifier is the interface to verify the whether the quorum is achieved by mask at each epoch.
 // TODO: Add some unit tests to make sure Verifier get exactly the same result as Decider
 type Verifier interface {
-	IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool
+	IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool
 }
 
 // NewVerifier creates the quorum verifier for the given committee, epoch and whether the scenario
@@ -43,18 +43,15 @@ func newStakeVerifier(committee *shard.Committee, epoch *big.Int) (*stakeVerifie
 }
 
 // IsQuorumAchievedByMask returns whether the quorum is achieved with the provided mask
-func (sv *stakeVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool {
+func (sv *stakeVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	if mask == nil {
 		return false
 	}
 	vp := sv.r.VotePowerByMask(mask)
-	return vp.GT(sv.threshold(height))
+	return vp.GT(sv.threshold())
 }
 
-func (sv *stakeVerifier) threshold(height uint64) numeric.Dec {
-	if fixed := tryFixedThreshold(height); fixed != nil {
-		return *fixed
-	}
+func (sv *stakeVerifier) threshold() numeric.Dec {
 	return twoThird
 }
 
@@ -75,7 +72,7 @@ func newUniformVerifier(committee *shard.Committee) (*uniformVerifier, error) {
 
 // IsQuorumAchievedByMask returns whether the quorum is achieved with the provided mask,
 // which is whether more than (2/3+1) nodes is included in mask.
-func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool {
+func (uv *uniformVerifier) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
 	got := int64(len(mask.Publics))
 	exp := uv.thresholdKeyCount()
 	// Theoretically speaking, greater or equal will do the work. But current logic is more strict
