@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -23,6 +21,7 @@ import (
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
@@ -109,7 +108,19 @@ type SyncConfig struct {
 	// SyncPeerConfig itself is guarded by its own mutex.
 	mtx sync.RWMutex
 
-	peers []*SyncPeerConfig
+	peers   []*SyncPeerConfig
+	shardID uint32
+}
+
+func NewSyncConfig(shardID uint32, peers []*SyncPeerConfig) *SyncConfig {
+	return &SyncConfig{
+		peers:   peers,
+		shardID: shardID,
+	}
+}
+
+func (sc *SyncConfig) ShardID() uint32 {
+	return sc.shardID
 }
 
 // AddPeer adds the given sync peer.
@@ -148,7 +159,7 @@ func (sc *SyncConfig) PeersCount() int {
 }
 
 // RemovePeer removes a peer from SyncConfig
-func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
+func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
@@ -159,7 +170,10 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 			break
 		}
 	}
-	utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+	utils.Logger().Info().
+		Str("peerIP", peer.ip).
+		Str("peerPortMsg", peer.port).
+		Str("reason", reason).
 		Msg("[SYNC] remove GRPC peer")
 }
 
@@ -173,7 +187,7 @@ func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]b
 	stateSync.commonBlocks = make(map[int]*types.Block)
 	stateSync.lastMileBlocks = []*types.Block{}
 	stateSync.isExplorer = isExplorer
-	stateSync.syncConfig = &SyncConfig{}
+	stateSync.syncConfig = NewSyncConfig(bc.ShardID(), nil)
 
 	stateSync.syncStatus = newSyncStatus(role)
 	return stateSync
@@ -332,9 +346,9 @@ func (peerConfig *SyncPeerConfig) GetBlocks(hashes [][]byte) ([][]byte, error) {
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.
-func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
+func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
 	var err error
-	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, isBeacon)
+	ss.syncConfig, err = createSyncConfig(ss.syncConfig, peers, shardID)
 	return err
 }
 
@@ -487,7 +501,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
 					Msg("[SYNC] getConsensusHashes Nil Response")
-				ss.syncConfig.RemovePeer(peerConfig)
+				ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: nil response for GetBlockHashes", ss.blockChain.ShardID()))
 				return
 			}
 			utils.Logger().Info().Uint32("queried blockHash size", size).
@@ -557,7 +571,7 @@ func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
 						Msg("[SYNC] downloadBlocks: GetBlocks failed")
-					ss.syncConfig.RemovePeer(peerConfig)
+					ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: error returned for GetBlocks: %s", ss.blockChain.ShardID(), err.Error()))
 					return
 				}
 				if err != nil || len(payload) == 0 {

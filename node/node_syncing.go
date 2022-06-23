@@ -240,14 +240,13 @@ func (node *Node) doBeaconSyncing() {
 					Msg("cannot retrieve beacon syncing peers")
 				continue
 			}
-			if err := node.epochSync.CreateSyncConfig(peers, true); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
 				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
 				continue
 			}
 		}
 
-		node.epochSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil)
-		time.Sleep(SyncFrequency)
+		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), node.BeaconWorker, true, nil))
 	}
 }
 
@@ -282,7 +281,7 @@ func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinCon
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
+		if err := node.stateSync.CreateSyncConfig(peers, shardID); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).

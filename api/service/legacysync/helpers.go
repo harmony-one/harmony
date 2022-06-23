@@ -1,6 +1,7 @@
 package legacysync
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -28,7 +29,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[Sync]GetBlockChainHeight failed")
-				syncConfig.RemovePeer(peerConfig)
+				syncConfig.RemovePeer(peerConfig, fmt.Sprintf("failed getMaxPeerHeight for shard %d with message: %s", syncConfig.ShardID(), err.Error()))
 				return
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
@@ -50,7 +51,7 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 	return maxHeight
 }
 
-func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, isBeacon bool) (*SyncConfig, error) {
+func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) (*SyncConfig, error) {
 	// sanity check to ensure no duplicate peers
 	if err := checkPeersDuplicity(peers); err != nil {
 		return syncConfig, err
@@ -61,7 +62,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, isBeacon bool) (
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).
-		Bool("isBeacon", isBeacon).
+		Uint32("shardID", shardID).
 		Msg("[SYNC] CreateSyncConfig: len of peers")
 
 	if len(peers) == 0 {
@@ -70,7 +71,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, isBeacon bool) (
 	if syncConfig != nil {
 		syncConfig.CloseConnections()
 	}
-	syncConfig = &SyncConfig{}
+	syncConfig = NewSyncConfig(shardID, nil)
 
 	var wg sync.WaitGroup
 	for _, peer := range peers {
@@ -92,7 +93,7 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, isBeacon bool) (
 	wg.Wait()
 	utils.Logger().Info().
 		Int("len", len(syncConfig.peers)).
-		Bool("isBeacon", isBeacon).
+		Uint32("shardID", shardID).
 		Msg("[SYNC] Finished making connection to peers")
 
 	return syncConfig, nil
