@@ -1,6 +1,7 @@
 package legacysync
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -44,45 +45,35 @@ func (ss *EpochSync) GetSyncStatus() SyncCheckResult {
 
 // isInSync query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *EpochSync) isInSync(doubleCheck bool) SyncCheckResult {
+func (ss *EpochSync) isInSync(_ bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
 	otherHeight1 := getMaxPeerHeight(ss.syncConfig)
-	curBlock := ss.beaconChain.CurrentBlock()
-	epochLastBlock := shard.Schedule.EpochLastBlock(curBlock.Epoch().Uint64())
-	lastHeight := ss.beaconChain.CurrentBlock().NumberU64()
-
-	if !doubleCheck {
-		heightDiff := otherHeight1 - lastHeight
-		if otherHeight1 < lastHeight {
-			heightDiff = 0 //
-		}
-		inSync := epochLastBlock > otherHeight1
-		utils.Logger().Info().
+	if otherHeight1 == math.MaxUint64 {
+		utils.Logger().Error().
 			Uint64("OtherHeight", otherHeight1).
-			Uint64("lastHeight", lastHeight).
-			Msg("[EPOCHSYNC] Checking sync status")
-		return SyncCheckResult{
-			IsInSync:    inSync,
-			OtherHeight: otherHeight1,
-			HeightDiff:  heightDiff,
-		}
+			Int("Peers count", ss.syncConfig.PeersCount()).
+			Msg("[EPOCHSYNC] No peers for get height")
+		return SyncCheckResult{}
 	}
-	// double check the sync status after 1 second to confirm (avoid false alarm)
-	time.Sleep(1 * time.Second)
+	curEpoch := ss.beaconChain.CurrentBlock().Epoch().Uint64()
+	otherEpoch := shard.Schedule.CalcEpochNumber(otherHeight1).Uint64()
+	normalizedOtherEpoch := otherEpoch - 1
+	inSync := curEpoch == normalizedOtherEpoch
 
-	otherHeight2 := getMaxPeerHeight(ss.syncConfig)
-	inSync := epochLastBlock > otherHeight2
-
-	heightDiff := otherHeight2 - lastHeight
-	if otherHeight2 < lastHeight {
-		heightDiff = 0 // overflow
+	heightDiff := normalizedOtherEpoch - curEpoch
+	if normalizedOtherEpoch < curEpoch {
+		heightDiff = 0
 	}
 
+	utils.Logger().Info().
+		Uint64("OtherEpoch", otherEpoch).
+		Uint64("CurrentEpoch", curEpoch).
+		Msg("[EPOCHSYNC] Checking sync status")
 	return SyncCheckResult{
 		IsInSync:    inSync,
-		OtherHeight: otherHeight2,
+		OtherHeight: otherHeight1,
 		HeightDiff:  heightDiff,
 	}
 }
@@ -108,30 +99,28 @@ func (ss *EpochSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
 	maxHeight := getMaxPeerHeight(ss.syncConfig)
 	for {
-		block := bc.CurrentBlock()
-		height := block.NumberU64()
-		if height >= maxHeight {
+		curEpoch := bc.CurrentBlock().Epoch().Uint64()
+		otherEpoch := shard.Schedule.CalcEpochNumber(maxHeight).Uint64()
+		if otherEpoch-1 <= curEpoch {
 			utils.Logger().Info().
-				Msgf("[EPOCHSYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					isBeacon, bc.ShardID(), maxHeight, height)
+				Msgf("[EPOCHSYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
+					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
 			return 60
 		}
 
 		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d, peers count %d)",
-				isBeacon, bc.ShardID(), maxHeight, height, ss.syncConfig.PeersCount())
+			Msgf("[EPOCHSYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d, peers count %d)",
+				isBeacon, bc.ShardID(), otherEpoch, curEpoch, ss.syncConfig.PeersCount())
 
 		var heights []uint64
-		curEpoch := block.Epoch()
-		for i := 0; i < int(SyncLoopBatchSize); i++ {
-			epochLastBlock := shard.Schedule.EpochLastBlock(curEpoch.Uint64())
-			if epochLastBlock > maxHeight {
+		loopEpoch := curEpoch + 1
+		for len(heights) < int(SyncLoopBatchSize) {
+			epochLastBlockHeight := shard.Schedule.EpochLastBlock(loopEpoch)
+			if epochLastBlockHeight > maxHeight {
 				break
 			}
-			if height != epochLastBlock {
-				heights = append(heights, epochLastBlock)
-			}
-			curEpoch = curEpoch.Add(curEpoch, common.Big1)
+			heights = append(heights, epochLastBlockHeight)
+			loopEpoch = loopEpoch + 1
 		}
 
 		if len(heights) == 0 {
@@ -142,8 +131,8 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		err := ss.ProcessStateSync(heights, bc, worker)
 		if err != nil {
 			utils.Logger().Error().Err(err).
-				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					isBeacon, bc.ShardID(), maxHeight, height)
+				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
+					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
 			return 2
 		}
 	}
