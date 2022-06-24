@@ -104,8 +104,19 @@ func TestCompareSyncPeerConfigByblockHashes(t *testing.T) {
 		0, "syncPeerConfig1 is less than syncPeerConfig2")
 }
 
+type mockBlockchain struct {
+}
+
+func (mockBlockchain) CurrentBlock() *types.Block {
+	panic("implement me")
+}
+
+func (mockBlockchain) ShardID() uint32 {
+	return 0
+}
+
 func TestCreateStateSync(t *testing.T) {
-	stateSync := CreateStateSync(nil, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
+	stateSync := CreateStateSync(mockBlockchain{}, "127.0.0.1", "8000", [20]byte{}, false, nodeconfig.Validator)
 
 	if stateSync == nil {
 		t.Error("Unable to create stateSync")

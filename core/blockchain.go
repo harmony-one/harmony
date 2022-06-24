@@ -143,6 +143,7 @@ type BlockChain struct {
 	chainConfig            *params.ChainConfig // Chain & network configuration
 	cacheConfig            *CacheConfig        // Cache configuration for pruning
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
+	shardID                uint32              // Shard number
 
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
@@ -299,6 +300,7 @@ func newBlockChainWithOptions(
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
 	}
+	bc.shardID = bc.CurrentBlock().ShardID()
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -506,7 +508,7 @@ func (bc *BlockChain) SetHead(head uint64) error {
 // ShardID returns the shard Id of the blockchain.
 // TODO: use a better solution before resharding shuffle nodes to different shards
 func (bc *BlockChain) ShardID() uint32 {
-	return bc.CurrentBlock().ShardID()
+	return bc.shardID
 }
 
 // GasLimit returns the gas limit of the current HEAD block.

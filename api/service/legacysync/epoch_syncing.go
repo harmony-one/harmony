@@ -20,7 +20,7 @@ import (
 )
 
 type EpochSync struct {
-	beaconChain        *core.BlockChain
+	beaconChain        blockChain
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination

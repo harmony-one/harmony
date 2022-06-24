@@ -178,7 +178,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
+func CreateStateSync(bc blockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -193,9 +193,15 @@ func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]b
 	return stateSync
 }
 
+// Small subset from Blockchain struct.
+type blockChain interface {
+	CurrentBlock() *types.Block
+	ShardID() uint32
+}
+
 // StateSync is the struct that implements StateSyncInterface.
 type StateSync struct {
-	blockChain         *core.BlockChain
+	blockChain         blockChain
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
