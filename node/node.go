@@ -165,21 +165,46 @@ func (node *Node) Blockchain() *core.BlockChain {
 	return bc
 }
 
-// Blockchain returns the blockchain for the node's current shard.
 func (node *Node) SyncInstance(isBeacon bool) ISync {
+	return node.GetOrCreateSyncInstance(isBeacon, true)
+}
+
+func (node *Node) SyncInstanceInitiated(isBeacon bool) bool {
+	return node.GetOrCreateSyncInstance(isBeacon, false) != nil
+}
+
+// Blockchain returns the blockchain for the node's current shard.
+// if rebuild sets to true, it generates a new instance 
+func (node *Node) GetOrCreateSyncInstance(isBeacon bool, initiate bool) ISync {
+	// check beacon instance first
 	if isBeacon {
-		var syncInstance ISync
-		if syncInstance = node.beaconSync; node.NodeConfig.StagedSync == true {
-			syncInstance = node.beaconStagedSync
+		if node.NodeConfig.StagedSync {
+			if initiate && node.beaconStagedSync == nil {
+				utils.Logger().Info().Msg("initializing staged beacon sync")
+				node.beaconStagedSync = node.createStagedSync(node.Blockchain(), true)
+			}
+			return node.beaconStagedSync
 		}
-		return syncInstance
+		if initiate && node.beaconSync == nil {
+			utils.Logger().Info().Msg("initializing beacon sync")
+			node.beaconSync = node.createStateSync(node.Beaconchain())
+		}
+		return node.beaconSync
 	}
 
-	var syncInstance ISync
-	if syncInstance = node.stateSync; node.NodeConfig.StagedSync == true {
-		syncInstance = node.stateStagedSync
+	// otherwise, return an instance of state sync, either legacy or staged 
+	if node.NodeConfig.StagedSync {
+		if initiate && node.stateStagedSync == nil {
+			utils.Logger().Info().Msg("initializing staged state sync")
+			node.stateStagedSync = node.createStagedSync(node.Blockchain(), false)
+		}
+		return node.stateStagedSync
 	}
-	return syncInstance
+	if initiate && node.stateSync == nil {
+		utils.Logger().Info().Msg("initializing legacy state sync")
+		node.stateSync = node.createStateSync(node.Beaconchain())
+	}
+	return node.stateSync
 }
 
 // Beaconchain returns the beaconchain from node.
