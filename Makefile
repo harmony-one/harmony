@@ -1,6 +1,6 @@
 TOP:=$(realpath ..)
 export CGO_CFLAGS:=-I$(TOP)/bls/include -I$(TOP)/mcl/include -I/usr/local/opt/openssl/include
-export CGO_LDFLAGS:=-L$(TOP)/bls/lib -L/usr/local/opt/openssl/lib -L:/usr/lib
+export CGO_LDFLAGS:=-L$(TOP)/bls/lib -L/usr/local/opt/openssl/lib
 export LD_LIBRARY_PATH:=$(TOP)/bls/lib:$(TOP)/mcl/lib:/usr/local/opt/openssl/lib:/opt/homebrew/opt/gmp/lib/:/opt/homebrew/opt/openssl/lib:/usr/lib
 export LIBRARY_PATH:=$(LD_LIBRARY_PATH)
 export DYLD_FALLBACK_LIBRARY_PATH:=$(LD_LIBRARY_PATH)

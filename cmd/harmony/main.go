@@ -240,11 +240,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 }
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
-	console := config.Log.Console
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
-	rotateSize := config.Log.RotateSize
-	rotateCount := config.Log.RotateCount
-	rotateMaxAge := config.Log.RotateMaxAge
 	verbosity := config.Log.Verbosity
 
 	utils.SetLogVerbosity(log.Lvl(verbosity))
@@ -253,8 +249,9 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 		port := config.Log.Context.Port
 		utils.SetLogContext(ip, strconv.Itoa(port))
 	}
-	if console != true {
-		utils.AddLogFile(logPath, rotateSize, rotateCount, rotateMaxAge)
+
+	if config.Log.Console != true {
+		utils.AddLogFile(logPath, config.Log.RotateSize, config.Log.RotateCount, config.Log.RotateMaxAge)
 	}
 }
 
