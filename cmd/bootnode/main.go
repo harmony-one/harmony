@@ -92,7 +92,7 @@ func printVersion(me string) {
 func main() {
 	ip := flag.String("ip", "127.0.0.1", "IP of the node")
 	port := flag.String("port", "9876", "port of the node.")
-	consoleOnly := flag.Bool("console_only", false, "Output to stdout only")
+	console := flag.Bool("console_only", false, "Output to stdout only")
 	logFolder := flag.String("log_folder", "latest", "the folder collecting the logs of this execution")
 	logMaxSize := flag.Int("log_max_size", 100, "the max size in megabytes of the log file before it gets rotated")
 	logRotateCount := flag.Int("log_rotate_count", 0, "the number of rotated logs to keep. If set to 0 rotation is disabled")
@@ -112,7 +112,10 @@ func main() {
 	// Logging setup
 	utils.SetLogContext(*port, *ip)
 	utils.SetLogVerbosity(log.Lvl(*verbosity))
-	if *consoleOnly == false {
+
+	fmt.Printf("console%v", *console)
+
+	if *console != true {
 		utils.AddLogFile(fmt.Sprintf("%v/bootnode-%v-%v.log", *logFolder, *ip, *port), *logMaxSize, *logRotateCount, *logRotateMaxAge)
 	}
 

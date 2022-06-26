@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 export GO111MODULE=on
 
 declare -A SRC
@@ -96,6 +98,12 @@ EOF
 
 function build_only
 {
+
+   TOP=/home/jason/workspace/consensys/github/jasonyic
+   export LD_LIBRARY_PATH=${TOP}/bls/lib:${TOP}/mcl/lib:/usr/lib
+
+   echo "XXXXXXX: $LD_LIBRARY_PATH"
+  
    if [[ "$STATIC" == "true" && "$GOOS" == "darwin" ]]; then
       echo "static build only supported on Linux platform"
       exit 2
@@ -154,9 +162,9 @@ function build_only
 
       $MD5 "${!SRC[@]}" "${!LIB[@]}" > md5sum.txt
       # hardcode the prebuilt libcrypto to md5sum.txt
-      if [ "$(uname -s)" == "Linux" ]; then
-         echo '771150db04267126823190c873a96e48  libcrypto.so.10' >> md5sum.txt
-      fi
+      #if [ "$(uname -s)" == "Linux" ]; then
+      #   echo '771150db04267126823190c873a96e48  libcrypto.so.10' >> md5sum.txt
+      #fi
    fi
    popd
 }
