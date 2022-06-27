@@ -1,0 +1,55 @@
+version: '3.6'
+services:
+  init:
+    image: alpine
+    command:
+      - /bin/sh
+      - -c
+      - |
+        rm -rfv /data/*
+        rm -rfv /log/*
+        echo "done cleaning data directory"
+    volumes:
+      - data:/data
+      - log:/log
+
+  harmony:
+    build:
+      context: ../../
+      dockerfile: ./scripts/docker/Dockerfile
+      args:
+        - HARMONY_VERSION=v4.3.10
+        - HARMONY_USER=harmony
+        - HARMONY_USER_UID=1000
+        - HARMONY_USER_GID=1000
+    environment:
+      - HARMONY_NETWORK_NETWORKTYPE=mainnet
+      - HARMONY_GENERAL_NODETYPE=validator
+      - HARMONY_GENERAL_ISARCHIVE=false
+      - HARMONY_HTTP_ROSETTAENABLED=true
+      - HARMONY_GENERAL_SHARDID=0
+      - HARMONY_GENERAL_TRACEENABLE=true
+      - HARMONY_LOG_CONSOLE=true
+      - HARMONY_LOG_VERBOSITY=4
+      - HARMONY_RPCOPT_DEBUGENABLED=true
+      - HARMONY_PPROF_ENABLED=true
+    restart: unless-stopped
+    ports:
+      - 6000:6000
+      - 9500:9500
+      - 9000:9000
+      - 9700:9700
+      - 9900:9900
+    healthcheck:
+      test: netstat -tunlp | grep 9500 > /dev/null; if [ 0 != $$? ]; then exit 1; else exit 0; fi;
+      interval: 5s
+      retries: 5
+      start_period: 10s
+      timeout: 3s
+    volumes:
+      - data:/data
+      - log:/harmony/log
+
+volumes:
+  data:
+  log:

@@ -1,31 +1,43 @@
-FROM alpine
+FROM alpine:3.16.0
 
-RUN apk add --no-cache bash libstdc++ gmp-dev libc6-compat bind-tools jq && ln -s libcrypto.so.1.1 /lib/libcrypto.so.10
+ARG HARMONY_VERSION=v4.3.10
+ARG HARMONY_USER=harmony
+ARG HARMONY_USER_UID=1000
+ARG HARMONY_USER_GID=1000
 
-# default base port, rpc port and rest port
-EXPOSE 9000/tcp 9500/tcp 9800/tcp 6000/tcp
+ENV HARMONY_HOME=/harmony
+ENV HOME=${HARMONY_HOME}
 
-VOLUME ["/harmony/harmony_db_0","/harmony/harmony_db_1","/harmony/harmony_db_2","/harmony/harmony_db_3","/harmony/log","/harmony/.hmy"]
+RUN apk add --no-cache bash~=5.1.16-r2 bind-tools~=9.16.29-r0 tini~=0.19.0 curl==7.83.1-r1 sed~=4.8-r0 \
+    && rm -rf /var/cache/apk/* \
+    && addgroup -g ${HARMONY_USER_GID} ${HARMONY_USER} \
+    && adduser -u ${HARMONY_USER_UID} -G ${HARMONY_USER} --shell /sbin/nologin --no-create-home -D ${HARMONY_USER} \
+    && addgroup ${HARMONY_USER} tty \
+    && sed -i -e "s/bin\/sh/bin\/bash/" /etc/passwd
 
-# Default BN for S3/mainnet
-ENV NODE_BN_MNET "/ip4/100.26.90.187/tcp/9874/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/54.213.43.194/tcp/9874/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/13.113.101.219/tcp/12019/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX,/ip4/99.81.170.167/tcp/12019/p2p/QmRVbTpEYup8dSaURZfF6ByrMTSKa4UyUzJhSjahFzRqNj"
+RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc \
+    && echo "Version: ${HARMONY_VERSION}" > /etc/motd \
+    && curl -LO https://harmony.one/hmycli \
+    && chmod +x hmycli \
+    && mv hmycli /usr/local/bin/hmy
 
-# Long Running Test Net
-ENV NODE_BN_LRTN "/ip4/54.213.43.194/tcp/9868/p2p/QmZJJx6AdaoEkGLrYG4JeLCKeCKDjnFz2wfHNHxAqFSGA9,/ip4/100.26.90.187/tcp/9868/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/13.113.101.219/tcp/12018/p2p/QmQayinFSgMMw5cSpDUiD9pQ2WeP6WNmGxpZ6ou3mdVFJX"
+WORKDIR ${HARMONY_HOME}
 
-# Open Staking Test Net
-ENV NODE_BN_OSTN "/ip4/54.86.126.90/tcp/9880/p2p/Qmdfjtk6hPoyrH1zVD9PEH4zfWLo38dP2mDvvKXfh3tnEv,/ip4/52.40.84.2/tcp/9880/p2p/QmbPVwrqWsTYXq1RxGWcxx9SWaTUCfoo1wA6wmdbduWe29"
+COPY bin/harmony ./scripts/docker/docker-entrypoint.sh ./
 
-ENV NODE_PORT "9000"
-ENV NODE_BLSKEY ""
-ENV NODE_BLSPASS ""
-ENV NODE_DNS_ZONE "t.hmny.io"
-ENV NODE_RPC "true"
-ENV NODE_BLACKLIST ""
-ENV NODE_NETWORK_TYPE "mainnet"
+# Use testnet configuration as default
+RUN chmod +x harmony docker-entrypoint.sh \
+    && mv harmony /usr/local/bin/harmony \
+    && harmony config dump --network testnet harmony.conf \
+    && mkdir -p /data \
+    && chown -R ${HARMONY_USER_UID}:${HARMONY_USER_GID} ${HARMONY_HOME} /data
 
-ENTRYPOINT ["/bin/run"]
-WORKDIR /harmony
+VOLUME /data
 
-COPY run /bin/run
-COPY harmony /bin/
+USER ${HARMONY_USER_UID}:${HARMONY_USER_GID}
+
+# NODE p2p (9000), pprof (6060), rpc (9500), ws (9800), rosetta (9700), DNS Sync (6000)
+EXPOSE 9000/udp 9000/tcp 6060/tcp 9500/tcp 9800/tcp 9700/tcp 6000/tcp
+
+ENTRYPOINT ["/sbin/tini", "--", "./docker-entrypoint.sh"]
+CMD ["harmony", "-c", "harmony.conf"]

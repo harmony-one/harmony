@@ -103,6 +103,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		CacheTime:       10,
 		CacheSize:       512,
 	},
+	Prometheus: &defaultPrometheusConfig,
 }
 
 var defaultSysConfig = harmonyconfig.SysConfig{

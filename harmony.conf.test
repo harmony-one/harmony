@@ -1,0 +1,119 @@
+Version = "2.5.3"
+
+[BLSKeys]
+  KMSConfigFile = ""
+  KMSConfigSrcType = "shared"
+  KMSEnabled = false
+  KeyDir = "./.hmy/blskeys"
+  KeyFiles = []
+  MaxKeys = 10
+  PassEnabled = true
+  PassFile = ""
+  PassSrcType = "auto"
+  SavePassphrase = false
+
+[DNSSync]
+  Client = true
+  LegacySyncing = false
+  Port = 6000
+  Server = true
+  ServerPort = 6000
+  Zone = "b.hmny.io"
+
+[General]
+  DataDir = "./"
+  EnablePruneBeaconChain = false
+  IsArchival = false
+  IsBackup = false
+  IsBeaconArchival = false
+  IsOffline = false
+  NoStaking = false
+  NodeType = "validator"
+  ShardID = -1
+  TraceEnable = false
+
+[HTTP]
+  AuthPort = 9501
+  Enabled = true
+  IP = "127.0.0.1"
+  Port = 9500
+  RosettaEnabled = false
+  RosettaPort = 9700
+
+[Log]
+  Console = false
+  FileName = "harmony.log"
+  Folder = "./latest"
+  RotateCount = 0
+  RotateMaxAge = 0
+  RotateSize = 100
+  Verbosity = 3
+
+  [Log.VerbosePrints]
+    Config = true
+
+[Network]
+  BootNodes = ["/dnsaddr/bootstrap.b.hmny.io"]
+  NetworkType = "testnet"
+
+[P2P]
+  DisablePrivateIPScan = false
+  DiscConcurrency = 0
+  IP = "0.0.0.0"
+  KeyFile = "./.hmykey"
+  MaxConnsPerIP = 10
+  Port = 9000
+
+[Pprof]
+  Enabled = false
+  Folder = "./profiles"
+  ListenAddr = "127.0.0.1:6060"
+  ProfileDebugValues = [0]
+  ProfileIntervals = [600]
+  ProfileNames = []
+
+[Prometheus]
+  EnablePush = false
+  Enabled = true
+  Gateway = "https://gateway.harmony.one"
+  IP = "0.0.0.0"
+  Port = 9900
+
+[RPCOpt]
+  DebugEnabled = false
+  EthRPCsEnabled = true
+  LegacyRPCsEnabled = true
+  RateLimterEnabled = true
+  RequestsPerSecond = 1000
+  RpcFilterFile = "./.hmy/rpc_filter.txt"
+  StakingRPCsEnabled = true
+
+[ShardData]
+  CacheSize = 512
+  CacheTime = 10
+  DiskCount = 8
+  EnableShardData = false
+  ShardCount = 4
+
+[Sync]
+  Concurrency = 2
+  DiscBatch = 3
+  DiscHardLowCap = 2
+  DiscHighCap = 1024
+  DiscSoftLowCap = 2
+  Downloader = false
+  Enabled = true
+  InitStreams = 2
+  MinPeers = 2
+
+[TxPool]
+  AccountSlots = 16
+  BlacklistFile = "./.hmy/blacklist.txt"
+  LocalAccountsFile = "./.hmy/locals.txt"
+  RosettaFixFile = ""
+
+[WS]
+  AuthPort = 9801
+  Enabled = true
+  IP = "127.0.0.1"
+  Port = 9800
