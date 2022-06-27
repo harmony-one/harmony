@@ -234,6 +234,7 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	applySysFlags(cmd, config)
 	applyDevnetFlags(cmd, config)
 	applyRevertFlags(cmd, config)
+	applyPruneRewardFlag(cmd, config)
 	applyPrometheusFlags(cmd, config)
 	applySyncFlags(cmd, config)
 	applyShardDataFlags(cmd, config)
@@ -370,6 +371,29 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 				Msg("Revert finished.")
 			os.Exit(1)
 		}
+	}
+
+	// prune rewards from archival node
+	shouldPrune := hc.PruneReward != nil && hc.PruneReward.TakeAction && // asked
+		(hc.General.IsBeaconArchival || (hc.General.IsArchival && hc.General.ShardID == 0)) // eligible
+	if shouldPrune {
+		chain := currentNode.Beaconchain()
+		curNum := chain.CurrentBlock().NumberU64()
+		if curNum == 0 {
+			fmt.Println("No rewards to prune because we are at genesis block")
+			os.Exit(1)
+		}
+
+		// ClearValidatorWrappersBetweenBlocks takes care of printing to stdout
+		if err := chain.ClearValidatorWrappersBetweenBlocks(
+			chain.ClearValidatorWrappersAtMinBlock, // start
+			curNum-core.ClearValidatorWrappersLag,  // end
+		); err != nil {
+			// if a single block fails, exit
+			os.Exit(1)
+		}
+		// no failures, we are done with this cli
+		os.Exit(1) // same as revert exit code
 	}
 
 	startMsg := "==== New Harmony Node ===="

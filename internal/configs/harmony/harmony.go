@@ -9,26 +9,27 @@ import (
 // from user set flags to internal node configs. Also user can persist this structure to a toml file
 // to avoid inputting all arguments.
 type HarmonyConfig struct {
-	Version    string
-	General    GeneralConfig
-	Network    NetworkConfig
-	P2P        P2pConfig
-	HTTP       HttpConfig
-	WS         WsConfig
-	RPCOpt     RpcOptConfig
-	BLSKeys    BlsConfig
-	TxPool     TxPoolConfig
-	Pprof      PprofConfig
-	Log        LogConfig
-	Sync       SyncConfig
-	Sys        *SysConfig        `toml:",omitempty"`
-	Consensus  *ConsensusConfig  `toml:",omitempty"`
-	Devnet     *DevnetConfig     `toml:",omitempty"`
-	Revert     *RevertConfig     `toml:",omitempty"`
-	Legacy     *LegacyConfig     `toml:",omitempty"`
-	Prometheus *PrometheusConfig `toml:",omitempty"`
-	DNSSync    DnsSync
-	ShardData  ShardDataConfig
+	Version     string
+	General     GeneralConfig
+	Network     NetworkConfig
+	P2P         P2pConfig
+	HTTP        HttpConfig
+	WS          WsConfig
+	RPCOpt      RpcOptConfig
+	BLSKeys     BlsConfig
+	TxPool      TxPoolConfig
+	Pprof       PprofConfig
+	Log         LogConfig
+	Sync        SyncConfig
+	Sys         *SysConfig        `toml:",omitempty"`
+	Consensus   *ConsensusConfig  `toml:",omitempty"`
+	Devnet      *DevnetConfig     `toml:",omitempty"`
+	Revert      *RevertConfig     `toml:",omitempty"`
+	Legacy      *LegacyConfig     `toml:",omitempty"`
+	Prometheus  *PrometheusConfig `toml:",omitempty"`
+	DNSSync     DnsSync
+	ShardData   ShardDataConfig
+	PruneReward *PruneRewardConfig `toml:",omitempty"`
 }
 
 type DnsSync struct {
@@ -188,6 +189,10 @@ type RevertConfig struct {
 	RevertBeacon bool
 	RevertTo     int
 	RevertBefore int
+}
+
+type PruneRewardConfig struct {
+	TakeAction bool
 }
 
 type LegacyConfig struct {

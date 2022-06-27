@@ -332,6 +332,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, sysFlags...)
 	flags = append(flags, devnetFlags...)
 	flags = append(flags, revertFlags...)
+	flags = append(flags, pruneRewardFlag)
 	flags = append(flags, legacyMiscFlags...)
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
@@ -1451,6 +1452,22 @@ func applyRevertFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		if cli.IsFlagChanged(cmd, legacyRevertToFlag) {
 			config.Revert.RevertTo = cli.GetIntFlagValue(cmd, legacyRevertToFlag)
 		}
+	}
+}
+
+var (
+	pruneRewardFlag = cli.BoolFlag{
+		Name:     "prune.rewards",
+		Usage:    "On (beacon) archival nodes, prune the rewards data from validator wrappers. Exits when done.",
+		DefValue: defaultPruneRewardConfig.TakeAction,
+	}
+)
+
+func applyPruneRewardFlag(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
+	if cli.IsFlagChanged(cmd, pruneRewardFlag) {
+		cfg := getDefaultPruneRewardConfigCopy()
+		cfg.TakeAction = cli.GetBoolFlagValue(cmd, pruneRewardFlag)
+		config.PruneReward = &cfg
 	}
 }
 

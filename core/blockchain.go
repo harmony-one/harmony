@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -45,6 +46,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -80,6 +82,10 @@ var (
 	blockExecutionTimer  = metrics.NewRegisteredTimer("chain/execution", nil)
 	blockWriteTimer      = metrics.NewRegisteredTimer("chain/write", nil)
 
+	// counter and timer to keep track of wrapper pruning
+	pruneWrappersCounter = metrics.NewRegisteredCounter("chain/wrappersPruned/count", nil)
+	pruneWrappersTimer   = metrics.NewRegisteredTimer("chain/wrappersPruned/time", nil)
+
 	// ErrNoGenesis is the error when there is no genesis.
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 	// errExceedMaxPendingSlashes ..
@@ -109,6 +115,8 @@ const (
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	BlockChainVersion = 3
 	pendingCLCacheKey = "pendingCLs"
+	// Number of blocks ago to trim validator wrappers
+	ClearValidatorWrappersLag = 32768
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -192,6 +200,9 @@ type BlockChain struct {
 	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
+
+	// minimum block number for clearing validator wrappers
+	ClearValidatorWrappersAtMinBlock uint64
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -225,35 +236,50 @@ func NewBlockChain(
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
 
+	var minNum uint64
+	if cacheConfig.Disabled {
+		if chainConfig.PreStakingEpoch.Cmp(common.Big0) == 0 {
+			minNum = 0
+		} else {
+			targetEpoch := new(big.Int).Add(chainConfig.PreStakingEpoch, big.NewInt(-1))
+			minNum = shard.Schedule.EpochLastBlock(
+				targetEpoch.Uint64(),
+			) + 1
+		}
+	} else {
+		minNum = math.MaxUint64
+	}
+
 	bc := &BlockChain{
-		chainConfig:                   chainConfig,
-		cacheConfig:                   cacheConfig,
-		db:                            db,
-		triegc:                        prque.New(nil),
-		stateCache:                    state.NewDatabase(db),
-		quit:                          make(chan struct{}),
-		shouldPreserve:                shouldPreserve,
-		bodyCache:                     bodyCache,
-		bodyRLPCache:                  bodyRLPCache,
-		receiptsCache:                 receiptsCache,
-		blockCache:                    blockCache,
-		futureBlocks:                  futureBlocks,
-		shardStateCache:               shardCache,
-		lastCommitsCache:              commitsCache,
-		epochCache:                    epochCache,
-		randomnessCache:               randomnessCache,
-		validatorSnapshotCache:        validatorCache,
-		validatorStatsCache:           validatorStatsCache,
-		validatorListCache:            validatorListCache,
-		validatorListByDelegatorCache: validatorListByDelegatorCache,
-		pendingCrossLinksCache:        pendingCrossLinksCache,
-		blockAccumulatorCache:         blockAccumulatorCache,
-		blockchainPruner:              newBlockchainPruner(db),
-		engine:                        engine,
-		vmConfig:                      vmConfig,
-		badBlocks:                     badBlocks,
-		pendingSlashes:                slash.Records{},
-		maxGarbCollectedBlkNum:        -1,
+		chainConfig:                      chainConfig,
+		cacheConfig:                      cacheConfig,
+		db:                               db,
+		triegc:                           prque.New(nil),
+		stateCache:                       state.NewDatabase(db),
+		quit:                             make(chan struct{}),
+		shouldPreserve:                   shouldPreserve,
+		bodyCache:                        bodyCache,
+		bodyRLPCache:                     bodyRLPCache,
+		receiptsCache:                    receiptsCache,
+		blockCache:                       blockCache,
+		futureBlocks:                     futureBlocks,
+		shardStateCache:                  shardCache,
+		lastCommitsCache:                 commitsCache,
+		epochCache:                       epochCache,
+		randomnessCache:                  randomnessCache,
+		validatorSnapshotCache:           validatorCache,
+		validatorStatsCache:              validatorStatsCache,
+		validatorListCache:               validatorListCache,
+		validatorListByDelegatorCache:    validatorListByDelegatorCache,
+		pendingCrossLinksCache:           pendingCrossLinksCache,
+		blockAccumulatorCache:            blockAccumulatorCache,
+		blockchainPruner:                 newBlockchainPruner(db),
+		engine:                           engine,
+		vmConfig:                         vmConfig,
+		badBlocks:                        badBlocks,
+		pendingSlashes:                   slash.Records{},
+		maxGarbCollectedBlkNum:           -1,
+		ClearValidatorWrappersAtMinBlock: minNum,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -1262,6 +1288,16 @@ func (bc *BlockChain) WriteBlockWithState(
 					triedb.Dereference(root.(common.Hash))
 				}
 			}
+		}
+	}
+
+	if bc.cacheConfig.Disabled { // archival node
+		laggedNumber := currentBlock.NumberU64() - ClearValidatorWrappersLag
+		if laggedNumber >= bc.ClearValidatorWrappersAtMinBlock {
+			// no error checking here as this is not crucial to the node operation
+			bc.ClearValidatorWrappersBetweenBlocks(
+				laggedNumber, laggedNumber,
+			)
 		}
 	}
 
@@ -3179,4 +3215,115 @@ func isUnrecoverableErr(err error) bool {
 	isLeveldbErr := strings.Contains(err.Error(), leveldbErrSpec)
 	isTooManyOpenFiles := strings.Contains(err.Error(), tooManyOpenFilesErrStr)
 	return isLeveldbErr && !isTooManyOpenFiles
+}
+
+// ClearValidatorWrappersBetweenBlocks will iterate over start and end blocks
+// (both inclusive) to clear out the validator wrapper information from each of them
+func (bc *BlockChain) ClearValidatorWrappersBetweenBlocks(
+	start uint64,
+	end uint64,
+) (result error) {
+	// this is the disk db so we can use it directly
+	batch := bc.db.NewBatch()
+	defer func() {
+		// flush out any remainder data from the last batch
+		if err := batch.Write(); err != nil {
+			if isUnrecoverableErr(err) {
+				fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+				os.Exit(1)
+			}
+			result = err
+		}
+	}()
+	currentState, err := bc.State()
+	if err != nil {
+		return errors.Wrapf(err, "state for current block not found")
+	}
+	// TODO: Is this list available by block?
+	validators, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+	// start from the top and work backwards so that we can assess the space saved faster
+	for i := end; i >= start; i-- {
+		startTime := time.Now()
+		if err := bc.clearValidatorWrappersAtBlock(i, batch, currentState, validators); err != nil {
+			pruneWrappersTimer.UpdateSince(startTime)
+			utils.Logger().Error().AnErr("err", err).
+				Int64("elapsed time", time.Since(startTime).Milliseconds()).
+				Uint64("blockNum", i).
+				Msg("ClearValidatorWrappersBetweenBlocks")
+			fmt.Printf(
+				"Could not clear wrappers at block %d due to %s\n", i, err,
+			)
+			return err
+		} else {
+			pruneWrappersCounter.Inc(1)
+			pruneWrappersTimer.UpdateSince(startTime)
+			utils.Logger().Info().
+				Int64("elapsed time", time.Since(startTime).Milliseconds()).
+				Uint64("blockNum", i).
+				Msg("ClearValidatorWrappersBetweenBlocks")
+			fmt.Printf(
+				"Successfully cleared wrappers at block %d\n", i,
+			)
+		}
+	}
+	return nil
+}
+
+// clearValidatorWrappersAtBlock is the internal locked version used by
+// ClearValidatorWrappersBetweenBlocks to clear wrappers from the specified block.
+// the caller MUST commit any remaining data from batch once done
+func (bc *BlockChain) clearValidatorWrappersAtBlock(
+	number uint64,
+	batch ethdb.Batch,
+	currentState *state.DB,
+	validators []common.Address,
+) (result error) {
+	if number == 0 {
+		return errors.New("cannot clear validator wrappers from genesis block")
+	}
+	block := bc.GetBlockByNumber(number)
+	if block == nil {
+		return errors.New(fmt.Sprintf("block %d not found", number))
+	}
+	state, err := bc.StateAt(block.Root())
+	if err != nil {
+		return errors.Wrapf(err, "state for block %d not found", number)
+	}
+	// pre staking epoch already checked
+	isAggregated := bc.chainConfig.IsAggregatedRewardEpoch(block.Epoch())
+	// either we had a staking tx, or we had rewards, which means either...
+	// ...we had rewards due to pre aggregated epoch, or...
+	// ...we are post aggregated epoch, and it's a reward distribution block)
+	wrappersChanged := len(block.StakingTransactions()) > 0 ||
+		(!isAggregated || (isAggregated && block.NumberU64()%chain.RewardFrequency == chain.RewardFrequency-1))
+	if !wrappersChanged {
+		return nil
+	}
+	for _, address := range validators {
+		object := state.GetOrNewStateObject(address)
+		// check if the code has changed
+		// if it has changed, delete the old code
+		// this is done to ensure that a validator,
+		// which has not been updated in a while,
+		// does not end up deleted
+		// inactive validators, for example, with no changes in reward
+		// or delegations could be deleted if not for this comparison
+		if !bytes.Equal(object.CodeHash(), currentState.GetCodeHash(address).Bytes()) {
+			batch.Delete(object.CodeHash())
+			if batch.ValueSize() > ethdb.IdealBatchSize {
+				if err := batch.Write(); err != nil {
+					if isUnrecoverableErr(err) {
+						fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
+						os.Exit(1)
+					}
+					return err
+				}
+				batch.Reset()
+			}
+		}
+	}
+	return nil
 }
