@@ -54,10 +54,6 @@ do
 done
 
 node_type=${HARMONY_GENERAL_NODETYPE:-explorer}
-# Enable Archival mode if explorer
-if [[ "${node_type}" == "explorer" ]]; then
-  sed -i "s#IsArchival.*#IsArchival = true#"  ${CONFIG_FILE}
-fi
 
 # Generate BLS key & pass for validator if not exist
 if [[ "${node_type}" == "validator" ]] && [[ ! "$(ls -A ${BLSKEYS_PATH})" ]] ; then
