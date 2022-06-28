@@ -23,7 +23,7 @@ RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bas
 
 WORKDIR ${HARMONY_HOME}
 
-COPY bin/harmony ./scripts/docker/docker-entrypoint.sh ./
+COPY bin/harmony scripts/docker/docker-entrypoint.sh ./
 
 # Use testnet configuration as default
 RUN chmod +x harmony docker-entrypoint.sh \

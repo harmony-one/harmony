@@ -22,25 +22,19 @@ BLACKLIST_FILE=${HARMONY_HOME}/.hmy/blacklist.txt
 # Create directory
 mkdir -p ${BLSKEYS_PATH}
 
-# Replace harmony.config with Env available to start the client
+# Initialize relevant harmony environment variable
 env_vars=$(printenv | awk -v RS='\n' -F= '/^HARMONY_/{print $1}')
 
-mainnet_dns_zone="t.hmny.io"
-mainnet_boot_nodes="[\"/dnsaddr/bootstrap.t.hmny.io\"]"
-mainnet_min_peers=6
-
-bls_keys_passphrase=harmony
 bls_keys_node="https://api.s0.b.hmny.io"
 bls_keys_shardid=${HARMONY_GENERAL_SHARDID:-0}
+network_type=${HARMONY_NETWORK_NETWORKTYPE:-testnet}
+
+# Generate default harmony.conf based on the NetworkType
+harmony config dump --network ${network_type} harmony.conf
 
 # Replace mainnet related configurations
 network_type=${HARMONY_NETWORK_NETWORKTYPE:-testnet}
 if [[ "${network_type}" == "mainnet" ]] ; then
-  sed -i "s#Zone.*#Zone = \"$mainnet_dns_zone\"#"           ${CONFIG_FILE}
-  sed -i "s#BootNodes.*#BootNodes = $mainnet_boot_nodes#"   ${CONFIG_FILE}
-  sed -i "s#NetworkType.*#NetworkType = \"$val\"#"          ${CONFIG_FILE}
-  sed -i "s#MinPeers.*#MinPeers = $mainnet_min_peers#"      ${CONFIG_FILE}
-
   bls_keys_node="https://api.s0.t.hmny.io"
 fi
 
@@ -59,13 +53,24 @@ do
   fi
 done
 
-# Generate BLS key & pass for validator if not exist
 node_type=${HARMONY_GENERAL_NODETYPE:-explorer}
+# Enable Archival mode if explorer
+if [[ "${node_type}" == "explorer" ]]; then
+  sed -i "s#IsArchival.*#IsArchival = true#"  ${CONFIG_FILE}
+fi
+
+# Generate BLS key & pass for validator if not exist
 if [[ "${node_type}" == "validator" ]] && [[ ! "$(ls -A ${BLSKEYS_PATH})" ]] ; then
-  echo -n $bls_keys_passphrase > bls.pass
+  bls_keys_passfile=${HARMONY_BLSKEYS_PASSFILE:-}
+  if [ -z "$bls_keys_passfile" ]; then
+      echo "\$bls_keys_passfile is empty, using default passphrase [harmony] to create bls keys"
+      bls_keys_passphrase=${HARMONY_BLSKEYS_PASSPHRASE:-harmony}
+      echo -n $bls_keys_passphrase > bls.pass
+      bls_keys_passfile=bls.pass
+  fi
 
   hmy keys generate-bls-keys --node=${bls_keys_node} --count 1 --shard ${bls_keys_shardid} \
-    --passphrase-file bls.pass
+    --passphrase-file $bls_keys_passfile
 
   key_name=$(find . -name '*.key' | cut -d'/' -f2 | cut -d'.' -f1)
 
@@ -75,8 +80,6 @@ if [[ "${node_type}" == "validator" ]] && [[ ! "$(ls -A ${BLSKEYS_PATH})" ]] ; t
   echo "### BLS key for validator###"
   cat ${BLSKEYS_PATH}/$key_name.key
   echo "#############################"
-else
-  sed -i "s#IsArchival.*#IsArchival = true#"  ${CONFIG_FILE}
 fi
 
 # Blacklist
