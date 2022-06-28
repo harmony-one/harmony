@@ -808,7 +808,7 @@ func (db *DB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
 }
 
 var (
-	errAddressNotPresent = errors.New("address not present in state")
+	ErrAddressNotPresent = errors.New("address not present in state")
 )
 
 // ValidatorWrapper retrieves the existing validator in the cache, if sendOriginal
@@ -834,7 +834,7 @@ func (db *DB) ValidatorWrapper(
 
 	by := db.GetCode(addr)
 	if len(by) == 0 {
-		return nil, errAddressNotPresent
+		return nil, ErrAddressNotPresent
 	}
 	val := stk.ValidatorWrapper{}
 	if err := rlp.DecodeBytes(by, &val); err != nil {
@@ -897,7 +897,7 @@ func (db *DB) UpdateValidatorWrapperWithRevert(
 	// a copy of the existing store can be used for revert
 	// since we are replacing the existing with the new anyway
 	prev, err := db.ValidatorWrapper(addr, true, false)
-	if err != nil && err != errAddressNotPresent {
+	if err != nil && err != ErrAddressNotPresent {
 		return err
 	}
 	if err := db.UpdateValidatorWrapper(addr, val); err != nil {
