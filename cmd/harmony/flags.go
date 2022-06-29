@@ -31,6 +31,7 @@ var (
 		legacyDataDirFlag,
 
 		taraceFlag,
+		mmrDBFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -310,6 +311,11 @@ var (
 		Usage:    "indicates if full transaction tracing should be enabled",
 		DefValue: defaultConfig.General.TraceEnable,
 	}
+	mmrDBFlag = cli.BoolFlag{
+		Name:     "mmrDB",
+		Usage:    "enable MMR file database",
+		DefValue: defaultConfig.General.MmrDBEnable,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -381,6 +387,9 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, taraceFlag) {
 		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
+	}
+	if cli.IsFlagChanged(cmd, mmrDBFlag) {
+		config.General.MmrDBEnable = cli.GetBoolFlagValue(cmd, mmrDBFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {

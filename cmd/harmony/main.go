@@ -296,6 +296,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		os.Exit(1)
 	}
 
+	nodeconfig.GetDefaultConfig().MmrDbEnable = nodeConfig.MmrDbEnable
 	// Update ethereum compatible chain ids
 	params.UpdateEthChainIDByShard(nodeConfig.ShardID)
 
@@ -303,7 +304,6 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
-
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
 	if !accurate {
@@ -629,6 +629,8 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	nodeConfig.NtpServer = hc.Sys.NtpServer
 
 	nodeConfig.TraceEnable = hc.General.TraceEnable
+
+	nodeConfig.MmrDbEnable = hc.General.MmrDBEnable
 
 	return nodeConfig, nil
 }

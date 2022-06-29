@@ -236,4 +236,11 @@ type Header interface {
 	// SetSlashes sets the RLP-encoded form of slashes
 	// It stores a copy; the caller may freely modify the original.
 	SetSlashes(newSlashes []byte)
+
+	// MMRRoot is the root of the Merkle Mountain Range tree formed
+	// using the block hashes of the current epoch
+	MMRRoot() common.Hash
+
+	// SetMMRRoot sets the updated MMR root after appending the parentHash
+	SetMMRRoot(newMMRRoot common.Hash)
 }

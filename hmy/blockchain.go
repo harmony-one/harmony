@@ -17,6 +17,7 @@ import (
 	internal_bls "github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/eth/rpc"
 	internal_common "github.com/harmony-one/harmony/internal/common"
+	"github.com/harmony-one/harmony/internal/mmr"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
@@ -310,6 +311,17 @@ func (hmy *Harmony) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrH
 	return nil, nil, errors.New("invalid arguments; neither block nor hash specified")
 }
 
+// HeaderByHash ...
+func (hmy *Harmony) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*block.Header, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok {
+		return hmy.BlockChain.GetHeaderByNumber(uint64(blockNr)), nil
+	}
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		return hmy.HeaderByHash(ctx, hash)
+	}
+	return nil, errors.New("invalid arguments; neither block nor hash specified")
+}
+
 // GetLeaderAddress returns the one address of the leader, given the coinbaseAddr.
 // Note that the coinbaseAddr is overloaded with the BLS pub key hash in staking era.
 func (hmy *Harmony) GetLeaderAddress(coinbaseAddr common.Address, epoch *big.Int) string {
@@ -367,6 +379,19 @@ func (hmy *Harmony) GetLogs(ctx context.Context, blockHash common.Hash, isEth bo
 		logs[i] = receipt.Logs
 	}
 	return logs, nil
+}
+
+// GetBalance returns balance of an given address.
+func (hmy *Harmony) GetBlockMmrProof(ctx context.Context, proofNrOrHash rpc.BlockNumberOrHash, mmrNrOrHash rpc.BlockNumberOrHash) (*mmr.MmrProof, error) {
+	proofHeader, err := hmy.HeaderByNumberOrHash(ctx, proofNrOrHash)
+	if proofHeader == nil || err != nil {
+		return nil, err
+	}
+	mmrHeader, err := hmy.HeaderByNumberOrHash(ctx, mmrNrOrHash)
+	if proofHeader == nil || err != nil {
+		return nil, err
+	}
+	return hmy.BlockChain.GetBlockMmrProof(proofHeader.Hash(), mmrHeader.Number().Uint64())
 }
 
 // ServiceFilter ...

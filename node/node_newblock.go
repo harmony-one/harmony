@@ -141,6 +141,14 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		err         error
 	)
 
+	if node.Blockchain().Config().IsMMRHeaderEpoch(header.Epoch()) {
+		mmrRoot, err := node.Blockchain().GetNewMMRRoot(header)
+		if err != nil {
+			return nil, err
+		}
+		header.SetMMRRoot(mmrRoot)
+	}
+
 	// After staking, all coinbase will be the address of bls pub key
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := leaderKey.Object.GetAddress()

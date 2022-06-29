@@ -95,6 +95,7 @@ type ConfigType struct {
 		Hooks *webhooks.Hooks
 	}
 	TraceEnable bool
+	MmrDbEnable bool
 }
 
 // RPCServerConfig is the config for rpc listen addresses

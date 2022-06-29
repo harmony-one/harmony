@@ -331,6 +331,32 @@ func (s *PublicBlockchainService) GetBlocks(
 	return result, nil
 }
 
+type MmrProofReponse struct {
+	Root     string   `json:"root"`
+	Width    int64    `json:"width"`
+	Index    int64    `json:"index"`
+	Peaks    []string `json:"peaks"`
+	Siblings []string `json:"siblings"`
+}
+
+// GetBlocks method returns blocks in range blockStart, blockEnd just like GetBlockByNumber but all at once.
+func (s *PublicBlockchainService) GetBlockMmrProof(ctx context.Context, proofNrOrHash rpc.BlockNumberOrHash, mmrNrOrHash rpc.BlockNumberOrHash) (*MmrProofReponse, error) {
+	mmrProof, err := s.hmy.GetBlockMmrProof(ctx, proofNrOrHash, mmrNrOrHash)
+	if err != nil {
+		return nil, err
+	}
+	peaks := []string{}
+	for i := range mmrProof.Peaks {
+		peaks = append(peaks, common.Bytes2Hex(mmrProof.Peaks[i]))
+	}
+	siblings := []string{}
+	for i := range mmrProof.Siblings {
+		siblings = append(siblings, common.Bytes2Hex(mmrProof.Siblings[i]))
+	}
+	return &MmrProofReponse{common.Bytes2Hex(mmrProof.Root), mmrProof.Width, mmrProof.Index, peaks, siblings}, nil
+
+}
+
 // IsLastBlock checks if block is last epoch block.
 func (s *PublicBlockchainService) IsLastBlock(ctx context.Context, blockNum uint64) (bool, error) {
 	timer := DoMetricRPCRequest(IsLastBlock)

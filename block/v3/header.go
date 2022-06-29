@@ -380,6 +380,21 @@ func (h *Header) SetSlashes(newSlashes []byte) {
 	h.fields.Slashes = append(newSlashes[:0:0], newSlashes...)
 }
 
+// MMRRoot is the root of the Merkle Mountain Range tree formed
+// using the block hashes of the current epoch
+func (h *Header) MMRRoot() common.Hash {
+	h.Logger(utils.Logger()).Error().
+		Msg("No MMRRoot in V3 header")
+	return common.Hash{}
+}
+
+// SetMMRRoot sets the updated MMR root after appending the parentHash
+func (h *Header) SetMMRRoot(newMMRRoot common.Hash) {
+	h.Logger(utils.Logger()).Error().
+		Hex("mmrRoot", newMMRRoot[:]).
+		Msg("cannot store mmrRoot in V3 header")
+}
+
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() common.Hash {

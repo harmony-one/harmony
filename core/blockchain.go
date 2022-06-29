@@ -45,6 +45,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/internal/mmr"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/numeric"
@@ -138,10 +139,11 @@ type BlockChain struct {
 	cacheConfig            *CacheConfig        // Cache configuration for pruning
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
 
-	db     ethdb.Database // Low level persistent database to store final content in
-	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
-
+	db            ethdb.Database // Low level persistent database to store final content in
+	triegc        *prque.Prque   // Priority queue mapping block numbers to tries to gc
+	gcproc        time.Duration  // Accumulates canonical block processing for trie dumping
+	mmrEpochDB    OpenMmrDB
+	mmr           *BlockchainMMR
 	hc            *HeaderChain
 	trace         bool       // atomic?
 	traceFeed     event.Feed // send trace_block result to explorer
@@ -198,7 +200,7 @@ type BlockChain struct {
 // available in the database. It initialises the default Ethereum validator and
 // Processor.
 func NewBlockChain(
-	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, mmrDBFunc OpenMmrDB, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChain, error) {
@@ -229,6 +231,7 @@ func NewBlockChain(
 		chainConfig:                   chainConfig,
 		cacheConfig:                   cacheConfig,
 		db:                            db,
+		mmrEpochDB:                    mmrDBFunc,
 		triegc:                        prque.New(nil),
 		stateCache:                    state.NewDatabase(db),
 		quit:                          make(chan struct{}),
@@ -273,6 +276,7 @@ func NewBlockChain(
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
 	}
+	bc.mmr = newMMR(bc)
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -886,6 +890,7 @@ func (bc *BlockChain) Stop() {
 	// Unsubscribe all subscriptions registered from blockchain
 	bc.scope.Close()
 	close(bc.quit)
+	bc.mmr.Close()
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
 	// Ensure the state of a recent block is also stored to disk before exiting.
@@ -1196,6 +1201,12 @@ func (bc *BlockChain) WriteBlockWithState(
 	currentBlock := bc.CurrentBlock()
 	if currentBlock == nil || block.ParentHash() != currentBlock.Hash() {
 		return NonStatTy, errors.New("Hash of parent block doesn't match the current block hash")
+	}
+
+	if bc.Config().IsMMRHeaderEpoch(block.Epoch()) {
+		if err := bc.mmr.computeAndCheckNewMMRRoot(block.Header()); err != nil {
+			return NonStatTy, err
+		}
 	}
 
 	// Commit state object changes to in-memory trie
@@ -3056,6 +3067,14 @@ func (bc *BlockChain) GetECDSAFromCoinbase(header *block.Header) (common.Address
 		"cannot find corresponding ECDSA Address for coinbase %s",
 		header.Coinbase().Hash().Hex(),
 	)
+}
+
+func (bc *BlockChain) GetNewMMRRoot(newHeader *block.Header) (common.Hash, error) {
+	return bc.mmr.computeNewMMRRoot(newHeader)
+}
+
+func (bc *BlockChain) GetBlockMmrProof(hash common.Hash, withRespectToBlockNumber uint64) (*mmr.MmrProof, error) {
+	return bc.mmr.GetProof(hash, withRespectToBlockNumber)
 }
 
 // SuperCommitteeForNextEpoch ...

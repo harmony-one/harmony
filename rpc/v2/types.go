@@ -73,6 +73,7 @@ type BlockHeader struct {
 	ShardState           hexutil.Bytes  `json:"shardState"`
 	CrossLink            hexutil.Bytes  `json:"crossLink"`
 	Slashes              hexutil.Bytes  `json:"slashes"`
+	MmrRoot              common.Hash    `json:"mmrRoot"`
 }
 
 // BlockWithFullTx represents a block that will serialize to the RPC representation of a block
@@ -740,6 +741,7 @@ func NewBlockHeader(
 		ShardState:          head.ShardState(),
 		CrossLink:           head.CrossLinks(),
 		Slashes:             head.Slashes(),
+		MmrRoot:             head.MMRRoot(),
 	}
 	return blk, nil
 }

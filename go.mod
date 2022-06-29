@@ -52,6 +52,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/syndtr/goleveldb v1.0.1-0.20200815110645-5c35d600f0ca
 	github.com/whyrusleeping/timecache v0.0.0-20160911033111-cfcb2f1abfee
+	github.com/zmitton/go-merklemountainrange v0.0.0-20190829194147-df01d22b2bdf
 	go.uber.org/ratelimit v0.1.0
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
