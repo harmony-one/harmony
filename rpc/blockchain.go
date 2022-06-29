@@ -51,7 +51,7 @@ type PublicBlockchainService struct {
 
 const (
 	DefaultRateLimiterWaitTimeout = 5 * time.Second
-	rpcGetBlocksLimit             = 1024
+	rpcGetBlocksLimit             = 64
 )
 
 // NewPublicBlockchainAPI creates a new API for the RPC interface
@@ -135,18 +135,14 @@ func (s *PublicBlockchainService) getBalanceByBlockNumber(
 
 // BlockNumber returns the block number of the chain head.
 func (s *PublicBlockchainService) BlockNumber(ctx context.Context) (interface{}, error) {
-	// Fetch latest header
-	header, err := s.hmy.HeaderByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil {
-		return nil, err
-	}
+	curNum := s.hmy.CurrentBlockNumber()
 
 	// Format return base on version
 	switch s.version {
 	case V1, Eth:
-		return hexutil.Uint64(header.Number().Uint64()), nil
+		return hexutil.Uint64(curNum), nil
 	case V2:
-		return header.Number().Uint64(), nil
+		return curNum, nil
 	default:
 		return nil, ErrUnknownRPCVersion
 	}
