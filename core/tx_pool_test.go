@@ -141,7 +141,7 @@ func pricedTransaction(shardID uint32, nonce uint64, gaslimit uint64, gasprice *
 	return signedTx
 }
 
-func createBlockChain() *BlockChain {
+func createBlockChain() *BlockChainImpl {
 	key, _ := crypto.GenerateKey()
 	gspec := Genesis{
 		Config:  params.TestChainConfig,
