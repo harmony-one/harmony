@@ -264,7 +264,6 @@ func NewBlockChain(
 	return bc, nil
 }
 
-// ValidateNewBlock validates new block.
 func (bc *BlockChainImpl) ValidateNewBlock(block *types.Block) error {
 	state, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 	if err != nil {
@@ -390,10 +389,6 @@ func (bc *BlockChainImpl) loadLastState() error {
 	return nil
 }
 
-// SetHead rewinds the local chain to a new head. In the case of headers, everything
-// above the new head will be deleted and the new one set. In the case of blocks
-// though, the head may be further rewound if block bodies are missing (non-archive
-// nodes after a fast sync).
 func (bc *BlockChainImpl) SetHead(head uint64) error {
 	utils.Logger().Warn().Uint64("target", head).Msg("Rewinding blockchain")
 
@@ -458,19 +453,11 @@ func (bc *BlockChainImpl) SetHead(head uint64) error {
 	return bc.loadLastState()
 }
 
-// ShardID returns the shard Id of the blockchain.
-// TODO: use a better solution before resharding shuffle nodes to different shards
+// TODO: use a better solution before resharding shuffle nodes to different shards.
 func (bc *BlockChainImpl) ShardID() uint32 {
 	return bc.CurrentBlock().ShardID()
 }
 
-// GasLimit returns the gas limit of the current HEAD block.
-func (bc *BlockChainImpl) GasLimit() uint64 {
-	return bc.CurrentBlock().GasLimit()
-}
-
-// CurrentBlock retrieves the current head block of the canonical chain. The
-// block is retrieved from the blockchain's internal cache.
 func (bc *BlockChainImpl) CurrentBlock() *types.Block {
 	return bc.currentBlock.Load().(*types.Block)
 }
@@ -481,51 +468,42 @@ func (bc *BlockChainImpl) CurrentFastBlock() *types.Block {
 	return bc.currentFastBlock.Load().(*types.Block)
 }
 
-// SetProcessor sets the processor required for making state modifications.
 func (bc *BlockChainImpl) SetProcessor(processor Processor) {
 	bc.procmu.Lock()
 	defer bc.procmu.Unlock()
 	bc.processor = processor
 }
 
-// SetValidator sets the validator which is used to validate incoming blocks.
 func (bc *BlockChainImpl) SetValidator(validator Validator) {
 	bc.procmu.Lock()
 	defer bc.procmu.Unlock()
 	bc.validator = validator
 }
 
-// Validator returns the current validator.
 func (bc *BlockChainImpl) Validator() Validator {
 	bc.procmu.RLock()
 	defer bc.procmu.RUnlock()
 	return bc.validator
 }
 
-// Processor returns the current processor.
 func (bc *BlockChainImpl) Processor() Processor {
 	bc.procmu.RLock()
 	defer bc.procmu.RUnlock()
 	return bc.processor
 }
 
-// State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChainImpl) State() (*state.DB, error) {
 	return bc.StateAt(bc.CurrentBlock().Root())
 }
 
-// StateAt returns a new mutable state based on a particular point in time.
 func (bc *BlockChainImpl) StateAt(root common.Hash) (*state.DB, error) {
 	return state.New(root, bc.stateCache)
 }
 
-// Reset purges the entire blockchain, restoring it to its genesis state.
 func (bc *BlockChainImpl) Reset() error {
 	return bc.ResetWithGenesisBlock(bc.genesisBlock)
 }
 
-// ResetWithGenesisBlock purges the entire blockchain, restoring it to the
-// specified genesis state.
 func (bc *BlockChainImpl) ResetWithGenesisBlock(genesis *types.Block) error {
 	// Dump the entire block chain and purge the caches
 	if err := bc.SetHead(0); err != nil {
@@ -743,7 +721,6 @@ func (bc *BlockChainImpl) GetBodyRLP(hash common.Hash) rlp.RawValue {
 	return body
 }
 
-// HasBlock checks if a block is fully present in the database or not.
 func (bc *BlockChainImpl) HasBlock(hash common.Hash, number uint64) bool {
 	if bc.blockCache.Contains(hash) {
 		return true
@@ -751,14 +728,11 @@ func (bc *BlockChainImpl) HasBlock(hash common.Hash, number uint64) bool {
 	return rawdb.HasBody(bc.db, hash, number)
 }
 
-// HasState checks if state trie is fully present in the database or not.
 func (bc *BlockChainImpl) HasState(hash common.Hash) bool {
 	_, err := bc.stateCache.OpenTrie(hash)
 	return err == nil
 }
 
-// HasBlockAndState checks if a block and associated state trie is fully present
-// in the database or not, caching it if present.
 func (bc *BlockChainImpl) HasBlockAndState(hash common.Hash, number uint64) bool {
 	// Check first that the block itself is known
 	block := bc.GetBlock(hash, number)
@@ -768,8 +742,6 @@ func (bc *BlockChainImpl) HasBlockAndState(hash common.Hash, number uint64) bool
 	return bc.HasState(block.Root())
 }
 
-// GetBlock retrieves a block from the database by hash and number,
-// caching it if found.
 func (bc *BlockChainImpl) GetBlock(hash common.Hash, number uint64) *types.Block {
 	// Short circuit if the block's already in the cache, retrieve otherwise
 	if block, ok := bc.blockCache.Get(hash); ok {
@@ -784,7 +756,6 @@ func (bc *BlockChainImpl) GetBlock(hash common.Hash, number uint64) *types.Block
 	return block
 }
 
-// GetBlockByHash retrieves a block from the database by hash, caching it if found.
 func (bc *BlockChainImpl) GetBlockByHash(hash common.Hash) *types.Block {
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
@@ -793,8 +764,6 @@ func (bc *BlockChainImpl) GetBlockByHash(hash common.Hash) *types.Block {
 	return bc.GetBlock(hash, *number)
 }
 
-// GetBlockByNumber retrieves a block from the database by number, caching it
-// (associated with its hash) if found.
 func (bc *BlockChainImpl) GetBlockByNumber(number uint64) *types.Block {
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (common.Hash{}) {
@@ -803,7 +772,6 @@ func (bc *BlockChainImpl) GetBlockByNumber(number uint64) *types.Block {
 	return bc.GetBlock(hash, number)
 }
 
-// GetReceiptsByHash retrieves the receipts for all transactions in a given block.
 func (bc *BlockChainImpl) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	if receipts, ok := bc.receiptsCache.Get(hash); ok {
 		return receipts.(types.Receipts)
@@ -838,8 +806,6 @@ func (bc *BlockChainImpl) GetBlocksFromHash(hash common.Hash, n int) (blocks []*
 	return
 }
 
-// GetUnclesInChain retrieves all the uncles from a given block backwards until
-// a specific distance is reached.
 func (bc *BlockChainImpl) GetUnclesInChain(b *types.Block, length int) []*block.Header {
 	uncles := []*block.Header{}
 	for i := 0; b != nil && i < length; i++ {
@@ -855,8 +821,6 @@ func (bc *BlockChainImpl) TrieNode(hash common.Hash) ([]byte, error) {
 	return bc.stateCache.TrieDB().Node(hash)
 }
 
-// Stop stops the blockchain service. If any imports are currently in progress
-// it will abort them using the procInterrupt.
 func (bc *BlockChainImpl) Stop() {
 	if !atomic.CompareAndSwapInt32(&bc.running, 0, 1) {
 		return
@@ -934,8 +898,6 @@ const (
 	SideStatTy
 )
 
-// Rollback is designed to remove a chain of links from the database that aren't
-// certain enough to be valid.
 func (bc *BlockChainImpl) Rollback(chain []common.Hash) error {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
@@ -1047,6 +1009,8 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
+// Deprecated: no usages of this function found.
+// TODO: should be removed
 func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(blockChain); i++ {
@@ -1150,9 +1114,6 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 
 var lastWrite uint64
 
-// WriteBlockWithoutState writes only the block and its metadata to the database,
-// but does not write any state. This is used to construct competing side forks
-// up to the point where they exceed the canonical total difficulty.
 func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
@@ -1167,7 +1128,6 @@ func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int
 	return nil
 }
 
-// WriteBlockWithState writes the block and all associated state to the database.
 func (bc *BlockChainImpl) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
@@ -1311,17 +1271,10 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	return CanonStatTy, nil
 }
 
-// GetMaxGarbageCollectedBlockNumber ..
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
 	return bc.maxGarbCollectedBlkNum
 }
 
-// InsertChain attempts to insert the given batch of blocks in to the canonical
-// chain or, otherwise, create a fork. If an error is returned it will return
-// the index number of the failing block as well an error describing what went
-// wrong.
-//
-// After insertion is done, all accumulated events will be fired.
 func (bc *BlockChainImpl) InsertChain(chain types.Blocks, verifyHeaders bool) (int, error) {
 	n, events, logs, err := bc.insertChain(chain, verifyHeaders)
 	bc.PostChainEvents(events, logs)
@@ -1699,8 +1652,6 @@ func (b BadBlock) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// BadBlocks returns a list of the last 'bad blocks' that
-// the client has seen on the network
 func (bc *BlockChainImpl) BadBlocks() []BadBlock {
 	blocks := make([]BadBlock, bc.badBlocks.Len())
 	for _, hash := range bc.badBlocks.Keys() {
@@ -1782,8 +1733,6 @@ func (bc *BlockChainImpl) InsertHeaderChain(chain []*block.Header, checkFreq int
 	return bc.hc.InsertHeaderChain(chain, whFunc, start)
 }
 
-// CurrentHeader retrieves the current head header of the canonical chain. The
-// header is retrieved from the HeaderChain's internal cache.
 func (bc *BlockChainImpl) CurrentHeader() *block.Header {
 	return bc.hc.CurrentHeader()
 }
@@ -1800,14 +1749,10 @@ func (bc *BlockChainImpl) GetTdByHash(hash common.Hash) *big.Int {
 	return bc.hc.GetTdByHash(hash)
 }
 
-// GetHeader retrieves a block header from the database by hash and number,
-// caching it if found.
 func (bc *BlockChainImpl) GetHeader(hash common.Hash, number uint64) *block.Header {
 	return bc.hc.GetHeader(hash, number)
 }
 
-// GetHeaderByHash retrieves a block header from the database by hash, caching it if
-// found.
 func (bc *BlockChainImpl) GetHeaderByHash(hash common.Hash) *block.Header {
 	return bc.hc.GetHeaderByHash(hash)
 }
@@ -1824,7 +1769,6 @@ func (bc *BlockChainImpl) GetBlockHashesFromHash(hash common.Hash, max uint64) [
 	return bc.hc.GetBlockHashesFromHash(hash, max)
 }
 
-// GetCanonicalHash returns the canonical hash for a given block number
 func (bc *BlockChainImpl) GetCanonicalHash(number uint64) common.Hash {
 	return bc.hc.GetCanonicalHash(number)
 }
@@ -1841,50 +1785,39 @@ func (bc *BlockChainImpl) GetAncestor(hash common.Hash, number, ancestor uint64,
 	return bc.hc.GetAncestor(hash, number, ancestor, maxNonCanonical)
 }
 
-// GetHeaderByNumber retrieves a block header from the database by number,
-// caching it (associated with its hash) if found.
 func (bc *BlockChainImpl) GetHeaderByNumber(number uint64) *block.Header {
 	return bc.hc.GetHeaderByNumber(number)
 }
 
-// Config retrieves the blockchain's chain configuration.
 func (bc *BlockChainImpl) Config() *params.ChainConfig { return bc.chainConfig }
 
-// Engine retrieves the blockchain's consensus engine.
 func (bc *BlockChainImpl) Engine() consensus_engine.Engine { return bc.engine }
 
-// SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
 func (bc *BlockChainImpl) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
 	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
 }
 
-// SubscribeChainEvent registers a subscription of ChainEvent.
 func (bc *BlockChainImpl) SubscribeTraceEvent(ch chan<- TraceEvent) event.Subscription {
 	bc.trace = true
 	return bc.scope.Track(bc.traceFeed.Subscribe(ch))
 }
 
-// SubscribeChainEvent registers a subscription of ChainEvent.
 func (bc *BlockChainImpl) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
 	return bc.scope.Track(bc.chainFeed.Subscribe(ch))
 }
 
-// SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
 func (bc *BlockChainImpl) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription {
 	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
 }
 
-// SubscribeChainSideEvent registers a subscription of ChainSideEvent.
 func (bc *BlockChainImpl) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {
 	return bc.scope.Track(bc.chainSideFeed.Subscribe(ch))
 }
 
-// SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChainImpl) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
 }
 
-// ReadShardState retrieves sharding state given the epoch number.
 func (bc *BlockChainImpl) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	cacheKey := string(epoch.Bytes())
 	if cached, ok := bc.shardStateCache.Get(cacheKey); ok {
@@ -1903,7 +1836,6 @@ func (bc *BlockChainImpl) ReadShardState(epoch *big.Int) (*shard.State, error) {
 	return shardState, nil
 }
 
-// WriteShardStateBytes saves the given sharding state under the given epoch number.
 func (bc *BlockChainImpl) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	epoch *big.Int, shardState []byte,
 ) (*shard.State, error) {
@@ -1920,7 +1852,6 @@ func (bc *BlockChainImpl) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	return decodeShardState, nil
 }
 
-// ReadCommitSig retrieves the commit signature on a block.
 func (bc *BlockChainImpl) ReadCommitSig(blockNum uint64) ([]byte, error) {
 	if cached, ok := bc.lastCommitsCache.Get(blockNum); ok {
 		lastCommits := cached.([]byte)
@@ -2197,7 +2128,6 @@ func (bc *BlockChainImpl) SavePendingCrossLinks() error {
 	return nil
 }
 
-// AddPendingSlashingCandidates appends pending slashing candidates
 func (bc *BlockChainImpl) AddPendingSlashingCandidates(
 	candidates slash.Records,
 ) error {
@@ -2230,7 +2160,6 @@ func (bc *BlockChainImpl) AddPendingSlashingCandidates(
 	return bc.writeSlashes(bc.pendingSlashes)
 }
 
-// AddPendingCrossLinks appends pending crosslinks
 func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
@@ -2245,7 +2174,6 @@ func (bc *BlockChainImpl) AddPendingCrossLinks(pendingCLs []types.CrossLink) (in
 	return len(cls), err
 }
 
-// DeleteFromPendingCrossLinks delete pending crosslinks that already committed (i.e. passed in the params)
 func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLink) (int, error) {
 	bc.pendingCrossLinksMutex.Lock()
 	defer bc.pendingCrossLinksMutex.Unlock()
@@ -2277,7 +2205,6 @@ func (bc *BlockChainImpl) DeleteFromPendingCrossLinks(crossLinks []types.CrossLi
 	return len(pendingCLs), err
 }
 
-// IsSameLeaderAsPreviousBlock retrieves a block from the database by number, caching it
 func (bc *BlockChainImpl) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	if IsEpochBlock(block) {
 		return false
@@ -2290,12 +2217,10 @@ func (bc *BlockChainImpl) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 	return block.Coinbase() == previousHeader.Coinbase()
 }
 
-// GetVMConfig returns the block chain VM config.
 func (bc *BlockChainImpl) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
 }
 
-// ReadCXReceipts retrieves the cross shard transaction receipts of a given shard
 func (bc *BlockChainImpl) ReadCXReceipts(shardID uint32, blockNum uint64, blockHash common.Hash) (types.CXReceipts, error) {
 	cxs, err := rawdb.ReadCXReceipts(bc.db, shardID, blockNum, blockHash)
 	if err != nil || len(cxs) == 0 {
@@ -2304,7 +2229,6 @@ func (bc *BlockChainImpl) ReadCXReceipts(shardID uint32, blockNum uint64, blockH
 	return cxs, nil
 }
 
-// CXMerkleProof calculates the cross shard transaction merkle proof of a given destination shard
 func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *types.Block) (*types.CXMerkleProof, error) {
 	proof := &types.CXMerkleProof{BlockNum: block.Number(), BlockHash: block.Hash(), ShardID: block.ShardID(), CXReceiptHash: block.Header().OutgoingReceiptHash(), CXShardHashes: []common.Hash{}, ShardIDs: []uint32{}}
 
@@ -2328,8 +2252,6 @@ func (bc *BlockChainImpl) CXMerkleProof(toShardID uint32, block *types.Block) (*
 	return proof, nil
 }
 
-// WriteCXReceiptsProofSpent mark the CXReceiptsProof list with given unspent status
-// true: unspent, false: spent
 func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxps []*types.CXReceiptsProof) error {
 	for _, cxp := range cxps {
 		if err := rawdb.WriteCXReceiptsProofSpent(db, cxp); err != nil {
@@ -2339,7 +2261,6 @@ func (bc *BlockChainImpl) WriteCXReceiptsProofSpent(db rawdb.DatabaseWriter, cxp
 	return nil
 }
 
-// IsSpent checks whether a CXReceiptsProof is unspent
 func (bc *BlockChainImpl) IsSpent(cxp *types.CXReceiptsProof) bool {
 	shardID := cxp.MerkleProof.ShardID
 	blockNum := cxp.MerkleProof.BlockNum.Uint64()
@@ -2347,15 +2268,10 @@ func (bc *BlockChainImpl) IsSpent(cxp *types.CXReceiptsProof) bool {
 	return by == rawdb.SpentByte
 }
 
-// ReadTxLookupEntry returns where the given transaction resides in the chain,
-// as a (block hash, block number, index in transaction list) triple.
-// returns 0, 0 if not found
 func (bc *BlockChainImpl) ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64) {
 	return rawdb.ReadTxLookupEntry(bc.db, txID)
 }
 
-// ReadValidatorInformationAtRoot reads staking
-// information of given validatorWrapper at a specific state root
 func (bc *BlockChainImpl) ReadValidatorInformationAtRoot(
 	addr common.Address, root common.Hash,
 ) (*staking.ValidatorWrapper, error) {
@@ -2366,8 +2282,6 @@ func (bc *BlockChainImpl) ReadValidatorInformationAtRoot(
 	return bc.ReadValidatorInformationAtState(addr, state)
 }
 
-// ReadValidatorInformationAtState reads staking
-// information of given validatorWrapper at a specific state root
 func (bc *BlockChainImpl) ReadValidatorInformationAtState(
 	addr common.Address, state *state.DB,
 ) (*staking.ValidatorWrapper, error) {
@@ -2381,15 +2295,12 @@ func (bc *BlockChainImpl) ReadValidatorInformationAtState(
 	return wrapper, nil
 }
 
-// ReadValidatorInformation reads staking information of given validator address
 func (bc *BlockChainImpl) ReadValidatorInformation(
 	addr common.Address,
 ) (*staking.ValidatorWrapper, error) {
 	return bc.ReadValidatorInformationAtRoot(addr, bc.CurrentBlock().Root())
 }
 
-// ReadValidatorSnapshotAtEpoch reads the snapshot
-// staking validator information of given validator address
 func (bc *BlockChainImpl) ReadValidatorSnapshotAtEpoch(
 	epoch *big.Int,
 	addr common.Address,
@@ -2397,7 +2308,6 @@ func (bc *BlockChainImpl) ReadValidatorSnapshotAtEpoch(
 	return rawdb.ReadValidatorSnapshot(bc.db, addr, epoch)
 }
 
-// ReadValidatorSnapshot reads the snapshot staking information of given validator address
 func (bc *BlockChainImpl) ReadValidatorSnapshot(
 	addr common.Address,
 ) (*staking.ValidatorSnapshot, error) {
@@ -2414,7 +2324,6 @@ func (bc *BlockChainImpl) ReadValidatorSnapshot(
 	return vs, nil
 }
 
-// WriteValidatorSnapshot writes the snapshot of provided validator
 func (bc *BlockChainImpl) WriteValidatorSnapshot(
 	batch rawdb.DatabaseWriter, snapshot *staking.ValidatorSnapshot,
 ) error {
@@ -2429,14 +2338,12 @@ func (bc *BlockChainImpl) WriteValidatorSnapshot(
 	return nil
 }
 
-// ReadValidatorStats reads the stats of a validator
 func (bc *BlockChainImpl) ReadValidatorStats(
 	addr common.Address,
 ) (*staking.ValidatorStats, error) {
 	return rawdb.ReadValidatorStats(bc.db, addr)
 }
 
-// UpdateValidatorVotingPower writes the voting power for the committees
 func (bc *BlockChainImpl) UpdateValidatorVotingPower(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
@@ -2564,7 +2471,6 @@ func (bc *BlockChainImpl) UpdateValidatorVotingPower(
 	return validatorStats, nil
 }
 
-// ComputeAndUpdateAPR ...
 func (bc *BlockChainImpl) ComputeAndUpdateAPR(
 	block *types.Block, now *big.Int,
 	wrapper *staking.ValidatorWrapper, stats *staking.ValidatorStats,
@@ -2595,8 +2501,6 @@ func (bc *BlockChainImpl) ComputeAndUpdateAPR(
 	return nil
 }
 
-// UpdateValidatorSnapshots updates the content snapshot of all validators
-// Note: this should only be called within the blockchain insert process.
 func (bc *BlockChainImpl) UpdateValidatorSnapshots(
 	batch rawdb.DatabaseWriter, epoch *big.Int, state *state.DB, newValidators []common.Address,
 ) error {
@@ -2626,7 +2530,6 @@ func (bc *BlockChainImpl) UpdateValidatorSnapshots(
 	return nil
 }
 
-// ReadValidatorList reads the addresses of current all validators
 func (bc *BlockChainImpl) ReadValidatorList() ([]common.Address, error) {
 	if cached, ok := bc.validatorListCache.Get("validatorList"); ok {
 		m, ok := cached.([]common.Address)
@@ -2638,8 +2541,6 @@ func (bc *BlockChainImpl) ReadValidatorList() ([]common.Address, error) {
 	return rawdb.ReadValidatorList(bc.db)
 }
 
-// WriteValidatorList writes the list of validator addresses to database
-// Note: this should only be called within the blockchain insert process.
 func (bc *BlockChainImpl) WriteValidatorList(
 	db rawdb.DatabaseWriter, addrs []common.Address,
 ) error {
@@ -2650,7 +2551,6 @@ func (bc *BlockChainImpl) WriteValidatorList(
 	return nil
 }
 
-// ReadDelegationsByDelegator reads the addresses of validators delegated by a delegator
 func (bc *BlockChainImpl) ReadDelegationsByDelegator(
 	delegator common.Address,
 ) (m staking.DelegationIndexes, err error) {
@@ -2678,7 +2578,6 @@ func (bc *BlockChainImpl) ReadDelegationsByDelegator(
 	return m, nil
 }
 
-// ReadDelegationsByDelegatorAt reads the addresses of validators delegated by a delegator at a given block
 func (bc *BlockChainImpl) ReadDelegationsByDelegatorAt(
 	delegator common.Address, blockNum *big.Int,
 ) (m staking.DelegationIndexes, err error) {
@@ -2723,9 +2622,6 @@ func (bc *BlockChainImpl) writeDelegationsByDelegator(
 	return nil
 }
 
-// UpdateStakingMetaData updates the metadata of validators and delegations,
-// including the full validator list and delegation indexes.
-// Note: this should only be called within the blockchain insert process.
 func (bc *BlockChainImpl) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, block *types.Block,
 	stakeMsgs []staking.StakeMsg,
@@ -2894,8 +2790,6 @@ func processDelegateMetadata(delegate *staking.Delegate,
 	return nil
 }
 
-// ReadBlockRewardAccumulator must only be called on beaconchain
-// Note that block rewards are only for staking era.
 func (bc *BlockChainImpl) ReadBlockRewardAccumulator(number uint64) (*big.Int, error) {
 	if !bc.chainConfig.IsStaking(shard.Schedule.CalcEpochNumber(number)) {
 		return big.NewInt(0), nil
@@ -2906,8 +2800,6 @@ func (bc *BlockChainImpl) ReadBlockRewardAccumulator(number uint64) (*big.Int, e
 	return rawdb.ReadBlockRewardAccumulator(bc.db, number)
 }
 
-// WriteBlockRewardAccumulator directly writes the BlockRewardAccumulator value
-// Note: this should only be called once during staking launch.
 func (bc *BlockChainImpl) WriteBlockRewardAccumulator(
 	batch rawdb.DatabaseWriter, reward *big.Int, number uint64,
 ) error {
@@ -2920,8 +2812,6 @@ func (bc *BlockChainImpl) WriteBlockRewardAccumulator(
 	return nil
 }
 
-// UpdateBlockRewardAccumulator ..
-// Note: this should only be called within the blockchain insert process.
 func (bc *BlockChainImpl) UpdateBlockRewardAccumulator(
 	batch rawdb.DatabaseWriter, diff *big.Int, number uint64,
 ) error {
@@ -2968,7 +2858,6 @@ func (bc *BlockChainImpl) addDelegationIndex(
 	return delegations, nil
 }
 
-// ValidatorCandidates returns the up to date validator candidates for next epoch
 func (bc *BlockChainImpl) ValidatorCandidates() []common.Address {
 	list, err := bc.ReadValidatorList()
 	if err != nil {
@@ -2977,12 +2866,10 @@ func (bc *BlockChainImpl) ValidatorCandidates() []common.Address {
 	return list
 }
 
-// DelegatorsInformation returns up to date information of delegators of a given validator address
 func (bc *BlockChainImpl) DelegatorsInformation(addr common.Address) []*staking.Delegation {
 	return make([]*staking.Delegation, 0)
 }
 
-// GetECDSAFromCoinbase retrieve corresponding ecdsa address from Coinbase Address
 // TODO: optimize this func by adding cache etc.
 func (bc *BlockChainImpl) GetECDSAFromCoinbase(header *block.Header) (common.Address, error) {
 	// backward compatibility: before isStaking epoch, coinbase address is the ecdsa address
@@ -3021,9 +2908,6 @@ func (bc *BlockChainImpl) GetECDSAFromCoinbase(header *block.Header) (common.Add
 	)
 }
 
-// SuperCommitteeForNextEpoch ...
-// isVerify=true means validators use it to verify
-// isVerify=false means leader is to propose
 func (bc *BlockChainImpl) SuperCommitteeForNextEpoch(
 	beacon consensus_engine.ChainReader,
 	header *block.Header,
@@ -3116,7 +3000,6 @@ func (bc *BlockChainImpl) EnablePruneBeaconChainFeature() {
 	bc.pruneBeaconChainEnable = true
 }
 
-// IsEnablePruneBeaconChainFeature returns is enable prune BeaconChain feature
 func (bc *BlockChainImpl) IsEnablePruneBeaconChainFeature() bool {
 	return bc.pruneBeaconChainEnable
 }

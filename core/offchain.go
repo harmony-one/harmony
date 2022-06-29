@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CommitOffChainData write off chain data of a block onto db writer.
 func (bc *BlockChainImpl) CommitOffChainData(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
