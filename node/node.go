@@ -158,7 +158,7 @@ func (node *Node) Blockchain() core.BlockChain {
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() core.BlockChain {
 	// tikv mode not have the BeaconChain storage
-	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {
+	if node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {
 		return nil
 	}
 
@@ -1096,7 +1096,7 @@ func New(
 		node.committeeCache, _ = lru.New(16)
 
 		// in tikv mode, not need BeaconChain
-		if !node.HarmonyConfig.General.RunElasticMode && node.Blockchain().ShardID() != shard.BeaconChainShardID {
+		if !(node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode) && node.Blockchain().ShardID() != shard.BeaconChainShardID {
 			node.BeaconWorker = worker.New(
 				node.Beaconchain().Config(), beaconChain, engine,
 			)
