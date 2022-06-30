@@ -12,13 +12,13 @@ type broadcast interface {
 
 type Service struct {
 	node    broadcast
-	bc      *core.BlockChain
+	bc      core.BlockChain
 	ch      chan core.ChainEvent
 	closeCh chan struct{}
 	beacon  bool
 }
 
-func New(node broadcast, bc *core.BlockChain) *Service {
+func New(node broadcast, bc core.BlockChain) *Service {
 	return &Service{
 		node:    node,
 		bc:      bc,

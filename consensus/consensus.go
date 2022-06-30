@@ -62,7 +62,7 @@ type Consensus struct {
 	multiSigMutex  sync.RWMutex
 
 	// The blockchain this consensus is working on
-	Blockchain *core.BlockChain
+	Blockchain core.BlockChain
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
 	MinPeers   int

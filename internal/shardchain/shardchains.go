@@ -21,7 +21,7 @@ import (
 type Collection interface {
 	// ShardChain returns the blockchain for the given shard,
 	// opening one as necessary.
-	ShardChain(shardID uint32) (*core.BlockChain, error)
+	ShardChain(shardID uint32) (core.BlockChain, error)
 
 	// CloseShardChain closes the given shard chain.
 	CloseShardChain(shardID uint32) error
@@ -37,7 +37,7 @@ type CollectionImpl struct {
 	dbInit       DBInitializer
 	engine       engine.Engine
 	mtx          sync.Mutex
-	pool         map[uint32]*core.BlockChain
+	pool         map[uint32]core.BlockChain
 	disableCache map[uint32]bool
 	chainConfig  *params.ChainConfig
 }
@@ -56,7 +56,7 @@ func NewCollection(
 		dbFactory:    dbFactory,
 		dbInit:       dbInit,
 		engine:       engine,
-		pool:         make(map[uint32]*core.BlockChain),
+		pool:         make(map[uint32]core.BlockChain),
 		disableCache: make(map[uint32]bool),
 		chainConfig:  chainConfig,
 	}
@@ -64,7 +64,7 @@ func NewCollection(
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *CollectionImpl) ShardChain(shardID uint32) (*core.BlockChain, error) {
+func (sc *CollectionImpl) ShardChain(shardID uint32) (core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -148,7 +148,7 @@ func (sc *CollectionImpl) CloseShardChain(shardID uint32) error {
 
 // Close closes all shard chains.
 func (sc *CollectionImpl) Close() error {
-	newPool := make(map[uint32]*core.BlockChain)
+	newPool := make(map[uint32]core.BlockChain)
 	sc.mtx.Lock()
 	oldPool := sc.pool
 	sc.pool = newPool

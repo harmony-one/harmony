@@ -56,7 +56,7 @@ type environment struct {
 type Worker struct {
 	config   *params.ChainConfig
 	factory  blockfactory.Factory
-	chain    *core.BlockChain
+	chain    core.BlockChain
 	current  *environment // An environment for current running cycle.
 	engine   consensus_engine.Engine
 	gasFloor uint64
@@ -566,7 +566,7 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, chain core.BlockChain, engine consensus_engine.Engine,
 ) *Worker {
 	worker := &Worker{
 		config:  config,

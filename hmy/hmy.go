@@ -47,8 +47,8 @@ type Harmony struct {
 	// Channel for shutting down the service
 	ShutdownChan  chan bool                      // Channel for shutting down the Harmony
 	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	BlockChain    *core.BlockChain
-	BeaconChain   *core.BlockChain
+	BlockChain    core.BlockChain
+	BeaconChain   core.BlockChain
 	TxPool        *core.TxPool
 	CxPool        *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
 	// DB interfaces
@@ -84,8 +84,8 @@ type Harmony struct {
 type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
-	Blockchain() *core.BlockChain
-	Beaconchain() *core.BlockChain
+	Blockchain() core.BlockChain
+	Beaconchain() core.BlockChain
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
