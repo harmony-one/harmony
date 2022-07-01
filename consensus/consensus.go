@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -45,7 +46,7 @@ type Consensus struct {
 	// FBFTLog stores the pbft messages and blocks during FBFT process
 	FBFTLog *FBFTLog
 	// phase: different phase of FBFT protocol: pre-prepare, prepare, commit, finish etc
-	phase FBFTPhase
+	phase *LockedFBFTPhase
 	// current indicates what state a node is in
 	current State
 	// isBackup declarative the node is in backup mode
@@ -131,7 +132,7 @@ type Consensus struct {
 	// finality of previous consensus in the unit of milliseconds
 	finality int64
 	// finalityCounter keep tracks of the finality time
-	finalityCounter int64
+	finalityCounter atomic.Value //int64
 
 	dHelper *downloadHelper
 }
@@ -168,6 +169,12 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
+func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	return consensus.LeaderPubKey
+}
+
 func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
 	return consensus.priKey
 }
@@ -197,6 +204,10 @@ func (consensus *Consensus) IsBackup() bool {
 	return consensus.isBackup
 }
 
+func (consensus *Consensus) BlockNum() uint64 {
+	return atomic.LoadUint64(&consensus.blockNum)
+}
+
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
@@ -209,7 +220,7 @@ func New(
 	consensus.BlockNumLowChan = make(chan struct{}, 1)
 	// FBFT related
 	consensus.FBFTLog = NewFBFTLog()
-	consensus.phase = FBFTAnnounce
+	consensus.phase = NewLockedFBFTPhase(FBFTAnnounce)
 	consensus.current = State{mode: Normal}
 	// FBFT timeout
 	consensus.consensusTimeout = createTimeout()

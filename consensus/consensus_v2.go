@@ -135,7 +135,7 @@ func (consensus *Consensus) finalCommit() {
 	consensus.getLogger().Info().
 		Int64("NumCommits", numCommits).
 		Msg("[finalCommit] Finalizing Consensus")
-	beforeCatchupNum := consensus.blockNum
+	beforeCatchupNum := consensus.BlockNum()
 
 	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
@@ -188,7 +188,7 @@ func (consensus *Consensus) finalCommit() {
 		} else {
 			consensus.getLogger().Info().
 				Hex("blockHash", curBlockHash[:]).
-				Uint64("blockNum", consensus.blockNum).
+				Uint64("blockNum", consensus.BlockNum()).
 				Msg("[finalCommit] Sent Committed Message")
 		}
 		consensus.getLogger().Info().Msg("[finalCommit] Start consensus timer")
@@ -203,7 +203,7 @@ func (consensus *Consensus) finalCommit() {
 			p2p.ConstructMessage(msgToSend))
 		consensus.getLogger().Info().
 			Hex("blockHash", curBlockHash[:]).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Hex("lastCommitSig", commitSigAndBitmap).
 			Msg("[finalCommit] Queued Committed Message")
 	}
@@ -211,7 +211,7 @@ func (consensus *Consensus) finalCommit() {
 	block.SetCurrentCommitSig(commitSigAndBitmap)
 	err = consensus.commitBlock(block, FBFTMsg)
 
-	if err != nil || consensus.blockNum-beforeCatchupNum != 1 {
+	if err != nil || consensus.BlockNum()-beforeCatchupNum != 1 {
 		consensus.getLogger().Err(err).
 			Uint64("beforeCatchupBlockNum", beforeCatchupNum).
 			Msg("[finalCommit] Leader failed to commit the confirmed block")
@@ -264,7 +264,7 @@ func (consensus *Consensus) finalCommit() {
 // BlockCommitSigs returns the byte array of aggregated
 // commit signature and bitmap signed on the block
 func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
-	if consensus.blockNum <= 1 {
+	if consensus.BlockNum() <= 1 {
 		return nil, nil
 	}
 	lastCommits, err := consensus.Blockchain.ReadCommitSig(blockNum)
@@ -363,7 +363,7 @@ func (consensus *Consensus) Start(
 			case <-consensus.syncReadyChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
 				consensus.mutex.Lock()
-				if consensus.blockNum < consensus.Blockchain.CurrentHeader().Number().Uint64()+1 {
+				if consensus.BlockNum() < consensus.Blockchain.CurrentHeader().Number().Uint64()+1 {
 					consensus.SetBlockNum(consensus.Blockchain.CurrentHeader().Number().Uint64() + 1)
 					consensus.SetViewIDs(consensus.Blockchain.CurrentHeader().ViewID().Uint64() + 1)
 					mode := consensus.UpdateConsensusInformation()
@@ -396,7 +396,7 @@ func (consensus *Consensus) Start(
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
 
-				if newBlock.NumberU64() < consensus.blockNum {
+				if newBlock.NumberU64() < consensus.BlockNum() {
 					consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
 						Msg("[ConsensusMainLoop] received old block, abort")
 					continue
@@ -443,7 +443,7 @@ func (consensus *Consensus) Close() error {
 
 // waitForCommit wait extra 2 seconds for commit phase to finish
 func (consensus *Consensus) waitForCommit() {
-	if consensus.Mode() != Normal || consensus.phase != FBFTCommit {
+	if consensus.Mode() != Normal || consensus.phase.Get() != FBFTCommit {
 		return
 	}
 	// We only need to wait consensus is in normal commit phase
@@ -569,7 +569,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		} else {
 			consensus.getLogger().Info().
 				Str("blockHash", blk.Hash().Hex()).
-				Uint64("blockNum", consensus.blockNum).
+				Uint64("blockNum", consensus.BlockNum()).
 				Hex("lastCommitSig", bareMinimumCommit).
 				Msg("[preCommitAndPropose] Sent Committed Message")
 		}
@@ -621,7 +621,7 @@ func (consensus *Consensus) tryCatchup() error {
 	if consensus.BlockVerifier == nil {
 		return errors.New("consensus haven't finished initialization")
 	}
-	initBN := consensus.blockNum
+	initBN := consensus.BlockNum()
 	defer consensus.postCatchup(initBN)
 
 	blks, msgs, err := consensus.getLastMileBlocksAndMsg(initBN)
@@ -683,7 +683,9 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+	consensus.pubKeyLock.Unlock()
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
 		consensus.SetMode(consensus.UpdateConsensusInformation())
@@ -693,15 +695,15 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
-	if initBN < consensus.blockNum {
+	if initBN < consensus.BlockNum() {
 		consensus.getLogger().Info().
 			Uint64("From", initBN).
-			Uint64("To", consensus.blockNum).
+			Uint64("To", consensus.BlockNum()).
 			Msg("[TryCatchup] Caught up!")
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
-	if initBN < consensus.blockNum && consensus.IsViewChangingMode() {
+	if initBN < consensus.BlockNum() && consensus.IsViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
