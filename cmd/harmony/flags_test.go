@@ -80,7 +80,7 @@ func TestHarmonyFlags(t *testing.T) {
 					LegacyRPCsEnabled:  true,
 					RpcFilterFile:      "./.hmy/rpc_filter.txt",
 					RateLimterEnabled:  true,
-					RequestsPerSecond:  1000,
+					RequestsPerSecond:  1250,
 				},
 				WS: harmonyconfig.WsConfig{
 					Enabled:  true,
@@ -631,7 +631,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  true,
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
@@ -644,7 +644,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  true,
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
@@ -657,7 +657,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  true,
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
@@ -670,7 +670,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  false,
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
@@ -683,7 +683,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  true,
 				RpcFilterFile:      "./rmf.toml",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
@@ -696,7 +696,7 @@ func TestRPCOptFlags(t *testing.T) {
 				LegacyRPCsEnabled:  true,
 				RpcFilterFile:      "./.hmy/rpc_filter.txt",
 				RateLimterEnabled:  true,
-				RequestsPerSecond:  1000,
+				RequestsPerSecond:  1250,
 			},
 		},
 
