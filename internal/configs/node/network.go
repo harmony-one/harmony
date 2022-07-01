@@ -64,7 +64,7 @@ const (
 
 const (
 	// DefaultRateLimit for RPC, the number of requests per second
-	DefaultRPCRateLimit = 1000
+	DefaultRPCRateLimit = 1250
 )
 
 const (
