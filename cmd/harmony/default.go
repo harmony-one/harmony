@@ -70,6 +70,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	TxPool: harmonyconfig.TxPoolConfig{
 		BlacklistFile:     "./.hmy/blacklist.txt",
+		AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 		RosettaFixFile:    "",
 		AccountSlots:      16,
 		LocalAccountsFile: "./.hmy/locals.txt",

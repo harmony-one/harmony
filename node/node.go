@@ -956,6 +956,7 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
+	allowedTxs map[common.Address]core.AllowedTxData,
 	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
@@ -1031,6 +1032,7 @@ func New(
 		}
 
 		txPoolConfig.Blacklist = blacklist
+		txPoolConfig.AllowedTxs = allowedTxs
 		txPoolConfig.Journal = fmt.Sprintf("%v/%v", node.NodeConfig.DBDir, txPoolConfig.Journal)
 		node.TxPool = core.NewTxPool(txPoolConfig, node.Blockchain().Config(), blockchain, node.TransactionErrorSink)
 		node.CxPool = core.NewCxPool(core.CxPoolSize)
