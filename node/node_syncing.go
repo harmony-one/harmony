@@ -129,7 +129,8 @@ func (node *Node) createStagedSync(bc *core.BlockChain, isBeacon bool) *stagedsy
 	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, role, isBeacon, isExplorer); err != nil {
+		node.GetSyncID(), bc, role, isBeacon, isExplorer,
+		node.NodeConfig.DoubleCheckBlockHashes); err != nil {
 		return nil
 	} else {
 		return s

@@ -317,8 +317,8 @@ func (ss *StateSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		return err
 	}
 	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
+	// randSeed := time.Now().UnixNano()
+	// peers = limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).

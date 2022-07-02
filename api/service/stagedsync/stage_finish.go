@@ -29,6 +29,7 @@ func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
 }
 
 func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+	
 	return s.state.generateNewState(s.state.Blockchain())
 	// return nil
 }

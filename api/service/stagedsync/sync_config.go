@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"math/rand"
 	"reflect"
 	"sort"
 	"sync"
@@ -28,6 +29,7 @@ const (
 	// shall be between numPeersLowBound and numPeersHighBound
 	NumPeersLowBound  = 3
 	numPeersHighBound = 5
+	NumPeersReserved  = 2
 
 	downloadTaskBatch = 5
 )
@@ -135,9 +137,9 @@ func (tasks syncBlockTasks) indexes() []int {
 type SyncConfig struct {
 	// mtx locks peers, and *SyncPeerConfig pointers in peers.
 	// SyncPeerConfig itself is guarded by its own mutex.
-	mtx sync.RWMutex
-
-	peers []*SyncPeerConfig
+	mtx           sync.RWMutex
+	reservedPeers []*SyncPeerConfig
+	peers         []*SyncPeerConfig
 }
 
 // AddPeer adds the given sync peer.
@@ -152,6 +154,48 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 		}
 	}
 	sc.peers = append(sc.peers, peer)
+}
+
+// limitNumPeers limits number of peers to release some server end sources.
+func (sc *SyncConfig) SelectRandomPeers(randSeed int64) {
+	numPeers := len(sc.peers)
+	targetSize := calcNumPeersWithBound(numPeers, NumPeersLowBound, numPeersHighBound)
+	// if number of peers is less than required number, keep all in list
+	if numPeers <= targetSize {
+		return
+	}
+	//shuffle peers list
+	r := rand.New(rand.NewSource(randSeed))
+	r.Shuffle(numPeers, func(i, j int) { sc.peers[i], sc.peers[j] = sc.peers[j], sc.peers[i] })
+	// close connection to other extra peers
+	for i := numPeers - 1; i >= targetSize+NumPeersReserved; i-- {
+		sc.RemovePeer(sc.peers[i])
+	}
+	// select reserved peers
+	if numPeers > targetSize {
+		u := targetSize + NumPeersReserved
+		if u > numPeers {
+			u = numPeers
+		}
+		sc.reservedPeers = sc.peers[targetSize:u]
+	}
+	// select main peers
+	sc.peers = sc.peers[:targetSize]
+}
+
+// Peers are expected to limited at half of the size, capped between lowBound and highBound.
+func calcNumPeersWithBound(size int, lowBound, highBound int) int {
+	if size < lowBound {
+		return size
+	}
+	expLen := size / 2
+	if expLen < lowBound {
+		expLen = lowBound
+	}
+	if expLen > highBound {
+		expLen = highBound
+	}
+	return expLen
 }
 
 // ForEachPeer calls the given function with each peer.
@@ -185,6 +229,30 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 		Msg("[STAGED_SYNC] remove GRPC peer")
 }
 
+// RemovePeer removes a peer from SyncConfig
+func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig) {
+	sc.mtx.Lock()
+	defer sc.mtx.Unlock()
+
+	peer.client.Close()
+	for i, p := range sc.peers {
+		if p == peer {
+			if len(sc.reservedPeers) > 0 {
+				sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
+				sc.peers = append(sc.peers, sc.reservedPeers[0])
+				sc.reservedPeers = sc.reservedPeers[1:]
+				utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+					Msg("[STAGED_SYNC] replaced GRPC peer by reserved")
+			} else {
+				sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
+				utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+					Msg("[STAGED_SYNC] remove GRPC peer without replacement")
+			}
+			break
+		}
+	}
+}
+
 // CloseConnections close grpc connections for state sync clients
 func (sc *SyncConfig) CloseConnections() {
 	sc.mtx.RLock()
@@ -211,22 +279,17 @@ func (sc *SyncConfig) FindPeerByHash(peerHash []byte) *SyncPeerConfig {
 // Caller shall ensure mtx is locked for reading.
 func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
-	curCount := 0
-	curFirstID := -1
-	maxCount := 0
-	maxFirstID := -1
-	for i := range sc.peers {
-		if curFirstID == -1 || CompareSyncPeerConfigByblockHashes(sc.peers[curFirstID], sc.peers[i]) != 0 {
-			curCount = 1
-			curFirstID = i
-		} else {
-			curCount++
-		}
-		if curCount >= maxCount {
-			maxCount = curCount
-			maxFirstID = curFirstID
-		}
+	if len(sc.peers) == 0 {
+		return -1, 0
 	}
+	maxFirstID := len(sc.peers) - 1
+	for i := maxFirstID - 1; i >= 0; i-- {
+		if CompareSyncPeerConfigByblockHashes(sc.peers[maxFirstID], sc.peers[i]) != 0 {
+			break
+		}
+		maxFirstID = i
+	}
+	maxCount := len(sc.peers) - maxFirstID
 	return maxFirstID, maxCount
 }
 
@@ -260,6 +323,24 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] post cleanUpPeers")
 }
 
+// cleanUpPeers cleans up all peers whose missed any required block hash or sent any invalid block hash
+// Caller shall ensure mtx is locked for RW.
+func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
+	sc.mtx.Lock()
+	defer sc.mtx.Unlock()
+
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] before cleanUpPeers")
+	for i := 0; i < len(sc.peers); i++ {
+		if ipm[string(sc.peers[i].peerHash)] == true {
+			sc.peers[i].client.Close()
+			copy(sc.peers[i:], sc.peers[i+1:])
+			sc.peers[len(sc.peers)-1] = nil
+			sc.peers = sc.peers[:len(sc.peers)-1]
+		}
+	}
+	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] post cleanUpPeers")
+}
+
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
 // Note that choosing the most common peer config does not guarantee that the blocks to be downloaded are the correct ones.
 // The subsequent node syncing steps of verifying the block header chain will give such confirmation later.
@@ -272,7 +353,6 @@ func (sc *SyncConfig) GetBlockHashesConsensusAndCleanUp() error {
 		return CompareSyncPeerConfigByblockHashes(sc.peers[i], sc.peers[j]) == -1
 	})
 	maxFirstID, maxCount := sc.getHowManyMaxConsensus()
-
 	if maxFirstID == -1 {
 		return errors.New("invalid peer index -1 for block hashes query")
 	}

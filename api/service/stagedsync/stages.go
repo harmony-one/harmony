@@ -53,6 +53,7 @@ var AllStages = []SyncStage{
 
 // GetStageProgress retrieves saved progress of given sync stage from the database
 func GetStageProgress(db kv.Getter, stage SyncStage) (uint64, error) {
+
 	v, err := db.GetOne(kv.SyncStageProgress, []byte(stage))
 	if err != nil {
 		return 0, err

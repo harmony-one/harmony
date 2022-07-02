@@ -24,6 +24,7 @@ const (
 )
 
 var Buckets = []string{
+	BlockHashesBucket,
 	CommonBlocksBucket,
 	LastMileBlocksBucket,
 	StageProgressBucket,
@@ -37,6 +38,7 @@ func CreateStagedSync(
 	role nodeconfig.Role,
 	isBeacon bool,
 	isExplorer bool,
+	doubleCheckBlockHashes bool,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -73,24 +75,24 @@ func CreateStagedSync(
 		stages,
 		DefaultUnwindOrder,
 		DefaultPruneOrder,
+		doubleCheckBlockHashes,
 	), nil
 }
 
 func initDB(ctx context.Context, db kv.RwDB) error {
+	tx, errRW := db.BeginRw(ctx)
+	if errRW != nil {
+		return errRW
+	}
+	defer tx.Rollback()
 	for _, name := range Buckets {
-		tx, errRW := db.BeginRw(ctx)
-		if errRW != nil {
-			return errRW
-		}
-		defer tx.Rollback()
 		if err := tx.CreateBucket(name); err != nil {
 			return err
 		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("failed to initiate db: %w", err)
-		}
 	}
-
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to initiate db: %w", err)
+	}
 	return nil
 }
 
@@ -159,7 +161,7 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 				}
 			}
 			// if haven't get any new block
-			if currentHeight==s.Blockchain().CurrentBlock().NumberU64() {
+			if currentHeight == s.Blockchain().CurrentBlock().NumberU64() {
 				break
 			}
 		}
@@ -236,6 +238,26 @@ func (s *StagedSync) StageLoopStep(
 		}
 		log.Info("Commit cycle", "in", time.Since(commitStart))
 	}
+
+	// //if err := bh.configs.db.View(context.Background(), func(ctx kv.Tx) error {
+	// ro, err := s.DB().BeginRo(context.Background())
+	// if err != nil {
+	// 	return headBlockHash, err
+	// }
+	// c, errCursor := ro.Cursor(BlockHashesBucket)
+	// if errCursor != nil {
+	// 	return headBlockHash, errCursor
+	// }
+	// defer c.Close()
+	// for k, v, err := c.First(); k != nil; k, v, err = c.Next() {
+	// 	if err != nil {
+	// 		return headBlockHash, err
+	// 	}
+	// 	confirms, _ := strconv.Atoi(string(v))
+	// 	fmt.Println(k, "--------->", v)
+	// 	fmt.Println(hex.EncodeToString(k), "--------->", confirms)
+	// }
+
 	// var rotx kv.Tx
 	// if rotx, err = db.BeginRo(ctx); err != nil {
 	// 	return headBlockHash, err

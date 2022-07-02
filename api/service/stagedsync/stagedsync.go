@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"math/rand"
 	"sort"
 	"strconv"
 	"sync"
@@ -60,6 +59,10 @@ type StagedSync struct {
 	currentStage uint
 	timings      []Timing
 	logPrefixes  []string
+
+	// if set to true, it will double check the block hashes
+	//so, only blocks are sent by 2/3 of peers are considered as valid
+	DoubleCheckBlockHashes bool
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -195,7 +198,8 @@ func New(ctx context.Context,
 	db kv.RwDB,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
-	pruneOrder PruneOrder) *StagedSync {
+	pruneOrder PruneOrder,
+	doubleCheckBlockHashes bool) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
@@ -221,23 +225,24 @@ func New(ctx context.Context,
 	}
 
 	return &StagedSync{
-		ctx:            ctx,
-		selfip:         ip,
-		selfport:       port,
-		selfPeerHash:   peerHash,
-		bc:             bc,
-		isBeacon:       isBeacon,
-		isExplorer:     isExplorer,
-		db:             db,
-		stages:         stagesList,
-		currentStage:   0,
-		unwindOrder:    unwindStages,
-		pruningOrder:   pruneStages,
-		logPrefixes:    logPrefixes,
-		syncStatus:     NewSyncStatus(role),
-		commonBlocks:   make(map[int]*types.Block),
-		lastMileBlocks: []*types.Block{},
-		syncConfig:     &SyncConfig{},
+		ctx:                    ctx,
+		selfip:                 ip,
+		selfport:               port,
+		selfPeerHash:           peerHash,
+		bc:                     bc,
+		isBeacon:               isBeacon,
+		isExplorer:             isExplorer,
+		db:                     db,
+		stages:                 stagesList,
+		currentStage:           0,
+		unwindOrder:            unwindStages,
+		pruningOrder:           pruneStages,
+		logPrefixes:            logPrefixes,
+		syncStatus:             NewSyncStatus(role),
+		commonBlocks:           make(map[int]*types.Block),
+		lastMileBlocks:         []*types.Block{},
+		syncConfig:             &SyncConfig{},
+		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 	}
 }
 
@@ -403,7 +408,7 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 		return err
 	}
 
-	fmt.Println("stage ", stage.ID, " executing ...")
+	// fmt.Println("stage ", stage.ID, " executing ...")
 	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
 		fmt.Println("stage ", stage.ID, " failed:", err)
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
@@ -582,9 +587,6 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	if err := checkPeersDuplicity(peers); err != nil {
 		return err
 	}
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).
@@ -622,6 +624,17 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 		Bool("isBeacon", isBeacon).
 		Msg("[STAGED_SYNC] Finished making connection to peers")
 
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	ss.syncConfig.SelectRandomPeers(randSeed)
+
+	// for _, p := range ss.syncConfig.peers {
+	// 	fmt.Println("main list-->",p.ip, ":", p.port)
+	// }
+	// for _, p := range ss.syncConfig.reservedPeers {
+	// 	fmt.Println("res list-->",p.ip, ":", p.port)
+	// }
+
 	return nil
 }
 
@@ -640,34 +653,6 @@ func checkPeersDuplicity(ps []p2p.Peer) error {
 		m[dip] = struct{}{}
 	}
 	return nil
-}
-
-// limitNumPeers limits number of peers to release some server end sources.
-func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
-	targetSize := calcNumPeersWithBound(len(ps), NumPeersLowBound, numPeersHighBound)
-	if len(ps) <= targetSize {
-		return ps
-	}
-
-	r := rand.New(rand.NewSource(randSeed))
-	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
-
-	return ps[:targetSize]
-}
-
-// Peers are expected to limited at half of the size, capped between lowBound and highBound.
-func calcNumPeersWithBound(size int, lowBound, highBound int) int {
-	if size < lowBound {
-		return size
-	}
-	expLen := size / 2
-	if expLen < lowBound {
-		expLen = lowBound
-	}
-	if expLen > highBound {
-		expLen = highBound
-	}
-	return expLen
 }
 
 // GetActivePeerNumber returns the number of active peers
@@ -693,55 +678,137 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.Rw
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
 					Msg("[STAGED_SYNC] getConsensusHashes Nil Response")
-				ss.syncConfig.RemovePeer(peerConfig)
+				// replace it with reserved peer
+				ss.syncConfig.ReplacePeerWithReserved(peerConfig)
 				return
 			}
 			utils.Logger().Info().Uint32("queried blockHash size", size).
 				Int("got blockHashSize", len(response.Payload)).
 				Str("PeerIP", peerConfig.ip).
 				Msg("[STAGED_SYNC] GetBlockHashes")
+
 			if len(response.Payload) > int(size+1) {
 				utils.Logger().Warn().
 					Uint32("requestSize", size).
 					Int("respondSize", len(response.Payload)).
 					Msg("[STAGED_SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
-				for i, blk := range response.Payload[:size+1] {
-					tx.Append(BlockHashesBucket, blk, []byte(strconv.Itoa(i)))
-				}
+				//addBlockHashesToDBWithConfirms(response.Payload[:size+1], tx)
 			} else {
 				peerConfig.blockHashes = response.Payload
-				for i, blk := range response.Payload {
-					tx.Append(BlockHashesBucket, blk, []byte(strconv.Itoa(i)))
-				}
+				//addBlockHashesToDBWithConfirms(response.Payload, tx)
 			}
 		}()
 		return
 	})
 	wg.Wait()
-	if err := ss.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
-		return err
-	}
+
 	utils.Logger().Info().Msg("[STAGED_SYNC] Finished getting consensus block hashes")
 	return nil
 }
 
-func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain,tx kv.RwTx) {
+// analyze block hashes and detects invalid peers
+func (ss *StagedSync) getInvalidPeersByBlockHashes(tx kv.RwTx) (map[string]bool, int, error) {
+	invalidPeers := make(map[string]bool)
+	if len(ss.syncConfig.peers) < 3 {
+		lb := len(ss.syncConfig.peers[0].blockHashes)
+		return invalidPeers, lb, nil
+	}
+
+	// confirmations threshold to consider as valid block hash
+	th := 2 * int(len(ss.syncConfig.peers)/3)
+	if len(ss.syncConfig.peers) == 4 {
+		th = 3
+	}
+
+	type BlockHashMap struct {
+		peers   map[string]bool
+		isValid bool
+	}
+
+	// populate the block hashes map
+	bhm := make(map[string]*BlockHashMap)
+	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+		for _, blkHash := range peerConfig.blockHashes {
+			k := string(blkHash)
+			if _, ok := bhm[k]; !ok {
+				bhm[k] = &BlockHashMap{
+					peers: make(map[string]bool),
+				}
+			}
+			peerHash := string(peerConfig.peerHash)
+			bhm[k].peers[peerHash] = true
+			bhm[k].isValid = true
+		}
+		return
+	})
+
+	var validBlockHashes int
+
+	for blkHash, hmap := range bhm {
+
+		// if block is not confirmed by th% of peers, it is considered as invalid block
+		// So, any peer with that block hash will be considered as invalid peer
+		if len(hmap.peers) < th {
+			bhm[blkHash].isValid = false
+			for _, p := range ss.syncConfig.peers {
+				hasBlockHash := hmap.peers[string(p.peerHash)]
+				if hasBlockHash {
+					invalidPeers[string(p.peerHash)] = true
+				}
+			}
+			continue
+		}
+
+		// so, block hash is valid, because have been sent by more than th number of peers
+		validBlockHashes++
+
+		// if all peers already sent this block hash, then it is considered as valid
+		if len(hmap.peers) == len(ss.syncConfig.peers) {
+			continue
+		}
+
+		//consider invalid peer if it hasn't sent this block hash
+		for _, p := range ss.syncConfig.peers {
+			hasBlockHash := hmap.peers[string(p.peerHash)]
+			if !hasBlockHash {
+				invalidPeers[string(p.peerHash)] = true
+			}
+		}
+
+	}
+	fmt.Printf("%d out of %d peers have missed blocks or sent invalid blocks\n", len(invalidPeers), len(ss.syncConfig.peers))
+	return invalidPeers, validBlockHashes, nil
+}
+
+func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain, tx kv.RwTx) error {
 	ss.stateSyncTaskQueue = queue.New(0)
+	allTasksAddedToQueue := false
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
 			if err := ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
+				ss.stateSyncTaskQueue = queue.New(0)
 				utils.Logger().Warn().
 					Err(err).
 					Int("taskIndex", id).
 					Str("taskBlock", hex.EncodeToString(blockHash)).
 					Msg("[STAGED_SYNC] generateStateSyncTaskQueue: cannot add task")
+				break
 			}
 		}
-		brk = true
+		// check if all block hashes added to task queue
+		if ss.stateSyncTaskQueue.Len() == int64(len(configPeer.blockHashes)) {
+			allTasksAddedToQueue = true
+			brk = true
+		}
 		return
 	})
+
+	if !allTasksAddedToQueue {
+		return fmt.Errorf("cannot add task to queue")
+	}
 	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[STAGED_SYNC] generateStateSyncTaskQueue: finished")
+	return nil
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
@@ -769,6 +836,12 @@ func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: GetBlocks failed")
+					if err := taskQueue.put(tasks); err != nil {
+						utils.Logger().Warn().
+							Err(err).
+							Interface("taskIndexes", tasks.indexes()).
+							Msg("cannot add task back to queue")
+					}
 					ss.syncConfig.RemovePeer(peerConfig)
 					return
 				}

@@ -22,7 +22,7 @@ const (
 type (
 	syncStatus struct {
 		lastResult     SyncCheckResult
-		currentCycle   Cycle
+		currentCycle   SyncCycle
 		lastUpdateTime time.Time
 		lock           sync.RWMutex
 		expiration     time.Duration
@@ -34,7 +34,7 @@ type (
 		HeightDiff  uint64
 	}
 
-	Cycle struct {
+	SyncCycle struct {
 		StartHash []byte
 		Size      uint32
 	}
@@ -85,6 +85,6 @@ func (status *syncStatus) update(result SyncCheckResult) {
 	status.lastResult = result
 }
 
-func (status *syncStatus) CurrentCycle() Cycle {
+func (status *syncStatus) CurrentCycle() SyncCycle {
 	return status.currentCycle
 }
