@@ -39,7 +39,7 @@ func TestNewNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot craeate consensus: %v", err)
 	}
-	node := New(host, consensus, testDBFactory, nil, nil, nil, nil)
+	node := New(host, consensus, testDBFactory, nil, nil, nil, nil, nil)
 	if node.Consensus == nil {
 		t.Error("Consensus is not initialized for the node")
 	}
@@ -216,7 +216,7 @@ func TestAddBeaconPeer(t *testing.T) {
 	archiveMode := make(map[uint32]bool)
 	archiveMode[0] = true
 	archiveMode[1] = false
-	node := New(host, consensus, testDBFactory, nil, nil, archiveMode, nil)
+	node := New(host, consensus, testDBFactory, nil, nil, nil, archiveMode, nil)
 	for _, p := range peers1 {
 		ret := node.AddBeaconPeer(p)
 		if ret {
