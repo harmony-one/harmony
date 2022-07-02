@@ -22,6 +22,7 @@ import (
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -874,9 +875,13 @@ func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, err
 			if err != nil {
 				return nil, err
 			}
+			data, err := hexutil.Decode(dataStr)
+			if err != nil {
+				return nil, err
+			}
 			allowedTxs[from] = core.AllowedTxData{
 				To:   to,
-				Data: ethCommon.FromHex(dataStr),
+				Data: data,
 			}
 		}
 	}
