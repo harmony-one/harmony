@@ -44,7 +44,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{

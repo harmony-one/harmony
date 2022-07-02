@@ -48,12 +48,12 @@ type Service struct {
 	storage     *storage
 	server      *http.Server
 	messageChan chan *msg_pb.Message
-	blockchain  *core.BlockChain
+	blockchain  core.BlockChain
 	backend     hmy.NodeAPI
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, bc *core.BlockChain, backend hmy.NodeAPI) *Service {
+func New(selfPeer *p2p.Peer, bc core.BlockChain, backend hmy.NodeAPI) *Service {
 	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
 	storage, err := newStorage(bc, dbPath)
 	if err != nil {

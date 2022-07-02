@@ -78,7 +78,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	}
 	// Construct broadcast p2p message
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum, msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
+		consensus.BlockNum(), msg_pb.MessageType_ANNOUNCE, []nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID)),
 		}, p2p.ConstructMessage(msgToSend)); err != nil {
 		consensus.getLogger().Warn().
@@ -99,7 +99,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 	// TODO(audit): make FBFT lookup using map instead of looping through all items.
 	if !consensus.FBFTLog.HasMatchingViewAnnounce(
-		consensus.blockNum, consensus.GetCurBlockViewID(), recvMsg.BlockHash,
+		consensus.BlockNum(), consensus.GetCurBlockViewID(), recvMsg.BlockHash,
 	) {
 		consensus.getLogger().Debug().
 			Uint64("MsgViewID", recvMsg.ViewID).

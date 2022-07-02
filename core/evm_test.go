@@ -27,7 +27,7 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 )
 
-func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChain, *state.DB, *block.Header, ethdb.Database) {
+func getTestEnvironment(testBankKey ecdsa.PrivateKey) (*BlockChainImpl, *state.DB, *block.Header, ethdb.Database) {
 	// initialize
 	var (
 		testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)

@@ -22,8 +22,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CommitOffChainData write off chain data of a block onto db writer.
-func (bc *BlockChain) CommitOffChainData(
+func (bc *BlockChainImpl) CommitOffChainData(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
 	receipts []*types.Receipt,
@@ -277,7 +276,7 @@ func (bc *BlockChain) CommitOffChainData(
 	return CanonStatTy, nil
 }
 
-func (bc *BlockChain) writeValidatorStats(
+func (bc *BlockChainImpl) writeValidatorStats(
 	tempValidatorStats map[common.Address]*staking.ValidatorStats,
 	batch rawdb.DatabaseWriter,
 ) {
@@ -311,7 +310,7 @@ func (bc *BlockChain) writeValidatorStats(
 	}
 }
 
-func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
+func (bc *BlockChainImpl) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
 	nextBlockEpoch := header.Epoch()
 	if header.IsLastBlockInEpoch() {
 		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)

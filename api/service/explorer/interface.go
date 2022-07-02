@@ -146,7 +146,7 @@ type iterator interface {
 }
 
 // blockChainTxIndexer is the interface to check the loop up entry for transaction.
-// Implemented by *core.BlockChain
+// Implemented by core.BlockChain
 type blockChainTxIndexer interface {
 	ReadTxLookupEntry(txID common.Hash) (common.Hash, uint64, uint64)
 }

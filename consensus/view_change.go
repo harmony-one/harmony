@@ -264,7 +264,9 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
+	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
+	consensus.pubKeyLock.Unlock()
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
@@ -285,7 +287,7 @@ func (consensus *Consensus) startViewChange() {
 	if err := consensus.vc.InitPayload(
 		consensus.FBFTLog,
 		nextViewID,
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.priKey,
 		members); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[startViewChange] Init Payload Error")
@@ -299,7 +301,7 @@ func (consensus *Consensus) startViewChange() {
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
 		if err := consensus.msgSender.SendWithRetry(
-			consensus.blockNum,
+			consensus.BlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
 			[]nodeconfig.GroupID{
 				nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -325,7 +327,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	}
 
 	if err := consensus.msgSender.SendWithRetry(
-		consensus.blockNum,
+		consensus.BlockNum(),
 		msg_pb.MessageType_NEWVIEW,
 		[]nodeconfig.GroupID{
 			nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(consensus.ShardID))},
@@ -471,10 +473,10 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		Msg("[onNewView] Received NewView Message")
 
 	// change view and leaderKey to keep in sync with network
-	if consensus.blockNum != recvMsg.BlockNum {
+	if consensus.BlockNum() != recvMsg.BlockNum {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("myBlockNum", consensus.BlockNum()).
 			Msg("[onNewView] Invalid block number")
 		return
 	}
@@ -551,7 +553,9 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 
 	// newView message verified success, override my state
 	consensus.SetViewIDs(recvMsg.ViewID)
+	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = senderKey
+	consensus.pubKeyLock.Unlock()
 	consensus.ResetViewChangeState()
 
 	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)

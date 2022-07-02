@@ -160,7 +160,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig) {
 }
 
 // CreateStateSync returns the implementation of StateSyncInterface interface.
-func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
+func CreateStateSync(bc core.BlockChain, ip string, port string, peerHash [20]byte, isExplorer bool, role nodeconfig.Role) *StateSync {
 	stateSync := &StateSync{}
 	stateSync.blockChain = bc
 	stateSync.selfip = ip
@@ -177,7 +177,7 @@ func CreateStateSync(bc *core.BlockChain, ip string, port string, peerHash [20]b
 
 // StateSync is the struct that implements StateSyncInterface.
 type StateSync struct {
-	blockChain         *core.BlockChain
+	blockChain         core.BlockChain
 	selfip             string
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
@@ -535,7 +535,7 @@ func (ss *StateSync) getConsensusHashes(startHash []byte, size uint32) error {
 	return nil
 }
 
-func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
+func (ss *StateSync) generateStateSyncTaskQueue(bc core.BlockChain) {
 	ss.stateSyncTaskQueue = queue.New(0)
 	ss.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
@@ -554,7 +554,7 @@ func (ss *StateSync) generateStateSyncTaskQueue(bc *core.BlockChain) {
 }
 
 // downloadBlocks downloads blocks from state sync task queue.
-func (ss *StateSync) downloadBlocks(bc *core.BlockChain) {
+func (ss *StateSync) downloadBlocks(bc core.BlockChain) {
 	// Initialize blockchain
 	var wg sync.WaitGroup
 	count := 0
@@ -839,7 +839,7 @@ func (ss *StateSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Ha
 }
 
 // UpdateBlockAndStatus ...
-func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChain, verifyAllSig bool) error {
+func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
 		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[SYNC] Inappropriate block number, ignore!")
 		return nil
@@ -910,7 +910,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockChai
 }
 
 // generateNewState will construct most recent state from downloaded blocks
-func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker) error {
+func (ss *StateSync) generateNewState(bc core.BlockChain, worker *worker.Worker) error {
 	// update blocks created before node start sync
 	parentHash := bc.CurrentBlock().Hash()
 
@@ -973,7 +973,7 @@ func (ss *StateSync) generateNewState(bc *core.BlockChain, worker *worker.Worker
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc *core.BlockChain, worker *worker.Worker) error {
+func (ss *StateSync) ProcessStateSync(startHash []byte, size uint32, bc core.BlockChain, worker *worker.Worker) error {
 	// Gets consensus hashes.
 	if err := ss.getConsensusHashes(startHash, size); err != nil {
 		return errors.Wrap(err, "getConsensusHashes")
@@ -1072,7 +1072,7 @@ func (ss *StateSync) getMaxPeerHeight(isBeacon bool) uint64 {
 }
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
-func (ss *StateSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
+func (ss *StateSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) {
 	otherHeight := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
@@ -1084,7 +1084,7 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
@@ -1128,7 +1128,7 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	ss.purgeAllBlocksFromCache()
 }
 
-func (ss *StateSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
+func (ss *StateSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
 	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
 	if err != nil {

@@ -53,7 +53,7 @@ var (
 	allRandomUserAddress  []common.Address
 	allRandomUserKey      []*ecdsa.PrivateKey
 	faucetContractAddress common.Address
-	chain                 *core.BlockChain
+	chain                 core.BlockChain
 	err                   error
 	state                 *core_state.DB
 )
@@ -84,10 +84,10 @@ func init() {
 type testWorkerBackend struct {
 	db     ethdb.Database
 	txPool *core.TxPool
-	chain  *core.BlockChain
+	chain  *core.BlockChainImpl
 }
 
-func fundFaucetContract(chain *core.BlockChain) {
+func fundFaucetContract(chain core.BlockChain) {
 	fmt.Println()
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
@@ -148,7 +148,7 @@ func fundFaucetContract(chain *core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call DONE ---------")
 }
 
-func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
+func callFaucetContractToFundAnAddress(chain core.BlockChain) {
 	// Send Faucet Contract Transaction ///
 	fmt.Println("--------- Now Setting up Faucet Contract Call ---------")
 	fmt.Println()
@@ -197,7 +197,7 @@ func callFaucetContractToFundAnAddress(chain *core.BlockChain) {
 	fmt.Println("--------- Faucet Contract Call DONE ---------")
 }
 
-func playFaucetContract(chain *core.BlockChain) {
+func playFaucetContract(chain core.BlockChain) {
 	fundFaucetContract(chain)
 	callFaucetContractToFundAnAddress(chain)
 }
