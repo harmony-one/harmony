@@ -12,7 +12,14 @@ RPMBUILD=$(HOME)/rpmbuild
 DEBBUILD=$(HOME)/debbuild
 SHELL := bash
 
-.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean
+local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
+ARCH ?= linux-amd64
+platform_temp = $(subst -, ,$(ARCH))
+GOOS = $(word 1, $(platform_temp))
+GOARCH = $(word 2, $(platform_temp))
+HARMONY_VERSION ?= v4.3.10
+
+.PHONY: all help libs exe race trace-pointer debug debug-kill test test-go test-api test-api-attach linux_static deb_init deb_build deb debpub_dev debpub_prod rpm_init rpm_build rpm rpmpub_dev rpmpub_prod clean distclean build-docker
 
 all: libs
 	bash ./scripts/go_executable_build.sh -S
@@ -157,3 +164,8 @@ go-vet:
 
 go-test:
 	go test ./...
+
+build-docker: linux_static
+	docker buildx build --platform=$(GOOS)/$(GOARCH) --pull -t harmonyone/$(PKGNAME):$(HARMONY_VERSION) \
+	-t harmonyone/$(PKGNAME):latest \
+	-f scripts/docker/Dockerfile . --output=type=docker

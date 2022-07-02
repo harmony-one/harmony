@@ -27,17 +27,28 @@ env_vars=$(printenv | awk -v RS='\n' -F= '/^HARMONY_/{print $1}')
 
 bls_keys_node="https://api.s0.b.hmny.io"
 bls_keys_shardid=${HARMONY_GENERAL_SHARDID:-0}
-network_type=${HARMONY_NETWORK_NETWORKTYPE:-testnet}
+
+# Default NetworkType to testnet
+: ${HARMONY_NETWORK_NETWORKTYPE:=testnet}
+
+# Default NodeType to explorer
+: ${HARMONY_GENERAL_NODETYPE:=explorer}
+
+# Default Shard ID to 0
+: ${HARMONY_GENERAL_SHARDID:=0}
+
+# Default Console to true
+: ${HARMONY_LOG_CONSOLE:=true}
 
 # Generate default harmony.conf based on the NetworkType
-harmony config dump --network ${network_type} harmony.conf
+harmony config dump --network ${HARMONY_NETWORK_NETWORKTYPE} harmony.conf
 
 # Replace mainnet related configurations
-network_type=${HARMONY_NETWORK_NETWORKTYPE:-testnet}
-if [[ "${network_type}" == "mainnet" ]] ; then
+if [[ "${HARMONY_NETWORK_NETWORKTYPE}" == "mainnet" ]] ; then
   bls_keys_node="https://api.s0.t.hmny.io"
 fi
 
+# Overwrite default harmony config with enviroment variables
 re_numbers='^[0-9]+$'
 for name in ${env_vars[@]}
 do
@@ -53,10 +64,8 @@ do
   fi
 done
 
-node_type=${HARMONY_GENERAL_NODETYPE:-explorer}
-
 # Generate BLS key & pass for validator if not exist
-if [[ "${node_type}" == "validator" ]] && [[ ! "$(ls -A ${BLSKEYS_PATH})" ]] ; then
+if [[ "${HARMONY_GENERAL_NODETYPE}" == "validator" ]] && [[ ! "$(ls -A ${BLSKEYS_PATH})" ]] ; then
   bls_keys_passfile=${HARMONY_BLSKEYS_PASSFILE:-}
   if [ -z "$bls_keys_passfile" ]; then
       echo "\$bls_keys_passfile is empty, using default passphrase [harmony] to create bls keys"
@@ -90,4 +99,4 @@ cat ${CONFIG_FILE}
 echo
 echo "#############################"
 
-exec yes no | "$@"
+exec "$@"
