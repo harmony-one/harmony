@@ -136,7 +136,7 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			}
 
 			// Do one step of staged sync
-			_, syncErr = s.StageLoopStep(startHash[:], size, initialCycle)
+			_, syncErr = s.StartStageLoop(startHash[:], size, initialCycle)
 
 			if syncErr != nil {
 				utils.Logger().Error().Err(syncErr).
@@ -182,7 +182,7 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	s.purgeAllBlocksFromCache()
 }
 
-func (s *StagedSync) StageLoopStep(
+func (s *StagedSync) StartStageLoop(
 	startHash []byte,
 	size uint32,
 	initialCycle bool,

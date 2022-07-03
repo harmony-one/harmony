@@ -278,7 +278,7 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool, startHash []by
 		var badBlockUnwind bool
 		if s.unwindPoint != nil {
 			for j := 0; j < len(s.unwindOrder); j++ {
-				if s.unwindOrder[j] == nil || s.unwindOrder[j].Disabled || s.unwindOrder[j].Handler.Unwind == nil {
+				if s.unwindOrder[j] == nil || s.unwindOrder[j].Disabled {
 					continue
 				}
 				if err := s.unwindStage(firstCycle, s.unwindOrder[j], db, tx); err != nil {
