@@ -1019,7 +1019,7 @@ func verifyValidatorWrapperRevert(
 ) {
 	state.RevertToSnapshot(snapshot)
 	loadedWrapper, err := state.ValidatorWrapper(wrapperAddress, true, false)
-	if err != nil && !(err == errAddressNotPresent && allowErrAddressNotPresent) {
+	if err != nil && !(err == ErrAddressNotPresent && allowErrAddressNotPresent) {
 		t.Fatalf("Could not load wrapper %v\n", err)
 	}
 	if expectedWrapper != nil {

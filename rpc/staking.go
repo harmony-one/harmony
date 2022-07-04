@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -366,7 +367,14 @@ func (s *PublicStakingService) getAllValidatorInformation(
 	for i := start; i < start+validatorsNum; i++ {
 		validatorInfo, err := s.hmy.GetValidatorInformation(addresses[i], blk)
 		if err != nil {
-			return nil, err
+			if errors.Cause(err) != state.ErrAddressNotPresent {
+				return nil, err
+			} else {
+				// GetAllValidatorAddresses is as of current block
+				// but we are querying state as of prior block
+				// which means we can ignore ErrAddressNotPresent
+				continue
+			}
 		}
 		// Response output is the same for all versions
 		validators = append(validators, validatorInfo)

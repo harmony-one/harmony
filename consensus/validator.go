@@ -175,7 +175,7 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 		consensus.getLogger().Warn().Err(err).Msg("[sendCommitMessages] Cannot send commit message!!")
 	} else {
 		consensus.getLogger().Info().
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Hex("blockHash", consensus.blockHash[:]).
 			Msg("[sendCommitMessages] Sent Commit Message!!")
 	}
@@ -192,14 +192,14 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		Uint64("MsgViewID", recvMsg.ViewID).
 		Msg("[OnPrepared] Received prepared message")
 
-	if recvMsg.BlockNum < consensus.blockNum {
+	if recvMsg.BlockNum < consensus.BlockNum() {
 		consensus.getLogger().Info().Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.BlockNum() {
 		consensus.getLogger().Warn().
-			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("myBlockNum", consensus.BlockNum()).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Hex("myBlockHash", consensus.blockHash[:]).
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
@@ -245,10 +245,10 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		}
 		return
 	}
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.BlockNum() {
 		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Msg("[OnPrepared] Future Block Received, ignoring!!")
 		return
 	}
@@ -274,12 +274,12 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 		if blockObj == nil {
 			return
 		}
-		curBlockNum := consensus.blockNum
+		curBlockNum := consensus.BlockNum()
 		for _, committedMsg := range consensus.FBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
 			if committedMsg != nil {
 				consensus.onCommitted(committedMsg)
 			}
-			if curBlockNum < consensus.blockNum {
+			if curBlockNum < consensus.BlockNum() {
 				consensus.getLogger().Info().Msg("[OnPrepared] Successfully caught up with committed message")
 				break
 			}
@@ -297,16 +297,16 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		Msg("[OnCommitted] Received committed message")
 
 	// Ok to receive committed from last block since it could have more signatures
-	if recvMsg.BlockNum < consensus.blockNum-1 {
+	if recvMsg.BlockNum < consensus.BlockNum()-1 {
 		consensus.getLogger().Info().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return
 	}
 
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.BlockNum() {
 		consensus.getLogger().Info().
-			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("myBlockNum", consensus.BlockNum()).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Hex("myBlockHash", consensus.blockHash[:]).
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
@@ -372,12 +372,12 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		}
 	}
 
-	initBn := consensus.blockNum
+	initBn := consensus.BlockNum()
 	consensus.tryCatchup()
 
-	if recvMsg.BlockNum > consensus.blockNum {
+	if recvMsg.BlockNum > consensus.BlockNum() {
 		consensus.getLogger().Info().
-			Uint64("myBlockNum", consensus.blockNum).
+			Uint64("myBlockNum", consensus.BlockNum()).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Hex("myBlockHash", consensus.blockHash[:]).
 			Hex("MsgBlockHash", recvMsg.BlockHash[:]).
@@ -395,7 +395,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 		consensus.getLogger().Debug().Msg("[OnCommitted] stop bootstrap timer only once")
 	}
 
-	if initBn < consensus.blockNum {
+	if initBn < consensus.BlockNum() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Start consensus timer (new block added)")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 	}

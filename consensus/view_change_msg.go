@@ -24,7 +24,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 		Request: &msg_pb.Message_Viewchange{
 			Viewchange: &msg_pb.ViewChangeRequest{
 				ViewId:       consensus.GetViewChangingID(),
-				BlockNum:     consensus.blockNum,
+				BlockNum:     consensus.BlockNum(),
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 				LeaderPubkey: consensus.LeaderPubKey.Bytes[:],
@@ -33,7 +33,7 @@ func (consensus *Consensus) constructViewChangeMessage(priKey *bls.PrivateKeyWra
 	}
 
 	preparedMsgs := consensus.FBFTLog.GetMessagesByTypeSeq(
-		msg_pb.MessageType_PREPARED, consensus.blockNum,
+		msg_pb.MessageType_PREPARED, consensus.BlockNum(),
 	)
 	preparedMsg := consensus.FBFTLog.FindMessageByMaxViewID(preparedMsgs)
 
@@ -107,7 +107,7 @@ func (consensus *Consensus) constructNewViewMessage(viewID uint64, priKey *bls.P
 		Request: &msg_pb.Message_Viewchange{
 			Viewchange: &msg_pb.ViewChangeRequest{
 				ViewId:       viewID,
-				BlockNum:     consensus.blockNum,
+				BlockNum:     consensus.BlockNum(),
 				ShardId:      consensus.ShardID,
 				SenderPubkey: priKey.Pub.Bytes[:],
 			},

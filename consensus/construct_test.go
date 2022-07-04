@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"bytes"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -86,7 +87,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		[]*bls.PublicKeyWrapper{&leaderKeyWrapper},
 		leaderPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.GetCurBlockViewID(),
 	)
 	if _, err := consensus.Decider.AddNewVote(
@@ -94,7 +95,7 @@ func TestConstructPreparedMessage(test *testing.T) {
 		[]*bls.PublicKeyWrapper{&validatorKeyWrapper},
 		validatorPriKey.Sign(message),
 		common.BytesToHash(consensus.blockHash[:]),
-		consensus.blockNum,
+		consensus.BlockNum(),
 		consensus.GetCurBlockViewID(),
 	); err != nil {
 		test.Log(err)
@@ -156,7 +157,7 @@ func TestConstructPrepareMessage(test *testing.T) {
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
 	copy(consensus.blockHash[:], []byte("random"))
-	consensus.blockNum = 1000
+	atomic.StoreUint64(&consensus.blockNum, 1000)
 
 	sig := priKeyWrapper1.Pri.SignHash(consensus.blockHash[:])
 	network, err := consensus.construct(msg_pb.MessageType_PREPARE, nil, []*bls.PrivateKeyWrapper{&priKeyWrapper1})
@@ -248,7 +249,7 @@ func TestConstructCommitMessage(test *testing.T) {
 	consensus.SetCurBlockViewID(2)
 	consensus.blockHash = [32]byte{}
 	copy(consensus.blockHash[:], []byte("random"))
-	consensus.blockNum = 1000
+	atomic.StoreUint64(&consensus.blockNum, 1000)
 
 	sigPayload := []byte("payload")
 

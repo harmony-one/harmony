@@ -138,7 +138,7 @@ type Node struct {
 }
 
 // Blockchain returns the blockchain for the node's current shard.
-func (node *Node) Blockchain() *core.BlockChain {
+func (node *Node) Blockchain() core.BlockChain {
 	shardID := node.NodeConfig.ShardID
 	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
@@ -151,7 +151,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 }
 
 // Beaconchain returns the beaconchain from node.
-func (node *Node) Beaconchain() *core.BlockChain {
+func (node *Node) Beaconchain() core.BlockChain {
 	return node.chain(shard.BeaconChainShardID, core.Options{})
 }
 
