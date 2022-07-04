@@ -34,7 +34,7 @@ import (
 
 const sampleNumber = 3 // Number of transactions sampled in a block
 
-var DefaultMaxPrice = big.NewInt(5e11) // 500 gwei is the max suggested limit
+var DefaultMaxPrice = big.NewInt(1e12) // 1000 gwei is the max suggested limit
 
 type GasPriceConfig struct {
 	Blocks     int
