@@ -179,7 +179,7 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	if node.IsRunningBeaconChain() {
 		return
 	}
-	if !(node.Consensus.IsLeader() || rand.Intn(100) == 0) {
+	if !(node.Consensus.IsLeader() || rand.Intn(100) <= 1) {
 		return
 	}
 	curBlock := node.Blockchain().CurrentBlock()

@@ -63,9 +63,9 @@ func (ss *EpochSync) isInSync(_ bool) SyncCheckResult {
 	normalizedOtherEpoch := otherEpoch - 1
 	inSync := curEpoch == normalizedOtherEpoch
 
-	heightDiff := normalizedOtherEpoch - curEpoch
+	epochDiff := normalizedOtherEpoch - curEpoch
 	if normalizedOtherEpoch < curEpoch {
-		heightDiff = 0
+		epochDiff = 0
 	}
 
 	utils.Logger().Info().
@@ -75,7 +75,7 @@ func (ss *EpochSync) isInSync(_ bool) SyncCheckResult {
 	return SyncCheckResult{
 		IsInSync:    inSync,
 		OtherHeight: otherHeight1,
-		HeightDiff:  heightDiff,
+		HeightDiff:  epochDiff,
 	}
 }
 
