@@ -143,6 +143,10 @@ type BlockChain interface {
 	WriteShardStateBytes(db rawdb.DatabaseWriter,
 		epoch *big.Int, shardState []byte,
 	) (*shard.State, error)
+	// WriteHeadBlock writes head block.
+	WriteHeadBlock(block *types.Block) error
+	// StoreShardStateBytes saves the given sharding state under the given epoch number.
+	StoreShardStateBytes(epoch *big.Int, shardState []byte) (*shard.State, error)
 	// ReadCommitSig retrieves the commit signature on a block.
 	ReadCommitSig(blockNum uint64) ([]byte, error)
 	// WriteCommitSig saves the commits signatures signed on a block.

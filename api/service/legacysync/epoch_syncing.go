@@ -88,11 +88,11 @@ func (ss *EpochSync) GetActivePeerNumber() int {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *EpochSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) time.Duration {
+func (ss *EpochSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) time.Duration {
 	return time.Duration(ss.syncLoop(bc, worker, isBeacon, consensus)) * time.Second
 }
 
-func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
+func (ss *EpochSync) syncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
 	maxHeight := getMaxPeerHeight(ss.syncConfig)
 	for {
 		if maxHeight == 0 || maxHeight == math.MaxUint64 {
@@ -142,7 +142,7 @@ func (ss *EpochSync) syncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, worker *worker.Worker) error {
+func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain, worker *worker.Worker) error {
 	var payload [][]byte
 	var peerCfg *SyncPeerConfig
 
@@ -173,7 +173,7 @@ func (ss *EpochSync) ProcessStateSync(heights []uint64, bc *core.BlockChain, wor
 	return nil
 }
 
-func (ss *EpochSync) processWithPayload(payload [][]byte, bc *core.BlockChain) error {
+func (ss *EpochSync) processWithPayload(payload [][]byte, bc core.BlockChain) error {
 	decoded := make([]*types.Block, 0, len(payload))
 	for idx, blockBytes := range payload {
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)

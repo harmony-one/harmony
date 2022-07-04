@@ -155,7 +155,7 @@ func (node *Node) Beaconchain() core.BlockChain {
 	return node.chain(shard.BeaconChainShardID, core.Options{})
 }
 
-func (node *Node) chain(shardID uint32, options core.Options) *core.BlockChain {
+func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
 	bc, err := node.shardChains.ShardChain(shardID, options)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
@@ -173,7 +173,7 @@ func (node *Node) chain(shardID uint32, options core.Options) *core.BlockChain {
 
 // EpochChain returns the epoch chain from node. Epoch chain is the same as BeaconChain,
 // but with differences in behaviour.
-func (node *Node) EpochChain() *core.BlockChain {
+func (node *Node) EpochChain() core.BlockChain {
 	return node.chain(shard.BeaconChainShardID, core.Options{
 		SkipInitialStateValidation: true,
 	})
@@ -1012,7 +1012,7 @@ func New(
 
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		var beaconChain *core.BlockChain
+		var beaconChain core.BlockChain
 		if blockchain.ShardID() == shard.BeaconChainShardID {
 			beaconChain = node.Beaconchain()
 		} else {
