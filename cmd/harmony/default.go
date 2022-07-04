@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.3" // bump from 2.5.2 for rpc filters
+const tomlConfigVersion = "2.5.4" // bump from 2.5.2 for rpc filters
 
 const (
 	defNetworkType = nodeconfig.Mainnet
