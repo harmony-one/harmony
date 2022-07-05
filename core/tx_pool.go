@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -96,7 +97,7 @@ var (
 	ErrInvalidMsgForStakingDirective = errors.New("staking message does not match directive message")
 
 	// ErrBlacklistFrom is returned if a transaction's from/source address is blacklisted
-	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist")
+	ErrBlacklistFrom = errors.New("`from` address of transaction in blacklist and not in allowlist")
 
 	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
 	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
@@ -728,18 +729,20 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 
 	// Make sure transaction does not have blacklisted addresses
 	if _, exists := (pool.config.Blacklist)[from]; exists && !inAllowedTxs {
-		if b32, err := hmyCommon.AddressToBech32(from); err == nil {
-			return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
-		}
-		return ErrBlacklistFrom
+		return errors.WithMessagef(
+			ErrBlacklistFrom,
+			"transaction sender: %s, receiver: %s, data %s",
+			from.Hex(), tx.To().Hex(), hexutil.Encode(tx.Data()),
+		)
 	}
 	// Make sure transaction does not burn funds by sending funds to blacklisted address
 	if tx.To() != nil {
 		if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
-			if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
-				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s with data: %x", b32, tx.Data())
-			}
-			return ErrBlacklistTo
+			return errors.WithMessagef(
+				ErrBlacklistTo,
+				"transaction receiver: %s, sender: %s, data %s",
+				tx.To().Hex(), from.Hex(), hexutil.Encode(tx.Data()),
+			)
 		}
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
