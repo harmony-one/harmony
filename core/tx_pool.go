@@ -737,7 +737,7 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 	if tx.To() != nil {
 		if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
 			if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
-				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s", b32)
+				return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s with data: %x", b32, tx.Data())
 			}
 			return ErrBlacklistTo
 		}
