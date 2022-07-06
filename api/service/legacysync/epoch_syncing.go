@@ -118,11 +118,10 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		var heights []uint64
 		loopEpoch := curEpoch + 1
 		for len(heights) < int(SyncLoopBatchSize) {
-			epochLastBlockHeight := shard.Schedule.EpochLastBlock(loopEpoch)
-			if epochLastBlockHeight > maxHeight {
+			if loopEpoch >= otherEpoch {
 				break
 			}
-			heights = append(heights, epochLastBlockHeight)
+			heights = append(heights, shard.Schedule.EpochLastBlock(loopEpoch))
 			loopEpoch = loopEpoch + 1
 		}
 
