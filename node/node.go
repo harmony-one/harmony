@@ -976,6 +976,7 @@ func New(
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
 	node.TransactionErrorSink = types.NewTransactionErrorSink()
+	node.crosslinks = crosslinks.New()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
