@@ -139,6 +139,10 @@ func AnalysisEnd(name string, more ...interface{}) {
 	ds().Debug().Msgf("ds-%s-end %s", name, fmt.Sprint(more...))
 }
 
+func init() {
+	zeroLogger = Logger()
+}
+
 // Logger returns a zerolog.Logger singleton
 func Logger() *zerolog.Logger {
 	if zeroLogger == nil {

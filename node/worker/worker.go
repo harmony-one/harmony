@@ -69,9 +69,9 @@ func (w *Worker) CommitSortedTransactions(
 	coinbase common.Address,
 ) {
 	for {
-		if w.current.gasPool.Gas() < 30000000 {
-			// Temporary solution to reduce the fullness of the block. Break here when the available gas left hit 30M.
-			// Effectively making the gas limit 50M (since 80M is the default gas limit)
+		if w.current.gasPool.Gas() < 50000000 {
+			// Temporary solution to reduce the fullness of the block. Break here when the available gas left hit 50M.
+			// Effectively making the gas limit 30M (since 80M is the default gas limit)
 			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("[Temp Gas Limit] Not enough gas for further transactions")
 			break
 		}
