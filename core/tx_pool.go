@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
@@ -101,6 +100,8 @@ var (
 
 	// ErrBlacklistTo is returned if a transaction's to/destination address is blacklisted
 	ErrBlacklistTo = errors.New("`to` address of transaction in blacklist")
+
+	ErrAllowedTxs = errors.New("transaction allowed whitelist check failed.")
 )
 
 var (
@@ -721,28 +722,32 @@ func (pool *TxPool) validateTx(tx types.PoolTransaction, local bool) error {
 		return ErrInvalidSender
 	}
 
-	inAllowedTxs := false
+	// do whitelist check first, if tx not in whitelist, do blacklist check
 	if allowedTx, exists := pool.config.AllowedTxs[from]; exists {
-		to := tx.To()
-		inAllowedTxs = to != nil && *to == allowedTx.To && bytes.Equal(tx.Data(), allowedTx.Data)
-	}
-
-	// Make sure transaction does not have blacklisted addresses
-	if _, exists := (pool.config.Blacklist)[from]; exists && !inAllowedTxs {
-		return errors.WithMessagef(
-			ErrBlacklistFrom,
-			"transaction sender: %s, receiver: %s, data %s",
-			from.Hex(), tx.To().Hex(), hexutil.Encode(tx.Data()),
-		)
-	}
-	// Make sure transaction does not burn funds by sending funds to blacklisted address
-	if tx.To() != nil {
-		if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
-			return errors.WithMessagef(
-				ErrBlacklistTo,
-				"transaction receiver: %s, sender: %s, data %s",
-				tx.To().Hex(), from.Hex(), hexutil.Encode(tx.Data()),
-			)
+		if to := tx.To(); to == nil || *to != allowedTx.To || !bytes.Equal(tx.Data(), allowedTx.Data) {
+			toAddr := common.Address{}
+			if to != nil {
+				toAddr = *to
+			}
+			return errors.WithMessagef(ErrAllowedTxs, "transaction sender: %x, receiver: %x, input: %x", tx.From(), toAddr, tx.Data())
+		}
+	} else {
+		// do blacklist check
+		// Make sure transaction does not have blacklisted addresses
+		if _, exists := (pool.config.Blacklist)[from]; exists {
+			if b32, err := hmyCommon.AddressToBech32(from); err == nil {
+				return errors.WithMessagef(ErrBlacklistFrom, "transaction sender is %s", b32)
+			}
+			return ErrBlacklistFrom
+		}
+		// Make sure transaction does not burn funds by sending funds to blacklisted address
+		if tx.To() != nil {
+			if _, exists := (pool.config.Blacklist)[*tx.To()]; exists {
+				if b32, err := hmyCommon.AddressToBech32(*tx.To()); err == nil {
+					return errors.WithMessagef(ErrBlacklistTo, "transaction receiver is %s with data: %x", b32, tx.Data())
+				}
+				return ErrBlacklistTo
+			}
 		}
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
