@@ -2,7 +2,6 @@ package node
 
 import (
 	"math/big"
-	"sync/atomic"
 
 	common2 "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -23,7 +22,8 @@ var (
 	errAlreadyExist = errors.New("crosslink already exist")
 )
 
-// VerifyBlockCrossLinks verifies the cross links of the block
+// VerifyBlockCrossLinks verifies the crosslinks of the block.
+// This method should be called from beacon chain.
 func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	cxLinksData := block.Header().CrossLinks()
 	if len(cxLinksData) == 0 {
@@ -44,6 +44,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 	}
 
 	for _, crossLink := range crossLinks {
+		// ReadCrossLink beacon chain usage.
 		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
 			// Add slash for exist same blocknum but different crosslink
@@ -58,6 +59,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 }
 
 // ProcessCrossLinkHeartbeatMessage process crosslink heart beat signal.
+// This function is only called on shards 1,2,3 when network message `CrosslinkHeartbeat` receiving.
 func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
 	if node.IsRunningBeaconChain() {
 		return
@@ -81,7 +83,7 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	// Outdated signal.
-	if hb.LatestContinuousBlockNum <= atomic.LoadUint64(&latestSentCrosslink) {
+	if s := node.crosslinks.LastKnownCrosslinkHeartbeatSignal(); s != nil && s.LatestContinuousBlockNum > hb.LatestContinuousBlockNum {
 		return nil
 	}
 
@@ -135,8 +137,8 @@ func (node *Node) processCrossLinkHeartbeatMessage(msgPayload []byte) error {
 	}
 
 	utils.Logger().Info().
-		Msgf("[ProcessCrossLinkHeartbeatMessage] storing latestSentCrosslink to %d", hb.LatestContinuousBlockNum)
-	atomic.StoreUint64(&latestSentCrosslink, hb.LatestContinuousBlockNum)
+		Msgf("[ProcessCrossLinkHeartbeatMessage] storing hb signal with block num %d", hb.LatestContinuousBlockNum)
+	node.crosslinks.SetLastKnownCrosslinkHeartbeatSignal(&hb)
 	return nil
 }
 
@@ -180,6 +182,7 @@ func (node *Node) ProcessCrossLinkMessage(msgPayload []byte) {
 				continue
 			}
 
+			// ReadCrossLink beacon chain usage.
 			exist, err := node.Blockchain().ReadCrossLink(cl.ShardID(), cl.Number().Uint64())
 			if err == nil && exist != nil {
 				nodeCrossLinkMessageCounterVec.With(prometheus.Labels{"type": "duplicate_crosslink"}).Inc()

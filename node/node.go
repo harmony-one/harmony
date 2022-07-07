@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -81,6 +82,7 @@ type Node struct {
 	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
 	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex        sync.Mutex
+	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
 	shardChains shardchain.Collection
 	SelfPeer    p2p.Peer
