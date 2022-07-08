@@ -7,13 +7,10 @@ import (
 	"time"
 
 	"github.com/Workiva/go-datastructures/queue"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
-	"github.com/harmony-one/harmony/node/worker"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
@@ -88,11 +85,11 @@ func (ss *EpochSync) GetActivePeerNumber() int {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *EpochSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) time.Duration {
-	return time.Duration(ss.syncLoop(bc, worker, isBeacon, consensus)) * time.Second
+func (ss *EpochSync) SyncLoop(bc core.BlockChain, isBeacon bool, consensus *consensus.Consensus) time.Duration {
+	return time.Duration(ss.syncLoop(bc, isBeacon, consensus)) * time.Second
 }
 
-func (ss *EpochSync) syncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, _ *consensus.Consensus) (timeout int) {
+func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Consensus) (timeout int) {
 	maxHeight := getMaxPeerHeight(ss.syncConfig)
 	for {
 		if maxHeight == 0 || maxHeight == math.MaxUint64 {
@@ -130,7 +127,7 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			return 10
 		}
 
-		err := ss.ProcessStateSync(heights, bc, worker)
+		err := ss.ProcessStateSync(heights, bc)
 		if err != nil {
 			utils.Logger().Error().Err(err).
 				Msgf("[EPOCHSYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
@@ -141,7 +138,7 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 }
 
 // ProcessStateSync processes state sync from the blocks received but not yet processed so far
-func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain, worker *worker.Worker) error {
+func (ss *EpochSync) ProcessStateSync(heights []uint64, bc core.BlockChain) error {
 	var payload [][]byte
 	var peerCfg *SyncPeerConfig
 
@@ -187,39 +184,8 @@ func (ss *EpochSync) processWithPayload(payload [][]byte, bc core.BlockChain) er
 		decoded = append(decoded, block)
 	}
 
-	for _, block := range decoded {
-		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
-		if err != nil {
-			return errors.Wrap(err, "parse commitSigAndBitmap")
-		}
-
-		// Signature validation.
-		err = bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap)
-		if err != nil {
-			return errors.Wrap(err, "failed signature validation")
-		}
-
-		ep := block.Header().Epoch()
-		next := ep.Add(ep, common.Big1)
-		_, err = bc.StoreShardStateBytes(next, block.Header().ShardState())
-		if err != nil {
-			return err
-		}
-
-		err = bc.WriteBlockWithoutState(block, common.Big1)
-		if err != nil {
-			return err
-		}
-
-		err = bc.WriteHeadBlock(block)
-		if err != nil {
-			return err
-		}
-		utils.Logger().Info().
-			Msgf("[EPOCHSYNC] Added block %d %s", block.NumberU64(), block.Hash().Hex())
-	}
-
-	return nil
+	_, err := bc.InsertChain(decoded, true)
+	return err
 }
 
 // CreateSyncConfig creates SyncConfig for StateSync object.

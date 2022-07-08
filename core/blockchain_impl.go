@@ -343,17 +343,15 @@ func (bc *BlockChainImpl) loadLastState() error {
 		utils.Logger().Warn().Str("hash", head.Hex()).Msg("Head block missing, resetting chain")
 		return bc.Reset()
 	}
-	if !bc.options.SkipInitialStateValidation {
-		// Make sure the state associated with the block is available
-		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
-			// Dangling block without a state associated, init from scratch
-			utils.Logger().Warn().
-				Str("number", currentBlock.Number().String()).
-				Str("hash", currentBlock.Hash().Hex()).
-				Msg("Head state missing, repairing chain")
-			if err := bc.repair(&currentBlock); err != nil {
-				return err
-			}
+	// Make sure the state associated with the block is available
+	if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
+		// Dangling block without a state associated, init from scratch
+		utils.Logger().Warn().
+			Str("number", currentBlock.Number().String()).
+			Str("hash", currentBlock.Hash().Hex()).
+			Msg("Head state missing, repairing chain")
+		if err := bc.repair(&currentBlock); err != nil {
+			return err
 		}
 	}
 	// Everything seems to be fine, set as the head block
@@ -1876,23 +1874,6 @@ func (bc *BlockChainImpl) WriteShardStateBytes(db rawdb.DatabaseWriter,
 	cacheKey := string(epoch.Bytes())
 	bc.shardStateCache.Add(cacheKey, decodeShardState)
 	return decodeShardState, nil
-}
-
-func (bc *BlockChainImpl) StoreShardStateBytes(epoch *big.Int, shardState []byte) (*shard.State, error) {
-	batch := bc.db.NewBatch()
-	rs, err := bc.WriteShardStateBytes(batch, epoch, shardState)
-	if err != nil {
-		return nil, err
-	}
-	if err := batch.Write(); err != nil {
-		if isUnrecoverableErr(err) {
-			fmt.Printf("Unrecoverable error when writing leveldb: %v\nExitting\n", err)
-			os.Exit(1)
-		}
-		return nil, err
-	}
-	return rs, nil
-
 }
 
 func (bc *BlockChainImpl) ReadCommitSig(blockNum uint64) ([]byte, error) {

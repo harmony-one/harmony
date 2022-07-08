@@ -110,9 +110,15 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 	if len(options) == 1 {
 		opts = options[0]
 	}
-	bc, err := core.NewBlockChainWithOptions(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil, opts,
-	)
+	var bc core.BlockChain
+	if opts.EpochChain {
+		bc, err = core.NewEpochChain(db, &chainConfig, sc.engine, vm.Config{})
+	} else {
+		bc, err = core.NewBlockChainWithOptions(
+			db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil, opts,
+		)
+	}
+
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
 	}

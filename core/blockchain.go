@@ -21,14 +21,14 @@ import (
 
 // Options contains configuration values to change blockchain behaviour.
 type Options struct {
-	// Skip state check on initialization. Should be enabled for epoch chain.
-	SkipInitialStateValidation bool
+	// Subset of blockchain suitable for storing last epoch blocks i.e. blocks with shard state.
+	EpochChain bool
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
 // block. The Blockchain manages chain imports, reverts, chain reorganisations.
 //
-// Importing blocks in to the block chain happens according to the set of rules
+// Importing blocks in to the blockchain happens according to the set of rules
 // defined by the two stage validator. Processing of blocks is done using the
 // Processor which processes the included transaction. The validation of the state
 // is done in the second part of the validator. Failing results in aborting of
@@ -145,8 +145,6 @@ type BlockChain interface {
 	) (*shard.State, error)
 	// WriteHeadBlock writes head block.
 	WriteHeadBlock(block *types.Block) error
-	// StoreShardStateBytes saves the given sharding state under the given epoch number.
-	StoreShardStateBytes(epoch *big.Int, shardState []byte) (*shard.State, error)
 	// ReadCommitSig retrieves the commit signature on a block.
 	ReadCommitSig(blockNum uint64) ([]byte, error)
 	// WriteCommitSig saves the commits signatures signed on a block.

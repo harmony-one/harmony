@@ -90,11 +90,11 @@ type Node struct {
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	stateMutex sync.Mutex // mutex for change node state
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	TxPool               *core.TxPool
-	CxPool               *core.CxPool // pool for missing cross shard receipts resend
-	Worker, BeaconWorker *worker.Worker
-	downloaderServer     *downloader.Server
+	BeaconNeighbors  sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	TxPool           *core.TxPool
+	CxPool           *core.CxPool // pool for missing cross shard receipts resend
+	Worker           *worker.Worker
+	downloaderServer *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync              *legacysync.StateSync
@@ -113,9 +113,7 @@ type Node struct {
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
-	chainConfig params.ChainConfig
-	// map of service type to its message channel.
-	isFirstTime         bool // the node was started with a fresh database
+	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
@@ -177,7 +175,7 @@ func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
 // but with differences in behaviour.
 func (node *Node) EpochChain() core.BlockChain {
 	return node.chain(shard.BeaconChainShardID, core.Options{
-		SkipInitialStateValidation: true,
+		EpochChain: true,
 	})
 }
 
@@ -998,7 +996,7 @@ func New(
 	engine := chain.NewEngine()
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
+		chainDBFactory, &core.GenesisInitializer{NetworkType: node.NodeConfig.GetNetworkType()}, engine, &chainConfig,
 	)
 
 	for shardID, archival := range isArchival {
@@ -1058,12 +1056,6 @@ func New(
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
-
-		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, engine,
-			)
-		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
