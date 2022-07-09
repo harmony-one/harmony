@@ -1,11 +1,14 @@
 package node
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
@@ -1429,6 +1432,29 @@ func (node *Node) syncFromTiKVWriter() {
 
 	// subscribe block update
 	go redis_helper.SubscribeShardUpdate(bc.ShardID(), func(blkNum uint64, logs []*types.Log) {
+		// todo temp code to find and fix problems
+		// redis: 2022/07/09 03:51:23 pubsub.go:605: redis: &{%!s(*redis.PubSub=&{0xc002198d20 0xe0b160 0xe0b380 {0 0} 0xc0454265a0 map[shard_update_0:{}] map[] false 0xc0047c7800 0xc004946240 {1 {0 0}} 0xc0074269c0 <nil>}) %!s(chan *redis.Message=0xc004946180) %!s(chan interface {}=<nil>) %!s(chan struct {}=0xc0047c7b60) %!s(int=100) %!s(time.Duration=60000000000) %!s(time.Duration=3000000000)} channel is full for 1m0s (message is dropped)
+		doneChan := make(chan struct{}, 1)
+		go func() {
+			select {
+			case <-doneChan:
+				return
+			case <-time.After(5 * time.Minute):
+				buf := bytes.NewBuffer(nil)
+				err := pprof.Lookup("goroutine").WriteTo(buf, 1)
+				if err != nil {
+					panic(err)
+				}
+				err = ioutil.WriteFile(fmt.Sprintf("/tmp/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				if err != nil {
+					panic(err)
+				}
+				// todo temp code to fix problems, restart self
+				os.Exit(1)
+			}
+		}()
+		defer close(doneChan)
+
 		err := bc.SyncFromTiKVWriter(blkNum, logs)
 		if err != nil {
 			utils.Logger().Warn().
