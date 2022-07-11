@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -480,7 +481,13 @@ func (consensus *Consensus) StartFinalityCount() {
 // FinishFinalityCount calculate the current finality
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
-	consensus.finality = (d - consensus.finalityCounter.Load().(int64)) / 1000000
+
+	if load, ok := consensus.finalityCounter.Load().(int64); ok {
+		consensus.finality = (d - load) / 1000000
+	} else {
+		panic(fmt.Sprintf("Consensus: %T", consensus.Blockchain))
+	}
+	//consensus.finality = (d - consensus.finalityCounter.Load().(int64)) / 1000000
 	consensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
