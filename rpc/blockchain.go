@@ -126,7 +126,7 @@ func (s *PublicBlockchainService) getBalanceByBlockNumber(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 	if err != nil {
 		return nil, err
 	}
@@ -413,6 +413,75 @@ func (s *PublicBlockchainService) GetBlockSignerKeys(
 	}
 	// Fetch signers
 	return s.helper.GetBLSSigners(bn)
+}
+
+// GetBlockReceipts returns all transaction receipts for a particular block.
+func (s *PublicBlockchainService) GetBlockReceipts(
+	ctx context.Context, blockHash common.Hash,
+) ([]StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetBlockReceipts)
+	defer DoRPCRequestDuration(GetBlockReceipts, timer)
+
+	block, err := s.hmy.GetBlock(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := s.hmy.GetReceipts(ctx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+
+	rmap := make(map[common.Hash]*types.Receipt, len(receipts))
+	for _, r := range receipts {
+		rmap[r.TxHash] = r
+	}
+
+	txns := make([]types.CoreTransaction, 0,
+		block.Transactions().Len()+block.StakingTransactions().Len())
+	for _, tx := range block.Transactions() {
+		txns = append(txns, tx)
+	}
+	for _, tx := range block.StakingTransactions() {
+		txns = append(txns, tx)
+	}
+
+	if len(txns) != len(rmap) {
+		return nil, fmt.Errorf(
+			"transactions (%d) and receipts (%d) count mismatch",
+			len(txns), len(rmap))
+	}
+
+	rpcr := make([]StructuredResponse, 0, len(txns))
+
+	for i, tx := range txns {
+		index := uint64(i)
+
+		r, err := interface{}(nil), error(nil)
+		switch s.version {
+		case V1:
+			r, err = v1.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case V2:
+			r, err = v2.NewReceipt(tx, blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+		case Eth:
+			if tx, ok := tx.(*types.Transaction); ok {
+				r, err = eth.NewReceipt(tx.ConvertToEth(), blockHash, block.NumberU64(), index, rmap[tx.Hash()])
+			}
+		default:
+			return nil, ErrUnknownRPCVersion
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		sr, err := NewStructuredResponse(r)
+		if err != nil {
+			return nil, err
+		}
+		rpcr = append(rpcr, sr)
+	}
+
+	return rpcr, nil
 }
 
 // IsBlockSigner returns true if validator with address signed blockNum block.
@@ -718,7 +787,7 @@ type StorageResult struct {
 
 // GetHeaderByNumberRLPHex returns block header at given number by `hex(rlp(header))`
 func (s *PublicBlockchainService) GetProof(
-	ctx context.Context, address common.Address, storageKeys []string, blockNumber BlockNumber) (ret *AccountResult, err error) {
+	ctx context.Context, address common.Address, storageKeys []string, blockNrOrHash rpc.BlockNumberOrHash) (ret *AccountResult, err error) {
 	timer := DoMetricRPCRequest(GetProof)
 	defer DoRPCRequestDuration(GetProof, timer)
 
@@ -734,23 +803,9 @@ func (s *PublicBlockchainService) GetProof(
 		return
 	}
 
-	// Process number based on version
-	blockNum := blockNumber.EthBlockNumber()
-
-	// Ensure valid block number
-	if s.version != Eth && isBlockGreaterThanLatest(s.hmy, blockNum) {
-		err = ErrRequestedBlockTooHigh
-		return
-	}
-
-	// Fetch Header
-	header, err := s.hmy.HeaderByNumber(ctx, blockNum)
-	if header == nil && err != nil {
-		return
-	}
-	state, err := s.hmy.BeaconChain.StateAt(header.Root())
+	state, _, err := s.hmy.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
-		return
+		return nil, err
 	}
 
 	storageTrie := state.StorageTrie(address)

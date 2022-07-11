@@ -81,7 +81,7 @@ function launch_localnet() {
     i=$((i + 1))
 
     # Read config for i-th node form config file
-    IFS=' ' read -r ip port mode bls_key shard <<<"${line}"
+    IFS=' ' read -r ip port mode bls_key shard node_config <<<"${line}"
     args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=false")
     if [[ -z "$ip" || -z "$port" ]]; then
       echo "skip empty node"
@@ -101,6 +101,12 @@ function launch_localnet() {
     else
       echo "skipping unknown node"
       continue
+    fi
+
+    # Setup node config for i-th localnet node
+    if [[ -f "$node_config" ]]; then
+      echo "node ${i} configuration is loaded from: ${node_config}"
+      args=("${args[@]}" --config "${node_config}")
     fi
 
     # Setup flags for i-th node based on config

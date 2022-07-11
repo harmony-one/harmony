@@ -159,7 +159,7 @@ func ReadValidatorSnapshot(
 			Msg("Unable to decode validator snapshot from database")
 		return nil, err
 	}
-	s := staking.ValidatorSnapshot{&v, epoch}
+	s := staking.ValidatorSnapshot{Validator: &v, Epoch: epoch}
 	return &s, nil
 }
 

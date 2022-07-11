@@ -57,7 +57,7 @@ type environment struct {
 type Worker struct {
 	config   *params.ChainConfig
 	factory  blockfactory.Factory
-	chain    *core.BlockChain
+	chain    core.BlockChain
 	current  *environment // An environment for current running cycle.
 	engine   consensus_engine.Engine
 	gasFloor uint64
@@ -70,6 +70,12 @@ func (w *Worker) CommitSortedTransactions(
 	coinbase common.Address,
 ) {
 	for {
+		if w.current.gasPool.Gas() < 50000000 {
+			// Temporary solution to reduce the fullness of the block. Break here when the available gas left hit 50M.
+			// Effectively making the gas limit 30M (since 80M is the default gas limit)
+			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("[Temp Gas Limit] Not enough gas for further transactions")
+			break
+		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
 			utils.Logger().Info().Uint64("have", w.current.gasPool.Gas()).Uint64("want", params.TxGas).Msg("Not enough gas for further transactions")
@@ -563,7 +569,7 @@ func (w *Worker) FinalizeNewBlock(
 
 // New create a new worker object.
 func New(
-	config *params.ChainConfig, chain *core.BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, chain core.BlockChain, engine consensus_engine.Engine,
 ) *Worker {
 	worker := &Worker{
 		config:  config,

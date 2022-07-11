@@ -134,7 +134,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	header := node.Worker.GetCurrentHeader()
 	// Update worker's current header and
 	// state data in preparation to propose/process new transactions
-	leaderKey := node.Consensus.LeaderPubKey
+	leaderKey := node.Consensus.GetLeaderPubKey()
 	var (
 		coinbase    = node.GetAddressForBLSKey(leaderKey.Object, header.Epoch())
 		beneficiary = coinbase

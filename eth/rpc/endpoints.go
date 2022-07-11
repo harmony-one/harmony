@@ -23,7 +23,7 @@ import (
 )
 
 // StartHTTPEndpoint starts the HTTP RPC endpoint, configured with cors/vhosts/modules
-func StartHTTPEndpoint(endpoint string, apis []API, modules []string, cors []string, vhosts []string, timeouts HTTPTimeouts) (net.Listener, *Server, error) {
+func StartHTTPEndpoint(endpoint string, apis []API, modules []string, rmf *RpcMethodFilter, cors []string, vhosts []string, timeouts HTTPTimeouts) (net.Listener, *Server, error) {
 	// Generate the whitelist based on the allowed modules
 	whitelist := make(map[string]bool)
 	for _, module := range modules {
@@ -33,7 +33,7 @@ func StartHTTPEndpoint(endpoint string, apis []API, modules []string, cors []str
 	handler := NewServer()
 	for _, api := range apis {
 		if whitelist[api.Namespace] || (len(whitelist) == 0 && api.Public) {
-			if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+			if err := handler.RegisterName(api.Namespace, api.Service, rmf); err != nil {
 				return nil, nil, err
 			}
 			log.Debug("HTTP registered", "namespace", api.Namespace)
@@ -52,7 +52,7 @@ func StartHTTPEndpoint(endpoint string, apis []API, modules []string, cors []str
 }
 
 // StartWSEndpoint starts a websocket endpoint
-func StartWSEndpoint(endpoint string, apis []API, modules []string, wsOrigins []string, exposeAll bool) (net.Listener, *Server, error) {
+func StartWSEndpoint(endpoint string, apis []API, modules []string, rmf *RpcMethodFilter, wsOrigins []string, exposeAll bool) (net.Listener, *Server, error) {
 
 	// Generate the whitelist based on the allowed modules
 	whitelist := make(map[string]bool)
@@ -63,7 +63,7 @@ func StartWSEndpoint(endpoint string, apis []API, modules []string, wsOrigins []
 	handler := NewServer()
 	for _, api := range apis {
 		if exposeAll || whitelist[api.Namespace] || (len(whitelist) == 0 && api.Public) {
-			if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+			if err := handler.RegisterName(api.Namespace, api.Service, rmf); err != nil {
 				return nil, nil, err
 			}
 			log.Debug("WebSocket registered", "service", api.Service, "namespace", api.Namespace)
@@ -83,11 +83,11 @@ func StartWSEndpoint(endpoint string, apis []API, modules []string, wsOrigins []
 }
 
 // StartIPCEndpoint starts an IPC endpoint.
-func StartIPCEndpoint(ipcEndpoint string, apis []API) (net.Listener, *Server, error) {
+func StartIPCEndpoint(ipcEndpoint string, apis []API, rmf *RpcMethodFilter) (net.Listener, *Server, error) {
 	// Register all the APIs exposed by the services.
 	handler := NewServer()
 	for _, api := range apis {
-		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+		if err := handler.RegisterName(api.Namespace, api.Service, rmf); err != nil {
 			return nil, nil, err
 		}
 		log.Debug("IPC registered", "namespace", api.Namespace)

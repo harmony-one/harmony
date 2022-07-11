@@ -70,7 +70,7 @@ func (node *Node) StartRPC() error {
 	// Gather all the possible APIs to surface
 	apis := node.APIs(harmony)
 
-	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer)
+	return hmy_rpc.StartServers(harmony, apis, node.NodeConfig.RPCServer, node.HarmonyConfig.RPCOpt)
 }
 
 // StopRPC stop RPC service
@@ -125,7 +125,7 @@ func (node *Node) GetConsensusCurViewID() uint64 {
 
 // GetConsensusBlockNum returns the current block number of the consensus
 func (node *Node) GetConsensusBlockNum() uint64 {
-	return node.Consensus.GetBlockNum()
+	return node.Consensus.BlockNum()
 }
 
 // GetConsensusInternal returns consensus internal data

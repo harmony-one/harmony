@@ -291,7 +291,7 @@ func (e *engineImpl) Finalize(
 		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, nil, err
 		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("PayoutUndelegations")
+		utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("PayoutUndelegations")
 
 		// Needs to be after payoutUndelegations because payoutUndelegations
 		// depends on the old LastEpochInCommittee
@@ -300,7 +300,7 @@ func (e *engineImpl) Finalize(
 		if err := setElectionEpochAndMinFee(header, state, chain.Config()); err != nil {
 			return nil, nil, nil, err
 		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("SetElectionEpochAndMinFee")
+		utils.Logger().Debug().Int64("elapsed time", time.Since(startTime).Milliseconds()).Msg("SetElectionEpochAndMinFee")
 
 		curShardState, err := chain.ReadShardState(chain.CurrentBlock().Epoch())
 		if err != nil {
@@ -342,8 +342,8 @@ func (e *engineImpl) Finalize(
 	// must be done after slashing and paying out rewards
 	// to avoid conflicts with snapshots
 	// any nil (un)delegations are eligible to be removed
-	// bulk pruning happens at the end of the NoNilDelegationsEpoch
-	// and then continuous pruning happens at the end of every epoch thereafter
+	// bulk pruning happens at the first block of the NoNilDelegationsEpoch + 1
+	// and each epoch thereafter
 	delegationsToRemove := make(map[common.Address][]common.Address, 0)
 	if shouldPruneStaleStakingData(chain, header) {
 		startTime := time.Now()
@@ -358,7 +358,7 @@ func (e *engineImpl) Finalize(
 			return nil, nil, nil, err
 		}
 		utils.Logger().Info().
-			Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
+			Int64("elapsed time", time.Since(startTime).Milliseconds()).
 			Uint64("blockNum", header.Number().Uint64()).
 			Uint64("epoch", header.Epoch().Uint64()).
 			Msg("pruneStaleStakingData")
@@ -427,14 +427,28 @@ func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) b
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-// shouldPruneStaleStakingData checks (1) we are in the beacon chain, and
-// (2) ChainConfig returns true for IsNoNilDelegations
+// shouldPruneStaleStakingData checks that all of the following are true
+// (1) we are in the beacon chain
+// (2) it is the first block of the epoch
+// (3) the chain is hard forked to no nil delegations epoch
 func shouldPruneStaleStakingData(
 	chain engine.ChainReader,
 	header *block.Header,
 ) bool {
+	firstBlockInEpoch := false
+	// if not first epoch
+	if header.Epoch().Cmp(common.Big0) > 0 {
+		// calculate the last block of prior epoch
+		targetEpoch := new(big.Int).Sub(header.Epoch(), common.Big1)
+		lastBlockNumber := shard.Schedule.EpochLastBlock(targetEpoch.Uint64())
+		// add 1 to it
+		firstBlockInEpoch = header.Number().Uint64() == lastBlockNumber+1
+	} else {
+		// otherwise gensis block
+		firstBlockInEpoch = header.Number().Cmp(common.Big0) == 0
+	}
 	return header.ShardID() == shard.BeaconChainShardID &&
-		header.IsLastBlockInEpoch() &&
+		firstBlockInEpoch &&
 		chain.Config().IsNoNilDelegations(header.Epoch())
 }
 
@@ -474,16 +488,10 @@ func pruneStaleStakingData(
 			} else {
 				// in this delegator's delegationIndexes, remove the one which has this validatorAddress
 				// since a validatorAddress is enough information to uniquely identify the delegationIndex
-				if _, ok := delegationsToRemove[delegation.DelegatorAddress]; ok {
-					delegationsToRemove[delegation.DelegatorAddress] = append(
-						delegationsToRemove[delegation.DelegatorAddress],
-						wrapper.Address,
-					)
-				} else {
-					delegationsToRemove[delegation.DelegatorAddress] = []common.Address{
-						wrapper.Address,
-					}
-				}
+				delegationsToRemove[delegation.DelegatorAddress] = append(
+					delegationsToRemove[delegation.DelegatorAddress],
+					wrapper.Address,
+				)
 			}
 		}
 		if len(wrapper.Delegations) != len(delegationsFinal) {
@@ -574,6 +582,9 @@ func applySlashes(
 		return false
 	})
 
+	// The Leader of the block gets all slashing rewards.
+	slashRewardBeneficiary := header.Coinbase()
+
 	// Do the slashing by groups in the sorted order
 	for _, key := range sortedKeys {
 		records := groupedRecords[key]
@@ -607,6 +618,7 @@ func applySlashes(
 			state,
 			records,
 			rate,
+			slashRewardBeneficiary,
 		); err != nil {
 			return errors.New("[Finalize] could not apply slash")
 		}
@@ -678,7 +690,7 @@ func (e *engineImpl) verifySignature(chain engine.ChainReader, pas payloadArgs, 
 	if err != nil {
 		return errors.Wrap(err, "deserialize signature and bitmap")
 	}
-	if !qrVerifier.IsQuorumAchievedByMask(mask) {
+	if !qrVerifier.IsQuorumAchievedByMask(mask, pas.number) {
 		return errors.New("not enough signature collected")
 	}
 	commitPayload := pas.constructPayload(chain)
@@ -818,7 +830,8 @@ func readShardState(chain engine.ChainReader, epoch *big.Int, targetShardID uint
 		return shardState, nil
 
 	} else {
-		shardState, err := chain.ReadShardState(epoch)
+		//shardState, err := chain.ReadShardState(epoch)
+		shardState, err := committee.WithStakingEnabled.ReadFromDB(epoch, chain)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read shard state for epoch %v", epoch)
 		}

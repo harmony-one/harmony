@@ -925,7 +925,7 @@ func makeValidValidatorWrapper(addr common.Address) stk.ValidatorWrapper {
 		MaxRate:       numeric.ZeroDec(),
 		MaxChangeRate: numeric.ZeroDec(),
 	}
-	c := stk.Commission{cr, big.NewInt(300)}
+	c := stk.Commission{CommissionRates: cr, UpdateHeight: big.NewInt(300)}
 	d := stk.Description{
 		Name:     "Wayne",
 		Identity: "wen",
@@ -1018,7 +1018,7 @@ func verifyValidatorWrapperRevert(
 ) {
 	state.RevertToSnapshot(snapshot)
 	loadedWrapper, err := state.ValidatorWrapper(wrapperAddress, true, false)
-	if err != nil && !(err == errAddressNotPresent && allowErrAddressNotPresent) {
+	if err != nil && !(err == ErrAddressNotPresent && allowErrAddressNotPresent) {
 		t.Fatalf("Could not load wrapper %v\n", err)
 	}
 	if expectedWrapper != nil {

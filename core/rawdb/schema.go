@@ -72,6 +72,8 @@ var (
 	preimageCounter             = metrics.NewRegisteredCounter("db/preimage/total", nil)
 	preimageHitCounter          = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 	currentRewardGivenOutPrefix = []byte("blk-rwd-")
+	// key of SnapdbInfo
+	snapdbInfoKey = []byte("SnapdbInfo")
 )
 
 // TxLookupEntry is a positional metadata to help looking up the data content of

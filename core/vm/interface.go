@@ -80,6 +80,7 @@ type StateDB interface {
 	TxIndex() int
 	BlockHash() common.Hash
 	TxHash() common.Hash
+	TxHashETH() common.Hash // used by tracer
 }
 
 // CallContext provides a basic interface for the EVM calling conventions. The EVM

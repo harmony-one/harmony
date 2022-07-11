@@ -2,6 +2,7 @@ package hmy
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -46,8 +47,8 @@ type Harmony struct {
 	// Channel for shutting down the service
 	ShutdownChan  chan bool                      // Channel for shutting down the Harmony
 	BloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	BlockChain    *core.BlockChain
-	BeaconChain   *core.BlockChain
+	BlockChain    core.BlockChain
+	BeaconChain   core.BlockChain
 	TxPool        *core.TxPool
 	CxPool        *core.CxPool // CxPool is used to store the blockHashes of blocks containing cx receipts to be sent
 	// DB interfaces
@@ -83,12 +84,13 @@ type Harmony struct {
 type NodeAPI interface {
 	AddPendingStakingTransaction(*staking.StakingTransaction) error
 	AddPendingTransaction(newTx *types.Transaction) error
-	Blockchain() *core.BlockChain
-	Beaconchain() *core.BlockChain
+	Blockchain() core.BlockChain
+	Beaconchain() core.BlockChain
 	GetTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetStakingTransactionsHistory(address, txType, order string) ([]common.Hash, error)
 	GetTransactionsCount(address, txType string) (uint64, error)
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
+	GetTraceResultByHash(hash common.Hash) (json.RawMessage, error)
 	IsCurrentlyLeader() bool
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64, uint64)
@@ -151,9 +153,9 @@ func New(
 
 	// Setup gas price oracle
 	gpoParams := GasPriceConfig{
-		Blocks:     20,
-		Percentile: 60,
-		Default:    big.NewInt(3e10),
+		Blocks:     20,                // take all eligible txs past 20 blocks and sort them
+		Percentile: 95,                // get the 95th percentile when sorted in an ascending manner
+		Default:    big.NewInt(100e9), // minimum of 100 gwei
 	}
 	gpo := NewOracle(backend, gpoParams)
 	backend.gpo = gpo

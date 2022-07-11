@@ -22,8 +22,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CommitOffChainData write off chain data of a block onto db writer.
-func (bc *BlockChain) CommitOffChainData(
+func (bc *BlockChainImpl) CommitOffChainData(
 	batch rawdb.DatabaseWriter,
 	block *types.Block,
 	receipts []*types.Receipt,
@@ -278,7 +277,7 @@ func (bc *BlockChain) CommitOffChainData(
 	return CanonStatTy, nil
 }
 
-func (bc *BlockChain) writeValidatorStats(
+func (bc *BlockChainImpl) writeValidatorStats(
 	tempValidatorStats map[common.Address]*staking.ValidatorStats,
 	batch rawdb.DatabaseWriter,
 ) {
@@ -312,7 +311,7 @@ func (bc *BlockChain) writeValidatorStats(
 	}
 }
 
-func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
+func (bc *BlockChainImpl) getNextBlockEpoch(header *block.Header) (*big.Int, error) {
 	nextBlockEpoch := header.Epoch()
 	if header.IsLastBlockInEpoch() {
 		nextBlockEpoch = new(big.Int).Add(header.Epoch(), common.Big1)
@@ -326,4 +325,34 @@ func (bc *BlockChain) getNextBlockEpoch(header *block.Header) (*big.Int, error) 
 		}
 	}
 	return nextBlockEpoch, nil
+}
+
+func (bc *BlockChainImpl) RemoveDelegationsFromDelegator(
+	batch rawdb.DatabaseWriter,
+	delegatorAddress common.Address,
+	validatorAddresses []common.Address,
+) error {
+	delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
+	if err != nil {
+		return err
+	}
+	finalDelegationIndexes := delegationIndexes[:0]
+	for _, validatorAddress := range validatorAddresses {
+		// TODO: can this be sped up from O(vd) to something shorter?
+		for _, delegationIndex := range delegationIndexes {
+			if bytes.Equal(
+				validatorAddress.Bytes(),
+				delegationIndex.ValidatorAddress.Bytes(),
+			) {
+				// do nothing
+				break
+			}
+			finalDelegationIndexes = append(
+				finalDelegationIndexes,
+				delegationIndex,
+			)
+		}
+	}
+	bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes)
+	return nil
 }

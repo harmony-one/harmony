@@ -20,7 +20,7 @@ var (
 
 // AggregateSigForCommittee ..
 func AggregateSigForCommittee(
-	chain *core.BlockChain,
+	chain core.BlockChain,
 	committee *shard.Committee,
 	decider quorum.Decider,
 	aggSignature *bls.Sign,
@@ -41,7 +41,7 @@ func AggregateSigForCommittee(
 		return err
 	}
 
-	if !decider.IsQuorumAchievedByMask(mask) {
+	if !decider.IsQuorumAchievedByMask(mask, blockNum) {
 		return errQuorumVerifyAggSign
 	}
 

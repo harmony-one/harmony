@@ -95,7 +95,7 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 		dnsSync.Client = true
 	case nodeconfig.Localnet:
 		dnsSync.Server = true
-		dnsSync.Client = true
+		dnsSync.Client = false
 	default:
 		dnsSync.Server = true
 		dnsSync.Client = false
@@ -194,7 +194,6 @@ var dumpConfigLegacyCmd = &cobra.Command{
 
 func registerDumpConfigFlags() error {
 	return cli.RegisterFlags(dumpConfigCmd, []cli.Flag{networkTypeFlag})
-	return cli.RegisterFlags(dumpConfigLegacyCmd, []cli.Flag{networkTypeFlag})
 }
 
 func promptConfigUpdate() bool {

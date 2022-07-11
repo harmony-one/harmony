@@ -15,7 +15,7 @@ type Downloaders struct {
 }
 
 // NewDownloaders creates Downloaders for sync of multiple blockchains
-func NewDownloaders(host p2p.Host, bcs []*core.BlockChain, config Config) *Downloaders {
+func NewDownloaders(host p2p.Host, bcs []core.BlockChain, config Config) *Downloaders {
 	ds := make(map[uint32]*Downloader)
 
 	for _, bc := range bcs {

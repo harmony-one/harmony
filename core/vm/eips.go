@@ -18,6 +18,7 @@ package vm
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/harmony-one/harmony/internal/params"
 )
@@ -81,8 +82,12 @@ func enable1344(jt *JumpTable) {
 
 // opChainID implements CHAINID opcode
 func opChainID(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	// TODO: CHAINID - add fork (or a new opcode) to use ethereum compatible chainID
-	chainID := interpreter.intPool.get().Set(interpreter.evm.chainConfig.ChainID)
+	var chainID *big.Int
+	if interpreter.evm.chainConfig.IsChainIdFix(interpreter.evm.EpochNumber) {
+		chainID = interpreter.intPool.get().Set(interpreter.evm.chainConfig.EthCompatibleChainID)
+	} else {
+		chainID = interpreter.intPool.get().Set(interpreter.evm.chainConfig.ChainID)
+	}
 	stack.push(chainID)
 	return nil, nil
 }

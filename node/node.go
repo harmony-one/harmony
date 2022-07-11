@@ -137,7 +137,7 @@ type Node struct {
 }
 
 // Blockchain returns the blockchain for the node's current shard.
-func (node *Node) Blockchain() *core.BlockChain {
+func (node *Node) Blockchain() core.BlockChain {
 	shardID := node.NodeConfig.ShardID
 	bc, err := node.shardChains.ShardChain(shardID)
 	if err != nil {
@@ -150,7 +150,7 @@ func (node *Node) Blockchain() *core.BlockChain {
 }
 
 // Beaconchain returns the beaconchain from node.
-func (node *Node) Beaconchain() *core.BlockChain {
+func (node *Node) Beaconchain() core.BlockChain {
 	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
@@ -465,6 +465,8 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
+		case proto_node.CrosslinkHeartbeat:
+			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
@@ -649,7 +651,7 @@ func (node *Node) StartPubSub() error {
 			}
 			allTopics = append(
 				allTopics, u{
-					NamedTopic:     p2p.NamedTopic{string(key), topicHandle},
+					NamedTopic:     p2p.NamedTopic{Name: string(key), Topic: topicHandle},
 					consensusBound: isCon,
 				},
 			)
@@ -787,19 +789,6 @@ func (node *Node) StartPubSub() error {
 					nodeP2PMessageCounterVec.With(prometheus.Labels{"type": "ignored"}).Inc()
 					return libp2p_pubsub.ValidationReject
 				}
-				select {
-				case <-ctx.Done():
-					if errors.Is(ctx.Err(), context.DeadlineExceeded) ||
-						errors.Is(ctx.Err(), context.Canceled) {
-						utils.Logger().Warn().
-							Str("topic", topicNamed).Msg("[context] exceeded validation deadline")
-					}
-					errChan <- withError{errors.WithStack(ctx.Err()), nil}
-				default:
-					return libp2p_pubsub.ValidationAccept
-				}
-
-				return libp2p_pubsub.ValidationReject
 			},
 			// WithValidatorTimeout is an option that sets a timeout for an (asynchronous) topic validator. By default there is no timeout in asynchronous validators.
 			// TODO: Currently this timeout is useless. Verify me.
@@ -945,6 +934,7 @@ func (node *Node) StartPubSub() error {
 		}
 	}()
 
+	node.TraceLoopForExplorer()
 	return nil
 }
 
@@ -966,6 +956,7 @@ func New(
 	consensusObj *consensus.Consensus,
 	chainDBFactory shardchain.DBFactory,
 	blacklist map[common.Address]struct{},
+	localAccounts []common.Address,
 	isArchival map[uint32]bool,
 	harmonyconfig *harmonyconfig.HarmonyConfig,
 ) *Node {
@@ -1036,6 +1027,7 @@ func New(
 		}
 		if harmonyconfig != nil {
 			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
+			txPoolConfig.Locals = append(txPoolConfig.Locals, localAccounts...)
 		}
 
 		txPoolConfig.Blacklist = blacklist
@@ -1180,7 +1172,7 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 				Int("numPubKeys", len(pubKeys)).
 				Str("mode", node.Consensus.Mode().String()).
 				Msg("[InitConsensusWithValidators] Successfully updated public keys")
-			node.Consensus.UpdatePublicKeys(pubKeys)
+			node.Consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(epoch).ExternalAllowlist())
 			node.Consensus.SetMode(consensus.Normal)
 			return nil
 		}

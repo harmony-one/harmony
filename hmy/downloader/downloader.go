@@ -32,8 +32,10 @@ type (
 		ctx       context.Context
 		cancel    func()
 
-		evtDownloadFinished event.Feed // channel for each download task finished
-		evtDownloadStarted  event.Feed // channel for each download has started
+		evtDownloadFinished           event.Feed // channel for each download task finished
+		evtDownloadFinishedSubscribed bool
+		evtDownloadStarted            event.Feed // channel for each download has started
+		evtDownloadStartedSubscribed  bool
 
 		status status
 		config Config
@@ -42,7 +44,7 @@ type (
 )
 
 // NewDownloader creates a new downloader
-func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloader {
+func NewDownloader(host p2p.Host, bc core.BlockChain, config Config) *Downloader {
 	config.fixValues()
 
 	sp := sync.NewProtocol(sync.Config{
@@ -78,7 +80,7 @@ func NewDownloader(host p2p.Host, bc *core.BlockChain, config Config) *Downloade
 
 		status: newStatus(),
 		config: config,
-		logger: utils.Logger().With().Str("module", "downloader").Logger(),
+		logger: utils.Logger().With().Str("module", "downloader").Uint32("ShardID", bc.ShardID()).Logger(),
 	}
 }
 
@@ -127,11 +129,13 @@ func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 
 // SubscribeDownloadStarted subscribe download started
 func (d *Downloader) SubscribeDownloadStarted(ch chan struct{}) event.Subscription {
+	d.evtDownloadStartedSubscribed = true
 	return d.evtDownloadStarted.Subscribe(ch)
 }
 
-// SubscribeDownloadFinishedEvent subscribe the download finished
+// SubscribeDownloadFinished subscribe the download finished
 func (d *Downloader) SubscribeDownloadFinished(ch chan struct{}) event.Subscription {
+	d.evtDownloadFinishedSubscribed = true
 	return d.evtDownloadFinished.Subscribe(ch)
 }
 
@@ -203,6 +207,7 @@ func (d *Downloader) loop() {
 					time.Sleep(5 * time.Second)
 					trigger()
 				}()
+				time.Sleep(1 * time.Second)
 				continue
 			}
 			d.logger.Info().Int("block added", addedBN).
@@ -250,12 +255,16 @@ func (d *Downloader) doDownload(initSync bool) (n int, err error) {
 
 func (d *Downloader) startSyncing() {
 	d.status.startSyncing()
-	d.evtDownloadStarted.Send(struct{}{})
+	if d.evtDownloadStartedSubscribed {
+		d.evtDownloadStarted.Send(struct{}{})
+	}
 }
 
 func (d *Downloader) finishSyncing() {
 	d.status.finishSyncing()
-	d.evtDownloadFinished.Send(struct{}{})
+	if d.evtDownloadFinishedSubscribed {
+		d.evtDownloadFinished.Send(struct{}{})
+	}
 }
 
 var emptySigVerifyErr *sigVerifyErr

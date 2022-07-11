@@ -57,9 +57,9 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage,
 ) bool {
-	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.blockNum {
+	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.BlockNum() {
 		consensus.getLogger().Debug().
-			Uint64("blockNum", consensus.blockNum).
+			Uint64("blockNum", consensus.BlockNum()).
 			Str("recvMsg", recvMsg.String()).
 			Msg("BlockNum/viewID not match")
 		return false
@@ -103,12 +103,12 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 }
 
 func (consensus *Consensus) isRightBlockNumCheck(recvMsg *FBFTMessage) bool {
-	if recvMsg.BlockNum < consensus.blockNum {
+	if recvMsg.BlockNum < consensus.BlockNum() {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("Wrong BlockNum Received, ignoring!")
 		return false
-	} else if recvMsg.BlockNum-consensus.blockNum > MaxBlockNumDiff {
+	} else if recvMsg.BlockNum-consensus.BlockNum() > MaxBlockNumDiff {
 		consensus.getLogger().Debug().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MaxBlockNumDiff", MaxBlockNumDiff).
@@ -122,7 +122,7 @@ func (consensus *Consensus) newBlockSanityChecks(
 	blockObj *types.Block, recvMsg *FBFTMessage,
 ) bool {
 	if blockObj.NumberU64() != recvMsg.BlockNum ||
-		recvMsg.BlockNum < consensus.blockNum {
+		recvMsg.BlockNum < consensus.BlockNum() {
 		consensus.getLogger().Warn().
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("blockNum", blockObj.NumberU64()).
@@ -152,12 +152,12 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 		Interface("SendPubKeys", recvMsg.SenderPubkeys).
 		Msg("[onViewChangeSanityCheck]")
 
-	if consensus.blockNum > recvMsg.BlockNum {
+	if consensus.BlockNum() > recvMsg.BlockNum {
 		consensus.getLogger().Debug().
 			Msg("[onViewChange] Message BlockNum Is Low")
 		return false
 	}
-	if consensus.blockNum < recvMsg.BlockNum {
+	if consensus.BlockNum() < recvMsg.BlockNum {
 		consensus.getLogger().Warn().
 			Msg("[onViewChangeSanityCheck] MsgBlockNum is different from my BlockNumber")
 		return false

@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/core/vm"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 )
@@ -77,27 +78,28 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		copy(vrf[:], vrfAndProof[:32])
 	}
 	return vm.Context{
-		CanTransfer:     CanTransfer,
-		Transfer:        Transfer,
-		IsValidator:     IsValidator,
-		GetHash:         GetHashFn(header, chain),
-		GetVRF:          GetVRFFn(header, chain),
-		CreateValidator: CreateValidatorFn(header, chain),
-		EditValidator:   EditValidatorFn(header, chain),
-		Delegate:        DelegateFn(header, chain),
-		Undelegate:      UndelegateFn(header, chain),
-		CollectRewards:  CollectRewardsFn(header, chain),
-		//MigrateDelegations:    MigrateDelegationsFn(header, chain),
-		CalculateMigrationGas: CalculateMigrationGasFn(chain),
+		CanTransfer:           CanTransfer,
+		Transfer:              Transfer,
+		GetHash:               GetHashFn(header, chain),
+		GetVRF:                GetVRFFn(header, chain),
+		IsValidator:           IsValidator,
 		Origin:                msg.From(),
+		GasPrice:              new(big.Int).Set(msg.GasPrice()),
 		Coinbase:              beneficiary,
+		GasLimit:              header.GasLimit(),
 		BlockNumber:           header.Number(),
 		EpochNumber:           header.Epoch(),
-		VRF:                   vrf,
 		Time:                  header.Time(),
-		GasLimit:              header.GasLimit(),
-		GasPrice:              new(big.Int).Set(msg.GasPrice()),
+		VRF:                   vrf,
+		TxType:                0,
+		CreateValidator:       CreateValidatorFn(header, chain),
+		EditValidator:         EditValidatorFn(header, chain),
+		Delegate:              DelegateFn(header, chain),
+		Undelegate:            UndelegateFn(header, chain),
+		CollectRewards:        CollectRewardsFn(header, chain),
+		CalculateMigrationGas: CalculateMigrationGasFn(chain),
 		ShardID:               chain.ShardID(),
+		NumShards:             shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards(),
 	}
 }
 

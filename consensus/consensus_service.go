@@ -73,10 +73,10 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
-func (consensus *Consensus) UpdatePublicKeys(pubKeys []bls_cosi.PublicKeyWrapper) int64 {
+func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
-	consensus.Decider.UpdateParticipants(pubKeys)
+	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
@@ -372,7 +372,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
-	consensus.UpdatePublicKeys(pubKeys)
+	consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
@@ -403,7 +403,9 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
+			consensus.pubKeyLock.Lock()
 			consensus.LeaderPubKey = leaderPubKey
+			consensus.pubKeyLock.Unlock()
 		}
 	}
 
@@ -442,8 +444,11 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
+	consensus.pubKeyLock.Lock()
+	obj := consensus.LeaderPubKey.Object
+	consensus.pubKeyLock.Unlock()
 	for _, key := range consensus.priKey {
-		if key.Pub.Object.IsEqual(consensus.LeaderPubKey.Object) {
+		if key.Pub.Object.IsEqual(obj) {
 			return true
 		}
 	}
@@ -469,13 +474,13 @@ func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 
 // StartFinalityCount set the finality counter to current time
 func (consensus *Consensus) StartFinalityCount() {
-	consensus.finalityCounter = time.Now().UnixNano()
+	consensus.finalityCounter.Store(time.Now().UnixNano())
 }
 
 // FinishFinalityCount calculate the current finality
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
-	consensus.finality = (d - consensus.finalityCounter) / 1000000
+	consensus.finality = (d - consensus.finalityCounter.Load().(int64)) / 1000000
 	consensusFinalityHistogram.Observe(float64(consensus.finality))
 }
 
@@ -491,7 +496,7 @@ func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 		Str("to:", desired.String()).
 		Str("switchPhase:", subject)
 
-	consensus.phase = desired
+	consensus.phase.Set(desired)
 	return
 }
 
@@ -580,7 +585,7 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
+		Uint64("myBlock", consensus.BlockNum()).
 		Uint64("myViewID", consensus.GetCurBlockViewID()).
 		Str("phase", consensus.phase.String()).
 		Str("mode", consensus.current.Mode().String()).

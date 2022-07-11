@@ -80,12 +80,13 @@ const (
 
 // HostConfig is the config structure to create a new host
 type HostConfig struct {
-	Self            *Peer
-	BLSKey          libp2p_crypto.PrivKey
-	BootNodes       []string
-	DataStoreFile   *string
-	DiscConcurrency int
-	MaxConnPerIP    int
+	Self                 *Peer
+	BLSKey               libp2p_crypto.PrivKey
+	BootNodes            []string
+	DataStoreFile        *string
+	DiscConcurrency      int
+	MaxConnPerIP         int
+	DisablePrivateIPScan bool
 }
 
 // NewHost ..
@@ -109,15 +110,18 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.BandwidthReporter(newCounter()),
 	)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p host")
 	}
 
 	disc, err := discovery.NewDHTDiscovery(p2pHost, discovery.DHTConfig{
-		BootNodes:       cfg.BootNodes,
-		DataStoreFile:   cfg.DataStoreFile,
-		DiscConcurrency: cfg.DiscConcurrency,
+		BootNodes:            cfg.BootNodes,
+		DataStoreFile:        cfg.DataStoreFile,
+		DiscConcurrency:      cfg.DiscConcurrency,
+		DisablePrivateIPScan: cfg.DisablePrivateIPScan,
 	})
 	if err != nil {
+		cancel()
 		return nil, errors.Wrap(err, "cannot create DHT discovery")
 	}
 
@@ -169,6 +173,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
+		cancel()
 		return nil, errors.Wrapf(err, "cannot initialize libp2p pub-sub")
 	}
 
@@ -185,8 +190,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		priKey:        key,
 		discovery:     disc,
 		security:      security,
-		onConnections: []ConnectCallback{},
-		onDisconnects: []DisconnectCallback{},
+		onConnections: ConnectCallbacks{},
+		onDisconnects: DisconnectCallbacks{},
 		logger:        &subLogger,
 		ctx:           ctx,
 		cancel:        cancel,
@@ -213,8 +218,8 @@ type HostV2 struct {
 	security      security.Security
 	logger        *zerolog.Logger
 	blocklist     libp2p_pubsub.Blacklist
-	onConnections []ConnectCallback
-	onDisconnects []DisconnectCallback
+	onConnections ConnectCallbacks
+	onDisconnects DisconnectCallbacks
 	ctx           context.Context
 	cancel        func()
 }
@@ -428,7 +433,7 @@ func (host *HostV2) ListenClose(net libp2p_network.Network, addr ma.Multiaddr) {
 func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	host.logger.Info().Interface("node", conn.RemotePeer()).Msg("peer connected")
 
-	for _, function := range host.onConnections {
+	for _, function := range host.onConnections.GetAll() {
 		if err := function(net, conn); err != nil {
 			host.logger.Error().Err(err).Interface("node", conn.RemotePeer()).Msg("failed on peer connected callback")
 		}
@@ -439,7 +444,7 @@ func (host *HostV2) Connected(net libp2p_network.Network, conn libp2p_network.Co
 func (host *HostV2) Disconnected(net libp2p_network.Network, conn libp2p_network.Conn) {
 	host.logger.Info().Interface("node", conn.RemotePeer()).Msg("peer disconnected")
 
-	for _, function := range host.onDisconnects {
+	for _, function := range host.onDisconnects.GetAll() {
 		if err := function(conn); err != nil {
 			host.logger.Error().Err(err).Interface("node", conn.RemotePeer()).Msg("failed on peer disconnected callback")
 		}
@@ -457,11 +462,11 @@ func (host *HostV2) ClosedStream(net libp2p_network.Network, stream libp2p_netwo
 }
 
 func (host *HostV2) SetConnectCallback(callback ConnectCallback) {
-	host.onConnections = append(host.onConnections, callback)
+	host.onConnections.Add(callback)
 }
 
 func (host *HostV2) SetDisconnectCallback(callback DisconnectCallback) {
-	host.onDisconnects = append(host.onDisconnects, callback)
+	host.onDisconnects.Add(callback)
 }
 
 // NamedTopic represents pubsub topic

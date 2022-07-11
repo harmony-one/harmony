@@ -52,7 +52,7 @@ func (node *Node) BeaconSyncHook() {
 	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
 		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
 		//       not have much idle resources.
-		node.BroadcastCrossLink()
+		node.BroadcastCrossLinkFromShardsToBeacon()
 	}
 }
 
@@ -92,7 +92,7 @@ func (node *Node) IsSameHeight() (uint64, bool) {
 	return node.stateSync.IsSameBlockchainHeight(node.Blockchain())
 }
 
-func (node *Node) createStateSync(bc *core.BlockChain) *legacysync.StateSync {
+func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
 	// But registration is done through an old way of port arithmetics (syncPort + 3000).
 	// Thus for compatibility, we are doing the arithmetics here, and not to change the
@@ -232,11 +232,11 @@ func (node *Node) doBeaconSyncing() {
 						)
 						if err != nil {
 							node.beaconSync.AddLastMileBlock(beaconBlock)
-						} else if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-							// Only leader or 1% of validators broadcast crosslink to avoid spamming p2p
-							if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
-								node.BroadcastCrossLink()
-							}
+						} else if node.Consensus.IsLeader() || rand.Intn(100) <= 1 {
+							// Only leader or 2% of validators broadcast crosslink to avoid spamming p2p
+							// if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
+							node.BroadcastCrossLinkFromShardsToBeacon()
+							// }
 						}
 					}
 				}
@@ -270,7 +270,7 @@ func (node *Node) doBeaconSyncing() {
 }
 
 // DoSyncing keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.NodeConfig.IsOffline {
 		return
 	}
@@ -289,7 +289,7 @@ func (node *Node) DoSyncing(bc *core.BlockChain, worker *worker.Worker, willJoin
 }
 
 // doSync keep the node in sync with other peers, willJoinConsensus means the node will try to join consensus after catch up
-func (node *Node) doSync(bc *core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
+func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
 		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
@@ -578,6 +578,28 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 				Msg("[SYNC] extra node registered")
 		}
 
+	case downloader_pb.DownloaderRequest_BLOCKBYHEIGHT:
+		if len(request.Heights) == 0 {
+			return response, errors.New("empty heights list provided")
+		}
+
+		if len(request.Heights) > int(legacysync.SyncLoopBatchSize) {
+			return response, errors.New("exceed size limit")
+		}
+
+		out := make([][]byte, 0, len(request.Heights))
+		for _, v := range request.Heights {
+			block := node.Blockchain().GetBlockByNumber(v)
+			if block == nil {
+				return response, errors.Errorf("no block with height %d found", v)
+			}
+			blockBytes, err := node.getEncodedBlockWithSigByHeight(v)
+			if err != nil {
+				return response, errors.Errorf("failed to get block")
+			}
+			out = append(out, blockBytes)
+		}
+		response.Payload = out
 	}
 
 	return response, nil
@@ -676,6 +698,26 @@ func (node *Node) getEncodedBlockWithSigByHash(hash common.Hash) ([]byte, error)
 		return nil, err
 	}
 	blockWithSigReqCache.Add(hash, b)
+	return b, nil
+}
+
+func (node *Node) getEncodedBlockWithSigByHeight(height uint64) ([]byte, error) {
+	blk := node.Blockchain().GetBlockByNumber(height)
+	if blk == nil {
+		return nil, errBlockNotExist
+	}
+	sab, err := node.getCommitSigAndBitmapFromChildOrDB(blk)
+	if err != nil {
+		return nil, err
+	}
+	bwh := legacysync.BlockWithSig{
+		Block:              blk,
+		CommitSigAndBitmap: sab,
+	}
+	b, err := rlp.EncodeToBytes(bwh)
+	if err != nil {
+		return nil, err
+	}
 	return b, nil
 }
 

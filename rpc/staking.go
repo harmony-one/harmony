@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	internal_common "github.com/harmony-one/harmony/internal/common"
@@ -80,7 +81,7 @@ func (s *PublicStakingService) getBalanceByBlockNumber(
 	if err != nil {
 		return nil, err
 	}
-	balance, err := s.hmy.GetBalance(ctx, addr, blockNum)
+	balance, err := s.hmy.GetBalance(ctx, addr, rpc.BlockNumberOrHashWithNumber(blockNum))
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +246,6 @@ func (s *PublicStakingService) GetValidatorKeys(
 }
 
 // GetAllValidatorInformation returns information about all validators.
-// If page is -1, return all instead of `validatorsPageSize` elements.
 func (s *PublicStakingService) GetAllValidatorInformation(
 	ctx context.Context, page int,
 ) (interface{}, error) {
@@ -338,25 +338,22 @@ func (s *PublicStakingService) getPagedValidatorInformationCached(ctx context.Co
 func (s *PublicStakingService) getAllValidatorInformation(
 	ctx context.Context, page int, blockNum uint64,
 ) (interface{}, error) {
-	if page < -1 {
-		return nil, errors.Errorf("page given %d cannot be less than -1", page)
+	if page < 0 {
+		return nil, errors.Errorf("page given %d cannot be less than 0", page)
 	}
 
 	// Get all validators
 	addresses := s.hmy.GetAllValidatorAddresses()
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
+	if len(addresses) <= page*validatorsPageSize {
 		return []StructuredResponse{}, nil
 	}
 
 	// Set page start
-	validatorsNum := len(addresses)
 	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
+	validatorsNum := validatorsPageSize
+	start = page * validatorsPageSize
+	if len(addresses)-start < validatorsPageSize {
+		validatorsNum = len(addresses) - start
 	}
 
 	// Fetch block
@@ -370,7 +367,14 @@ func (s *PublicStakingService) getAllValidatorInformation(
 	for i := start; i < start+validatorsNum; i++ {
 		validatorInfo, err := s.hmy.GetValidatorInformation(addresses[i], blk)
 		if err != nil {
-			return nil, err
+			if errors.Cause(err) != state.ErrAddressNotPresent {
+				return nil, err
+			} else {
+				// GetAllValidatorAddresses is as of current block
+				// but we are querying state as of prior block
+				// which means we can ignore ErrAddressNotPresent
+				continue
+			}
 		}
 		// Response output is the same for all versions
 		validators = append(validators, validatorInfo)
@@ -520,7 +524,6 @@ func (s *PublicStakingService) GetValidatorTotalDelegation(
 
 // GetAllDelegationInformation returns delegation information about `validatorsPageSize` validators,
 // starting at `page*validatorsPageSize`.
-// If page is -1, return all instead of `validatorsPageSize` elements.
 // TODO(dm): optimize with single flight
 func (s *PublicStakingService) GetAllDelegationInformation(
 	ctx context.Context, page int,
@@ -538,7 +541,7 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 		DoMetricRPCQueryInfo(GetAllDelegationInformation, FailedNumber)
 		return nil, ErrNotBeaconShard
 	}
-	if page < -1 {
+	if page < 0 {
 		return make([][]StructuredResponse, 0), nil
 	}
 
@@ -546,19 +549,16 @@ func (s *PublicStakingService) GetAllDelegationInformation(
 	addresses := s.hmy.GetAllValidatorAddresses()
 
 	// Return nothing if no delegation on page
-	if page != -1 && len(addresses) <= page*validatorsPageSize {
+	if len(addresses) <= page*validatorsPageSize {
 		return make([][]StructuredResponse, 0), nil
 	}
 
 	// Set page start
-	validatorsNum := len(addresses)
 	start := 0
-	if page != -1 {
-		validatorsNum = validatorsPageSize
-		start = page * validatorsPageSize
-		if len(addresses)-start < validatorsPageSize {
-			validatorsNum = len(addresses) - start
-		}
+	validatorsNum := validatorsPageSize
+	start = page * validatorsPageSize
+	if len(addresses)-start < validatorsPageSize {
+		validatorsNum = len(addresses) - start
 	}
 
 	// Fetch all delegations
@@ -729,16 +729,15 @@ func (s *PublicStakingService) getDelegationByValidatorHelper(address string) ([
 	delegations := s.hmy.GetDelegationsByValidator(validatorAddress)
 
 	// Format response
-	result := []StructuredResponse{}
-	for i := range delegations {
-		delegation := delegations[i]
-		undelegations := make([]Undelegation, len(delegation.Undelegations))
+	result := make([]StructuredResponse, 0, len(delegations))
+	for _, delegation := range delegations {
+		undelegations := make([]Undelegation, 0, len(delegation.Undelegations))
 
-		for j := range delegation.Undelegations {
-			undelegations[j] = Undelegation{
-				Amount: delegation.Undelegations[j].Amount,
-				Epoch:  delegation.Undelegations[j].Epoch,
-			}
+		for _, undelegation := range delegation.Undelegations {
+			undelegations = append(undelegations, Undelegation{
+				Amount: undelegation.Amount,
+				Epoch:  undelegation.Epoch,
+			})
 		}
 		valAddr, _ := internal_common.AddressToBech32(validatorAddress)
 		delAddr, _ := internal_common.AddressToBech32(delegation.DelegatorAddress)
@@ -749,17 +748,13 @@ func (s *PublicStakingService) getDelegationByValidatorHelper(address string) ([
 		}
 
 		// Response output is the same for all versions
-		del, err := NewStructuredResponse(Delegation{
+		del := Delegation{
 			ValidatorAddress: valAddr,
 			DelegatorAddress: delAddr,
 			Amount:           delegation.Amount,
 			Reward:           delegation.Reward,
 			Undelegations:    undelegations,
-		})
-		if err != nil {
-			DoMetricRPCQueryInfo(GetDelegationsByValidator, FailedNumber)
-			return nil, err
-		}
+		}.IntoStructuredResponse()
 		result = append(result, del)
 	}
 	return result, nil
