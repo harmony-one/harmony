@@ -125,7 +125,6 @@ type Engine interface {
 		state *state.DB, txs []*types.Transaction,
 		receipts []*types.Receipt, outcxs []*types.CXReceipt,
 		incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-		delegationsToAlter map[common.Address](map[common.Address]uint64),
 		doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
-	) (*types.Block, map[common.Address](map[common.Address]uint64), reward.Reader, error)
+	) (*types.Block, map[common.Address][]common.Address, reward.Reader, error)
 }

@@ -2,7 +2,6 @@ package chain
 
 import (
 	"bytes"
-	"math"
 	"math/big"
 	"sort"
 	"time"
@@ -279,20 +278,17 @@ func (e *engineImpl) Finalize(
 	state *state.DB, txs []*types.Transaction,
 	receipts []*types.Receipt, outcxs []*types.CXReceipt,
 	incxs []*types.CXReceiptsProof, stks staking.StakingTransactions,
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
 	doubleSigners slash.Records, sigsReady chan bool, viewID func() uint64,
-) (*types.Block, map[common.Address](map[common.Address]uint64), reward.Reader, error) {
+) (*types.Block, map[common.Address][]common.Address, reward.Reader, error) {
 
 	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
 	inStakingEra := chain.Config().IsStaking(header.Epoch())
 
 	// Process Undelegations, set LastEpochInCommittee and set EPoS status
 	// Needs to be before AccumulateRewardsAndCountSigs
-	var delegationsToRemove map[common.Address][]uint64
 	if IsCommitteeSelectionBlock(chain, header) {
 		startTime := time.Now()
-		var err error
-		if delegationsToRemove, err = payoutUndelegations(chain, header, state); err != nil {
+		if err := payoutUndelegations(chain, header, state); err != nil {
 			return nil, nil, nil, err
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("PayoutUndelegations")
@@ -340,23 +336,20 @@ func (e *engineImpl) Finalize(
 			return nil, nil, nil, err
 		}
 	} else if len(doubleSigners) > 0 {
-		return nil, nil, nil, err
+		return nil, nil, nil, errors.New("slashes proposed in non-beacon chain or non-staking epoch")
 	}
 
 	// must be done after slashing and paying out rewards
 	// to avoid conflicts with snapshots
 	// any nil (un)delegations are eligible to be removed
 	// bulk pruning happens at the end of the NoNilDelegationsEpoch
-	// and then continuous pruning happens at each block thereafter
-	if isPruneStaleStakingData(chain, header) {
+	// and then continuous pruning happens at the end of every epoch thereafter
+	delegationsToRemove := make(map[common.Address][]common.Address, 0)
+	if shouldPruneStaleStakingData(chain, header) {
 		startTime := time.Now()
-		delegationsToAlter, err = pruneStaleStakingData(
-			chain,
-			header,
-			state,
-			delegationsToAlter,
-			delegationsToRemove,
-		)
+		// this will modify wrappers in-situ, which will be used by UpdateValidatorSnapshots
+		// which occurs in the next epoch at the second to last block
+		err = pruneStaleStakingData(chain, header, state, delegationsToRemove)
 		if err != nil {
 			utils.Logger().Error().AnErr("err", err).
 				Uint64("blockNum", header.Number().Uint64()).
@@ -365,27 +358,10 @@ func (e *engineImpl) Finalize(
 			return nil, nil, nil, err
 		}
 		utils.Logger().Info().
-			Int64("elapsed time", time.Since(startTime).Milliseconds()).
+			Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
 			Uint64("blockNum", header.Number().Uint64()).
 			Uint64("epoch", header.Epoch().Uint64()).
 			Msg("pruneStaleStakingData")
-	} else if isBulkPruneStaleStakingData(chain, header) {
-		startTime := time.Now()
-		// this will modify wrappers in-situ, which will be used by UpdateValidatorSnapshots
-		// which occurs in the next epoch at the second to last block
-		delegationsToAlter, err = bulkPruneStaleStakingData(chain, header, state, delegationsToAlter)
-		if err != nil {
-			utils.Logger().Error().AnErr("err", err).
-				Uint64("blockNum", header.Number().Uint64()).
-				Uint64("epoch", header.Epoch().Uint64()).
-				Msg("bulkPruneStaleStakingData error")
-			return nil, nil, nil, err
-		}
-		utils.Logger().Info().
-			Int64("elapsed time", time.Since(startTime).Milliseconds()).
-			Uint64("blockNum", header.Number().Uint64()).
-			Uint64("epoch", header.Epoch().Uint64()).
-			Msg("bulkPruneStaleStakingData")
 	}
 
 	// ViewID setting needs to happen after commig sig reward logic for pipelining reason.
@@ -394,34 +370,31 @@ func (e *engineImpl) Finalize(
 
 	// Finalize the state root
 	header.SetRoot(state.IntermediateRoot(chain.Config().IsS3(header.Epoch())))
-	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), delegationsToAlter, payout, nil
+	return types.NewBlock(header, txs, receipts, outcxs, incxs, stks), delegationsToRemove, payout, nil
 }
 
 // Withdraw unlocked tokens to the delegators' accounts
 func payoutUndelegations(
 	chain engine.ChainReader, header *block.Header, state *state.DB,
-) (map[common.Address][]uint64, error) {
+) error {
 	currentHeader := chain.CurrentHeader()
 	nowEpoch, blockNow := currentHeader.Epoch(), currentHeader.Number()
 	utils.AnalysisStart("payoutUndelegations", nowEpoch, blockNow)
 	defer utils.AnalysisEnd("payoutUndelegations", nowEpoch, blockNow)
 
 	validators, err := chain.ReadValidatorList()
+	countTrack := map[common.Address]int{}
 	if err != nil {
 		const msg = "[Finalize] failed to read all validators"
-		return nil, errors.New(msg)
+		return errors.New(msg)
 	}
-	countTrack := map[common.Address]int{}
-	// map of validator to indices removed
-	// indices are guaranteed to be in increasing order
-	removedDelegations := make(map[common.Address][]uint64, 0)
 	// Payout undelegated/unlocked tokens
 	lockPeriod := GetLockPeriodInEpoch(chain, header.Epoch())
 	noEarlyUnlock := chain.Config().IsNoEarlyUnlock(header.Epoch())
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
-			return nil, errors.New(
+			return errors.New(
 				"[Finalize] failed to get validator from state to finalize",
 			)
 		}
@@ -432,20 +405,6 @@ func payoutUndelegations(
 			)
 			if totalWithdraw.Sign() != 0 {
 				state.AddBalance(delegation.DelegatorAddress, totalWithdraw)
-				shouldRemove := i != 0 && // never remove the (inactive) validator
-					len(delegation.Undelegations) == 0 &&
-					delegation.Amount.Cmp(common.Big0) == 0 &&
-					delegation.Reward.Cmp(common.Big0) == 0 &&
-					chain.Config().IsPostNoNilDelegations(header.Epoch())
-				if shouldRemove {
-					if _, ok := removedDelegations[wrapper.Address]; !ok {
-						removedDelegations[wrapper.Address] = make([]uint64, 0)
-					}
-					removedDelegations[wrapper.Address] = append(
-						removedDelegations[wrapper.Address],
-						uint64(i),
-					)
-				}
 			}
 		}
 		countTrack[validator] = len(wrapper.Delegations)
@@ -457,7 +416,7 @@ func payoutUndelegations(
 		Interface("count-track", countTrack).
 		Msg("paid out delegations")
 
-	return removedDelegations, nil
+	return nil
 }
 
 // IsCommitteeSelectionBlock checks if the given header is for the committee selection block
@@ -468,94 +427,9 @@ func IsCommitteeSelectionBlock(chain engine.ChainReader, header *block.Header) b
 	return isBeaconChain && header.IsLastBlockInEpoch() && inPreStakingEra
 }
 
-// isPruneStaleStakingData checks (1) we are in the beacon chain, and
-// (2) ChainConfig returns true for IsPostNoNilDelegations
-// since any block can have redelegations that result in a stale delegation
-// there is no check for last block of epoch here
-func isPruneStaleStakingData(
-	chain engine.ChainReader,
-	header *block.Header,
-) bool {
-	return header.ShardID() == shard.BeaconChainShardID &&
-		chain.Config().IsPostNoNilDelegations(header.Epoch())
-}
-
-func pruneStaleStakingData(
-	chain engine.ChainReader,
-	header *block.Header,
-	state *state.DB,
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
-	delegationsToRemove map[common.Address][]uint64,
-) (
-	map[common.Address](map[common.Address]uint64),
-	error,
-) {
-	if len(delegationsToAlter) == 0 {
-		// possible that this is nil, in case no re delegation has occurred during this block
-		delegationsToAlter = make(map[common.Address](map[common.Address]uint64), 0)
-		// it is okay if delegationsToRemove is nil here
-		// it means no undelegations were paid out
-		// or that we are not in the last block of the epoch
-	}
-	for validatorAddress, indices := range delegationsToRemove {
-		wrapper, err := state.ValidatorWrapper(validatorAddress, true, false)
-		if err != nil {
-			return nil, errors.Wrapf(
-				err,
-				"[pruneStaleStakingData] could not load wrapper for %s",
-				validatorAddress.Hex(),
-			)
-		}
-		for i, delegationIndex := range indices {
-			effectiveIndex := delegationIndex - uint64(i)
-			delegatorAddress := wrapper.Delegations[effectiveIndex].DelegatorAddress
-			if _, ok := delegationsToAlter[delegatorAddress]; !ok {
-				delegationsToAlter[delegatorAddress] = make(map[common.Address]uint64)
-			}
-			// mark it for deletion from delegations by delegator
-			delegationsToAlter[delegatorAddress][wrapper.Address] = math.MaxUint64
-			// add offset for the following delegations
-			for j := delegationIndex + 1; j < uint64(len(wrapper.Delegations)); j++ {
-				sDelegatorAddress := wrapper.Delegations[j].DelegatorAddress
-				if _, ok := delegationsToAlter[sDelegatorAddress]; !ok {
-					// this will be created for all of the following delegations...
-					delegationsToAlter[sDelegatorAddress] = make(map[common.Address]uint64)
-				}
-				if value, ok := delegationsToAlter[sDelegatorAddress][wrapper.Address]; ok {
-					if value == math.MaxUint64 {
-						// to be deleted from redelegation source
-						continue
-					} else {
-						// ...for multiple deletions, it will add
-						delegationsToAlter[sDelegatorAddress][wrapper.Address] += 1
-					}
-				} else {
-					// first deletion
-					delegationsToAlter[sDelegatorAddress][wrapper.Address] = 1
-				}
-			}
-			// actually delete it from validator, in-situ
-			wrapper.Delegations = append(
-				wrapper.Delegations[:effectiveIndex],
-				wrapper.Delegations[effectiveIndex+1:]...,
-			)
-		}
-		// per validator
-		if len(indices) > 0 {
-			utils.Logger().Info().
-				Str("ValidatorAddress", wrapper.Address.Hex()).
-				Uint64("epoch", header.Epoch().Uint64()).
-				Int("count", len(indices)).
-				Msg("pruneStaleStakingData pruned count")
-		}
-	}
-	return delegationsToAlter, nil
-}
-
-// isBulkPruneStaleStakingData checks (1) we are in the beacon chain, and
-// (2) ChainConfig returns true for IsPostNoNilDelegations, and
-// (3) we are in the last block of the epoch,
-func isBulkPruneStaleStakingData(
+// shouldPruneStaleStakingData checks (1) we are in the beacon chain, and
+// (2) ChainConfig returns true for IsNoNilDelegations
+func shouldPruneStaleStakingData(
 	chain engine.ChainReader,
 	header *block.Header,
 ) bool {
@@ -564,35 +438,26 @@ func isBulkPruneStaleStakingData(
 		chain.Config().IsNoNilDelegations(header.Epoch())
 }
 
-// bulkPruneStaleStakingData prunes any stale staking data
-// this function is called exactly once, since bulk data is removed
-// only at the end of the hard fork epoch.
-// continuous pruning is done by pruneStaleStakingData thereafter
-// must be called only if isBulkPruneStaleStakingData is true
+// pruneStaleStakingData prunes any stale staking data
+// must be called only if shouldPruneStaleStakingData is true
 // here and not in staking package to avoid import cycle for state
-func bulkPruneStaleStakingData(
+func pruneStaleStakingData(
 	chain engine.ChainReader,
 	header *block.Header,
 	state *state.DB,
-	// map of delegator address to validator address to offset
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
-) (map[common.Address](map[common.Address]uint64), error) {
-	if len(delegationsToAlter) > 0 {
-		return nil, errors.New("[bulkPruneStaleStakingData] non-zero delegations to alter for bulk pruning")
-	}
-	delegationsToAlter = make(map[common.Address](map[common.Address]uint64), 0)
+	delegationsToRemove map[common.Address][]common.Address,
+) error {
 	validators, err := chain.ReadValidatorList()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, validator := range validators {
 		wrapper, err := state.ValidatorWrapper(validator, true, false)
 		if err != nil {
-			return nil, errors.New(
+			return errors.New(
 				"[pruneStaleStakingData] failed to get validator from state to finalize",
 			)
 		}
-		offset := uint64(0)
 		delegationsFinal := wrapper.Delegations[:0]
 		for i := range wrapper.Delegations {
 			delegation := &wrapper.Delegations[i]
@@ -606,19 +471,19 @@ func bulkPruneStaleStakingData(
 					delegationsFinal,
 					*delegation,
 				)
-				if offset > 0 {
-					if _, ok := delegationsToAlter[delegation.DelegatorAddress]; !ok {
-						delegationsToAlter[delegation.DelegatorAddress] = make(map[common.Address]uint64)
-					}
-					// move it by these many offsets
-					delegationsToAlter[delegation.DelegatorAddress][wrapper.Address] = uint64(offset)
-				}
 			} else {
-				if _, ok := delegationsToAlter[delegation.DelegatorAddress]; !ok {
-					delegationsToAlter[delegation.DelegatorAddress] = make(map[common.Address]uint64)
+				// in this delegator's delegationIndexes, remove the one which has this validatorAddress
+				// since a validatorAddress is enough information to uniquely identify the delegationIndex
+				if _, ok := delegationsToRemove[delegation.DelegatorAddress]; ok {
+					delegationsToRemove[delegation.DelegatorAddress] = append(
+						delegationsToRemove[delegation.DelegatorAddress],
+						wrapper.Address,
+					)
+				} else {
+					delegationsToRemove[delegation.DelegatorAddress] = []common.Address{
+						wrapper.Address,
+					}
 				}
-				delegationsToAlter[delegation.DelegatorAddress][wrapper.Address] = math.MaxUint64
-				offset++
 			}
 		}
 		if len(wrapper.Delegations) != len(delegationsFinal) {
@@ -626,12 +491,12 @@ func bulkPruneStaleStakingData(
 				Str("ValidatorAddress", wrapper.Address.Hex()).
 				Uint64("epoch", header.Epoch().Uint64()).
 				Int("count", len(wrapper.Delegations)-len(delegationsFinal)).
-				Msg("bulkPruneStaleStakingData pruned count")
+				Msg("pruneStaleStakingData pruned count")
 		}
 		// now re-assign the delegations
 		wrapper.Delegations = delegationsFinal
 	}
-	return delegationsToAlter, nil
+	return nil
 }
 
 func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *params.ChainConfig) error {

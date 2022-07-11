@@ -57,9 +57,9 @@ type (
 	// Below functions are used by staking precompile, and state transition
 	CreateValidatorFunc func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CreateValidator) error
 	EditValidatorFunc   func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.EditValidator) error
-	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) (map[common.Address](map[common.Address]uint64), error)
+	DelegateFunc        func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Delegate) error
 	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
-	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) (map[common.Address](map[common.Address]uint64), error)
+	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
 	// Used for migrating delegations via the staking precompile
 	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
@@ -215,8 +215,7 @@ type EVM struct {
 	callGasTemp uint64
 	// stored temporarily by stakingPrecompile and cleared immediately after return
 	// (although the EVM object itself is ephemeral)
-	StakeMsgs          []stakingTypes.StakeMsg
-	DelegationsToAlter map[common.Address](map[common.Address]uint64)
+	StakeMsgs []stakingTypes.StakeMsg
 }
 
 // NewEVM returns a new EVM. The returned EVM is not thread safe and should

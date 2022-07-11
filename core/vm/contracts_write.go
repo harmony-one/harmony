@@ -106,7 +106,7 @@ func (c *stakingPrecompile) RunWriteCapable(
 	input []byte,
 ) ([]byte, error) {
 	if evm.Context.ShardID != shard.BeaconChainShardID {
-		return nil, errors.New("staking not supported on this shard")
+		return nil, errors.New("Staking not supported on this shard")
 	}
 	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
 	if err != nil {
@@ -119,10 +119,9 @@ func (c *stakingPrecompile) RunWriteCapable(
 	}
 
 	if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-		if delegationsToAlter, err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
+		if err := evm.Delegate(evm.StateDB, rosettaBlockTracer, delegate); err != nil {
 			return nil, err
 		} else {
-			evm.DelegationsToAlter = delegationsToAlter
 			evm.StakeMsgs = append(evm.StakeMsgs, delegate)
 			return nil, nil
 		}
@@ -131,12 +130,7 @@ func (c *stakingPrecompile) RunWriteCapable(
 		return nil, evm.Undelegate(evm.StateDB, rosettaBlockTracer, undelegate)
 	}
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
-		if delegationsToAlter, err := evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards); err != nil {
-			return nil, err
-		} else {
-			evm.DelegationsToAlter = delegationsToAlter
-			return nil, nil
-		}
+		return nil, evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
 	}
 	// Migrate is not supported in precompile and will be done in a batch hard fork
 	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {

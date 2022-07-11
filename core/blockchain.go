@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -1183,7 +1182,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	block *types.Block, receipts []*types.Receipt,
 	cxReceipts []*types.CXReceipt,
 	stakeMsgs []staking.StakeMsg,
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
+	delegationsToRemove map[common.Address][]common.Address,
 	paid reward.Reader,
 	state *state.DB,
 ) (status WriteStatus, err error) {
@@ -1276,7 +1275,7 @@ func (bc *BlockChain) WriteBlockWithState(
 	if status, err := bc.CommitOffChainData(
 		batch, block, receipts,
 		cxReceipts, stakeMsgs,
-		delegationsToAlter,
+		delegationsToRemove,
 		paid, state,
 	); err != nil {
 		return status, err
@@ -1504,7 +1503,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 
 		// Process block using the parent state as reference point.
 		substart := time.Now()
-		receipts, cxReceipts, stakeMsgs, delegationsToAlter, logs, usedGas, payout, newState, err := bc.processor.Process(
+		receipts, cxReceipts, stakeMsgs, delegationsToRemove, logs, usedGas, payout, newState, err := bc.processor.Process(
 			block, state, bc.vmConfig, true,
 		)
 		state = newState // update state in case the new state is cached.
@@ -1541,7 +1540,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifyHeaders bool) (int, 
 		// Write the block to the chain and get the status.
 		substart = time.Now()
 		status, err := bc.WriteBlockWithState(
-			block, receipts, cxReceipts, stakeMsgs, delegationsToAlter, payout, state,
+			block, receipts, cxReceipts, stakeMsgs, delegationsToRemove, payout, state,
 		)
 		if err != nil {
 			return i, events, coalescedLogs, err
@@ -2756,7 +2755,7 @@ func (bc *BlockChain) writeDelegationsByDelegator(
 func (bc *BlockChain) UpdateStakingMetaData(
 	batch rawdb.DatabaseWriter, block *types.Block,
 	stakeMsgs []staking.StakeMsg,
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
+	delegationsToRemove map[common.Address][]common.Address,
 	state *state.DB, epoch, newEpoch *big.Int,
 ) (newValidators []common.Address, err error) {
 	newValidators, newDelegations, err := bc.prepareStakingMetaData(block, stakeMsgs, state)
@@ -2813,8 +2812,10 @@ func (bc *BlockChain) UpdateStakingMetaData(
 		}
 	}
 
-	if err := bc.UpdateDelegationIndices(block, batch, delegationsToAlter); err != nil {
-		return newValidators, err
+	for delegatorAddress, validatorAddresses := range delegationsToRemove {
+		if err := bc.RemoveDelegationsFromDelegator(batch, delegatorAddress, validatorAddresses); err != nil {
+			return newValidators, err
+		}
 	}
 
 	return newValidators, nil
@@ -2988,8 +2989,6 @@ func (bc *BlockChain) addDelegationIndex(
 	if err != nil {
 		return delegations, err
 	}
-	// since this is calculated from scratch here
-	// there is no adjustment needed for removal of stale delegations
 	for i := range wrapper.Delegations {
 		if bytes.Equal(
 			wrapper.Delegations[i].DelegatorAddress[:], delegatorAddress[:],
@@ -3008,49 +3007,33 @@ func (bc *BlockChain) addDelegationIndex(
 
 // RemoveDelegationsFromDelegator will remove the delegationIndexes from state
 // for delegatorAddress and all validatorAddresses
-func (bc *BlockChain) UpdateDelegationIndices(
-	block *types.Block,
+func (bc *BlockChain) RemoveDelegationsFromDelegator(
 	batch rawdb.DatabaseWriter,
-	delegationsToAlter map[common.Address](map[common.Address]uint64),
+	delegatorAddress common.Address,
+	validatorAddresses []common.Address,
 ) error {
-	for delegatorAddress, validatorAddressToOffset := range delegationsToAlter {
-		startTime := time.Now()
-		delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
-		if err != nil {
-			return err
-		}
-		finalDelegationIndexes := delegationIndexes[:0]
-		for _, delegationIndex := range delegationIndexes {
-			validatorAddress := delegationIndex.ValidatorAddress
-			if requestedOffset, ok := validatorAddressToOffset[validatorAddress]; ok {
-				if requestedOffset == math.MaxUint64 {
-					// do not add it to the final index
-				} else {
-					updatedDelegationIndex := staking.DelegationIndex{
-						ValidatorAddress: validatorAddress,
-						Index:            delegationIndex.Index - requestedOffset,
-						BlockNum:         delegationIndex.BlockNum,
-					}
-					finalDelegationIndexes = append(
-						finalDelegationIndexes,
-						updatedDelegationIndex,
-					)
-				}
-			} else {
-				// unchanged (no offset), so add it
-				finalDelegationIndexes = append(finalDelegationIndexes, delegationIndex)
-			}
-		}
-		if err := bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes); err != nil {
-			return err
-		}
-		utils.Logger().Info().
-			Int64("elapsed time", time.Since(startTime).Milliseconds()).
-			Uint64("blockNum", block.Number().Uint64()).
-			Uint64("epoch", block.Epoch().Uint64()).
-			Str("delegator", delegatorAddress.Hex()).
-			Msg("UpdateDelegationIndices")
+	delegationIndexes, err := bc.ReadDelegationsByDelegator(delegatorAddress)
+	if err != nil {
+		return err
 	}
+	finalDelegationIndexes := delegationIndexes[:0]
+	for _, validatorAddress := range validatorAddresses {
+		// TODO: can this be sped up from O(vd) to something shorter?
+		for _, delegationIndex := range delegationIndexes {
+			if bytes.Equal(
+				validatorAddress.Bytes(),
+				delegationIndex.ValidatorAddress.Bytes(),
+			) {
+				// do nothing
+				break
+			}
+			finalDelegationIndexes = append(
+				finalDelegationIndexes,
+				delegationIndex,
+			)
+		}
+	}
+	bc.writeDelegationsByDelegator(batch, delegatorAddress, finalDelegationIndexes)
 	return nil
 }
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/harmony-one/harmony/internal/params"
 
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/harmony-one/harmony/crypto/bls"
@@ -34,7 +33,6 @@ const (
 	validatorIndex  = 0
 	validator2Index = 1
 	delegatorIndex  = 6
-	delegator2Index = 7
 )
 
 var (
@@ -44,7 +42,6 @@ var (
 	validatorAddr       = makeTestAddr(validatorIndex)
 	validatorAddr2      = makeTestAddr(validator2Index)
 	delegatorAddr       = makeTestAddr(delegatorIndex)
-	delegatorAddr2      = makeTestAddr(delegator2Index)
 )
 
 var (
@@ -781,18 +778,16 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		epoch      *big.Int
 		redelegate bool
 
-		expVWrappers          []staking.ValidatorWrapper
-		expAmt                *big.Int
-		expRedel              map[common.Address]*big.Int
-		expErr                error
-		delegationsToAlter    map[common.Address](map[common.Address]uint64)
-		noNilDelegationsEpoch *big.Int
+		expVWrappers []staking.ValidatorWrapper
+		expAmt       *big.Int
+		expRedel     map[common.Address]*big.Int
+		expErr       error
 	}{
 		{
 			// 0: new delegate
 			sdb:        makeStateDBForStake(t),
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -803,7 +798,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			// 1: add amount to current delegate
 			sdb:        makeStateDBForStake(t),
 			msg:        defaultMsgSelfDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -814,7 +809,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			// 2: nil state db
 			sdb:        nil,
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -823,7 +818,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		{
 			// 3: validatorFlag not set
 			sdb: makeStateDBForStake(t),
-			ds:  makeDelegationIndexes(),
+			ds:  makeMsgCollectRewards(),
 			msg: func() staking.Delegate {
 				msg := defaultMsgDelegate()
 				msg.ValidatorAddress = makeTestAddr("not in state")
@@ -842,7 +837,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = big.NewInt(-1)
 				return msg
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -856,7 +851,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = big.NewInt(100)
 				return msg
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -874,7 +869,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.ValidatorAddress = createValidatorAddr
 				return d
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -888,7 +883,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				return sdb
 			}(),
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -902,7 +897,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.Amount = hundredKOnes
 				return d
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -916,7 +911,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				d.Amount = hundredKOnes
 				return d
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(0),
 			redelegate: false,
 
@@ -926,7 +921,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			// 10: full redelegate without using balance
 			sdb:        makeStateForRedelegate(t),
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(7),
 			redelegate: true,
 
@@ -941,7 +936,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			// 11: redelegate with undelegation epoch too recent, have to use some balance
 			sdb:        makeStateForRedelegate(t),
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(6),
 			redelegate: true,
 
@@ -965,7 +960,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				del.Amount = twentyKOnes
 				return del
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(7),
 			redelegate: true,
 
@@ -984,7 +979,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			// 13: no redelegation and full balance used
 			sdb:        makeStateForRedelegate(t),
 			msg:        defaultMsgDelegate(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(5),
 			redelegate: true,
 
@@ -1005,7 +1000,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			sdb: makeStateForRedelegate(t),
 			msg: defaultMsgSelfDelegate(),
 			ds: func() []staking.DelegationIndex {
-				dis := makeDelegationIndexes()
+				dis := makeMsgCollectRewards()
 				dis[1].Index = 2
 				return dis
 			}(),
@@ -1019,7 +1014,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			sdb: makeStateForRedelegate(t),
 			msg: defaultMsgSelfDelegate(),
 			ds: func() []staking.DelegationIndex {
-				dis := makeDelegationIndexes()
+				dis := makeMsgCollectRewards()
 				dis[1].Index = 2
 				return dis
 			}(),
@@ -1036,7 +1031,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				del.DelegatorAddress = del.ValidatorAddress
 				return del
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(5),
 			redelegate: true,
 
@@ -1063,7 +1058,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = new(big.Int).Mul(big.NewInt(90), oneBig)
 				return msg
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(100),
 			redelegate: false,
 
@@ -1077,7 +1072,7 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 				msg.Amount = new(big.Int).Mul(big.NewInt(500), oneBig)
 				return msg
 			}(),
-			ds:         makeDelegationIndexes(),
+			ds:         makeMsgCollectRewards(),
 			epoch:      big.NewInt(100),
 			redelegate: false,
 
@@ -1088,70 +1083,16 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 			}(),
 			expAmt: new(big.Int).Mul(big.NewInt(500), oneBig),
 		},
-		{
-			// 19: redelegate and remove stale delegation
-			sdb: func() *state.DB {
-				db := makeStateForRedelegate(t)
-				wrapper, _ := db.ValidatorWrapper(validatorAddr, true, false)
-				wrapper.Delegations[1].Amount = big.NewInt(0) // leave only fiveK ones available for redelegation at defaultEpoch
-				// also add one more delegation to check that the offset for the following one works
-				wrapper.Delegations = append(
-					wrapper.Delegations,
-					staking.NewDelegation(delegatorAddr2, fiveKOnes),
-				)
-				db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-				wrapper, _ = db.ValidatorWrapper(validatorAddr2, true, false)
-				wrapper.Delegations[1].Undelegations = make(staking.Undelegations, 0) // remove the undelegation here
-				db.UpdateValidatorWrapper(wrapper.Address, wrapper)
-				return db
-			}(),
-			msg: func() staking.Delegate {
-				msg := defaultMsgDelegate()
-				msg.Amount = fiveKOnes
-				msg.ValidatorAddress = validatorAddr2 // delegate entirely to validator2
-				return msg
-			}(),
-			ds:         makeDelegationIndexes(),
-			epoch:      big.NewInt(7),
-			redelegate: true,
-
-			expVWrappers: func() []staking.ValidatorWrapper {
-				wrappers := defaultExpVWrappersRedelegate()
-				wrappers[0].Delegations = wrappers[0].Delegations[:1]
-				wrappers[0].Delegations = append( // manually added
-					wrappers[0].Delegations,
-					staking.NewDelegation(delegatorAddr2, fiveKOnes),
-				)
-				wrappers[1].Delegations[1].Amount = twentyFiveKOnes
-				return wrappers
-			}(),
-			expAmt: big.NewInt(0),
-			expRedel: map[common.Address]*big.Int{
-				validatorAddr: fiveKOnes,
-			},
-			noNilDelegationsEpoch: big.NewInt(6),
-			delegationsToAlter: func() map[common.Address]map[common.Address]uint64 {
-				x := make(map[common.Address](map[common.Address]uint64))
-				x[delegatorAddr] = make(map[common.Address]uint64)
-				x[delegatorAddr][validatorAddr] = math.MaxUint64
-				x[delegatorAddr2] = make(map[common.Address]uint64)
-				x[delegatorAddr2][validatorAddr] = 1
-				return x
-			}(),
-		},
 	}
 	for i, test := range tests {
 		config := &params.ChainConfig{}
-		if test.noNilDelegationsEpoch != nil {
-			config.NoNilDelegationsEpoch = test.noNilDelegationsEpoch
-		}
 		config.MinDelegation100Epoch = big.NewInt(100)
 		if test.redelegate {
 			config.RedelegationEpoch = test.epoch
 		} else {
 			config.RedelegationEpoch = big.NewInt(test.epoch.Int64() + 1)
 		}
-		ws, amt, amtRedel, delegationsToAlter, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, config)
+		ws, amt, amtRedel, err := VerifyAndDelegateFromMsg(test.sdb, test.epoch, &test.msg, test.ds, config)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Errorf("Test %v: %v", i, assErr)
@@ -1179,12 +1120,8 @@ func TestVerifyAndDelegateFromMsg(t *testing.T) {
 		}
 		for j := range ws {
 			if err := staketest.CheckValidatorWrapperEqual(*ws[j], test.expVWrappers[j]); err != nil {
-				t.Errorf("Test on wrapper %s %v: %v", ws[j].Address.Hex(), j, err)
+				t.Errorf("Test %v: %v", i, err)
 			}
-		}
-
-		if err := staketest.CompareDelegationsToAlter(delegationsToAlter, test.delegationsToAlter); err != nil {
-			t.Error(err)
 		}
 	}
 }
@@ -1444,7 +1381,7 @@ func TestVerifyAndUndelegateFromMsg(t *testing.T) {
 			}(),
 			expVWrapper:           makeDefaultSnapVWrapperForUndelegate(t),
 			expErr:                staking.ErrUndelegationRemaining,
-			noNilDelegationsEpoch: big.NewInt(defaultEpoch - 1), // "post" no nil undelegations epoch
+			noNilDelegationsEpoch: big.NewInt(defaultEpoch),
 		},
 		{
 			// 13: Undelegate with NoNilDelegationsEpoch set
@@ -1595,12 +1532,11 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		expVWrappers    []*staking.ValidatorWrapper
 		expTotalRewards *big.Int
 		expErr          error
-		epoch           *big.Int
 	}{
 		{
 			// 0: Positive test case
 			sdb: makeStateForReward(t),
-			ds:  makeDelegationIndexes(),
+			ds:  makeMsgCollectRewards(),
 
 			expVWrappers:    expVWrappersForReward(),
 			expTotalRewards: new(big.Int).Add(reward01, reward11),
@@ -1615,7 +1551,7 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 		{
 			// 2: nil state db
 			sdb: nil,
-			ds:  makeDelegationIndexes(),
+			ds:  makeMsgCollectRewards(),
 
 			expErr: errStateDBIsMissing,
 		},
@@ -1623,7 +1559,7 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 			// 3: ValidatorWrapper not in state
 			sdb: makeStateForReward(t),
 			ds: func() []staking.DelegationIndex {
-				msg := makeDelegationIndexes()
+				msg := makeMsgCollectRewards()
 				msg[1].ValidatorAddress = makeTestAddr("addr not exist")
 				return msg
 			}(),
@@ -1634,7 +1570,7 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 			// 4: Wrong input message - index out of range
 			sdb: makeStateForReward(t),
 			ds: func() []staking.DelegationIndex {
-				dis := makeDelegationIndexes()
+				dis := makeMsgCollectRewards()
 				dis[1].Index = 2
 				return dis
 			}(),
@@ -1642,10 +1578,8 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 			expErr: errors.New("index out of bound"),
 		},
 	}
-	stakeMsg := makeCollectRewards()
 	for i, test := range tests {
-		config := &params.ChainConfig{}
-		ws, tReward, _, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds, stakeMsg, big.NewInt(defaultEpoch), config)
+		ws, tReward, err := VerifyAndCollectRewardsFromDelegation(test.sdb, test.ds)
 
 		if assErr := assertError(err, test.expErr); assErr != nil {
 			t.Fatalf("Test %v: %v", i, err)
@@ -1668,7 +1602,7 @@ func TestVerifyAndCollectRewardsFromDelegation(t *testing.T) {
 	}
 }
 
-func makeDelegationIndexes() []staking.DelegationIndex {
+func makeMsgCollectRewards() []staking.DelegationIndex {
 	dis := []staking.DelegationIndex{
 		{
 			ValidatorAddress: validatorAddr,
@@ -1681,12 +1615,6 @@ func makeDelegationIndexes() []staking.DelegationIndex {
 		},
 	}
 	return dis
-}
-
-func makeCollectRewards() *staking.CollectRewards {
-	return &staking.CollectRewards{
-		DelegatorAddress: delegatorAddr,
-	}
 }
 
 func makeStateForReward(t *testing.T) *state.DB {

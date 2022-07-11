@@ -1,18 +1,14 @@
 package types
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
-	"github.com/harmony-one/harmony/internal/params"
-	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -213,103 +209,4 @@ func (d *Delegation) RemoveUnlockedUndelegations(
 	}
 	d.Undelegations = d.Undelegations[count:]
 	return totalWithdraw
-}
-
-func MergeDelegationsToAlter(
-	top map[common.Address](map[common.Address]uint64),
-	leaf map[common.Address](map[common.Address]uint64),
-) map[common.Address](map[common.Address]uint64) {
-	if len(top) == 0 { // first merge
-		return leaf
-	}
-	for delegator, mod := range leaf {
-		var topDelegator map[common.Address]uint64
-		var ok bool
-		if topDelegator, ok = top[delegator]; !ok {
-			topDelegator = make(map[common.Address]uint64)
-		}
-		// iterate over offsets
-		for validator, offset := range mod {
-			// check whether such an offset exists
-			if topOffset, ok := topDelegator[validator]; !ok {
-				// if not, set it
-				topDelegator[validator] = offset
-			} else {
-				// else, add to existing
-				if topOffset == math.MaxUint64 { // marked for deletion by top
-					continue
-				} else if offset == math.MaxUint64 { // marked for deletion by leaf
-					topDelegator[validator] = offset
-				} else {
-					topDelegator[validator] += offset // increase the offset
-				}
-			}
-		}
-		// insert delegator into top
-		top[delegator] = topDelegator
-	}
-	return top
-}
-
-// func PrintDelegationsToAlter(
-// 	delegationsToAlter map[common.Address](map[common.Address]uint64),
-// ) {
-// 	for delegatorAddress, x := range delegationsToAlter {
-// 		fmt.Printf("Delegator: %s\n", delegatorAddress.Hex())
-// 		for validatorAddress, offset := range x {
-// 			fmt.Printf("\tValidator: %s, Offset: %d\n", validatorAddress.Hex(), offset)
-// 		}
-// 	}
-// }
-
-func FindDelegationInWrapper(
-	delegatorAddress common.Address,
-	wrapper *ValidatorWrapper,
-	delegationIndex *DelegationIndex,
-	chainConfig *params.ChainConfig,
-	epoch *big.Int,
-) (*Delegation, uint64, error) {
-	var delegation *Delegation
-	if !chainConfig.IsPostNoNilDelegations(epoch) {
-		if delegationIndex.Index >= uint64(len(wrapper.Delegations)) {
-			// index out of bounds
-			utils.Logger().Warn().
-				Str("validator", delegationIndex.ValidatorAddress.String()).
-				Uint64("delegation index", delegationIndex.Index).
-				Int("delegations length", len(wrapper.Delegations)).
-				Msg("Delegation index out of bound")
-			return nil, math.MaxUint64, errors.New("Delegation index out of bound")
-		}
-		return &wrapper.Delegations[delegationIndex.Index], delegationIndex.Index, nil
-	} else {
-		if delegationIndex.Index == 0 {
-			// since this is referring to self delegation
-			// and it is never removed
-			// no address comparison is needed
-			return &wrapper.Delegations[0], 0, nil
-		}
-		var startingPoint uint64
-		if delegationIndex.Index >= uint64(len(wrapper.Delegations)) {
-			// we never remove the (inactive) validator
-			// so this will never overflow
-			startingPoint = uint64(len(wrapper.Delegations)) - 1
-		} else {
-			startingPoint = delegationIndex.Index
-		}
-		// delegationIndex is as of previous block
-		// and between the two blocks only removal takes place
-		// go backwards only, not forward
-		// do not check 0 because we've already taken care of
-		// validator's self delegation
-		for j := startingPoint; j > 0; j-- {
-			delegation = &wrapper.Delegations[j]
-			if bytes.Equal(
-				delegation.DelegatorAddress[:],
-				delegatorAddress[:],
-			) {
-				return delegation, j, nil
-			}
-		}
-	}
-	return nil, math.MaxUint64, nil
 }

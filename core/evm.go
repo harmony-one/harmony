@@ -155,19 +155,19 @@ func EditValidatorFn(ref *block.Header, chain ChainContext) vm.EditValidatorFunc
 
 func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 	// moved from state_transition.go to here, with some modifications
-	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) (map[common.Address](map[common.Address]uint64), error) {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, delegate *stakingTypes.Delegate) error {
 		delegations, err := chain.ReadDelegationsByDelegatorAt(delegate.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
-			return nil, err
+			return err
 		}
-		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, delegationsToAlter, err := VerifyAndDelegateFromMsg(
+		updatedValidatorWrappers, balanceToBeDeducted, fromLockedTokens, err := VerifyAndDelegateFromMsg(
 			db, ref.Epoch(), delegate, delegations, chain.Config())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
 			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-				return nil, err
+				return err
 			}
 		}
 
@@ -201,7 +201,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 			for _, key := range sortedKeys {
 				redelegatedToken, ok := fromLockedTokens[key]
 				if !ok {
-					return nil, errors.New("Key missing for delegation receipt")
+					return errors.New("Key missing for delegation receipt")
 				}
 				encodedRedelegationData := []byte{}
 				addrBytes := key.Bytes()
@@ -238,7 +238,7 @@ func DelegateFn(ref *block.Header, chain ChainContext) vm.DelegateFunc {
 				}
 			}
 		}
-		return delegationsToAlter, nil
+		return nil
 	}
 }
 
@@ -273,23 +273,23 @@ func UndelegateFn(ref *block.Header, chain ChainContext) vm.UndelegateFunc {
 }
 
 func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFunc {
-	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) (map[common.Address](map[common.Address]uint64), error) {
+	return func(db vm.StateDB, rosettaTracer vm.RosettaTracer, collectRewards *stakingTypes.CollectRewards) error {
 		if chain == nil {
-			return nil, errors.New("[CollectRewards] No chain context provided")
+			return errors.New("[CollectRewards] No chain context provided")
 		}
 		delegations, err := chain.ReadDelegationsByDelegatorAt(collectRewards.DelegatorAddress, big.NewInt(0).Sub(ref.Number(), big.NewInt(1)))
 		if err != nil {
-			return nil, err
+			return err
 		}
-		updatedValidatorWrappers, totalRewards, delegationsToAlter, err := VerifyAndCollectRewardsFromDelegation(
-			db, delegations, collectRewards, ref.Epoch(), chain.Config(),
+		updatedValidatorWrappers, totalRewards, err := VerifyAndCollectRewardsFromDelegation(
+			db, delegations,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, wrapper := range updatedValidatorWrappers {
 			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-				return nil, err
+				return err
 			}
 		}
 		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
@@ -314,7 +314,7 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 			)
 		}
 
-		return delegationsToAlter, nil
+		return nil
 	}
 }
 
