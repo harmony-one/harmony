@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -256,15 +257,19 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 	}
 
 	for _, shardID := range []uint32{1, 2, 3} {
+		var latestContinuousBlockNum uint64
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
+		fmt.Println("LASTLINK", shardID, lastLink, err)
 		if err != nil {
-			utils.Logger().Error().Err(err).Msg("[BroadcastCrossLinkSignal] failed to get crosslinks")
-			continue
+			utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLinkSignal] failed to get crosslinks for shardID", shardID)
+			latestContinuousBlockNum = 0
+		} else {
+			latestContinuousBlockNum = lastLink.BlockNum()
 		}
 
 		hb := types.CrosslinkHeartbeat{
 			ShardID:                  lastLink.ShardID(),
-			LatestContinuousBlockNum: lastLink.BlockNum(),
+			LatestContinuousBlockNum: latestContinuousBlockNum,
 			Epoch:                    lastLink.Epoch().Uint64(),
 			PublicKey:                privToSing.Pub.Bytes[:],
 			Signature:                nil,

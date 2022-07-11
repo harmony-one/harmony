@@ -390,6 +390,7 @@ func (a Stub) SuperCommitteeForNextEpoch(beacon engine.ChainReader, header *bloc
 }
 
 func (a Stub) EnablePruneBeaconChainFeature() {
+	panic("not implemented")
 }
 
 func (a Stub) IsEnablePruneBeaconChainFeature() bool {
