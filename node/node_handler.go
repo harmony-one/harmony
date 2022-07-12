@@ -187,10 +187,11 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		return
 	}
 
-	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
-		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
-		return
-	}
+	fmt.Println("From shards to beacon 3", !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()), curBlock.Epoch().Uint64(), curBlock.NumberU64())
+	//if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
+	//	// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
+	//	return
+	//}
 
 	utils.Logger().Info().Msgf(
 		"Construct and Broadcasting new crosslink to beacon chain groupID %s",
@@ -198,6 +199,7 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	)
 
 	headers, err := getCrosslinkHeadersForShards(node.Blockchain(), curBlock, node.crosslinks)
+	fmt.Println("getCrosslinkHeadersForShards", curBlock.ShardID(), headers, err)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLink] failed to get crosslinks")
 		return
@@ -259,8 +261,8 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 	for _, shardID := range []uint32{1, 2, 3} {
 		var latestContinuousBlockNum uint64
 		lastLink, err := node.Blockchain().ReadShardLastCrossLink(shardID)
-		fmt.Println("LASTLINK", shardID, lastLink, err)
 		if err != nil {
+			continue
 			utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLinkSignal] failed to get crosslinks for shardID", shardID)
 			latestContinuousBlockNum = 0
 		} else {

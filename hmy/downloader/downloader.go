@@ -311,7 +311,11 @@ func verifyAndInsertBlock(bc blockChain, block *types.Block, nextBlocks ...*type
 	if err := bc.Engine().VerifyHeader(bc, block.Header(), true); err != nil {
 		return errors.Wrap(err, "[VerifyHeader]")
 	}
+	//if block.ShardID() == 1 {
+	fmt.Printf("Trying insert chain %T %d %d %d %v\n", bc, block.ShardID(), block.Epoch().Uint64(), block.Number().Uint64(), block.IsLastBlockInEpoch())
+	//}
 	if _, err := bc.InsertChain(types.Blocks{block}, false); err != nil {
+		fmt.Printf("Failed insert chain %T %q %d %d %d %v\n", bc, err, block.ShardID(), block.Epoch().Uint64(), block.Number().Uint64(), block.IsLastBlockInEpoch())
 		return errors.Wrap(err, "[InsertChain]")
 	}
 	return nil

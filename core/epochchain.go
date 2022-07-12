@@ -120,6 +120,9 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 		<-bc.mu
 	}()
 	for i, block := range blocks {
+		if !block.IsLastBlockInEpoch() {
+			continue
+		}
 		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 		if err != nil {
 			return i, errors.Wrap(err, "parse commitSigAndBitmap")

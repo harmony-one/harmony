@@ -125,9 +125,9 @@ func ConstructCrossLinkMessage(bc engine.ChainReader, headers []*block.Header) [
 	byteBuffer := bytes.NewBuffer(crossLinkH)
 	crosslinks := []*types.CrossLink{}
 	for _, header := range headers {
-		if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
-			continue
-		}
+		//if header.Number().Uint64() <= 1 || !bc.Config().IsCrossLink(header.Epoch()) {
+		//	continue
+		//}
 		parentHeader := bc.GetHeaderByHash(header.ParentHash())
 		if parentHeader == nil {
 			continue

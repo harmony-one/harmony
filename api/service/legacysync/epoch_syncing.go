@@ -185,6 +185,9 @@ func (ss *EpochSync) processWithPayload(payload [][]byte, bc core.BlockChain) er
 	}
 
 	_, err := bc.InsertChain(decoded, true)
+	if err != nil {
+		fmt.Println("EpochSync InsertChain err", err)
+	}
 	return err
 }
 
