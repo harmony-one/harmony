@@ -22,6 +22,7 @@ import (
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -667,6 +668,10 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	if err != nil {
 		utils.Logger().Warn().Msgf("Blacklist setup error: %s", err.Error())
 	}
+	allowedTxs, err := setupAllowedTxs(hc)
+	if err != nil {
+		utils.Logger().Warn().Msgf("AllowedTxs setup error: %s", err.Error())
+	}
 
 	localAccounts, err := setupLocalAccounts(hc, blacklist)
 	if err != nil {
@@ -687,7 +692,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		chainDBFactory = &shardchain.LDBFactory{RootDir: nodeConfig.DBDir}
 	}
 
-	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, localAccounts, nodeConfig.ArchiveModes(), &hc)
+	currentNode := node.New(myHost, currentConsensus, chainDBFactory, blacklist, allowedTxs, localAccounts, nodeConfig.ArchiveModes(), &hc)
 
 	if hc.Legacy != nil && hc.Legacy.TPBroadcastInvalidTxn != nil {
 		currentNode.BroadcastInvalidTx = *hc.Legacy.TPBroadcastInvalidTxn
@@ -842,7 +847,7 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 	for _, line := range strings.Split(string(dat), "\n") {
 		if len(line) != 0 { // blacklist file may have trailing empty string line
 			b32 := strings.TrimSpace(strings.Split(string(line), "#")[0])
-			addr, err := common.Bech32ToAddress(b32)
+			addr, err := common.ParseAddr(b32)
 			if err != nil {
 				return nil, err
 			}
@@ -850,6 +855,46 @@ func setupBlacklist(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]struc
 		}
 	}
 	return addrMap, nil
+}
+
+func parseAllowedTxs(data []byte) (map[ethCommon.Address]core.AllowedTxData, error) {
+	allowedTxs := make(map[ethCommon.Address]core.AllowedTxData)
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) != 0 { // AllowedTxs file may have trailing empty string line
+			substrings := strings.Split(string(line), "->")
+			fromStr := strings.TrimSpace(substrings[0])
+			txSubstrings := strings.Split(substrings[1], ":")
+			toStr := strings.TrimSpace(txSubstrings[0])
+			dataStr := strings.TrimSpace(txSubstrings[1])
+			from, err := common.ParseAddr(fromStr)
+			if err != nil {
+				return nil, err
+			}
+			to, err := common.ParseAddr(toStr)
+			if err != nil {
+				return nil, err
+			}
+			data, err := hexutil.Decode(dataStr)
+			if err != nil {
+				return nil, err
+			}
+			allowedTxs[from] = core.AllowedTxData{
+				To:   to,
+				Data: data,
+			}
+		}
+	}
+	return allowedTxs, nil
+}
+
+func setupAllowedTxs(hc harmonyconfig.HarmonyConfig) (map[ethCommon.Address]core.AllowedTxData, error) {
+	utils.Logger().Debug().Msgf("Using AllowedTxs file at `%s`", hc.TxPool.AllowedTxsFile)
+	data, err := ioutil.ReadFile(hc.TxPool.AllowedTxsFile)
+	if err != nil {
+		return nil, err
+	}
+	return parseAllowedTxs(data)
 }
 
 func setupLocalAccounts(hc harmonyconfig.HarmonyConfig, blacklist map[ethCommon.Address]struct{}) ([]ethCommon.Address, error) {
