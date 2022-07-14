@@ -72,7 +72,7 @@ function launch_localnet() {
     verbosity=3
   fi
 
-  base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" "--network_type=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" "--dns=false" "--verbosity=${verbosity}" "--p2p.security.max-conn-per-ip=100")
+  base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" "--network_type=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" "--dns=false" "--dns.client=true" "--verbosity=${verbosity}" "--p2p.security.max-conn-per-ip=100")
   sleep 2
 
   # Start nodes
@@ -163,7 +163,7 @@ EXAMPLES:
 }
 
 DURATION=60000
-MIN=3
+MIN=4
 SHARDS=2
 DRYRUN=
 NETWORK=localnet
