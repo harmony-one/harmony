@@ -135,6 +135,7 @@ var (
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
 		localAccountsFileFlag,
+		allowedTxsFileFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -1080,6 +1081,11 @@ var (
 		Usage:    "file of local wallet addresses",
 		DefValue: defaultConfig.TxPool.LocalAccountsFile,
 	}
+	allowedTxsFileFlag = cli.StringFlag{
+		Name:     "txpool.allowedtxs",
+		Usage:    "file of allowed transactions",
+		DefValue: defaultConfig.TxPool.AllowedTxsFile,
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -1100,6 +1106,9 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, localAccountsFileFlag) {
 		config.TxPool.LocalAccountsFile = cli.GetStringFlagValue(cmd, localAccountsFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, allowedTxsFileFlag) {
+		config.TxPool.AllowedTxsFile = cli.GetStringFlagValue(cmd, allowedTxsFileFlag)
 	}
 }
 

@@ -106,6 +106,7 @@ func TestHarmonyFlags(t *testing.T) {
 				},
 				TxPool: harmonyconfig.TxPoolConfig{
 					BlacklistFile:     "./.hmy/blacklist.txt",
+					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
 					LocalAccountsFile: "./.hmy/locals.txt",
@@ -875,15 +876,17 @@ func TestTxPoolFlags(t *testing.T) {
 			args: []string{},
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
 		{
-			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file"},
+			args: []string{"--txpool.blacklist", "blacklist.file", "--txpool.rosettafixfile", "rosettafix.file", "--txpool.allowedtxs", "allowedtxs.txt"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:     "blacklist.file",
+				AllowedTxsFile:    "allowedtxs.txt",
 				RosettaFixFile:    "rosettafix.file",
 				AccountSlots:      16, // default
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
@@ -894,6 +897,7 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:     "blacklist.file",
 				RosettaFixFile:    "rosettafix.file",
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				AccountSlots:      16, // default
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
@@ -903,6 +907,7 @@ func TestTxPoolFlags(t *testing.T) {
 			expConfig: harmonyconfig.TxPoolConfig{
 				AccountSlots:      5,
 				BlacklistFile:     "blacklist.file",
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
@@ -911,6 +916,7 @@ func TestTxPoolFlags(t *testing.T) {
 			args: []string{"--txpool.locals", "locals.txt"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: "locals.txt",
