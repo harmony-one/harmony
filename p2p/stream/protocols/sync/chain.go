@@ -50,23 +50,20 @@ func (ch *chainHelperImpl) getBlockHashes(bns []uint64) []common.Hash {
 }
 
 func (ch *chainHelperImpl) getBlocksByNumber(bns []uint64) ([]*types.Block, error) {
-	var (
-		blocks = make([]*types.Block, 0, len(bns))
-	)
+	curBlock := ch.chain.CurrentHeader().Number().Uint64()
+	blocks := make([]*types.Block, 0, len(bns))
 	for _, bn := range bns {
-		var (
-			block *types.Block
-			err   error
-		)
+		if curBlock < bn {
+			continue
+		}
 		header := ch.chain.GetHeaderByNumber(bn)
 		if header != nil {
-			block, err = ch.getBlockWithSigByHeader(header)
+			block, err := ch.getBlockWithSigByHeader(header)
 			if err != nil {
 				return nil, errors.Wrapf(err, "get block %v at %v", header.Hash().String(), header.Number())
 			}
+			blocks = append(blocks, block)
 		}
-		blocks = append(blocks, block)
-
 	}
 	return blocks, nil
 }

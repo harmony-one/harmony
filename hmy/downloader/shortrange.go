@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	syncProto "github.com/harmony-one/harmony/p2p/stream/protocols/sync"
 	sttypes "github.com/harmony-one/harmony/p2p/stream/types"
+	"github.com/harmony-one/harmony/shard"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 )
@@ -22,6 +24,9 @@ import (
 // 2. Get blocks by hashes from computed hash chain.
 // 3. Insert the blocks to blockchain.
 func (d *Downloader) doShortRangeSync() (int, error) {
+	if _, ok := d.bc.(*core.EpochChain); ok {
+		return d.doShortRangeSyncForEpochSync()
+	}
 	numShortRangeCounterVec.With(d.promLabels()).Inc()
 
 	srCtx, cancel := context.WithTimeout(d.ctx, shortRangeTimeout)
@@ -38,7 +43,7 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 		return 0, errors.Wrap(err, "prerequisite")
 	}
 	curBN := d.bc.CurrentBlock().NumberU64()
-	hashChain, whitelist, err := sh.getHashChain(curBN)
+	hashChain, whitelist, err := sh.getHashChain(sh.prepareBlockHashNumbers(curBN))
 	if err != nil {
 		return 0, errors.Wrap(err, "getHashChain")
 	}
@@ -87,6 +92,56 @@ func (d *Downloader) doShortRangeSync() (int, error) {
 	return len(blocks), nil
 }
 
+func (d *Downloader) doShortRangeSyncForEpochSync() (int, error) {
+	numShortRangeCounterVec.With(d.promLabels()).Inc()
+
+	srCtx, cancel := context.WithTimeout(d.ctx, shortRangeTimeout)
+	defer cancel()
+
+	sh := &srHelper{
+		syncProtocol: d.syncProtocol,
+		ctx:          srCtx,
+		config:       d.config,
+		logger:       d.logger.With().Str("mode", "short range").Logger(),
+	}
+
+	if err := sh.checkPrerequisites(); err != nil {
+		return 0, errors.Wrap(err, "prerequisite")
+	}
+	curBN := d.bc.CurrentBlock().NumberU64()
+	bns := make([]uint64, 0, numBlocksByNumPerRequest)
+	loopEpoch := d.bc.CurrentHeader().Epoch().Uint64() //+ 1
+	for len(bns) < numBlocksByNumPerRequest {
+		blockNum := shard.Schedule.EpochLastBlock(loopEpoch)
+		if blockNum > curBN {
+			bns = append(bns, blockNum)
+		}
+		loopEpoch = loopEpoch + 1
+	}
+
+	if len(bns) == 0 {
+		return 0, nil
+	}
+
+	blocks, streamID, err := sh.getBlocksChain(bns)
+	if err != nil {
+		return 0, errors.Wrap(err, "getHashChain")
+	}
+	if len(blocks) == 0 {
+		// short circuit for no sync is needed
+		return 0, nil
+	}
+	n, err := d.bc.InsertChain(blocks, true)
+	numBlocksInsertedShortRangeHistogramVec.With(d.promLabels()).Observe(float64(n))
+	if err != nil {
+		sh.removeStreams([]sttypes.StreamID{streamID}) // Data provided by remote nodes is corrupted
+		return n, err
+	}
+	d.logger.Info().Err(err).Int("blocks inserted", n).Msg("Insert block success")
+
+	return len(blocks), nil
+}
+
 type srHelper struct {
 	syncProtocol syncProtocol
 
@@ -95,8 +150,7 @@ type srHelper struct {
 	logger zerolog.Logger
 }
 
-func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamID, error) {
-	bns := sh.prepareBlockHashNumbers(curBN)
+func (sh *srHelper) getHashChain(bns []uint64) ([]common.Hash, []sttypes.StreamID, error) {
 	results := newBlockHashResults(bns)
 
 	var wg sync.WaitGroup
@@ -135,6 +189,10 @@ func (sh *srHelper) getHashChain(curBN uint64) ([]common.Hash, []sttypes.StreamI
 	sh.logger.Info().Int("hashChain size", len(hashChain)).Int("whitelist", len(wl)).
 		Msg("computeLongestHashChain result")
 	return hashChain, wl, nil
+}
+
+func (sh *srHelper) getBlocksChain(bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
+	return sh.doGetBlocksByNumbersRequest(bns)
 }
 
 func (sh *srHelper) getBlocksByHashes(hashes []common.Hash, whitelist []sttypes.StreamID) ([]*types.Block, []sttypes.StreamID, error) {
@@ -239,6 +297,18 @@ func (sh *srHelper) doGetBlockHashesRequest(bns []uint64) ([]common.Hash, sttype
 		return nil, stid, err
 	}
 	return hashes, stid, nil
+}
+
+func (sh *srHelper) doGetBlocksByNumbersRequest(bns []uint64) ([]*types.Block, sttypes.StreamID, error) {
+	ctx, cancel := context.WithTimeout(sh.ctx, 2*time.Second)
+	defer cancel()
+
+	blocks, stid, err := sh.syncProtocol.GetBlocksByNumber(ctx, bns)
+	if err != nil {
+		sh.logger.Warn().Err(err).Str("stream", string(stid)).Msg("failed to doGetBlockHashesRequest")
+		return nil, stid, err
+	}
+	return blocks, stid, nil
 }
 
 func (sh *srHelper) doGetBlocksByHashesRequest(ctx context.Context, hashes []common.Hash, wl []sttypes.StreamID) ([]*types.Block, sttypes.StreamID, error) {

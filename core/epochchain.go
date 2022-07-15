@@ -115,11 +115,17 @@ func (bc *EpochChain) Stop() {
 }
 
 func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
+	if len(blocks) == 0 {
+		return 0, nil
+	}
 	bc.mu <- struct{}{}
 	defer func() {
 		<-bc.mu
 	}()
 	for i, block := range blocks {
+		if !block.IsLastBlockInEpoch() {
+			return i, errors.New("block is not last block in epoch")
+		}
 		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
 		if err != nil {
 			return i, errors.Wrap(err, "parse commitSigAndBitmap")
