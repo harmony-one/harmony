@@ -703,10 +703,6 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.Rw
 				//addBlockHashesToDBWithConfirms(response.Payload, tx)
 			}
 
-			// for id, blkHash := range peerConfig.blockHashes {
-			// 	fmt.Println(peerConfig.port, "/", id, "BBBBBBBBBBBBBBBBBBBBBBBBBBBB---------->", blkHash)
-			// }
-
 		}()
 		return
 	})
@@ -1245,7 +1241,6 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
 				Msg("[STAGED_SYNC] getMaxPeerHeight")
-			//fmt.Println(peerConfig.port, "-----[HEIGHT]--------------->", response.BlockHeight)
 			lock.Lock()
 			if response != nil {
 				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {

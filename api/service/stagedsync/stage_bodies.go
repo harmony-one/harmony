@@ -68,15 +68,12 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	}
 
 	size := uint64(0)
-
-	//fmt.Print("\033[s") // save the cursor position
+	currProgress++
+	
+	fmt.Print("\033[s") // save the cursor position
 
 	for ok := true; ok; ok = currProgress < targetHeight {
-		// size = targetHeight - currProgress
-		// if size > uint64(SyncLoopBatchSize) {
-		// 	size = uint64(SyncLoopBatchSize)
-		// }
-		maxSize := targetHeight - currProgress
+		maxSize := targetHeight - currProgress + 1
 		size = uint64(downloadTaskBatch * len(s.state.syncConfig.peers))
 		if size > maxSize {
 			size = maxSize
@@ -90,24 +87,23 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		}
 
 		// Download blocks.
-		//s.state.downloadBlocks(s.state.Blockchain())
 		verifyAllSig := true //TODO: move it to configs
 		if err = b.downloadBlocks(s, verifyAllSig, nil); err != nil {
 			return nil
 		}
 
+		// save blocks and update current progress
 		if currProgress, err = b.saveDownloadedBlocks(s, currProgress, nil); err != nil {
 			return err
 		}
 
 		// currProgress += size
-
 		// if err = b.saveProgress(s, currProgress, tx); err != nil {
 		// 	return err
 		// }
 
-		// fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		// fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight)
+		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight)
 	}
 
 	return nil
@@ -135,7 +131,6 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 					utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
 					break
 				}
-				fmt.Println("tasks: ---------> ", tasks.indexes())
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
 					count++
@@ -287,7 +282,6 @@ func (b *StageBodies) verifyBlockSignatures(bc *core.BlockChain, block *types.Bl
 	}
 	// err = bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 	// if err == engine.ErrUnknownAncestor {
-	// 	fmt.Println("signature failed here ---------------> 5:", err)
 	// 	return err
 	// } else if err != nil {
 	// 	utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
@@ -334,8 +328,6 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 
 func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64, tx kv.RwTx) error {
 	s.state.stateSyncTaskQueue = queue.New(0)
-
-	fmt.Println("load block hashes to task queue -----------> from", startIndex, "size", size)
 
 	if errV := b.configs.db.View(b.configs.ctx, func(etx kv.Tx) error {
 
@@ -384,13 +376,11 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 	// sort blocks by task id
 	taskIDs := make([]int, 0, len(s.state.downloadedBlocks))
 	for id := range s.state.downloadedBlocks {
-		fmt.Println("k---------------->",id)
 		taskIDs = append(taskIDs, id)
 	}
 	sort.Ints(taskIDs)
 	for taskID := range taskIDs {
 		blockBytes := s.state.downloadedBlocks[taskID]
-		fmt.Println("saving block: ", taskID, "----------[D]--------> len: ", len(blockBytes))
 		//key := strconv.FormatUint(p+1, 10)
 		key := fmt.Sprintf("%020d", p)
 		if err := tx.Put(DownloadedBlocksBucket, []byte(key), blockBytes); err != nil {
@@ -400,15 +390,13 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 				Msg("[STAGED_SYNC] adding block to db failed")
 			return p, err
 		}
-		p++
+		if taskID != taskIDs[len(taskIDs)-1] {
+			p++
+		}
 	}
 
-	// fmt.Println("old progress---SSS---------->", progress)
-	// fmt.Println("new progress---SSS---------->", p)
-	// fmt.Println("exp progress---SSS---------->", len(s.state.downloadedBlocks))
-
 	// check if all block hashes are added to db break the loop
-	if p-progress != uint64(len(s.state.downloadedBlocks)) {
+	if p-progress != uint64(len(s.state.downloadedBlocks)-1) {
 		return p, fmt.Errorf("save downloaded block bodies failed")
 	}
 	// save progress

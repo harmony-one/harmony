@@ -50,7 +50,6 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		if currProgress, err = GetStageProgress(etx, States, isBeacon); err != nil {
 			return err
 		}
-		fmt.Println("STATES progress -------------------> ", currProgress, "/", targetHeight)
 		return nil
 	}); errV != nil {
 		return errV
@@ -77,22 +76,20 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	// update current progress before return
 	defer stg.saveProgress(s, nil)
 
-	//fmt.Print("\033[s") // save the cursor position
+	fmt.Print("\033[s") // save the cursor position
+	
 	for n, blockBytes, err := c.First(); n != nil; n, blockBytes, err = c.Next() {
 		if err != nil {
 			return err
 		}
-		sz := len(blockBytes) //unsafe.Sizeof(blockBytes)
+		sz := len(blockBytes)
 		if sz <= 1 {
 			continue
 		}
 		var bb [10000]byte
 		copy(bb[:sz], blockBytes[:])
 		block := *(*types.Block)(unsafe.Pointer(&bb))
-		key := string(n) // strconv.FormatUint(currProgress, 10)
-		//fmt.Print("\033[u\033[K")
-		fmt.Println("STATE Block", key, "------>", block.NumberU64())
-
+		
 		// Verify block signatures
 		if block.NumberU64() > 1 {
 
@@ -117,7 +114,6 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 			}
 		}
 
-		fmt.Println("STATE insert", key, "------>", block.NumberU64())
 		_, err := stg.configs.bc.InsertChain([]*types.Block{&block}, false /* verifyHeaders */)
 		if err != nil {
 			utils.Logger().Error().
@@ -146,6 +142,8 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 				)
 		}
 
+		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight)
 	}
 
 	return nil
@@ -153,7 +151,6 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 
 func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 
-	fmt.Println("STATES PROGRESS SAVE -------------------------------------------------------------->", stg.configs.bc.CurrentBlock().NumberU64())
 	useExternalTx := tx != nil
 	if !useExternalTx {
 		var err error

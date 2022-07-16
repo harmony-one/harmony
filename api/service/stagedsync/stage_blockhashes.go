@@ -77,7 +77,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 
 	fmt.Print("\033[s") // save the cursor position
 
-	for ok := true; ok; ok = currProgress < targetHeight {
+	for ok := true; ok; ok = currProgress <= targetHeight {
 
 		size = uint32(targetHeight - currProgress)
 		if size > SyncLoopBatchSize {
