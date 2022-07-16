@@ -281,6 +281,8 @@ func (sc *SyncConfig) getHowManyMaxConsensus() (int, int) {
 	// As all peers are sorted by their blockHashes, all equal blockHashes should come together and consecutively.
 	if len(sc.peers) == 0 {
 		return -1, 0
+	} else if len(sc.peers) == 1 {
+		return 0, 1
 	}
 	maxFirstID := len(sc.peers) - 1
 	for i := maxFirstID - 1; i >= 0; i-- {

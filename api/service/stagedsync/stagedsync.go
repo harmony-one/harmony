@@ -34,6 +34,7 @@ type StagedSync struct {
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
 	commonBlocks       map[int]*types.Block
+	downloadedBlocks   map[int][]byte
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
 	isExplorer         bool
@@ -75,7 +76,7 @@ type BlockWithSig struct {
 type Timing struct {
 	isUnwind bool
 	isPrune  bool
-	stage    SyncStage
+	stage    SyncStageID
 	took     time.Duration
 }
 
@@ -91,22 +92,22 @@ func (s *StagedSync) Blockchain() *core.BlockChain { return s.bc }
 func (s *StagedSync) DB() kv.RwDB              { return s.db }
 func (s *StagedSync) PrevUnwindPoint() *uint64 { return s.prevUnwindPoint }
 
-func (s *StagedSync) NewUnwindState(id SyncStage, unwindPoint, currentProgress uint64) *UnwindState {
+func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress uint64) *UnwindState {
 	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
 }
 
-func (s *StagedSync) PruneStageState(id SyncStage, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*PruneState, error) {
+func (s *StagedSync) PruneStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*PruneState, error) {
 	var pruneProgress uint64
 	var err error
 	useExternalTx := tx != nil
 	if useExternalTx {
-		pruneProgress, err = GetStagePruneProgress(tx, id)
+		pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		if err = db.View(context.Background(), func(tx kv.Tx) error {
-			pruneProgress, err = GetStagePruneProgress(tx, id)
+			pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
 			if err != nil {
 				return err
 			}
@@ -127,7 +128,7 @@ func (s *StagedSync) NextStage() {
 }
 
 // IsBefore returns true if stage1 goes before stage2 in staged sync
-func (s *StagedSync) IsBefore(stage1, stage2 SyncStage) bool {
+func (s *StagedSync) IsBefore(stage1, stage2 SyncStageID) bool {
 	idx1 := -1
 	idx2 := -1
 	for i, stage := range s.stages {
@@ -144,7 +145,7 @@ func (s *StagedSync) IsBefore(stage1, stage2 SyncStage) bool {
 }
 
 // IsAfter returns true if stage1 goes after stage2 in staged sync
-func (s *StagedSync) IsAfter(stage1, stage2 SyncStage) bool {
+func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	idx1 := -1
 	idx2 := -1
 	for i, stage := range s.stages {
@@ -166,6 +167,11 @@ func (s *StagedSync) UnwindTo(unwindPoint uint64, badBlock common.Hash) {
 	s.badBlock = badBlock
 }
 
+func (s *StagedSync) Done() {
+	s.currentStage = uint(len(s.stages))
+	s.unwindPoint = nil
+}
+
 func (s *StagedSync) IsDone() bool {
 	return s.currentStage >= uint(len(s.stages)) && s.unwindPoint == nil
 }
@@ -177,7 +183,7 @@ func (s *StagedSync) LogPrefix() string {
 	return s.logPrefixes[s.currentStage]
 }
 
-func (s *StagedSync) SetCurrentStage(id SyncStage) error {
+func (s *StagedSync) SetCurrentStage(id SyncStageID) error {
 	for i, stage := range s.stages {
 		if stage.ID == id {
 			s.currentStage = uint(i)
@@ -240,24 +246,25 @@ func New(ctx context.Context,
 		logPrefixes:            logPrefixes,
 		syncStatus:             NewSyncStatus(role),
 		commonBlocks:           make(map[int]*types.Block),
+		downloadedBlocks:       make(map[int][]byte),
 		lastMileBlocks:         []*types.Block{},
 		syncConfig:             &SyncConfig{},
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 	}
 }
 
-func (s *StagedSync) StageState(stage SyncStage, tx kv.Tx, db kv.RoDB) (*StageState, error) {
+func (s *StagedSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RoDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
 	useExternalTx := tx != nil
 	if useExternalTx {
-		blockNum, err = GetStageProgress(tx, stage)
+		blockNum, err = GetStageProgress(tx, stage, s.isBeacon)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		if err = db.View(context.Background(), func(tx kv.Tx) error {
-			blockNum, err = GetStageProgress(tx, stage)
+			blockNum, err = GetStageProgress(tx, stage, s.isBeacon)
 			if err != nil {
 				return err
 			}
@@ -270,7 +277,7 @@ func (s *StagedSync) StageState(stage SyncStage, tx kv.Tx, db kv.RoDB) (*StageSt
 	return &StageState{s, stage, blockNum}, nil
 }
 
-func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool, startHash []byte, size uint32) error {
+func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	s.prevUnwindPoint = nil
 	s.timings = s.timings[:0]
 
@@ -307,9 +314,6 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool, startHash []by
 			s.NextStage()
 			continue
 		}
-
-		s.syncStatus.currentCycle.StartHash = startHash
-		s.syncStatus.currentCycle.Size = size
 
 		if err := s.runStage(stage, db, tx, firstCycle, badBlockUnwind); err != nil {
 			return err
@@ -489,8 +493,8 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 }
 
 // DisableAllStages - including their unwinds
-func (s *StagedSync) DisableAllStages() []SyncStage {
-	var backupEnabledIds []SyncStage
+func (s *StagedSync) DisableAllStages() []SyncStageID {
+	var backupEnabledIds []SyncStageID
 	for i := range s.stages {
 		if !s.stages[i].Disabled {
 			backupEnabledIds = append(backupEnabledIds, s.stages[i].ID)
@@ -502,7 +506,7 @@ func (s *StagedSync) DisableAllStages() []SyncStage {
 	return backupEnabledIds
 }
 
-func (s *StagedSync) DisableStages(ids ...SyncStage) {
+func (s *StagedSync) DisableStages(ids ...SyncStageID) {
 	for i := range s.stages {
 		for _, id := range ids {
 			if s.stages[i].ID != id {
@@ -513,7 +517,7 @@ func (s *StagedSync) DisableStages(ids ...SyncStage) {
 	}
 }
 
-func (s *StagedSync) EnableStages(ids ...SyncStage) {
+func (s *StagedSync) EnableStages(ids ...SyncStageID) {
 	for i := range s.stages {
 		for _, id := range ids {
 			if s.stages[i].ID != id {
@@ -698,6 +702,11 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.Rw
 				peerConfig.blockHashes = response.Payload
 				//addBlockHashesToDBWithConfirms(response.Payload, tx)
 			}
+
+			// for id, blkHash := range peerConfig.blockHashes {
+			// 	fmt.Println(peerConfig.port, "/", id, "BBBBBBBBBBBBBBBBBBBBBBBBBBBB---------->", blkHash)
+			// }
+
 		}()
 		return
 	})
@@ -811,126 +820,126 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc *core.BlockChain, tx kv.RwTx
 	return nil
 }
 
-// downloadBlocks downloads blocks from state sync task queue.
-func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
-	// Initialize blockchain
-	var wg sync.WaitGroup
-	count := 0
-	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
-	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for !taskQueue.empty() {
-				tasks, err := taskQueue.poll(downloadTaskBatch, time.Millisecond)
-				if err != nil || len(tasks) == 0 {
-					if err == queue.ErrDisposed {
-						continue
-					}
-					utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
-					break
-				}
-				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
-				if err != nil {
-					utils.Logger().Warn().Err(err).
-						Str("peerID", peerConfig.ip).
-						Str("port", peerConfig.port).
-						Msg("[STAGED_SYNC] downloadBlocks: GetBlocks failed")
-					if err := taskQueue.put(tasks); err != nil {
-						utils.Logger().Warn().
-							Err(err).
-							Interface("taskIndexes", tasks.indexes()).
-							Msg("cannot add task back to queue")
-					}
-					ss.syncConfig.RemovePeer(peerConfig)
-					return
-				}
-				if len(payload) == 0 {
-					count++
-					utils.Logger().Error().Int("failNumber", count).
-						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
-					if count > downloadBlocksRetryLimit {
-						break
-					}
-					if err := taskQueue.put(tasks); err != nil {
-						utils.Logger().Warn().
-							Err(err).
-							Interface("taskIndexes", tasks.indexes()).
-							Interface("taskBlockes", tasks.blockHashesStr()).
-							Msg("downloadBlocks: cannot add task")
-					}
-					continue
-				}
+// // downloadBlocks downloads blocks from state sync task queue.
+// func (ss *StagedSync) downloadBlocks(bc *core.BlockChain) {
+// 	// Initialize blockchain
+// 	var wg sync.WaitGroup
+// 	count := 0
+// 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
+// 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
+// 		wg.Add(1)
+// 		go func() {
+// 			defer wg.Done()
+// 			for !taskQueue.empty() {
+// 				tasks, err := taskQueue.poll(downloadTaskBatch, time.Millisecond)
+// 				if err != nil || len(tasks) == 0 {
+// 					if err == queue.ErrDisposed {
+// 						continue
+// 					}
+// 					utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
+// 					break
+// 				}
+// 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
+// 				if err != nil {
+// 					utils.Logger().Warn().Err(err).
+// 						Str("peerID", peerConfig.ip).
+// 						Str("port", peerConfig.port).
+// 						Msg("[STAGED_SYNC] downloadBlocks: GetBlocks failed")
+// 					if err := taskQueue.put(tasks); err != nil {
+// 						utils.Logger().Warn().
+// 							Err(err).
+// 							Interface("taskIndexes", tasks.indexes()).
+// 							Msg("cannot add task back to queue")
+// 					}
+// 					ss.syncConfig.RemovePeer(peerConfig)
+// 					return
+// 				}
+// 				if len(payload) == 0 {
+// 					count++
+// 					utils.Logger().Error().Int("failNumber", count).
+// 						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
+// 					if count > downloadBlocksRetryLimit {
+// 						break
+// 					}
+// 					if err := taskQueue.put(tasks); err != nil {
+// 						utils.Logger().Warn().
+// 							Err(err).
+// 							Interface("taskIndexes", tasks.indexes()).
+// 							Interface("taskBlockes", tasks.blockHashesStr()).
+// 							Msg("downloadBlocks: cannot add task")
+// 					}
+// 					continue
+// 				}
 
-				failedTasks := ss.handleBlockSyncResult(payload, tasks)
+// 				failedTasks := ss.handleBlockSyncResult(payload, tasks)
 
-				if len(failedTasks) != 0 {
-					count++
-					if count > downloadBlocksRetryLimit {
-						break
-					}
-					if err := taskQueue.put(failedTasks); err != nil {
-						utils.Logger().Warn().
-							Err(err).
-							Interface("taskIndexes", failedTasks.indexes()).
-							Interface("taskBlockes", tasks.blockHashesStr()).
-							Msg("cannot add task")
-					}
-					continue
-				}
-			}
-		}()
-		return
-	})
-	wg.Wait()
-	utils.Logger().Info().Msg("[STAGED_SYNC] downloadBlocks: finished")
-}
+// 				if len(failedTasks) != 0 {
+// 					count++
+// 					if count > downloadBlocksRetryLimit {
+// 						break
+// 					}
+// 					if err := taskQueue.put(failedTasks); err != nil {
+// 						utils.Logger().Warn().
+// 							Err(err).
+// 							Interface("taskIndexes", failedTasks.indexes()).
+// 							Interface("taskBlockes", tasks.blockHashesStr()).
+// 							Msg("cannot add task")
+// 					}
+// 					continue
+// 				}
+// 			}
+// 		}()
+// 		return
+// 	})
+// 	wg.Wait()
+// 	utils.Logger().Info().Msg("[STAGED_SYNC] downloadBlocks: finished")
+// }
 
-func (ss *StagedSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
-	if len(payload) > len(tasks) {
-		utils.Logger().Warn().
-			Err(errors.New("unexpected number of block delivered")).
-			Int("expect", len(tasks)).
-			Int("got", len(payload))
-		return tasks
-	}
+// func (ss *StagedSync) handleBlockSyncResult(payload [][]byte, tasks syncBlockTasks) syncBlockTasks {
+// 	if len(payload) > len(tasks) {
+// 		utils.Logger().Warn().
+// 			Err(errors.New("unexpected number of block delivered")).
+// 			Int("expect", len(tasks)).
+// 			Int("got", len(payload))
+// 		return tasks
+// 	}
 
-	var failedTasks syncBlockTasks
-	if len(payload) < len(tasks) {
-		utils.Logger().Warn().
-			Err(errors.New("unexpected number of block delivered")).
-			Int("expect", len(tasks)).
-			Int("got", len(payload))
-		failedTasks = append(failedTasks, tasks[len(payload):]...)
-	}
+// 	var failedTasks syncBlockTasks
+// 	if len(payload) < len(tasks) {
+// 		utils.Logger().Warn().
+// 			Err(errors.New("unexpected number of block delivered")).
+// 			Int("expect", len(tasks)).
+// 			Int("got", len(payload))
+// 		failedTasks = append(failedTasks, tasks[len(payload):]...)
+// 	}
 
-	for i, blockBytes := range payload {
-		// For forward compatibility at server side, it can be types.block or BlockWithSig
-		blockObj, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
-		if err != nil {
-			utils.Logger().Warn().
-				Err(err).
-				Int("taskIndex", tasks[i].index).
-				Str("taskBlock", hex.EncodeToString(tasks[i].blockHash)).
-				Msg("download block")
-			failedTasks = append(failedTasks, tasks[i])
-			continue
-		}
-		gotHash := blockObj.Hash()
-		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
-			utils.Logger().Warn().
-				Err(errors.New("wrong block delivery")).
-				Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
-				Str("gotHash", hex.EncodeToString(gotHash[:]))
-			failedTasks = append(failedTasks, tasks[i])
-			continue
-		}
-		ss.syncMux.Lock()
-		ss.commonBlocks[tasks[i].index] = blockObj
-		ss.syncMux.Unlock()
-	}
-	return failedTasks
-}
+// 	for i, blockBytes := range payload {
+// 		// For forward compatibility at server side, it can be types.block or BlockWithSig
+// 		blockObj, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
+// 		if err != nil {
+// 			utils.Logger().Warn().
+// 				Err(err).
+// 				Int("taskIndex", tasks[i].index).
+// 				Str("taskBlock", hex.EncodeToString(tasks[i].blockHash)).
+// 				Msg("download block")
+// 			failedTasks = append(failedTasks, tasks[i])
+// 			continue
+// 		}
+// 		gotHash := blockObj.Hash()
+// 		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
+// 			utils.Logger().Warn().
+// 				Err(errors.New("wrong block delivery")).
+// 				Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
+// 				Str("gotHash", hex.EncodeToString(gotHash[:]))
+// 			failedTasks = append(failedTasks, tasks[i])
+// 			continue
+// 		}
+// 		ss.syncMux.Lock()
+// 		ss.commonBlocks[tasks[i].index] = blockObj
+// 		ss.syncMux.Unlock()
+// 	}
+// 	return failedTasks
+// }
 
 // RlpDecodeBlockOrBlockWithSig decode payload to types.Block or BlockWithSig.
 // Return the block with commitSig if set.
@@ -1134,6 +1143,7 @@ func (ss *StagedSync) generateNewState(bc *core.BlockChain) error {
 	}
 
 	ss.syncMux.Lock()
+	ss.downloadedBlocks = make(map[int][]byte)
 	ss.commonBlocks = make(map[int]*types.Block)
 	ss.syncMux.Unlock()
 
@@ -1214,7 +1224,7 @@ func (ss *StagedSync) RegisterNodeInfo() int {
 }
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) uint64 {
+func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 	maxHeight := uint64(math.MaxUint64)
 	var (
 		wg   sync.WaitGroup
@@ -1235,7 +1245,7 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) uint64 {
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
 				Msg("[STAGED_SYNC] getMaxPeerHeight")
-
+			//fmt.Println(peerConfig.port, "-----[HEIGHT]--------------->", response.BlockHeight)
 			lock.Lock()
 			if response != nil {
 				if maxHeight == uint64(math.MaxUint64) || maxHeight < response.BlockHeight {
@@ -1247,19 +1257,25 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) uint64 {
 		return
 	})
 	wg.Wait()
-	return maxHeight
+
+	if maxHeight == uint64(math.MaxUint64) {
+		return 0, fmt.Errorf("get max peer height failed")
+	}
+
+	return maxHeight, nil
 }
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StagedSync) IsSameBlockchainHeight(bc *core.BlockChain) (uint64, bool) {
-	otherHeight := ss.getMaxPeerHeight(false)
+	otherHeight, _ := ss.getMaxPeerHeight(false)
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
 func (ss *StagedSync) GetMaxPeerHeight() uint64 {
-	return ss.getMaxPeerHeight(false)
+	mph, _ := ss.getMaxPeerHeight(false)
+	return mph
 }
 
 // // SyncLoop will keep syncing with peers until catches up
@@ -1382,7 +1398,7 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1 := ss.getMaxPeerHeight(false)
+	otherHeight1, _ := ss.getMaxPeerHeight(false)
 	lastHeight := ss.Blockchain().CurrentBlock().NumberU64()
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
@@ -1404,7 +1420,7 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2 := ss.getMaxPeerHeight(false)
+	otherHeight2, _ := ss.getMaxPeerHeight(false)
 	currentHeight := ss.Blockchain().CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2

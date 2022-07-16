@@ -29,22 +29,22 @@ func NewStageTasksQueueCfg(ctx context.Context, db kv.RwDB) StageTasksQueueCfg {
 }
 
 func (tq *StageTasksQueue) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
-		tx, err = tq.configs.db.BeginRw(tq.configs.ctx)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
-	}
+	// useExternalTx := tx != nil
+	// if !useExternalTx {
+	// 	tx, err = tq.configs.db.BeginRw(tq.configs.ctx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	defer tx.Rollback()
+	// }
 
-	s.state.generateStateSyncTaskQueue(s.state.Blockchain(), tx)
+	//s.state.generateStateSyncTaskQueue(s.state.Blockchain(), tx)
 
-	if !useExternalTx {
-		if err = tx.Commit(); err != nil {
-			return err
-		}
-	}
+	// if !useExternalTx {
+	// 	if err = tx.Commit(); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }

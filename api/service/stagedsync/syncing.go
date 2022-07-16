@@ -5,27 +5,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/ledgerwatch/erigon-lib/kv"
+
 	"github.com/ledgerwatch/erigon-lib/kv/memdb"
+	//"github.com/ledgerwatch/erigon-lib/kv/mdbx"
+	//"github.com/ledgerwatch/log/v3"
 )
 
 const (
-	CommonBlocksBucket   = "Blocks"
-	BlockHashesBucket    = "BlockHashes"
-	LastMileBlocksBucket = "LastMileBlocks" // last mile blocks to catch up with the consensus
-	StageProgressBucket  = "StageProgress"
+	BlockHashesBucket      = "BlockHashes"
+	DownloadedBlocksBucket = "BlockBodies"
+	LastMileBlocksBucket   = "LastMileBlocks" // last mile blocks to catch up with the consensus
+	StageProgressBucket    = "StageProgress"
 )
 
 var Buckets = []string{
 	BlockHashesBucket,
-	CommonBlocksBucket,
+	DownloadedBlocksBucket,
 	LastMileBlocksBucket,
 	StageProgressBucket,
 }
@@ -43,6 +44,8 @@ func CreateStagedSync(
 
 	ctx := context.Background()
 	db := memdb.New()
+	//db := mdbx.NewMDBX(log.New()).Path("./test_db") .MustOpen()
+
 	if errInitDB := initDB(ctx, db); errInitDB != nil {
 		return nil, errInitDB
 	}
@@ -50,7 +53,8 @@ func CreateStagedSync(
 	headersCfg := NewStageHeadersCfg(ctx, db)
 	blockHashesCfg := NewStageBlockHashesCfg(ctx, db)
 	taskQueueCfg := NewStageTasksQueueCfg(ctx, db)
-	bodiesCfg := NewStageBodiesCfg(ctx, db)
+	bodiesCfg := NewStageBodiesCfg(ctx, bc, db)
+	statesCfg := NewStageStatesCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)
 
 	stages := DefaultStages(ctx,
@@ -58,6 +62,7 @@ func CreateStagedSync(
 		blockHashesCfg,
 		taskQueueCfg,
 		bodiesCfg,
+		statesCfg,
 		finishCfg,
 	)
 
@@ -105,70 +110,113 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		s.RegisterNodeInfo()
 	}
 
-	// defer close(waitForDone)
+	// canRunCycleInOneTransaction := true //!initialCycle && highestSeenHeader-origin < 8096 && highestSeenHeader-finishProgressBefore < 8096
 
+	// var tx kv.RwTx // on this variable will run sync cycle.
+	// if canRunCycleInOneTransaction {
+	// 	tx, err = s.DB().BeginRw(context.Background())
+	// 	if err != nil {
+	// 		return headBlockHash, err
+	// 	}
+	// 	defer tx.Rollback()
+	// }
+
+	// Do one step of staged sync
+	start := time.Now()
 	initialCycle := true
-
-	for {
-		start := time.Now()
-		otherHeight := s.getMaxPeerHeight(s.IsBeacon())
-		currentHeight := s.Blockchain().CurrentBlock().NumberU64()
-		if currentHeight >= otherHeight {
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-			break
-		}
-		var syncErr error
-		for {
-			currentHeight = s.Blockchain().CurrentBlock().NumberU64()
-			if currentHeight >= otherHeight {
-				break
-			}
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-
-			startHash := s.Blockchain().CurrentBlock().Hash()
-			size := uint32(otherHeight - currentHeight)
-			if size > SyncLoopBatchSize {
-				size = SyncLoopBatchSize
-			}
-
-			// Do one step of staged sync
-			_, syncErr = s.StartStageLoop(startHash[:], size, initialCycle)
-
-			if syncErr != nil {
-				utils.Logger().Error().Err(syncErr).
-					Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-						s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-				s.purgeOldBlocksFromCache()
-				break
-			}
-			initialCycle = false
-			s.purgeOldBlocksFromCache()
-
-			if loopMinTime != 0 {
-				waitTime := loopMinTime - time.Since(start)
-				utils.Logger().Info().
-					Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d, currentHeight: %d)",
-						waitTime, s.IsBeacon(), s.Blockchain().ShardID(), currentHeight)
-				c := time.After(waitTime)
-				select {
-				case <-s.Context().Done():
-					return
-				case <-c:
-				}
-			}
-			// if haven't get any new block
-			if currentHeight == s.Blockchain().CurrentBlock().NumberU64() {
-				break
-			}
-		}
-		if syncErr != nil {
-			break
+	syncErr := s.Run(s.DB(), nil, initialCycle)
+	if syncErr != nil {
+		utils.Logger().Error().Err(syncErr).
+			Msgf("[STAGED_SYNC] Sync loop failed (isBeacon: %t, ShardID: %d, error: %s)",
+				s.IsBeacon(), s.Blockchain().ShardID(), syncErr)
+		s.purgeOldBlocksFromCache()
+	}
+	if loopMinTime != 0 {
+		waitTime := loopMinTime - time.Since(start)
+		utils.Logger().Info().
+			Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d)",
+				waitTime, s.IsBeacon(), s.Blockchain().ShardID())
+		c := time.After(waitTime)
+		select {
+		case <-s.Context().Done():
+			return
+		case <-c:
 		}
 	}
+
+	// if canRunCycleInOneTransaction {
+	// 	commitStart := time.Now()
+	// 	errTx := tx.Commit()
+	// 	if errTx != nil {
+	// 		return headBlockHash, errTx
+	// 	}
+	// 	log.Info("Commit cycle", "in", time.Since(commitStart))
+	// }
+
+	// defer close(waitForDone)
+
+	//initialCycle := true
+
+	// for {
+	// 	start := time.Now()
+	// 	otherHeight := s.getMaxPeerHeight(s.IsBeacon())
+	// 	currentHeight := s.Blockchain().CurrentBlock().NumberU64()
+	// 	if currentHeight >= otherHeight {
+	// 		utils.Logger().Info().
+	// 			Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+	// 				s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
+	// 		break
+	// 	}
+	// 	var syncErr error
+	// 	for {
+	// 		currentHeight = s.Blockchain().CurrentBlock().NumberU64()
+	// 		if currentHeight >= otherHeight {
+	// 			break
+	// 		}
+	// 		utils.Logger().Info().
+	// 			Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+	// 				s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
+
+	// 		startHash := s.Blockchain().CurrentBlock().Hash()
+	// 		size := uint32(otherHeight - currentHeight)
+	// 		if size > SyncLoopBatchSize {
+	// 			size = SyncLoopBatchSize
+	// 		}
+
+	// 		// Do one step of staged sync
+	// 		_, syncErr = s.StartStageLoop(startHash[:], size, initialCycle)
+
+	// 		if syncErr != nil {
+	// 			utils.Logger().Error().Err(syncErr).
+	// 				Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+	// 					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
+	// 			s.purgeOldBlocksFromCache()
+	// 			break
+	// 		}
+	// 		initialCycle = false
+	// 		s.purgeOldBlocksFromCache()
+
+	// 		if loopMinTime != 0 {
+	// 			waitTime := loopMinTime - time.Since(start)
+	// 			utils.Logger().Info().
+	// 				Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d, currentHeight: %d)",
+	// 					waitTime, s.IsBeacon(), s.Blockchain().ShardID(), currentHeight)
+	// 			c := time.After(waitTime)
+	// 			select {
+	// 			case <-s.Context().Done():
+	// 				return
+	// 			case <-c:
+	// 			}
+	// 		}
+	// 		// if haven't get any new block
+	// 		if currentHeight == s.Blockchain().CurrentBlock().NumberU64() {
+	// 			break
+	// 		}
+	// 	}
+	// 	if syncErr != nil {
+	// 		break
+	// 	}
+	// }
 	if consensus != nil {
 		if err := s.addConsensusLastMile(s.Blockchain(), consensus); err != nil {
 			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")
@@ -180,118 +228,4 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	}
 	utils.Logger().Info().Msgf("staged sync executed")
 	s.purgeAllBlocksFromCache()
-}
-
-func (s *StagedSync) StartStageLoop(
-	startHash []byte,
-	size uint32,
-	initialCycle bool,
-) (headBlockHash common.Hash, err error) {
-	// db kv.RwDB,
-	// sync *Sync,
-	// highestSeenHeader uint64,
-	// initialCycle bool,
-	// updateHead func(ctx context.Context, head uint64, hash common.Hash, td *uint256.Int),
-	// snapshotMigratorFinal func(tx kv.Tx) error,
-
-	defer func() {
-		if rec := recover(); rec != nil {
-			err = fmt.Errorf("%+v", rec)
-		}
-	}() // avoid crash because Erigon's core does many things
-
-	// var origin, finishProgressBefore uint64
-	// if err := db.View(ctx, func(tx kv.Tx) error {
-	// 	origin, err = stages.GetStageProgress(tx, stages.Headers)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	finishProgressBefore, err = stages.GetStageProgress(tx, stages.Finish)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// }); err != nil {
-	// 	return headBlockHash, err
-	// }
-
-	canRunCycleInOneTransaction := true //!initialCycle && highestSeenHeader-origin < 8096 && highestSeenHeader-finishProgressBefore < 8096
-
-	var tx kv.RwTx // on this variable will run sync cycle.
-	if canRunCycleInOneTransaction {
-		tx, err = s.DB().BeginRw(context.Background())
-		if err != nil {
-			return headBlockHash, err
-		}
-		defer tx.Rollback()
-	}
-
-	err = s.Run(s.DB(), tx, initialCycle, startHash[:], size)
-	if err != nil {
-		return headBlockHash, err
-	}
-	if canRunCycleInOneTransaction {
-		commitStart := time.Now()
-		errTx := tx.Commit()
-		if errTx != nil {
-			return headBlockHash, errTx
-		}
-		log.Info("Commit cycle", "in", time.Since(commitStart))
-	}
-
-	// //if err := bh.configs.db.View(context.Background(), func(ctx kv.Tx) error {
-	// ro, err := s.DB().BeginRo(context.Background())
-	// if err != nil {
-	// 	return headBlockHash, err
-	// }
-	// c, errCursor := ro.Cursor(BlockHashesBucket)
-	// if errCursor != nil {
-	// 	return headBlockHash, errCursor
-	// }
-	// defer c.Close()
-	// for k, v, err := c.First(); k != nil; k, v, err = c.Next() {
-	// 	if err != nil {
-	// 		return headBlockHash, err
-	// 	}
-	// 	confirms, _ := strconv.Atoi(string(v))
-	// 	fmt.Println(k, "--------->", v)
-	// 	fmt.Println(hex.EncodeToString(k), "--------->", confirms)
-	// }
-
-	// var rotx kv.Tx
-	// if rotx, err = db.BeginRo(ctx); err != nil {
-	// 	return headBlockHash, err
-	// }
-	// defer rotx.Rollback()
-
-	// // Update sentry status for peers to see our sync status
-	// var headTd *big.Int
-	// var head uint64
-	// var headHash common.Hash
-	// if head, err = stages.GetStageProgress(rotx, stages.Headers); err != nil {
-	// 	return headBlockHash, err
-	// }
-	// if headHash, err = rawdb.ReadCanonicalHash(rotx, head); err != nil {
-	// 	return headBlockHash, err
-	// }
-	// if headTd, err = rawdb.ReadTd(rotx, headHash, head); err != nil {
-	// 	return headBlockHash, err
-	// }
-	// headBlockHash = rawdb.ReadHeadBlockHash(rotx)
-
-	// if canRunCycleInOneTransaction && snapshotMigratorFinal != nil {
-	// 	err = snapshotMigratorFinal(rotx)
-	// 	if err != nil {
-	// 		log.Error("snapshot migration failed", "err", err)
-	// 	}
-	// }
-	// rotx.Rollback()
-
-	// headTd256, overflow := uint256.FromBig(headTd)
-	// if overflow {
-	// 	return headBlockHash, fmt.Errorf("headTds higher than 2^256-1")
-	// }
-	// updateHead(ctx, head, headHash, headTd256)
-
-	return headBlockHash, nil
 }

@@ -35,8 +35,9 @@ type (
 	}
 
 	SyncCycle struct {
-		StartHash []byte
-		Size      uint32
+		StartHash    []byte
+		Size         uint32
+		TargetHeight uint64
 	}
 )
 

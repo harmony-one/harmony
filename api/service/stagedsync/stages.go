@@ -30,52 +30,65 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-// SyncStage represents the stages of syncronisation in the Mode.StagedSync mode
+// SyncStageID represents the stages of syncronisation in the Mode.StagedSync mode
 // It is used to persist the information about the stage state into the database.
 // It should not be empty and should be unique.
-type SyncStage string
+type SyncStageID string
 
 var (
-	Headers     SyncStage = "Headers"     // Headers are downloaded
-	BlockHashes SyncStage = "BlockHashes" // Headers hashes are downloaded from peers
-	TasksQueue  SyncStage = "TasksQueue"  // Generate Tasks Queue 
-	Bodies      SyncStage = "Bodies"      // Block bodies are downloaded, TxHash and UncleHash are getting verified
-	Finish      SyncStage = "Finish"      // Nominal stage after all other stages
+	Headers     SyncStageID = "Headers"     // Headers are downloaded
+	BlockHashes SyncStageID = "BlockHashes" // Headers hashes are downloaded from peers
+	TasksQueue  SyncStageID = "TasksQueue"  // Generate Tasks Queue
+	Bodies      SyncStageID = "Bodies"      // Block bodies are downloaded, TxHash and UncleHash are getting verified
+	States      SyncStageID = "States"      // will construct most recent state from downloaded blocks
+	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
 )
 
-var AllStages = []SyncStage{
+var AllStages = []SyncStageID{
 	Headers,
 	BlockHashes,
 	TasksQueue,
 	Bodies,
+	States,
 	Finish,
 }
 
-// GetStageProgress retrieves saved progress of given sync stage from the database
-func GetStageProgress(db kv.Getter, stage SyncStage) (uint64, error) {
+func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
+	name := stage
+	if isBeacon {
+		name = "beacon_" + name
+	}
+	if prune {
+		name = "prune_" + name
+	}
+	return []byte(name)
+}
 
-	v, err := db.GetOne(kv.SyncStageProgress, []byte(stage))
+// GetStageProgress retrieves saved progress of given sync stage from the database
+func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
+
+	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage,isBeacon,false))
 	if err != nil {
 		return 0, err
 	}
 	return unmarshalData(v)
 }
 
-func SaveStageProgress(db kv.Putter, stage SyncStage, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, []byte(stage), marshalData(progress))
+func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
+	return db.Put(kv.SyncStageProgress, GetStageID(stage,isBeacon,false), marshalData(progress))
 }
 
 // GetStagePruneProgress retrieves saved progress of given sync stage from the database
-func GetStagePruneProgress(db kv.Getter, stage SyncStage) (uint64, error) {
-	v, err := db.GetOne(kv.SyncStageProgress, []byte("prune_"+stage))
+func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
+	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage,isBeacon,true))
 	if err != nil {
 		return 0, err
 	}
 	return unmarshalData(v)
 }
 
-func SaveStagePruneProgress(db kv.Putter, stage SyncStage, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, []byte("prune_"+stage), marshalData(progress))
+func SaveStagePruneProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
+	return db.Put(kv.SyncStageProgress, GetStageID(stage,isBeacon,true), marshalData(progress))
 }
 
 func marshalData(blockNumber uint64) []byte {

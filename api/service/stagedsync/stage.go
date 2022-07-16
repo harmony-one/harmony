@@ -33,7 +33,7 @@ type StageHandler interface {
 // Stage is a single sync stage in staged sync.
 type Stage struct {
 	// ID of the sync stage. Should not be empty and should be unique. It is recommended to prefix it with reverse domain to avoid clashes (`com.example.my-stage`).
-	ID SyncStage
+	ID SyncStageID
 	// Handler handles the logic for the stage
 	Handler StageHandler
 	// Description is a string that is shown in the logs.
@@ -50,7 +50,7 @@ var ErrUnwind = errors.New("unwound")
 // StageState is the state of the stage.
 type StageState struct {
 	state       *StagedSync
-	ID          SyncStage
+	ID          SyncStageID
 	BlockNumber uint64 // BlockNumber is the current block number of the stage at the beginning of the state execution.
 }
 
@@ -61,10 +61,10 @@ func (s *StageState) Update(db kv.Putter, newBlockNum uint64) error {
 	// if m, ok := syncMetrics[s.ID]; ok {
 	// 	m.Set(newBlockNum)
 	// }
-	return SaveStageProgress(db, s.ID, newBlockNum)
+	return SaveStageProgress(db, s.ID, s.state.isBeacon, newBlockNum)
 }
 func (s *StageState) UpdatePrune(db kv.Putter, blockNum uint64) error {
-	return SaveStagePruneProgress(db, s.ID, blockNum)
+	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, blockNum)
 }
 
 // Unwinder allows the stage to cause an unwind.
@@ -75,7 +75,7 @@ type Unwinder interface {
 
 // UnwindState contains the information about unwind.
 type UnwindState struct {
-	ID SyncStage
+	ID SyncStageID
 	// UnwindPoint is the block to unwind to.
 	UnwindPoint        uint64
 	CurrentBlockNumber uint64
@@ -88,11 +88,11 @@ func (u *UnwindState) LogPrefix() string { return u.state.LogPrefix() }
 
 // Done updates the DB state of the stage.
 func (u *UnwindState) Done(db kv.Putter) error {
-	return SaveStageProgress(db, u.ID, u.UnwindPoint)
+	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.UnwindPoint)
 }
 
 type PruneState struct {
-	ID              SyncStage
+	ID              SyncStageID
 	ForwardProgress uint64 // progress of stage forward move
 	PruneProgress   uint64 // progress of stage prune move. after sync cycle it become equal to ForwardProgress by Done() method
 	state           *StagedSync
@@ -100,10 +100,10 @@ type PruneState struct {
 
 func (s *PruneState) LogPrefix() string { return s.state.LogPrefix() + " Prune" }
 func (s *PruneState) Done(db kv.Putter) error {
-	return SaveStagePruneProgress(db, s.ID, s.ForwardProgress)
+	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, s.ForwardProgress)
 }
 func (s *PruneState) DoneAt(db kv.Putter, blockNum uint64) error {
-	return SaveStagePruneProgress(db, s.ID, blockNum)
+	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, blockNum)
 }
 
 // PruneTable has `limit` parameter to avoid too large data deletes per one sync cycle - better delete by small portions to reduce db.FreeList size
