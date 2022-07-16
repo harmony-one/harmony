@@ -41,6 +41,7 @@ var (
 	TasksQueue  SyncStageID = "TasksQueue"  // Generate Tasks Queue
 	Bodies      SyncStageID = "Bodies"      // Block bodies are downloaded, TxHash and UncleHash are getting verified
 	States      SyncStageID = "States"      // will construct most recent state from downloaded blocks
+	LastMile    SyncStageID = "LastMile"    // update blocks after sync and update last mile blocks as well
 	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
 )
 
@@ -50,6 +51,7 @@ var AllStages = []SyncStageID{
 	TasksQueue,
 	Bodies,
 	States,
+	LastMile,
 	Finish,
 }
 
@@ -67,7 +69,7 @@ func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
 // GetStageProgress retrieves saved progress of given sync stage from the database
 func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
 
-	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage,isBeacon,false))
+	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage, isBeacon, false))
 	if err != nil {
 		return 0, err
 	}
@@ -75,12 +77,12 @@ func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, e
 }
 
 func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, GetStageID(stage,isBeacon,false), marshalData(progress))
+	return db.Put(kv.SyncStageProgress, GetStageID(stage, isBeacon, false), marshalData(progress))
 }
 
 // GetStagePruneProgress retrieves saved progress of given sync stage from the database
 func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
-	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage,isBeacon,true))
+	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage, isBeacon, true))
 	if err != nil {
 		return 0, err
 	}
@@ -88,7 +90,7 @@ func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint
 }
 
 func SaveStagePruneProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, GetStageID(stage,isBeacon,true), marshalData(progress))
+	return db.Put(kv.SyncStageProgress, GetStageID(stage, isBeacon, true), marshalData(progress))
 }
 
 func marshalData(blockNumber uint64) []byte {

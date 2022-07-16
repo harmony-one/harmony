@@ -52,17 +52,17 @@ func CreateStagedSync(
 
 	headersCfg := NewStageHeadersCfg(ctx, db)
 	blockHashesCfg := NewStageBlockHashesCfg(ctx, db)
-	taskQueueCfg := NewStageTasksQueueCfg(ctx, db)
 	bodiesCfg := NewStageBodiesCfg(ctx, bc, db)
 	statesCfg := NewStageStatesCfg(ctx, bc, db)
+	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)
 
 	stages := DefaultStages(ctx,
 		headersCfg,
 		blockHashesCfg,
-		taskQueueCfg,
 		bodiesCfg,
 		statesCfg,
+		lastMileCfg,
 		finishCfg,
 	)
 

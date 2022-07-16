@@ -15,27 +15,27 @@ type PruneOrder []SyncStageID
 var DefaultForwardOrder = ForwardOrder{
 	Headers,
 	BlockHashes,
-	TasksQueue,
 	Bodies,
 	// Stages below don't use Internet
 	States,
+	LastMile,
 	Finish,
 }
 
 var DefaultUnwindOrder = UnwindOrder{
 	Finish,
+	LastMile,
 	States,
 	Bodies,
-	TasksQueue,
 	BlockHashes,
 	Headers,
 }
 
 var DefaultPruneOrder = PruneOrder{
 	Finish,
+	LastMile,
 	States,
 	Bodies,
-	TasksQueue,
 	BlockHashes,
 	Headers,
 }
@@ -43,16 +43,16 @@ var DefaultPruneOrder = PruneOrder{
 func DefaultStages(ctx context.Context,
 	headersCfg StageHeadersCfg,
 	blockHashesCfg StageBlockHashesCfg,
-	taskQueueCfg StageTasksQueueCfg,
 	bodiesCfg StageBodiesCfg,
 	statesCfg StageStatesCfg,
+	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg) []*Stage {
 
 	handlerStageHeaders := NewStageHeders(headersCfg)
 	handlerStageBlockHashes := NewStageBlockHashes(blockHashesCfg)
-	handlerStageTaskQueue := NewStageTasksQueue(taskQueueCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handleStageStates := NewStageStates(statesCfg)
+	handlerStageLastMile := NewStageLastMile(lastMileCfg)
 	handlerStageFinish := NewStageFinish(finishCfg)
 
 	return []*Stage{
@@ -67,19 +67,19 @@ func DefaultStages(ctx context.Context,
 			Handler:     handlerStageBlockHashes,
 		},
 		{
-			ID:          TasksQueue,
-			Description: "Generate tasks queue",
-			Handler:     handlerStageTaskQueue,
-		},
-		{
 			ID:          Bodies,
 			Description: "Download block bodies",
 			Handler:     handlerStageBodies,
 		},
 		{
 			ID:          States,
-			Description: "Final: insert new blocks and update blockchain states",
+			Description: "insert new blocks and update blockchain states",
 			Handler:     handleStageStates,
+		},
+		{
+			ID:          LastMile,
+			Description: "update status for blocks after sync and update last mile blocks as well",
+			Handler:     handlerStageLastMile,
 		},
 		{
 			ID:          Finish,

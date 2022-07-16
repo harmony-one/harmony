@@ -139,7 +139,6 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 				continue
 			}
 			key := strconv.FormatUint(p+1, 10)
-			// fmt.Println(configPeer.port, "========[block]==================>", key, ":", id)
 			if err := tx.Put(BlockHashesBucket, []byte(key), blockHash); err != nil {
 				utils.Logger().Warn().
 					Err(err).
