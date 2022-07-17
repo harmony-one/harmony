@@ -16,10 +16,11 @@ install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
-  - git clone https://github.com/harmony-one/mcl.git $HOME/gopath/src/github.com/harmony-one/mcl
-  - git clone https://github.com/harmony-one/bls.git $HOME/gopath/src/github.com/harmony-one/bls
-  - (cd $HOME/gopath/src/github.com/harmony-one/mcl; make -j4)
-  - (cd $HOME/gopath/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
+  - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
+  - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
+  - git clone https://github.com/harmony-one/harmony-test $GOPATH/src/github.com/harmony-one/harmony-test
+  - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
+  - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
   - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
   - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
   - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
