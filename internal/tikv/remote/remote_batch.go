@@ -27,16 +27,14 @@ type RemoteBatch struct {
 
 	db *RemoteDatabase
 
-	size    int
-	valMap  map[string]*valueInfo
-	valData []byte
+	size   int
+	valMap map[string]*valueInfo
 }
 
 func newRemoteBatch(db *RemoteDatabase) *RemoteBatch {
 	return &RemoteBatch{
-		db:      db,
-		valMap:  make(map[string]*valueInfo),
-		valData: make([]byte, 128*1024), // init 128kb
+		db:     db,
+		valMap: make(map[string]*valueInfo),
 	}
 }
 
