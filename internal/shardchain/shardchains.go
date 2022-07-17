@@ -54,7 +54,7 @@ type CollectionImpl struct {
 // dbInit is the shard chain initializer to use when the database returned by
 // the factory is brand new (empty).
 func NewCollection(
-	harmonyconfig *harmonyconfig.HarmonyConfig, 
+	harmonyconfig *harmonyconfig.HarmonyConfig,
 	dbFactory DBFactory, dbInit DBInitializer, engine engine.Engine,
 	chainConfig *params.ChainConfig,
 ) *CollectionImpl {
