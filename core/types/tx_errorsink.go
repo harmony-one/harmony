@@ -59,6 +59,7 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 		utils.Logger().Debug().
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
+			Err(err).
 			Msgf("Added plain transaction error message")
 	} else if ethTx, ok := tx.(*EthTransaction); ok {
 		hash := ethTx.Hash().String()
@@ -70,6 +71,7 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 		utils.Logger().Debug().
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
+			Err(err).
 			Msgf("Added eth transaction error message")
 	} else if stakingTx, ok := tx.(*staking.StakingTransaction); ok {
 		hash := stakingTx.Hash().String()
@@ -82,11 +84,13 @@ func (sink *TransactionErrorSink) Add(tx PoolTransaction, err error) {
 		utils.Logger().Debug().
 			Str("tag", logTag).
 			Interface("tx-hash-id", hash).
+			Err(err).
 			Msgf("Added staking transaction error message")
 	} else {
 		utils.Logger().Error().
 			Str("tag", logTag).
 			Interface("tx", tx).
+			Err(err).
 			Msg("Attempted to add an unknown transaction type")
 	}
 }
