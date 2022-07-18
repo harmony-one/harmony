@@ -266,5 +266,12 @@ func init() {
 		confTree.Set("Version", "2.5.4")
 		return confTree
 	}
+	migrations["2.5.4"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("TxPool.GlobalSlots") == nil {
+			confTree.Set("TxPool.GlobalSlots", defaultConfig.TxPool.GlobalSlots)
+		}
+		confTree.Set("Version", "2.5.5")
+		return confTree
+	}
 
 }

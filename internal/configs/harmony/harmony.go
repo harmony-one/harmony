@@ -102,6 +102,7 @@ type TxPoolConfig struct {
 	RosettaFixFile    string
 	AccountSlots      uint64
 	LocalAccountsFile string
+	GlobalSlots       uint64
 }
 
 type PprofConfig struct {
