@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.4" // bump from 2.5.2 for rpc filters
+const tomlConfigVersion = "2.5.5"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -74,6 +74,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		RosettaFixFile:    "",
 		AccountSlots:      16,
 		LocalAccountsFile: "./.hmy/locals.txt",
+		GlobalSlots:       5120,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
