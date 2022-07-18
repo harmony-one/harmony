@@ -163,6 +163,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		// }
 		_, err = stg.configs.bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 		if err != nil {
+			// TODO: handle chain roll back because of bad block
 			utils.Logger().Error().
 				Err(err).
 				Msgf(

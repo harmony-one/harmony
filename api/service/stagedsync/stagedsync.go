@@ -67,6 +67,8 @@ type StagedSync struct {
 	// Maximum number of blocks per each cycle. if set to zero, all blocks will be
 	// downloaded and synced in one full cycle.
 	MaxBlocksPerSyncCycle uint64
+	// use mem db for staged sync, set to false to use disk
+	UseMemDB bool
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -208,6 +210,7 @@ func New(ctx context.Context,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
 	pruneOrder PruneOrder,
+	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64) *StagedSync {
 
@@ -253,6 +256,7 @@ func New(ctx context.Context,
 		downloadedBlocks:       make(map[string][]byte),
 		lastMileBlocks:         []*types.Block{},
 		syncConfig:             &SyncConfig{},
+		UseMemDB:               UseMemDB,
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 	}
@@ -1122,70 +1126,6 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc *core.BlockCha
 	return nil
 }
 
-// generateNewState will construct most recent state from downloaded blocks
-func (ss *StagedSync) generateNewState(bc *core.BlockChain) error {
-	// update blocks created before node start sync
-	parentHash := bc.CurrentBlock().Hash()
-
-	var err error
-
-	commonIter := ss.getCommonBlockIter(parentHash)
-	for {
-		block := commonIter.Next()
-		if block == nil {
-			break
-		}
-		// Enforce sig check for the last block in a batch
-		enforceSigCheck := !commonIter.HasNext()
-		err = ss.UpdateBlockAndStatus(block, bc, enforceSigCheck)
-		if err != nil {
-			break
-		}
-	}
-
-	ss.syncMux.Lock()
-	ss.downloadedBlocks = make(map[string][]byte)
-	ss.commonBlocks = make(map[int]*types.Block)
-	ss.syncMux.Unlock()
-
-	// update blocks after node start sync
-	parentHash = bc.CurrentBlock().Hash()
-	for {
-		block := ss.getMaxConsensusBlockFromParentHash(parentHash)
-		if block == nil {
-			break
-		}
-		err = ss.UpdateBlockAndStatus(block, bc, true)
-		if err != nil {
-			break
-		}
-		parentHash = block.Hash()
-	}
-	// TODO ek – Do we need to hold syncMux now that syncConfig has its own mutex?
-	ss.syncMux.Lock()
-	ss.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
-		peer.newBlocks = []*types.Block{}
-		return
-	})
-	ss.syncMux.Unlock()
-
-	// update last mile blocks if any
-	parentHash = bc.CurrentBlock().Hash()
-	for {
-		block := ss.getBlockFromLastMileBlocksByParentHash(parentHash)
-		if block == nil {
-			break
-		}
-		err = ss.UpdateBlockAndStatus(block, bc, false)
-		if err != nil {
-			break
-		}
-		parentHash = block.Hash()
-	}
-
-	return err
-}
-
 // RegisterNodeInfo will register node to peers to accept future new block broadcasting
 // return number of successful registration
 func (ss *StagedSync) RegisterNodeInfo() int {
@@ -1277,51 +1217,6 @@ func (ss *StagedSync) GetMaxPeerHeight() uint64 {
 	mph, _ := ss.getMaxPeerHeight(false)
 	return mph
 }
-
-// // SyncLoop will keep syncing with peers until catches up
-// func (ss *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
-// 	if !isBeacon {
-// 		ss.RegisterNodeInfo()
-// 	}
-// 	for {
-// 		otherHeight := ss.getMaxPeerHeight(isBeacon)
-// 		currentHeight := bc.CurrentBlock().NumberU64()
-// 		if currentHeight >= otherHeight {
-// 			utils.Logger().Info().
-// 				Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-// 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-// 			break
-// 		}
-// 		utils.Logger().Info().
-// 			Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-// 				isBeacon, bc.ShardID(), otherHeight, currentHeight)
-
-// 		startHash := bc.CurrentBlock().Hash()
-// 		size := uint32(otherHeight - currentHeight)
-// 		if size > SyncLoopBatchSize {
-// 			size = SyncLoopBatchSize
-// 		}
-// 		err := ss.ProcessStateSync(startHash[:], size, bc, worker)
-// 		if err != nil {
-// 			utils.Logger().Error().Err(err).
-// 				Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-// 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
-// 			ss.purgeOldBlocksFromCache()
-// 			break
-// 		}
-// 		ss.purgeOldBlocksFromCache()
-// 	}
-// 	if consensus != nil {
-// 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
-// 			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")
-// 		}
-// 		// TODO: move this to explorer handler code.
-// 		if ss.isExplorer {
-// 			consensus.UpdateConsensusInformation()
-// 		}
-// 	}
-// 	ss.purgeAllBlocksFromCache()
-// }
 
 func (ss *StagedSync) addConsensusLastMile(bc *core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()

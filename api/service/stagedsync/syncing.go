@@ -43,13 +43,19 @@ func CreateStagedSync(
 	role nodeconfig.Role,
 	isBeacon bool,
 	isExplorer bool,
+	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
-	db := memdb.New()
-	//db := mdbx.NewMDBX(log.New()).Path("./test_db") .MustOpen()
+	var db kv.RwDB
+	if UseMemDB {
+		db = memdb.New()
+	} else {
+		//db := mdbx.NewMDBX(log.New()).Path("./test_db") .MustOpen()
+		return nil, fmt.Errorf("Staged sync doesn't not supported disk yet")
+	}
 
 	if errInitDB := initDB(ctx, db); errInitDB != nil {
 		return nil, errInitDB
@@ -85,6 +91,7 @@ func CreateStagedSync(
 		stages,
 		DefaultUnwindOrder,
 		DefaultPruneOrder,
+		UseMemDB,
 		doubleCheckBlockHashes,
 		maxBlocksPerCycle,
 	), nil
@@ -170,68 +177,6 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 
 	// defer close(waitForDone)
 
-	//initialCycle := true
-
-	// for {
-	// 	start := time.Now()
-	// 	otherHeight := s.getMaxPeerHeight(s.IsBeacon())
-	// 	currentHeight := s.Blockchain().CurrentBlock().NumberU64()
-	// 	if currentHeight >= otherHeight {
-	// 		utils.Logger().Info().
-	// 			Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-	// 				s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-	// 		break
-	// 	}
-	// 	var syncErr error
-	// 	for {
-	// 		currentHeight = s.Blockchain().CurrentBlock().NumberU64()
-	// 		if currentHeight >= otherHeight {
-	// 			break
-	// 		}
-	// 		utils.Logger().Info().
-	// 			Msgf("[STAGED_SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-	// 				s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-
-	// 		startHash := s.Blockchain().CurrentBlock().Hash()
-	// 		size := uint32(otherHeight - currentHeight)
-	// 		if size > SyncLoopBatchSize {
-	// 			size = SyncLoopBatchSize
-	// 		}
-
-	// 		// Do one step of staged sync
-	// 		_, syncErr = s.StartStageLoop(startHash[:], size, initialCycle)
-
-	// 		if syncErr != nil {
-	// 			utils.Logger().Error().Err(syncErr).
-	// 				Msgf("[STAGED_SYNC] ProcessStateSync failed (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-	// 					s.IsBeacon(), s.Blockchain().ShardID(), otherHeight, currentHeight)
-	// 			s.purgeOldBlocksFromCache()
-	// 			break
-	// 		}
-	// 		initialCycle = false
-	// 		s.purgeOldBlocksFromCache()
-
-	// 		if loopMinTime != 0 {
-	// 			waitTime := loopMinTime - time.Since(start)
-	// 			utils.Logger().Info().
-	// 				Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d, currentHeight: %d)",
-	// 					waitTime, s.IsBeacon(), s.Blockchain().ShardID(), currentHeight)
-	// 			c := time.After(waitTime)
-	// 			select {
-	// 			case <-s.Context().Done():
-	// 				return
-	// 			case <-c:
-	// 			}
-	// 		}
-	// 		// if haven't get any new block
-	// 		if currentHeight == s.Blockchain().CurrentBlock().NumberU64() {
-	// 			break
-	// 		}
-	// 	}
-	// 	if syncErr != nil {
-	// 		break
-	// 	}
-	// }
 	if consensus != nil {
 		if err := s.addConsensusLastMile(s.Blockchain(), consensus); err != nil {
 			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")

@@ -82,6 +82,7 @@ type ConfigType struct {
 	IsOffline              bool
 	Downloader             bool // Whether stream downloader is running; TODO: remove this after sync up
 	StagedSync             bool // use staged sync
+	UseMemDB               bool // use mem db for staged sync
 	DoubleCheckBlockHashes bool
 	MaxBlocksPerSyncCycle  uint64 // Maximum number of blocks per each cycle. if set to zero, all blocks will be  downloaded and synced in one full cycle.
 	NtpServer              string

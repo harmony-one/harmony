@@ -586,6 +586,7 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	nodeConfig.IsOffline = hc.General.IsOffline
 	nodeConfig.Downloader = hc.Sync.Downloader
 	nodeConfig.StagedSync = hc.Sync.StagedSync
+	nodeConfig.UseMemDB = hc.Sync.StagedSyncCfg.UseMemDB
 	nodeConfig.DoubleCheckBlockHashes = hc.Sync.StagedSyncCfg.DoubleCheckBlockHashes
 	nodeConfig.MaxBlocksPerSyncCycle = hc.Sync.StagedSyncCfg.MaxBlocksPerSyncCycle
 
