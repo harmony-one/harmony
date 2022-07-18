@@ -37,9 +37,8 @@ type SyncStageID string
 
 var (
 	Headers     SyncStageID = "Headers"     // Headers are downloaded
-	BlockHashes SyncStageID = "BlockHashes" // Headers hashes are downloaded from peers
-	TasksQueue  SyncStageID = "TasksQueue"  // Generate Tasks Queue
-	Bodies      SyncStageID = "Bodies"      // Block bodies are downloaded, TxHash and UncleHash are getting verified
+	BlockHashes SyncStageID = "BlockHashes" // block hashes are downloaded from peers
+	BlockBodies SyncStageID = "BlockBodies" // Block bodies are downloaded, TxHash and UncleHash are getting verified
 	States      SyncStageID = "States"      // will construct most recent state from downloaded blocks
 	LastMile    SyncStageID = "LastMile"    // update blocks after sync and update last mile blocks as well
 	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
@@ -48,14 +47,13 @@ var (
 var AllStages = []SyncStageID{
 	Headers,
 	BlockHashes,
-	TasksQueue,
-	Bodies,
+	BlockBodies,
 	States,
 	LastMile,
 	Finish,
 }
 
-func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
+func GetStageName(stage string, isBeacon bool, prune bool) string {
 	name := stage
 	if isBeacon {
 		name = "beacon_" + name
@@ -63,7 +61,19 @@ func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
 	if prune {
 		name = "prune_" + name
 	}
-	return []byte(name)
+	return name
+}
+
+func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
+	return []byte(GetStageName(string(stage), isBeacon, prune))
+}
+
+func GetBucketName(bucket_name string, isBeacon bool) string {
+	name := bucket_name
+	if isBeacon {
+		name = "Beacon" + name
+	}
+	return name
 }
 
 // GetStageProgress retrieves saved progress of given sync stage from the database

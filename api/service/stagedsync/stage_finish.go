@@ -29,7 +29,27 @@ func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
 }
 
 func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
-	//return s.state.generateNewState(s.state.Blockchain())
+	useExternalTx := tx != nil
+	if !useExternalTx {
+		var err error
+		tx, err = finish.configs.db.BeginRw(context.Background())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+
+	// hashesBucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+	// tx.ClearBucket(hashesBucketName)
+	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
+	tx.ClearBucket(blocksBucketName)
+
+	if !useExternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -83,6 +83,7 @@ type ConfigType struct {
 	Downloader             bool // Whether stream downloader is running; TODO: remove this after sync up
 	StagedSync             bool // use staged sync
 	DoubleCheckBlockHashes bool
+	MaxBlocksPerSyncCycle  uint64 // Maximum number of blocks per each cycle. if set to zero, all blocks will be  downloaded and synced in one full cycle.
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`

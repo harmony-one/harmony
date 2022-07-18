@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
@@ -18,6 +19,7 @@ type StageHeaders struct {
 
 type StageHeadersCfg struct {
 	ctx context.Context
+	bc  *core.BlockChain
 	db  kv.RwDB
 }
 
@@ -27,17 +29,22 @@ func NewStageHeders(cfg StageHeadersCfg) *StageHeaders {
 	}
 }
 
-func NewStageHeadersCfg(ctx context.Context, db kv.RwDB) StageHeadersCfg {
+func NewStageHeadersCfg(ctx context.Context, bc *core.BlockChain, db kv.RwDB) StageHeadersCfg {
 	return StageHeadersCfg{
 		ctx: ctx,
+		bc:  bc,
 		db:  db,
 	}
 }
 
 func (headers *StageHeaders) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+
+	if len(s.state.syncConfig.peers) == 0 {
+		return fmt.Errorf("haven't connected to any peer yet!")
+	}
 	otherHeight := uint64(0)
 	if errV := headers.configs.db.View(headers.configs.ctx, func(etx kv.Tx) (err error) {
-		if otherHeight, err = GetStageProgress(etx, Headers, s.state.isBeacon); err != nil {
+		if otherHeight, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
 		return nil
@@ -54,31 +61,37 @@ func (headers *StageHeaders) Exec(firstCycle bool, badBlockUnwind bool, s *Stage
 		}
 		defer tx.Rollback()
 	}
-	fmt.Println("current block height:", s.state.Blockchain().CurrentBlock().NumberU64())
-	if otherHeight <= s.state.Blockchain().CurrentBlock().NumberU64() {
+	fmt.Println("current block height:", headers.configs.bc.CurrentBlock().NumberU64())
+	if otherHeight <= headers.configs.bc.CurrentBlock().NumberU64() {
 		maxPeersHeight, err := s.state.getMaxPeerHeight(s.state.IsBeacon())
 		if err != nil {
 			return err
 		}
 		fmt.Println("max peers height:", maxPeersHeight)
-		if maxPeersHeight <= s.state.Blockchain().CurrentBlock().NumberU64() {
+		if maxPeersHeight <= headers.configs.bc.CurrentBlock().NumberU64() {
 			s.state.Done()
 			return nil
 		}
 		otherHeight = maxPeersHeight
 	}
 
-	currentHeight := s.state.Blockchain().CurrentBlock().NumberU64()
+	currentHeight := headers.configs.bc.CurrentBlock().NumberU64()
 	if currentHeight >= otherHeight {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				s.state.IsBeacon(), s.state.Blockchain().ShardID(), otherHeight, currentHeight)
+				s.state.IsBeacon(), headers.configs.bc.ShardID(), otherHeight, currentHeight)
 		s.state.Done()
 		return nil
 	}
 
 	// GetStageProgress(headers.configs.db, Headers)
-	if err := SaveStageProgress(tx, Headers, s.state.isBeacon, 200 /*---->TODO: replace with otherHeight*/); err != nil {
+	maxBlocksPerSyncCycle := s.state.MaxBlocksPerSyncCycle
+	fmt.Println("max blocks per sync cycle is", maxBlocksPerSyncCycle)
+	targetHeight := otherHeight
+	if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
+		targetHeight = currentHeight + maxBlocksPerSyncCycle
+	}
+	if err := s.Update(tx, targetHeight); err != nil { //SaveStageProgress(tx, Headers, s.state.isBeacon, targetHeight); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving progress for headers stage failed: %v", err)
 		return err

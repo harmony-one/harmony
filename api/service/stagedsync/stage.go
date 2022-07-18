@@ -56,6 +56,14 @@ type StageState struct {
 
 func (s *StageState) LogPrefix() string { return s.state.LogPrefix() }
 
+func (s *StageState) CurrentStageProgress(db kv.Getter) (uint64, error) {
+	return GetStageProgress(db, s.ID, s.state.isBeacon)
+}
+
+func (s *StageState) StageProgress(db kv.Getter, id SyncStageID) (uint64, error) {
+	return GetStageProgress(db, id, s.state.isBeacon)
+}
+
 // Update updates the stage state (current block number) in the database. Can be called multiple times during stage execution.
 func (s *StageState) Update(db kv.Putter, newBlockNum uint64) error {
 	// if m, ok := syncMetrics[s.ID]; ok {

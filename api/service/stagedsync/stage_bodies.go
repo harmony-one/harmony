@@ -1,7 +1,6 @@
 package stagedsync
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -9,14 +8,11 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/pkg/errors"
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/harmony-one/harmony/core"
-	"github.com/harmony-one/harmony/core/types"
-	"github.com/harmony-one/harmony/internal/chain"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
@@ -55,8 +51,14 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		if targetHeight, err = GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
 			return err
 		}
-		if currProgress, err = GetStageProgress(etx, Bodies, isBeacon); err != nil {
+		if currProgress, err = s.CurrentStageProgress(etx); err != nil { //GetStageProgress(etx, Bodies, isBeacon); err != nil {
 			return err
+		}
+		if currProgress == 0 {
+			if err := b.clearBlocksBucket(nil, s.state.isBeacon); err != nil {
+				return err
+			}
+			currProgress = b.configs.bc.CurrentBlock().NumberU64()
 		}
 		return nil
 	}); errV != nil {
@@ -68,17 +70,16 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	}
 
 	size := uint64(0)
-	currProgress++
-	
-	fmt.Print("\033[s") // save the cursor position
+	// currProgress++
 
+	fmt.Print("\033[s") // save the cursor position
 	for ok := true; ok; ok = currProgress < targetHeight {
-		maxSize := targetHeight - currProgress + 1
+		maxSize := targetHeight - currProgress
 		size = uint64(downloadTaskBatch * len(s.state.syncConfig.peers))
 		if size > maxSize {
 			size = maxSize
 		}
-		if err = b.loadBlockHashesToTaskQueue(s, currProgress, size, nil); err != nil {
+		if err = b.loadBlockHashesToTaskQueue(s, currProgress+1, size, nil); err != nil {
 			return err
 		}
 
@@ -91,7 +92,6 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		if err = b.downloadBlocks(s, verifyAllSig, nil); err != nil {
 			return nil
 		}
-
 		// save blocks and update current progress
 		if currProgress, err = b.saveDownloadedBlocks(s, currProgress, nil); err != nil {
 			return err
@@ -109,6 +109,29 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	return nil
 }
 
+func (b *StageBodies) clearBlocksBucket(tx kv.RwTx, isBeacon bool) error {
+	useExternalTx := tx != nil
+	if !useExternalTx {
+		var err error
+		tx, err = b.configs.db.BeginRw(context.Background())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+	bucketName := GetBucketName(DownloadedBlocksBucket, isBeacon)
+	if err := tx.ClearBucket(bucketName); err != nil {
+		return err
+	}
+
+	if !useExternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // downloadBlocks downloads blocks from state sync task queue.
 func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwTx) (err error) {
 	ss := s.state
@@ -116,7 +139,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 	var wg sync.WaitGroup
 	count := 0
 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
-	s.state.downloadedBlocks = make(map[int][]byte)
+	s.state.downloadedBlocks = make(map[string][]byte)
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
@@ -226,78 +249,12 @@ func (b *StageBodies) handleBlockSyncResult(s *StageState, payload [][]byte, tas
 	defer s.state.syncMux.Unlock()
 
 	for i, blockBytes := range payload {
-		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
-		if err != nil {
-			utils.Logger().Warn().
-				Err(err).
-				Int("taskIndex", tasks[i].index).
-				Str("taskBlock", hex.EncodeToString(tasks[i].blockHash)).
-				Msg("download block")
-			failedTasks = append(failedTasks, tasks[i])
-			continue
-		}
-		gotHash := block.Hash()
-		if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
-			utils.Logger().Warn().
-				Err(errors.New("wrong block delivery")).
-				Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
-				Str("gotHash", hex.EncodeToString(gotHash[:]))
-			failedTasks = append(failedTasks, tasks[i])
-			continue
-		}
-		// Verify block signatures
-		if block.NumberU64() > 1 {
-			// Verify signature every 100 blocks
-			haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
-			verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
-			verifyCurrentSig := verifyAllSig && haveCurrentSig
-			bc := b.configs.bc
-			if err = b.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
-				failedTasks = append(failedTasks, tasks[i])
-				continue
-			}
-		}
-		const sz = unsafe.Sizeof(*block)
-		blockRawBytes := *(*[sz]byte)(unsafe.Pointer(block))
-		k := tasks[i].index //strconv.FormatInt(int64(tasks[i].index), 10)
-		s.state.downloadedBlocks[k] = blockRawBytes[:]
+		k := fmt.Sprintf("%020d", tasks[i].index) //block.NumberU64())
+		s.state.downloadedBlocks[k] = make([]byte, len(blockBytes))
+		copy(s.state.downloadedBlocks[k], blockBytes[:])
 	}
 
 	return failedTasks, nil
-}
-
-//verifyBlockSignatures verifies block signatures
-func (b *StageBodies) verifyBlockSignatures(bc *core.BlockChain, block *types.Block, verifyCurrentSig bool, verifySeal bool, verifyAllSig bool) (err error) {
-	if verifyCurrentSig {
-		sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
-		if err != nil {
-			return errors.Wrap(err, "parse commitSigAndBitmap")
-		}
-
-		startTime := time.Now()
-		if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
-			return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
-		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[STAGED_SYNC] VerifyHeaderSignature")
-	}
-	// err = bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
-	// if err == engine.ErrUnknownAncestor {
-	// 	return err
-	// } else if err != nil {
-	// 	utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
-
-	// 	if !verifyAllSig {
-	// 		utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-	// 		for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-	// 			if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-	// 				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-	// 				return err
-	// 			}
-	// 		}
-	// 	}
-	// 	return err
-	// }
-	return nil
 }
 
 func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (err error) {
@@ -328,13 +285,13 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 
 func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64, tx kv.RwTx) error {
 	s.state.stateSyncTaskQueue = queue.New(0)
-
 	if errV := b.configs.db.View(b.configs.ctx, func(etx kv.Tx) error {
 
 		for i := startIndex; i < startIndex+size; i++ {
 			key := strconv.FormatUint(i, 10)
 			id := int(i - startIndex)
-			blockHash, err := etx.GetOne(BlockHashesBucket, []byte(key))
+			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+			blockHash, err := etx.GetOne(bucketName, []byte(key))
 			if err != nil {
 				return err
 			}
@@ -344,7 +301,7 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 					Err(err).
 					Int("taskIndex", id).
 					Str("taskBlock", hex.EncodeToString(blockHash)).
-					Msg("[STAGED_SYNC] generateStateSyncTaskQueue: cannot add task")
+					Msg("[STAGED_SYNC] loadBlockHashesToTaskQueue: cannot add task")
 				break
 			}
 		}
@@ -374,29 +331,26 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 	}
 
 	// sort blocks by task id
-	taskIDs := make([]int, 0, len(s.state.downloadedBlocks))
+	taskIDs := make([]string, 0, len(s.state.downloadedBlocks))
 	for id := range s.state.downloadedBlocks {
 		taskIDs = append(taskIDs, id)
 	}
-	sort.Ints(taskIDs)
-	for taskID := range taskIDs {
-		blockBytes := s.state.downloadedBlocks[taskID]
-		//key := strconv.FormatUint(p+1, 10)
-		key := fmt.Sprintf("%020d", p)
-		if err := tx.Put(DownloadedBlocksBucket, []byte(key), blockBytes); err != nil {
+	sort.Strings(taskIDs)
+	for _, key := range taskIDs {
+		blockBytes := s.state.downloadedBlocks[key]
+		blkNumber := fmt.Sprintf("%020d", p+1)
+		bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
+		if err := tx.Put(bucketName, []byte(blkNumber), blockBytes); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Uint64("block height", p).
 				Msg("[STAGED_SYNC] adding block to db failed")
 			return p, err
 		}
-		if taskID != taskIDs[len(taskIDs)-1] {
-			p++
-		}
+		p++
 	}
-
 	// check if all block hashes are added to db break the loop
-	if p-progress != uint64(len(s.state.downloadedBlocks)-1) {
+	if p-progress != uint64(len(s.state.downloadedBlocks)) {
 		return p, fmt.Errorf("save downloaded block bodies failed")
 	}
 	// save progress

@@ -15,7 +15,7 @@ type PruneOrder []SyncStageID
 var DefaultForwardOrder = ForwardOrder{
 	Headers,
 	BlockHashes,
-	Bodies,
+	BlockBodies,
 	// Stages below don't use Internet
 	States,
 	LastMile,
@@ -26,7 +26,7 @@ var DefaultUnwindOrder = UnwindOrder{
 	Finish,
 	LastMile,
 	States,
-	Bodies,
+	BlockBodies,
 	BlockHashes,
 	Headers,
 }
@@ -35,7 +35,7 @@ var DefaultPruneOrder = PruneOrder{
 	Finish,
 	LastMile,
 	States,
-	Bodies,
+	BlockBodies,
 	BlockHashes,
 	Headers,
 }
@@ -67,7 +67,7 @@ func DefaultStages(ctx context.Context,
 			Handler:     handlerStageBlockHashes,
 		},
 		{
-			ID:          Bodies,
+			ID:          BlockBodies,
 			Description: "Download block bodies",
 			Handler:     handlerStageBodies,
 		},

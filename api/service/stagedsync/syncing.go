@@ -18,15 +18,19 @@ import (
 )
 
 const (
-	BlockHashesBucket      = "BlockHashes"
-	DownloadedBlocksBucket = "BlockBodies"
-	LastMileBlocksBucket   = "LastMileBlocks" // last mile blocks to catch up with the consensus
-	StageProgressBucket    = "StageProgress"
+	BlockHashesBucket            = "BlockHashes"
+	BeaconBlockHashesBucket      = "BeaconBlockHashes"
+	DownloadedBlocksBucket       = "BlockBodies"
+	BeaconDownloadedBlocksBucket = "BeaconBlockBodies" // Beacon Block bodies are downloaded, TxHash and UncleHash are getting verified
+	LastMileBlocksBucket         = "LastMileBlocks"    // last mile blocks to catch up with the consensus
+	StageProgressBucket          = "StageProgress"
 )
 
 var Buckets = []string{
 	BlockHashesBucket,
+	BeaconBlockHashesBucket,
 	DownloadedBlocksBucket,
+	BeaconDownloadedBlocksBucket,
 	LastMileBlocksBucket,
 	StageProgressBucket,
 }
@@ -40,6 +44,7 @@ func CreateStagedSync(
 	isBeacon bool,
 	isExplorer bool,
 	doubleCheckBlockHashes bool,
+	maxBlocksPerCycle uint64,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -50,8 +55,8 @@ func CreateStagedSync(
 		return nil, errInitDB
 	}
 
-	headersCfg := NewStageHeadersCfg(ctx, db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx, db)
+	headersCfg := NewStageHeadersCfg(ctx, bc, db)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db)
 	bodiesCfg := NewStageBodiesCfg(ctx, bc, db)
 	statesCfg := NewStageStatesCfg(ctx, bc, db)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
@@ -81,6 +86,7 @@ func CreateStagedSync(
 		DefaultUnwindOrder,
 		DefaultPruneOrder,
 		doubleCheckBlockHashes,
+		maxBlocksPerCycle,
 	), nil
 }
 
@@ -91,7 +97,16 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 	}
 	defer tx.Rollback()
 	for _, name := range Buckets {
-		if err := tx.CreateBucket(name); err != nil {
+		// create bucket
+		if err := tx.CreateBucket(GetStageName(name, false, false)); err != nil {
+			return err
+		}
+		// create bucket for beacon
+		if err := tx.CreateBucket(GetStageName(name, true, false)); err != nil {
+			return err
+		}
+		// create bucket for prune
+		if err := tx.CreateBucket(GetStageName(name, false, true)); err != nil {
 			return err
 		}
 	}

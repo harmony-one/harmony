@@ -34,7 +34,7 @@ type StagedSync struct {
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
 	commonBlocks       map[int]*types.Block
-	downloadedBlocks   map[int][]byte
+	downloadedBlocks   map[string][]byte
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
 	isExplorer         bool
@@ -64,6 +64,9 @@ type StagedSync struct {
 	// if set to true, it will double check the block hashes
 	//so, only blocks are sent by 2/3 of peers are considered as valid
 	DoubleCheckBlockHashes bool
+	// Maximum number of blocks per each cycle. if set to zero, all blocks will be
+	// downloaded and synced in one full cycle.
+	MaxBlocksPerSyncCycle uint64
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -205,7 +208,8 @@ func New(ctx context.Context,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
 	pruneOrder PruneOrder,
-	doubleCheckBlockHashes bool) *StagedSync {
+	doubleCheckBlockHashes bool,
+	maxBlocksPerCycle uint64) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
@@ -246,10 +250,11 @@ func New(ctx context.Context,
 		logPrefixes:            logPrefixes,
 		syncStatus:             NewSyncStatus(role),
 		commonBlocks:           make(map[int]*types.Block),
-		downloadedBlocks:       make(map[int][]byte),
+		downloadedBlocks:       make(map[string][]byte),
 		lastMileBlocks:         []*types.Block{},
 		syncConfig:             &SyncConfig{},
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
+		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 	}
 }
 
@@ -1139,7 +1144,7 @@ func (ss *StagedSync) generateNewState(bc *core.BlockChain) error {
 	}
 
 	ss.syncMux.Lock()
-	ss.downloadedBlocks = make(map[int][]byte)
+	ss.downloadedBlocks = make(map[string][]byte)
 	ss.commonBlocks = make(map[int]*types.Block)
 	ss.syncMux.Unlock()
 

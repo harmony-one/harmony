@@ -9,6 +9,7 @@ import (
 
 	//"github.com/harmony-one/harmony/internal/common"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/pkg/errors"
@@ -22,6 +23,7 @@ type StageBlockHashes struct {
 type StageBlockHashesCfg struct {
 	mtx sync.Mutex
 	ctx context.Context
+	bc  *core.BlockChain
 	db  kv.RwDB
 }
 
@@ -31,10 +33,11 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(ctx context.Context, db kv.RwDB) StageBlockHashesCfg {
+func NewStageBlockHashesCfg(ctx context.Context, bc *core.BlockChain, db kv.RwDB) StageBlockHashesCfg {
 	return StageBlockHashesCfg{
 		mtx: sync.Mutex{},
 		ctx: ctx,
+		bc:  bc,
 		db:  db,
 	}
 }
@@ -45,28 +48,33 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 	currHash := []byte{}
 	targetHeight := uint64(0)
 	isBeacon := s.state.isBeacon
+	startHash := bh.configs.bc.CurrentBlock().Hash()
 
 	if errV := bh.configs.db.View(bh.configs.ctx, func(etx kv.Tx) error {
 		if targetHeight, err = GetStageProgress(etx, Headers, isBeacon); err != nil {
 			return err
 		}
-		if currProgress, err = GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
+		if currProgress, err = s.CurrentStageProgress(etx); err != nil { //GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
 			return err
 		}
-		key := strconv.FormatUint(currProgress, 10)
-		if currHash, err = etx.GetOne(BlockHashesBucket, []byte(key)); err != nil {
-			return err
+		if currProgress > 0 {
+			key := strconv.FormatUint(currProgress, 10)
+			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+			if currHash, err = etx.GetOne(bucketName, []byte(key)); err != nil {
+				//TODO: currProgress and DB don't match. Either re-download all or verify db and set currProgress to last
+				return err
+			}
+			startHash.SetBytes(currHash[:])
+		} else {
+			if err := bh.clearBucket(nil, s.state.isBeacon); err != nil {
+				return nil
+			}
+			startHash = bh.configs.bc.CurrentBlock().Hash()
+			currProgress = bh.configs.bc.CurrentBlock().NumberU64()
 		}
 		return nil
 	}); errV != nil {
 		return errV
-	}
-
-	startHash := s.state.Blockchain().CurrentBlock().Hash()
-	if currProgress > 0 {
-		startHash.SetBytes(currHash[:])
-	} else {
-		currProgress = s.state.Blockchain().CurrentBlock().NumberU64()
 	}
 
 	if currProgress >= targetHeight {
@@ -76,9 +84,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 	size := uint32(0)
 
 	fmt.Print("\033[s") // save the cursor position
-
-	for ok := true; ok; ok = currProgress <= targetHeight {
-
+	for ok := true; ok; ok = currProgress < targetHeight {
 		size = uint32(targetHeight - currProgress)
 		if size > SyncLoopBatchSize {
 			size = SyncLoopBatchSize
@@ -116,6 +122,29 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 	return nil
 }
 
+func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
+	useExternalTx := tx != nil
+	if !useExternalTx {
+		var err error
+		tx, err = bh.configs.db.BeginRw(context.Background())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+	bucketName := GetBucketName(BlockHashesBucket, isBeacon)
+	if err := tx.ClearBucket(bucketName); err != nil {
+		return err
+	}
+
+	if !useExternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress uint64, startHash common.Hash, tx kv.RwTx) (p uint64, h common.Hash, err error) {
 	p = progress
 	h.SetBytes([]byte{})
@@ -139,7 +168,8 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 				continue
 			}
 			key := strconv.FormatUint(p+1, 10)
-			if err := tx.Put(BlockHashesBucket, []byte(key), blockHash); err != nil {
+			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+			if err := tx.Put(bucketName, []byte(key), blockHash); err != nil {
 				utils.Logger().Warn().
 					Err(err).
 					Int("block hash index", id).
