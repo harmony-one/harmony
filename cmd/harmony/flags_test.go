@@ -109,6 +109,7 @@ func TestHarmonyFlags(t *testing.T) {
 					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
+					GlobalQueue:       5120,
 					LocalAccountsFile: "./.hmy/locals.txt",
 				},
 				Pprof: harmonyconfig.PprofConfig{
@@ -880,6 +881,7 @@ func TestTxPoolFlags(t *testing.T) {
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 			},
 		},
 		{
@@ -888,7 +890,8 @@ func TestTxPoolFlags(t *testing.T) {
 				BlacklistFile:     "blacklist.file",
 				AllowedTxsFile:    "allowedtxs.txt",
 				RosettaFixFile:    "rosettafix.file",
-				AccountSlots:      16, // default
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
@@ -898,7 +901,8 @@ func TestTxPoolFlags(t *testing.T) {
 				BlacklistFile:     "blacklist.file",
 				RosettaFixFile:    "rosettafix.file",
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
-				AccountSlots:      16, // default
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
@@ -910,6 +914,7 @@ func TestTxPoolFlags(t *testing.T) {
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 			},
 		},
 		{
@@ -920,6 +925,18 @@ func TestTxPoolFlags(t *testing.T) {
 				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: "locals.txt",
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+			},
+		},
+		{
+			args: []string{"--txpool.globalqueue", "10240"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalQueue:       10240,
 			},
 		},
 	}

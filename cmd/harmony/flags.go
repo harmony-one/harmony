@@ -136,6 +136,7 @@ var (
 		legacyTPBlacklistFileFlag,
 		localAccountsFileFlag,
 		allowedTxsFileFlag,
+		tpGlobalQueueFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -1086,6 +1087,11 @@ var (
 		Usage:    "file of allowed transactions",
 		DefValue: defaultConfig.TxPool.AllowedTxsFile,
 	}
+	tpGlobalQueueFlag = cli.IntFlag{
+		Name:     "txpool.globalqueue",
+		Usage:    "maximum global number of non-executable transactions in the pool",
+		DefValue: int(defaultConfig.TxPool.GlobalQueue),
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -1097,7 +1103,14 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 		if value <= 0 {
 			panic("Must provide positive for txpool.accountslots")
 		}
-		config.TxPool.AccountSlots = uint64(cli.GetIntFlagValue(cmd, tpAccountSlotsFlag))
+		config.TxPool.AccountSlots = uint64(value)
+	}
+	if cli.IsFlagChanged(cmd, tpGlobalQueueFlag) {
+		value := cli.GetIntFlagValue(cmd, tpGlobalQueueFlag)
+		if value <= 0 {
+			panic("Must provide positive value for txpool.globalqueue")
+		}
+		config.TxPool.GlobalQueue = uint64(value)
 	}
 	if cli.IsFlagChanged(cmd, tpBlacklistFileFlag) {
 		config.TxPool.BlacklistFile = cli.GetStringFlagValue(cmd, tpBlacklistFileFlag)

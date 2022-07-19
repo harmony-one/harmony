@@ -1028,6 +1028,7 @@ func New(
 		}
 		if harmonyconfig != nil {
 			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
+			txPoolConfig.GlobalQueue = harmonyconfig.TxPool.GlobalQueue
 			txPoolConfig.Locals = append(txPoolConfig.Locals, localAccounts...)
 		}
 

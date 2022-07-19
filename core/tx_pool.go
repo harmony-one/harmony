@@ -186,7 +186,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	AccountSlots: 16,
 	GlobalSlots:  4096,
 	AccountQueue: 64,
-	GlobalQueue:  1024,
+	GlobalQueue:  5120,
 
 	Lifetime: 30 * time.Minute,
 
@@ -233,6 +233,13 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Uint64("updated", DefaultTxPoolConfig.AccountSlots).
 			Msg("Sanitizing invalid txpool account slots")
 		conf.AccountSlots = DefaultTxPoolConfig.AccountSlots
+	}
+	if conf.GlobalQueue == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.GlobalQueue).
+			Uint64("updated", DefaultTxPoolConfig.GlobalQueue).
+			Msg("Sanitizing invalid txpool global queue")
+		conf.GlobalQueue = DefaultTxPoolConfig.GlobalQueue
 	}
 
 	return conf
