@@ -44,6 +44,9 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 	tx.ClearBucket(blocksBucketName)
 
+	// clean up cache
+	s.state.purgeAllBlocksFromCache()
+
 	if !useExternalTx {
 		if err := tx.Commit(); err != nil {
 			return err

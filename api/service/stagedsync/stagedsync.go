@@ -641,13 +641,6 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, isBeacon bool) error {
 	randSeed := time.Now().UnixNano()
 	ss.syncConfig.SelectRandomPeers(randSeed)
 
-	// for _, p := range ss.syncConfig.peers {
-	// 	fmt.Println("main list-->",p.ip, ":", p.port)
-	// }
-	// for _, p := range ss.syncConfig.reservedPeers {
-	// 	fmt.Println("res list-->",p.ip, ":", p.port)
-	// }
-
 	return nil
 }
 
@@ -690,7 +683,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.Rw
 				utils.Logger().Warn().
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
-					Msg("[STAGED_SYNC] getConsensusHashes Nil Response")
+					Msg("[STAGED_SYNC] getConsensusHashes Nil Response, will be replaced with reserved node (if any)")
 				// replace it with reserved peer
 				ss.syncConfig.ReplacePeerWithReserved(peerConfig)
 				return

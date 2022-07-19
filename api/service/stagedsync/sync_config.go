@@ -162,6 +162,9 @@ func (sc *SyncConfig) SelectRandomPeers(randSeed int64) {
 	targetSize := calcNumPeersWithBound(numPeers, NumPeersLowBound, numPeersHighBound)
 	// if number of peers is less than required number, keep all in list
 	if numPeers <= targetSize {
+		utils.Logger().Info().
+			Int("num connected peers", numPeers).
+			Msg("[STAGED_SYNC] not enough connected peers to sync, still sync will on going")
 		return
 	}
 	//shuffle peers list
@@ -240,9 +243,13 @@ func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig) {
 			if len(sc.reservedPeers) > 0 {
 				sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
 				sc.peers = append(sc.peers, sc.reservedPeers[0])
-				sc.reservedPeers = sc.reservedPeers[1:]
-				utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+				utils.Logger().Info().
+					Str("peerIP", peer.ip).
+					Str("peerPort", peer.port).
+					Str("reservedPeerIP", sc.reservedPeers[0].ip).
+					Str("reservedPeerPort", sc.reservedPeers[0].port).
 					Msg("[STAGED_SYNC] replaced GRPC peer by reserved")
+				sc.reservedPeers = sc.reservedPeers[1:]
 			} else {
 				sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
 				utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).

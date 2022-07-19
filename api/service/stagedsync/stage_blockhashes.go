@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	//"github.com/harmony-one/harmony/internal/common"
 	"github.com/ethereum/go-ethereum/common"
@@ -62,13 +63,14 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
 			if currHash, err = etx.GetOne(bucketName, []byte(key)); err != nil {
 				//TODO: currProgress and DB don't match. Either re-download all or verify db and set currProgress to last
-				return err
+				startHash.SetBytes(bh.configs.bc.CurrentBlock().Hash().Bytes())
+			} else {
+				startHash.SetBytes(currHash[:])
 			}
-			startHash.SetBytes(currHash[:])
 		} else {
-			if err := bh.clearBucket(nil, s.state.isBeacon); err != nil {
-				return nil
-			}
+			// if err := bh.clearBucket(nil, s.state.isBeacon); err != nil {
+			// 	return nil
+			// }
 			startHash = bh.configs.bc.CurrentBlock().Hash()
 			currProgress = bh.configs.bc.CurrentBlock().NumberU64()
 		}
@@ -84,6 +86,8 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 	size := uint32(0)
 
 	fmt.Print("\033[s") // save the cursor position
+	startTime := time.Now()
+	startBlock := currProgress
 	for ok := true; ok; ok = currProgress < targetHeight {
 		size = uint32(targetHeight - currProgress)
 		if size > SyncLoopBatchSize {
@@ -93,7 +97,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 		if err := s.state.getConsensusHashes(startHash[:], size, tx); err != nil {
 			return errors.Wrap(err, "getConsensusHashes")
 		}
-		// download block hashes
+		// selects the most common peer config based on their block hashes and doing the clean up
 		if err := s.state.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
 			return err
 		}
@@ -112,11 +116,17 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 		if currProgress, startHash, err = bh.saveDownloadedBlockHashes(s, currProgress, startHash, tx); err != nil {
 			return err
 		}
-		// clean up cache
-		s.state.purgeAllBlocksFromCache()
+
+		//calculating block speed
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if (dt>0) {
+			speed = float64(currProgress - startBlock) / dt
+		}
+		blockSpeed := fmt.Sprintf("%.2f", speed)
 
 		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("downloading block hash progress:", currProgress, "/", targetHeight)
+		fmt.Println("downloading block hash progress:", currProgress, "/", targetHeight, "(",  blockSpeed,"blocks/s",")")
 	}
 
 	return nil

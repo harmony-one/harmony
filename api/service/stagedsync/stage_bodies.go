@@ -71,6 +71,8 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 
 	size := uint64(0)
 	// currProgress++
+	startTime := time.Now()
+	startBlock := currProgress
 
 	fmt.Print("\033[s") // save the cursor position
 	for ok := true; ok; ok = currProgress < targetHeight {
@@ -102,8 +104,16 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		// 	return err
 		// }
 
+		//calculating block speed
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if (dt>0) {
+			speed = float64(currProgress - startBlock) / dt
+		}
+		blockSpeed := fmt.Sprintf("%.2f", speed)
+
 		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight)
+		fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed,"blocks/s",")")
 	}
 
 	return nil

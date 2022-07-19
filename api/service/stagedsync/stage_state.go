@@ -77,11 +77,13 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	}
 
 	firstKey := fmt.Sprintf("%020d", currProgress+1)
-
 	verifyAllSig := true //TODO: move to configs
 
 	// update current progress before return
 	// defer stg.saveProgress(s, nil)
+
+	startTime := time.Now()
+	startBlock := currProgress
 
 	fmt.Print("\033[s") // save the cursor position
 	for n, blockBytes, err := c.Seek([]byte(firstKey)); n != nil; n, blockBytes, err = c.Next() {
@@ -189,8 +191,15 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 					"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
 				)
 		}
+		//calculating block speed
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if (dt>0) {
+			speed = float64(currProgress - startBlock) / dt
+		}
+		blockSpeed := fmt.Sprintf("%.2f", speed)
 
-		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight)
+		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed,"blocks/s",")")
 	}
 
 	return nil

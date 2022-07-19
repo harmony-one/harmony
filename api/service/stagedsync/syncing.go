@@ -132,19 +132,21 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 		s.RegisterNodeInfo()
 	}
 
-	// canRunCycleInOneTransaction := true //!initialCycle && highestSeenHeader-origin < 8096 && highestSeenHeader-finishProgressBefore < 8096
-
-	// var tx kv.RwTx // on this variable will run sync cycle.
+	// canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= 8192
+	// var tx kv.RwTx
 	// if canRunCycleInOneTransaction {
-	// 	tx, err = s.DB().BeginRw(context.Background())
-	// 	if err != nil {
-	// 		return headBlockHash, err
+	// 	var err error
+	// 	fmt.Println("creating tx----------->", s.MaxBlocksPerSyncCycle)
+	// 	if tx, err = s.DB().BeginRw(context.Background()); err != nil {
+	// 		fmt.Println("error making tx----------->", err)
+	// 		return
 	// 	}
 	// 	defer tx.Rollback()
 	// }
 
 	// Do one step of staged sync
-	start := time.Now()
+	startTime := time.Now()
+	startHead := bc.CurrentBlock().NumberU64()
 	initialCycle := true
 	syncErr := s.Run(s.DB(), nil, initialCycle)
 	if syncErr != nil {
@@ -153,8 +155,18 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 				s.IsBeacon(), s.Blockchain().ShardID(), syncErr)
 		s.purgeOldBlocksFromCache()
 	}
+	// calculating sync speed (blocks/second)
+	currHead := bc.CurrentBlock().NumberU64()
+	dt := time.Now().Sub(startTime).Seconds()
+	speed := float64(0)
+	if dt > 0 {
+		speed = float64(currHead-startHead) / dt
+	}
+	syncSpeed := fmt.Sprintf("%.2f", speed)
+	fmt.Println("sync speed:", syncSpeed, "blocks/s")
+
 	if loopMinTime != 0 {
-		waitTime := loopMinTime - time.Since(start)
+		waitTime := loopMinTime - time.Since(startTime)
 		utils.Logger().Info().
 			Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d)",
 				waitTime, s.IsBeacon(), s.Blockchain().ShardID())
@@ -167,12 +179,10 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	}
 
 	// if canRunCycleInOneTransaction {
-	// 	commitStart := time.Now()
 	// 	errTx := tx.Commit()
 	// 	if errTx != nil {
-	// 		return headBlockHash, errTx
+	// 		return
 	// 	}
-	// 	log.Info("Commit cycle", "in", time.Since(commitStart))
 	// }
 
 	// defer close(waitForDone)
@@ -186,6 +196,5 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			consensus.UpdateConsensusInformation()
 		}
 	}
-	utils.Logger().Info().Msgf("staged sync executed")
-	s.purgeAllBlocksFromCache()
+	utils.Logger().Info().Msgf("staged sync loop executed")
 }
