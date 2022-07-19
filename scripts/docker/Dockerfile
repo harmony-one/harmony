@@ -1,6 +1,5 @@
 FROM alpine:3.16.0
 
-ARG HARMONY_VERSION=v4.3.10
 ARG HARMONY_USER=harmony
 ARG HARMONY_USER_UID=1000
 ARG HARMONY_USER_GID=1000
@@ -15,20 +14,14 @@ RUN apk add --no-cache bash~=5.1.16-r2 bind-tools~=9.16.29-r0 tini~=0.19.0 curl=
     && addgroup ${HARMONY_USER} tty \
     && sed -i -e "s/bin\/sh/bin\/bash/" /etc/passwd
 
-RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc \
-    && echo "Version: ${HARMONY_VERSION}" > /etc/motd \
-    && curl -LO https://harmony.one/hmycli \
-    && chmod +x hmycli \
-    && mv hmycli /usr/local/bin/hmy
+RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc
 
 WORKDIR ${HARMONY_HOME}
 
-COPY bin/harmony scripts/docker/docker-entrypoint.sh ./
+COPY bin/harmony scripts/docker/docker-entrypoint.sh /usr/local/bin/
 
 # Use testnet configuration as default
-RUN chmod +x harmony docker-entrypoint.sh \
-    && mv harmony /usr/local/bin/harmony \
-    && harmony config dump --network testnet harmony.conf \
+RUN chmod +x  /usr/local/bin/harmony  /usr/local/bin/docker-entrypoint.sh \
     && mkdir -p /data \
     && chown -R ${HARMONY_USER_UID}:${HARMONY_USER_GID} ${HARMONY_HOME} /data
 
@@ -36,8 +29,8 @@ VOLUME /data
 
 USER ${HARMONY_USER_UID}:${HARMONY_USER_GID}
 
-# NODE p2p (9000), pprof (6060), rpc (9500), ws (9800), rosetta (9700), DNS Sync (6000)
-EXPOSE 9000/udp 9000/tcp 6060/tcp 9500/tcp 9800/tcp 9700/tcp 6000/tcp
+# NODE p2p (9000),rpc (9500), ws (9800)
+EXPOSE 9000 9500 9800
 
-ENTRYPOINT ["/sbin/tini", "--", "./docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--"]
 CMD ["harmony", "-c", "harmony.conf"]

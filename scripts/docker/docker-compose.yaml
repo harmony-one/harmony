@@ -6,41 +6,21 @@ services:
       - /bin/sh
       - -c
       - |
-        rm -rfv /data/*
-        rm -rfv /log/*
-        echo "done cleaning data directory"
+        chown -R 1000:1000 /data
+
+        echo "done grany data directory permission"
     volumes:
       - data:/data
-      - log:/log
 
   harmony:
     build:
       context: ../../
       dockerfile: ./scripts/docker/Dockerfile
-      args:
-        - HARMONY_VERSION=v4.3.10
-        - HARMONY_USER=harmony
-        - HARMONY_USER_UID=1000
-        - HARMONY_USER_GID=1000
-    environment:
-      - HARMONY_NETWORK_NETWORKTYPE=testnet
-      - HARMONY_GENERAL_NODETYPE=explorer
-      - HARMONY_GENERAL_ISARCHIVE=false
-      - HARMONY_HTTP_ROSETTAENABLED=true
-      - HARMONY_GENERAL_SHARDID=2
-      - HARMONY_LOG_CONSOLE=true
-      - HARMONY_LOG_VERBOSITY=4
-      - HARMONY_PPROF_LISTENADDR=0.0.0.0:6060
-      - HARMONY_GENERAL_DATADIR=/data
-      - HARMONY_HTTP_IP=0.0.0.0
-      - HARMONY_WS_IP=0.0.0.0
     restart: unless-stopped
     ports:
-      - 6000:6000
       - 9500:9500
       - 9000:9000
       - 9700:9700
-      - 9900:9900
     healthcheck:
       test: netstat -tunlp | grep 9500 > /dev/null; if [ 0 != $$? ]; then exit 1; else exit 0; fi;
       interval: 5s
@@ -49,8 +29,19 @@ services:
       timeout: 3s
     volumes:
       - data:/data
-      - log:/harmony/log
+      - config:/harmony
 
 volumes:
+  config:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/tmp/harmony/config/testnet'
   data:
-  log:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/tmp/harmony/data/testnet'
+
