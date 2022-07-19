@@ -157,6 +157,7 @@ var (
 		logVerbosityFlag,
 		logVerbosePrintsFlag,
 		legacyVerbosityFlag,
+		logConsoleFlag,
 
 		legacyLogFolderFlag,
 		legacyLogRotateSizeFlag,
@@ -1207,6 +1208,11 @@ var (
 		Usage:    "debugging feature. to print verbose internal objects as JSON in log file. available internal objects: config",
 		DefValue: []string{"config"},
 	}
+	logConsoleFlag = cli.BoolFlag{
+		Name:     "log.console",
+		Usage:    "output log to console only",
+		DefValue: defaultConfig.Log.Console,
+	}
 	// TODO: remove context (this shall not be in the log)
 	logContextIPFlag = cli.StringFlag{
 		Name:     "log.ctx.ip",
@@ -1274,6 +1280,10 @@ func applyLogFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, logVerbosePrintsFlag) {
 		verbosePrintsFlagSlice := cli.GetStringSliceFlagValue(cmd, logVerbosePrintsFlag)
 		config.Log.VerbosePrints = harmonyconfig.FlagSliceToLogVerbosePrints(verbosePrintsFlagSlice)
+	}
+
+	if cli.IsFlagChanged(cmd, logConsoleFlag) {
+		config.Log.Console = cli.GetBoolFlagValue(cmd, logConsoleFlag)
 	}
 
 	if cli.HasFlagsChanged(cmd, []cli.Flag{logContextIPFlag, logContextPortFlag}) {

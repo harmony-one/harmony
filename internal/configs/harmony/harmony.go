@@ -113,6 +113,7 @@ type PprofConfig struct {
 }
 
 type LogConfig struct {
+	Console       bool
 	Folder        string
 	FileName      string
 	RotateSize    int
