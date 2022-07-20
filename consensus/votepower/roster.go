@@ -176,6 +176,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 	// TODO Check for duplicate BLS Keys
 	ourPercentage := numeric.ZeroDec()
 	theirPercentage := numeric.ZeroDec()
+	var lastStakedVoter *AccommodateHarmonyVote
 
 	harmonyPercent := shard.Schedule.InstanceForEpoch(epoch).HarmonyVotePercent()
 	externalPercent := shard.Schedule.InstanceForEpoch(epoch).ExternalVotePercent()
@@ -199,6 +200,7 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 			member.GroupPercent = e.Quo(roster.TotalEffectiveStake)
 			member.OverallPercent = member.GroupPercent.Mul(externalPercent)
 			theirPercentage = theirPercentage.Add(member.OverallPercent)
+			lastStakedVoter = &member
 		} else { // Our node
 			member.IsHarmonyNode = true
 			member.OverallPercent = harmonyPercent.Quo(asDecHMYSlotCount)
@@ -210,6 +212,23 @@ func Compute(subComm *shard.Committee, epoch *big.Int) (*Roster, error) {
 			roster.Voters[staked[i].BLSPublicKey] = &member
 		} else {
 			utils.Logger().Debug().Str("blsKey", staked[i].BLSPublicKey.Hex()).Msg("Duplicate BLS key found")
+		}
+	}
+
+	{
+		// NOTE Enforce voting power sums to one,
+		// give diff (expect tiny amt) to last staked voter
+		if diff := numeric.OneDec().Sub(
+			ourPercentage.Add(theirPercentage),
+		); !diff.IsZero() && lastStakedVoter != nil {
+			lastStakedVoter.OverallPercent =
+				lastStakedVoter.OverallPercent.Add(diff)
+			theirPercentage = theirPercentage.Add(diff)
+		}
+
+		if lastStakedVoter != nil &&
+			!ourPercentage.Add(theirPercentage).Equal(numeric.OneDec()) {
+			return nil, ErrVotingPowerNotEqualOne
 		}
 	}
 
