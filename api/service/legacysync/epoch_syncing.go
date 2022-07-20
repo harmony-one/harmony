@@ -101,7 +101,7 @@ func (ss *EpochSync) syncLoop(bc core.BlockChain, isBeacon bool, _ *consensus.Co
 
 		curEpoch := bc.CurrentBlock().Epoch().Uint64()
 		otherEpoch := shard.Schedule.CalcEpochNumber(maxHeight).Uint64()
-		if otherEpoch-1 <= curEpoch {
+		if otherEpoch <= curEpoch+1 {
 			utils.Logger().Info().
 				Msgf("[EPOCHSYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherEpoch: %d, currentEpoch: %d)",
 					isBeacon, bc.ShardID(), otherEpoch, curEpoch)
