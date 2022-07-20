@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
@@ -1196,6 +1197,11 @@ var (
 		Usage:    "global capacity for queued transactions in the pool",
 		DefValue: int(defaultConfig.TxPool.GlobalQueue),
 	}
+	tpLifetime = cli.StringFlag{
+		Name:     "txpool.lifetime",
+		Usage:    "maximum lifetime of transactions in the pool",
+		DefValue: defaultConfig.TxPool.Lifetime.String(),
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -1240,6 +1246,13 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	}
 	if cli.IsFlagChanged(cmd, allowedTxsFileFlag) {
 		config.TxPool.AllowedTxsFile = cli.GetStringFlagValue(cmd, allowedTxsFileFlag)
+	}
+	if cli.IsFlagChanged(cmd, tpLifetime) {
+		value, err := time.ParseDuration(cli.GetStringFlagValue(cmd, tpLifetime))
+		if err != nil {
+			panic(fmt.Sprintf("Invalid value for txpool.lifetime: %v", err))
+		}
+		config.TxPool.Lifetime = value
 	}
 }
 

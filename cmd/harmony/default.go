@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -86,6 +88,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		GlobalSlots:       5120,
 		AccountQueue:      64,
 		GlobalQueue:       1024,
+		Lifetime:          30 * time.Minute,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

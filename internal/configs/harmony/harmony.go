@@ -185,6 +185,7 @@ type TxPoolConfig struct {
 	GlobalQueue       uint64
 	LocalAccountsFile string
 	GlobalSlots       uint64
+	Lifetime          time.Duration
 }
 
 type PprofConfig struct {

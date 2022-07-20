@@ -257,6 +257,13 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Msg("Sanitizing invalid txpool account queue")
 		conf.GlobalQueue = DefaultTxPoolConfig.GlobalQueue
 	}
+	if conf.Lifetime == 0 {
+		utils.Logger().Warn().
+			Dur("provided", conf.Lifetime).
+			Dur("updated", DefaultTxPoolConfig.Lifetime).
+			Msg("Sanitizing invalid txpool lifetime")
+		conf.Lifetime = DefaultTxPoolConfig.Lifetime
+	}
 
 	return conf
 }

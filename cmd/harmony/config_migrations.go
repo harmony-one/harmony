@@ -364,6 +364,10 @@ func init() {
 		if confTree.Get("TxPool.GlobalQueue") == nil {
 			confTree.Set("TxPool.GlobalQueue", defaultConfig.TxPool.GlobalQueue)
 		}
+		if confTree.Get("TxPool.Lifetime") == nil {
+			confTree.Set("TxPool.Lifetime", defaultConfig.TxPool.Lifetime.String())
+		}
+
 		confTree.Set("Version", "2.5.8")
 		return confTree
 	}
