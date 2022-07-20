@@ -84,6 +84,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		AccountSlots:      16,
 		LocalAccountsFile: "./.hmy/locals.txt",
 		GlobalSlots:       5120,
+		AccountQueue:      64,
+		GlobalQueue:       1024,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

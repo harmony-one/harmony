@@ -243,6 +243,20 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 			Msg("Sanitizing invalid txpool global slots")
 		conf.GlobalSlots = DefaultTxPoolConfig.GlobalSlots
 	}
+	if conf.AccountQueue == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.AccountQueue).
+			Uint64("updated", DefaultTxPoolConfig.AccountQueue).
+			Msg("Sanitizing invalid txpool account queue")
+		conf.AccountQueue = DefaultTxPoolConfig.AccountQueue
+	}
+	if conf.GlobalQueue == 0 {
+		utils.Logger().Warn().
+			Uint64("provided", conf.GlobalQueue).
+			Uint64("updated", DefaultTxPoolConfig.GlobalQueue).
+			Msg("Sanitizing invalid txpool account queue")
+		conf.GlobalQueue = DefaultTxPoolConfig.GlobalQueue
+	}
 
 	return conf
 }

@@ -1093,6 +1093,8 @@ func New(
 			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
 			txPoolConfig.GlobalSlots = harmonyconfig.TxPool.GlobalSlots
 			txPoolConfig.Locals = append(txPoolConfig.Locals, localAccounts...)
+			txPoolConfig.AccountQueue = harmonyconfig.TxPool.AccountQueue
+			txPoolConfig.GlobalQueue = harmonyconfig.TxPool.GlobalQueue
 		}
 
 		txPoolConfig.Blacklist = blacklist
