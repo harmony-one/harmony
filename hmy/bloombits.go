@@ -49,38 +49,6 @@ const (
 	bloomRetrievalWait = time.Duration(0)
 )
 
-// startBloomHandlers starts a batch of goroutines to accept bloom bit database
-// retrievals from possibly a range of filters and serving the data to satisfy.
-func (hmy *Harmony) startBloomHandlers(sectionSize uint64) {
-	for i := 0; i < bloomServiceThreads; i++ {
-		go func() {
-			for {
-				select {
-				case <-hmy.ShutdownChan:
-					return
-
-				case request := <-hmy.BloomRequests:
-					task := <-request
-					task.Bitsets = make([][]byte, len(task.Sections))
-					for i, section := range task.Sections {
-						head := rawdb.ReadCanonicalHash(hmy.chainDb, (section+1)*sectionSize-1)
-						if compVector, err := rawdb.ReadBloomBits(hmy.chainDb, task.Bit, section, head); err == nil {
-							if blob, err := bitutil.DecompressBytes(compVector, int(sectionSize/8)); err == nil {
-								task.Bitsets[i] = blob
-							} else {
-								task.Error = err
-							}
-						} else {
-							task.Error = err
-						}
-					}
-					request <- task
-				}
-			}
-		}()
-	}
-}
-
 const (
 	// bloomThrottling is the time to wait between processing two consecutive index
 	// sections. It's useful during chain upgrades to prevent disk overload.
@@ -99,12 +67,12 @@ type BloomIndexer struct {
 
 // NewBloomIndexer returns a chain indexer that generates bloom bits data for the
 // canonical chain for fast logs filtering.
-func NewBloomIndexer(db ethdb.Database, size, confirms uint64) *core.ChainIndexer {
+func NewBloomIndexer(db core.Chain, size, confirms uint64) *core.ChainIndexer {
 	backend := &BloomIndexer{
-		db:   db,
+		db:   db.ChainDb(),
 		size: size,
 	}
-	table := ethRawDB.NewTable(db, string(rawdb.BloomBitsIndexPrefix))
+	table := ethRawDB.NewTable(db.ChainDb(), string(rawdb.BloomBitsIndexPrefix))
 
 	return core.NewChainIndexer(db, table, backend, size, confirms, bloomThrottling, "bloombits")
 }

@@ -633,7 +633,7 @@ func (bc *BlockChainImpl) ExportN(w io.Writer, first uint64, last uint64) error 
 // writeHeadBlock writes a new head block
 func (bc *BlockChainImpl) writeHeadBlock(block *types.Block) error {
 	// If the block is on a side chain or an unknown one, force other heads onto it too
-	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
+	updateHeads := bc.GetCanonicalHash(block.NumberU64()) != block.Hash()
 
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.ChainDb().NewBatch()
@@ -765,7 +765,7 @@ func (bc *BlockChainImpl) GetBlockByHash(hash common.Hash) *types.Block {
 }
 
 func (bc *BlockChainImpl) GetBlockByNumber(number uint64) *types.Block {
-	hash := rawdb.ReadCanonicalHash(bc.db, number)
+	hash := bc.GetCanonicalHash(number)
 	if hash == (common.Hash{}) {
 		return nil
 	}

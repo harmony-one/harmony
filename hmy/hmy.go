@@ -123,12 +123,11 @@ type NodeAPI interface {
 func New(
 	nodeAPI NodeAPI, txPool *core.TxPool, cxPool *core.CxPool, shardID uint32,
 ) *Harmony {
-	chainDb := nodeAPI.Blockchain().ChainDb()
 	leaderCache, _ := lru.New(leaderCacheSize)
 	undelegationPayoutsCache, _ := lru.New(undelegationPayoutsCacheSize)
 	preStakingBlockRewardsCache, _ := lru.New(preStakingBlockRewardsCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
-	bloomIndexer := NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms)
+	bloomIndexer := NewBloomIndexer(nodeAPI.Blockchain(), params.BloomBitsBlocks, params.BloomConfirms)
 	bloomIndexer.Start(nodeAPI.Blockchain())
 
 	backend := &Harmony{
@@ -140,7 +139,7 @@ func New(
 		TxPool:                      txPool,
 		CxPool:                      cxPool,
 		eventMux:                    new(event.TypeMux),
-		chainDb:                     chainDb,
+		chainDb:                     nodeAPI.Blockchain().ChainDb(),
 		NodeAPI:                     nodeAPI,
 		ChainID:                     nodeAPI.Blockchain().Config().ChainID.Uint64(),
 		EthChainID:                  nodeAPI.Blockchain().Config().EthCompatibleChainID.Uint64(),

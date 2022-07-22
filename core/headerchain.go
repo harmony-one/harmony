@@ -348,9 +348,9 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		return common.Hash{}, 0
 	}
 	for ancestor != 0 {
-		if rawdb.ReadCanonicalHash(hc.chainDb, number) == hash {
+		if hc.GetCanonicalHash(number) == hash {
 			number -= ancestor
-			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
+			return hc.GetCanonicalHash(number), number
 		}
 		if *maxNonCanonical == 0 {
 			return common.Hash{}, 0
@@ -448,6 +448,10 @@ func (hc *HeaderChain) GetHeaderByNumber(number uint64) *block.Header {
 }
 
 func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
+	return hc.GetCanonicalHash(number)
+}
+
+func (hc *HeaderChain) GetCanonicalHash(number uint64) common.Hash {
 	// Since canonical chain is immutable, it's safe to read header
 	// hash by number from cache.
 	if hash, ok := hc.canonicalCache.Get(number); ok {
@@ -458,10 +462,6 @@ func (hc *HeaderChain) getHashByNumber(number uint64) common.Hash {
 		hc.canonicalCache.Add(number, hash)
 	}
 	return hash
-}
-
-func (hc *HeaderChain) GetCanonicalHash(number uint64) common.Hash {
-	return rawdb.ReadCanonicalHash(hc.chainDb, number)
 }
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
