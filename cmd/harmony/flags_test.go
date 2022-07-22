@@ -119,7 +119,7 @@ func TestHarmonyFlags(t *testing.T) {
 					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
-					GlobalSlots:       1024,
+					GlobalSlots:       4096,
 					LocalAccountsFile: "./.hmy/locals.txt",
 					AccountQueue:      64,
 					GlobalQueue:       5120,
