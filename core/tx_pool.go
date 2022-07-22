@@ -186,7 +186,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceBump:  1,     // PriceBump is percent, 1% is enough
 
 	AccountSlots: 16,   // --txpool.accountslots
-	GlobalSlots:  1024, // --txpool.globalslots
+	GlobalSlots:  4096, // --txpool.globalslots
 	AccountQueue: 64,   // --txpool.accountqueue
 	GlobalQueue:  5120, // --txpool.globalqueue
 
