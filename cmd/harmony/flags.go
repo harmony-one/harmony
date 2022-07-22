@@ -140,12 +140,15 @@ var (
 
 	txPoolFlags = []cli.Flag{
 		tpAccountSlotsFlag,
+		tpGlobalSlotsFlag,
+		tpAccountQueueFlag,
+		tpGlobalQueueFlag,
+		tpLifetimeFlag,
 		rosettaFixFileFlag,
 		tpBlacklistFileFlag,
 		legacyTPBlacklistFileFlag,
 		localAccountsFileFlag,
 		allowedTxsFileFlag,
-		tpGlobalSlotsFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -1197,9 +1200,9 @@ var (
 		Usage:    "global capacity for queued transactions in the pool",
 		DefValue: int(defaultConfig.TxPool.GlobalQueue),
 	}
-	tpLifetime = cli.StringFlag{
+	tpLifetimeFlag = cli.StringFlag{
 		Name:     "txpool.lifetime",
-		Usage:    "maximum lifetime of transactions in the pool",
+		Usage:    "maximum lifetime of transactions in the pool as a golang duration string",
 		DefValue: defaultConfig.TxPool.Lifetime.String(),
 	}
 )
@@ -1247,8 +1250,8 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, allowedTxsFileFlag) {
 		config.TxPool.AllowedTxsFile = cli.GetStringFlagValue(cmd, allowedTxsFileFlag)
 	}
-	if cli.IsFlagChanged(cmd, tpLifetime) {
-		value, err := time.ParseDuration(cli.GetStringFlagValue(cmd, tpLifetime))
+	if cli.IsFlagChanged(cmd, tpLifetimeFlag) {
+		value, err := time.ParseDuration(cli.GetStringFlagValue(cmd, tpLifetimeFlag))
 		if err != nil {
 			panic(fmt.Sprintf("Invalid value for txpool.lifetime: %v", err))
 		}

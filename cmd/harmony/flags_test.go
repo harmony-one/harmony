@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
@@ -118,8 +119,11 @@ func TestHarmonyFlags(t *testing.T) {
 					AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 					RosettaFixFile:    "",
 					AccountSlots:      16,
-					GlobalSlots:       5120,
+					GlobalSlots:       1024,
 					LocalAccountsFile: "./.hmy/locals.txt",
+					AccountQueue:      64,
+					GlobalQueue:       5120,
+					Lifetime:          30 * time.Minute,
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -1005,6 +1009,9 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
 			},
 		},
 		{
@@ -1015,6 +1022,9 @@ func TestTxPoolFlags(t *testing.T) {
 				RosettaFixFile:    "rosettafix.file",
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
@@ -1026,6 +1036,9 @@ func TestTxPoolFlags(t *testing.T) {
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 			},
 		},
@@ -1038,6 +1051,9 @@ func TestTxPoolFlags(t *testing.T) {
 				RosettaFixFile:    "rosettafix.file",
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
 			},
 		},
 		{
@@ -1049,6 +1065,9 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: "locals.txt",
 				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
 			},
 		},
 		{
@@ -1060,6 +1079,23 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountSlots:      defaultConfig.TxPool.AccountSlots,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
 				GlobalSlots:       10240,
+				AccountQueue:      defaultConfig.TxPool.AccountQueue,
+				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
+				Lifetime:          defaultConfig.TxPool.Lifetime,
+			},
+		},
+		{
+			args: []string{"--txpool.accountqueue", "128", "--txpool.globalqueue", "10240", "--txpool.lifetime", "15m"},
+			expConfig: harmonyconfig.TxPoolConfig{
+				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
+				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
+				RosettaFixFile:    defaultConfig.TxPool.RosettaFixFile,
+				AccountSlots:      defaultConfig.TxPool.AccountSlots,
+				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				GlobalSlots:       defaultConfig.TxPool.GlobalSlots,
+				AccountQueue:      128,
+				GlobalQueue:       10240,
+				Lifetime:          15 * time.Minute,
 			},
 		},
 	}

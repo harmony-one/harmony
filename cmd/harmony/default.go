@@ -1,8 +1,7 @@
 package main
 
 import (
-	"time"
-
+	"github.com/harmony-one/harmony/core"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -83,12 +82,12 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		BlacklistFile:     "./.hmy/blacklist.txt",
 		AllowedTxsFile:    "./.hmy/allowedtxs.txt",
 		RosettaFixFile:    "",
-		AccountSlots:      16,
+		AccountSlots:      core.DefaultTxPoolConfig.AccountSlots,
 		LocalAccountsFile: "./.hmy/locals.txt",
-		GlobalSlots:       5120,
-		AccountQueue:      64,
-		GlobalQueue:       1024,
-		Lifetime:          30 * time.Minute,
+		GlobalSlots:       core.DefaultTxPoolConfig.GlobalSlots,
+		AccountQueue:      core.DefaultTxPoolConfig.AccountQueue,
+		GlobalQueue:       core.DefaultTxPoolConfig.GlobalQueue,
+		Lifetime:          core.DefaultTxPoolConfig.Lifetime,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{

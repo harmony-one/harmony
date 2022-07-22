@@ -185,12 +185,12 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: 100e9, // 100 Gwei/Nano
 	PriceBump:  1,     // PriceBump is percent, 1% is enough
 
-	AccountSlots: 16,
-	GlobalSlots:  4096,
-	AccountQueue: 64,
-	GlobalQueue:  1024,
+	AccountSlots: 16,   // --txpool.accountslots
+	GlobalSlots:  1024, // --txpool.globalslots
+	AccountQueue: 64,   // --txpool.accountqueue
+	GlobalQueue:  5120, // --txpool.globalqueue
 
-	Lifetime: 30 * time.Minute,
+	Lifetime: 30 * time.Minute, // --txpool.lifetime
 
 	Blacklist:  map[common.Address]struct{}{},
 	AllowedTxs: map[common.Address]AllowedTxData{},
