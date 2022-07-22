@@ -15,7 +15,6 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 //go:build VERIFY_EVM_INTEGER_POOL
-// +build VERIFY_EVM_INTEGER_POOL
 
 package vm
 
