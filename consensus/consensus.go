@@ -141,7 +141,7 @@ type Consensus struct {
 func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
-			return errors.New("Block verification failed")
+			return errors.Errorf("Block verification failed: %s", err)
 		}
 		consensus.FBFTLog.MarkBlockVerified(block)
 	}
