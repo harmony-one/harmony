@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package core
+package chain
 
 import (
 	"fmt"
@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/harmony-one/harmony/core"
 
 	"github.com/harmony-one/harmony/block"
 	blockfactory "github.com/harmony-one/harmony/block/factory"
@@ -43,7 +44,7 @@ type BlockGen struct {
 	factory  blockfactory.Factory
 	header   *block.Header
 	statedb  *state.DB
-	gasPool  *GasPool
+	gasPool  *core.GasPool
 	txs      []*types.Transaction
 	receipts []*types.Receipt
 	uncles   []*block.Header
@@ -61,7 +62,7 @@ func (b *BlockGen) SetCoinbase(addr common.Address) {
 		panic("coinbase can only be set once")
 	}
 	b.header.SetCoinbase(addr)
-	b.gasPool = new(GasPool).AddGas(b.header.GasLimit())
+	b.gasPool = new(core.GasPool).AddGas(b.header.GasLimit())
 }
 
 // SetExtra sets the extra data field of the generated block.
@@ -94,14 +95,14 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 // further limitations on the content of transactions that can be
 // added. If contract code relies on the BLOCKHASH instruction,
 // the block in chain will be returned.
-func (b *BlockGen) AddTxWithChain(bc BlockChain, tx *types.Transaction) {
+func (b *BlockGen) AddTxWithChain(bc core.BlockChain, tx *types.Transaction) {
 	if b.gasPool == nil {
 		b.SetCoinbase(common.Address{})
 	}
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 	coinbase := b.header.Coinbase()
 	gasUsed := b.header.GasUsed()
-	receipt, _, _, _, err := ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
+	receipt, _, _, _, err := core.ApplyTransaction(b.config, bc, &coinbase, b.gasPool, b.statedb, b.header, tx, &gasUsed, vm.Config{})
 	b.header.SetGasUsed(gasUsed)
 	b.header.SetCoinbase(coinbase)
 	if err != nil {
@@ -239,7 +240,7 @@ func makeHeader(chain consensus_engine.ChainReader, parent *types.Block, state *
 		Root(state.IntermediateRoot(chain.Config().IsS3(parent.Epoch()))).
 		ParentHash(parent.Hash()).
 		Coinbase(parent.Coinbase()).
-		GasLimit(CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
+		GasLimit(core.CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())).
 		Number(new(big.Int).Add(parent.Number(), common.Big1)).
 		Time(time).
 		Header()
