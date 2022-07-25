@@ -74,7 +74,8 @@ func (headers *StageHeaders) Exec(firstCycle bool, badBlockUnwind bool, s *Stage
 		}
 		otherHeight = maxPeersHeight
 	}
-
+	s.state.syncStatus.maxPeersHeight = otherHeight
+	
 	currentHeight := headers.configs.bc.CurrentBlock().NumberU64()
 	if currentHeight >= otherHeight {
 		utils.Logger().Info().

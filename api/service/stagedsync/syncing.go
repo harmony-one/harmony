@@ -12,7 +12,9 @@ import (
 	"github.com/harmony-one/harmony/node/worker"
 	"github.com/ledgerwatch/erigon-lib/kv"
 
+	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
 	"github.com/ledgerwatch/erigon-lib/kv/memdb"
+	"github.com/ledgerwatch/log/v3"
 	//"github.com/ledgerwatch/erigon-lib/kv/mdbx"
 	//"github.com/ledgerwatch/log/v3"
 )
@@ -24,6 +26,13 @@ const (
 	BeaconDownloadedBlocksBucket = "BeaconBlockBodies" // Beacon Block bodies are downloaded, TxHash and UncleHash are getting verified
 	LastMileBlocksBucket         = "LastMileBlocks"    // last mile blocks to catch up with the consensus
 	StageProgressBucket          = "StageProgress"
+	ExtraBlockHashesBucket       = "ExtraBlockHashes" //extra block hashes for backgound process
+
+	// cache db keys
+	StartBlockHeight = "StartBlockHeight"
+	StartBlockHash   = "StartBlockHash"
+	LastBlockHeight  = "LastBlockHeight"
+	LastBlockHash    = "LastBlockHash"
 )
 
 var Buckets = []string{
@@ -33,6 +42,7 @@ var Buckets = []string{
 	BeaconDownloadedBlocksBucket,
 	LastMileBlocksBucket,
 	StageProgressBucket,
+	ExtraBlockHashesBucket,
 }
 
 func CreateStagedSync(
@@ -49,12 +59,17 @@ func CreateStagedSync(
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
+
 	var db kv.RwDB
 	if UseMemDB {
 		db = memdb.New()
 	} else {
-		//db := mdbx.NewMDBX(log.New()).Path("./test_db") .MustOpen()
-		return nil, fmt.Errorf("Staged sync doesn't not supported disk yet")
+		if isBeacon {
+			db = mdbx.NewMDBX(log.New()).Path("cache_beacon_db").MustOpen()
+		} else {
+			db = mdbx.NewMDBX(log.New()).Path("cache_shard_db").MustOpen()
+		}
+		return nil, fmt.Errorf("Staged sync doesn't support disk yet")
 	}
 
 	if errInitDB := initDB(ctx, db); errInitDB != nil {
@@ -62,8 +77,8 @@ func CreateStagedSync(
 	}
 
 	headersCfg := NewStageHeadersCfg(ctx, bc, db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db)
-	bodiesCfg := NewStageBodiesCfg(ctx, bc, db)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon)
+	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon)
 	statesCfg := NewStageStatesCfg(ctx, bc, db)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)
@@ -112,10 +127,10 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 		if err := tx.CreateBucket(GetStageName(name, true, false)); err != nil {
 			return err
 		}
-		// create bucket for prune
-		if err := tx.CreateBucket(GetStageName(name, false, true)); err != nil {
-			return err
-		}
+		// // create bucket for prune
+		// if err := tx.CreateBucket(GetStageName(name, false, true)); err != nil {
+		// 	return err
+		// }
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to initiate db: %w", err)
@@ -141,6 +156,7 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	// 		fmt.Println("error making tx----------->", err)
 	// 		return
 	// 	}
+	// 	fmt.Println("creating tx-----------> 2")
 	// 	defer tx.Rollback()
 	// }
 
@@ -157,13 +173,15 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	}
 	// calculating sync speed (blocks/second)
 	currHead := bc.CurrentBlock().NumberU64()
-	dt := time.Now().Sub(startTime).Seconds()
-	speed := float64(0)
-	if dt > 0 {
-		speed = float64(currHead-startHead) / dt
+	if currHead-startHead > 0 {
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if dt > 0 {
+			speed = float64(currHead-startHead) / dt
+		}
+		syncSpeed := fmt.Sprintf("%.2f", speed)
+		fmt.Println("sync speed:", syncSpeed, "blocks/s")
 	}
-	syncSpeed := fmt.Sprintf("%.2f", speed)
-	fmt.Println("sync speed:", syncSpeed, "blocks/s")
 
 	if loopMinTime != 0 {
 		waitTime := loopMinTime - time.Since(startTime)

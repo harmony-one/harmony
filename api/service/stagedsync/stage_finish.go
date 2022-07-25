@@ -39,6 +39,7 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 		defer tx.Rollback()
 	}
 
+	//TODO: manage this for Turbo Mode
 	// hashesBucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
 	// tx.ClearBucket(hashesBucketName)
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)

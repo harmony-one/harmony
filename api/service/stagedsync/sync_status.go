@@ -22,6 +22,7 @@ const (
 type (
 	syncStatus struct {
 		lastResult     SyncCheckResult
+		maxPeersHeight uint64
 		currentCycle   SyncCycle
 		lastUpdateTime time.Time
 		lock           sync.RWMutex

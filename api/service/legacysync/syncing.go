@@ -1091,6 +1091,11 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
+
+	startTime := time.Now()
+	// totalBlocksSynced := uint32(0)
+	startHead := bc.CurrentBlock().NumberU64()
+	fmt.Print("\033[s") // save the cursor position
 	for {
 		otherHeight := ss.getMaxPeerHeight(isBeacon)
 		currentHeight := bc.CurrentBlock().NumberU64()
@@ -1100,9 +1105,9 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
 		}
-		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				isBeacon, bc.ShardID(), otherHeight, currentHeight)
+		// utils.Logger().Info().
+		// 	Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+		// 		isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
 		size := uint32(otherHeight - currentHeight)
@@ -1118,6 +1123,17 @@ func (ss *StateSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 			break
 		}
 		ss.purgeOldBlocksFromCache()
+		//calculating block speed
+		currHead := bc.CurrentBlock().NumberU64()
+		// totalBlocksSynced += size
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if dt > 0 {
+			speed = float64(currHead-startHead) / dt
+		}
+		blockSpeed := fmt.Sprintf("%.2f", speed)
+		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		fmt.Println("sync block speed:", blockSpeed, "blocks/s")
 	}
 	if consensus != nil {
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {

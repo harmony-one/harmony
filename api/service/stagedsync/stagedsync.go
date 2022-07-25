@@ -671,7 +671,7 @@ func (ss *StagedSync) GetActivePeerNumber() int {
 }
 
 // getConsensusHashes gets all hashes needed to download.
-func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, tx kv.RwTx) error {
+func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 	var wg sync.WaitGroup
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
