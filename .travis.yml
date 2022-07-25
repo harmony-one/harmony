@@ -2,7 +2,7 @@ os: linux
 dist: bionic
 language: go
 go:
-  - 1.16
+  - 1.18
 go_import_path: github.com/harmony-one/harmony
 cache:
   directories:
@@ -16,9 +16,10 @@ install:
   # default working directory with source code is automatically set to
   #   /home/travis/gopath/src/github.com/harmony-one/harmony
   # https://docs.travis-ci.com/user/languages/go/#go-import-path
+  - echo $TRAVIS_PULL_REQUEST_BRANCH
   - git clone https://github.com/harmony-one/mcl.git $GOPATH/src/github.com/harmony-one/mcl
   - git clone https://github.com/harmony-one/bls.git $GOPATH/src/github.com/harmony-one/bls
-  - git clone https://github.com/harmony-one/harmony-test $GOPATH/src/github.com/harmony-one/harmony-test
+  - git clone https://github.com/harmony-one/harmony-test.git $GOPATH/src/github.com/harmony-one/harmony-test
   - (cd $GOPATH/src/github.com/harmony-one/mcl; make -j4)
   - (cd $GOPATH/src/github.com/harmony-one/bls; make BLS_SWAP_G=1 -j4)
   - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26

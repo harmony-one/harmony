@@ -500,7 +500,7 @@ func (vc *viewChange) GetViewIDBitmap(viewID uint64) *bls_cosi.Mask {
 	return vc.viewIDBitmap[viewID]
 }
 
-// GetM1Payload returns the m1Payload
+// GetM1Payload returns the m1Payload.
 func (vc *viewChange) GetM1Payload() []byte {
 	return vc.m1Payload
 }

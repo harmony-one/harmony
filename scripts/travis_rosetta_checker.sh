@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -e
+
+echo $TRAVIS_PULL_REQUEST_BRANCH
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-CACHE_DIR="docker_images"
-mkdir -p $CACHE_DIR
-echo "pulling cached docker img"
-docker load -i $CACHE_DIR/images.tar || true
-docker pull harmonyone/localnet-test
-echo "saving cached docker img"
-docker save -o $CACHE_DIR/images.tar harmonyone/localnet-test
+echo $DIR
+echo $GOPATH
+cd $GOPATH/src/github.com/harmony-one/harmony-test
+git fetch
+git checkout $TRAVIS_PULL_REQUEST_BRANCH || true
+git pull
+git branch --show-current
+cd localnet
+docker build -t harmonyone/localnet-test .
 docker run -v "$DIR/../:/go/src/github.com/harmony-one/harmony" harmonyone/localnet-test -r

@@ -3,7 +3,6 @@
 // and not really importable packages.
 //
 //go:build tools
-// +build tools
 
 // Package tools provides build tools necessary for Harmony.
 package tools
