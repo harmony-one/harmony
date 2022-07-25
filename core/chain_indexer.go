@@ -34,6 +34,12 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 )
 
+type Chain interface {
+	GetCanonicalHash(number uint64) common.Hash
+	GetHeader(hash common.Hash, number uint64) *block.Header
+	ChainDb() ethdb.Database
+}
+
 // ChainIndexerBackend defines the methods needed to process chain segments in
 // the background and write the segment results into the database. These can be
 // used to create filter blooms or CHTs.
@@ -69,7 +75,7 @@ type ChainIndexerChain interface {
 // after an entire section has been finished or in case of rollbacks that might
 // affect already finished sections.
 type ChainIndexer struct {
-	chainDb  ethdb.Database      // Chain database to index the data from
+	chainDb  Chain               // Chain database to index the data from
 	indexDb  ethdb.Database      // Prefixed table-view of the db to write index metadata into
 	backend  ChainIndexerBackend // Background processor generating the index data content
 	children []*ChainIndexer     // Child indexers to cascade chain updates to
@@ -99,7 +105,7 @@ type ChainIndexer struct {
 // NewChainIndexer creates a new chain indexer to do background processing on
 // chain segments of a given size after certain number of confirmations passed.
 // The throttling parameter might be used to prevent database thrashing.
-func NewChainIndexer(chainDb ethdb.Database, indexDb ethdb.Database, backend ChainIndexerBackend, section, confirm uint64, throttling time.Duration, kind string) *ChainIndexer {
+func NewChainIndexer(chainDb Chain, indexDb ethdb.Database, backend ChainIndexerBackend, section, confirm uint64, throttling time.Duration, kind string) *ChainIndexer {
 	logger := utils.Logger().With().Str("type", kind).Logger()
 	c := &ChainIndexer{
 		chainDb:     chainDb,
@@ -225,8 +231,8 @@ func (c *ChainIndexer) eventLoop(currentHeader *block.Header, events chan ChainH
 				// Reorg to the common ancestor if needed (might not exist in light sync mode, skip reorg then)
 				// TODO(karalabe, zsfelfoldi): This seems a bit brittle, can we detect this case explicitly?
 
-				if rawdb.ReadCanonicalHash(c.chainDb, prevHeader.Number().Uint64()) != prevHash {
-					if h := rawdb.FindCommonAncestor(c.chainDb, prevHeader, header); h != nil {
+				if c.chainDb.GetCanonicalHash(prevHeader.Number().Uint64()) != prevHash {
+					if h := rawdb.FindCommonAncestor(c.chainDb.ChainDb(), prevHeader, header); h != nil {
 						c.newHead(h.Number().Uint64(), true)
 					}
 				}
@@ -282,7 +288,7 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 		if sections > c.knownSections {
 			if c.knownSections < c.checkpointSections {
 				// syncing reached the checkpoint, verify section head
-				syncedHead := rawdb.ReadCanonicalHash(c.chainDb, c.checkpointSections*c.sectionSize-1)
+				syncedHead := c.chainDb.GetCanonicalHash(c.checkpointSections*c.sectionSize - 1)
 				if syncedHead != c.checkpointHead {
 					c.log.Error().
 						Uint64("number", c.checkpointSections*c.sectionSize-1).
@@ -397,11 +403,11 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 	}
 
 	for number := section * c.sectionSize; number < (section+1)*c.sectionSize; number++ {
-		hash := rawdb.ReadCanonicalHash(c.chainDb, number)
+		hash := c.chainDb.GetCanonicalHash(number)
 		if hash == (common.Hash{}) {
 			return common.Hash{}, fmt.Errorf("canonical block #%d unknown", number)
 		}
-		header := rawdb.ReadHeader(c.chainDb, hash, number)
+		header := c.chainDb.GetHeader(hash, number)
 		if header == nil {
 			return common.Hash{}, fmt.Errorf("block #%d [%x…] not found", number, hash[:4])
 		} else if header.ParentHash() != lastHead {

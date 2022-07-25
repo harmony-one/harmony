@@ -87,6 +87,14 @@ type KakashiDB struct {
 	cache      *lru.Cache
 }
 
+func (db *KakashiDB) GetCanonicalHash(number uint64) common.Hash {
+	return rawdb.ReadCanonicalHash(db, number)
+}
+
+func (db *KakashiDB) ChainDb() ethdb.Database {
+	return db
+}
+
 const (
 	MB                 = 1024 * 1024
 	BLOCKS_DUMP        = 512 // must >= 256
