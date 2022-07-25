@@ -149,6 +149,8 @@ var (
 		legacyTPBlacklistFileFlag,
 		localAccountsFileFlag,
 		allowedTxsFileFlag,
+		tpPriceLimitFlag,
+		tpPriceBumpFlag,
 	}
 
 	pprofFlags = []cli.Flag{
@@ -1205,6 +1207,16 @@ var (
 		Usage:    "maximum lifetime of transactions in the pool as a golang duration string",
 		DefValue: defaultConfig.TxPool.Lifetime.String(),
 	}
+	tpPriceLimitFlag = cli.IntFlag{
+		Name:     "txpool.pricelimit",
+		Usage:    "minimum gas price to enforce for acceptance into the pool",
+		DefValue: int(defaultConfig.TxPool.PriceLimit),
+	}
+	tpPriceBumpFlag = cli.IntFlag{
+		Name:     "txpool.pricebump",
+		Usage:    "minimum price bump to replace an already existing transaction (nonce)",
+		DefValue: int(defaultConfig.TxPool.PriceLimit),
+	}
 )
 
 func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
@@ -1256,6 +1268,20 @@ func applyTxPoolFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 			panic(fmt.Sprintf("Invalid value for txpool.lifetime: %v", err))
 		}
 		config.TxPool.Lifetime = value
+	}
+	if cli.IsFlagChanged(cmd, tpPriceLimitFlag) {
+		value := cli.GetIntFlagValue(cmd, tpPriceLimitFlag)
+		if value <= 0 {
+			panic("Must provide positive value for txpool.pricelimit")
+		}
+		config.TxPool.PriceLimit = harmonyconfig.PriceLimit(value)
+	}
+	if cli.IsFlagChanged(cmd, tpPriceBumpFlag) {
+		value := cli.GetIntFlagValue(cmd, tpPriceBumpFlag)
+		if value <= 0 {
+			panic("Must provide positive value for txpool.pricebump")
+		}
+		config.TxPool.PriceBump = uint64(value)
 	}
 }
 

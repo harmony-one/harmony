@@ -367,6 +367,12 @@ func init() {
 		if confTree.Get("TxPool.Lifetime") == nil {
 			confTree.Set("TxPool.Lifetime", defaultConfig.TxPool.Lifetime.String())
 		}
+		if confTree.Get("TxPool.PriceLimit") == nil {
+			confTree.Set("TxPool.PriceLimit", defaultConfig.TxPool.PriceLimit)
+		}
+		if confTree.Get("TxPool.PriceBump") == nil {
+			confTree.Set("TxPool.PriceBump", defaultConfig.TxPool.PriceBump)
+		}
 
 		confTree.Set("Version", "2.5.8")
 		return confTree

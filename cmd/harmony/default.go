@@ -88,6 +88,8 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		AccountQueue:      core.DefaultTxPoolConfig.AccountQueue,
 		GlobalQueue:       core.DefaultTxPoolConfig.GlobalQueue,
 		Lifetime:          core.DefaultTxPoolConfig.Lifetime,
+		PriceLimit:        harmonyconfig.PriceLimit(core.DefaultTxPoolConfig.PriceLimit),
+		PriceBump:         core.DefaultTxPoolConfig.PriceBump,
 	},
 	Sync: getDefaultSyncConfig(defNetworkType),
 	Pprof: harmonyconfig.PprofConfig{
