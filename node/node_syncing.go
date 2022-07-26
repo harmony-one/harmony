@@ -130,6 +130,7 @@ func (node *Node) createStagedSync(bc *core.BlockChain, isBeacon bool) *stagedsy
 
 	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
 		node.GetSyncID(), bc, role, isBeacon, isExplorer,
+		node.NodeConfig.StagedSyncTurboMode,
 		node.NodeConfig.UseMemDB,
 		node.NodeConfig.DoubleCheckBlockHashes,
 		node.NodeConfig.MaxBlocksPerSyncCycle); err != nil {

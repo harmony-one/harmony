@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -47,12 +48,8 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		if targetHeight, err = GetStageProgress(etx, BlockBodies, isBeacon); err != nil {
 			return err
 		}
-		// if currProgress, err = GetStageProgress(etx, States, isBeacon); err != nil {
-		// 	return err
-		// }
-		// if currProgress == 0 {
 		currProgress = stg.configs.bc.CurrentBlock().NumberU64()
-		//}
+
 		return nil
 	}); errV != nil {
 		return errV
@@ -78,14 +75,13 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 
 	firstKey := fmt.Sprintf("%020d", currProgress+1)
 	verifyAllSig := true //TODO: move to configs
-
-	// update current progress before return
-	// defer stg.saveProgress(s, nil)
-
 	startTime := time.Now()
 	startBlock := currProgress
 
-	fmt.Print("\033[s") // save the cursor position
+	fmt.Print("\033[s")        // save the cursor position
+	var newBlocks types.Blocks //:= make([]types.Block, 100)
+	nBlock := int(0)
+
 	for n, blockBytes, err := c.Seek([]byte(firstKey)); n != nil; n, blockBytes, err = c.Next() {
 		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
 		if err != nil {
@@ -105,6 +101,9 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 			// TODO: handle bad block
 			return err
 		}
+
+		// TODO:  use hash as key and here check key (which is hash) against block.header.hash
+
 		// gotHash := block.Hash()
 		// if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
 		// 	utils.Logger().Warn().
@@ -115,12 +114,11 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		// }
 
 		if block.NumberU64() <= currProgress {
-			utils.Logger().Warn().
-				Err(err).
-				Uint64("block number", block.NumberU64()).
-				Uint64("current head", currProgress).
-				Msg("block number doesn't match with current head")
-			fmt.Print("\033[s")
+			// utils.Logger().Warn().
+			// 	Err(err).
+			// 	Uint64("block number", block.NumberU64()).
+			// 	Uint64("current head", currProgress).
+			// 	Msg("block number doesn't match with current head")
 			continue
 		}
 
@@ -135,35 +133,39 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 				// TODO: handle bad block
 				return err
 			}
+
+			// err := stg.configs.bc.Engine().VerifyHeader(stg.configs.bc, block.Header(), verifySeal)
+			// if err == engine.ErrUnknownAncestor {
+			// 	return err
+			// } else if err != nil {
+			// 	utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] failed verifying signatures for new block %d", block.NumberU64())
+
+			// 	if !verifyAllSig {
+			// 		utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
+			// 		for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
+			// 			if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
+			// 				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+			// 				return err
+			// 			}
+			// 		}
+
+			// 		currProgress = stg.configs.bc.CurrentBlock().NumberU64()
+			// 	}
+			// 	return err
+			// }
 		}
 
-		// Verify block signatures
+		//newBlocks[nBlock] = *block
+		newBlocks = append(newBlocks, block)
+		if nBlock < 99 && block.NumberU64() != targetHeight {
+			nBlock++
+			continue
+		}
 
-		// if block.NumberU64() > 1 {
-
-		// 	verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
-
-		// 	err := stg.configs.bc.Engine().VerifyHeader(stg.configs.bc, block.Header(), verifySeal)
-		// 	if err == engine.ErrUnknownAncestor {
-		// 		return err
-		// 	} else if err != nil {
-		// 		utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] failed verifying signatures for new block %d", block.NumberU64())
-
-		// 		if !verifyAllSig {
-		// 			utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
-		// 			for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-		// 				if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
-		// 					utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-		// 					return err
-		// 				}
-		// 			}
-
-		// 			currProgress = stg.configs.bc.CurrentBlock().NumberU64()
-		// 		}
-		// 		return err
-		// 	}
-		// }
-		_, err = stg.configs.bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
+		// insert downloaded block into chain
+		//_, err = stg.configs.bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
+		headBeforeNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
+		_, err = stg.configs.bc.InsertChain(newBlocks, false /* verifyHeaders */)
 		if err != nil {
 			// TODO: handle chain roll back because of bad block
 			utils.Logger().Error().
@@ -173,6 +175,17 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 					block.NumberU64(),
 					block.ShardID(),
 				)
+			// roll back bc
+			utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last added blocks!")
+			headAfterNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
+			nNewAddedBlocks := headAfterNewBlocks - headBeforeNewBlocks
+			for i := uint64(0); i < nNewAddedBlocks; i++ {
+				if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
+					utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+					return err
+				}
+			}
+
 			return err
 		}
 		utils.Logger().Info().
@@ -191,15 +204,20 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 					"StakingTxn %d: %s, %v", i, tx.StakingType().String(), tx.StakingMessage(),
 				)
 		}
+
+		nBlock = 0
+		newBlocks = newBlocks[:0]
+
 		//calculating block speed
 		dt := time.Now().Sub(startTime).Seconds()
 		speed := float64(0)
-		if (dt>0) {
-			speed = float64(currProgress - startBlock) / dt
+		if dt > 0 {
+			speed = float64(currProgress-startBlock) / dt
 		}
 		blockSpeed := fmt.Sprintf("%.2f", speed)
 
-		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed,"blocks/s",")")
+		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package stagedsync
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
@@ -40,8 +41,10 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 	}
 
 	//TODO: manage this for Turbo Mode
-	// hashesBucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
-	// tx.ClearBucket(hashesBucketName)
+	hashesBucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+	tx.ClearBucket(hashesBucketName)
+	extrahashesBucketName := GetBucketName(ExtraBlockHashesBucket, s.state.isBeacon)
+	tx.ClearBucket(extrahashesBucketName)
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 	tx.ClearBucket(blocksBucketName)
 
@@ -54,6 +57,29 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 		}
 	}
 
+	return nil
+}
+
+func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
+	useExternalTx := tx != nil
+	if !useExternalTx {
+		var err error
+		tx, err = bh.configs.db.BeginRw(context.Background())
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+	}
+	bucketName := GetBucketName(BlockHashesBucket, isBeacon)
+	if err := tx.ClearBucket(bucketName); err != nil {
+		return err
+	}
+
+	if !useExternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

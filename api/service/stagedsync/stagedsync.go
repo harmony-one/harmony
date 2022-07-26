@@ -69,6 +69,8 @@ type StagedSync struct {
 	MaxBlocksPerSyncCycle uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
+	// use turbo mode for staged sync
+	StagedSyncTurboMode bool
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -210,6 +212,7 @@ func New(ctx context.Context,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
 	pruneOrder PruneOrder,
+	TurboMode bool,
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64) *StagedSync {
@@ -256,6 +259,7 @@ func New(ctx context.Context,
 		downloadedBlocks:       make(map[string][]byte),
 		lastMileBlocks:         []*types.Block{},
 		syncConfig:             &SyncConfig{},
+		StagedSyncTurboMode:    TurboMode,
 		UseMemDB:               UseMemDB,
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,

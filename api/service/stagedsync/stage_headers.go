@@ -55,7 +55,7 @@ func (headers *StageHeaders) Exec(firstCycle bool, badBlockUnwind bool, s *Stage
 	useExternalTx := tx != nil
 	if !useExternalTx {
 		var err error
-		tx, err = headers.configs.db.BeginRw(context.Background())
+		tx, err = headers.configs.db.BeginRw(headers.configs.ctx)
 		if err != nil {
 			return err
 		}

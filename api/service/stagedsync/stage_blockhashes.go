@@ -26,6 +26,7 @@ type StageBlockHashesCfg struct {
 	ctx           context.Context
 	bc            *core.BlockChain
 	db            kv.RwDB
+	turbo         bool
 	turboModeCh   chan struct{}
 	bgProcRunning bool
 	isBeacon      bool
@@ -38,8 +39,8 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(ctx context.Context, bc *core.BlockChain, db kv.RwDB, isBeacon bool) StageBlockHashesCfg {
-	cachedb, err := InitHashesCacheDB(ctx, isBeacon)
+func NewStageBlockHashesCfg(ctx context.Context, bc *core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool) StageBlockHashesCfg {
+	cachedb, err := initHashesCacheDB(ctx, isBeacon)
 	if err != nil {
 		panic("can't initialize sync caches")
 	}
@@ -47,12 +48,13 @@ func NewStageBlockHashesCfg(ctx context.Context, bc *core.BlockChain, db kv.RwDB
 		ctx:      ctx,
 		bc:       bc,
 		db:       db,
+		turbo:    turbo,
 		isBeacon: isBeacon,
 		cachedb:  cachedb,
 	}
 }
 
-func InitHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
+func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
 	// create caches db
 	cachedbName := "cache_hashes"
 	if isBeacon {
@@ -88,13 +90,12 @@ func InitHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
-	currHash := []byte{}
 	targetHeight := uint64(0)
 	isBeacon := s.state.isBeacon
 	startHash := bh.configs.bc.CurrentBlock().Hash()
 
 	// terminate background process in turbo mode
-	if bh.configs.turboModeCh != nil && bh.configs.bgProcRunning {
+	if bh.configs.turbo && bh.configs.turboModeCh != nil && bh.configs.bgProcRunning {
 		bh.configs.turboModeCh <- struct{}{}
 	}
 
@@ -108,24 +109,29 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 		}
 		if currProgress > 0 {
 			key := strconv.FormatUint(currProgress, 10)
-			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
-			if currHash, err = etx.GetOne(bucketName, []byte(key)); err != nil {
+			bucketName := GetBucketName(BlockHashesBucket, isBeacon)
+			currHash := []byte{}
+			if currHash, err = etx.GetOne(bucketName, []byte(key)); err != nil || len(currHash[:]) == 0 {
 				//TODO: currProgress and DB don't match. Either re-download all or verify db and set currProgress to last
-				startHash.SetBytes(bh.configs.bc.CurrentBlock().Hash().Bytes())
-			} else {
-				startHash.SetBytes(currHash[:])
+				return err
 			}
-		} else {
-			startHash = bh.configs.bc.CurrentBlock().Hash()
-			currProgress = bh.configs.bc.CurrentBlock().NumberU64()
+			startHash.SetBytes(currHash[:])
 		}
 		return nil
 	}); errV != nil {
 		return errV
 	}
 
+	if currProgress == 0 {
+		if err := bh.clearBlockHashesBucket(tx, s.state.isBeacon); err != nil {
+			return err
+		}
+		startHash = bh.configs.bc.CurrentBlock().Hash()
+		currProgress = bh.configs.bc.CurrentBlock().NumberU64()
+	}
+
 	if currProgress >= targetHeight {
-		if currProgress < s.state.syncStatus.maxPeersHeight {
+		if bh.configs.turbo && currProgress < s.state.syncStatus.maxPeersHeight {
 			// TODO: Turbo mode
 			bh.configs.turboModeCh = make(chan struct{})
 			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
@@ -134,36 +140,37 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 	}
 
 	// check whether any block hashes after curr height is cached
-	var cacheHash []byte
-	if cacheHash, err = bh.getHashFromCache(currProgress); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed: %v", err)
-		return fmt.Errorf("fetch cache progress for block hashes stage failed")
-	} else {
-		if len(cacheHash[:]) > 0 {
-			// get blocks from cached db rather than calling peers, and update current progress
-			currProgress, startHash, err = bh.loadBlockHashesFromCache(s, currProgress, targetHeight, tx)
-			if err != nil {
-				utils.Logger().Info().
-					Msgf("[STAGED_SYNC] fetch cached block hashes failed: %v", err)
-				return fmt.Errorf("fetch cached block hashes failed")
+	if bh.configs.turbo {
+		var cacheHash []byte
+		if cacheHash, err = bh.getHashFromCache(currProgress + 1); err != nil {
+			utils.Logger().Info().
+				Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed: %v", err)
+			return fmt.Errorf("fetch cache progress for block hashes stage failed")
+		} else {
+			if len(cacheHash[:]) > 0 {
+				// get blocks from cached db rather than calling peers, and update current progress
+				currProgress, startHash, err = bh.loadBlockHashesFromCache(s, currProgress, targetHeight, tx)
+				if err != nil {
+					utils.Logger().Info().
+						Msgf("[STAGED_SYNC] fetch cached block hashes failed: %v", err)
+					return fmt.Errorf("fetch cached block hashes failed")
+				}
 			}
 		}
 	}
 
 	if currProgress >= targetHeight {
-		if currProgress < s.state.syncStatus.maxPeersHeight {
+		if bh.configs.turbo && currProgress < s.state.syncStatus.maxPeersHeight {
 			// TODO: Turbo mode
 			bh.configs.turboModeCh = make(chan struct{})
 			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
 		}
-
 		return nil
 	}
 
 	size := uint32(0)
 
-	fmt.Print("\033[s") // save the cursor position
+	//fmt.Print("\033[s") // save the cursor position
 	startTime := time.Now()
 	startBlock := currProgress
 	for ok := true; ok; ok = currProgress < targetHeight {
@@ -203,12 +210,12 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 		}
 		blockSpeed := fmt.Sprintf("%.2f", speed)
 
-		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		//fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
 		fmt.Println("downloading block hash progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
 	// continue downloading in background
-	if currProgress < s.state.syncStatus.maxPeersHeight {
+	if bh.configs.turbo && currProgress < s.state.syncStatus.maxPeersHeight {
 		// TODO: Turbo mode
 		bh.configs.turboModeCh = make(chan struct{})
 		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
@@ -219,6 +226,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64, startHash common.Hash) error {
 	size := uint32(0)
 	currProgress := startHeight
+	currHash := startHash
 	bh.configs.bgProcRunning = true
 
 	// retrieve bg progress and last hash
@@ -229,17 +237,17 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 				Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed: %v", err)
 			return fmt.Errorf("retrieving cache progress for block hashes stage failed")
 		} else {
-			if len(progressBytes) > 0 {
-				savedProgress, _ := strconv.ParseUint(string(progressBytes), 10, 64)
+			if len(progressBytes[:]) > 0 {
+				savedProgress, _ := unmarshalData(progressBytes)
 				if savedProgress > startHeight {
-					startHeight = savedProgress
+					currProgress = savedProgress
 					// retrieve start hash
-					if startHashBytes, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHash)); err != nil {
+					if lastBlockHash, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHash)); err != nil {
 						utils.Logger().Info().
 							Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed: %v", err)
 						return fmt.Errorf("retrieving cache progress for block hashes stage failed")
 					} else {
-						startHash.SetBytes(startHashBytes[:])
+						currHash.SetBytes(lastBlockHash[:])
 					}
 				}
 			}
@@ -250,7 +258,6 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	if errV != nil {
 		return errV
 	}
-
 
 	for {
 		select {
@@ -271,8 +278,8 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 			}
 
 			// Gets consensus hashes.
-			if err := s.state.getConsensusHashes(startHash[:], size); err != nil {
-				return errors.Wrap(err, "getConsensusHashes")
+			if err := s.state.getConsensusHashes(currHash[:], size); err != nil {
+				return err
 			}
 
 			// selects the most common peer config based on their block hashes and doing the clean up
@@ -282,7 +289,7 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 
 			// save the downloaded files to db
 			var err error
-			if currProgress, startHash, err = bh.saveBlockHashesInCacheDB(s, currProgress, startHash); err != nil {
+			if currProgress, currHash, err = bh.saveBlockHashesInCacheDB(s, currProgress, currHash); err != nil {
 				return err
 			}
 		}
@@ -291,7 +298,7 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	// return nil
 }
 
-func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
+func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) error {
 	useExternalTx := tx != nil
 	if !useExternalTx {
 		var err error
@@ -317,7 +324,7 @@ func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
 // saves block hashes to db (map from block heigh to block hash)
 func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress uint64, startHash common.Hash, tx kv.RwTx) (p uint64, h common.Hash, err error) {
 	p = progress
-	h.SetBytes([]byte{})
+	h.SetBytes(startHash.Bytes())
 	lastAddedID := int(0) // the first id won't be added
 	saved := false
 
@@ -368,16 +375,16 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 	if err = s.Update(tx, p); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving progress for block hashes stage failed: %v", err)
-		return p, h, fmt.Errorf("saving progress for block hashes stage failed")
+		return progress, startHash, fmt.Errorf("saving progress for block hashes stage failed")
 	}
 
-	if !saved {
-		return p, h, fmt.Errorf("save downloaded block hashes failed, lastAddedID is %d but is supposed to be %d", lastAddedID, len(s.state.syncConfig.peers[0].blockHashes)-1) //len(configPeer.blockHashes)-1)
+	if len(s.state.syncConfig.peers) > 0 && len(s.state.syncConfig.peers[0].blockHashes) > 0 && !saved {
+		return progress, startHash, fmt.Errorf("save downloaded block hashes failed, lastAddedID is %d but is supposed to be %d", lastAddedID, len(s.state.syncConfig.peers[0].blockHashes)-1) //len(configPeer.blockHashes)-1)
 	}
 
 	if !useExternalTx {
 		if err := tx.Commit(); err != nil {
-			return p, h, err
+			return progress, startHash, err
 		}
 	}
 	return p, h, nil
@@ -390,11 +397,11 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 	lastAddedID := int(0) // the first id won't be added
 	saved := false
 
-	tx, err := bh.configs.cachedb.BeginRw(context.Background())
+	etx, err := bh.configs.cachedb.BeginRw(context.Background())
 	if err != nil {
 		return p, h, err
 	}
-	defer tx.Rollback()
+	defer etx.Rollback()
 
 	s.state.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		for id, blockHash := range configPeer.blockHashes {
@@ -402,7 +409,7 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 				continue
 			}
 			key := strconv.FormatUint(p+1, 10)
-			if err := tx.Put(BlockHashesBucket, []byte(key), blockHash); err != nil {
+			if err := etx.Put(BlockHashesBucket, []byte(key), blockHash); err != nil {
 				utils.Logger().Warn().
 					Err(err).
 					Int("block hash index", id).
@@ -423,26 +430,25 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 		return
 	})
 
-	// save cache progress (last block height) hash
-	k := strconv.FormatUint(p, 10)
-	if err = tx.Put(StageProgressBucket, []byte(LastBlockHeight), []byte(k)); err != nil {
+	// save cache progress (last block height)
+	if err = etx.Put(StageProgressBucket, []byte(LastBlockHeight), marshalData(p)); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving cache progress for block hashes stage failed: %v", err)
 		return p, h, fmt.Errorf("saving cache progress for block hashes stage failed")
 	}
 
 	// save cache progress
-	if err = tx.Put(StageProgressBucket, []byte(LastBlockHash), h.Bytes()); err != nil {
+	if err = etx.Put(StageProgressBucket, []byte(LastBlockHash), h.Bytes()); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving cache last block hash for block hashes stage failed: %v", err)
 		return p, h, fmt.Errorf("saving cache last block hash for block hashes stage failed")
 	}
 
-	if !saved {
+	if len(s.state.syncConfig.peers) > 0 && len(s.state.syncConfig.peers[0].blockHashes) > 0 && !saved {
 		return p, h, fmt.Errorf("caching downloaded block hashes failed, lastAddedID:", lastAddedID)
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := etx.Commit(); err != nil {
 		return p, h, err
 	}
 	return p, h, nil
@@ -477,18 +483,17 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 
 	p = startHeight
 	var lastHash []byte
-
+	h.SetBytes(lastHash[:])
 	useExternalTx := tx != nil
 	if !useExternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)
 		if err != nil {
-			h.SetBytes(lastHash[:])
 			return p, h, err
 		}
 		defer tx.Rollback()
 	}
 
-	bh.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
+	if errV := bh.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
 		// load block hashes from cache db snd copy them to main sync db
 		for ok := true; ok; ok = p < targetHeight {
 			key := strconv.FormatUint(p+1, 10)
@@ -500,6 +505,9 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 					Msg("[STAGED_SYNC] retrieve block hash from cache failed")
 				return err
 			}
+			if len(lastHash[:]) == 0 {
+				return nil
+			}
 			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
 			if err = tx.Put(bucketName, []byte(key), lastHash); err != nil {
 				return err
@@ -507,8 +515,8 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 			p++
 		}
 		// load extra block hashes from cache db snd copy them to bg db to download in background
-		pExtraHashes := p + 1
-		for ok := true; ok; ok = pExtraHashes < targetHeight+1000 {
+		pExtraHashes := p
+		for ok := true; ok; ok = pExtraHashes < p+1000 {
 			key := strconv.FormatUint(pExtraHashes+1, 10)
 			newHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
 			if err != nil {
@@ -518,6 +526,9 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 					Msg("[STAGED_SYNC] retrieve extra block hashes for background process failed")
 				break
 			}
+			if len(newHash[:]) == 0 {
+				return nil
+			}
 			bucketName := GetBucketName(ExtraBlockHashesBucket, s.state.isBeacon)
 			if err = tx.Put(bucketName, []byte(key), newHash); err != nil {
 				break
@@ -525,7 +536,9 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 			pExtraHashes++
 		}
 		return nil
-	})
+	}); errV != nil {
+		return startHeight, h, errV
+	}
 
 	// set last hash
 	h.SetBytes(lastHash[:])
@@ -534,12 +547,12 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 	if err = s.Update(tx, p); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving retrieved cached progress for block hashes stage failed: %v", err)
-		return p, h, fmt.Errorf("saving retrieved cached progress for block hashes stage failed")
+		return startHeight, h, err
 	}
 
 	// update the progress
 	if err := tx.Commit(); err != nil {
-		return p, h, err
+		return startHeight, h, err
 	}
 
 	return p, h, nil

@@ -53,6 +53,7 @@ func CreateStagedSync(
 	role nodeconfig.Role,
 	isBeacon bool,
 	isExplorer bool,
+	TurboMode bool,
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
@@ -77,8 +78,8 @@ func CreateStagedSync(
 	}
 
 	headersCfg := NewStageHeadersCfg(ctx, bc, db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon)
-	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon, TurboMode)
+	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon, TurboMode)
 	statesCfg := NewStageStatesCfg(ctx, bc, db)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)
@@ -106,6 +107,7 @@ func CreateStagedSync(
 		stages,
 		DefaultUnwindOrder,
 		DefaultPruneOrder,
+		TurboMode,
 		UseMemDB,
 		doubleCheckBlockHashes,
 		maxBlocksPerCycle,
@@ -151,12 +153,9 @@ func (s *StagedSync) SyncLoop(bc *core.BlockChain, worker *worker.Worker, isBeac
 	// var tx kv.RwTx
 	// if canRunCycleInOneTransaction {
 	// 	var err error
-	// 	fmt.Println("creating tx----------->", s.MaxBlocksPerSyncCycle)
 	// 	if tx, err = s.DB().BeginRw(context.Background()); err != nil {
-	// 		fmt.Println("error making tx----------->", err)
 	// 		return
 	// 	}
-	// 	fmt.Println("creating tx-----------> 2")
 	// 	defer tx.Rollback()
 	// }
 
