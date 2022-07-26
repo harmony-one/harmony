@@ -124,6 +124,8 @@ func TestHarmonyFlags(t *testing.T) {
 					AccountQueue:      64,
 					GlobalQueue:       5120,
 					Lifetime:          30 * time.Minute,
+					PriceLimit:        100e9,
+					PriceBump:         1,
 				},
 				Pprof: harmonyconfig.PprofConfig{
 					Enabled:            false,
@@ -1012,6 +1014,8 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountQueue:      defaultConfig.TxPool.AccountQueue,
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
@@ -1026,6 +1030,8 @@ func TestTxPoolFlags(t *testing.T) {
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
@@ -1040,6 +1046,8 @@ func TestTxPoolFlags(t *testing.T) {
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
 				LocalAccountsFile: defaultConfig.TxPool.LocalAccountsFile,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
@@ -1054,6 +1062,8 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountQueue:      defaultConfig.TxPool.AccountQueue,
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
@@ -1068,6 +1078,8 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountQueue:      defaultConfig.TxPool.AccountQueue,
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
@@ -1082,10 +1094,12 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountQueue:      defaultConfig.TxPool.AccountQueue,
 				GlobalQueue:       defaultConfig.TxPool.GlobalQueue,
 				Lifetime:          defaultConfig.TxPool.Lifetime,
+				PriceLimit:        100e9,
+				PriceBump:         1,
 			},
 		},
 		{
-			args: []string{"--txpool.accountqueue", "128", "--txpool.globalqueue", "10240", "--txpool.lifetime", "15m"},
+			args: []string{"--txpool.accountqueue", "128", "--txpool.globalqueue", "10240", "--txpool.lifetime", "15m", "--txpool.pricelimit", "100", "--txpool.pricebump", "2"},
 			expConfig: harmonyconfig.TxPoolConfig{
 				BlacklistFile:     defaultConfig.TxPool.BlacklistFile,
 				AllowedTxsFile:    defaultConfig.TxPool.AllowedTxsFile,
@@ -1096,6 +1110,8 @@ func TestTxPoolFlags(t *testing.T) {
 				AccountQueue:      128,
 				GlobalQueue:       10240,
 				Lifetime:          15 * time.Minute,
+				PriceLimit:        100,
+				PriceBump:         2,
 			},
 		},
 	}
