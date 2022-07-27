@@ -2,7 +2,6 @@ package stagedsync
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ledgerwatch/erigon-lib/kv"
 )

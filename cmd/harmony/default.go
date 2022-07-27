@@ -140,8 +140,9 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 }
 
 var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
+	TurboMode:              true,
 	DoubleCheckBlockHashes: false,
-	MaxBlocksPerSyncCycle:  4096, // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
+	MaxBlocksPerSyncCycle:  1024, // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
 	UseMemDB:               true, // it uses memory by default. set it to false to use disk
 }
 
