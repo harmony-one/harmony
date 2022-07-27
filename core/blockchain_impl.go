@@ -123,6 +123,7 @@ type BlockChainImpl struct {
 	chainConfig            *params.ChainConfig // Chain & network configuration
 	cacheConfig            *CacheConfig        // Cache configuration for pruning
 	pruneBeaconChainEnable bool                // pruneBeaconChainEnable is enable prune BeaconChain feature
+	shardID                uint32              // Shard number
 
 	db     ethdb.Database // Low level persistent database to store final content in
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
@@ -178,6 +179,17 @@ type BlockChainImpl struct {
 	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
+
+	options Options
+}
+
+// NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
+func NewBlockChainWithOptions(
+	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	engine consensus_engine.Engine, vmConfig vm.Config,
+	shouldPreserve func(block *types.Block) bool, options Options,
+) (*BlockChainImpl, error) {
+	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, options)
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -188,6 +200,13 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainImpl, error) {
+	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, Options{})
+}
+
+func newBlockChainWithOptions(
+	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	engine consensus_engine.Engine, vmConfig vm.Config,
+	shouldPreserve func(block *types.Block) bool, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -240,6 +259,7 @@ func NewBlockChain(
 		badBlocks:                     badBlocks,
 		pendingSlashes:                slash.Records{},
 		maxGarbCollectedBlkNum:        -1,
+		options:                       options,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
@@ -259,6 +279,7 @@ func NewBlockChain(
 	if err := bc.loadLastState(); err != nil {
 		return nil, err
 	}
+	bc.shardID = bc.CurrentBlock().ShardID()
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -453,9 +474,8 @@ func (bc *BlockChainImpl) SetHead(head uint64) error {
 	return bc.loadLastState()
 }
 
-// TODO: use a better solution before resharding shuffle nodes to different shards.
 func (bc *BlockChainImpl) ShardID() uint32 {
-	return bc.CurrentBlock().ShardID()
+	return bc.shardID
 }
 
 func (bc *BlockChainImpl) CurrentBlock() *types.Block {
@@ -628,6 +648,10 @@ func (bc *BlockChainImpl) ExportN(w io.Writer, first uint64, last uint64) error 
 	}
 
 	return nil
+}
+
+func (bc *BlockChainImpl) WriteHeadBlock(block *types.Block) error {
+	return bc.writeHeadBlock(block)
 }
 
 // writeHeadBlock writes a new head block

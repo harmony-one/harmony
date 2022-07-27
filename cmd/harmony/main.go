@@ -818,7 +818,7 @@ func setupSyncService(node *node.Node, host p2p.Host, hc harmonyconfig.HarmonyCo
 		SmDiscBatch:  hc.Sync.DiscBatch,
 	}
 	// If we are running side chain, we will need to do some extra works for beacon
-	// sync
+	// sync.
 	if !node.IsRunningBeaconChain() {
 		dConfig.BHConfig = &downloader.BeaconHelperConfig{
 			BlockC:     node.BeaconBlockChannel,

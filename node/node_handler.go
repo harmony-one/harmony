@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 
 	"github.com/harmony-one/harmony/api/proto"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
@@ -53,9 +53,8 @@ func (node *Node) processSkippedMsgTypeByteValue(
 }
 
 var (
-	errInvalidPayloadSize        = errors.New("invalid payload size")
-	errWrongBlockMsgSize         = errors.New("invalid block message size")
-	latestSentCrosslink   uint64 = 0
+	errInvalidPayloadSize = errors.New("invalid payload size")
+	errWrongBlockMsgSize  = errors.New("invalid block message size")
 )
 
 // HandleNodeMessage parses the message and dispatch the actions.
@@ -84,9 +83,11 @@ func (node *Node) HandleNodeMessage(
 						if block.ShardID() == 0 {
 							utils.Logger().Info().
 								Msgf("Beacon block being handled by block channel: %d", block.NumberU64())
-							go func(blk *types.Block) {
-								node.BeaconBlockChannel <- blk
-							}(block)
+							if block.IsLastBlockInEpoch() {
+								go func(blk *types.Block) {
+									node.BeaconBlockChannel <- blk
+								}(block)
+							}
 						}
 					}
 				}
@@ -177,21 +178,16 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 	if node.IsRunningBeaconChain() {
 		return
 	}
+	if !(node.Consensus.IsLeader() || rand.Intn(100) <= 1) {
+		return
+	}
 	curBlock := node.Blockchain().CurrentBlock()
 	if curBlock == nil {
 		return
 	}
-	shardID := curBlock.ShardID()
 
 	if !node.Blockchain().Config().IsCrossLink(curBlock.Epoch()) {
 		// no need to broadcast crosslink if it's beacon chain, or it's not crosslink epoch
-		return
-	}
-
-	// no point to broadcast the crosslink if we aren't even in the right epoch yet
-	if !node.Blockchain().Config().IsCrossLink(
-		node.Blockchain().CurrentHeader().Epoch(),
-	) {
 		return
 	}
 
@@ -200,7 +196,7 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID),
 	)
 
-	headers, err := getCrosslinkHeadersForShards(node.Beaconchain(), node.Blockchain(), curBlock, shardID, &latestSentCrosslink)
+	headers, err := getCrosslinkHeadersForShards(node.Blockchain(), curBlock, node.crosslinks)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("[BroadcastCrossLink] failed to get crosslinks")
 		return
@@ -211,11 +207,20 @@ func (node *Node) BroadcastCrossLinkFromShardsToBeacon() { // leader of 1-3 shar
 		return
 	}
 
-	node.host.SendMessageToGroups(
+	for _, h := range headers {
+		utils.Logger().Info().Msgf("[BroadcastCrossLink] header shard %d blockNum %d", h.ShardID(), h.Number().Uint64())
+	}
+
+	err = node.host.SendMessageToGroups(
 		[]nodeconfig.GroupID{nodeconfig.NewGroupIDByShardID(shard.BeaconChainShardID)},
 		p2p.ConstructMessage(
 			proto_node.ConstructCrossLinkMessage(node.Consensus.Blockchain, headers)),
 	)
+	if err != nil {
+		utils.Logger().Error().Err(err).Msgf("[BroadcastCrossLink] failed to broadcast message")
+	} else {
+		node.crosslinks.SetLatestSentCrosslinkBlockNumber(headers[len(headers)-1].Number().Uint64())
+	}
 }
 
 // BroadcastCrosslinkHeartbeatSignalFromBeaconToShards is called by consensus leader or 1% validators to
@@ -280,15 +285,13 @@ func (node *Node) BroadcastCrosslinkHeartbeatSignalFromBeaconToShards() { // lea
 }
 
 // getCrosslinkHeadersForShards get headers required for crosslink creation.
-func getCrosslinkHeadersForShards(beacon core.BlockChain, shardChain core.BlockChain, curBlock *types.Block, shardID uint32, latestSentCrosslink *uint64) ([]*block.Header, error) {
+func getCrosslinkHeadersForShards(shardChain core.BlockChain, curBlock *types.Block, crosslinks *crosslinks.Crosslinks) ([]*block.Header, error) {
 	var headers []*block.Header
-	lastLink, err := beacon.ReadShardLastCrossLink(shardID)
+	signal := crosslinks.LastKnownCrosslinkHeartbeatSignal()
 	var latestBlockNum uint64
 
-	// TODO chao: record the missing crosslink in local database instead of using latest crosslink
-	// if cannot find latest crosslink, broadcast latest 3 block headers
-	if err != nil {
-		utils.Logger().Debug().Err(err).Msg("[BroadcastCrossLink] ReadShardLastCrossLink Failed")
+	if signal == nil {
+		utils.Logger().Debug().Msg("[BroadcastCrossLink] no known crosslink heartbeat signal")
 		header := shardChain.GetHeaderByNumber(curBlock.NumberU64() - 2)
 		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
@@ -297,46 +300,35 @@ func getCrosslinkHeadersForShards(beacon core.BlockChain, shardChain core.BlockC
 		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
 			headers = append(headers, header)
 		}
-		headers = append(headers, curBlock.Header())
-	} else {
-		latestBlockNum = lastLink.BlockNum()
-		latest := atomic.LoadUint64(latestSentCrosslink)
-		if latest > latestBlockNum && latest <= latestBlockNum+crossLinkBatchSize*6 {
-			latestBlockNum = latest
-		}
+		return append(headers, curBlock.Header()), nil
+	}
+	latestBlockNum = signal.LatestContinuousBlockNum
+	latest := crosslinks.LatestSentCrosslinkBlockNumber()
+	if latest > latestBlockNum && latest <= latestBlockNum+crossLinkBatchSize*6 {
+		latestBlockNum = latest
+	}
 
-		batchSize := crossLinkBatchSize
-		diff := curBlock.Number().Uint64() - latestBlockNum
+	batchSize := crossLinkBatchSize
+	diff := curBlock.Number().Uint64() - latestBlockNum
 
-		// Increase batch size by 1 for every 5 blocks behind
-		batchSize += int(diff) / 5
+	// Increase batch size by 1 for every 5 blocks behind
+	batchSize += int(diff) / 5
 
-		// Cap at a sane size to avoid overload network
-		if batchSize > crossLinkBatchSize*2 {
-			batchSize = crossLinkBatchSize * 2
-		}
+	// Cap at a sane size to avoid overload network
+	if batchSize > crossLinkBatchSize*2 {
+		batchSize = crossLinkBatchSize * 2
+	}
 
-		for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
-			header := shardChain.GetHeaderByNumber(blockNum)
-			if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
-				headers = append(headers, header)
-				if len(headers) == batchSize {
-					break
-				}
+	for blockNum := latestBlockNum + 1; blockNum <= curBlock.NumberU64(); blockNum++ {
+		header := shardChain.GetHeaderByNumber(blockNum)
+		if header != nil && shardChain.Config().IsCrossLink(header.Epoch()) {
+			headers = append(headers, header)
+			if len(headers) == batchSize {
+				break
 			}
 		}
 	}
 
-	utils.Logger().Info().Msgf("[BroadcastCrossLink] Broadcasting Block Headers, latestBlockNum %d, currentBlockNum %d, Number of Headers %d", latestBlockNum, curBlock.NumberU64(), len(headers))
-	for i, header := range headers {
-		utils.Logger().Debug().Msgf(
-			"[BroadcastCrossLink] Broadcasting %d",
-			header.Number().Uint64(),
-		)
-		if i == len(headers)-1 {
-			atomic.StoreUint64(latestSentCrosslink, header.Number().Uint64())
-		}
-	}
 	return headers, nil
 }
 

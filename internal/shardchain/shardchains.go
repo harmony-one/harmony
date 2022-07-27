@@ -21,7 +21,7 @@ import (
 type Collection interface {
 	// ShardChain returns the blockchain for the given shard,
 	// opening one as necessary.
-	ShardChain(shardID uint32) (core.BlockChain, error)
+	ShardChain(shardID uint32, options ...core.Options) (core.BlockChain, error)
 
 	// CloseShardChain closes the given shard chain.
 	CloseShardChain(shardID uint32) error
@@ -64,7 +64,7 @@ func NewCollection(
 
 // ShardChain returns the blockchain for the given shard,
 // opening one as necessary.
-func (sc *CollectionImpl) ShardChain(shardID uint32) (core.BlockChain, error) {
+func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (core.BlockChain, error) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 	if bc, ok := sc.pool[shardID]; ok {
@@ -105,9 +105,20 @@ func (sc *CollectionImpl) ShardChain(shardID uint32) (core.BlockChain, error) {
 		// For beacon chain inside a shard chain, need to reset the eth chainID to shard 0's eth chainID in the config
 		chainConfig.EthCompatibleChainID = big.NewInt(chainConfig.EthCompatibleShard0ChainID.Int64())
 	}
-	bc, err := core.NewBlockChain(
-		db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil,
-	)
+
+	opts := core.Options{}
+	if len(options) == 1 {
+		opts = options[0]
+	}
+	var bc core.BlockChain
+	if opts.EpochChain {
+		bc, err = core.NewEpochChain(db, &chainConfig, sc.engine, vm.Config{})
+	} else {
+		bc, err = core.NewBlockChainWithOptions(
+			db, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil, opts,
+		)
+	}
+
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot create blockchain")
 	}

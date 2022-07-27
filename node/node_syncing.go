@@ -33,7 +33,7 @@ import (
 
 // Constants related to doing syncing.
 const (
-	SyncFrequency = 60
+	SyncFrequency = 60 * time.Second
 
 	// getBlocksRequestHardCap is the hard capped message size at server side for getBlocks request.
 	// The number is 4MB (default gRPC message size) minus 2k reserved for message overhead.
@@ -49,11 +49,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 // BeaconSyncHook is the hook function called after inserted beacon in downloader
 // TODO: This is a small misc piece of consensus logic. Better put it to consensus module.
 func (node *Node) BeaconSyncHook() {
-	if node.Consensus.IsLeader() || rand.Intn(100) == 0 {
-		// TODO: Instead of leader, it would better be validator do this broadcast since leader do
-		//       not have much idle resources.
-		node.BroadcastCrossLinkFromShardsToBeacon()
-	}
+	node.BroadcastCrossLinkFromShardsToBeacon()
 }
 
 // GenerateRandomString generates a random string with given length
@@ -224,33 +220,18 @@ func (node *Node) doBeaconSyncing() {
 		// If Downloader is not working, we need also deal with blocks from beaconBlockChannel
 		go func(node *Node) {
 			// TODO ek – infinite loop; add shutdown/cleanup logic
-			for beaconBlock := range node.BeaconBlockChannel {
-				if node.beaconSync != nil {
-					if beaconBlock.NumberU64() >= node.Beaconchain().CurrentBlock().NumberU64()+1 {
-						err := node.beaconSync.UpdateBlockAndStatus(
-							beaconBlock, node.Beaconchain(), true,
-						)
-						if err != nil {
-							node.beaconSync.AddLastMileBlock(beaconBlock)
-						} else if node.Consensus.IsLeader() || rand.Intn(100) <= 1 {
-							// Only leader or 2% of validators broadcast crosslink to avoid spamming p2p
-							// if beaconBlock.NumberU64() == node.Beaconchain().CurrentBlock().NumberU64() {
-							node.BroadcastCrossLinkFromShardsToBeacon()
-							// }
-						}
-					}
-				}
+			for _ = range node.BeaconBlockChannel {
 			}
 		}(node)
 	}
 
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			utils.Logger().Info().Msg("initializing beacon sync")
-			node.beaconSync = node.createStateSync(node.Beaconchain())
+			node.epochSync = node.createStateSync(node.EpochChain()).IntoEpochSync()
 		}
-		if node.beaconSync.GetActivePeerNumber() == 0 {
+		if node.epochSync.GetActivePeerNumber() == 0 {
 			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
 			peers, err := node.SyncingPeerProvider.SyncingPeers(shard.BeaconChainShardID)
 			if err != nil {
@@ -259,13 +240,13 @@ func (node *Node) doBeaconSyncing() {
 					Msg("cannot retrieve beacon syncing peers")
 				continue
 			}
-			if err := node.beaconSync.CreateSyncConfig(peers, true); err != nil {
+			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
 				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
 				continue
 			}
 		}
-		node.beaconSync.SyncLoop(node.Beaconchain(), node.BeaconWorker, true, nil)
-		time.Sleep(time.Duration(SyncFrequency) * time.Second)
+
+		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), true, nil))
 	}
 }
 
@@ -275,7 +256,7 @@ func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinC
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(SyncFrequency) * time.Second)
+	ticker := time.NewTicker(SyncFrequency)
 	defer ticker.Stop()
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
@@ -300,7 +281,7 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 				Msg("cannot retrieve syncing peers")
 			return
 		}
-		if err := node.stateSync.CreateSyncConfig(peers, false); err != nil {
+		if err := node.stateSync.CreateSyncConfig(peers, shardID); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Interface("peers", peers).
@@ -784,10 +765,10 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	case shard.BeaconChainShardID:
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			return false, 0, 0
 		}
-		result := node.beaconSync.GetSyncStatus()
+		result := node.epochSync.GetSyncStatus()
 		return result.IsInSync, result.OtherHeight, result.HeightDiff
 
 	default:
@@ -817,10 +798,10 @@ func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 		return !result.IsInSync
 
 	case shard.BeaconChainShardID:
-		if node.beaconSync == nil {
+		if node.epochSync == nil {
 			return true
 		}
-		result := node.beaconSync.GetSyncStatus()
+		result := node.epochSync.GetSyncStatus()
 		return !result.IsInSync
 
 	default:

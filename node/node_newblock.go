@@ -236,6 +236,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 		invalidToDelete := []types.CrossLink{}
 		if err == nil {
 			for _, pending := range allPending {
+				// ReadCrossLink beacon chain usage.
 				exist, err := node.Blockchain().ReadCrossLink(pending.ShardID(), pending.BlockNum())
 				if err == nil || exist != nil {
 					invalidToDelete = append(invalidToDelete, pending)

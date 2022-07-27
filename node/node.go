@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/utils/crosslinks"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -81,6 +82,7 @@ type Node struct {
 	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
 	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
 	pendingCXMutex        sync.Mutex
+	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
 	shardChains shardchain.Collection
 	SelfPeer    p2p.Peer
@@ -88,14 +90,15 @@ type Node struct {
 	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
 	stateMutex sync.Mutex // mutex for change node state
 	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors      sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	TxPool               *core.TxPool
-	CxPool               *core.CxPool // pool for missing cross shard receipts resend
-	Worker, BeaconWorker *worker.Worker
-	downloaderServer     *downloader.Server
+	BeaconNeighbors  sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	TxPool           *core.TxPool
+	CxPool           *core.CxPool // pool for missing cross shard receipts resend
+	Worker           *worker.Worker
+	downloaderServer *downloader.Server
 	// Syncing component.
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
-	stateSync, beaconSync  *legacysync.StateSync
+	stateSync              *legacysync.StateSync
+	epochSync              *legacysync.EpochSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -110,9 +113,7 @@ type Node struct {
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
-	chainConfig params.ChainConfig
-	// map of service type to its message channel.
-	isFirstTime         bool // the node was started with a fresh database
+	chainConfig         params.ChainConfig
 	unixTimeAtNodeStart int64
 	// KeysToAddrs holds the addresses of bls keys run by the node
 	KeysToAddrs      map[string]common.Address
@@ -151,7 +152,11 @@ func (node *Node) Blockchain() core.BlockChain {
 
 // Beaconchain returns the beaconchain from node.
 func (node *Node) Beaconchain() core.BlockChain {
-	bc, err := node.shardChains.ShardChain(shard.BeaconChainShardID)
+	return node.chain(shard.BeaconChainShardID, core.Options{})
+}
+
+func (node *Node) chain(shardID uint32, options core.Options) core.BlockChain {
+	bc, err := node.shardChains.ShardChain(shardID, options)
 	if err != nil {
 		utils.Logger().Error().Err(err).Msg("cannot get beaconchain")
 	}
@@ -164,6 +169,14 @@ func (node *Node) Beaconchain() core.BlockChain {
 		utils.Logger().Info().Msg("`IsEnablePruneBeaconChain` only available in validator node and shard 1-3")
 	}
 	return bc
+}
+
+// EpochChain returns the epoch chain from node. Epoch chain is the same as BeaconChain,
+// but with differences in behaviour.
+func (node *Node) EpochChain() core.BlockChain {
+	return node.chain(shard.BeaconChainShardID, core.Options{
+		EpochChain: true,
+	})
 }
 
 // TODO: make this batch more transactions
@@ -460,9 +473,7 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "node_receipt"}).Inc()
 		case proto_node.CrossLink:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink"}).Inc()
-			// only beacon chain node process crosslink messages
-			if !node.IsRunningBeaconChain() ||
-				node.NodeConfig.Role() == nodeconfig.ExplorerNode {
+			if node.NodeConfig.Role() == nodeconfig.ExplorerNode {
 				return nil, 0, errIgnoreBeaconMsg
 			}
 		case proto_node.CrosslinkHeartbeat:
@@ -964,6 +975,7 @@ func New(
 	node := Node{}
 	node.unixTimeAtNodeStart = time.Now().Unix()
 	node.TransactionErrorSink = types.NewTransactionErrorSink()
+	node.crosslinks = crosslinks.New()
 	// Get the node config that's created in the harmony.go program.
 	if consensusObj != nil {
 		node.NodeConfig = nodeconfig.GetShardConfig(consensusObj.ShardID)
@@ -985,7 +997,7 @@ func New(
 	engine := chain.NewEngine()
 
 	collection := shardchain.NewCollection(
-		chainDBFactory, &genesisInitializer{&node}, engine, &chainConfig,
+		chainDBFactory, &core.GenesisInitializer{NetworkType: node.NodeConfig.GetNetworkType()}, engine, &chainConfig,
 	)
 
 	for shardID, archival := range isArchival {
@@ -1002,7 +1014,13 @@ func New(
 
 		// Load the chains.
 		blockchain := node.Blockchain() // this also sets node.isFirstTime if the DB is fresh
-		beaconChain := node.Beaconchain()
+		var beaconChain core.BlockChain
+		if blockchain.ShardID() == shard.BeaconChainShardID {
+			beaconChain = node.Beaconchain()
+		} else {
+			beaconChain = node.EpochChain()
+		}
+
 		if b1, b2 := beaconChain == nil, blockchain == nil; b1 || b2 {
 			var err error
 			if b2 {
@@ -1041,12 +1059,6 @@ func New(
 
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
-
-		if node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, engine,
-			)
-		}
 
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
