@@ -75,6 +75,16 @@ func ReadHeaderNumber(db DatabaseReader, hash common.Hash) *uint64 {
 	return &number
 }
 
+// WriteHeaderNumber stores reference from hash to number.
+func WriteHeaderNumber(db DatabaseWriter, hash common.Hash, number uint64) error {
+	var (
+		key     = headerNumberKey(hash)
+		encoded = encodeBlockNumber(number)
+	)
+
+	return db.Put(key, encoded)
+}
+
 // ReadHeadHeaderHash retrieves the hash of the current canonical head header.
 func ReadHeadHeaderHash(db DatabaseReader) common.Hash {
 	data, _ := db.Get(headHeaderKey)
