@@ -2967,7 +2967,13 @@ func (bc *BlockChainImpl) SuperCommitteeForNextEpoch(
 			}
 		} else {
 			//propose
-			beaconEpoch = beacon.CurrentHeader().Epoch()
+			h := beacon.CurrentHeader()
+			if h.IsLastBlockInEpoch() {
+				beaconEpoch = beacon.CurrentHeader().Epoch()
+				beaconEpoch = beaconEpoch.Add(beaconEpoch, common.Big1)
+			} else {
+				beaconEpoch = beacon.CurrentHeader().Epoch()
+			}
 		}
 		utils.Logger().Debug().Msgf("[SuperCommitteeCalculation] isVerify: %+v, realBeaconEpoch:%+v, beaconEpoch: %+v, headerEpoch:%+v, shardStateEpoch:%+v",
 			isVerify, beacon.CurrentHeader().Epoch(), beaconEpoch, header.Epoch(), shardState.Epoch)
