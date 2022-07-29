@@ -1098,13 +1098,6 @@ func New(
 		node.deciderCache, _ = lru.New(16)
 		node.committeeCache, _ = lru.New(16)
 
-		// in tikv mode, not need BeaconChain
-		if !(node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode) && node.Blockchain().ShardID() != shard.BeaconChainShardID {
-			node.BeaconWorker = worker.New(
-				node.Beaconchain().Config(), beaconChain, engine,
-			)
-		}
-
 		node.pendingCXReceipts = map[string]*types.CXReceiptsProof{}
 		node.proposedBlock = map[uint64]*types.Block{}
 		node.Consensus.VerifiedNewBlock = make(chan *types.Block, 1)
