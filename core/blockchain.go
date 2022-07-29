@@ -1,6 +1,7 @@
 package core
 
 import (
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -341,6 +342,8 @@ type BlockChain interface {
 	RedisPreempt() *redis_helper.RedisPreempt
 	// SyncFromTiKVWriter used for tikv mode, all reader or follower writer used to sync block from master writer
 	SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error
+	// InitTiKV used for tikv mode, init the tikv mode
+	InitTiKV(conf *harmonyconfig.TiKVConfig)
 
 	// ========== Only For Tikv End ==========
 }

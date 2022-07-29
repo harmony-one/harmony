@@ -1,6 +1,8 @@
 package core
 
 import (
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -399,4 +401,20 @@ func (a Stub) IsEnablePruneBeaconChainFeature() bool {
 
 func (a Stub) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
 	return 0, errors.Errorf("method CommitOffChainData not implemented for %s", a.Name)
+}
+
+func (a Stub) IsTikvWriterMaster() bool {
+	return false
+}
+
+func (a Stub) RedisPreempt() *redis_helper.RedisPreempt {
+	return nil
+}
+
+func (a Stub) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
+	return errors.Errorf("method SyncFromTiKVWriter not implemented for %s", a.Name)
+}
+
+func (a Stub) InitTiKV(conf *harmonyconfig.TiKVConfig) {
+	return
 }

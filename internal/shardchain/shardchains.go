@@ -121,6 +121,9 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		bc, err = core.NewEpochChain(db, &chainConfig, sc.engine, vm.Config{})
 	} else {
 		stateCache, err := initStateCache(db, sc, shardID)
+		if err != nil {
+			return nil, err
+		}
 
 		bc, err = core.NewBlockChainWithOptions(
 			db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil, opts,

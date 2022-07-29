@@ -199,11 +199,11 @@ type BlockChainImpl struct {
 
 // NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
 func NewBlockChainWithOptions(
-	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool, options Options,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, options)
+	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, options)
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -214,11 +214,11 @@ func NewBlockChain(
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, Options{})
+	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, Options{})
 }
 
 func newBlockChainWithOptions(
-	db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
+	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
 	shouldPreserve func(block *types.Block) bool, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
