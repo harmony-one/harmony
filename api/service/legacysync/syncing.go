@@ -580,7 +580,7 @@ func (ss *StateSync) downloadBlocks(bc core.BlockChain) {
 					ss.syncConfig.RemovePeer(peerConfig, fmt.Sprintf("StateSync %d: error returned for GetBlocks: %s", ss.blockChain.ShardID(), err.Error()))
 					return
 				}
-				if err != nil || len(payload) == 0 {
+				if len(payload) == 0 {
 					count++
 					utils.Logger().Error().Int("failNumber", count).
 						Msg("[SYNC] downloadBlocks: no more retrievable blocks")
@@ -886,7 +886,7 @@ func (ss *StateSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain
 		utils.Logger().Error().
 			Err(err).
 			Msgf(
-				"[SYNC] UpdateBlockAndStatus: Error adding newck to blockchain %d %d",
+				"[SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
 				block.NumberU64(),
 				block.ShardID(),
 			)
@@ -1050,10 +1050,16 @@ func (ss *StateSync) GetMaxPeerHeight() uint64 {
 }
 
 // SyncLoop will keep syncing with peers until catches up
-func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus) {
+func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
+	utils.Logger().Info().Msgf("legacy sync is executing ...")
 	if !isBeacon {
 		ss.RegisterNodeInfo()
 	}
+
+	startTime := time.Now()
+	// totalBlocksSynced := uint32(0)
+	startHead := bc.CurrentBlock().NumberU64()
+	fmt.Print("\033[s") // save the cursor position
 	for {
 		otherHeight := getMaxPeerHeight(ss.syncConfig)
 		currentHeight := bc.CurrentBlock().NumberU64()
@@ -1063,9 +1069,9 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
 		}
-		utils.Logger().Info().
-			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				isBeacon, bc.ShardID(), otherHeight, currentHeight)
+		// utils.Logger().Info().
+		// 	Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+		// 		isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
 		size := uint32(otherHeight - currentHeight)
@@ -1081,6 +1087,17 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			break
 		}
 		ss.purgeOldBlocksFromCache()
+		//calculating block speed
+		currHead := bc.CurrentBlock().NumberU64()
+		// totalBlocksSynced += size
+		dt := time.Now().Sub(startTime).Seconds()
+		speed := float64(0)
+		if dt > 0 {
+			speed = float64(currHead-startHead) / dt
+		}
+		blockSpeed := fmt.Sprintf("%.2f", speed)
+		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+		fmt.Println("sync block speed:", blockSpeed, "blocks/s")
 	}
 	if consensus != nil {
 		if err := ss.addConsensusLastMile(bc, consensus); err != nil {
@@ -1091,6 +1108,7 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			consensus.UpdateConsensusInformation()
 		}
 	}
+	utils.Logger().Info().Msgf("legacy sync is executed")
 	ss.purgeAllBlocksFromCache()
 }
 
@@ -1147,6 +1165,16 @@ type (
 	}
 )
 
+func ParseResult(res interface{}) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+	result, ok := res.(*SyncCheckResult)
+	if ok {
+		IsInSync = result.IsInSync
+		OtherHeight = result.OtherHeight
+		HeightDiff = result.HeightDiff
+	}
+	return false, 0, 0
+}
+
 func newSyncStatus(role nodeconfig.Role) syncStatus {
 	expiration := getSyncStatusExpiration(role)
 	return syncStatus{
@@ -1192,6 +1220,11 @@ func (status *syncStatus) Clone() syncStatus {
 	}
 }
 
+func (ss *StateSync) IsInSync() bool {
+	result := ss.GetSyncStatus()
+	return result.IsInSync
+}
+
 func (status *syncStatus) expired() bool {
 	return time.Since(status.lastUpdateTime) > status.expiration
 }
@@ -1210,11 +1243,23 @@ func (ss *StateSync) GetSyncStatus() SyncCheckResult {
 	})
 }
 
+func (ss *StateSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+	res := ss.syncStatus.Get(func() SyncCheckResult {
+		return ss.isInSync(false)
+	})
+	return ParseResult(res)
+}
+
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
 	result := ss.isInSync(true)
 	return result
+}
+
+func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+	result := ss.isInSync(true)
+	return ParseResult(result)
 }
 
 // isInSync query the remote DNS node for the latest height to check what is the current

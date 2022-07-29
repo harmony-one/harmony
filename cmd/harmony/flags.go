@@ -216,6 +216,7 @@ var (
 	syncFlags = []cli.Flag{
 		syncStreamEnabledFlag,
 		syncDownloaderFlag,
+		syncStagedSyncFlag,
 		syncConcurrencyFlag,
 		syncMinPeersFlag,
 		syncInitStreamsFlag,
@@ -1639,6 +1640,12 @@ var (
 		Hidden:   true,
 		DefValue: false,
 	}
+	syncStagedSyncFlag = cli.BoolFlag{
+		Name:     "sync.stagedsync",
+		Usage:    "Enable the staged sync",
+		Hidden:   false,
+		DefValue: false,
+	}
 	syncConcurrencyFlag = cli.IntFlag{
 		Name:   "sync.concurrency",
 		Usage:  "Concurrency when doing p2p sync requests",
@@ -1684,6 +1691,10 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
+	}
+	
+	if cli.IsFlagChanged(cmd, syncStagedSyncFlag) {
+		config.Sync.StagedSync = cli.GetBoolFlagValue(cmd, syncStagedSyncFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, syncConcurrencyFlag) {

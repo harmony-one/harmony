@@ -31,6 +31,7 @@ import (
 	"github.com/harmony-one/harmony/api/service"
 	"github.com/harmony-one/harmony/api/service/legacysync"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
+	"github.com/harmony-one/harmony/api/service/stagedsync"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/rawdb"
@@ -74,6 +75,20 @@ type syncConfig struct {
 	withSig bool
 }
 
+type ISync interface {
+	UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error
+	AddLastMileBlock(block *types.Block)
+	GetActivePeerNumber() int
+	CreateSyncConfig(peers []p2p.Peer, shardID uint32) error
+	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
+	IsInSync() bool
+	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
+	AddNewBlock(peerHash []byte, block *types.Block)
+	RegisterNodeInfo() int
+	GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
+}
+
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
@@ -99,6 +114,7 @@ type Node struct {
 	syncID                 [SyncIDLength]byte // a unique ID for the node during the state syncing process with peers
 	stateSync              *legacysync.StateSync
 	epochSync              *legacysync.EpochSync
+	stateStagedSync        *stagedsync.StagedSync
 	peerRegistrationRecord map[string]*syncConfig // record registration time (unixtime) of peers begin in syncing
 	SyncingPeerProvider    SyncingPeerProvider
 	// The p2p host used to send/receive p2p messages
@@ -148,6 +164,32 @@ func (node *Node) Blockchain() core.BlockChain {
 			Msg("cannot get shard chain")
 	}
 	return bc
+}
+
+func (node *Node) SyncInstance() ISync {
+	return node.GetOrCreateSyncInstance(true)
+}
+
+func (node *Node) CurrentSyncInstance() bool {
+	return node.GetOrCreateSyncInstance(false) != nil
+}
+
+// Blockchain returns the blockchain for the node's current shard.
+// if rebuild sets to true, it generates a new instance
+func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
+	// otherwise, return an instance of state sync, either legacy or staged
+	if node.NodeConfig.StagedSync {
+		if initiate && node.stateStagedSync == nil {
+			utils.Logger().Info().Msg("initializing staged state sync")
+			node.stateStagedSync = node.createStagedSync(node.Blockchain(), false)
+		}
+		return node.stateStagedSync
+	}
+	if initiate && node.stateSync == nil {
+		utils.Logger().Info().Msg("initializing legacy state sync")
+		node.stateSync = node.createStateSync(node.Beaconchain())
+	}
+	return node.stateSync
 }
 
 // Beaconchain returns the beaconchain from node.

@@ -141,10 +141,19 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 	Gateway:    "https://gateway.harmony.one",
 }
 
+var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
+	TurboMode:              true,
+	DoubleCheckBlockHashes: false,
+	MaxBlocksPerSyncCycle:  1024, // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
+	UseMemDB:               true, // it uses memory by default. set it to false to use disk
+}
+
 var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        false,
 		Downloader:     false,
+		StagedSync:     true,
+		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    6,
 		MinPeers:       6,
 		InitStreams:    8,
@@ -157,6 +166,8 @@ var (
 	defaultTestNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     false,
+		StagedSync:     false,
+		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    2,
 		MinPeers:       2,
 		InitStreams:    2,
@@ -168,7 +179,9 @@ var (
 
 	defaultLocalNetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
-		Downloader:     true,
+		Downloader:     false,
+		StagedSync:     false,
+		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    2,
 		MinPeers:       2,
 		InitStreams:    2,
@@ -181,6 +194,8 @@ var (
 	defaultElseSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        true,
 		Downloader:     true,
+		StagedSync:     false,
+		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    4,
 		MinPeers:       4,
 		InitStreams:    4,

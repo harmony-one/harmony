@@ -95,7 +95,7 @@ func getDefaultDNSSyncConfig(nt nodeconfig.NetworkType) harmonyconfig.DnsSync {
 		dnsSync.Client = true
 	case nodeconfig.Localnet:
 		dnsSync.Server = true
-		dnsSync.Client = false
+		dnsSync.Client = true
 	default:
 		dnsSync.Server = true
 		dnsSync.Client = false

@@ -304,6 +304,7 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeconfig.GetDefaultConfig().ShardID = nodeConfig.ShardID
 	nodeconfig.GetDefaultConfig().IsOffline = nodeConfig.IsOffline
 	nodeconfig.GetDefaultConfig().Downloader = nodeConfig.Downloader
+	nodeconfig.GetDefaultConfig().StagedSync = nodeConfig.StagedSync
 
 	// Check NTP configuration
 	accurate, err := ntp.CheckLocalTimeAccurate(nodeConfig.NtpServer)
@@ -587,6 +588,11 @@ func createGlobalConfig(hc harmonyconfig.HarmonyConfig) (*nodeconfig.ConfigType,
 	nodeConfig.SetArchival(hc.General.IsBeaconArchival, hc.General.IsArchival)
 	nodeConfig.IsOffline = hc.General.IsOffline
 	nodeConfig.Downloader = hc.Sync.Downloader
+	nodeConfig.StagedSync = hc.Sync.StagedSync
+	nodeConfig.StagedSyncTurboMode = hc.Sync.StagedSyncCfg.TurboMode
+	nodeConfig.UseMemDB = hc.Sync.StagedSyncCfg.UseMemDB
+	nodeConfig.DoubleCheckBlockHashes = hc.Sync.StagedSyncCfg.DoubleCheckBlockHashes
+	nodeConfig.MaxBlocksPerSyncCycle = hc.Sync.StagedSyncCfg.MaxBlocksPerSyncCycle
 
 	// P2P private key is used for secure message transfer between p2p nodes.
 	nodeConfig.P2PPriKey, _, err = utils.LoadKeyFromFile(hc.P2P.KeyFile)
