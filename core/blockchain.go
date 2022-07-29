@@ -1,7 +1,6 @@
 package core
 
 import (
-	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -14,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
 	"github.com/harmony-one/harmony/shard"
