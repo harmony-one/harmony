@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/harmony-one/harmony/internal/tikv"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -145,6 +147,11 @@ func (node *Node) TraceLoopForExplorer() {
 
 // AddNewBlockForExplorer add new block for explorer.
 func (node *Node) AddNewBlockForExplorer(block *types.Block) {
+	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
+		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
+		return
+	}
+
 	utils.Logger().Info().Uint64("blockHeight", block.NumberU64()).Msg("[Explorer] Adding new block for explorer node")
 
 	if _, err := node.Blockchain().InsertChain([]*types.Block{block}, false); err == nil {
@@ -153,23 +160,38 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 		}
 		// Clean up the blocks to avoid OOM.
 		node.Consensus.FBFTLog.DeleteBlockByNumber(block.NumberU64())
-		// Do dump all blocks from state syncing for explorer one time
-		// TODO: some blocks can be dumped before state syncing finished.
-		// And they would be dumped again here. Please fix it.
-		once.Do(func() {
-			utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
-				Msg("[Explorer] Populating explorer data from state synced blocks")
-			go func() {
-				exp, err := node.getExplorerService()
-				if err != nil {
-					// shall be unreachable
-					utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
-				}
-				for blockHeight := int64(block.NumberU64()) - 1; blockHeight >= 0; blockHeight-- {
-					exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(uint64(blockHeight)))
-				}
-			}()
-		})
+
+		// if in tikv mode, only master writer node need dump all explorer block
+		if !node.HarmonyConfig.General.RunElasticMode || node.Blockchain().IsTikvWriterMaster() {
+			// Do dump all blocks from state syncing for explorer one time
+			// TODO: some blocks can be dumped before state syncing finished.
+			// And they would be dumped again here. Please fix it.
+			once.Do(func() {
+				utils.Logger().Info().Int64("starting height", int64(block.NumberU64())-1).
+					Msg("[Explorer] Populating explorer data from state synced blocks")
+				go func() {
+					exp, err := node.getExplorerService()
+					if err != nil {
+						// shall be unreachable
+						utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+					}
+
+					if block.NumberU64() == 0 {
+						return
+					}
+
+					// get checkpoint bitmap and flip all bit
+					bitmap := exp.GetCheckpointBitmap()
+					bitmap.Flip(0, block.NumberU64())
+
+					// find all not processed block and dump it
+					iterator := bitmap.ReverseIterator()
+					for iterator.HasNext() {
+						exp.DumpCatchupBlock(node.Blockchain().GetBlockByNumber(iterator.Next()))
+					}
+				}()
+			})
+		}
 	} else {
 		utils.Logger().Error().Err(err).Msg("[Explorer] Error when adding new block for explorer node")
 	}
@@ -177,17 +199,20 @@ func (node *Node) AddNewBlockForExplorer(block *types.Block) {
 
 // ExplorerMessageHandler passes received message in node_handler to explorer service.
 func (node *Node) commitBlockForExplorer(block *types.Block) {
-	if block.ShardID() != node.NodeConfig.ShardID {
-		return
+	// if in tikv mode, only master writer node need dump explorer block
+	if !node.HarmonyConfig.General.RunElasticMode || (node.HarmonyConfig.TiKV.Role == tikv.RoleWriter && node.Blockchain().IsTikvWriterMaster()) {
+		if block.ShardID() != node.NodeConfig.ShardID {
+			return
+		}
+		// Dump new block into level db.
+		utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
+		exp, err := node.getExplorerService()
+		if err != nil {
+			// shall be unreachable
+			utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
+		}
+		exp.DumpNewBlock(block)
 	}
-	// Dump new block into level db.
-	utils.Logger().Info().Uint64("blockNum", block.NumberU64()).Msg("[Explorer] Committing block into explorer DB")
-	exp, err := node.getExplorerService()
-	if err != nil {
-		// shall be unreachable
-		utils.Logger().Fatal().Err(err).Msg("critical error in explorer node")
-	}
-	exp.DumpNewBlock(block)
 
 	curNum := block.NumberU64()
 	if curNum-100 > 0 {

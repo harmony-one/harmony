@@ -3,8 +3,8 @@ package explorer
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	goversion "github.com/hashicorp/go-version"
@@ -15,26 +15,39 @@ import (
 
 const (
 	LegAddressPrefix = "ad_"
-	CheckpointPrefix = "dc"
+	CheckpointBitmap = "checkpoint_bitmap"
 	TracePrefix      = "tr_"
 
 	oneAddrByteLen = 42 // byte size of string "one1..."
 )
 
-// Common schema
-// GetCheckpointKey ...
-func GetCheckpointKey(blockNum *big.Int) []byte {
-	return []byte(fmt.Sprintf("%s_%x", CheckpointPrefix, blockNum))
+// readCheckpointBitmap read explorer checkpoint bitmap from storage
+func readCheckpointBitmap(db databaseReader) (*roaring64.Bitmap, error) {
+	bitmapByte, err := db.Get([]byte(CheckpointBitmap))
+	if err != nil {
+		if err == leveldb.ErrNotFound {
+			return roaring64.NewBitmap(), nil
+		}
+		return nil, err
+	}
+
+	rb := roaring64.NewBitmap()
+	err = rb.UnmarshalBinary(bitmapByte)
+	if err != nil {
+		return nil, err
+	}
+
+	return rb, nil
 }
 
-func isBlockComputedInDB(db databaseReader, bn uint64) (bool, error) {
-	key := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	return db.Has(key)
-}
+// writeCheckpointBitmap write explorer checkpoint bitmap to storage
+func writeCheckpointBitmap(db databaseWriter, rb *roaring64.Bitmap) error {
+	bitmapByte, err := rb.MarshalBinary()
+	if err != nil {
+		return err
+	}
 
-func writeCheckpoint(db databaseWriter, bn uint64) error {
-	blockCheckpoint := GetCheckpointKey(new(big.Int).SetUint64(bn))
-	return db.Put(blockCheckpoint, []byte{})
+	return db.Put([]byte(CheckpointBitmap), bitmapByte)
 }
 
 func getTraceResultKey(key []byte) []byte {

@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/harmony-one/harmony/core/state"
+
 	"github.com/ethereum/go-ethereum/core/rawdb"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -43,7 +45,7 @@ func TestNewWorker(t *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, err := core.NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
+	chain, err := core.NewBlockChain(database, state.NewDatabase(database), nil, gspec.Config, engine, vm.Config{}, nil)
 
 	if err != nil {
 		t.Error(err)
@@ -70,7 +72,7 @@ func TestCommitTransactions(t *testing.T) {
 	)
 
 	gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, nil, gspec.Config, engine, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, state.NewDatabase(database), nil, gspec.Config, engine, vm.Config{}, nil)
 
 	// Create a new worker
 	worker := New(params.TestChainConfig, chain, engine)

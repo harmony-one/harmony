@@ -158,12 +158,12 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 		NewPublicHarmonyAPI(hmy, V2),
 		NewPublicBlockchainAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
 		NewPublicBlockchainAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
-		NewPublicContractAPI(hmy, V1),
-		NewPublicContractAPI(hmy, V2),
+		NewPublicContractAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
+		NewPublicContractAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
 		NewPublicTransactionAPI(hmy, V1),
 		NewPublicTransactionAPI(hmy, V2),
-		NewPublicPoolAPI(hmy, V1),
-		NewPublicPoolAPI(hmy, V2),
+		NewPublicPoolAPI(hmy, V1, config.RateLimiterEnabled, config.RequestsPerSecond),
+		NewPublicPoolAPI(hmy, V2, config.RateLimiterEnabled, config.RequestsPerSecond),
 	}
 
 	// Legacy methods (subject to removal)
@@ -185,9 +185,9 @@ func getAPIs(hmy *hmy.Harmony, config nodeconfig.RPCServerConfig) []rpc.API {
 		publicAPIs = append(publicAPIs,
 			NewPublicHarmonyAPI(hmy, Eth),
 			NewPublicBlockchainAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
-			NewPublicContractAPI(hmy, Eth),
+			NewPublicContractAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
 			NewPublicTransactionAPI(hmy, Eth),
-			NewPublicPoolAPI(hmy, Eth),
+			NewPublicPoolAPI(hmy, Eth, config.RateLimiterEnabled, config.RequestsPerSecond),
 			eth.NewPublicEthService(hmy, "eth"),
 		)
 	}
