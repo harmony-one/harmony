@@ -57,7 +57,7 @@ func (f *TiKvFactory) getRemoteDB(shardID uint32) (*prefix.PrefixDatabase, error
 	}
 }
 
-// getStateDB create statedb storage with local memory cahce
+// getStateDB create statedb storage with local memory cache.
 func (f *TiKvFactory) getStateDB(shardID uint32) (*statedb_cache.StateDBCacheDatabase, error) {
 	key := fmt.Sprintf("state_db_%d_%s", shardID, f.Role)
 	if db, ok := f.cacheDBMap.Load(key); ok {
