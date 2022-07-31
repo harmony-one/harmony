@@ -74,8 +74,8 @@ func (lm *StageLastMile) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 }
 
 func (lm *StageLastMile) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = lm.configs.db.BeginRw(lm.configs.ctx)
 		if err != nil {
 			return err
@@ -86,7 +86,7 @@ func (lm *StageLastMile) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 	if err = u.Done(tx); err != nil {
 		return err
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
@@ -95,8 +95,8 @@ func (lm *StageLastMile) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 }
 
 func (lm *StageLastMile) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = lm.configs.db.BeginRw(lm.configs.ctx)
 		if err != nil {
 			return err
@@ -104,7 +104,7 @@ func (lm *StageLastMile) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err 
 		defer tx.Rollback()
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}

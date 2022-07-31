@@ -66,6 +66,8 @@ type StagedSync struct {
 	// Maximum number of blocks per each cycle. if set to zero, all blocks will be
 	// downloaded and synced in one full cycle.
 	MaxBlocksPerSyncCycle uint64
+	// Maximum number of blocks which can be downloaded in background. 
+	MaxBackgroundBlocks uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
 	// use turbo mode for staged sync
@@ -105,22 +107,15 @@ func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress
 func (s *StagedSync) PruneStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*PruneState, error) {
 	var pruneProgress uint64
 	var err error
-	useExternalTx := tx != nil
-	if useExternalTx {
+
+	if errV := CreateView(context.Background(), db, tx, func(tx kv.Tx) error {
 		pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	} else {
-		if errV := db.View(context.Background(), func(tx kv.Tx) error {
-			pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
-			if err != nil {
-				return err
-			}
-			return nil
-		}); errV != nil {
-			return nil, errV
-		}
+		return nil
+	}); errV != nil {
+		return nil, errV
 	}
 
 	return &PruneState{id, forwardProgress, pruneProgress, s}, nil
@@ -218,7 +213,8 @@ func New(ctx context.Context,
 	TurboMode bool,
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
-	maxBlocksPerCycle uint64) *StagedSync {
+	maxBlocksPerCycle uint64,
+	maxBackgroundBlocks uint64) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
@@ -266,6 +262,7 @@ func New(ctx context.Context,
 		UseMemDB:               UseMemDB,
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
+		MaxBackgroundBlocks:    maxBackgroundBlocks,
 	}
 }
 

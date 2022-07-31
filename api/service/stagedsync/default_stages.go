@@ -73,7 +73,7 @@ func DefaultStages(ctx context.Context,
 		},
 		{
 			ID:          States,
-			Description: "insert new blocks and update blockchain states",
+			Description: "Insert new blocks and update blockchain states",
 			Handler:     handleStageStates,
 		},
 		{

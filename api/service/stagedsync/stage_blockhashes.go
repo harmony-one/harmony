@@ -292,8 +292,8 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 }
 
 func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) error {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = bh.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -306,7 +306,7 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) er
 		return err
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -321,8 +321,8 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 	lastAddedID := int(0) // the first id won't be added
 	saved := false
 
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = bh.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -375,7 +375,7 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 		return progress, startHash, ErrSaveBlockHashesProgressFail
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return progress, startHash, err
 		}
@@ -477,8 +477,8 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 	p = startHeight
 	var lastHash []byte
 	h.SetBytes(lastHash[:])
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)
 		if err != nil {
 			return p, h, err
@@ -509,7 +509,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 		}
 		// load extra block hashes from cache db and copy them to bg db to be downloaded in background by block stage
 		pExtraHashes := p
-		for ok := true; ok; ok = pExtraHashes < p+100 { //TODO: add this number to configs
+		for ok := true; ok; ok = pExtraHashes < p + s.state.MaxBackgroundBlocks {
 			key := strconv.FormatUint(pExtraHashes+1, 10)
 			newHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
 			if err != nil {
@@ -544,7 +544,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 	}
 
 	// update the progress
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return startHeight, h, err
 		}
@@ -553,8 +553,8 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 }
 
 func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)
 		if err != nil {
 			return err
@@ -565,7 +565,7 @@ func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageStat
 	if err = u.Done(tx); err != nil {
 		return fmt.Errorf(" reset: %w", err)
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return ErrCommitTransactionFail
 		}
@@ -574,8 +574,8 @@ func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageStat
 }
 
 func (bh *StageBlockHashes) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)
 		if err != nil {
 			return err
@@ -588,7 +588,7 @@ func (bh *StageBlockHashes) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (e
 		bh.configs.turboModeCh <- struct{}{}
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}

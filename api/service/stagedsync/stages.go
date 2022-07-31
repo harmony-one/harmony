@@ -36,7 +36,7 @@ import (
 type SyncStageID string
 
 var (
-	Heads       SyncStageID = "Heads"     // Heads are downloaded
+	Heads       SyncStageID = "Heads"       // Heads are downloaded
 	BlockHashes SyncStageID = "BlockHashes" // block hashes are downloaded from peers
 	BlockBodies SyncStageID = "BlockBodies" // Block bodies are downloaded, TxHash and UncleHash are getting verified
 	States      SyncStageID = "States"      // will construct most recent state from downloaded blocks

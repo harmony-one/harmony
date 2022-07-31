@@ -61,6 +61,7 @@ func CreateStagedSync(
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
+	maxBackgroundBlocks uint64,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -115,6 +116,7 @@ func CreateStagedSync(
 		UseMemDB,
 		doubleCheckBlockHashes,
 		maxBlocksPerCycle,
+		maxBackgroundBlocks,
 	), nil
 }
 

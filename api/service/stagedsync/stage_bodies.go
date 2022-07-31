@@ -171,7 +171,7 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	// TODO: Turbo mode
 	if canRunInTurboMode && currProgress < targetHeight {
 		b.configs.turboModeCh = make(chan struct{})
-		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+100)
+		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress + s.state.MaxBackgroundBlocks)
 	}
 	return nil
 }
@@ -227,8 +227,8 @@ func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon b
 }
 
 func (b *StageBodies) clearBlocksBucket(tx kv.RwTx, isBeacon bool) error {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -241,7 +241,7 @@ func (b *StageBodies) clearBlocksBucket(tx kv.RwTx, isBeacon bool) error {
 		return err
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -377,8 +377,8 @@ func (b *StageBodies) handleBlockSyncResult(s *StageState, payload [][]byte, tas
 }
 
 func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -394,7 +394,7 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 		return ErrSavingBodiesProgressFail
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -476,8 +476,8 @@ func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex 
 func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv.RwTx) (p uint64, err error) {
 	p = progress
 
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = b.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -515,7 +515,7 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
 		return progress, ErrSavingBodiesProgressFail
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return progress, err
 		}
@@ -574,8 +574,8 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 
 	p = startHeight
 
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(b.configs.ctx)
 		if err != nil {
 			return p, err
@@ -632,18 +632,18 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 	}
 
 	// update the progress
-	if !useExternalTx {
-	if err := tx.Commit(); err != nil {
-		return p, err
-	}
+	if useInternalTx {
+		if err := tx.Commit(); err != nil {
+			return p, err
+		}
 	}
 
 	return p, nil
 }
 
 func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(b.configs.ctx)
 		if err != nil {
 			return err
@@ -656,7 +656,7 @@ func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx 
 	if err = u.Done(tx); err != nil {
 		return err
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
@@ -665,8 +665,8 @@ func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx 
 }
 
 func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(b.configs.ctx)
 		if err != nil {
 			return err
@@ -679,7 +679,7 @@ func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err err
 		b.configs.turboModeCh <- struct{}{}
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}

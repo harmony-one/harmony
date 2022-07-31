@@ -42,8 +42,8 @@ func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 		return ErrNoConnectedPeers
 	}
 
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = heads.configs.db.BeginRw(heads.configs.ctx)
 		if err != nil {
@@ -103,7 +103,7 @@ func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 		return err
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -113,8 +113,8 @@ func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 }
 
 func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = heads.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
@@ -123,7 +123,7 @@ func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 	}
 	// TODO: Delete canonical hashes that are being unwound
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -132,8 +132,8 @@ func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 }
 
 func (heads *StageHeads) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = heads.configs.db.BeginRw(context.Background())
 		if err != nil {
 			return err
@@ -141,7 +141,7 @@ func (heads *StageHeads) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err 
 		defer tx.Rollback()
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}

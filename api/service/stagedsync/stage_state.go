@@ -61,8 +61,8 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	}
 
 	//size := uint64(0)
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
 		if err != nil {
@@ -223,12 +223,12 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -268,8 +268,8 @@ func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.B
 
 func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = stg.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -286,7 +286,7 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 		return ErrSaveStateProgressFail
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -295,8 +295,8 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 }
 
 func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
 		if err != nil {
 			return err
@@ -309,7 +309,7 @@ func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, t
 	if err = u.Done(tx); err != nil {
 		return err
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
@@ -318,8 +318,8 @@ func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, t
 }
 
 func (stg *StageStates) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
 		if err != nil {
 			return err
@@ -327,7 +327,7 @@ func (stg *StageStates) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err e
 		defer tx.Rollback()
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}

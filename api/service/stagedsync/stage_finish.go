@@ -29,8 +29,8 @@ func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
 }
 
 func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = finish.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -50,7 +50,7 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 	// clean up cache
 	s.state.purgeAllBlocksFromCache()
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -60,8 +60,8 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 }
 
 func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		var err error
 		tx, err = bh.configs.db.BeginRw(context.Background())
 		if err != nil {
@@ -74,7 +74,7 @@ func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
 		return err
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
@@ -83,8 +83,8 @@ func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
 }
 
 func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)
 		if err != nil {
 			return err
@@ -95,7 +95,7 @@ func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState
 	if err = u.Done(tx); err != nil {
 		return err
 	}
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
@@ -104,8 +104,8 @@ func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState
 }
 
 func (finish *StageFinish) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
-	useExternalTx := tx != nil
-	if !useExternalTx {
+	useInternalTx := tx == nil
+	if useInternalTx {
 		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)
 		if err != nil {
 			return err
@@ -113,7 +113,7 @@ func (finish *StageFinish) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (er
 		defer tx.Rollback()
 	}
 
-	if !useExternalTx {
+	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
 		}
