@@ -66,7 +66,7 @@ type StagedSync struct {
 	// Maximum number of blocks per each cycle. if set to zero, all blocks will be
 	// downloaded and synced in one full cycle.
 	MaxBlocksPerSyncCycle uint64
-	// Maximum number of blocks which can be downloaded in background. 
+	// Maximum number of blocks which can be downloaded in background.
 	MaxBackgroundBlocks uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool

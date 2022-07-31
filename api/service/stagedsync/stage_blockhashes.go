@@ -509,7 +509,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 		}
 		// load extra block hashes from cache db and copy them to bg db to be downloaded in background by block stage
 		pExtraHashes := p
-		for ok := true; ok; ok = pExtraHashes < p + s.state.MaxBackgroundBlocks {
+		for ok := true; ok; ok = pExtraHashes < p+s.state.MaxBackgroundBlocks {
 			key := strconv.FormatUint(pExtraHashes+1, 10)
 			newHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
 			if err != nil {

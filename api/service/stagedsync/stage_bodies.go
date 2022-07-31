@@ -171,7 +171,7 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	// TODO: Turbo mode
 	if canRunInTurboMode && currProgress < targetHeight {
 		b.configs.turboModeCh = make(chan struct{})
-		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress + s.state.MaxBackgroundBlocks)
+		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
 	}
 	return nil
 }
