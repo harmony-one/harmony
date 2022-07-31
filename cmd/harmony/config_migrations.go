@@ -274,4 +274,12 @@ func init() {
 		return confTree
 	}
 
+	migrations["2.5.3"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Log.Console") == nil {
+			confTree.Set("Log.Console", defaultConfig.Log.Console)
+		}
+
+		confTree.Set("Version", "2.5.4")
+		return confTree
+	}
 }

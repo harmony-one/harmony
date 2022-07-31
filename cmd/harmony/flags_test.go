@@ -121,6 +121,7 @@ func TestHarmonyFlags(t *testing.T) {
 					ProfileDebugValues: []int{0},
 				},
 				Log: harmonyconfig.LogConfig{
+					Console:      false,
 					Folder:       "./latest",
 					FileName:     "validator-8.8.8.8-9000.log",
 					RotateSize:   100,
@@ -1082,6 +1083,7 @@ func TestLogFlags(t *testing.T) {
 		{
 			args: []string{"--log.ctx.ip", "8.8.8.8", "--log.ctx.port", "9001"},
 			expConfig: harmonyconfig.LogConfig{
+				Console:       defaultConfig.Log.Console,
 				Folder:        defaultConfig.Log.Folder,
 				FileName:      defaultConfig.Log.FileName,
 				RotateSize:    defaultConfig.Log.RotateSize,
