@@ -125,7 +125,6 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 
 	if currProgress >= targetHeight {
 		if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
-			// TODO: Turbo mode
 			bh.configs.turboModeCh = make(chan struct{})
 			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
 		}
@@ -154,7 +153,6 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 
 	if currProgress >= targetHeight {
 		if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
-			// TODO: Turbo mode
 			bh.configs.turboModeCh = make(chan struct{})
 			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
 		}
@@ -209,7 +207,6 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageS
 
 	// continue downloading in background
 	if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
-		// TODO: Turbo mode
 		bh.configs.turboModeCh = make(chan struct{})
 		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
 	}

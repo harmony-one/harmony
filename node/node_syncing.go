@@ -130,7 +130,8 @@ func (node *Node) createStagedSync(bc core.BlockChain, isBeacon bool) *stagedsyn
 		node.NodeConfig.UseMemDB,
 		node.NodeConfig.DoubleCheckBlockHashes,
 		node.NodeConfig.MaxBlocksPerSyncCycle,
-		node.NodeConfig.MaxBackgroundBlocks); err != nil {
+		node.NodeConfig.MaxBackgroundBlocks,
+		node.NodeConfig.MaxMemSyncCycleSize); err != nil {
 		return nil
 	} else {
 		return s

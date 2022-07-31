@@ -168,7 +168,7 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
-	// TODO: Turbo mode
+	// Run background process in turbo mode
 	if canRunInTurboMode && currProgress < targetHeight {
 		b.configs.turboModeCh = make(chan struct{})
 		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)

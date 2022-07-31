@@ -62,6 +62,7 @@ func CreateStagedSync(
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
+	maxMemSyncCycleSize uint64,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -117,6 +118,7 @@ func CreateStagedSync(
 		doubleCheckBlockHashes,
 		maxBlocksPerCycle,
 		maxBackgroundBlocks,
+		maxMemSyncCycleSize,
 	), nil
 }
 
@@ -155,7 +157,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		s.RegisterNodeInfo()
 	}
 
-	canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= 8192 //TODO: this number can be set in configs
+	canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= s.MaxMemSyncCycleSize
 	var tx kv.RwTx
 	if canRunCycleInOneTransaction {
 		var err error

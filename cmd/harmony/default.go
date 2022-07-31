@@ -145,6 +145,8 @@ var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 	TurboMode:              true,
 	DoubleCheckBlockHashes: false,
 	MaxBlocksPerSyncCycle:  1024, // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
+	MaxBackgroundBlocks:    256,  // max blocks to be downloaded at background process in turbo mode
+	MaxMemSyncCycleSize:    8192, // max number of blocks to use a single transaction for staged sync
 	UseMemDB:               true, // it uses memory by default. set it to false to use disk
 }
 
@@ -152,7 +154,7 @@ var (
 	defaultMainnetSyncConfig = harmonyconfig.SyncConfig{
 		Enabled:        false,
 		Downloader:     false,
-		StagedSync:     true,
+		StagedSync:     true, //TODO: set this
 		StagedSyncCfg:  defaultStagedSyncConfig,
 		Concurrency:    6,
 		MinPeers:       6,

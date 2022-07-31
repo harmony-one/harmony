@@ -225,5 +225,6 @@ type StagedSyncConfig struct {
 	DoubleCheckBlockHashes bool   // double check all block hashes before download blocks
 	MaxBlocksPerSyncCycle  uint64 // max number of blocks per each sync cycle, if set to zero, all blocks will be synced in one full cycle
 	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
+	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync 
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
 }

@@ -68,6 +68,8 @@ type StagedSync struct {
 	MaxBlocksPerSyncCycle uint64
 	// Maximum number of blocks which can be downloaded in background.
 	MaxBackgroundBlocks uint64
+	// max number of blocks to use a single transaction for staged sync
+	MaxMemSyncCycleSize uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
 	// use turbo mode for staged sync
@@ -214,7 +216,8 @@ func New(ctx context.Context,
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
-	maxBackgroundBlocks uint64) *StagedSync {
+	maxBackgroundBlocks uint64,
+	maxMemSyncCycleSize uint64) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
@@ -263,6 +266,7 @@ func New(ctx context.Context,
 		DoubleCheckBlockHashes: doubleCheckBlockHashes,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 		MaxBackgroundBlocks:    maxBackgroundBlocks,
+		MaxMemSyncCycleSize:    maxMemSyncCycleSize,
 	}
 }
 
