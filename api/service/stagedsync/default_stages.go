@@ -48,7 +48,7 @@ func DefaultStages(ctx context.Context,
 	lastMileCfg StageLastMileCfg,
 	finishCfg StageFinishCfg) []*Stage {
 
-	handlerStageHeaders := NewStageHeders(headsCfg)
+	handlerStageHeads := NewStageHeads(headsCfg)
 	handlerStageBlockHashes := NewStageBlockHashes(blockHashesCfg)
 	handlerStageBodies := NewStageBodies(bodiesCfg)
 	handleStageStates := NewStageStates(statesCfg)
@@ -59,7 +59,7 @@ func DefaultStages(ctx context.Context,
 		{
 			ID:          Heads,
 			Description: "Retrieve Chain Heads",
-			Handler:     handlerStageHeaders,
+			Handler:     handlerStageHeads,
 		},
 		{
 			ID:          BlockHashes,

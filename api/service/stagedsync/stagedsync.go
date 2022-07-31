@@ -15,7 +15,6 @@ import (
 
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	"github.com/harmony-one/harmony/consensus"
@@ -113,14 +112,14 @@ func (s *StagedSync) PruneStageState(id SyncStageID, forwardProgress uint64, tx 
 			return nil, err
 		}
 	} else {
-		if err = db.View(context.Background(), func(tx kv.Tx) error {
+		if errV := db.View(context.Background(), func(tx kv.Tx) error {
 			pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
 			if err != nil {
 				return err
 			}
 			return nil
-		}); err != nil {
-			return nil, err
+		}); errV != nil {
+			return nil, errV
 		}
 	}
 
@@ -169,7 +168,8 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 }
 
 func (s *StagedSync) UnwindTo(unwindPoint uint64, badBlock common.Hash) {
-	log.Info("UnwindTo", "block", unwindPoint, "bad_block_hash", badBlock.String())
+	utils.Logger().Info().
+		Msgf("[STAGED_SYNC] UnwindTo block:%d bad_block_hash:%s", unwindPoint, badBlock.String())
 	s.unwindPoint = &unwindPoint
 	s.badBlock = badBlock
 }
@@ -197,6 +197,9 @@ func (s *StagedSync) SetCurrentStage(id SyncStageID) error {
 			return nil
 		}
 	}
+	utils.Logger().Error().
+		Msgf("[STAGED_SYNC] stage not found with id: %v", id)
+
 	return fmt.Errorf("stage not found with id: %v", id)
 }
 
@@ -266,25 +269,17 @@ func New(ctx context.Context,
 	}
 }
 
-func (s *StagedSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RoDB) (*StageState, error) {
+func (s *StagedSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (*StageState, error) {
 	var blockNum uint64
 	var err error
-	useExternalTx := tx != nil
-	if useExternalTx {
-		blockNum, err = GetStageProgress(tx, stage, s.isBeacon)
+	if errV := CreateView(context.Background(), db, tx, func(rtx kv.Tx) error {
+		blockNum, err = GetStageProgress(rtx, stage, s.isBeacon)
 		if err != nil {
-			return nil, err
+			return err
 		}
-	} else {
-		if err = db.View(context.Background(), func(tx kv.Tx) error {
-			blockNum, err = GetStageProgress(tx, stage, s.isBeacon)
-			if err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
+		return nil
+	}); errV != nil {
+		return nil, errV
 	}
 
 	return &StageState{s, stage, blockNum}, nil
@@ -322,7 +317,8 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		stage := s.stages[s.currentStage]
 
 		if stage.Disabled {
-			log.Trace(fmt.Sprintf("%s disabled. %s", stage.ID, stage.DisabledDescription))
+			utils.Logger().Trace().
+				Msgf("[STAGED_SYNC] %s disabled. %s", stage.ID, stage.DisabledDescription)
 
 			s.NextStage()
 			continue
@@ -351,6 +347,18 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		return err
 	}
 	s.currentStage = 0
+	return nil
+}
+
+func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) error) error {
+	if tx != nil {
+		return f(tx)
+	}
+	if errV := db.View(context.Background(), func(etx kv.Tx) error {
+		return f(etx)
+	}); errV != nil {
+		return errV
+	}
 	return nil
 }
 
@@ -388,7 +396,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 		}
 	}
 	if len(logCtx) > 0 {
-		log.Info("Timings (slower than 50ms)", logCtx...)
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] Timings (slower than 50ms) %v", logCtx...)
 	}
 
 	if tx == nil {
@@ -412,7 +421,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 			}
 			bucketSizes = append(bucketSizes, bucket, ByteCount(sz))
 		}
-		log.Info("Tables", bucketSizes...)
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] Tables %v", bucketSizes...)
 	}
 	tx.CollectMetrics()
 	return nil
@@ -427,15 +437,20 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 
 	// fmt.Println("stage ", stage.ID, " executing ...")
 	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
-		fmt.Println("stage ", stage.ID, " failed:", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] stage %s failed", stage.ID)
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
-	fmt.Println("stage ", stage.ID, " executed successfully")
+	utils.Logger().Info().
+		Msgf("[STAGED_SYNC] stage %s executed successfully", stage.ID)
 
 	took := time.Since(start)
 	if took > 60*time.Second {
 		logPrefix := s.LogPrefix()
-		log.Info(fmt.Sprintf("[%s] DONE", logPrefix), "in", took)
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] [%s] DONE in %d", logPrefix, took)
+
 	}
 	s.timings = append(s.timings, Timing{stage: stage.ID, took: took})
 	return nil
@@ -443,7 +458,8 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 
 func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
-	log.Trace("Unwind...", "stage", stage.ID)
+	utils.Logger().Trace().
+		Msgf("[STAGED_SYNC] Unwind... stage %s", stage.ID)
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
 		return err
@@ -468,7 +484,8 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 	took := time.Since(start)
 	if took > 60*time.Second {
 		logPrefix := s.LogPrefix()
-		log.Info(fmt.Sprintf("[%s] Unwind done", logPrefix), "in", took)
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] [%s] Unwind done in %d", logPrefix, took)
 	}
 	s.timings = append(s.timings, Timing{isUnwind: true, stage: stage.ID, took: took})
 	return nil
@@ -476,7 +493,8 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 
 func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
-	log.Trace("Prune...", "stage", stage.ID)
+	utils.Logger().Info().
+		Msgf("[STAGED_SYNC] Prune... stage %s", stage.ID)
 
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
@@ -499,7 +517,11 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 	took := time.Since(start)
 	if took > 60*time.Second {
 		logPrefix := s.LogPrefix()
-		log.Info(fmt.Sprintf("[%s] Prune done", logPrefix), "in", took)
+		utils.Logger().Trace().
+			Msgf("[STAGED_SYNC] [%s] Prune done in %d", logPrefix, took)
+
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] [%s] Prune done in ", logPrefix, took)
 	}
 	s.timings = append(s.timings, Timing{isPrune: true, stage: stage.ID, took: took})
 	return nil

@@ -33,6 +33,10 @@ const (
 	StartBlockHash   = "StartBlockHash"
 	LastBlockHeight  = "LastBlockHeight"
 	LastBlockHash    = "LastBlockHash"
+
+	// cache db  names
+	Block_Hashes_Cache_DB = "cache_block_hashes"
+	Block_Cache_DB        = "cache_blocks"
 )
 
 var Buckets = []string{
@@ -149,27 +153,34 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		s.RegisterNodeInfo()
 	}
 
-	// canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= 8192
-	// var tx kv.RwTx
-	// if canRunCycleInOneTransaction {
-	// 	var err error
-	// 	if tx, err = s.DB().BeginRw(context.Background()); err != nil {
-	// 		return
-	// 	}
-	// 	defer tx.Rollback()
-	// }
+	canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= 8192 //TODO: this number can be set in configs
+	var tx kv.RwTx
+	if canRunCycleInOneTransaction {
+		var err error
+		if tx, err = s.DB().BeginRw(context.Background()); err != nil {
+			return
+		}
+		defer tx.Rollback()
+	}
 
 	// Do one step of staged sync
 	startTime := time.Now()
 	startHead := bc.CurrentBlock().NumberU64()
-	initialCycle := true
-	syncErr := s.Run(s.DB(), nil, initialCycle)
+	initialCycle := true //TODO: should be based on cycle number
+	syncErr := s.Run(s.DB(), tx, initialCycle)
 	if syncErr != nil {
 		utils.Logger().Error().Err(syncErr).
 			Msgf("[STAGED_SYNC] Sync loop failed (isBeacon: %t, ShardID: %d, error: %s)",
 				s.IsBeacon(), s.Blockchain().ShardID(), syncErr)
 		s.purgeOldBlocksFromCache()
 	}
+	if tx != nil {
+		errTx := tx.Commit()
+		if errTx != nil {
+			return
+		}
+	}
+
 	// calculating sync speed (blocks/second)
 	currHead := bc.CurrentBlock().NumberU64()
 	if currHead-startHead > 0 {
@@ -194,13 +205,6 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		case <-c:
 		}
 	}
-
-	// if canRunCycleInOneTransaction {
-	// 	errTx := tx.Commit()
-	// 	if errTx != nil {
-	// 		return
-	// 	}
-	// }
 
 	// defer close(waitForDone)
 

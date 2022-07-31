@@ -2,7 +2,6 @@ package stagedsync
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -23,7 +22,7 @@ type StageHeadsCfg struct {
 	db  kv.RwDB
 }
 
-func NewStageHeders(cfg StageHeadsCfg) *StageHeads {
+func NewStageHeads(cfg StageHeadsCfg) *StageHeads {
 	return &StageHeads{
 		configs: cfg,
 	}
@@ -40,16 +39,7 @@ func NewStageHeadersCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Sta
 func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
 
 	if len(s.state.syncConfig.peers) == 0 {
-		return fmt.Errorf("haven't connected to any peer yet!")
-	}
-	otherHeight := uint64(0)
-	if errV := heads.configs.db.View(heads.configs.ctx, func(etx kv.Tx) (err error) {
-		if otherHeight, err = s.CurrentStageProgress(etx); err != nil {
-			return err
-		}
-		return nil
-	}); errV != nil {
-		return errV
+		return ErrNoConnectedPeers
 	}
 
 	useExternalTx := tx != nil
@@ -61,13 +51,27 @@ func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 		}
 		defer tx.Rollback()
 	}
-	fmt.Println("current block height:", heads.configs.bc.CurrentBlock().NumberU64())
+
+	otherHeight := uint64(0)
+	if errV := CreateView(heads.configs.ctx, heads.configs.db, tx, func(etx kv.Tx) (err error) {
+		if otherHeight, err = s.CurrentStageProgress(etx); err != nil {
+			return err
+		}
+		return nil
+	}); errV != nil {
+		return errV
+	}
+
+	utils.Logger().Info().
+		Msgf("[STAGED_SYNC] current block height: %d)", heads.configs.bc.CurrentBlock().NumberU64())
+
 	if otherHeight <= heads.configs.bc.CurrentBlock().NumberU64() {
 		maxPeersHeight, err := s.state.getMaxPeerHeight(s.state.IsBeacon())
 		if err != nil {
 			return err
 		}
-		fmt.Println("max peers height:", maxPeersHeight)
+		utils.Logger().Info().
+			Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
 		if maxPeersHeight <= heads.configs.bc.CurrentBlock().NumberU64() {
 			s.state.Done()
 			return nil
@@ -85,9 +89,10 @@ func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageStat
 		return nil
 	}
 
-	// GetStageProgress(heads.configs.db, Heads)
 	maxBlocksPerSyncCycle := s.state.MaxBlocksPerSyncCycle
-	fmt.Println("max blocks per sync cycle is", maxBlocksPerSyncCycle)
+	utils.Logger().Info().
+		Msgf("[STAGED_SYNC] max blocks per sync cycle is: %d)", maxBlocksPerSyncCycle)
+
 	targetHeight := otherHeight
 	if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
 		targetHeight = currentHeight + maxBlocksPerSyncCycle

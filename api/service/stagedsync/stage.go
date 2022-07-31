@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
@@ -119,7 +119,7 @@ func PruneTable(tx kv.RwTx, table string, pruneTo uint64, ctx context.Context, l
 	c, err := tx.RwCursor(table)
 
 	if err != nil {
-		return fmt.Errorf("failed to create cursor for pruning %w", err)
+		return ErrPruningCursorCreationFail
 	}
 	defer c.Close()
 
@@ -152,7 +152,7 @@ func PruneTable(tx kv.RwTx, table string, pruneTo uint64, ctx context.Context, l
 func PruneTableDupSort(tx kv.RwTx, table string, logPrefix string, pruneTo uint64, logEvery *time.Ticker, ctx context.Context) error {
 	c, err := tx.RwCursorDupSort(table)
 	if err != nil {
-		return fmt.Errorf("failed to create cursor for pruning %w", err)
+		return ErrPruningCursorCreationFail
 	}
 	defer c.Close()
 
@@ -166,7 +166,8 @@ func PruneTableDupSort(tx kv.RwTx, table string, logPrefix string, pruneTo uint6
 		}
 		select {
 		case <-logEvery.C:
-			log.Info(fmt.Sprintf("[%s]", logPrefix), "table", table, "block", blockNum)
+			utils.Logger().Info().
+				Msgf("[STAGED_SYNC] [%s] table:%s block:%s", logPrefix, table, blockNum)
 		case <-ctx.Done():
 			return ErrStopped
 		default:

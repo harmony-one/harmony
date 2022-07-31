@@ -44,7 +44,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	targetHeight := uint64(0)
 	isBeacon := s.state.isBeacon
 
-	if errV := stg.configs.db.View(stg.configs.ctx, func(etx kv.Tx) error {
+	if errV := CreateView(stg.configs.ctx, stg.configs.db, tx, func(etx kv.Tx) error {
 		if targetHeight, err = GetStageProgress(etx, BlockBodies, isBeacon); err != nil {
 			return err
 		}
@@ -61,14 +61,18 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	}
 
 	//size := uint64(0)
-
-	r, err := stg.configs.db.BeginRo(stg.configs.ctx)
-	if err != nil {
-		return err
+	useExternalTx := tx != nil
+	if !useExternalTx {
+		var err error
+		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 	}
-	defer r.Rollback()
+
 	bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
-	c, err := r.CursorDupSort(bucketName)
+	c, err := tx.CursorDupSort(bucketName)
 	if err != nil {
 		return err
 	}
@@ -219,6 +223,12 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
+	if !useExternalTx {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	
 	return nil
 }
 
@@ -270,9 +280,10 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 
 	// save progress
 	if err = s.Update(tx, stg.configs.bc.CurrentBlock().NumberU64()); err != nil {
-		utils.Logger().Info().
+		utils.Logger().Error().
+			Err(err).
 			Msgf("[STAGED_SYNC] saving progress for block States stage failed: %v", err)
-		return fmt.Errorf("saving progress for block States stage failed")
+		return ErrSaveStateProgressFail
 	}
 
 	if !useExternalTx {

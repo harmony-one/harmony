@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/Workiva/go-datastructures/queue"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -56,7 +54,7 @@ func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBe
 
 func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
 	// create caches db
-	cachedbName := "cache_blocks"
+	cachedbName := Block_Cache_DB
 	if isBeacon {
 		cachedbName = "beacon_" + cachedbName
 	}
@@ -93,17 +91,17 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	currProgress := uint64(0)
 	targetHeight := uint64(0)
 	isBeacon := s.state.isBeacon
-
+	canRunInTurboMode := b.configs.turbo
 	// terminate background process in turbo mode
-	if b.configs.turbo && b.configs.turboModeCh != nil && b.configs.bgProcRunning {
-		b.configs.turboModeCh <- struct{}{}
-	}
+	// if canRunInTurboMode && b.configs.turboModeCh != nil && b.configs.bgProcRunning {
+	// 	b.configs.turboModeCh <- struct{}{}
+	// }
 
-	if errV := b.configs.db.View(b.configs.ctx, func(etx kv.Tx) error {
+	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if targetHeight, err = GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
 			return err
 		}
-		if currProgress, err = s.CurrentStageProgress(etx); err != nil { //GetStageProgress(etx, Bodies, isBeacon); err != nil {
+		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
 		return nil
@@ -119,21 +117,17 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	}
 
 	if currProgress >= targetHeight {
-		// b.configs.turboModeCh = make(chan struct{})
-		// go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+100)
 		return nil
 	}
 
 	// load cached blocks to main sync db
-	if b.configs.turbo {
+	if canRunInTurboMode {
 		if currProgress, err = b.loadBlocksFromCache(s, currProgress, tx); err != nil {
 			return err
 		}
 	}
 
 	if currProgress >= targetHeight {
-		// b.configs.turboModeCh = make(chan struct{})
-		// go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+100)
 		return nil
 	}
 
@@ -148,17 +142,17 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 		if size > maxSize {
 			size = maxSize
 		}
-		if err = b.loadBlockHashesToTaskQueue(s, currProgress+1, size, nil); err != nil {
+		if err = b.loadBlockHashesToTaskQueue(s, currProgress+1, size, tx); err != nil {
 			return err
 		}
 
 		// Download blocks.
 		verifyAllSig := true //TODO: move it to configs
-		if err = b.downloadBlocks(s, verifyAllSig, nil); err != nil {
+		if err = b.downloadBlocks(s, verifyAllSig, tx); err != nil {
 			return nil
 		}
 		// save blocks and update current progress
-		if currProgress, err = b.saveDownloadedBlocks(s, currProgress, nil); err != nil {
+		if currProgress, err = b.saveDownloadedBlocks(s, currProgress, tx); err != nil {
 			return err
 		}
 
@@ -175,9 +169,9 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	}
 
 	// TODO: Turbo mode
-	if b.configs.turbo && currProgress < targetHeight {
+	if canRunInTurboMode && currProgress < targetHeight {
 		b.configs.turboModeCh = make(chan struct{})
-		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+1000)
+		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+100)
 	}
 	return nil
 }
@@ -274,7 +268,9 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 					if err == queue.ErrDisposed {
 						continue
 					}
-					utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
+					utils.Logger().Error().
+						Err(err).
+						Msg("[STAGED_SYNC] downloadBlocks: ss.stateSyncTaskQueue poll timeout")
 					break
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
@@ -314,7 +310,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 					continue
 				}
 
-				failedTasks, err := b.handleBlockSyncResult(s, payload, tasks, verifyAllSig, nil)
+				failedTasks, err := b.handleBlockSyncResult(s, payload, tasks, verifyAllSig, tx)
 				if err != nil {
 					if err := taskQueue.put(tasks); err != nil {
 						utils.Logger().Warn().
@@ -353,16 +349,16 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 func (b *StageBodies) handleBlockSyncResult(s *StageState, payload [][]byte, tasks syncBlockTasks, verifyAllSig bool, tx kv.RwTx) (syncBlockTasks, error) {
 	if len(payload) > len(tasks) {
 		utils.Logger().Warn().
-			Err(errors.New("unexpected number of block delivered")).
+			Err(ErrUnexpectedNumberOfBlocks).
 			Int("expect", len(tasks)).
 			Int("got", len(payload))
-		return tasks, errors.Errorf("unexpected number of block delivered")
+		return tasks, ErrUnexpectedNumberOfBlocks
 	}
 
 	var failedTasks syncBlockTasks
 	if len(payload) < len(tasks) {
 		utils.Logger().Warn().
-			Err(errors.New("unexpected number of block delivered")).
+			Err(ErrUnexpectedNumberOfBlocks).
 			Int("expect", len(tasks)).
 			Int("got", len(payload))
 		failedTasks = append(failedTasks, tasks[len(payload):]...)
@@ -395,7 +391,7 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 	if err = s.Update(tx, progress); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
-		return fmt.Errorf("saving progress for block bodies stage failed")
+		return ErrSavingBodiesProgressFail
 	}
 
 	if !useExternalTx {
@@ -408,7 +404,7 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 
 func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64, tx kv.RwTx) error {
 	s.state.stateSyncTaskQueue = queue.New(0)
-	if errV := b.configs.db.View(b.configs.ctx, func(etx kv.Tx) error {
+	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 
 		for i := startIndex; i < startIndex+size; i++ {
 			key := strconv.FormatUint(i, 10)
@@ -442,7 +438,7 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 
 func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64, tx kv.RwTx) error {
 	s.state.stateSyncTaskQueue = queue.New(0)
-	if errV := b.configs.db.View(b.configs.ctx, func(etx kv.Tx) error {
+	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 
 		for i := startIndex; i < startIndex+size; i++ {
 			key := strconv.FormatUint(i, 10)
@@ -472,7 +468,7 @@ func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex 
 	}
 
 	if s.state.stateSyncTaskQueue.Len() != int64(size) {
-		return fmt.Errorf("cannot add task to queue")
+		return ErrAddTasksToQueueFail
 	}
 	return nil
 }
@@ -517,7 +513,7 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 	if err = s.Update(tx, p); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
-		return progress, fmt.Errorf("saving progress for block bodies stage failed")
+		return progress, ErrSavingBodiesProgressFail
 	}
 	if !useExternalTx {
 		if err := tx.Commit(); err != nil {
@@ -563,7 +559,7 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 	if err = tx.Put(StageProgressBucket, []byte(LastBlockHeight), marshalData(p)); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving cache progress for blocks stage failed: %v", err)
-		return p, fmt.Errorf("saving cache progress for blocks stage failed")
+		return p, ErrSavingCachedBodiesProgressFail
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -592,13 +588,13 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 		if err != nil {
 			utils.Logger().Info().
 				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed: %v", err)
-			return fmt.Errorf("retrieving cache progress for blocks stage failed")
+			return ErrRetrievingCachedBodiesProgressFail
 		}
 		lastHeight, err := unmarshalData(lastCachedHeightBytes)
 		if err != nil {
 			utils.Logger().Info().
 				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed: %v", err)
-			return fmt.Errorf("retrieving cache progress for blocks stage failed")
+			return ErrRetrievingCachedBodiesProgressFail
 		}
 
 		if p >= lastHeight {
@@ -632,12 +628,14 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 	if err = s.Update(tx, p); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving retrieved cached progress for blocks stage failed: %v", err)
-		return p, fmt.Errorf("saving retrieved cached progress for blocks stage failed")
+		return p, ErrSavingCachedBodiesProgressFail
 	}
 
 	// update the progress
+	if !useExternalTx {
 	if err := tx.Commit(); err != nil {
 		return p, err
+	}
 	}
 
 	return p, nil
@@ -674,6 +672,11 @@ func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err err
 			return err
 		}
 		defer tx.Rollback()
+	}
+
+	// terminate background process in turbo mode
+	if b.configs.turboModeCh != nil && b.configs.bgProcRunning {
+		b.configs.turboModeCh <- struct{}{}
 	}
 
 	if !useExternalTx {

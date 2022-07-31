@@ -78,8 +78,8 @@ func GetBucketName(bucket_name string, isBeacon bool) string {
 
 // GetStageProgress retrieves saved progress of given sync stage from the database
 func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
-
-	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage, isBeacon, false))
+	stgID := GetStageID(stage, isBeacon, false)
+	v, err := db.GetOne(kv.SyncStageProgress, stgID)
 	if err != nil {
 		return 0, err
 	}
@@ -87,12 +87,14 @@ func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, e
 }
 
 func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, GetStageID(stage, isBeacon, false), marshalData(progress))
+	stgID := GetStageID(stage, isBeacon, false)
+	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
 }
 
 // GetStagePruneProgress retrieves saved progress of given sync stage from the database
 func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
-	v, err := db.GetOne(kv.SyncStageProgress, GetStageID(stage, isBeacon, true))
+	stgID := GetStageID(stage, isBeacon, true)
+	v, err := db.GetOne(kv.SyncStageProgress, stgID)
 	if err != nil {
 		return 0, err
 	}
@@ -100,7 +102,8 @@ func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint
 }
 
 func SaveStagePruneProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
-	return db.Put(kv.SyncStageProgress, GetStageID(stage, isBeacon, true), marshalData(progress))
+	stgID := GetStageID(stage, isBeacon, true)
+	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
 }
 
 func marshalData(blockNumber uint64) []byte {
