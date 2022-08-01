@@ -12,13 +12,13 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-type ExecFunc func(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
+type ExecFunc func(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
 
 type StageHandler interface {
 	// ExecFunc is the execution function for the stage to move forward.
 	// * state - is the current state of the stage and contains stage data.
 	// * unwinder - if the stage needs to cause unwinding, `unwinder` methods can be used.
-	Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
+	Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
 
 	// UnwindFunc is the unwinding logic of the stage.
 	// * unwindState - contains information about the unwind itself.
@@ -78,7 +78,7 @@ func (s *StageState) UpdatePrune(db kv.Putter, blockNum uint64) error {
 // Unwinder allows the stage to cause an unwind.
 type Unwinder interface {
 	// UnwindTo begins staged sync unwind to the specified block.
-	UnwindTo(unwindPoint uint64, badBlock common.Hash)
+	UnwindTo(unwindPoint uint64, invalidBlock common.Hash)
 }
 
 // UnwindState contains the information about unwind.
@@ -88,7 +88,7 @@ type UnwindState struct {
 	UnwindPoint        uint64
 	CurrentBlockNumber uint64
 	// If unwind is caused by a bad block, this hash is not empty
-	BadBlock common.Hash
+	InvalidBlock common.Hash
 	state    *StagedSync
 }
 

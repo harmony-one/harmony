@@ -51,7 +51,7 @@ type StagedSync struct {
 
 	unwindPoint     *uint64 // used to run stages
 	prevUnwindPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
-	badBlock        common.Hash
+	invalidBlock    common.Hash
 
 	stages       []*Stage
 	unwindOrder  []*Stage
@@ -70,6 +70,8 @@ type StagedSync struct {
 	MaxBackgroundBlocks uint64
 	// max number of blocks to use a single transaction for staged sync
 	MaxMemSyncCycleSize uint64
+	// number of blocks to build a batch and insert to chain in staged sync
+	InsertChainBatchSize int
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
 	// use turbo mode for staged sync
@@ -164,11 +166,11 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	return idx1 > idx2
 }
 
-func (s *StagedSync) UnwindTo(unwindPoint uint64, badBlock common.Hash) {
+func (s *StagedSync) UnwindTo(unwindPoint uint64, invalidBlock common.Hash) {
 	utils.Logger().Info().
-		Msgf("[STAGED_SYNC] UnwindTo block:%d bad_block_hash:%s", unwindPoint, badBlock.String())
+		Msgf("[STAGED_SYNC] UnwindTo block:%d bad_block_hash:%s", unwindPoint, invalidBlock.String())
 	s.unwindPoint = &unwindPoint
-	s.badBlock = badBlock
+	s.invalidBlock = invalidBlock
 }
 
 func (s *StagedSync) Done() {
@@ -217,7 +219,8 @@ func New(ctx context.Context,
 	doubleCheckBlockHashes bool,
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
-	maxMemSyncCycleSize uint64) *StagedSync {
+	maxMemSyncCycleSize uint64,
+	insertChainBatchSize int) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range unwindOrder {
@@ -267,6 +270,7 @@ func New(ctx context.Context,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 		MaxBackgroundBlocks:    maxBackgroundBlocks,
 		MaxMemSyncCycleSize:    maxMemSyncCycleSize,
+		InsertChainBatchSize:   insertChainBatchSize,
 	}
 }
 
@@ -291,7 +295,7 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	s.timings = s.timings[:0]
 
 	for !s.IsDone() {
-		var badBlockUnwind bool
+		var invalidBlockUnwind bool
 		if s.unwindPoint != nil {
 			for j := 0; j < len(s.unwindOrder); j++ {
 				if s.unwindOrder[j] == nil || s.unwindOrder[j].Disabled {
@@ -303,10 +307,10 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 			}
 			s.prevUnwindPoint = s.unwindPoint
 			s.unwindPoint = nil
-			if s.badBlock != (common.Hash{}) {
-				badBlockUnwind = true
+			if s.invalidBlock != (common.Hash{}) {
+				invalidBlockUnwind = true
 			}
-			s.badBlock = common.Hash{}
+			s.invalidBlock = common.Hash{}
 			if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
 				return err
 			}
@@ -325,7 +329,7 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 			continue
 		}
 
-		if err := s.runStage(stage, db, tx, firstCycle, badBlockUnwind); err != nil {
+		if err := s.runStage(stage, db, tx, firstCycle, invalidBlockUnwind); err != nil {
 			return err
 		}
 
@@ -429,7 +433,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	return nil
 }
 
-func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, badBlockUnwind bool) (err error) {
+func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockUnwind bool) (err error) {
 	start := time.Now()
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
@@ -437,7 +441,7 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 	}
 
 	// fmt.Println("stage ", stage.ID, " executing ...")
-	if err = stage.Handler.Exec(firstCycle, badBlockUnwind, stageState, s, tx); err != nil {
+	if err = stage.Handler.Exec(firstCycle, invalidBlockUnwind, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf("[STAGED_SYNC] stage %s failed", stage.ID)
@@ -467,7 +471,7 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 	}
 
 	unwind := s.NewUnwindState(stage.ID, *s.unwindPoint, stageState.BlockNumber)
-	unwind.BadBlock = s.badBlock
+	unwind.InvalidBlock = s.invalidBlock
 
 	if stageState.BlockNumber <= unwind.UnwindPoint {
 		return nil

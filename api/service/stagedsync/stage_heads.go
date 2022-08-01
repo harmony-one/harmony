@@ -36,7 +36,7 @@ func NewStageHeadersCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Sta
 	}
 }
 
-func (heads *StageHeads) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
 
 	if len(s.state.syncConfig.peers) == 0 {
 		return ErrNoConnectedPeers

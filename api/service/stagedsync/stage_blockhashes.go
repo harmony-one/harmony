@@ -84,7 +84,7 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 	return cachedb, nil
 }
 
-func (bh *StageBlockHashes) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
 	targetHeight := uint64(0)
@@ -584,6 +584,12 @@ func (bh *StageBlockHashes) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (e
 	if bh.configs.turboModeCh != nil && bh.configs.bgProcRunning {
 		bh.configs.turboModeCh <- struct{}{}
 	}
+
+	hashesBucketName := GetBucketName(BlockHashesBucket, bh.configs.isBeacon)
+	tx.ClearBucket(hashesBucketName)
+
+	extrahashesBucketName := GetBucketName(ExtraBlockHashesBucket, bh.configs.isBeacon)
+	tx.ClearBucket(extrahashesBucketName)
 
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {

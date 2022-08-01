@@ -86,7 +86,7 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 }
 
 // ExecBodiesStage progresses Bodies stage in the forward direction
-func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
 	targetHeight := uint64(0)
@@ -117,6 +117,10 @@ func (b *StageBodies) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, 
 	}
 
 	if currProgress >= targetHeight {
+		// if canRunInTurboMode && currProgress < s.state.syncStatus.currentCycle.TargetHeight {
+		// 	b.configs.turboModeCh = make(chan struct{})
+		// 	go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
+		// }
 		return nil
 	}
 
@@ -275,7 +279,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
-					count++
+					peerConfig.failedTimes++
 					utils.Logger().Warn().Err(err).
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
@@ -286,14 +290,13 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("taskIndexes", tasks.indexes()).
 							Msg("cannot add task back to queue")
 					}
-					ss.syncConfig.RemovePeer(peerConfig)
-					if count > downloadBlocksRetryLimit {
-						break
+					if peerConfig.failedTimes > downloadBlocksRetryLimit {
+						ss.syncConfig.RemovePeer(peerConfig)
 					}
 					return
 				}
 				if len(payload) == 0 {
-					count++
+					peerConfig.failedTimes++
 					utils.Logger().Error().Int("failNumber", count).
 						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
 					if err := taskQueue.put(tasks); err != nil {
@@ -304,11 +307,13 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Msg("downloadBlocks: cannot add task")
 					}
 					ss.syncConfig.RemovePeer(peerConfig)
-					if count > downloadBlocksRetryLimit {
-						break
+					if peerConfig.failedTimes > downloadBlocksRetryLimit {
+						ss.syncConfig.RemovePeer(peerConfig)
 					}
-					continue
+					return
 				}
+				// node received blocks from peer, so it is working now  
+				peerConfig.failedTimes = 0
 
 				failedTasks, err := b.handleBlockSyncResult(s, payload, tasks, verifyAllSig, tx)
 				if err != nil {
@@ -319,23 +324,26 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("taskBlockes", tasks.blockHashesStr()).
 							Msg("downloadBlocks: cannot add task")
 					}
-					ss.syncConfig.RemovePeer(peerConfig)
+					peerConfig.failedTimes++
+					if peerConfig.failedTimes > downloadBlocksRetryLimit {
+						ss.syncConfig.RemovePeer(peerConfig)
+					}
 					return
 				}
 
 				if len(failedTasks) != 0 {
-					count++
-					if count > downloadBlocksRetryLimit {
-						break
+					peerConfig.failedTimes++
+					if peerConfig.failedTimes > downloadBlocksRetryLimit {
+						ss.syncConfig.RemovePeer(peerConfig)
+						return
 					}
 					if err := taskQueue.put(failedTasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
-							Interface("taskIndexes", failedTasks.indexes()).
-							Interface("taskBlockes", tasks.blockHashesStr()).
+							Interface("task Indexes", failedTasks.indexes()).
+							Interface("task Blocks", tasks.blockHashesStr()).
 							Msg("cannot add task")
 					}
-					continue
 				}
 			}
 		}()
@@ -678,6 +686,9 @@ func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err err
 	if b.configs.turboModeCh != nil && b.configs.bgProcRunning {
 		b.configs.turboModeCh <- struct{}{}
 	}
+
+	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
+	tx.ClearBucket(blocksBucketName)
 
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {

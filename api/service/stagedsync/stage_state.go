@@ -38,7 +38,7 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 }
 
 // ExecStatesStage progresses States stage in the forward direction
-func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
 	targetHeight := uint64(0)
@@ -60,7 +60,6 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		return nil
 	}
 
-	//size := uint64(0)
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -82,14 +81,19 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 	startTime := time.Now()
 	startBlock := currProgress
 
-	fmt.Print("\033[s")        // save the cursor position
-	var newBlocks types.Blocks //:= make([]types.Block, 100)
+	fmt.Print("\033[s") // save the cursor position
+	var newBlocks types.Blocks
 	nBlock := int(0)
 
 	for n, blockBytes, err := c.Seek([]byte(firstKey)); n != nil; n, blockBytes, err = c.Next() {
 		if err != nil {
 			return err
 		}
+		blockHeight, err := unmarshalData(n)
+		if err != nil {
+			return err
+		}
+
 		sz := len(blockBytes)
 		if sz <= 1 {
 			continue
@@ -102,6 +106,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 				Str("block number", string(n)).
 				Msg("block RLP decode failed")
 			// TODO: handle bad block
+			s.state.UnwindTo(blockHeight-1, common.Hash{})
 			return err
 		}
 
@@ -134,6 +139,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 			bc := stg.configs.bc
 			if err = stg.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
 				// TODO: handle bad block
+				s.state.UnwindTo(blockHeight-1, block.Hash())
 				return err
 			}
 
@@ -160,7 +166,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 
 		//newBlocks[nBlock] = *block
 		newBlocks = append(newBlocks, block)
-		if nBlock < 99 && block.NumberU64() != targetHeight {
+		if nBlock < s.state.InsertChainBatchSize-1 && block.NumberU64() != targetHeight {
 			nBlock++
 			continue
 		}
@@ -168,6 +174,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 		// insert downloaded block into chain
 		//_, err = stg.configs.bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 		headBeforeNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
+		headHashBeforeNewBlocks := stg.configs.bc.CurrentBlock().Hash()
 		_, err = stg.configs.bc.InsertChain(newBlocks, false /* verifyHeaders */)
 		if err != nil {
 			// TODO: handle chain roll back because of bad block
@@ -188,7 +195,7 @@ func (stg *StageStates) Exec(firstCycle bool, badBlockUnwind bool, s *StageState
 					return err
 				}
 			}
-
+			s.state.UnwindTo(stg.configs.bc.CurrentBlock().NumberU64(), headHashBeforeNewBlocks)
 			return err
 		}
 		utils.Logger().Info().

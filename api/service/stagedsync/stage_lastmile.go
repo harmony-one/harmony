@@ -32,7 +32,7 @@ func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) St
 	}
 }
 
-func (lm *StageLastMile) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	bc := lm.configs.bc
 	// update blocks after node start sync

@@ -28,7 +28,7 @@ func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
 	}
 }
 
-func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+func (finish *StageFinish) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -38,14 +38,6 @@ func (finish *StageFinish) Exec(firstCycle bool, badBlockUnwind bool, s *StageSt
 		}
 		defer tx.Rollback()
 	}
-
-	//TODO: manage this for Turbo Mode
-	hashesBucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
-	tx.ClearBucket(hashesBucketName)
-	extrahashesBucketName := GetBucketName(ExtraBlockHashesBucket, s.state.isBeacon)
-	tx.ClearBucket(extrahashesBucketName)
-	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
-	tx.ClearBucket(blocksBucketName)
 
 	// clean up cache
 	s.state.purgeAllBlocksFromCache()

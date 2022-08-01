@@ -63,6 +63,7 @@ func CreateStagedSync(
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
 	maxMemSyncCycleSize uint64,
+	insertChainBatchSize int,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -119,6 +120,7 @@ func CreateStagedSync(
 		maxBlocksPerCycle,
 		maxBackgroundBlocks,
 		maxMemSyncCycleSize,
+		insertChainBatchSize,
 	), nil
 }
 
@@ -167,7 +169,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		defer tx.Rollback()
 	}
 
-	// Do one step of staged sync
+	// Do one cycle of staged sync
 	startTime := time.Now()
 	startHead := bc.CurrentBlock().NumberU64()
 	initialCycle := true //TODO: should be based on cycle number

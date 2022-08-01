@@ -43,6 +43,7 @@ type SyncPeerConfig struct {
 	blockHashes [][]byte       // block hashes before node doing sync
 	newBlocks   []*types.Block // blocks after node doing sync
 	mux         sync.Mutex
+	failedTimes uint64
 }
 
 // CreateTestSyncPeerConfig used for testing.

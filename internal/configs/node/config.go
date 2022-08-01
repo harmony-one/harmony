@@ -86,8 +86,9 @@ type ConfigType struct {
 	UseMemDB               bool // use mem db for staged sync
 	DoubleCheckBlockHashes bool
 	MaxBlocksPerSyncCycle  uint64 // Maximum number of blocks per each cycle. if set to zero, all blocks will be  downloaded and synced in one full cycle.
-	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync 
+	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
 	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
+	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`
