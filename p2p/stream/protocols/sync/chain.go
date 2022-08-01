@@ -93,7 +93,7 @@ func (ch *chainHelperImpl) getBlockWithSigByHeader(header *block.Header) (*types
 	rs, err := ch.keyLocker.Lock(header.Number().Uint64(), func() (interface{}, error) {
 		b := ch.chain.GetBlock(header.Hash(), header.Number().Uint64())
 		if b == nil {
-			return nil, nil
+			return nil, errors.Errorf("block %d not found", header.Number().Uint64())
 		}
 		commitSig, err := ch.getBlockSigAndBitmap(header)
 		if err != nil {

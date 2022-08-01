@@ -59,6 +59,7 @@ Version = "1.0.4"
   Port = 9500
 
 [Log]
+  Console = false
   FileName = "harmony.log"
   Folder = "./latest"
   RotateSize = 100

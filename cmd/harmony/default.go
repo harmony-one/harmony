@@ -86,6 +86,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		ProfileDebugValues: []int{0},
 	},
 	Log: harmonyconfig.LogConfig{
+		Console:      false,
 		Folder:       "./latest",
 		FileName:     "harmony.log",
 		RotateSize:   100,

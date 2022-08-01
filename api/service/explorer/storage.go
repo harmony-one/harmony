@@ -9,6 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/harmony-one/harmony/internal/tikv"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/harmony-one/abool"
 	"github.com/harmony-one/harmony/core"
@@ -22,7 +26,8 @@ import (
 )
 
 const (
-	numWorker = 8
+	numWorker        = 8
+	changedSaveCount = 100
 )
 
 // ErrExplorerNotReady is the error when querying explorer db data when
@@ -33,6 +38,7 @@ type (
 	storage struct {
 		db database
 		bc core.BlockChain
+		rb *roaring64.Bitmap
 
 		// TODO: optimize this with priority queue
 		tm      *taskManager
@@ -55,17 +61,39 @@ type (
 	}
 )
 
-func newStorage(bc core.BlockChain, dbPath string) (*storage, error) {
-	utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
-	db, err := newLvlDB(dbPath)
+func newExplorerDB(hc *harmonyconfig.HarmonyConfig, dbPath string) (database, error) {
+	if hc.General.RunElasticMode {
+		// init the storage using tikv
+		dbPath = fmt.Sprintf("explorer_tikv_%d", hc.General.ShardID)
+		readOnly := hc.TiKV.Role == tikv.RoleReader
+		utils.Logger().Info().Msg("explorer storage in tikv: " + dbPath)
+		return newExplorerTiKv(hc.TiKV.PDAddr, dbPath, readOnly)
+	} else {
+		// or leveldb
+		utils.Logger().Info().Msg("explorer storage folder: " + dbPath)
+		return newExplorerLvlDB(dbPath)
+	}
+}
+
+func newStorage(hc *harmonyconfig.HarmonyConfig, bc core.BlockChain, dbPath string) (*storage, error) {
+	db, err := newExplorerDB(hc, dbPath)
 	if err != nil {
-		utils.Logger().Error().Err(err).Msg("Failed to create new database")
+		utils.Logger().Error().Err(err).Msg("Failed to create new explorer database")
 		return nil, err
 	}
+
+	// load checkpoint roaring bitmap from storage
+	// roaring bitmap is a very high compression bitmap, in our scene, 1 million blocks use almost 1kb storage
+	bitmap, err := readCheckpointBitmap(db)
+	if err != nil {
+		return nil, err
+	}
+
 	return &storage{
 		db:        db,
 		bc:        bc,
-		tm:        newTaskManager(),
+		rb:        bitmap,
+		tm:        newTaskManager(bitmap),
 		resultC:   make(chan blockResult, numWorker),
 		resultT:   make(chan *traceResult, numWorker),
 		available: abool.New(),
@@ -79,6 +107,7 @@ func (s *storage) Start() {
 }
 
 func (s *storage) Close() {
+	_ = writeCheckpointBitmap(s.db, s.rb)
 	close(s.closeC)
 }
 
@@ -182,14 +211,18 @@ type taskManager struct {
 	blocksLP []*types.Block // blocks with low priorities
 	lock     sync.Mutex
 
+	rb             *roaring64.Bitmap
+	rbChangedCount int
+
 	C chan struct{}
 	T chan *traceResult
 }
 
-func newTaskManager() *taskManager {
+func newTaskManager(bitmap *roaring64.Bitmap) *taskManager {
 	return &taskManager{
-		C: make(chan struct{}, numWorker),
-		T: make(chan *traceResult, numWorker),
+		rb: bitmap,
+		C:  make(chan struct{}, numWorker),
+		T:  make(chan *traceResult, numWorker),
 	}
 }
 
@@ -243,6 +276,30 @@ func (tm *taskManager) PullTask() *types.Block {
 		return b
 	}
 	return nil
+}
+
+// markBlockDone mark block processed done when explorer computed one block
+func (tm *taskManager) markBlockDone(btc batch, blockNum uint64) {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	if tm.rb.CheckedAdd(blockNum) {
+		tm.rbChangedCount++
+
+		// every 100 change write once
+		if tm.rbChangedCount == changedSaveCount {
+			tm.rbChangedCount = 0
+			_ = writeCheckpointBitmap(btc, tm.rb)
+		}
+	}
+}
+
+// markBlockDone check block is processed done
+func (tm *taskManager) hasBlockDone(blockNum uint64) bool {
+	tm.lock.Lock()
+	defer tm.lock.Unlock()
+
+	return tm.rb.Contains(blockNum)
 }
 
 func (s *storage) makeWorkersAndStart() {
@@ -321,9 +378,8 @@ LOOP:
 }
 
 func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
-	is, err := isBlockComputedInDB(bc.db, b.NumberU64())
-	if is || err != nil {
-		return nil, err
+	if bc.tm.hasBlockDone(b.NumberU64()) {
+		return nil, nil
 	}
 	btc := bc.db.NewBatch()
 
@@ -333,7 +389,7 @@ func (bc *blockComputer) computeBlock(b *types.Block) (*blockResult, error) {
 	for _, stk := range b.StakingTransactions() {
 		bc.computeStakingTx(btc, b, stk)
 	}
-	_ = writeCheckpoint(btc, b.NumberU64())
+	bc.tm.markBlockDone(btc, b.NumberU64())
 	return &blockResult{
 		btc: btc,
 		bn:  b.NumberU64(),

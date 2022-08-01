@@ -80,7 +80,7 @@ func NewEpochChain(db ethdb.Database, chainConfig *params.ChainConfig,
 			return nil, err
 		}
 	} else {
-		header := bc.GetHeaderByHash(hash)
+		header := bc.GetHeaderByHash(head)
 		if header == nil {
 			return nil, errors.New("failed to initialize: missing header")
 		}
@@ -145,6 +145,18 @@ func (bc *EpochChain) InsertChain(blocks types.Blocks, _ bool) (int, error) {
 			return i, err
 		}
 		se2, err := bc.writeHeadBlock(batch, block)
+		if err != nil {
+			return i, err
+		}
+		err = rawdb.WriteHeadHeaderHash(batch, block.Hash())
+		if err != nil {
+			return i, err
+		}
+		err = rawdb.WriteHeaderNumber(batch, block.Hash(), block.NumberU64())
+		if err != nil {
+			return i, err
+		}
+		err = rawdb.WriteHeader(batch, block.Header())
 		if err != nil {
 			return i, err
 		}

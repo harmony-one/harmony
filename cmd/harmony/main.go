@@ -15,6 +15,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/harmony-one/harmony/internal/shardchain/tikv_manage"
+	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
+	"github.com/harmony-one/harmony/internal/tikv/statedb_cache"
+
 	"github.com/harmony-one/harmony/api/service/crosslink_sending"
 	rosetta_common "github.com/harmony-one/harmony/rosetta/common"
 
@@ -242,17 +246,17 @@ func applyRootFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 	logPath := filepath.Join(config.Log.Folder, config.Log.FileName)
-	rotateSize := config.Log.RotateSize
-	rotateCount := config.Log.RotateCount
-	rotateMaxAge := config.Log.RotateMaxAge
 	verbosity := config.Log.Verbosity
 
-	utils.AddLogFile(logPath, rotateSize, rotateCount, rotateMaxAge)
 	utils.SetLogVerbosity(log.Lvl(verbosity))
 	if config.Log.Context != nil {
 		ip := config.Log.Context.IP
 		port := config.Log.Context.Port
 		utils.SetLogContext(ip, strconv.Itoa(port))
+	}
+
+	if config.Log.Console != true {
+		utils.AddLogFile(logPath, config.Log.RotateSize, config.Log.RotateCount, config.Log.RotateMaxAge)
 	}
 }
 
@@ -294,6 +298,11 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	nodeConfig, err := createGlobalConfig(hc)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR cannot configure node: %s\n", err)
+		os.Exit(1)
+	}
+
+	if hc.General.RunElasticMode && hc.TiKV == nil {
+		fmt.Fprintf(os.Stderr, "Use TIKV MUST HAS TIKV CONFIG")
 		os.Exit(1)
 	}
 
@@ -427,6 +436,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 		utils.Logger().Info().Msg("go with gRPC sync client")
 		currentNode.StartGRPCSyncClient()
 	}
+
+	currentNode.NodeSyncing()
 
 	if err := currentNode.StartServices(); err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
@@ -688,7 +699,9 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// Current node.
 	var chainDBFactory shardchain.DBFactory
-	if hc.ShardData.EnableShardData {
+	if hc.General.RunElasticMode {
+		chainDBFactory = setupTiKV(hc)
+	} else if hc.ShardData.EnableShardData {
 		chainDBFactory = &shardchain.LDBShardFactory{
 			RootDir:    nodeConfig.DBDir,
 			DiskCount:  hc.ShardData.DiskCount,
@@ -762,6 +775,28 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	return currentNode
 }
 
+func setupTiKV(hc harmonyconfig.HarmonyConfig) shardchain.DBFactory {
+	err := redis_helper.Init(hc.TiKV.StateDBRedisServerAddr)
+	if err != nil {
+		panic("can not connect to redis: " + err.Error())
+	}
+
+	factory := &shardchain.TiKvFactory{
+		PDAddr: hc.TiKV.PDAddr,
+		Role:   hc.TiKV.Role,
+		CacheConfig: statedb_cache.StateDBCacheConfig{
+			CacheSizeInMB:        hc.TiKV.StateDBCacheSizeInMB,
+			CachePersistencePath: hc.TiKV.StateDBCachePersistencePath,
+			RedisServerAddr:      hc.TiKV.StateDBRedisServerAddr,
+			RedisLRUTimeInDay:    hc.TiKV.StateDBRedisLRUTimeInDay,
+			DebugHitRate:         hc.TiKV.Debug,
+		},
+	}
+
+	tikv_manage.SetDefaultTiKVFactory(factory)
+	return factory
+}
+
 func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, currentConsensus *consensus.Consensus) {
 	switch hc.General.NodeType {
 	case nodeTypeExplorer:
@@ -804,6 +839,11 @@ func setupPrometheusService(node *node.Node, hc harmonyconfig.HarmonyConfig, sid
 		Shard:      sid,
 		Instance:   myHost.GetID().Pretty(),
 	}
+
+	if hc.General.RunElasticMode {
+		prometheusConfig.TikvRole = hc.TiKV.Role
+	}
+
 	p := prometheus.NewService(prometheusConfig)
 	node.RegisterService(service.Prometheus, p)
 }

@@ -278,6 +278,10 @@ func init() {
 		if confTree.Get("Sync.StagedSync") == nil {
 			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
 		}
+		if confTree.Get("Log.Console") == nil {
+			confTree.Set("Log.Console", defaultConfig.Log.Console)
+		}
+
 		confTree.Set("Version", "2.5.4")
 		return confTree
 	}

@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
+	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+
 	ethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gorilla/mux"
 	msg_pb "github.com/harmony-one/harmony/api/proto/message"
@@ -42,20 +45,21 @@ type HTTPError struct {
 
 // Service is the struct for explorer service.
 type Service struct {
-	router      *mux.Router
-	IP          string
-	Port        string
-	storage     *storage
-	server      *http.Server
-	messageChan chan *msg_pb.Message
-	blockchain  core.BlockChain
-	backend     hmy.NodeAPI
+	router        *mux.Router
+	IP            string
+	Port          string
+	storage       *storage
+	server        *http.Server
+	messageChan   chan *msg_pb.Message
+	blockchain    core.BlockChain
+	backend       hmy.NodeAPI
+	harmonyConfig *harmonyconfig.HarmonyConfig
 }
 
 // New returns explorer service.
-func New(selfPeer *p2p.Peer, bc core.BlockChain, backend hmy.NodeAPI) *Service {
+func New(harmonyConfig *harmonyconfig.HarmonyConfig, selfPeer *p2p.Peer, bc core.BlockChain, backend hmy.NodeAPI) *Service {
 	dbPath := defaultDBPath(selfPeer.IP, selfPeer.Port)
-	storage, err := newStorage(bc, dbPath)
+	storage, err := newStorage(harmonyConfig, bc, dbPath)
 	if err != nil {
 		utils.Logger().Fatal().Err(err).Msg("cannot open explorer DB")
 	}
@@ -333,6 +337,11 @@ func (s *Service) NotifyService(params map[string]interface{}) {}
 // SetMessageChan sets up message channel to service.
 func (s *Service) SetMessageChan(messageChan chan *msg_pb.Message) {
 	s.messageChan = messageChan
+}
+
+// GetCheckpointBitmap get explorer checkpoint bitmap
+func (s *Service) GetCheckpointBitmap() *roaring64.Bitmap {
+	return s.storage.rb.Clone()
 }
 
 func defaultDBPath(ip, port string) string {
