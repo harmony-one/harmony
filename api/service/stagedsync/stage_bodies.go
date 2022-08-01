@@ -628,6 +628,16 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 		return p, ErrSavingCachedBodiesProgressFail
 	}
 
+	// Clear cache db
+	if errU := b.configs.cachedb.Update(context.Background(), func(etx kv.RwTx) error {
+		if err := etx.ClearBucket(DownloadedBlocksBucket); err != nil {
+			return err
+		}
+		return nil
+	}); errU != nil {
+		return p, errU
+	}
+
 	// update the progress
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {

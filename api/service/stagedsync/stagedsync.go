@@ -407,14 +407,7 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	}
 
 	if len(logCtx) > 0 { // also don't print this logs if everything is fast
-		buckets := []string{
-			"freelist",
-			kv.PlainState,
-			kv.AccountChangeSet,
-			kv.StorageChangeSet,
-			kv.EthTx,
-			kv.Log,
-		}
+		buckets := Buckets
 		bucketSizes := make([]interface{}, 0, 2*len(buckets))
 		for _, bucket := range buckets {
 			sz, err1 := tx.BucketSize(bucket)

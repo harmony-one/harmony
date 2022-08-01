@@ -7,9 +7,7 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-// SyncStageID represents the stages of syncronisation in the Mode.StagedSync mode
-// It is used to persist the information about the stage state into the database.
-// It should not be empty and should be unique.
+// SyncStageID represents the stages in the Mode.StagedSync mode
 type SyncStageID string
 
 var (
@@ -63,6 +61,7 @@ func GetStageProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, e
 	return unmarshalData(v)
 }
 
+// SaveStageProgress saves progress of given sync stage
 func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
 	stgID := GetStageID(stage, isBeacon, false)
 	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
