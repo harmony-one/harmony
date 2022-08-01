@@ -562,6 +562,7 @@ func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageStat
 	if err = u.Done(tx); err != nil {
 		return fmt.Errorf(" reset: %w", err)
 	}
+
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return ErrCommitTransactionFail

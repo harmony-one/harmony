@@ -49,6 +49,7 @@ var Buckets = []string{
 	ExtraBlockHashesBucket,
 }
 
+// CreateStagedSync creates an instance of staged sync
 func CreateStagedSync(
 	ip string,
 	port string,
@@ -100,8 +101,6 @@ func CreateStagedSync(
 		finishCfg,
 	)
 
-	// During Import we don't want other services like header requests, body requests etc. to be running.
-	// Hence we run it in the test mode.
 	return New(ctx,
 		ip,
 		port,
@@ -124,6 +123,7 @@ func CreateStagedSync(
 	), nil
 }
 
+// init sync loop main database and create buckets
 func initDB(ctx context.Context, db kv.RwDB) error {
 	tx, errRW := db.BeginRw(ctx)
 	if errRW != nil {
@@ -139,10 +139,6 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 		if err := tx.CreateBucket(GetStageName(name, true, false)); err != nil {
 			return err
 		}
-		// // create bucket for prune
-		// if err := tx.CreateBucket(GetStageName(name, false, true)); err != nil {
-		// 	return err
-		// }
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to initiate db: %w", err)
@@ -211,8 +207,6 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		case <-c:
 		}
 	}
-
-	// defer close(waitForDone)
 
 	if consensus != nil {
 		if err := s.addConsensusLastMile(s.Blockchain(), consensus); err != nil {

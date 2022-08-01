@@ -87,6 +87,7 @@ func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState
 	if err = u.Done(tx); err != nil {
 		return err
 	}
+
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err

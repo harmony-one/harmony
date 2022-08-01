@@ -92,10 +92,6 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	targetHeight := uint64(0)
 	isBeacon := s.state.isBeacon
 	canRunInTurboMode := b.configs.turbo
-	// terminate background process in turbo mode
-	// if canRunInTurboMode && b.configs.turboModeCh != nil && b.configs.bgProcRunning {
-	// 	b.configs.turboModeCh <- struct{}{}
-	// }
 
 	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if targetHeight, err = GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
@@ -117,10 +113,6 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	}
 
 	if currProgress >= targetHeight {
-		// if canRunInTurboMode && currProgress < s.state.syncStatus.currentCycle.TargetHeight {
-		// 	b.configs.turboModeCh = make(chan struct{})
-		// 	go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
-		// }
 		return nil
 	}
 
@@ -181,7 +173,6 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 }
 
 func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64) error {
-	//TODO: clear bg blocks db first
 	currProgress := startHeight
 	var err error
 	size := uint64(0)
@@ -222,7 +213,6 @@ func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon b
 					return err
 				}
 			}
-			// time.Sleep(1 * time.Millisecond)
 		}
 		return nil
 	})
@@ -256,7 +246,6 @@ func (b *StageBodies) clearBlocksBucket(tx kv.RwTx, isBeacon bool) error {
 // downloadBlocks downloads blocks from state sync task queue.
 func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwTx) (err error) {
 	ss := s.state
-	// Initialize blockchain
 	var wg sync.WaitGroup
 	count := 0
 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
@@ -312,7 +301,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 					}
 					return
 				}
-				// node received blocks from peer, so it is working now  
+				// node received blocks from peer, so it is working now
 				peerConfig.failedTimes = 0
 
 				failedTasks, err := b.handleBlockSyncResult(s, payload, tasks, verifyAllSig, tx)
@@ -659,11 +648,10 @@ func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx 
 		defer tx.Rollback()
 	}
 
-	// MakeBodiesNonCanonical
-
 	if err = u.Done(tx); err != nil {
 		return err
 	}
+
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err

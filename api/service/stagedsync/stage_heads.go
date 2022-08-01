@@ -8,10 +8,6 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-// The number of blocks we should be able to re-org sub-second on commodity hardware.
-// See https://hackmd.io/TdJtNs0dS56q-In8h-ShSg
-const ShortPoSReorgThresholdBlocks = 10
-
 type StageHeads struct {
 	configs StageHeadsCfg
 }
@@ -121,7 +117,10 @@ func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 		}
 		defer tx.Rollback()
 	}
-	// TODO: Delete canonical hashes that are being unwound
+
+	if err = u.Done(tx); err != nil {
+		return err
+	}
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {

@@ -98,11 +98,10 @@ func (s *StagedSync) IsBeacon() bool           { return s.isBeacon }
 func (s *StagedSync) IsExplorer() bool         { return s.isExplorer }
 
 // func (s *StagedSync) Consensus() *consensus.Consensus { return s.consensus }
-func (s *StagedSync) Blockchain() core.BlockChain { return s.bc }
-
 // func (s *StagedSync) Worker() *worker.Worker          { return s.worker }
-func (s *StagedSync) DB() kv.RwDB              { return s.db }
-func (s *StagedSync) PrevUnwindPoint() *uint64 { return s.prevUnwindPoint }
+func (s *StagedSync) Blockchain() core.BlockChain { return s.bc }
+func (s *StagedSync) DB() kv.RwDB                 { return s.db }
+func (s *StagedSync) PrevUnwindPoint() *uint64    { return s.prevUnwindPoint }
 
 func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress uint64) *UnwindState {
 	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
@@ -314,8 +313,6 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 			if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
 				return err
 			}
-			// If there were unwinds at the start, a heavier but invalid chain may be present, so
-			// we relax the rules for Stage1
 			firstCycle = false
 		}
 
@@ -440,7 +437,6 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 		return err
 	}
 
-	// fmt.Println("stage ", stage.ID, " executing ...")
 	if err = stage.Handler.Exec(firstCycle, invalidBlockUnwind, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).

@@ -89,7 +89,7 @@ type UnwindState struct {
 	CurrentBlockNumber uint64
 	// If unwind is caused by a bad block, this hash is not empty
 	InvalidBlock common.Hash
-	state    *StagedSync
+	state        *StagedSync
 }
 
 func (u *UnwindState) LogPrefix() string { return u.state.LogPrefix() }

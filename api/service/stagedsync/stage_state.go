@@ -110,23 +110,19 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 			return err
 		}
 
-		// TODO:  use hash as key and here check key (which is hash) against block.header.hash
-
-		// gotHash := block.Hash()
-		// if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
-		// 	utils.Logger().Warn().
-		// 		Err(errors.New("wrong block delivery")).
-		// 		Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
-		// 		Str("gotHash", hex.EncodeToString(gotHash[:]))
-		// 	continue
-		// }
+		/*
+			// TODO:  use hash as key and here check key (which is hash) against block.header.hash
+				gotHash := block.Hash()
+				if !bytes.Equal(gotHash[:], tasks[i].blockHash) {
+					utils.Logger().Warn().
+						Err(errors.New("wrong block delivery")).
+						Str("expectHash", hex.EncodeToString(tasks[i].blockHash)).
+						Str("gotHash", hex.EncodeToString(gotHash[:]))
+					continue
+				}
+		*/
 
 		if block.NumberU64() <= currProgress {
-			// utils.Logger().Warn().
-			// 	Err(err).
-			// 	Uint64("block number", block.NumberU64()).
-			// 	Uint64("current head", currProgress).
-			// 	Msg("block number doesn't match with current head")
 			continue
 		}
 
@@ -143,25 +139,28 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 				return err
 			}
 
-			// err := stg.configs.bc.Engine().VerifyHeader(stg.configs.bc, block.Header(), verifySeal)
-			// if err == engine.ErrUnknownAncestor {
-			// 	return err
-			// } else if err != nil {
-			// 	utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] failed verifying signatures for new block %d", block.NumberU64())
+			/*
+				//TODO: we are handling the bad blocks and already blocks are verified, so do we need verify header?
+					err := stg.configs.bc.Engine().VerifyHeader(stg.configs.bc, block.Header(), verifySeal)
+					if err == engine.ErrUnknownAncestor {
+						return err
+					} else if err != nil {
+						utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] failed verifying signatures for new block %d", block.NumberU64())
 
-			// 	if !verifyAllSig {
-			// 		utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
-			// 		for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-			// 			if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
-			// 				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-			// 				return err
-			// 			}
-			// 		}
+						if !verifyAllSig {
+							utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
+							for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
+								if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
+									utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+									return err
+								}
+							}
 
-			// 		currProgress = stg.configs.bc.CurrentBlock().NumberU64()
-			// 	}
-			// 	return err
-			// }
+							currProgress = stg.configs.bc.CurrentBlock().NumberU64()
+						}
+						return err
+					}
+			*/
 		}
 
 		//newBlocks[nBlock] = *block
@@ -172,10 +171,9 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		}
 
 		// insert downloaded block into chain
-		//_, err = stg.configs.bc.InsertChain([]*types.Block{block}, false /* verifyHeaders */)
 		headBeforeNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
 		headHashBeforeNewBlocks := stg.configs.bc.CurrentBlock().Hash()
-		_, err = stg.configs.bc.InsertChain(newBlocks, false /* verifyHeaders */)
+		_, err = stg.configs.bc.InsertChain(newBlocks, false) //TODO: verifyHeaders can be done here
 		if err != nil {
 			// TODO: handle chain roll back because of bad block
 			utils.Logger().Error().
@@ -253,23 +251,6 @@ func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.B
 		}
 		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[STAGED_SYNC] VerifyHeaderSignature")
 	}
-	// err = bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
-	// if err == engine.ErrUnknownAncestor {
-	// 	return err
-	// } else if err != nil {
-	// 	utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
-
-	// 	if !verifyAllSig {
-	// 		utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-	// 		for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
-	// 			if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-	// 				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-	// 				return err
-	// 			}
-	// 		}
-	// 	}
-	// 	return err
-	// }
 	return nil
 }
 
@@ -311,11 +292,10 @@ func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, t
 		defer tx.Rollback()
 	}
 
-	// MakeStatesNonCanonical
-
 	if err = u.Done(tx); err != nil {
 		return err
 	}
+
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {
 			return err
