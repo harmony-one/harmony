@@ -458,6 +458,40 @@ func (s *PublicStakingService) GetValidatorInformationByBlockNumber(
 	return NewStructuredResponse(validatorInfo)
 }
 
+// GetValidatorsStakeByBlockNumber returns the stake per validator at the specified block
+func (s *PublicStakingService) GetValidatorsStakeByBlockNumber(
+	ctx context.Context, blockNumber BlockNumber,
+) (StructuredResponse, error) {
+	timer := DoMetricRPCRequest(GetValidatorsStakeByBlockNumber)
+	defer DoRPCRequestDuration(GetValidatorsStakeByBlockNumber, timer)
+
+	// Process number based on version
+	blockNum := blockNumber.EthBlockNumber()
+
+	// Fetch block
+	if !isBeaconShard(s.hmy) {
+		DoMetricRPCQueryInfo(GetValidatorsStakeByBlockNumber, FailedNumber)
+		return nil, ErrNotBeaconShard
+	}
+	if isBlockGreaterThanLatest(s.hmy, blockNum) {
+		DoMetricRPCQueryInfo(GetValidatorsStakeByBlockNumber, FailedNumber)
+		return nil, ErrRequestedBlockTooHigh
+	}
+	blk, err := s.hmy.BlockByNumber(ctx, blockNum)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetValidatorsStakeByBlockNumber, FailedNumber)
+		return nil, errors.Wrapf(err, "could not retrieve the blk information for blk number: %d", blockNum)
+	}
+	response, err := s.hmy.GetValidatorsStakeByBlockNumber(blk)
+	if err != nil {
+		DoMetricRPCQueryInfo(GetValidatorsStakeByBlockNumber, FailedNumber)
+		return nil, err
+	}
+
+	// Response output is the same for all versions
+	return NewStructuredResponse(response)
+}
+
 // GetValidatorSelfDelegation returns validator stake.
 func (s *PublicStakingService) GetValidatorSelfDelegation(
 	ctx context.Context, address string,
