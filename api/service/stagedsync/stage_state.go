@@ -163,7 +163,6 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 			*/
 		}
 
-		//newBlocks[nBlock] = *block
 		newBlocks = append(newBlocks, block)
 		if nBlock < s.state.InsertChainBatchSize-1 && block.NumberU64() != targetHeight {
 			nBlock++
@@ -175,7 +174,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		headHashBeforeNewBlocks := stg.configs.bc.CurrentBlock().Hash()
 		_, err = stg.configs.bc.InsertChain(newBlocks, false) //TODO: verifyHeaders can be done here
 		if err != nil {
-			// TODO: handle chain roll back because of bad block
+			// TODO: handle chain rollback because of bad block
 			utils.Logger().Error().
 				Err(err).
 				Msgf(
@@ -183,7 +182,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 					block.NumberU64(),
 					block.ShardID(),
 				)
-			// roll back bc
+			// rollback bc
 			utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last added blocks!")
 			headAfterNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
 			nNewAddedBlocks := headAfterNewBlocks - headBeforeNewBlocks

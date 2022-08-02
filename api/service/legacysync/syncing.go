@@ -1057,7 +1057,6 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 	}
 
 	startTime := time.Now()
-	// totalBlocksSynced := uint32(0)
 	startHead := bc.CurrentBlock().NumberU64()
 	fmt.Print("\033[s") // save the cursor position
 	for {
@@ -1069,9 +1068,9 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 					isBeacon, bc.ShardID(), otherHeight, currentHeight)
 			break
 		}
-		// utils.Logger().Info().
-		// 	Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-		// 		isBeacon, bc.ShardID(), otherHeight, currentHeight)
+		utils.Logger().Info().
+			Msgf("[SYNC] Node is OUT OF SYNC (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
+				isBeacon, bc.ShardID(), otherHeight, currentHeight)
 
 		startHash := bc.CurrentBlock().Hash()
 		size := uint32(otherHeight - currentHeight)
@@ -1089,7 +1088,6 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		ss.purgeOldBlocksFromCache()
 		//calculating block speed
 		currHead := bc.CurrentBlock().NumberU64()
-		// totalBlocksSynced += size
 		dt := time.Now().Sub(startTime).Seconds()
 		speed := float64(0)
 		if dt > 0 {

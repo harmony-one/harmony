@@ -55,9 +55,6 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 	if err := checkPeersDuplicity(peers); err != nil {
 		return syncConfig, err
 	}
-	// limit the number of dns peers to connect
-	// randSeed := time.Now().UnixNano()
-	// peers = limitNumPeers(peers, randSeed)
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).
