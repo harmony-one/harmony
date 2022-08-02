@@ -279,7 +279,7 @@ func init() {
 			confTree.Set("Log.Console", defaultConfig.Log.Console)
 		}
 
-		confTree.Set("Version", "2.5.4")
+		confTree.Set("Version", "2.5.6")
 		return confTree
 	}
 }
