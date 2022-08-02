@@ -283,9 +283,8 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 				return err
 			}
 		}
-		//time.Sleep(1 * time.Millisecond)
+		//TODO: do we need sleep a few milliseconds? ex: time.Sleep(1 * time.Millisecond)
 	}
-	// return nil
 }
 
 func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) error {

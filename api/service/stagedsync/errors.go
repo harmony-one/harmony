@@ -7,7 +7,6 @@ var (
 	ErrRegistrationFail                   = errors.New("[STAGED_SYNC]: registration failed")
 	ErrGetBlock                           = errors.New("[STAGED_SYNC]: get block failed")
 	ErrGetBlockHash                       = errors.New("[STAGED_SYNC]: get block hash failed")
-	ErrProcessStateSync                   = errors.New("[STAGED_SYNC]: get block hash failed")
 	ErrGetConsensusHashes                 = errors.New("[STAGED_SYNC]: get consensus hashes failed")
 	ErrGenStateSyncTaskQueue              = errors.New("[STAGED_SYNC]: generate state sync task queue failed")
 	ErrDownloadBlocks                     = errors.New("[STAGED_SYNC]: get download blocks failed")
