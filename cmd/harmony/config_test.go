@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
+	"github.com/stretchr/testify/require"
 
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
@@ -86,6 +87,11 @@ Version = "1.0.4"
   BlacklistFile = "./.hmy/blacklist.txt"
   LocalAccountsFile = "./.hmy/locals.txt"
   AllowedTxsFile = "./.hmy/allowedtxs.txt"
+  AccountQueue = 64
+  GlobalQueue = 5120
+  Lifetime = "30m"
+  PriceBump = 1
+  PriceLimit = 100e9
 
 [Sync]
   Downloader = false
@@ -136,9 +142,7 @@ Version = "1.0.4"
 		t.Errorf("Expected config version: 1.0.4, not %v", config.Version)
 	}
 	config.Version = defConf.Version // Shortcut for testing, value checked above
-	if !reflect.DeepEqual(config, defConf) {
-		t.Errorf("Unexpected config \n\t%+v \n\t%+v", config, defaultConfig)
-	}
+	require.Equal(t, config, defConf)
 }
 
 func TestPersistConfig(t *testing.T) {
