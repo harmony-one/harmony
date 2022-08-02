@@ -1084,11 +1084,6 @@ func New(
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
 
-		// Temporarily not updating other networks to make the rpc tests pass
-		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet && node.NodeConfig.GetNetworkType() != nodeconfig.Testnet {
-			txPoolConfig.PriceLimit = 1e9
-			txPoolConfig.PriceBump = 10
-		}
 		if harmonyconfig != nil {
 			txPoolConfig.AccountSlots = harmonyconfig.TxPool.AccountSlots
 			txPoolConfig.GlobalSlots = harmonyconfig.TxPool.GlobalSlots
@@ -1096,6 +1091,13 @@ func New(
 			txPoolConfig.AccountQueue = harmonyconfig.TxPool.AccountQueue
 			txPoolConfig.GlobalQueue = harmonyconfig.TxPool.GlobalQueue
 			txPoolConfig.Lifetime = harmonyconfig.TxPool.Lifetime
+			txPoolConfig.PriceLimit = uint64(harmonyconfig.TxPool.PriceLimit)
+			txPoolConfig.PriceBump = harmonyconfig.TxPool.PriceBump
+		}
+		// Temporarily not updating other networks to make the rpc tests pass
+		if node.NodeConfig.GetNetworkType() != nodeconfig.Mainnet && node.NodeConfig.GetNetworkType() != nodeconfig.Testnet {
+			txPoolConfig.PriceLimit = 1e9
+			txPoolConfig.PriceBump = 10
 		}
 
 		txPoolConfig.Blacklist = blacklist
