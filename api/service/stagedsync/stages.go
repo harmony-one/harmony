@@ -10,7 +10,7 @@ import (
 // SyncStageID represents the stages in the Mode.StagedSync mode
 type SyncStageID string
 
-var (
+const (
 	Heads       SyncStageID = "Heads"       // Heads are downloaded
 	BlockHashes SyncStageID = "BlockHashes" // block hashes are downloaded from peers
 	BlockBodies SyncStageID = "BlockBodies" // Block bodies are downloaded, TxHash and UncleHash are getting verified
@@ -18,15 +18,6 @@ var (
 	LastMile    SyncStageID = "LastMile"    // update blocks after sync and update last mile blocks as well
 	Finish      SyncStageID = "Finish"      // Nominal stage after all other stages
 )
-
-var AllStages = []SyncStageID{
-	Heads,
-	BlockHashes,
-	BlockBodies,
-	States,
-	LastMile,
-	Finish,
-}
 
 func GetStageName(stage string, isBeacon bool, prune bool) string {
 	name := stage
@@ -43,8 +34,8 @@ func GetStageID(stage SyncStageID, isBeacon bool, prune bool) []byte {
 	return []byte(GetStageName(string(stage), isBeacon, prune))
 }
 
-func GetBucketName(bucket_name string, isBeacon bool) string {
-	name := bucket_name
+func GetBucketName(bucketName string, isBeacon bool) string {
+	name := bucketName
 	if isBeacon {
 		name = "Beacon" + name
 	}

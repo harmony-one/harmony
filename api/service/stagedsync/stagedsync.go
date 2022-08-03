@@ -356,12 +356,9 @@ func CreateView(ctx context.Context, db kv.RwDB, tx kv.Tx, f func(tx kv.Tx) erro
 	if tx != nil {
 		return f(tx)
 	}
-	if errV := db.View(context.Background(), func(etx kv.Tx) error {
+	return db.View(context.Background(), func(etx kv.Tx) error {
 		return f(etx)
-	}); errV != nil {
-		return errV
-	}
-	return nil
+	})
 }
 
 func ByteCount(b uint64) string {
@@ -931,10 +928,6 @@ func (ss *StagedSync) getBlockFromOldBlocksByParentHash(parentHash common.Hash) 
 	return nil
 }
 
-func (ss *StagedSync) getCommonBlockIter(parentHash common.Hash) *commonBlockIter {
-	return newCommonBlockIter(ss.commonBlocks, parentHash)
-}
-
 func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.Hash) *types.Block {
 	for _, block := range ss.lastMileBlocks {
 		ph := block.ParentHash()
@@ -1134,14 +1127,11 @@ func GetSyncingPort(nodePort string) string {
 	return ""
 }
 
-func ParseResult(res interface{}) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	result, ok := res.(*SyncCheckResult)
-	if ok {
-		IsInSync = result.IsInSync
-		OtherHeight = result.OtherHeight
-		HeightDiff = result.HeightDiff
-	}
-	return false, 0, 0
+func ParseResult(res SyncCheckResult) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+	IsInSync = res.IsInSync
+	OtherHeight = res.OtherHeight
+	HeightDiff = res.HeightDiff
+	return IsInSync, OtherHeight, HeightDiff
 }
 
 // GetSyncStatus get the last sync status for other modules (E.g. RPC, explorer).

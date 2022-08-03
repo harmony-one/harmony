@@ -1163,14 +1163,11 @@ type (
 	}
 )
 
-func ParseResult(res interface{}) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	result, ok := res.(*SyncCheckResult)
-	if ok {
-		IsInSync = result.IsInSync
-		OtherHeight = result.OtherHeight
-		HeightDiff = result.HeightDiff
-	}
-	return false, 0, 0
+func ParseResult(res SyncCheckResult) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+	IsInSync = res.IsInSync
+	OtherHeight = res.OtherHeight
+	HeightDiff = res.HeightDiff
+	return IsInSync, OtherHeight, HeightDiff
 }
 
 func newSyncStatus(role nodeconfig.Role) syncStatus {
