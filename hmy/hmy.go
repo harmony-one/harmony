@@ -35,6 +35,8 @@ const (
 	undelegationPayoutsCacheSize           = 500  // max number of epochs to store in cache
 	preStakingBlockRewardsCacheSize        = 1024 // max number of block rewards to store in cache
 	totalStakeCacheDuration                = 20   // number of blocks where the returned total stake will remain the same
+	// max number of blocks for which the map "validator address -> total delegation to validator" is stored
+	stakeByBlockNumberCacheSize = 250
 )
 
 var (
@@ -78,6 +80,8 @@ type Harmony struct {
 	preStakingBlockRewardsCache *lru.Cache
 	// totalStakeCache to save on recomputation for `totalStakeCacheDuration` blocks.
 	totalStakeCache *totalStakeCache
+	// stakeByBlockNumberCache to save on recomputation for `totalStakeCacheDuration` blocks
+	stakeByBlockNumberCache *lru.Cache
 }
 
 // NodeAPI is the list of functions from node used to call rpc apis.
@@ -125,6 +129,7 @@ func New(
 ) *Harmony {
 	leaderCache, _ := lru.New(leaderCacheSize)
 	undelegationPayoutsCache, _ := lru.New(undelegationPayoutsCacheSize)
+	stakeByBlockNumberCache, _ := lru.New(stakeByBlockNumberCacheSize)
 	preStakingBlockRewardsCache, _ := lru.New(preStakingBlockRewardsCacheSize)
 	totalStakeCache := newTotalStakeCache(totalStakeCacheDuration)
 	bloomIndexer := NewBloomIndexer(nodeAPI.Blockchain(), params.BloomBitsBlocks, params.BloomConfirms)
@@ -148,6 +153,7 @@ func New(
 		totalStakeCache:             totalStakeCache,
 		undelegationPayoutsCache:    undelegationPayoutsCache,
 		preStakingBlockRewardsCache: preStakingBlockRewardsCache,
+		stakeByBlockNumberCache:     stakeByBlockNumberCache,
 	}
 
 	// Setup gas price oracle

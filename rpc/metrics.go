@@ -71,6 +71,7 @@ const (
 	GetAllValidatorInformationByBlockNumber = "GetAllValidatorInformationByBlockNumber"
 	GetValidatorInformation                 = "GetValidatorInformation"
 	GetValidatorInformationByBlockNumber    = "GetValidatorInformationByBlockNumber"
+	GetValidatorsStakeByBlockNumber         = "GetValidatorsStakeByBlockNumber"
 	GetValidatorSelfDelegation              = "GetValidatorSelfDelegation"
 	GetValidatorTotalDelegation             = "GetValidatorTotalDelegation"
 	GetAllDelegationInformation             = "GetAllDelegationInformation"
