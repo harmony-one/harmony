@@ -37,13 +37,13 @@ type EpochSync struct {
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *EpochSync) GetSyncStatus() SyncCheckResult {
 	return ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
 }
 
-// isInSync query the remote DNS node for the latest height to check what is the current
+// isSynchronized query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *EpochSync) isInSync(_ bool) SyncCheckResult {
+func (ss *EpochSync) isSynchronized(_ bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
@@ -70,9 +70,9 @@ func (ss *EpochSync) isInSync(_ bool) SyncCheckResult {
 		Uint64("CurrentEpoch", curEpoch).
 		Msg("[EPOCHSYNC] Checking sync status")
 	return SyncCheckResult{
-		IsInSync:    inSync,
-		OtherHeight: otherHeight1,
-		HeightDiff:  epochDiff,
+		IsSynchronized: inSync,
+		OtherHeight:    otherHeight1,
+		HeightDiff:     epochDiff,
 	}
 }
 

@@ -58,6 +58,7 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 		cachedbName = "beacon_" + cachedbName
 	}
 	cachedb := mdbx.NewMDBX(log.New()).Path(cachedbName).MustOpen()
+	// create transaction on cachedb
 	tx, errRW := cachedb.BeginRw(ctx)
 	if errRW != nil {
 		utils.Logger().
@@ -213,6 +214,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	return nil
 }
 
+// runBackgroundProcess continues downloading block hashes in the background and caching them on disk while next stages are running.
+// In the next sync cycle, this stage will use cached block hashes rather than download them from peers.
+// This helps performance and reduces stage duration. It also helps to use the resources more efficiently.
 func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64, startHash common.Hash) error {
 	size := uint32(0)
 	currProgress := startHeight
@@ -433,17 +437,21 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 		return p, h, ErrSavingCacheLastBlockHashFail
 	}
 
+	// if node was connected to other peers and had some hashes to store in db, but it failed to save the blocks, return error
 	if len(s.state.syncConfig.peers) > 0 && len(s.state.syncConfig.peers[0].blockHashes) > 0 && !saved {
 		return p, h, ErrCachingBlockHashFail
 	}
 
+	// commit transaction to db to cache all downloaded blocks
 	if err := etx.Commit(); err != nil {
 		return p, h, err
 	}
+
+	// it cached block hashes successfully, so, it returns the cache progress and last cached block hash 
 	return p, h, nil
 }
 
-// save block hashes to cache db (map from block heigh to block hash)
+// getHashFromCache fetches block hashes from cache db
 func (bh *StageBlockHashes) getHashFromCache(height uint64) (h []byte, err error) {
 
 	tx, err := bh.configs.cachedb.BeginRw(context.Background())

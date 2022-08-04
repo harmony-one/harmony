@@ -89,6 +89,7 @@ type ConfigType struct {
 	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
 	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
 	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
+	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	NtpServer              string
 	StringRole             string
 	P2PPriKey              p2p_crypto.PrivKey   `json:"-"`

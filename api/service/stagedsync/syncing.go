@@ -64,6 +64,7 @@ func CreateStagedSync(
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
 	maxMemSyncCycleSize uint64,
+	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int,
 ) (*StagedSync, error) {
 
@@ -119,6 +120,7 @@ func CreateStagedSync(
 		maxBlocksPerCycle,
 		maxBackgroundBlocks,
 		maxMemSyncCycleSize,
+		verifyHeaderBatchSize,
 		insertChainBatchSize,
 	), nil
 }

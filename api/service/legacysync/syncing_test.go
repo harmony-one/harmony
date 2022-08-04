@@ -280,7 +280,7 @@ func TestSyncStatus_Get_Concurrency(t *testing.T) {
 	fb := func() SyncCheckResult {
 		time.Sleep(1 * time.Second)
 		atomic.AddInt32(&updated, 1)
-		return SyncCheckResult{IsInSync: true}
+		return SyncCheckResult{IsSynchronized: true}
 	}
 	for i := 0; i != 20; i++ {
 		wg.Add(1)

@@ -89,12 +89,12 @@ type ISync interface {
 	GetActivePeerNumber() int
 	CreateSyncConfig(peers []p2p.Peer, shardID uint32) error
 	SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration)
-	IsInSync() bool
+	IsSynchronized() bool
 	IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool)
 	AddNewBlock(peerHash []byte, block *types.Block)
 	RegisterNodeInfo() int
-	GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
-	GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
+	GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64)
 }
 
 // Node represents a protocol-participating node in the network
@@ -148,8 +148,8 @@ type Node struct {
 	// BroadcastInvalidTx flag is considered when adding pending tx to tx-pool
 	BroadcastInvalidTx bool
 	// InSync flag indicates the node is in-sync or not
-	IsInSync      *abool.AtomicBool
-	proposedBlock map[uint64]*types.Block
+	IsSynchronized *abool.AtomicBool
+	proposedBlock  map[uint64]*types.Block
 
 	deciderCache   *lru.Cache
 	committeeCache *lru.Cache
@@ -1073,7 +1073,7 @@ func New(
 		}
 	}
 	node.shardChains = collection
-	node.IsInSync = abool.NewBool(false)
+	node.IsSynchronized = abool.NewBool(false)
 
 	if host != nil && consensusObj != nil {
 		// Consensus and associated channel to communicate blocks

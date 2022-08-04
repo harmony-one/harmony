@@ -172,6 +172,9 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	return nil
 }
 
+// runBackgroundProcess continues downloading blocks in the background and caching them on disk while next stages are running.
+// In the next sync cycle, this stage will use cached blocks rather than download them from peers.
+// This helps performance and reduces stage duration. It also helps to use the resources more efficiently.
 func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64) error {
 	currProgress := startHeight
 	var err error
@@ -512,11 +515,13 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
 		return progress, ErrSavingBodiesProgressFail
 	}
+	// if it's using its own transaction, commit transaction to db to cache all downloaded blocks
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
 			return progress, err
 		}
 	}
+	// it cached blocks successfully, so, it returns the cache progress
 	return p, nil
 }
 

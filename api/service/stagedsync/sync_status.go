@@ -30,9 +30,9 @@ type (
 	}
 
 	SyncCheckResult struct {
-		IsInSync    bool
-		OtherHeight uint64
-		HeightDiff  uint64
+		IsSynchronized bool
+		OtherHeight    uint64
+		HeightDiff     uint64
 	}
 
 	SyncCycle struct {

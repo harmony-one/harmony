@@ -1157,17 +1157,17 @@ type (
 	}
 
 	SyncCheckResult struct {
-		IsInSync    bool
-		OtherHeight uint64
-		HeightDiff  uint64
+		IsSynchronized bool
+		OtherHeight    uint64
+		HeightDiff     uint64
 	}
 )
 
-func ParseResult(res SyncCheckResult) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	IsInSync = res.IsInSync
+func ParseResult(res SyncCheckResult) (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	IsSynchronized = res.IsSynchronized
 	OtherHeight = res.OtherHeight
 	HeightDiff = res.HeightDiff
-	return IsInSync, OtherHeight, HeightDiff
+	return IsSynchronized, OtherHeight, HeightDiff
 }
 
 func newSyncStatus(role nodeconfig.Role) syncStatus {
@@ -1215,9 +1215,9 @@ func (status *syncStatus) Clone() syncStatus {
 	}
 }
 
-func (ss *StateSync) IsInSync() bool {
+func (ss *StateSync) IsSynchronized() bool {
 	result := ss.GetSyncStatus()
-	return result.IsInSync
+	return result.IsSynchronized
 }
 
 func (status *syncStatus) expired() bool {
@@ -1234,13 +1234,13 @@ func (status *syncStatus) update(result SyncCheckResult) {
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *StateSync) GetSyncStatus() SyncCheckResult {
 	return ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
 }
 
-func (ss *StateSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+func (ss *StateSync) GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
 	res := ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
 	return ParseResult(res)
 }
@@ -1248,18 +1248,18 @@ func (ss *StateSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, H
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StateSync) GetSyncStatusDoubleChecked() SyncCheckResult {
-	result := ss.isInSync(true)
+	result := ss.isSynchronized(true)
 	return result
 }
 
-func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	result := ss.isInSync(true)
+func (ss *StateSync) GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	result := ss.isSynchronized(true)
 	return ParseResult(result)
 }
 
-// isInSync query the remote DNS node for the latest height to check what is the current
+// isSynchronized query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
+func (ss *StateSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
@@ -1277,9 +1277,9 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 			Uint64("lastHeight", lastHeight).
 			Msg("[SYNC] Checking sync status")
 		return SyncCheckResult{
-			IsInSync:    !wasOutOfSync,
-			OtherHeight: otherHeight1,
-			HeightDiff:  heightDiff,
+			IsSynchronized: !wasOutOfSync,
+			OtherHeight:    otherHeight1,
+			HeightDiff:     heightDiff,
 		}
 	}
 	// double check the sync status after 1 second to confirm (avoid false alarm)
@@ -1301,8 +1301,8 @@ func (ss *StateSync) isInSync(doubleCheck bool) SyncCheckResult {
 		heightDiff = 0 // overflow
 	}
 	return SyncCheckResult{
-		IsInSync:    !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
-		OtherHeight: otherHeight2,
-		HeightDiff:  heightDiff,
+		IsSynchronized: !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		OtherHeight:    otherHeight2,
+		HeightDiff:     heightDiff,
 	}
 }

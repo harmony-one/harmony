@@ -134,6 +134,7 @@ func (node *Node) createStagedSync(bc core.BlockChain, isBeacon bool) *stagedsyn
 		node.NodeConfig.MaxBlocksPerSyncCycle,
 		node.NodeConfig.MaxBackgroundBlocks,
 		node.NodeConfig.MaxMemSyncCycleSize,
+		node.NodeConfig.VerifyHeaderBatchSize,
 		node.NodeConfig.InsertChainBatchSize); err != nil {
 		return nil
 	} else {
@@ -330,18 +331,18 @@ func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinCons
 		utils.Logger().Debug().Int("len", syncInstance.GetActivePeerNumber()).Msg("[SYNC] Get Active Peers")
 	}
 	// TODO: treat fake maximum height
-	if isInSync, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isInSync {
-		node.IsInSync.UnSet()
+	if isSynchronized, _, _ := syncInstance.GetParsedSyncStatusDoubleChecked(); !isSynchronized {
+		node.IsSynchronized.UnSet()
 		if willJoinConsensus {
 			node.Consensus.BlocksNotSynchronized()
 		}
 		syncInstance.SyncLoop(bc, worker, false, node.Consensus, 0)
 		if willJoinConsensus {
-			node.IsInSync.Set()
+			node.IsSynchronized.Set()
 			node.Consensus.BlocksSynchronized()
 		}
 	}
-	node.IsInSync.Set()
+	node.IsSynchronized.Set()
 }
 
 // SupportGRPCSyncServer do gRPC sync server
@@ -558,7 +559,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 	// this is the out of sync node acts as grpc server side
 	case downloader_pb.DownloaderRequest_NEWBLOCK:
 		dnsServerRequestCounterVec.With(dnsReqMetricLabel("new block")).Inc()
-		if node.IsInSync.IsSet() {
+		if node.IsSynchronized.IsSet() {
 			response.Type = downloader_pb.DownloaderResponse_INSYNC
 			return response, nil
 		}
@@ -611,7 +612,7 @@ func (node *Node) CalculateResponse(request *downloader_pb.DownloaderRequest, in
 		}
 
 	case downloader_pb.DownloaderRequest_REGISTERTIMEOUT:
-		if !node.IsInSync.IsSet() {
+		if !node.IsSynchronized.IsSet() {
 			count := node.SyncInstance().RegisterNodeInfo()
 			utils.Logger().Debug().
 				Int("number", count).
@@ -827,7 +828,7 @@ func (node *Node) legacySyncStatus(shardID uint32) (bool, uint64, uint64) {
 			return false, 0, 0
 		}
 		result := node.epochSync.GetSyncStatus()
-		return result.IsInSync, result.OtherHeight, result.HeightDiff
+		return result.IsSynchronized, result.OtherHeight, result.HeightDiff
 
 	default:
 		// Shard node is not working on
@@ -854,14 +855,14 @@ func (node *Node) legacyIsOutOfSync(shardID uint32) bool {
 		} else if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
 			return true
 		}
-		return node.SyncInstance().IsInSync()
+		return node.SyncInstance().IsSynchronized()
 
 	case shard.BeaconChainShardID:
 		if node.epochSync == nil {
 			return true
 		}
 		result := node.epochSync.GetSyncStatus()
-		return !result.IsInSync
+		return !result.IsSynchronized
 
 	default:
 		return true

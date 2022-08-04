@@ -72,6 +72,8 @@ type StagedSync struct {
 	MaxMemSyncCycleSize uint64
 	// number of blocks to build a batch and insert to chain in staged sync
 	InsertChainBatchSize int
+	// batch size to verify header before insert to chain	
+	VerifyHeaderBatchSize uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
 	// use turbo mode for staged sync
@@ -219,6 +221,7 @@ func New(ctx context.Context,
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
 	maxMemSyncCycleSize uint64,
+	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int) *StagedSync {
 
 	unwindStages := make([]*Stage, len(stagesList))
@@ -269,6 +272,7 @@ func New(ctx context.Context,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 		MaxBackgroundBlocks:    maxBackgroundBlocks,
 		MaxMemSyncCycleSize:    maxMemSyncCycleSize,
+		VerifyHeaderBatchSize:  verifyHeaderBatchSize,
 		InsertChainBatchSize:   insertChainBatchSize,
 	}
 }
@@ -949,7 +953,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 	// Verify block signatures
 	if block.NumberU64() > 1 {
 		// Verify signature every 100 blocks
-		verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
+		verifySeal := block.NumberU64()%ss.VerifyHeaderBatchSize == 0 || verifyAllSig
 		verifyCurrentSig := verifyAllSig && haveCurrentSig
 		if verifyCurrentSig {
 			sig, bitmap, err := chain.ParseCommitSigAndBitmap(block.GetCurrentCommitSig())
@@ -971,7 +975,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 
 			if !verifyAllSig {
 				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
-				for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
+				for i := uint64(0); i < ss.VerifyHeaderBatchSize-1; i++ {
 					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
 						utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 						return err
@@ -1127,11 +1131,11 @@ func GetSyncingPort(nodePort string) string {
 	return ""
 }
 
-func ParseResult(res SyncCheckResult) (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	IsInSync = res.IsInSync
+func ParseResult(res SyncCheckResult) (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	IsSynchronized = res.IsSynchronized
 	OtherHeight = res.OtherHeight
 	HeightDiff = res.HeightDiff
-	return IsInSync, OtherHeight, HeightDiff
+	return IsSynchronized, OtherHeight, HeightDiff
 }
 
 // GetSyncStatus get the last sync status for other modules (E.g. RPC, explorer).
@@ -1139,37 +1143,37 @@ func ParseResult(res SyncCheckResult) (IsInSync bool, OtherHeight uint64, Height
 // If the last result is expired, ask the remote DNS nodes for latest height and return the result.
 func (ss *StagedSync) GetSyncStatus() SyncCheckResult {
 	return ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
 }
 
-func (ss *StagedSync) GetParsedSyncStatus() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
+func (ss *StagedSync) GetParsedSyncStatus() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
 	res := ss.syncStatus.Get(func() SyncCheckResult {
-		return ss.isInSync(false)
+		return ss.isSynchronized(false)
 	})
 	return ParseResult(res)
 }
 
-func (ss *StagedSync) IsInSync() bool {
+func (ss *StagedSync) IsSynchronized() bool {
 	result := ss.GetSyncStatus()
-	return result.IsInSync
+	return result.IsSynchronized
 }
 
 // GetSyncStatusDoubleChecked return the sync status when enforcing a immediate query on DNS nodes
 // with a double check to avoid false alarm.
 func (ss *StagedSync) GetSyncStatusDoubleChecked() SyncCheckResult {
-	result := ss.isInSync(true)
+	result := ss.isSynchronized(true)
 	return result
 }
 
-func (ss *StagedSync) GetParsedSyncStatusDoubleChecked() (IsInSync bool, OtherHeight uint64, HeightDiff uint64) {
-	result := ss.isInSync(true)
+func (ss *StagedSync) GetParsedSyncStatusDoubleChecked() (IsSynchronized bool, OtherHeight uint64, HeightDiff uint64) {
+	result := ss.isSynchronized(true)
 	return ParseResult(result)
 }
 
-// isInSync query the remote DNS node for the latest height to check what is the current
+// isSynchronized query the remote DNS node for the latest height to check what is the current
 // sync status
-func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
+func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
@@ -1187,9 +1191,9 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 			Uint64("lastHeight", lastHeight).
 			Msg("[STAGED_SYNC] Checking sync status")
 		return SyncCheckResult{
-			IsInSync:    !wasOutOfSync,
-			OtherHeight: otherHeight1,
-			HeightDiff:  heightDiff,
+			IsSynchronized: !wasOutOfSync,
+			OtherHeight:    otherHeight1,
+			HeightDiff:     heightDiff,
 		}
 	}
 	// double check the sync status after 1 second to confirm (avoid false alarm)
@@ -1211,8 +1215,8 @@ func (ss *StagedSync) isInSync(doubleCheck bool) SyncCheckResult {
 		heightDiff = 0 // overflow
 	}
 	return SyncCheckResult{
-		IsInSync:    !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
-		OtherHeight: otherHeight2,
-		HeightDiff:  heightDiff,
+		IsSynchronized: !(wasOutOfSync && isOutOfSync && lastHeight == currentHeight),
+		OtherHeight:    otherHeight2,
+		HeightDiff:     heightDiff,
 	}
 }

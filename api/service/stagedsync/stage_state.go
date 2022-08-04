@@ -130,7 +130,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		if block.NumberU64() > 1 {
 			// Verify signature every 100 blocks
 			haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
-			verifySeal := block.NumberU64()%verifyHeaderBatchSize == 0 || verifyAllSig
+			verifySeal := block.NumberU64()%s.state.VerifyHeaderBatchSize == 0 || verifyAllSig
 			verifyCurrentSig := verifyAllSig && haveCurrentSig
 			bc := stg.configs.bc
 			if err = stg.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
@@ -149,7 +149,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 
 						if !verifyAllSig {
 							utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last 99 blocks!")
-							for i := uint64(0); i < verifyHeaderBatchSize-1; i++ {
+							for i := uint64(0); i < s.state.VerifyHeaderBatchSize-1; i++ {
 								if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
 									utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 									return err
