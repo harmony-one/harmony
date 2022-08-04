@@ -229,12 +229,12 @@ func (hmy *Harmony) GetAllValidatorAddresses() []common.Address {
 
 func (hmy *Harmony) GetValidatorsStakeByBlockNumber(
 	block *types.Block,
-) (map[common.Address]*big.Int, error) {
+) (map[string]*big.Int, error) {
 	if cachedReward, ok := hmy.stakeByBlockNumberCache.Get(block.Hash()); ok {
-		return cachedReward.(map[common.Address]*big.Int), nil
+		return cachedReward.(map[string]*big.Int), nil
 	}
 	validatorAddresses := hmy.GetAllValidatorAddresses()
-	stakes := make(map[common.Address]*big.Int, len(validatorAddresses))
+	stakes := make(map[string]*big.Int, len(validatorAddresses))
 	for _, validatorAddress := range validatorAddresses {
 		wrapper, err := hmy.BlockChain.ReadValidatorInformationAtRoot(validatorAddress, block.Root())
 		if err != nil {
@@ -250,7 +250,7 @@ func (hmy *Harmony) GetValidatorsStakeByBlockNumber(
 				continue
 			}
 		}
-		stakes[validatorAddress] = wrapper.TotalDelegation()
+		stakes[validatorAddress.Hex()] = wrapper.TotalDelegation()
 	}
 	hmy.stakeByBlockNumberCache.Add(block.Hash(), stakes)
 	return stakes, nil
