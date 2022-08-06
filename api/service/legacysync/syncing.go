@@ -137,6 +137,14 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 	sc.peers = append(sc.peers, peer)
 }
 
+func (sc *SyncConfig) GetPeers() []*SyncPeerConfig {
+	sc.mtx.RLock()
+	defer sc.mtx.RUnlock()
+	out := make([]*SyncPeerConfig, len(sc.peers))
+	copy(out, sc.peers)
+	return out
+}
+
 // ForEachPeer calls the given function with each peer.
 // It breaks the iteration iff the function returns true.
 func (sc *SyncConfig) ForEachPeer(f func(peer *SyncPeerConfig) (brk bool)) {
