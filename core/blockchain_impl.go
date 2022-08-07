@@ -3186,7 +3186,13 @@ func (bc *BlockChainImpl) isInitTiKV() bool {
 func (bc *BlockChainImpl) tikvPreemptMaster(fromBlock, toBlock uint64) bool {
 	for {
 		// preempt master
-		if ok, _ := bc.redisPreempt.TryLock(60); ok {
+		lockType, _ := bc.redisPreempt.TryLock(60)
+		switch lockType {
+		case redis_helper.LockResultRenewalSuccess:
+			return true
+		case redis_helper.LockResultSuccess:
+			// first to master
+			bc.validatorListByDelegatorCache.Purge()
 			return true
 		}
 

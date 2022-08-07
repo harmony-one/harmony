@@ -4,8 +4,17 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-
+	"errors"
 	"github.com/go-redis/redis/v8"
+)
+
+type LockResult int
+
+const (
+	_ LockResult = iota
+	LockResultSuccess
+	LockResultRenewalSuccess
+	LockResultFail
 )
 
 type RedisPreempt struct {
@@ -31,10 +40,15 @@ func (p *RedisPreempt) init() {
 	_, _ = rand.Read(byt)
 	p.password = base64.StdEncoding.EncodeToString(byt)
 	p.lockScript = redis.NewScript(`
-		if redis.call('get',KEYS[1]) == ARGV[1] then
-			return redis.call('expire', KEYS[1], ARGV[2])
-		else
-			return redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2], 'nx')
+		local val = redis.call('get', KEYS[1])
+		if (val==nil or (type(val) == "boolean" and not val)) then
+			redis.call('set', KEYS[1], ARGV[1], 'ex', ARGV[2])
+			return 'LockResultSuccess'
+		elseif (val == ARGV[1]) then
+			redis.call('expire', KEYS[1], ARGV[2])
+			return 'LockResultRenewalSuccess'
+		else 
+			return 'LockResultFail'
 		end
 	`)
 	p.unlockScript = redis.NewScript(`
@@ -47,10 +61,23 @@ func (p *RedisPreempt) init() {
 }
 
 // TryLock attempt to lock the master for ttlSecond
-func (p *RedisPreempt) TryLock(ttlSecond int) (ok bool, err error) {
-	ok, err = p.lockScript.Run(context.Background(), redisInstance, []string{p.key}, p.password, ttlSecond).Bool()
-	p.lastLockStatus = ok
-	return
+func (p *RedisPreempt) TryLock(ttlSecond int) (result LockResult, err error) {
+	ret, err := p.lockScript.Run(context.Background(), redisInstance, []string{p.key}, p.password, ttlSecond).Text()
+	if err != nil {
+		return LockResultFail, err
+	}
+	switch ret {
+	case "LockResultRenewalSuccess":
+		p.lastLockStatus = true
+		return LockResultRenewalSuccess, nil
+	case "LockResultSuccess":
+		p.lastLockStatus = true
+		return LockResultSuccess, nil
+	case "LockResultFail":
+		return LockResultFail, nil
+	default:
+		return LockResultFail, errors.New("fixme: unknown return")
+	}
 }
 
 // Unlock try to release the master permission
