@@ -128,7 +128,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 
 		// Verify block signatures
 		if block.NumberU64() > 1 {
-			// Verify signature every 100 blocks
+			// Verify signature every N blocks (which N is verifyHeaderBatchSize and can be adjusted in configs)
 			haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 			verifySeal := block.NumberU64()%s.state.VerifyHeaderBatchSize == 0 || verifyAllSig
 			verifyCurrentSig := verifyAllSig && haveCurrentSig

@@ -952,7 +952,7 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 	haveCurrentSig := len(block.GetCurrentCommitSig()) != 0
 	// Verify block signatures
 	if block.NumberU64() > 1 {
-		// Verify signature every 100 blocks
+		// Verify signature every N blocks (which N is verifyHeaderBatchSize and can be adjusted in configs)
 		verifySeal := block.NumberU64()%ss.VerifyHeaderBatchSize == 0 || verifyAllSig
 		verifyCurrentSig := verifyAllSig && haveCurrentSig
 		if verifyCurrentSig {
