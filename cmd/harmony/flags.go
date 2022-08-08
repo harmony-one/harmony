@@ -1702,7 +1702,7 @@ func applySyncFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 	if cli.IsFlagChanged(cmd, syncDownloaderFlag) {
 		config.Sync.Downloader = cli.GetBoolFlagValue(cmd, syncDownloaderFlag)
 	}
-	
+
 	if cli.IsFlagChanged(cmd, syncStagedSyncFlag) {
 		config.Sync.StagedSync = cli.GetBoolFlagValue(cmd, syncStagedSyncFlag)
 	}
