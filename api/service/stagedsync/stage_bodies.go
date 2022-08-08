@@ -89,14 +89,12 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
-	targetHeight := uint64(0)
+	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
 	canRunInTurboMode := b.configs.turbo
 
 	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
-		if targetHeight, err = GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
-			return err
-		}
+
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
@@ -600,6 +598,9 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 					Str("block height", key).
 					Msg("[STAGED_SYNC] retrieve block from cache failed")
 				return err
+			}
+			if len(blkBytes) == 0 {
+				break
 			}
 			bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 			if err = tx.Put(bucketName, []byte(key), blkBytes); err != nil {

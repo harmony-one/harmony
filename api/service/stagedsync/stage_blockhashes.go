@@ -88,15 +88,12 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	currProgress := uint64(0)
-	targetHeight := uint64(0)
+	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
 	startHash := bh.configs.bc.CurrentBlock().Hash()
 	canRunInTurboMode := bh.configs.turbo
 	// retrieve the progress
 	if errV := CreateView(bh.configs.ctx, bh.configs.db, tx, func(etx kv.Tx) error {
-		if targetHeight, err = GetStageProgress(etx, Heads, isBeacon); err != nil {
-			return err
-		}
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil { //GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
 			return err
 		}

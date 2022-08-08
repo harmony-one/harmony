@@ -201,7 +201,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			speed = float64(currHead-startHead) / dt
 		}
 		syncSpeed := fmt.Sprintf("%.2f", speed)
-		fmt.Println("sync speed:", syncSpeed, "blocks/s (", currHead, "/", maxPeersHeight)
+		fmt.Println("sync speed:", syncSpeed, "blocks/s (", currHead, "/", maxPeersHeight, ")")
 	}
 
 	s.syncStatus.currentCycle.Number++

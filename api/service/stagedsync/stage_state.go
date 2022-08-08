@@ -40,26 +40,13 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 // ExecStatesStage progresses States stage in the forward direction
 func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
-	currProgress := uint64(0)
-	targetHeight := uint64(0)
-	isBeacon := s.state.isBeacon
-
-	if errV := CreateView(stg.configs.ctx, stg.configs.db, tx, func(etx kv.Tx) error {
-		if targetHeight, err = GetStageProgress(etx, BlockBodies, isBeacon); err != nil {
-			return err
-		}
-		currProgress = stg.configs.bc.CurrentBlock().NumberU64()
-
-		return nil
-	}); errV != nil {
-		return errV
-	}
+	currProgress := stg.configs.bc.CurrentBlock().NumberU64()
+	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 
 	if currProgress >= targetHeight {
 		s.state.Done()
 		return nil
 	}
-
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -69,13 +56,11 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		}
 		defer tx.Rollback()
 	}
-
 	bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 	c, err := tx.CursorDupSort(bucketName)
 	if err != nil {
 		return err
 	}
-
 	firstKey := fmt.Sprintf("%020d", currProgress+1)
 	verifyAllSig := false //TODO: move to configs
 	startTime := time.Now()
