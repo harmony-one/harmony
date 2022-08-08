@@ -580,7 +580,7 @@ func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageStat
 	return nil
 }
 
-func (bh *StageBlockHashes) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (bh *StageBlockHashes) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)

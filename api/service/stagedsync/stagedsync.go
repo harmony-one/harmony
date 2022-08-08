@@ -72,7 +72,7 @@ type StagedSync struct {
 	MaxMemSyncCycleSize uint64
 	// number of blocks to build a batch and insert to chain in staged sync
 	InsertChainBatchSize int
-	// batch size to verify header before insert to chain	
+	// batch size to verify header before insert to chain
 	VerifyHeaderBatchSize uint64
 	// use mem db for staged sync, set to false to use disk
 	UseMemDB bool
@@ -88,10 +88,10 @@ type BlockWithSig struct {
 }
 
 type Timing struct {
-	isUnwind bool
-	isPrune  bool
-	stage    SyncStageID
-	took     time.Duration
+	isUnwind  bool
+	isCleanUp bool
+	stage     SyncStageID
+	took      time.Duration
 }
 
 func (s *StagedSync) Len() int                 { return len(s.stages) }
@@ -109,12 +109,12 @@ func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress
 	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
 }
 
-func (s *StagedSync) PruneStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*PruneState, error) {
+func (s *StagedSync) CleanUpStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
 	var pruneProgress uint64
 	var err error
 
 	if errV := CreateView(context.Background(), db, tx, func(tx kv.Tx) error {
-		pruneProgress, err = GetStagePruneProgress(tx, id, s.isBeacon)
+		pruneProgress, err = GetStageCleanUpProgress(tx, id, s.isBeacon)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (s *StagedSync) PruneStageState(id SyncStageID, forwardProgress uint64, tx 
 		return nil, errV
 	}
 
-	return &PruneState{id, forwardProgress, pruneProgress, s}, nil
+	return &CleanUpState{id, forwardProgress, pruneProgress, s}, nil
 }
 
 func (s *StagedSync) NextStage() {
@@ -214,7 +214,7 @@ func New(ctx context.Context,
 	db kv.RwDB,
 	stagesList []*Stage,
 	unwindOrder UnwindOrder,
-	pruneOrder PruneOrder,
+	pruneOrder CleanUpOrder,
 	TurboMode bool,
 	UseMemDB bool,
 	doubleCheckBlockHashes bool,
@@ -392,8 +392,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 		}
 		if timings[i].isUnwind {
 			logCtx = append(logCtx, "Unwind "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
-		} else if timings[i].isPrune {
-			logCtx = append(logCtx, "Prune "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
+		} else if timings[i].isCleanUp {
+			logCtx = append(logCtx, "CleanUp "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
 		} else {
 			logCtx = append(logCtx, string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
 		}
@@ -489,14 +489,14 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 	utils.Logger().Info().
-		Msgf("[STAGED_SYNC] Prune... stage %s", stage.ID)
+		Msgf("[STAGED_SYNC] CleanUp... stage %s", stage.ID)
 
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	prune, err := s.PruneStageState(stage.ID, stageState.BlockNumber, tx, db)
+	prune, err := s.CleanUpStageState(stage.ID, stageState.BlockNumber, tx, db)
 	if err != nil {
 		return err
 	}
@@ -504,7 +504,7 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 		return err
 	}
 
-	err = stage.Handler.Prune(firstCycle, prune, tx)
+	err = stage.Handler.CleanUp(firstCycle, prune, tx)
 	if err != nil {
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
@@ -513,12 +513,12 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 	if took > 60*time.Second {
 		logPrefix := s.LogPrefix()
 		utils.Logger().Trace().
-			Msgf("[STAGED_SYNC] [%s] Prune done in %d", logPrefix, took)
+			Msgf("[STAGED_SYNC] [%s] CleanUp done in %d", logPrefix, took)
 
 		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] [%s] Prune done in ", logPrefix, took)
+			Msgf("[STAGED_SYNC] [%s] CleanUp done in ", logPrefix, took)
 	}
-	s.timings = append(s.timings, Timing{isPrune: true, stage: stage.ID, took: took})
+	s.timings = append(s.timings, Timing{isCleanUp: true, stage: stage.ID, took: took})
 	return nil
 }
 

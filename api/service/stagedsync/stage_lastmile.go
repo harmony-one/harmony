@@ -95,7 +95,7 @@ func (lm *StageLastMile) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 	return nil
 }
 
-func (lm *StageLastMile) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (lm *StageLastMile) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = lm.configs.db.BeginRw(lm.configs.ctx)

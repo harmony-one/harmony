@@ -662,7 +662,7 @@ func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx 
 	return nil
 }
 
-func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (b *StageBodies) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(b.configs.ctx)
@@ -678,7 +678,6 @@ func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err err
 	}
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
 	tx.ClearBucket(blocksBucketName)
-
 
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {

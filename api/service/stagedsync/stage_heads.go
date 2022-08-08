@@ -126,7 +126,7 @@ func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, 
 	return nil
 }
 
-func (heads *StageHeads) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (heads *StageHeads) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = heads.configs.db.BeginRw(context.Background())

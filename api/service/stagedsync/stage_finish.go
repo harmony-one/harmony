@@ -96,7 +96,7 @@ func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState
 	return nil
 }
 
-func (finish *StageFinish) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (finish *StageFinish) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)

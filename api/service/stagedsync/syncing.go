@@ -112,7 +112,7 @@ func CreateStagedSync(
 		db,
 		stages,
 		DefaultUnwindOrder,
-		DefaultPruneOrder,
+		DefaultCleanUpOrder,
 		TurboMode,
 		UseMemDB,
 		doubleCheckBlockHashes,

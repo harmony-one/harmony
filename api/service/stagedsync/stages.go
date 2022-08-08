@@ -58,8 +58,8 @@ func SaveStageProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress 
 	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
 }
 
-// GetStagePruneProgress retrieves saved progress of given sync stage from the database
-func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
+// GetStageCleanUpProgress retrieves saved progress of given sync stage from the database
+func GetStageCleanUpProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint64, error) {
 	stgID := GetStageID(stage, isBeacon, true)
 	v, err := db.GetOne(kv.SyncStageProgress, stgID)
 	if err != nil {
@@ -68,7 +68,7 @@ func GetStagePruneProgress(db kv.Getter, stage SyncStageID, isBeacon bool) (uint
 	return unmarshalData(v)
 }
 
-func SaveStagePruneProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
+func SaveStageCleanUpProgress(db kv.Putter, stage SyncStageID, isBeacon bool, progress uint64) error {
 	stgID := GetStageID(stage, isBeacon, true)
 	return db.Put(kv.SyncStageProgress, stgID, marshalData(progress))
 }

@@ -6,7 +6,7 @@ import (
 
 type ForwardOrder []SyncStageID
 type UnwindOrder []SyncStageID
-type PruneOrder []SyncStageID
+type CleanUpOrder []SyncStageID
 
 var DefaultForwardOrder = ForwardOrder{
 	Heads,
@@ -27,7 +27,7 @@ var DefaultUnwindOrder = UnwindOrder{
 	Heads,
 }
 
-var DefaultPruneOrder = PruneOrder{
+var DefaultCleanUpOrder = CleanUpOrder{
 	Finish,
 	LastMile,
 	States,

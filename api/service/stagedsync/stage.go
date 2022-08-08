@@ -25,9 +25,9 @@ type StageHandler interface {
 	// * stageState - represents the state of this stage at the beginning of unwind.
 	Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) error
 
-	// PruneFunc is the execution function for the stage to prune old data.
+	// CleanUpFunc is the execution function for the stage to prune old data.
 	// * state - is the current state of the stage and contains stage data.
-	Prune(firstCycle bool, p *PruneState, tx kv.RwTx) error
+	CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) error
 }
 
 // Stage is a single sync stage in staged sync.
@@ -71,8 +71,8 @@ func (s *StageState) Update(db kv.Putter, newBlockNum uint64) error {
 	// }
 	return SaveStageProgress(db, s.ID, s.state.isBeacon, newBlockNum)
 }
-func (s *StageState) UpdatePrune(db kv.Putter, blockNum uint64) error {
-	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, blockNum)
+func (s *StageState) UpdateCleanUp(db kv.Putter, blockNum uint64) error {
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, blockNum)
 }
 
 // Unwinder allows the stage to cause an unwind.
@@ -99,23 +99,23 @@ func (u *UnwindState) Done(db kv.Putter) error {
 	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.UnwindPoint)
 }
 
-type PruneState struct {
+type CleanUpState struct {
 	ID              SyncStageID
 	ForwardProgress uint64 // progress of stage forward move
-	PruneProgress   uint64 // progress of stage prune move. after sync cycle it become equal to ForwardProgress by Done() method
+	CleanUpProgress uint64 // progress of stage prune move. after sync cycle it become equal to ForwardProgress by Done() method
 	state           *StagedSync
 }
 
-func (s *PruneState) LogPrefix() string { return s.state.LogPrefix() + " Prune" }
-func (s *PruneState) Done(db kv.Putter) error {
-	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, s.ForwardProgress)
+func (s *CleanUpState) LogPrefix() string { return s.state.LogPrefix() + " CleanUp" }
+func (s *CleanUpState) Done(db kv.Putter) error {
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, s.ForwardProgress)
 }
-func (s *PruneState) DoneAt(db kv.Putter, blockNum uint64) error {
-	return SaveStagePruneProgress(db, s.ID, s.state.isBeacon, blockNum)
+func (s *CleanUpState) DoneAt(db kv.Putter, blockNum uint64) error {
+	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, blockNum)
 }
 
-// PruneTable has `limit` parameter to avoid too large data deletes per one sync cycle - better delete by small portions to reduce db.FreeList size
-func PruneTable(tx kv.RwTx, table string, pruneTo uint64, ctx context.Context, limit int) error {
+// CleanUpTable has `limit` parameter to avoid too large data deletes per one sync cycle - better delete by small portions to reduce db.FreeList size
+func CleanUpTable(tx kv.RwTx, table string, pruneTo uint64, ctx context.Context, limit int) error {
 	c, err := tx.RwCursor(table)
 
 	if err != nil {
@@ -149,7 +149,7 @@ func PruneTable(tx kv.RwTx, table string, pruneTo uint64, ctx context.Context, l
 	return nil
 }
 
-func PruneTableDupSort(tx kv.RwTx, table string, logPrefix string, pruneTo uint64, logEvery *time.Ticker, ctx context.Context) error {
+func CleanUpTableDupSort(tx kv.RwTx, table string, logPrefix string, pruneTo uint64, logEvery *time.Ticker, ctx context.Context) error {
 	c, err := tx.RwCursorDupSort(table)
 	if err != nil {
 		return ErrPruningCursorCreationFail

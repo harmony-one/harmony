@@ -303,7 +303,7 @@ func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, t
 	return nil
 }
 
-func (stg *StageStates) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err error) {
+func (stg *StageStates) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)
