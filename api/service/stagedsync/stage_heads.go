@@ -48,9 +48,9 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 		defer tx.Rollback()
 	}
 
-	otherHeight := uint64(0)
+	targetHeight := uint64(0)
 	if errV := CreateView(heads.configs.ctx, heads.configs.db, tx, func(etx kv.Tx) (err error) {
-		if otherHeight, err = s.CurrentStageProgress(etx); err != nil {
+		if targetHeight, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
 		return nil
@@ -61,26 +61,23 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 	utils.Logger().Info().
 		Msgf("[STAGED_SYNC] current block height: %d)", heads.configs.bc.CurrentBlock().NumberU64())
 
-	if otherHeight <= heads.configs.bc.CurrentBlock().NumberU64() {
-		maxPeersHeight, err := s.state.getMaxPeerHeight(s.state.IsBeacon())
-		if err != nil {
-			return err
-		}
+	if targetHeight <= heads.configs.bc.CurrentBlock().NumberU64() {
+		maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
 		if maxPeersHeight <= heads.configs.bc.CurrentBlock().NumberU64() {
 			s.state.Done()
 			return nil
 		}
-		otherHeight = maxPeersHeight
+		targetHeight = maxPeersHeight
 	}
-	s.state.syncStatus.maxPeersHeight = otherHeight
+	s.state.syncStatus.currentCycle.TargetHeight = targetHeight
 
 	currentHeight := heads.configs.bc.CurrentBlock().NumberU64()
-	if currentHeight >= otherHeight {
+	if currentHeight >= targetHeight {
 		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-				s.state.IsBeacon(), heads.configs.bc.ShardID(), otherHeight, currentHeight)
+			Msgf("[STAGED_SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, targetHeight: %d, currentHeight: %d)",
+				s.state.IsBeacon(), heads.configs.bc.ShardID(), targetHeight, currentHeight)
 		s.state.Done()
 		return nil
 	}
@@ -89,7 +86,6 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 	utils.Logger().Info().
 		Msgf("[STAGED_SYNC] max blocks per sync cycle is: %d)", maxBlocksPerSyncCycle)
 
-	targetHeight := otherHeight
 	if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
 		targetHeight = currentHeight + maxBlocksPerSyncCycle
 	}

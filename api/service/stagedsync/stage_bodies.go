@@ -165,9 +165,9 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	}
 
 	// Run background process in turbo mode
-	if canRunInTurboMode && currProgress < targetHeight {
+	if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
 		b.configs.turboModeCh = make(chan struct{})
-		go b.runBackgroundProcess(nil, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
+		go b.runBackgroundProcess(tx, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
 	}
 	return nil
 }
@@ -176,50 +176,48 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 // In the next sync cycle, this stage will use cached blocks rather than download them from peers.
 // This helps performance and reduces stage duration. It also helps to use the resources more efficiently.
 func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64) error {
+
+	if s.state.syncStatus.currentCycle.Number == 0 || len(s.state.syncStatus.currentCycle.ExtraHashes) == 0 {
+		return nil
+	}
 	currProgress := startHeight
 	var err error
 	size := uint64(0)
 	b.configs.bgProcRunning = true
 
-	b.configs.cachedb.View(context.Background(), func(etx kv.Tx) error {
+	defer func() {
+		close(b.configs.turboModeCh)
+		b.configs.bgProcRunning = false
+	}()
 
-		for ok := true; ok; ok = currProgress < targetHeight {
-			select {
-			case <-b.configs.turboModeCh:
-				close(b.configs.turboModeCh)
-				b.configs.bgProcRunning = false
+	for ok := true; ok; ok = currProgress < targetHeight {
+		select {
+		case <-b.configs.turboModeCh:
+			return nil
+		default:
+			if currProgress >= targetHeight {
 				return nil
-			default:
-				if currProgress >= targetHeight {
-					close(b.configs.turboModeCh)
-					b.configs.bgProcRunning = false
-					return nil
-				}
+			}
 
-				maxSize := targetHeight - currProgress
-				size = uint64(downloadTaskBatch * len(s.state.syncConfig.peers))
-				if size > maxSize {
-					size = maxSize
-				}
-
-				if err = b.loadExtraBlockHashesToTaskQueue(s, currProgress+1, size, nil); err != nil {
-					return err
-				}
-
-				// Download blocks.
-				verifyAllSig := true //TODO: move it to configs
-				if err = b.downloadBlocks(s, verifyAllSig, nil); err != nil {
-					return nil
-				}
-				// save blocks and update current progress
-				if currProgress, err = b.cacheBlocks(s, currProgress); err != nil {
-					return err
-				}
+			maxSize := targetHeight - currProgress
+			size = uint64(downloadTaskBatch * len(s.state.syncConfig.peers))
+			if size > maxSize {
+				size = maxSize
+			}
+			if err = b.loadExtraBlockHashesToTaskQueue(s, currProgress+1, size); err != nil {
+				return err
+			}
+			// Download blocks.
+			verifyAllSig := true //TODO: move it to configs
+			if err = b.downloadBlocks(s, verifyAllSig, nil); err != nil {
+				return nil
+			}
+			// save blocks and update current progress
+			if currProgress, err = b.cacheBlocks(s, currProgress); err != nil {
+				return err
 			}
 		}
-		return nil
-	})
-
+	}
 	return nil
 }
 
@@ -436,35 +434,24 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 	return nil
 }
 
-func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64, tx kv.RwTx) error {
+func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64) error {
 	s.state.stateSyncTaskQueue = queue.New(0)
-	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 
-		for i := startIndex; i < startIndex+size; i++ {
-			key := strconv.FormatUint(i, 10)
-			id := int(i - startIndex)
-			bucketName := GetBucketName(ExtraBlockHashesBucket, s.state.isBeacon)
-			blockHash, err := etx.GetOne(bucketName, []byte(key))
-			if err != nil {
-				return err
-			}
-			if len(blockHash[:]) == 0 {
-				break
-			}
-			if err := s.state.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
-				s.state.stateSyncTaskQueue = queue.New(0)
-				utils.Logger().Warn().
-					Err(err).
-					Int("taskIndex", id).
-					Str("taskBlock", hex.EncodeToString(blockHash)).
-					Msg("[STAGED_SYNC] loadBlockHashesToTaskQueue: cannot add task")
-				break
-			}
+	for i := startIndex; i < startIndex+size; i++ {
+		id := int(i - startIndex)
+		blockHash := s.state.syncStatus.currentCycle.ExtraHashes[i]
+		if len(blockHash[:]) == 0 {
+			break
 		}
-		return nil
-
-	}); errV != nil {
-		return errV
+		if err := s.state.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
+			s.state.stateSyncTaskQueue = queue.New(0)
+			utils.Logger().Warn().
+				Err(err).
+				Int("taskIndex", id).
+				Str("taskBlock", hex.EncodeToString(blockHash)).
+				Msg("[STAGED_SYNC] loadBlockHashesToTaskQueue: cannot add task")
+			break
+		}
 	}
 
 	if s.state.stateSyncTaskQueue.Len() != int64(size) {
@@ -689,9 +676,9 @@ func (b *StageBodies) Prune(firstCycle bool, p *PruneState, tx kv.RwTx) (err err
 	if b.configs.turboModeCh != nil && b.configs.bgProcRunning {
 		b.configs.turboModeCh <- struct{}{}
 	}
-
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
 	tx.ClearBucket(blocksBucketName)
+
 
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {

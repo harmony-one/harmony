@@ -79,7 +79,6 @@ func CreateStagedSync(
 		} else {
 			db = mdbx.NewMDBX(log.New()).Path("cache_shard_db").MustOpen()
 		}
-		return nil, fmt.Errorf("Staged sync doesn't support disk yet")
 	}
 
 	if errInitDB := initDB(ctx, db); errInitDB != nil {
@@ -167,10 +166,18 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 		defer tx.Rollback()
 	}
 
+	// get max peers height
+	maxPeersHeight, err := s.getMaxPeerHeight(s.IsBeacon())
+	if err != nil {
+		return
+	}
+	utils.Logger().Info().Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
+	s.syncStatus.MaxPeersHeight = maxPeersHeight
+
 	// Do one cycle of staged sync
 	startTime := time.Now()
 	startHead := bc.CurrentBlock().NumberU64()
-	initialCycle := true //TODO: should be based on cycle number
+	initialCycle := s.syncStatus.currentCycle.Number == 0
 	syncErr := s.Run(s.DB(), tx, initialCycle)
 	if syncErr != nil {
 		utils.Logger().Error().Err(syncErr).
@@ -194,8 +201,10 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			speed = float64(currHead-startHead) / dt
 		}
 		syncSpeed := fmt.Sprintf("%.2f", speed)
-		fmt.Println("sync speed:", syncSpeed, "blocks/s")
+		fmt.Println("sync speed:", syncSpeed, "blocks/s (", currHead, "/", maxPeersHeight)
 	}
+
+	s.syncStatus.currentCycle.Number++
 
 	if loopMinTime != 0 {
 		waitTime := loopMinTime - time.Since(startTime)

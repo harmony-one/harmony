@@ -77,7 +77,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 	}
 
 	firstKey := fmt.Sprintf("%020d", currProgress+1)
-	verifyAllSig := true //TODO: move to configs
+	verifyAllSig := false //TODO: move to configs
 	startTime := time.Now()
 	startBlock := currProgress
 

@@ -92,7 +92,6 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	isBeacon := s.state.isBeacon
 	startHash := bh.configs.bc.CurrentBlock().Hash()
 	canRunInTurboMode := bh.configs.turbo
-
 	// retrieve the progress
 	if errV := CreateView(bh.configs.ctx, bh.configs.db, tx, func(etx kv.Tx) error {
 		if targetHeight, err = GetStageProgress(etx, Heads, isBeacon); err != nil {
@@ -125,9 +124,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	}
 
 	if currProgress >= targetHeight {
-		if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
+		if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
 			bh.configs.turboModeCh = make(chan struct{})
-			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
+			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
 		}
 		return nil
 	}
@@ -153,9 +152,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	}
 
 	if currProgress >= targetHeight {
-		if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
+		if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
 			bh.configs.turboModeCh = make(chan struct{})
-			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
+			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
 		}
 		return nil
 	}
@@ -207,9 +206,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	}
 
 	// continue downloading in background
-	if canRunInTurboMode && currProgress < s.state.syncStatus.maxPeersHeight {
+	if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
 		bh.configs.turboModeCh = make(chan struct{})
-		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.maxPeersHeight, startHash)
+		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
 	}
 	return nil
 }
@@ -222,6 +221,11 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	currProgress := startHeight
 	currHash := startHash
 	bh.configs.bgProcRunning = true
+
+	defer func() {
+		close(bh.configs.turboModeCh)
+		bh.configs.bgProcRunning = false
+	}()
 
 	// retrieve bg progress and last hash
 	errV := bh.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
@@ -256,13 +260,9 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	for {
 		select {
 		case <-bh.configs.turboModeCh:
-			close(bh.configs.turboModeCh)
-			bh.configs.bgProcRunning = false
 			return nil
 		default:
 			if currProgress >= targetHeight {
-				close(bh.configs.turboModeCh)
-				bh.configs.bgProcRunning = false
 				return nil
 			}
 
@@ -447,7 +447,7 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 		return p, h, err
 	}
 
-	// it cached block hashes successfully, so, it returns the cache progress and last cached block hash 
+	// it cached block hashes successfully, so, it returns the cache progress and last cached block hash
 	return p, h, nil
 }
 
@@ -513,6 +513,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 		}
 		// load extra block hashes from cache db and copy them to bg db to be downloaded in background by block stage
 		pExtraHashes := p
+		s.state.syncStatus.currentCycle.ExtraHashes = make(map[uint64][]byte)
 		for ok := true; ok; ok = pExtraHashes < p+s.state.MaxBackgroundBlocks {
 			key := strconv.FormatUint(pExtraHashes+1, 10)
 			newHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
@@ -526,10 +527,11 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 			if len(newHash[:]) == 0 {
 				return nil
 			}
-			bucketName := GetBucketName(ExtraBlockHashesBucket, s.state.isBeacon)
-			if err = tx.Put(bucketName, []byte(key), newHash); err != nil {
-				break
-			}
+			// bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
+			// if err = tx.Put(bucketName, []byte(key), newHash); err != nil {
+			// 	break
+			// }
+			s.state.syncStatus.currentCycle.ExtraHashes[pExtraHashes+1] = newHash
 			pExtraHashes++
 		}
 		return nil
