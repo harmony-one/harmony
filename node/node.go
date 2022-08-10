@@ -91,13 +91,9 @@ type Node struct {
 	pendingCXMutex        sync.Mutex
 	crosslinks            *crosslinks.Crosslinks // Memory storage for crosslink processing.
 	// Shard databases
-	shardChains shardchain.Collection
-	SelfPeer    p2p.Peer
-	// TODO: Neighbors should store only neighbor nodes in the same shard
-	Neighbors  sync.Map   // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
-	stateMutex sync.Mutex // mutex for change node state
-	// BeaconNeighbors store only neighbor nodes in the beacon chain shard
-	BeaconNeighbors  sync.Map // All the neighbor nodes, key is the sha256 of Peer IP/Port, value is the p2p.Peer
+	shardChains      shardchain.Collection
+	SelfPeer         p2p.Peer
+	stateMutex       sync.Mutex // mutex for change node state
 	TxPool           *core.TxPool
 	CxPool           *core.CxPool // pool for missing cross shard receipts resend
 	Worker           *worker.Worker
@@ -1226,30 +1222,6 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		}
 	}
 	return nil
-}
-
-// AddPeers adds neighbors nodes
-func (node *Node) AddPeers(peers []*p2p.Peer) int {
-	for _, p := range peers {
-		key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-		_, ok := node.Neighbors.LoadOrStore(key, *p)
-		if !ok {
-			// !ok means new peer is stored
-			node.host.AddPeer(p)
-			continue
-		}
-	}
-
-	return node.host.GetPeerCount()
-}
-
-// AddBeaconPeer adds beacon chain neighbors nodes
-// Return false means new neighbor peer was added
-// Return true means redundant neighbor peer wasn't added
-func (node *Node) AddBeaconPeer(p *p2p.Peer) bool {
-	key := fmt.Sprintf("%s:%s:%s", p.IP, p.Port, p.PeerID)
-	_, ok := node.BeaconNeighbors.LoadOrStore(key, *p)
-	return ok
 }
 
 func (node *Node) initNodeConfiguration() (service.NodeConfig, chan p2p.Peer, error) {

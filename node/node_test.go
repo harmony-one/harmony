@@ -2,7 +2,6 @@ package node
 
 import (
 	"errors"
-	"sync"
 	"testing"
 
 	"github.com/harmony-one/harmony/consensus"
@@ -59,59 +58,6 @@ func TestNewNode(t *testing.T) {
 	if node.Blockchain().CurrentBlock() == nil {
 		t.Error("Genesis block is not initialized for the node")
 	}
-}
-
-func TestLegacySyncingPeerProvider(t *testing.T) {
-	t.Run("ShardChain", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		expectedPeers := []p2p.Peer{
-			{IP: "127.0.0.1", Port: "6001"},
-			{IP: "127.0.0.1", Port: "6003"},
-		}
-		actualPeers, err := p.SyncingPeers(1)
-		if assert.NoError(t, err) {
-			assert.ElementsMatch(t, actualPeers, expectedPeers)
-		}
-	})
-	t.Run("BeaconChain", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		expectedPeers := []p2p.Peer{
-			{IP: "127.0.0.1", Port: "6000"},
-			{IP: "127.0.0.1", Port: "6002"},
-		}
-		actualPeers, err := p.SyncingPeers(0)
-		if assert.NoError(t, err) {
-			assert.ElementsMatch(t, actualPeers, expectedPeers)
-		}
-	})
-	t.Run("NoMatch", func(t *testing.T) {
-		p := makeLegacySyncingPeerProvider()
-		_, err := p.SyncingPeers(999)
-		assert.Error(t, err)
-	})
-}
-
-func makeLegacySyncingPeerProvider() *LegacySyncingPeerProvider {
-	node := makeSyncOnlyNode()
-	p := NewLegacySyncingPeerProvider(node)
-	p.shardID = func() uint32 { return 1 }
-	return p
-}
-
-func makeSyncOnlyNode() *Node {
-	node := &Node{
-		Neighbors:       sync.Map{},
-		BeaconNeighbors: sync.Map{},
-	}
-	node.Neighbors.Store(
-		"127.0.0.1:9001:omg", p2p.Peer{IP: "127.0.0.1", Port: "9001"})
-	node.Neighbors.Store(
-		"127.0.0.1:9003:wtf", p2p.Peer{IP: "127.0.0.1", Port: "9003"})
-	node.BeaconNeighbors.Store(
-		"127.0.0.1:9000:bbq", p2p.Peer{IP: "127.0.0.1", Port: "9000"})
-	node.BeaconNeighbors.Store(
-		"127.0.0.1:9002:cakes", p2p.Peer{IP: "127.0.0.1", Port: "9002"})
-	return node
 }
 
 func TestDNSSyncingPeerProvider(t *testing.T) {

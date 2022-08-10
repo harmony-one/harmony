@@ -730,8 +730,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		selfPort := hc.P2P.Port
 		currentNode.SyncingPeerProvider = node.NewLocalSyncingPeerProvider(
 			6000, uint16(selfPort), epochConfig.NumShards(), uint32(epochConfig.NumNodesPerShard()))
-	} else if hc.DNSSync.LegacySyncing {
-		currentNode.SyncingPeerProvider = node.NewLegacySyncingPeerProvider(currentNode)
 	} else {
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port))
 	}

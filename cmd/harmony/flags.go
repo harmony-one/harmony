@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -499,7 +500,8 @@ func applyDNSSyncFlags(cmd *cobra.Command, cfg *harmonyconfig.HarmonyConfig) {
 	} else if cli.IsFlagChanged(cmd, legacyDNSFlag) {
 		val := cli.GetBoolFlagValue(cmd, legacyDNSFlag)
 		if !val {
-			cfg.DNSSync.LegacySyncing = true
+			fmt.Println("--dns flag should be enabled")
+			os.Exit(1)
 		}
 	}
 

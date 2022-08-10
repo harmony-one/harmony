@@ -289,6 +289,14 @@ func init() {
 		return confTree
 	}
 
+
+	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
+		confTree.Delete("DNSSync.LegacySyncing")
+
+		confTree.Set("Version", "2.5.8")
+		return confTree
+	}
+
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
 	if largestKey != tomlConfigVersion {
