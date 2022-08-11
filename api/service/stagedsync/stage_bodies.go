@@ -88,6 +88,11 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 // ExecBodiesStage progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
+	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
+	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	if currentHead >= maxPeersHeight {
+		return nil
+	}
 	currProgress := uint64(0)
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
@@ -107,7 +112,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 		if err := b.clearBlocksBucket(tx, s.state.isBeacon); err != nil {
 			return err
 		}
-		currProgress = b.configs.bc.CurrentBlock().NumberU64()
+		currProgress = currentHead
 	}
 
 	if currProgress >= targetHeight {
@@ -163,7 +168,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	}
 
 	// Run background process in turbo mode
-	if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
+	if canRunInTurboMode && currProgress < maxPeersHeight {
 		b.configs.turboModeCh = make(chan struct{})
 		go b.runBackgroundProcess(tx, s, isBeacon, currProgress, currProgress+s.state.MaxBackgroundBlocks)
 	}

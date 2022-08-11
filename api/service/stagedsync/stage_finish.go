@@ -3,6 +3,7 @@ package stagedsync
 import (
 	"context"
 
+	"github.com/harmony-one/harmony/core/types"
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
@@ -41,6 +42,16 @@ func (finish *StageFinish) Exec(firstCycle bool, invalidBlockUnwind bool, s *Sta
 
 	// clean up cache
 	s.state.purgeAllBlocksFromCache()
+
+	// clean up new blocks if any
+	s.state.syncMux.Lock()
+	s.state.syncConfig.ForEachPeer(func(peer *SyncPeerConfig) (brk bool) {
+		if len(peer.newBlocks) > 0 {
+			peer.newBlocks = []*types.Block{}
+		}
+		return
+	})
+	s.state.syncMux.Unlock()
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {

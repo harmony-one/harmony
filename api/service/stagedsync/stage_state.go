@@ -40,11 +40,14 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 // ExecStatesStage progresses States stage in the forward direction
 func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
+	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
+	currentHead := stg.configs.bc.CurrentBlock().NumberU64()
+	if currentHead >= maxPeersHeight {
+		return nil
+	}
 	currProgress := stg.configs.bc.CurrentBlock().NumberU64()
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
-
 	if currProgress >= targetHeight {
-		s.state.Done()
 		return nil
 	}
 	useInternalTx := tx == nil

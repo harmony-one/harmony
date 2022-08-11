@@ -87,6 +87,11 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 
 func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
+	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
+	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
+	if currentHead >= maxPeersHeight {
+		return nil
+	}
 	currProgress := uint64(0)
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
@@ -117,13 +122,13 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 			return err
 		}
 		startHash = bh.configs.bc.CurrentBlock().Hash()
-		currProgress = bh.configs.bc.CurrentBlock().NumberU64()
+		currProgress = currentHead
 	}
 
 	if currProgress >= targetHeight {
-		if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
+		if canRunInTurboMode && currProgress < maxPeersHeight {
 			bh.configs.turboModeCh = make(chan struct{})
-			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
+			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, maxPeersHeight, startHash)
 		}
 		return nil
 	}
@@ -149,9 +154,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	}
 
 	if currProgress >= targetHeight {
-		if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
+		if canRunInTurboMode && currProgress < maxPeersHeight {
 			bh.configs.turboModeCh = make(chan struct{})
-			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
+			go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, maxPeersHeight, startHash)
 		}
 		return nil
 	}
@@ -203,9 +208,9 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 	}
 
 	// continue downloading in background
-	if canRunInTurboMode && currProgress < s.state.syncStatus.MaxPeersHeight {
+	if canRunInTurboMode && currProgress < maxPeersHeight {
 		bh.configs.turboModeCh = make(chan struct{})
-		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, s.state.syncStatus.MaxPeersHeight, startHash)
+		go bh.runBackgroundProcess(nil, s, isBeacon, currProgress, maxPeersHeight, startHash)
 	}
 	return nil
 }

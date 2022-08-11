@@ -34,6 +34,13 @@ func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) St
 
 func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
+	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
+	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
+	isLastCycle := targetHeight >= maxPeersHeight
+	if !isLastCycle {
+		return nil
+	}
+
 	bc := lm.configs.bc
 	// update blocks after node start sync
 	parentHash := bc.CurrentBlock().Hash()

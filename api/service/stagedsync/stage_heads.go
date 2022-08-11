@@ -51,6 +51,7 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	maxBlocksPerSyncCycle := s.state.MaxBlocksPerSyncCycle
 	currentHeight := heads.configs.bc.CurrentBlock().NumberU64()
+	s.state.syncStatus.currentCycle.TargetHeight = maxPeersHeight
 	targetHeight := uint64(0)
 	if errV := CreateView(heads.configs.ctx, heads.configs.db, tx, func(etx kv.Tx) (err error) {
 		if targetHeight, err = s.CurrentStageProgress(etx); err != nil {
@@ -69,7 +70,6 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
 		if maxPeersHeight <= currentHeight {
-			s.state.Done()
 			return nil
 		}
 		utils.Logger().Info().
@@ -87,7 +87,7 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 
 	s.state.syncStatus.currentCycle.TargetHeight = targetHeight
 
-	if err := s.Update(tx, targetHeight); err != nil { //SaveStageProgress(tx, Heads, s.state.isBeacon, targetHeight); err != nil {
+	if err := s.Update(tx, targetHeight); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving progress for headers stage failed: %v", err)
 		return err
