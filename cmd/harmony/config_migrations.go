@@ -275,14 +275,18 @@ func init() {
 	}
 
 	migrations["2.5.5"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("Sync.StagedSync") == nil {
-			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
-		}
 		if confTree.Get("Log.Console") == nil {
 			confTree.Set("Log.Console", defaultConfig.Log.Console)
 		}
-
 		confTree.Set("Version", "2.5.6")
+		return confTree
+	}
+
+	migrations["2.5.6"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("Sync.StagedSync") == nil {
+			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
+		}
+		confTree.Set("Version", "2.5.7")
 		return confTree
 	}
 }
