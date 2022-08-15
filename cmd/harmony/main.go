@@ -769,7 +769,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	)
 
 	nodeconfig.GetDefaultConfig().DBDir = nodeConfig.DBDir
-	processNodeType(hc, currentNode, currentConsensus)
+	currentConsensus.SetIsBackup(processNodeType(hc, currentNode))
 	currentNode.NodeConfig.SetShardGroupID(nodeconfig.NewGroupIDByShardID(nodeconfig.ShardID(nodeConfig.ShardID)))
 	currentNode.NodeConfig.SetClientGroupID(nodeconfig.NewClientGroupIDByShardID(shard.BeaconChainShardID))
 	currentNode.NodeConfig.ConsensusPriKey = nodeConfig.ConsensusPriKey
@@ -821,7 +821,7 @@ func setupTiKV(hc harmonyconfig.HarmonyConfig) shardchain.DBFactory {
 	return factory
 }
 
-func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, currentConsensus *consensus.Consensus) {
+func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node) (isBackup bool) {
 	switch hc.General.NodeType {
 	case nodeTypeExplorer:
 		nodeconfig.SetDefaultRole(nodeconfig.ExplorerNode)
@@ -831,10 +831,9 @@ func processNodeType(hc harmonyconfig.HarmonyConfig, currentNode *node.Node, cur
 		nodeconfig.SetDefaultRole(nodeconfig.Validator)
 		currentNode.NodeConfig.SetRole(nodeconfig.Validator)
 
-		if hc.General.IsBackup {
-			currentConsensus.SetIsBackup(true)
-		}
+		return hc.General.IsBackup
 	}
+	return false
 }
 
 func setupPprofService(node *node.Node, hc harmonyconfig.HarmonyConfig) {
