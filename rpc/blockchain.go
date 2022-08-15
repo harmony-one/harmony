@@ -2,12 +2,11 @@ package rpc
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"reflect"
 	"time"
-
-	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
