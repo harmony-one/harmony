@@ -206,7 +206,7 @@ func playFaucetContract(chain core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, gspec.Config, chain.Engine(), vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, gspec.Config, chain.Engine(), vm.Config{})
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, types.NewTransactionErrorSink())
 
 	backend := &testWorkerBackend{

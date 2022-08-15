@@ -189,8 +189,7 @@ type BlockChainImpl struct {
 	processor              Processor // block processor interface
 	validator              Validator // block and state validator interface
 	vmConfig               vm.Config
-	badBlocks              *lru.Cache              // Bad block cache
-	shouldPreserve         func(*types.Block) bool // Function used to determine whether should preserve the given block.
+	badBlocks              *lru.Cache // Bad block cache
 	pendingSlashes         slash.Records
 	maxGarbCollectedBlkNum int64
 
@@ -200,10 +199,9 @@ type BlockChainImpl struct {
 // NewBlockChainWithOptions same as NewBlockChain but can accept additional behaviour options.
 func NewBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config,
-	shouldPreserve func(block *types.Block) bool, options Options,
+	engine consensus_engine.Engine, vmConfig vm.Config, options Options,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, options)
+	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, options)
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -212,15 +210,13 @@ func NewBlockChainWithOptions(
 func NewBlockChain(
 	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
 	engine consensus_engine.Engine, vmConfig vm.Config,
-	shouldPreserve func(block *types.Block) bool,
 ) (*BlockChainImpl, error) {
-	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, shouldPreserve, Options{})
+	return newBlockChainWithOptions(db, stateCache, cacheConfig, chainConfig, engine, vmConfig, Options{})
 }
 
 func newBlockChainWithOptions(
 	db ethdb.Database, stateCache state.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig,
-	engine consensus_engine.Engine, vmConfig vm.Config,
-	shouldPreserve func(block *types.Block) bool, options Options) (*BlockChainImpl, error) {
+	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -251,7 +247,6 @@ func newBlockChainWithOptions(
 		triegc:                        prque.New(nil),
 		stateCache:                    stateCache,
 		quit:                          make(chan struct{}),
-		shouldPreserve:                shouldPreserve,
 		bodyCache:                     bodyCache,
 		bodyRLPCache:                  bodyRLPCache,
 		receiptsCache:                 receiptsCache,
