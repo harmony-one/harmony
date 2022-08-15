@@ -503,6 +503,10 @@ func (node *Node) validateNodeMessage(ctx context.Context, payload []byte) (
 			}
 		case proto_node.CrosslinkHeartbeat:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "crosslink_heartbeat"}).Inc()
+			// only non beacon chain processes cross link heartbeat
+			if node.IsRunningBeaconChain() {
+				return nil, 0, errInvalidShard
+			}
 		default:
 			nodeNodeMessageCounterVec.With(prometheus.Labels{"type": "invalid_block_type"}).Inc()
 			return nil, 0, errInvalidNodeMsg
