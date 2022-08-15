@@ -282,11 +282,12 @@ func (c *StateDBCacheDatabase) Close() error {
 		}
 
 		if !c.l2ReadOnly {
+			time.Sleep(time.Second)
+			close(c.l2ExpiredRefresh)
+
 			for range c.l2ExpiredRefresh {
 				// nop, clear chan
 			}
-
-			defer close(c.l2ExpiredRefresh)
 		}
 	}
 
