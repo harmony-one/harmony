@@ -234,20 +234,23 @@ func (node *Node) doBeaconSyncing() {
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.epochSync == nil {
-			utils.Logger().Info().Msg("initializing beacon sync")
+			utils.Logger().Info().Msg("[EPOCHSYNC] initializing beacon sync")
 			node.epochSync = node.createStateSync(node.EpochChain()).IntoEpochSync()
 		}
-		if node.epochSync.GetActivePeerNumber() == 0 {
-			utils.Logger().Info().Msg("no peers; bootstrapping beacon sync config")
+		peersCount := node.epochSync.GetActivePeerNumber()
+		if peersCount < legacysync.NumPeersLowBound {
+			utils.Logger().Warn().
+				Msgf("[EPOCHSYNC] num peers %d less than low bound %d; bootstrapping beacon sync config", peersCount, legacysync.NumPeersLowBound)
 			peers, err := node.SyncingPeerProvider.SyncingPeers(shard.BeaconChainShardID)
 			if err != nil {
-				utils.Logger().Warn().
+				utils.Logger().
 					Err(err).
-					Msg("cannot retrieve beacon syncing peers")
+					Msg("[EPOCHSYNC] cannot retrieve beacon syncing peers")
 				continue
 			}
+
 			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
-				utils.Logger().Warn().Err(err).Msg("cannot create beacon sync config")
+				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
 		}
