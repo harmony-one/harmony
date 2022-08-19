@@ -31,6 +31,8 @@ const (
 
 func (ts testnetSchedule) InstanceForEpoch(epoch *big.Int) Instance {
 	switch {
+	case params.TestnetChainConfig.IsStaking(epoch):
+		return testnetV1
 	default: // genesis
 		return testnetV0
 	}
@@ -104,4 +106,7 @@ var testnetReshardingEpoch = []*big.Int{
 	params.TestnetChainConfig.TwoSecondsEpoch,
 }
 
-var testnetV0 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, testnetAllowlistV3_3, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+var (
+	testnetV0 = MustNewInstance(4, 10, 8, 0, numeric.OneDec(), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+	testnetV1 = MustNewInstance(4, 30, 8, 0.15, numeric.MustNewDecFromStr("0.70"), genesis.TNHarmonyAccounts, genesis.TNFoundationalAccounts, emptyAllowlist, testnetReshardingEpoch, TestnetSchedule.BlocksPerEpoch())
+)
