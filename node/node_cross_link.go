@@ -61,10 +61,6 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 // ProcessCrossLinkHeartbeatMessage process crosslink heart beat signal.
 // This function is only called on shards 1,2,3 when network message `CrosslinkHeartbeat` receiving.
 func (node *Node) ProcessCrossLinkHeartbeatMessage(msgPayload []byte) {
-	if node.IsRunningBeaconChain() {
-		return
-	}
-
 	if err := node.processCrossLinkHeartbeatMessage(msgPayload); err != nil {
 		utils.Logger().Err(err).
 			Msg("[ProcessCrossLinkHeartbeatMessage] failed process crosslink heartbeat signal")
