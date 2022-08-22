@@ -19,7 +19,7 @@ func (node *Node) IsCurrentlyLeader() bool {
 
 // PeerConnectivity ..
 func (node *Node) PeerConnectivity() (int, int, int) {
-	return node.host.C()
+	return node.host.PeerConnectivity()
 }
 
 // ListPeer return list of peers for a certain topic
