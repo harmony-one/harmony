@@ -51,7 +51,7 @@ type Host interface {
 	// SendMessageToGroups sends a message to one or more multicast groups.
 	SendMessageToGroups(groups []nodeconfig.GroupID, msg []byte) error
 	PubSub() *libp2p_pubsub.PubSub
-	C() (int, int, int)
+	PeerConnectivity() (int, int, int)
 	GetOrJoin(topic string) (*libp2p_pubsub.Topic, error)
 	ListPeer(topic string) []libp2p_peer.ID
 	ListTopic() []string
@@ -87,6 +87,20 @@ type HostConfig struct {
 	DiscConcurrency      int
 	MaxConnPerIP         int
 	DisablePrivateIPScan bool
+}
+
+func init() {
+	libp2p_pubsub.GossipSubDlazy = 4
+	libp2p_pubsub.GossipSubGossipFactor = 0.15
+	libp2p_pubsub.GossipSubD = 5
+	libp2p_pubsub.GossipSubDlo = 4
+	libp2p_pubsub.GossipSubDhi = 8
+	libp2p_pubsub.GossipSubHistoryLength = 2
+	libp2p_pubsub.GossipSubHistoryGossip = 2
+	libp2p_pubsub.GossipSubGossipRetransmission = 2
+	libp2p_pubsub.GossipSubFanoutTTL = 10 * time.Second
+	libp2p_pubsub.GossipSubMaxPendingConnections = 32
+	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
 }
 
 // NewHost ..
@@ -159,18 +173,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		}
 	}
 
-	libp2p_pubsub.GossipSubDlazy = 4
-	libp2p_pubsub.GossipSubGossipFactor = 0.15
-	libp2p_pubsub.GossipSubD = 5
-	libp2p_pubsub.GossipSubDlo = 4
-	libp2p_pubsub.GossipSubDhi = 8
-	libp2p_pubsub.GossipSubHistoryLength = 2
-	libp2p_pubsub.GossipSubHistoryGossip = 2
-	libp2p_pubsub.GossipSubGossipRetransmission = 2
-	libp2p_pubsub.GossipSubFanoutTTL = 10 * time.Second
-	libp2p_pubsub.GossipSubMaxPendingConnections = 32
-	libp2p_pubsub.GossipSubMaxIHaveLength = 1000
-
 	pubsub, err := libp2p_pubsub.NewGossipSub(ctx, p2pHost, options...)
 	if err != nil {
 		cancel()
@@ -241,7 +243,7 @@ func (host *HostV2) Start() error {
 	return host.discovery.Start()
 }
 
-// Close close the HostV2
+// Close closes the HostV2.
 func (host *HostV2) Close() error {
 	for _, proto := range host.streamProtos {
 		proto.Close()
@@ -251,8 +253,8 @@ func (host *HostV2) Close() error {
 	return host.h.Close()
 }
 
-// C .. -> (total known peers, connected, not connected)
-func (host *HostV2) C() (int, int, int) {
+// PeerConnectivity returns total number of known, connected and not connected peers.
+func (host *HostV2) PeerConnectivity() (int, int, int) {
 	connected, not := 0, 0
 	peers := host.h.Peerstore().Peers()
 	for _, peer := range peers {
