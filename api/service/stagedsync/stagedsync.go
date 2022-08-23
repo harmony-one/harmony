@@ -293,6 +293,22 @@ func (s *StagedSync) StageState(stage SyncStageID, tx kv.Tx, db kv.RwDB) (*Stage
 	return &StageState{s, stage, blockNum}, nil
 }
 
+func (s *StagedSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
+	found := false
+	for i := 0; i < len(s.pruningOrder); i++ {
+		if s.pruningOrder[i].ID == s.stages[fromStage].ID {
+			found = true
+		}
+		if !found || s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled {
+			continue
+		}
+		if err := s.pruneStage(firstCycle, s.pruningOrder[i], db, tx); err != nil {
+			panic(err)
+		}
+	}
+	return nil
+}
+
 func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	s.prevUnwindPoint = nil
 	s.timings = s.timings[:0]
@@ -331,20 +347,17 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		}
 
 		if err := s.runStage(stage, db, tx, firstCycle, invalidBlockUnwind); err != nil {
+			s.cleanUp(int(s.currentStage), db, tx, firstCycle)
 			return err
 		}
 
 		s.NextStage()
 	}
 
-	for i := 0; i < len(s.pruningOrder); i++ {
-		if s.pruningOrder[i] == nil || s.pruningOrder[i].Disabled {
-			continue
-		}
-		if err := s.pruneStage(firstCycle, s.pruningOrder[i], db, tx); err != nil {
-			return err
-		}
+	if err := s.cleanUp(0, db, tx, firstCycle); err != nil {
+		return err
 	}
+
 	if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
 		return err
 	}
