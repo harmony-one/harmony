@@ -386,7 +386,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		return
 	}
 
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID), recvMsg.BlockNum) {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
 			Int64("need", consensus.Decider.TwoThirdsSignersCount()).
@@ -428,7 +428,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	}
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID), recvMsg.BlockNum) && consensus.IsViewChangingMode() {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.IsViewChangingMode() {
 		// no previous prepared message, go straight to normal mode
 		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
@@ -498,7 +498,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	}
 
 	m3Mask := recvMsg.M3Bitmap
-	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask, recvMsg.BlockNum) {
+	if !consensus.Decider.IsQuorumAchievedByMask(m3Mask) {
 		consensus.getLogger().Warn().
 			Msgf("[onNewView] Quorum Not achieved")
 		return

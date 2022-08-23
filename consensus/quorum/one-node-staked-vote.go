@@ -9,8 +9,6 @@ import (
 
 	"github.com/harmony-one/harmony/internal/utils"
 
-	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
 	"github.com/ethereum/go-ethereum/common"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/pkg/errors"
@@ -24,17 +22,7 @@ import (
 
 var (
 	twoThird = numeric.NewDec(2).Quo(numeric.NewDec(3))
-	// fix testnet temporary
-	fixedThreshold       = numeric.MustNewDecFromStr("0.51")
-	fixedThresholdHeight = uint64(26481647)
 )
-
-func tryFixedThreshold(height uint64) *numeric.Dec {
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet && height >= fixedThresholdHeight {
-		return &fixedThreshold
-	}
-	return nil
-}
 
 // TallyResult is the result of when we calculate voting power,
 // recall that it happens to us at epoch change
@@ -128,7 +116,7 @@ func (v *stakedVoteWeight) AddNewVote(
 	}()
 	tallyQuorum.tally = tallyQuorum.tally.Add(additionalVotePower)
 
-	t := v.QuorumThreshold(height)
+	t := v.QuorumThreshold()
 
 	msg := "[AddNewVote] New Vote Added!"
 	if !tallyQuorum.quorumAchieved {
@@ -163,8 +151,8 @@ func (v *stakedVoteWeight) IsQuorumAchieved(p Phase) bool {
 }
 
 // IsQuorumAchivedByMask ..
-func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask, height uint64) bool {
-	threshold := v.QuorumThreshold(height)
+func (v *stakedVoteWeight) IsQuorumAchievedByMask(mask *bls_cosi.Mask) bool {
+	threshold := v.QuorumThreshold()
 	if mask == nil {
 		return false
 	}
@@ -206,10 +194,7 @@ func (v *stakedVoteWeight) computeTotalPowerByMask(mask *bls_cosi.Mask) *numeric
 }
 
 // QuorumThreshold ..
-func (v *stakedVoteWeight) QuorumThreshold(height uint64) numeric.Dec {
-	if fixed := tryFixedThreshold(height); fixed != nil {
-		return *fixed
-	}
+func (v *stakedVoteWeight) QuorumThreshold() numeric.Dec {
 	return twoThird
 }
 
