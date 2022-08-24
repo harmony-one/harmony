@@ -273,23 +273,22 @@ func (c *StateDBCacheDatabase) NewIterator(start, end []byte) ethdb.Iterator {
 // Close disconnect the redis and save memory cache to file
 func (c *StateDBCacheDatabase) Close() error {
 	if atomic.CompareAndSwapUint64(&c.isClose, 0, 1) {
+		defer c.remoteDB.Close()
+		defer c.l2Cache.Close()
+
 		err := c.l1Cache.SaveToFileConcurrent(c.config.CachePersistencePath, runtime.NumCPU())
 		if err != nil {
 			log.Printf("save file to '%s' error: %v", c.config.CachePersistencePath, err)
 		}
 
 		if !c.l2ReadOnly {
-			close(c.l2ExpiredRefresh)
 			time.Sleep(time.Second)
+			close(c.l2ExpiredRefresh)
 
 			for range c.l2ExpiredRefresh {
 				// nop, clear chan
 			}
 		}
-
-		_ = c.l2Cache.Close()
-
-		return c.remoteDB.Close()
 	}
 
 	return nil

@@ -234,6 +234,11 @@ var (
 		cacheTimeFlag,
 		cacheSizeFlag,
 	}
+
+	metricsFlags = []cli.Flag{
+		metricsETHFlag,
+		metricsExpensiveETHFlag,
+	}
 )
 
 var (
@@ -340,6 +345,7 @@ func getRootFlags() []cli.Flag {
 	flags = append(flags, prometheusFlags...)
 	flags = append(flags, syncFlags...)
 	flags = append(flags, shardDataFlags...)
+	flags = append(flags, metricsFlags...)
 
 	return flags
 }
@@ -1762,6 +1768,22 @@ var (
 		Name:     "sharddata.cache_size",
 		Usage:    "local cache storage size (MB)",
 		DefValue: defaultConfig.ShardData.CacheSize,
+	}
+)
+
+// metrics flags required for the go-eth library
+// https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L35-L55
+var (
+	metricsETHFlag = cli.BoolFlag{
+		Name:     "metrics", // https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L30
+		Usage:    "flag required to enable the eth metrics",
+		DefValue: false,
+	}
+
+	metricsExpensiveETHFlag = cli.BoolFlag{
+		Name:     "metrics.expensive", // https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L33
+		Usage:    "flag required to enable the expensive eth metrics",
+		DefValue: false,
 	}
 )
 
