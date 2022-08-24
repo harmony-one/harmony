@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	ic "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -58,7 +57,7 @@ func TestManager_OnConnectCheck(t *testing.T) {
 	defer h1.Close()
 
 	fakeHost := &fakeHost{}
-	security := NewManager(2)
+	security := NewManager(2, 1)
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
@@ -103,7 +102,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 	defer h1.Close()
 
 	fakeHost := &fakeHost{}
-	security := NewManager(2)
+	security := NewManager(2, 0)
 	h1.Network().Notify(fakeHost)
 	fakeHost.SetConnectCallback(security.OnConnectCheck)
 	fakeHost.SetDisconnectCallback(security.OnDisconnectCheck)
@@ -130,7 +129,7 @@ func TestManager_OnDisconnectCheck(t *testing.T) {
 }
 
 func newPeer(port int) (host.Host, error) {
-	priv, _, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
+	priv, _, err := ic.GenerateKeyPair(ic.RSA, 2048)
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +159,8 @@ func (conn *fakeConn) ID() string                                        { retur
 func (conn *fakeConn) NewStream(context.Context) (network.Stream, error) { return nil, nil }
 func (conn *fakeConn) GetStreams() []network.Stream                      { return nil }
 func (conn *fakeConn) Stat() network.Stat                                { return network.Stat{} }
-func TestGetIP(t *testing.T) {
-	ip, err := getIP(&fakeConn{})
+func TestGetRemoteIP(t *testing.T) {
+	ip, err := getRemoteIP(&fakeConn{})
 	assert.Nil(t, err)
 	assert.Equal(t, "fe80::7802:31ff:fee9:c093", ip)
 }
