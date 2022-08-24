@@ -347,7 +347,6 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 		}
 
 		if err := s.runStage(stage, db, tx, firstCycle, invalidBlockUnwind); err != nil {
-			s.cleanUp(int(s.currentStage), db, tx, firstCycle)
 			return err
 		}
 
