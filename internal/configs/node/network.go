@@ -59,7 +59,10 @@ const (
 	DefaultPrometheusPort = 9900
 	// DefaultP2PConcurrency is the default P2P concurrency, 0 means is set the default value of P2P Discovery, the actual value is 10
 	DefaultP2PConcurrency = 0
-	DefaultMaxConnPerIP   = 10
+	// DefaultMaxConnPerIP is the maximum number of connections to/from a remote IP
+	DefaultMaxConnPerIP = 10
+	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
+	DefaultMaxPeers = 0
 )
 
 const (

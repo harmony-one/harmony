@@ -87,6 +87,7 @@ type HostConfig struct {
 	DiscConcurrency      int
 	MaxConnPerIP         int
 	DisablePrivateIPScan bool
+	MaxPeers             int64
 }
 
 func init() {
@@ -182,7 +183,7 @@ func NewHost(cfg HostConfig) (Host, error) {
 	self.PeerID = p2pHost.ID()
 	subLogger := utils.Logger().With().Str("hostID", p2pHost.ID().Pretty()).Logger()
 
-	security := security.NewManager(cfg.MaxConnPerIP)
+	security := security.NewManager(cfg.MaxConnPerIP, cfg.MaxPeers)
 	// has to save the private key for host
 	h := &HostV2{
 		h:             p2pHost,

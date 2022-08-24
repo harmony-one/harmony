@@ -62,6 +62,7 @@ var (
 		legacyKeyFileFlag,
 		p2pDisablePrivateIPScanFlag,
 		maxConnPerIPFlag,
+		maxPeersFlag,
 	}
 
 	httpFlags = []cli.Flag{
@@ -573,7 +574,12 @@ var (
 	}
 	maxConnPerIPFlag = cli.IntFlag{
 		Name:     "p2p.security.max-conn-per-ip",
-		Usage:    "maximum number of connections allowed per node",
+		Usage:    "maximum number of connections allowed per remote node, 0 means no limit",
+		DefValue: defaultConfig.P2P.MaxConnsPerIP,
+	}
+	maxPeersFlag = cli.IntFlag{
+		Name:     "p2p.security.max-peers",
+		Usage:    "maximum number of peers allowed, 0 means no limit",
 		DefValue: defaultConfig.P2P.MaxConnsPerIP,
 	}
 )
@@ -606,6 +612,10 @@ func applyP2PFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) {
 
 	if cli.IsFlagChanged(cmd, maxConnPerIPFlag) {
 		config.P2P.MaxConnsPerIP = cli.GetIntFlagValue(cmd, maxConnPerIPFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, maxPeersFlag) {
+		config.P2P.MaxPeers = int64(cli.GetIntFlagValue(cmd, maxPeersFlag))
 	}
 
 	if cli.IsFlagChanged(cmd, p2pDisablePrivateIPScanFlag) {

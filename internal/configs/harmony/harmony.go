@@ -54,6 +54,7 @@ type P2pConfig struct {
 	DiscConcurrency      int     // Discovery Concurrency value
 	MaxConnsPerIP        int
 	DisablePrivateIPScan bool
+	MaxPeers             int64
 }
 
 type GeneralConfig struct {
