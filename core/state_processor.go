@@ -166,6 +166,8 @@ func (p *StateProcessor) Process(
 		}
 	}
 
+	applyReimbursement(p.config, p.bc, statedb, header)
+
 	slashes := slash.Records{}
 	if s := header.Slashes(); len(s) > 0 {
 		if err := rlp.DecodeBytes(s, &slashes); err != nil {
@@ -400,6 +402,37 @@ func ApplyIncomingReceipt(
 		db.IntermediateRoot(config.IsS3(header.Epoch()))
 	}
 	return nil
+}
+
+func applyReimbursement(config *params.ChainConfig, bc BlockChain, db *state.DB, header *block.Header) {
+	if config.IsReimbursementEpoch(header.Epoch()) {
+		parentHeader := bc.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
+		reimbursement := shard.Schedule.InstanceForEpoch(header.Epoch()).Reimbursement()
+		startNumber := shard.Schedule.EpochLastBlock(config.ReimbursementEpoch.Uint64()-1) + 1
+		startHeader := bc.GetHeaderByNumber(startNumber) // first block to reimburse, use it as the starting time
+		// endTime = startTime + duration
+		endTime := startHeader.Time().Uint64() + reimbursement.Duration.Uint64()
+		parentTime := parentHeader.Time().Uint64()
+		if parentTime >= endTime { // reimburse over
+			return
+		}
+		currentTime := header.Time().Uint64()
+		deltaTime := currentTime - parentTime
+		if currentTime > endTime { // parentTime < endTime < currentTime
+			deltaTime = endTime - parentTime
+		}
+		// rate = TotalAmount / Duration
+		rate := new(big.Int).Div(reimbursement.TotalAmount, reimbursement.Duration)
+		// mintOne = deltaTime * rate
+		mintOne := new(big.Int).Mul(rate, big.NewInt(int64(deltaTime)))
+		if !config.IsReimbursementEpoch(parentHeader.Epoch()) { // first mint, add remainder
+			// remainder = TotalAmount - (reimbursement * onePerSecond)
+			remainder := new(big.Int).Sub(reimbursement.TotalAmount, new(big.Int).Mul(rate, reimbursement.Duration))
+			// mintOne += remainder
+			mintOne = mintOne.Add(mintOne, remainder)
+		}
+		db.AddBalance(reimbursement.Receiver, mintOne)
+	}
 }
 
 // StakingToMessage returns the staking transaction as a core.Message.

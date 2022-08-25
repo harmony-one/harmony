@@ -69,6 +69,7 @@ var (
 		SlotsLimitedEpoch:             big.NewInt(999), // Around Fri, 27 May 2022 09:41:02 UTC with 2s block time
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -106,6 +107,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -144,6 +146,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -182,6 +185,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -220,6 +224,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -257,6 +262,7 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		ReimbursementEpoch:            EpochTBD,
 	}
 
 	// AllProtocolChanges ...
@@ -296,6 +302,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
+		big.NewInt(0),                      //ReimbursementEpoch
 	}
 
 	// TestChainConfig ...
@@ -335,6 +342,7 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
+		big.NewInt(0),        //ReimbursementEpoch
 	}
 
 	// TestRules ...
@@ -464,6 +472,8 @@ type ChainConfig struct {
 
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
+	// ReimbursementEpoch is the first epoch to Reimburse
+	ReimbursementEpoch *big.Int
 }
 
 // String implements the fmt.Stringer interface.
@@ -645,6 +655,11 @@ func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 // IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
 func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
+}
+
+// IsReimbursementEpoch determines whether Reimbursement is actived
+func (c *ChainConfig) IsReimbursementEpoch(epoch *big.Int) bool {
+	return isForked(c.ReimbursementEpoch, epoch)
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
