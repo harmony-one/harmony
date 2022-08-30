@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	goversion "github.com/hashicorp/go-version"
 	"github.com/pelletier/go-toml"
@@ -281,12 +282,35 @@ func init() {
 		confTree.Set("Version", "2.5.6")
 		return confTree
 	}
-
 	migrations["2.5.6"] = func(confTree *toml.Tree) *toml.Tree {
-		if confTree.Get("Sync.StagedSync") == nil {
-			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
+		if confTree.Get("P2P.MaxPeers") == nil {
+			confTree.Set("P2P.MaxPeers", defaultConfig.P2P.MaxPeers)
 		}
 		confTree.Set("Version", "2.5.7")
 		return confTree
 	}
+
+	// check that the latest version here is the same as in default.go
+	largestKey := getNextVersion(migrations)
+	if largestKey != tomlConfigVersion {
+		panic(fmt.Sprintf("next migration value: %s, toml version: %s", largestKey, tomlConfigVersion))
+	}
+}
+
+func getNextVersion(x map[string]configMigrationFunc) string {
+	versionMap := make(map[string]interface{}, 1)
+	versionMap["Version"] = "FakeVersion"
+	tree, _ := toml.TreeFromMap(versionMap)
+
+	// needs to be sorted in case the order is incorrect
+	keys := make([]string, len(x))
+	i := 0
+	for k := range x {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+	requiredFunc := x[keys[len(keys)-1]]
+	tree = requiredFunc(tree)
+	return tree.Get("Version").(string)
 }

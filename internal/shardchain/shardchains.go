@@ -126,7 +126,7 @@ func (sc *CollectionImpl) ShardChain(shardID uint32, options ...core.Options) (c
 		}
 
 		bc, err = core.NewBlockChainWithOptions(
-			db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, nil, opts,
+			db, stateCache, cacheConfig, &chainConfig, sc.engine, vm.Config{}, opts,
 		)
 	}
 

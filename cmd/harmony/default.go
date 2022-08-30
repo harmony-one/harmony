@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.5"
+const tomlConfigVersion = "2.5.7"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -31,6 +31,7 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
 		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
 		DisablePrivateIPScan: false,
+		MaxPeers:             nodeconfig.DefaultMaxPeers,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
