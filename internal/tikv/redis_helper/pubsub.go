@@ -20,6 +20,12 @@ type BlockUpdate struct {
 	Logs   []*types.Log
 }
 
+// NewFilterUpdated new filter update event
+type NewFilterUpdated struct {
+	ID             string
+	FilterCriteria ethereum.FilterQuery
+}
+
 // SubscribeShardUpdate subscribe block update event
 func SubscribeShardUpdate(shardID uint32, cb func(blkNum uint64, logs []*types.Log)) {
 	pubsub := redisInstance.Subscribe(context.Background(), fmt.Sprintf("shard_update_%d", shardID))
@@ -47,30 +53,34 @@ func PublishShardUpdate(shardID uint32, blkNum uint64, logs []*types.Log) error 
 }
 
 // SubscribeNewFilterLogEvent subscribe new filter log event from other readers
-func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(crit ethereum.FilterQuery)) {
+func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id string, crit ethereum.FilterQuery)) {
 	if redisInstance == nil {
 		return
 	}
 	pubsub := redisInstance.
 		Subscribe(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID))
 	for message := range pubsub.Channel() {
-		query := ethereum.FilterQuery{}
+		query := NewFilterUpdated{}
 		err := rlp.DecodeBytes([]byte(message.Payload), &query)
 		if err != nil {
 			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log_ error")
 			continue
 		}
-		cb(query)
+		cb(query.ID, query.FilterCriteria)
 	}
 }
 
 // PublishNewFilterLogEvent publish new filter log event from other readers
-func PublishNewFilterLogEvent(shardID uint32, namespace string, crit ethereum.FilterQuery) error {
+func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereum.FilterQuery) error {
 	if redisInstance == nil {
 		return nil
 	}
 
-	msg, err := rlp.EncodeToBytes(&crit)
+	ev := NewFilterUpdated{
+		FilterCriteria: crit,
+		ID:             id,
+	}
+	msg, err := rlp.EncodeToBytes(&ev)
 	if err != nil {
 		return err
 	}

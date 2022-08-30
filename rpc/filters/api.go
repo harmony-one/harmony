@@ -312,7 +312,7 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 		matchedLogs = make(chan []*types.Log)
 	)
 
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -355,17 +355,18 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewFilter)
 	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewFilter, timer)
 
-	time.Sleep(time.Millisecond * 50) // to give time to the other writers to catch up
-	if err := redis_helper.PublishNewFilterLogEvent(api.shardID, api.namespace, ethereum.FilterQuery(crit)); err != nil {
+	id := rpc.NewID()
+	if err := redis_helper.PublishNewFilterLogEvent(api.shardID, api.namespace, string(id), ethereum.FilterQuery(crit)); err != nil {
 		return "", fmt.Errorf("sending filter logs to other readers: %w", err)
 	}
 
-	return api.createFilter(ethereum.FilterQuery(crit))
+	time.Sleep(time.Millisecond * 70) // to give time to the other writers to catch up
+	return api.createFilter(ethereum.FilterQuery(crit), id)
 }
 
-func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery) (rpc.ID, error) {
+func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery, customId rpc.ID) (rpc.ID, error) {
 	logs := make(chan []*types.Log)
-	logsSub, err := api.events.SubscribeLogs(crit, logs)
+	logsSub, err := api.events.SubscribeLogs(crit, logs, &customId)
 	if err != nil {
 		return "", err
 	}
@@ -402,8 +403,8 @@ func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery) (rpc.ID, err
 }
 
 func (api *PublicFilterAPI) SyncNewFilterFromOtherReaders() {
-	go redis_helper.SubscribeNewFilterLogEvent(api.shardID, api.namespace, func(crit ethereum.FilterQuery) {
-		if _, err := api.createFilter(crit); err != nil {
+	go redis_helper.SubscribeNewFilterLogEvent(api.shardID, api.namespace, func(id string, crit ethereum.FilterQuery) {
+		if _, err := api.createFilter(crit, rpc.ID(id)); err != nil {
 			utils.Logger().Warn().
 				Uint32("shardID", api.shardID).
 				Err(err).
