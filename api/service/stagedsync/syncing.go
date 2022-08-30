@@ -26,8 +26,8 @@ const (
 	StageProgressBucket          = "StageProgress"
 
 	// cache db keys
-	LastBlockHeight  = "LastBlockHeight"
-	LastBlockHash    = "LastBlockHash"
+	LastBlockHeight = "LastBlockHeight"
+	LastBlockHash   = "LastBlockHash"
 
 	// cache db  names
 	BlockHashesCacheDB = "cache_block_hashes"
@@ -105,7 +105,7 @@ func CreateStagedSync(
 		isExplorer,
 		db,
 		stages,
-		DefaultUnwindOrder,
+		DefaultRevertOrder,
 		DefaultCleanUpOrder,
 		TurboMode,
 		UseMemDB,

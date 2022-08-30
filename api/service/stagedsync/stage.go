@@ -12,18 +12,18 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 )
 
-type ExecFunc func(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
+type ExecFunc func(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error
 
 type StageHandler interface {
 	// Exec is the execution function for the stage to move forward.
 	// * state - is the current state of the stage and contains stage data.
-	// * unwinder - if the stage needs to cause unwinding, `unwinder` methods can be used.
-	Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error
+	// * reverter - if the stage needs to cause reverting, `reverter` methods can be used.
+	Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error
 
-	// Unwind is the unwinding logic of the stage.
-	// * unwindState - contains information about the unwind itself.
-	// * stageState - represents the state of this stage at the beginning of unwind.
-	Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) error
+	// Revert is the reverting logic of the stage.
+	// * revertState - contains information about the revert itself.
+	// * stageState - represents the state of this stage at the beginning of revert.
+	Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) error
 
 	// CleanUp is the execution function for the stage to prune old data.
 	// * state - is the current state of the stage and contains stage data.
@@ -45,7 +45,7 @@ type Stage struct {
 }
 
 var ErrStopped = errors.New("stopped")
-var ErrUnwind = errors.New("unwound")
+var ErrRevert = errors.New("unwound")
 
 // StageState is the state of the stage.
 type StageState struct {
@@ -72,28 +72,28 @@ func (s *StageState) UpdateCleanUp(db kv.Putter, blockNum uint64) error {
 	return SaveStageCleanUpProgress(db, s.ID, s.state.isBeacon, blockNum)
 }
 
-// Unwinder allows the stage to cause an unwind.
-type Unwinder interface {
-	// UnwindTo begins staged sync unwind to the specified block.
-	UnwindTo(unwindPoint uint64, invalidBlock common.Hash)
+// Reverter allows the stage to cause an revert.
+type Reverter interface {
+	// RevertTo begins staged sync revert to the specified block.
+	RevertTo(revertPoint uint64, invalidBlock common.Hash)
 }
 
-// UnwindState contains the information about unwind.
-type UnwindState struct {
+// RevertState contains the information about revert.
+type RevertState struct {
 	ID SyncStageID
-	// UnwindPoint is the block to unwind to.
-	UnwindPoint        uint64
+	// RevertPoint is the block to revert to.
+	RevertPoint        uint64
 	CurrentBlockNumber uint64
-	// If unwind is caused by a bad block, this hash is not empty
+	// If revert is caused by a bad block, this hash is not empty
 	InvalidBlock common.Hash
 	state        *StagedSync
 }
 
-func (u *UnwindState) LogPrefix() string { return u.state.LogPrefix() }
+func (u *RevertState) LogPrefix() string { return u.state.LogPrefix() }
 
 // Done updates the DB state of the stage.
-func (u *UnwindState) Done(db kv.Putter) error {
-	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.UnwindPoint)
+func (u *RevertState) Done(db kv.Putter) error {
+	return SaveStageProgress(db, u.ID, u.state.isBeacon, u.RevertPoint)
 }
 
 type CleanUpState struct {

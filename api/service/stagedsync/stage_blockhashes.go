@@ -85,7 +85,7 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 	return cachedb, nil
 }
 
-func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
@@ -561,7 +561,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 	return p, h, nil
 }
 
-func (bh *StageBlockHashes) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (bh *StageBlockHashes) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = bh.configs.db.BeginRw(bh.configs.ctx)

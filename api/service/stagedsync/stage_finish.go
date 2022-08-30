@@ -28,7 +28,7 @@ func NewStageFinishCfg(ctx context.Context, db kv.RwDB) StageFinishCfg {
 	}
 }
 
-func (finish *StageFinish) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+func (finish *StageFinish) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
@@ -74,7 +74,7 @@ func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
 	return nil
 }
 
-func (finish *StageFinish) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (finish *StageFinish) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = finish.configs.db.BeginRw(finish.configs.ctx)

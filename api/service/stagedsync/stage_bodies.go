@@ -85,7 +85,7 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 }
 
 // Exec progresses Bodies stage in the forward direction
-func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
@@ -666,7 +666,7 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 	return p, nil
 }
 
-func (b *StageBodies) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = b.configs.db.BeginRw(b.configs.ctx)

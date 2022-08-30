@@ -38,7 +38,7 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 }
 
 // Exec progresses States stage in the forward direction
-func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := stg.configs.bc.CurrentBlock().NumberU64()
@@ -87,7 +87,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 				Str("block number", string(i)).
 				Msg("block RLP decode failed")
 			// TODO: handle bad block
-			s.state.UnwindTo(i-1, common.Hash{})
+			s.state.RevertTo(i-1, common.Hash{})
 			return err
 		}
 
@@ -118,7 +118,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 			bc := stg.configs.bc
 			if err = stg.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
 				// TODO: handle bad block
-				s.state.UnwindTo(i-1, block.Hash())
+				s.state.RevertTo(i-1, block.Hash())
 				return err
 			}
 
@@ -171,7 +171,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 				return err
 			}
-			s.state.UnwindTo(headBeforeNewBlocks, headHashBeforeNewBlocks)
+			s.state.RevertTo(headBeforeNewBlocks, headHashBeforeNewBlocks)
 			return err
 		}
 		utils.Logger().Info().
@@ -260,7 +260,7 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 	return nil
 }
 
-func (stg *StageStates) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (stg *StageStates) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = stg.configs.db.BeginRw(stg.configs.ctx)

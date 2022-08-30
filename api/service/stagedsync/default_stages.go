@@ -5,7 +5,7 @@ import (
 )
 
 type ForwardOrder []SyncStageID
-type UnwindOrder []SyncStageID
+type RevertOrder []SyncStageID
 type CleanUpOrder []SyncStageID
 
 var DefaultForwardOrder = ForwardOrder{
@@ -18,7 +18,7 @@ var DefaultForwardOrder = ForwardOrder{
 	Finish,
 }
 
-var DefaultUnwindOrder = UnwindOrder{
+var DefaultRevertOrder = RevertOrder{
 	Finish,
 	LastMile,
 	States,

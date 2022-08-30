@@ -32,7 +32,7 @@ func NewStageLastMileCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) St
 	}
 }
 
-func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
+func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
@@ -80,7 +80,7 @@ func (lm *StageLastMile) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 	return nil
 }
 
-func (lm *StageLastMile) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (lm *StageLastMile) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = lm.configs.db.BeginRw(lm.configs.ctx)

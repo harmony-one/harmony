@@ -32,7 +32,7 @@ func NewStageHeadersCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Sta
 	}
 }
 
-func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) error {
+func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 
 	if len(s.state.syncConfig.peers) == 0 {
 		return ErrNoConnectedPeers
@@ -102,7 +102,7 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockUnwind bool, s *Stage
 	return nil
 }
 
-func (heads *StageHeads) Unwind(firstCycle bool, u *UnwindState, s *StageState, tx kv.RwTx) (err error) {
+func (heads *StageHeads) Revert(firstCycle bool, u *RevertState, s *StageState, tx kv.RwTx) (err error) {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		tx, err = heads.configs.db.BeginRw(context.Background())

@@ -35,7 +35,7 @@ var (
 	ErrInvalidBlockNumber                 = WrapStagedSyncError("invalid block number")
 	ErrInvalidBlockBytes                  = WrapStagedSyncError("invalid block bytes to insert into chain")
 	ErrAddTaskFailed                      = WrapStagedSyncError("cannot add task to queue")
-	ErrNodeNotEnoughBlockHashes			  = WrapStagedSyncError("some of the nodes didn't provide all block hashes")
+	ErrNodeNotEnoughBlockHashes           = WrapStagedSyncError("some of the nodes didn't provide all block hashes")
 )
 
 // WrapStagedSyncError wraps errors for staged sync and returns error object

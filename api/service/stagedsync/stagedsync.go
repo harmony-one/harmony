@@ -50,12 +50,12 @@ type StagedSync struct {
 	isBeacon bool
 	db       kv.RwDB
 
-	unwindPoint     *uint64 // used to run stages
-	prevUnwindPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
+	revertPoint     *uint64 // used to run stages
+	prevRevertPoint *uint64 // used to get value from outside of staged sync after cycle (for example to notify RPCDaemon)
 	invalidBlock    common.Hash
 
 	stages       []*Stage
-	unwindOrder  []*Stage
+	revertOrder  []*Stage
 	pruningOrder []*Stage
 	currentStage uint
 	timings      []Timing
@@ -89,7 +89,7 @@ type BlockWithSig struct {
 }
 
 type Timing struct {
-	isUnwind  bool
+	isRevert  bool
 	isCleanUp bool
 	stage     SyncStageID
 	took      time.Duration
@@ -104,7 +104,7 @@ func (s *StagedSync) IsExplorer() bool         { return s.isExplorer }
 // func (s *StagedSync) Worker() *worker.Worker          { return s.worker }
 func (s *StagedSync) Blockchain() core.BlockChain { return s.bc }
 func (s *StagedSync) DB() kv.RwDB                 { return s.db }
-func (s *StagedSync) PrevUnwindPoint() *uint64    { return s.prevUnwindPoint }
+func (s *StagedSync) PrevRevertPoint() *uint64    { return s.prevRevertPoint }
 
 func (s *StagedSync) InitDownloadedBlocksMap() error {
 	s.lockBlocks.Lock()
@@ -134,8 +134,8 @@ func (s *StagedSync) GetDownloadedBlocks() map[uint64][]byte {
 	return d
 }
 
-func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress uint64) *UnwindState {
-	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
+func (s *StagedSync) NewRevertState(id SyncStageID, revertPoint, currentProgress uint64) *RevertState {
+	return &RevertState{id, revertPoint, currentProgress, common.Hash{}, s}
 }
 
 func (s *StagedSync) CleanUpStageState(id SyncStageID, forwardProgress uint64, tx kv.Tx, db kv.RwDB) (*CleanUpState, error) {
@@ -196,20 +196,20 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 	return idx1 > idx2
 }
 
-func (s *StagedSync) UnwindTo(unwindPoint uint64, invalidBlock common.Hash) {
+func (s *StagedSync) RevertTo(revertPoint uint64, invalidBlock common.Hash) {
 	utils.Logger().Info().
-		Msgf("[STAGED_SYNC] UnwindTo block:%d bad_block_hash:%s", unwindPoint, invalidBlock.String())
-	s.unwindPoint = &unwindPoint
+		Msgf("[STAGED_SYNC] RevertTo block:%d bad_block_hash:%s", revertPoint, invalidBlock.String())
+	s.revertPoint = &revertPoint
 	s.invalidBlock = invalidBlock
 }
 
 func (s *StagedSync) Done() {
 	s.currentStage = uint(len(s.stages))
-	s.unwindPoint = nil
+	s.revertPoint = nil
 }
 
 func (s *StagedSync) IsDone() bool {
-	return s.currentStage >= uint(len(s.stages)) && s.unwindPoint == nil
+	return s.currentStage >= uint(len(s.stages)) && s.revertPoint == nil
 }
 
 func (s *StagedSync) LogPrefix() string {
@@ -242,7 +242,7 @@ func New(ctx context.Context,
 	isExplorer bool,
 	db kv.RwDB,
 	stagesList []*Stage,
-	unwindOrder UnwindOrder,
+	revertOrder RevertOrder,
 	pruneOrder CleanUpOrder,
 	TurboMode bool,
 	UseMemDB bool,
@@ -253,11 +253,11 @@ func New(ctx context.Context,
 	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int) *StagedSync {
 
-	unwindStages := make([]*Stage, len(stagesList))
-	for i, stageIndex := range unwindOrder {
+	revertStages := make([]*Stage, len(stagesList))
+	for i, stageIndex := range revertOrder {
 		for _, s := range stagesList {
 			if s.ID == stageIndex {
-				unwindStages[i] = s
+				revertStages[i] = s
 				break
 			}
 		}
@@ -287,7 +287,7 @@ func New(ctx context.Context,
 		db:                     db,
 		stages:                 stagesList,
 		currentStage:           0,
-		unwindOrder:            unwindStages,
+		revertOrder:            revertStages,
 		pruningOrder:           pruneStages,
 		logPrefixes:            logPrefixes,
 		syncStatus:             NewSyncStatus(role),
@@ -339,24 +339,24 @@ func (s *StagedSync) cleanUp(fromStage int, db kv.RwDB, tx kv.RwTx, firstCycle b
 }
 
 func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
-	s.prevUnwindPoint = nil
+	s.prevRevertPoint = nil
 	s.timings = s.timings[:0]
 
 	for !s.IsDone() {
-		var invalidBlockUnwind bool
-		if s.unwindPoint != nil {
-			for j := 0; j < len(s.unwindOrder); j++ {
-				if s.unwindOrder[j] == nil || s.unwindOrder[j].Disabled {
+		var invalidBlockRevert bool
+		if s.revertPoint != nil {
+			for j := 0; j < len(s.revertOrder); j++ {
+				if s.revertOrder[j] == nil || s.revertOrder[j].Disabled {
 					continue
 				}
-				if err := s.unwindStage(firstCycle, s.unwindOrder[j], db, tx); err != nil {
+				if err := s.revertStage(firstCycle, s.revertOrder[j], db, tx); err != nil {
 					return err
 				}
 			}
-			s.prevUnwindPoint = s.unwindPoint
-			s.unwindPoint = nil
+			s.prevRevertPoint = s.revertPoint
+			s.revertPoint = nil
 			if s.invalidBlock != (common.Hash{}) {
-				invalidBlockUnwind = true
+				invalidBlockRevert = true
 			}
 			s.invalidBlock = common.Hash{}
 			if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
@@ -375,7 +375,7 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 			continue
 		}
 
-		if err := s.runStage(stage, db, tx, firstCycle, invalidBlockUnwind); err != nil {
+		if err := s.runStage(stage, db, tx, firstCycle, invalidBlockRevert); err != nil {
 			return err
 		}
 
@@ -429,8 +429,8 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 		if count == 50 {
 			break
 		}
-		if timings[i].isUnwind {
-			logCtx = append(logCtx, "Unwind "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
+		if timings[i].isRevert {
+			logCtx = append(logCtx, "Revert "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
 		} else if timings[i].isCleanUp {
 			logCtx = append(logCtx, "CleanUp "+string(timings[i].stage), timings[i].took.Truncate(time.Millisecond).String())
 		} else {
@@ -463,14 +463,14 @@ func printLogs(tx kv.RwTx, timings []Timing) error {
 	return nil
 }
 
-func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockUnwind bool) (err error) {
+func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle bool, invalidBlockRevert bool) (err error) {
 	start := time.Now()
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	if err = stage.Handler.Exec(firstCycle, invalidBlockUnwind, stageState, s, tx); err != nil {
+	if err = stage.Handler.Exec(firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
 			Msgf("[STAGED_SYNC] stage %s failed", stage.ID)
@@ -490,19 +490,19 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 	return nil
 }
 
-func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
+func (s *StagedSync) revertStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv.RwTx) error {
 	start := time.Now()
 	utils.Logger().Trace().
-		Msgf("[STAGED_SYNC] Unwind... stage %s", stage.ID)
+		Msgf("[STAGED_SYNC] Revert... stage %s", stage.ID)
 	stageState, err := s.StageState(stage.ID, tx, db)
 	if err != nil {
 		return err
 	}
 
-	unwind := s.NewUnwindState(stage.ID, *s.unwindPoint, stageState.BlockNumber)
-	unwind.InvalidBlock = s.invalidBlock
+	revert := s.NewRevertState(stage.ID, *s.revertPoint, stageState.BlockNumber)
+	revert.InvalidBlock = s.invalidBlock
 
-	if stageState.BlockNumber <= unwind.UnwindPoint {
+	if stageState.BlockNumber <= revert.RevertPoint {
 		return nil
 	}
 
@@ -510,7 +510,7 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 		return err
 	}
 
-	err = stage.Handler.Unwind(firstCycle, unwind, stageState, tx)
+	err = stage.Handler.Revert(firstCycle, revert, stageState, tx)
 	if err != nil {
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
@@ -519,9 +519,9 @@ func (s *StagedSync) unwindStage(firstCycle bool, stage *Stage, db kv.RwDB, tx k
 	if took > 60*time.Second {
 		logPrefix := s.LogPrefix()
 		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] [%s] Unwind done in %d", logPrefix, took)
+			Msgf("[STAGED_SYNC] [%s] Revert done in %d", logPrefix, took)
 	}
-	s.timings = append(s.timings, Timing{isUnwind: true, stage: stage.ID, took: took})
+	s.timings = append(s.timings, Timing{isRevert: true, stage: stage.ID, took: took})
 	return nil
 }
 
@@ -561,7 +561,7 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 	return nil
 }
 
-// DisableAllStages - including their unwinds
+// DisableAllStages - including their reverts
 func (s *StagedSync) DisableAllStages() []SyncStageID {
 	var backupEnabledIds []SyncStageID
 	for i := range s.stages {
