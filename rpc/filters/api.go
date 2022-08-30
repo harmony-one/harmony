@@ -402,7 +402,7 @@ func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery) (rpc.ID, err
 }
 
 func (api *PublicFilterAPI) SyncNewFilterFromOtherReaders() {
-	redis_helper.SubscribeNewFilterLogEvent(api.shardID, api.namespace, func(crit ethereum.FilterQuery) {
+	go redis_helper.SubscribeNewFilterLogEvent(api.shardID, api.namespace, func(crit ethereum.FilterQuery) {
 		if _, err := api.createFilter(crit); err != nil {
 			utils.Logger().Warn().
 				Uint32("shardID", api.shardID).
