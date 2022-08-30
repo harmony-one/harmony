@@ -37,7 +37,7 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 	}
 }
 
-// ExecStatesStage progresses States stage in the forward direction
+// Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
@@ -60,41 +60,34 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		defer tx.Rollback()
 	}
 	bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
-	c, err := tx.CursorDupSort(bucketName)
-	if err != nil {
-		return err
-	}
-	firstKey := fmt.Sprintf("%020d", currProgress+1)
 	verifyAllSig := false //TODO: move to configs
 	startTime := time.Now()
 	startBlock := currProgress
-
-	fmt.Print("\033[s") // save the cursor position
 	var newBlocks types.Blocks
 	nBlock := int(0)
 
-	for n, blockBytes, err := c.Seek([]byte(firstKey)); n != nil; n, blockBytes, err = c.Next() {
-		if err != nil {
-			return err
-		}
-		blockHeight, err := unmarshalData(n)
+	fmt.Print("\033[s") // save the cursor position
+
+	for i := currProgress + 1; i <= targetHeight; i++ {
+		key := marshalData(i)
+		blockBytes, err := tx.GetOne(bucketName, key)
 		if err != nil {
 			return err
 		}
 
 		sz := len(blockBytes)
 		if sz <= 1 {
-			continue
+			return ErrInvalidBlockBytes
 		}
 
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
 		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
-				Str("block number", string(n)).
+				Str("block number", string(i)).
 				Msg("block RLP decode failed")
 			// TODO: handle bad block
-			s.state.UnwindTo(blockHeight-1, common.Hash{})
+			s.state.UnwindTo(i-1, common.Hash{})
 			return err
 		}
 
@@ -109,7 +102,9 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 					continue
 				}
 		*/
-
+		if block.NumberU64() != i {
+			return ErrInvalidBlockNumber
+		}
 		if block.NumberU64() <= currProgress {
 			continue
 		}
@@ -123,7 +118,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 			bc := stg.configs.bc
 			if err = stg.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
 				// TODO: handle bad block
-				s.state.UnwindTo(blockHeight-1, block.Hash())
+				s.state.UnwindTo(i-1, block.Hash())
 				return err
 			}
 
@@ -152,7 +147,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 		}
 
 		newBlocks = append(newBlocks, block)
-		if nBlock < s.state.InsertChainBatchSize-1 && block.NumberU64() != targetHeight {
+		if nBlock < s.state.InsertChainBatchSize-1 && block.NumberU64() < targetHeight {
 			nBlock++
 			continue
 		}
@@ -172,15 +167,11 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageS
 				)
 			// rollback bc
 			utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last added blocks!")
-			headAfterNewBlocks := stg.configs.bc.CurrentBlock().NumberU64()
-			nNewAddedBlocks := headAfterNewBlocks - headBeforeNewBlocks
-			for i := uint64(0); i < nNewAddedBlocks; i++ {
-				if rbErr := stg.configs.bc.Rollback([]common.Hash{stg.configs.bc.CurrentBlock().Hash()}); rbErr != nil {
-					utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
-					return err
-				}
+			if rbErr := stg.configs.bc.Rollback([]common.Hash{headHashBeforeNewBlocks}); rbErr != nil {
+				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+				return err
 			}
-			s.state.UnwindTo(stg.configs.bc.CurrentBlock().NumberU64(), headHashBeforeNewBlocks)
+			s.state.UnwindTo(headBeforeNewBlocks, headHashBeforeNewBlocks)
 			return err
 		}
 		utils.Logger().Info().

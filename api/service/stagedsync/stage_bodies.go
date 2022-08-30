@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -54,7 +53,7 @@ func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBe
 
 func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
 	// create caches db
-	cachedbName := Block_Cache_DB
+	cachedbName := BlockCacheDB
 	if isBeacon {
 		cachedbName = "beacon_" + cachedbName
 	}
@@ -85,7 +84,7 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 	return cachedb, nil
 }
 
-// ExecBodiesStage progresses Bodies stage in the forward direction
+// Exec progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageState, unwinder Unwinder, tx kv.RwTx) (err error) {
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
@@ -99,7 +98,6 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 	canRunInTurboMode := b.configs.turbo
 
 	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
-
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
 			return err
 		}
@@ -180,6 +178,9 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockUnwind bool, s *StageSta
 // This helps performance and reduces stage duration. It also helps to use the resources more efficiently.
 func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon bool, startHeight uint64, targetHeight uint64) error {
 
+	s.state.syncStatus.currentCycle.lock.RLock()
+	defer s.state.syncStatus.currentCycle.lock.RUnlock()
+
 	if s.state.syncStatus.currentCycle.Number == 0 || len(s.state.syncStatus.currentCycle.ExtraHashes) == 0 {
 		return nil
 	}
@@ -189,8 +190,10 @@ func (b *StageBodies) runBackgroundProcess(tx kv.RwTx, s *StageState, isBeacon b
 	b.configs.bgProcRunning = true
 
 	defer func() {
-		close(b.configs.turboModeCh)
-		b.configs.bgProcRunning = false
+		if b.configs.bgProcRunning {
+			close(b.configs.turboModeCh)
+			b.configs.bgProcRunning = false
+		}
 	}()
 
 	for ok := true; ok; ok = currProgress < targetHeight {
@@ -251,14 +254,22 @@ func (b *StageBodies) clearBlocksBucket(tx kv.RwTx, isBeacon bool) error {
 func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwTx) (err error) {
 	ss := s.state
 	var wg sync.WaitGroup
-	count := 0
 	taskQueue := downloadTaskQueue{ss.stateSyncTaskQueue}
-	s.state.downloadedBlocks = make(map[string][]byte)
+	s.state.InitDownloadedBlocksMap()
 
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if !peerConfig.client.IsReady() {
+				// try to connect
+				if ready := peerConfig.client.WaitForConnection(1000 * time.Millisecond); !ready {
+					if !peerConfig.client.IsConnecting() { // if it's idle or closed then remove it
+						ss.syncConfig.RemovePeer(peerConfig, "not ready to download blocks")
+					}
+					return
+				}
+			}
 			for !taskQueue.empty() {
 				tasks, err := taskQueue.poll(downloadTaskBatch, time.Millisecond)
 				if err != nil || len(tasks) == 0 {
@@ -272,7 +283,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 				}
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
-					peerConfig.failedTimes++
+					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
 					utils.Logger().Warn().Err(err).
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
@@ -283,14 +294,16 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("taskIndexes", tasks.indexes()).
 							Msg("cannot add task back to queue")
 					}
-					if peerConfig.failedTimes > downloadBlocksRetryLimit {
-						ss.syncConfig.RemovePeer(peerConfig)
+					if isBrokenPeer {
+						ss.syncConfig.RemovePeer(peerConfig, "get blocks failed")
 					}
 					return
 				}
 				if len(payload) == 0 {
-					peerConfig.failedTimes++
-					utils.Logger().Error().Int("failNumber", count).
+					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
+					utils.Logger().Error().
+						Str("peerID", peerConfig.ip).
+						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
 					if err := taskQueue.put(tasks); err != nil {
 						utils.Logger().Warn().
@@ -299,9 +312,8 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("taskBlockes", tasks.blockHashesStr()).
 							Msg("downloadBlocks: cannot add task")
 					}
-					ss.syncConfig.RemovePeer(peerConfig)
-					if peerConfig.failedTimes > downloadBlocksRetryLimit {
-						ss.syncConfig.RemovePeer(peerConfig)
+					if isBrokenPeer {
+						ss.syncConfig.RemovePeer(peerConfig, "no blocks in payload")
 					}
 					return
 				}
@@ -310,6 +322,12 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 
 				failedTasks, err := b.handleBlockSyncResult(s, payload, tasks, verifyAllSig, tx)
 				if err != nil {
+					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
+					utils.Logger().Error().
+						Err(err).
+						Str("peerID", peerConfig.ip).
+						Str("port", peerConfig.port).
+						Msg("[STAGED_SYNC] downloadBlocks: handleBlockSyncResult failed")
 					if err := taskQueue.put(tasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
@@ -317,19 +335,18 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("taskBlockes", tasks.blockHashesStr()).
 							Msg("downloadBlocks: cannot add task")
 					}
-					peerConfig.failedTimes++
-					if peerConfig.failedTimes > downloadBlocksRetryLimit {
-						ss.syncConfig.RemovePeer(peerConfig)
+					if isBrokenPeer {
+						ss.syncConfig.RemovePeer(peerConfig, "handleBlockSyncResult failed")
 					}
 					return
 				}
 
 				if len(failedTasks) != 0 {
-					peerConfig.failedTimes++
-					if peerConfig.failedTimes > downloadBlocksRetryLimit {
-						ss.syncConfig.RemovePeer(peerConfig)
-						return
-					}
+					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
+					utils.Logger().Error().
+						Str("peerID", peerConfig.ip).
+						Str("port", peerConfig.port).
+						Msg("[STAGED_SYNC] downloadBlocks: some tasks failed")
 					if err := taskQueue.put(failedTasks); err != nil {
 						utils.Logger().Warn().
 							Err(err).
@@ -337,6 +354,10 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 							Interface("task Blocks", tasks.blockHashesStr()).
 							Msg("cannot add task")
 					}
+					if isBrokenPeer {
+						ss.syncConfig.RemovePeer(peerConfig, "some blocks failed to handle")
+					}
+					return
 				}
 			}
 		}()
@@ -365,11 +386,15 @@ func (b *StageBodies) handleBlockSyncResult(s *StageState, payload [][]byte, tas
 		failedTasks = append(failedTasks, tasks[len(payload):]...)
 	}
 
-	s.state.syncMux.Lock()
-	defer s.state.syncMux.Unlock()
+	s.state.lockBlocks.Lock()
+	defer s.state.lockBlocks.Unlock()
 
 	for i, blockBytes := range payload {
-		k := fmt.Sprintf("%020d", tasks[i].index) //block.NumberU64())
+		if len(blockBytes[:]) <= 1 {
+			failedTasks = append(failedTasks, tasks[i])
+			continue
+		}
+		k := uint64(tasks[i].index) // fmt.Sprintf("%d", tasks[i].index) //fmt.Sprintf("%020d", tasks[i].index)
 		s.state.downloadedBlocks[k] = make([]byte, len(blockBytes))
 		copy(s.state.downloadedBlocks[k], blockBytes[:])
 	}
@@ -432,12 +457,13 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 	}
 
 	if s.state.stateSyncTaskQueue.Len() != int64(size) {
-		return fmt.Errorf("cannot add task to queue")
+		return ErrAddTaskFailed
 	}
 	return nil
 }
 
 func (b *StageBodies) loadExtraBlockHashesToTaskQueue(s *StageState, startIndex uint64, size uint64) error {
+
 	s.state.stateSyncTaskQueue = queue.New(0)
 
 	for i := startIndex; i < startIndex+size; i++ {
@@ -476,27 +502,24 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 		defer tx.Rollback()
 	}
 
-	// sort blocks by task id
-	taskIDs := make([]string, 0, len(s.state.downloadedBlocks))
-	for id := range s.state.downloadedBlocks {
-		taskIDs = append(taskIDs, id)
-	}
-	sort.Strings(taskIDs)
-	for _, key := range taskIDs {
-		blockBytes := s.state.downloadedBlocks[key]
-		blkNumber := fmt.Sprintf("%020d", p+1)
+	downloadedBlocks := s.state.GetDownloadedBlocks()
+
+	for i := uint64(0); i < uint64(len(downloadedBlocks)); i++ {
+		blockBytes := downloadedBlocks[i]
+		n := progress + i + 1
+		blkNumber := marshalData(n)
 		bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
-		if err := tx.Put(bucketName, []byte(blkNumber), blockBytes); err != nil {
+		if err := tx.Put(bucketName, blkNumber, blockBytes); err != nil {
 			utils.Logger().Warn().
 				Err(err).
-				Uint64("block height", p).
+				Uint64("block height", n).
 				Msg("[STAGED_SYNC] adding block to db failed")
 			return p, err
 		}
 		p++
 	}
 	// check if all block hashes are added to db break the loop
-	if p-progress != uint64(len(s.state.downloadedBlocks)) {
+	if p-progress != uint64(len(downloadedBlocks)) {
 		return progress, fmt.Errorf("save downloaded block bodies failed")
 	}
 	// save progress
@@ -524,16 +547,13 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 	}
 	defer tx.Rollback()
 
-	// sort blocks by task id
-	taskIDs := make([]string, 0, len(s.state.downloadedBlocks))
-	for id := range s.state.downloadedBlocks {
-		taskIDs = append(taskIDs, id)
-	}
-	sort.Strings(taskIDs)
-	for _, key := range taskIDs {
-		blockBytes := s.state.downloadedBlocks[key]
-		blkNumber := fmt.Sprintf("%020d", p+1)
-		if err := tx.Put(DownloadedBlocksBucket, []byte(blkNumber), blockBytes); err != nil {
+	downloadedBlocks := s.state.GetDownloadedBlocks()
+
+	for i := uint64(0); i < uint64(len(downloadedBlocks)); i++ {
+		blockBytes := downloadedBlocks[i]
+		n := progress + i + 1
+		blkNumber := marshalData(n) // fmt.Sprintf("%020d", p+1)
+		if err := tx.Put(DownloadedBlocksBucket, blkNumber, blockBytes); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Uint64("block height", p).
@@ -543,7 +563,7 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 		p++
 	}
 	// check if all block hashes are added to db break the loop
-	if p-progress != uint64(len(s.state.downloadedBlocks)) {
+	if p-progress != uint64(len(downloadedBlocks)) {
 		return p, fmt.Errorf("caching downloaded block bodies failed")
 	}
 
@@ -575,6 +595,16 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 		defer tx.Rollback()
 	}
 
+	defer func() {
+		// Clear cache db
+		b.configs.cachedb.Update(context.Background(), func(etx kv.RwTx) error {
+			if err := etx.ClearBucket(DownloadedBlocksBucket); err != nil {
+				return err
+			}
+			return nil
+		})
+	}()
+
 	errV := b.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
 		lastCachedHeightBytes, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHeight))
 		if err != nil {
@@ -589,22 +619,22 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 			return ErrRetrievingCachedBodiesProgressFail
 		}
 
-		if p >= lastHeight {
+		if startHeight >= lastHeight {
 			return nil
 		}
 
 		// load block hashes from cache db snd copy them to main sync db
 		for ok := true; ok; ok = p < lastHeight {
-			key := fmt.Sprintf("%020d", p+1)
+			key := marshalData(p + 1)
 			blkBytes, err := rtx.GetOne(DownloadedBlocksBucket, []byte(key))
 			if err != nil {
 				utils.Logger().Warn().
 					Err(err).
-					Str("block height", key).
+					Uint64("block height", p+1).
 					Msg("[STAGED_SYNC] retrieve block from cache failed")
 				return err
 			}
-			if len(blkBytes) == 0 {
+			if len(blkBytes[:]) <= 1 {
 				break
 			}
 			bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
@@ -623,23 +653,13 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 	if err = s.Update(tx, p); err != nil {
 		utils.Logger().Info().
 			Msgf("[STAGED_SYNC] saving retrieved cached progress for blocks stage failed: %v", err)
-		return p, ErrSavingCachedBodiesProgressFail
-	}
-
-	// Clear cache db
-	if errU := b.configs.cachedb.Update(context.Background(), func(etx kv.RwTx) error {
-		if err := etx.ClearBucket(DownloadedBlocksBucket); err != nil {
-			return err
-		}
-		return nil
-	}); errU != nil {
-		return p, errU
+		return startHeight, ErrSavingCachedBodiesProgressFail
 	}
 
 	// update the progress
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
-			return p, err
+			return startHeight, err
 		}
 	}
 
@@ -679,8 +699,10 @@ func (b *StageBodies) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx) (err
 	}
 
 	// terminate background process in turbo mode
-	if b.configs.turboModeCh != nil && b.configs.bgProcRunning {
+	if b.configs.bgProcRunning {
+		b.configs.bgProcRunning = false
 		b.configs.turboModeCh <- struct{}{}
+		close(b.configs.turboModeCh)
 	}
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
 	tx.ClearBucket(blocksBucketName)

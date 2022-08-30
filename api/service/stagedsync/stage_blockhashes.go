@@ -53,7 +53,7 @@ func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB,
 
 func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err error) {
 	// create caches db
-	cachedbName := Block_Hashes_Cache_DB
+	cachedbName := BlockHashesCacheDB
 	if isBeacon {
 		cachedbName = "beacon_" + cachedbName
 	}
@@ -172,11 +172,11 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockUnwind bool, s *St
 			size = SyncLoopBatchSize
 		}
 		// Gets consensus hashes.
-		if err := s.state.getConsensusHashes(startHash[:], size); err != nil {
+		if err := s.state.getConsensusHashes(startHash[:], size, false); err != nil {
 			return err
 		}
 		// selects the most common peer config based on their block hashes and doing the clean up
-		if err := s.state.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
+		if err := s.state.syncConfig.GetBlockHashesConsensusAndCleanUp(true); err != nil {
 			return err
 		}
 		// double check block hashes
@@ -225,8 +225,10 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	bh.configs.bgProcRunning = true
 
 	defer func() {
-		close(bh.configs.turboModeCh)
-		bh.configs.bgProcRunning = false
+		if bh.configs.bgProcRunning {
+			close(bh.configs.turboModeCh)
+			bh.configs.bgProcRunning = false
+		}
 	}()
 
 	// retrieve bg progress and last hash
@@ -274,12 +276,12 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 			}
 
 			// Gets consensus hashes.
-			if err := s.state.getConsensusHashes(currHash[:], size); err != nil {
+			if err := s.state.getConsensusHashes(currHash[:], size, true); err != nil {
 				return err
 			}
 
 			// selects the most common peer config based on their block hashes and doing the clean up
-			if err := s.state.syncConfig.GetBlockHashesConsensusAndCleanUp(); err != nil {
+			if err := s.state.syncConfig.GetBlockHashesConsensusAndCleanUp(false); err != nil {
 				return err
 			}
 
@@ -304,6 +306,7 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) er
 		defer tx.Rollback()
 	}
 	bucketName := GetBucketName(BlockHashesBucket, isBeacon)
+
 	if err := tx.ClearBucket(bucketName); err != nil {
 		return err
 	}
@@ -514,6 +517,8 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 			p++
 		}
 		// load extra block hashes from cache db and copy them to bg db to be downloaded in background by block stage
+		s.state.syncStatus.currentCycle.lock.Lock()
+		defer s.state.syncStatus.currentCycle.lock.Unlock()
 		pExtraHashes := p
 		s.state.syncStatus.currentCycle.ExtraHashes = make(map[uint64][]byte)
 		for ok := true; ok; ok = pExtraHashes < p+s.state.MaxBackgroundBlocks {
@@ -529,10 +534,6 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHeight 
 			if len(newHash[:]) == 0 {
 				return nil
 			}
-			// bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
-			// if err = tx.Put(bucketName, []byte(key), newHash); err != nil {
-			// 	break
-			// }
 			s.state.syncStatus.currentCycle.ExtraHashes[pExtraHashes+1] = newHash
 			pExtraHashes++
 		}
@@ -593,15 +594,14 @@ func (bh *StageBlockHashes) CleanUp(firstCycle bool, p *CleanUpState, tx kv.RwTx
 	}
 
 	// terminate background process in turbo mode
-	if bh.configs.turboModeCh != nil && bh.configs.bgProcRunning {
+	if bh.configs.bgProcRunning {
+		bh.configs.bgProcRunning = false
 		bh.configs.turboModeCh <- struct{}{}
+		close(bh.configs.turboModeCh)
 	}
 
 	hashesBucketName := GetBucketName(BlockHashesBucket, bh.configs.isBeacon)
 	tx.ClearBucket(hashesBucketName)
-
-	extrahashesBucketName := GetBucketName(ExtraBlockHashesBucket, bh.configs.isBeacon)
-	tx.ClearBucket(extrahashesBucketName)
 
 	if useInternalTx {
 		if err = tx.Commit(); err != nil {

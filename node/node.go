@@ -182,14 +182,13 @@ func (node *Node) CurrentSyncInstance() bool {
 	return node.GetOrCreateSyncInstance(false) != nil
 }
 
-// Blockchain returns the blockchain for the node's current shard.
-// if rebuild sets to true, it generates a new instance
+// GetOrCreateSyncInstance returns an instance of state sync, either legacy or staged
+// if initiate sets to true, it generates a new instance
 func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
-	// otherwise, return an instance of state sync, either legacy or staged
 	if node.NodeConfig.StagedSync {
 		if initiate && node.stateStagedSync == nil {
 			utils.Logger().Info().Msg("initializing staged state sync")
-			node.stateStagedSync = node.createStagedSync(node.Blockchain(), false)
+			node.stateStagedSync = node.createStagedSync(node.Blockchain())
 		}
 		return node.stateStagedSync
 	}
@@ -200,7 +199,7 @@ func (node *Node) GetOrCreateSyncInstance(initiate bool) ISync {
 	return node.stateSync
 }
 
-// Beaconchain returns the beaconchain from node.
+// Beaconchain returns the beacon chain from node.
 func (node *Node) Beaconchain() core.BlockChain {
 	// tikv mode not have the BeaconChain storage
 	if node.HarmonyConfig != nil && node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.General.ShardID != shard.BeaconChainShardID {

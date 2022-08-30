@@ -8,6 +8,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/internal/utils"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 )
 
 // Client is the client model for downloader package.
@@ -33,6 +34,32 @@ func ClientSetup(ip, port string) *Client {
 	utils.Logger().Debug().Str("ip", ip).Msg("[SYNC] grpc connect successfully")
 	client.dlClient = pb.NewDownloaderClient(client.conn)
 	return &client
+}
+
+// IsReady returns true if client is ready
+func (client *Client) IsReady() bool {
+	return client.conn.GetState() == connectivity.Ready
+}
+
+// IsConnecting returns true if client is connecting
+func (client *Client) IsConnecting() bool {
+	return client.conn.GetState() == connectivity.Connecting
+}
+
+// State returns current Connecting state
+func (client *Client) State() connectivity.State {
+	return client.conn.GetState()
+}
+
+// WaitForConnection waits for client to connect
+func (client *Client) WaitForConnection(t time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), t)
+	defer cancel()
+	if ready := client.conn.WaitForStateChange(ctx, client.conn.GetState()); !ready {
+		return false
+	} else {
+		return client.conn.GetState() == connectivity.Ready
+	}
 }
 
 // Close closes the Client.
@@ -118,6 +145,7 @@ func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
+		fmt.Println("GetBlocksAndSigs------------------>", err)
 		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocksAndSigs query failed")
 	}
 	return response

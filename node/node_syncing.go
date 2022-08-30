@@ -108,7 +108,7 @@ func (node *Node) createStateSync(bc core.BlockChain) *legacysync.StateSync {
 		node.GetSyncID(), node.NodeConfig.Role() == nodeconfig.ExplorerNode, role)
 }
 
-func (node *Node) createStagedSync(bc core.BlockChain, isBeacon bool) *stagedsync.StagedSync {
+func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
 	// Temp hack: The actual port used in dns sync is node.downloaderServer.Port.
 	// But registration is done through an old way of port arithmetics (syncPort + 3000).
 	// Thus for compatibility, we are doing the arithmetics here, and not to change the
@@ -127,7 +127,7 @@ func (node *Node) createStagedSync(bc core.BlockChain, isBeacon bool) *stagedsyn
 	isExplorer := node.NodeConfig.Role() == nodeconfig.ExplorerNode
 
 	if s, err := stagedsync.CreateStagedSync(node.SelfPeer.IP, mutatedPort,
-		node.GetSyncID(), bc, role, isBeacon, isExplorer,
+		node.GetSyncID(), bc, role, isExplorer,
 		node.NodeConfig.StagedSyncTurboMode,
 		node.NodeConfig.UseMemDB,
 		node.NodeConfig.DoubleCheckBlockHashes,
@@ -168,8 +168,10 @@ func NewLegacySyncingPeerProvider(node *Node) *LegacySyncingPeerProvider {
 func (p *LegacySyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer, err error) {
 	switch shardID {
 	case p.shardID():
+		fmt.Println("SSSSHHHHHHHHHAAAAAAAAAARRRDDDDDDDDDDDDD------->",p.shardID())
 		peers = getNeighborPeers(&p.node.Neighbors)
 	case 0:
+		fmt.Println("SSSSHHHHHHHHHAAAAAAAAAARRRDDDDDDDDDDDDD- BEACON------>",p.shardID())
 		peers = getNeighborPeers(&p.node.BeaconNeighbors)
 	default:
 		return nil, errors.Errorf("unsupported shard ID %v", shardID)
@@ -401,7 +403,7 @@ func (node *Node) supportSyncing() {
 	}
 
 	if node.NodeConfig.StagedSync && node.stateStagedSync == nil {
-		node.stateStagedSync = node.createStagedSync(node.Blockchain(), false)
+		node.stateStagedSync = node.createStagedSync(node.Blockchain())
 		utils.Logger().Debug().Msg("[SYNC] initialized state for staged sync")
 	}
 

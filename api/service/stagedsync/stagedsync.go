@@ -33,7 +33,7 @@ type StagedSync struct {
 	selfport           string
 	selfPeerHash       [20]byte // hash of ip and address combination
 	commonBlocks       map[int]*types.Block
-	downloadedBlocks   map[string][]byte
+	downloadedBlocks   map[uint64][]byte
 	lastMileBlocks     []*types.Block // last mile blocks to catch up with the consensus
 	syncConfig         *SyncConfig
 	isExplorer         bool
@@ -41,6 +41,7 @@ type StagedSync struct {
 	syncMux            sync.Mutex
 	lastMileMux        sync.Mutex
 	syncStatus         syncStatus
+	lockBlocks         sync.RWMutex
 
 	ctx context.Context
 	bc  core.BlockChain
@@ -104,6 +105,34 @@ func (s *StagedSync) IsExplorer() bool         { return s.isExplorer }
 func (s *StagedSync) Blockchain() core.BlockChain { return s.bc }
 func (s *StagedSync) DB() kv.RwDB                 { return s.db }
 func (s *StagedSync) PrevUnwindPoint() *uint64    { return s.prevUnwindPoint }
+
+func (s *StagedSync) InitDownloadedBlocksMap() error {
+	s.lockBlocks.Lock()
+	defer s.lockBlocks.Unlock()
+	s.downloadedBlocks = make(map[uint64][]byte)
+	return nil
+}
+
+func (s *StagedSync) AddBlocks(blks map[uint64][]byte) error {
+	s.lockBlocks.Lock()
+	defer s.lockBlocks.Unlock()
+	for k, blkBytes := range blks {
+		s.downloadedBlocks[k] = make([]byte, len(blkBytes))
+		copy(s.downloadedBlocks[k], blkBytes[:])
+	}
+	return nil
+}
+
+func (s *StagedSync) GetDownloadedBlocks() map[uint64][]byte {
+	d := make(map[uint64][]byte)
+	s.lockBlocks.RLock()
+	defer s.lockBlocks.RUnlock()
+	for k, blkBytes := range s.downloadedBlocks {
+		d[k] = make([]byte, len(blkBytes))
+		copy(d[k], blkBytes[:])
+	}
+	return d
+}
 
 func (s *StagedSync) NewUnwindState(id SyncStageID, unwindPoint, currentProgress uint64) *UnwindState {
 	return &UnwindState{id, unwindPoint, currentProgress, common.Hash{}, s}
@@ -263,7 +292,7 @@ func New(ctx context.Context,
 		logPrefixes:            logPrefixes,
 		syncStatus:             NewSyncStatus(role),
 		commonBlocks:           make(map[int]*types.Block),
-		downloadedBlocks:       make(map[string][]byte),
+		downloadedBlocks:       make(map[uint64][]byte),
 		lastMileBlocks:         []*types.Block{},
 		syncConfig:             &SyncConfig{},
 		StagedSyncTurboMode:    TurboMode,
@@ -356,11 +385,9 @@ func (s *StagedSync) Run(db kv.RwDB, tx kv.RwTx, firstCycle bool) error {
 	if err := s.cleanUp(0, db, tx, firstCycle); err != nil {
 		return err
 	}
-
 	if err := s.SetCurrentStage(s.stages[0].ID); err != nil {
 		return err
 	}
-
 	if err := printLogs(tx, s.timings); err != nil {
 		return err
 	}
@@ -702,26 +729,48 @@ func (ss *StagedSync) GetActivePeerNumber() int {
 }
 
 // getConsensusHashes gets all hashes needed to download.
-func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
+func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode bool) error {
+	var bgModeError error
+
 	var wg sync.WaitGroup
 	ss.syncConfig.ForEachPeer(func(peerConfig *SyncPeerConfig) (brk bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
+			if !peerConfig.client.IsReady() {
+				// try to connect
+				if ready := peerConfig.client.WaitForConnection(1000 * time.Millisecond); !ready {
+					// replace it with reserved peer (in bg mode don't replace because maybe other stages still are using this node)
+					if bgMode {
+						bgModeError = fmt.Errorf("some nodes are not ready")
+						brk = true //finish whole peers loop
+					} else {
+						if !peerConfig.client.IsConnecting() {
+							ss.syncConfig.ReplacePeerWithReserved(peerConfig)
+						}
+					}
+					return
+				}
+			}
 			response := peerConfig.client.GetBlockHashes(startHash, size, ss.selfip, ss.selfport)
 			if response == nil {
 				utils.Logger().Warn().
 					Str("peerIP", peerConfig.ip).
 					Str("peerPort", peerConfig.port).
 					Msg("[STAGED_SYNC] getConsensusHashes Nil Response, will be replaced with reserved node (if any)")
-				// replace it with reserved peer
-				ss.syncConfig.ReplacePeerWithReserved(peerConfig)
+				// replace it with reserved peer (in bg mode don't replace because maybe other stages still are using this node)
+				if bgMode {
+					bgModeError = fmt.Errorf("some nodes failed to download block hashes")
+					brk = true //finish whole peers loop
+				} else {
+					ss.syncConfig.ReplacePeerWithReserved(peerConfig)
+				}
 				return
 			}
 			utils.Logger().Info().Uint32("queried blockHash size", size).
 				Int("got blockHashSize", len(response.Payload)).
 				Str("PeerIP", peerConfig.ip).
+				Bool("background Mode", bgMode).
 				Msg("[STAGED_SYNC] GetBlockHashes")
 
 			if len(response.Payload) > int(size+1) {
@@ -730,10 +779,10 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 					Int("respondSize", len(response.Payload)).
 					Msg("[STAGED_SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
-				//addBlockHashesToDBWithConfirms(response.Payload[:size+1], tx)
 			} else {
+				//peerConfig.mux.Lock()
 				peerConfig.blockHashes = response.Payload
-				//addBlockHashesToDBWithConfirms(response.Payload, tx)
+				//peerConfig.mux.Unlock()
 			}
 
 		}()
@@ -742,7 +791,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32) error {
 	wg.Wait()
 
 	utils.Logger().Info().Msg("[STAGED_SYNC] Finished getting consensus block hashes")
-	return nil
+	return bgModeError
 }
 
 // analyze block hashes and detects invalid peers
@@ -843,7 +892,7 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc core.BlockChain, tx kv.RwTx)
 	})
 
 	if !allTasksAddedToQueue {
-		return fmt.Errorf("cannot add task to queue")
+		return ErrAddTaskFailed
 	}
 	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[STAGED_SYNC] generateStateSyncTaskQueue: finished")
 	return nil
@@ -930,7 +979,7 @@ func (ss *StagedSync) getMaxConsensusBlockFromParentHash(parentHash common.Hash)
 		Hex("parentHash", parentHash[:]).
 		Hex("hash", hash[:]).
 		Int("maxCount", maxCount).
-		Msg("[STAGED_SYNC] Find block with matching parenthash")
+		Msg("[STAGED_SYNC] Find block with matching parent hash")
 	return candidateBlocks[maxFirstID]
 }
 
@@ -1080,7 +1129,7 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]GetBlockChainHeight failed")
-				ss.syncConfig.RemovePeer(peerConfig)
+				ss.syncConfig.RemovePeer(peerConfig, "GetBlockChainHeight failed")
 				return
 			}
 			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
