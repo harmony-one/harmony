@@ -145,7 +145,6 @@ func (client *Client) GetBlocksAndSigs(hashes [][]byte) *pb.DownloaderResponse {
 	}
 	response, err := client.dlClient.Query(ctx, request)
 	if err != nil {
-		fmt.Println("GetBlocksAndSigs------------------>", err)
 		utils.Logger().Error().Err(err).Str("target", client.conn.Target()).Msg("[SYNC] downloader/client.go:GetBlocksAndSigs query failed")
 	}
 	return response

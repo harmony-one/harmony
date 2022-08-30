@@ -168,10 +168,8 @@ func NewLegacySyncingPeerProvider(node *Node) *LegacySyncingPeerProvider {
 func (p *LegacySyncingPeerProvider) SyncingPeers(shardID uint32) (peers []p2p.Peer, err error) {
 	switch shardID {
 	case p.shardID():
-		fmt.Println("SSSSHHHHHHHHHAAAAAAAAAARRRDDDDDDDDDDDDD------->",p.shardID())
 		peers = getNeighborPeers(&p.node.Neighbors)
 	case 0:
-		fmt.Println("SSSSHHHHHHHHHAAAAAAAAAARRRDDDDDDDDDDDDD- BEACON------>",p.shardID())
 		peers = getNeighborPeers(&p.node.BeaconNeighbors)
 	default:
 		return nil, errors.Errorf("unsupported shard ID %v", shardID)
