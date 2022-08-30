@@ -5,6 +5,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
+	"github.com/harmony-one/harmony/internal/tikv"
 	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
@@ -95,7 +96,7 @@ func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
 	hmyFilter := filters.NewPublicFilterAPI(harmony, false, "hmy", harmony.ShardID)
 	ethFilter := filters.NewPublicFilterAPI(harmony, false, "eth", harmony.ShardID)
 
-	if node.HarmonyConfig.General.RunElasticMode {
+	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
 		hmyFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
 		ethFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
 	}

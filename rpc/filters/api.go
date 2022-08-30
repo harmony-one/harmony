@@ -355,6 +355,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	timer := hmy_rpc.DoMetricRPCRequest(hmy_rpc.NewFilter)
 	defer hmy_rpc.DoRPCRequestDuration(hmy_rpc.NewFilter, timer)
 
+	time.Sleep(time.Millisecond * 50) // to give time to the other writers to catch up
 	if err := redis_helper.PublishNewFilterLogEvent(api.shardID, api.namespace, ethereum.FilterQuery(crit)); err != nil {
 		return "", fmt.Errorf("sending filter logs to other readers: %w", err)
 	}
