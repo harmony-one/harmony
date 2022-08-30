@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/ethereum/go-ethereum"
+
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -42,6 +44,38 @@ func PublishShardUpdate(shardID uint32, blkNum uint64, logs []*types.Log) error 
 		return err
 	}
 	return redisInstance.Publish(context.Background(), fmt.Sprintf("shard_update_%d", shardID), msg).Err()
+}
+
+// SubscribeNewFilterLogEvent subscribe new filter log event from other readers
+func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(crit ethereum.FilterQuery)) {
+	if redisInstance == nil {
+		return
+	}
+	pubsub := redisInstance.
+		Subscribe(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID))
+	for message := range pubsub.Channel() {
+		query := ethereum.FilterQuery{}
+		err := rlp.DecodeBytes([]byte(message.Payload), &query)
+		if err != nil {
+			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log_ error")
+			continue
+		}
+		cb(query)
+	}
+}
+
+// PublishNewFilterLogEvent publish new filter log event from other readers
+func PublishNewFilterLogEvent(shardID uint32, namespace string, crit ethereum.FilterQuery) error {
+	if redisInstance == nil {
+		return nil
+	}
+
+	msg, err := rlp.EncodeToBytes(&crit)
+	if err != nil {
+		return err
+	}
+	return redisInstance.
+		Publish(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID), msg).Err()
 }
 
 //TxPoolUpdate tx pool update event

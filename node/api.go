@@ -92,14 +92,22 @@ func (node *Node) StopRosetta() error {
 // APIs return the collection of local RPC services.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (node *Node) APIs(harmony *hmy.Harmony) []rpc.API {
+	hmyFilter := filters.NewPublicFilterAPI(harmony, false, "hmy", harmony.ShardID)
+	ethFilter := filters.NewPublicFilterAPI(harmony, false, "eth", harmony.ShardID)
+
+	if node.HarmonyConfig.General.RunElasticMode {
+		hmyFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
+		ethFilter.Service.(*filters.PublicFilterAPI).SyncNewFilterFromOtherReaders()
+	}
+
 	// Append all the local APIs and return
 	return []rpc.API{
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V1),
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.V2),
 		hmy_rpc.NewPublicNetAPI(node.host, harmony.ChainID, hmy_rpc.Eth),
 		hmy_rpc.NewPublicWeb3API(),
-		filters.NewPublicFilterAPI(harmony, false, "hmy"),
-		filters.NewPublicFilterAPI(harmony, false, "eth"),
+		hmyFilter,
+		ethFilter,
 	}
 }
 
