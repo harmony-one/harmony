@@ -18,6 +18,7 @@ import (
 )
 
 func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
+
 	recvMsg, err := consensus.ParseFBFTMessage(msg)
 	if err != nil {
 		consensus.getLogger().Error().
@@ -25,6 +26,9 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnAnnounce] Unparseable leader message")
 		return
+	}
+	if consensus.ShardID == 0 {
+		//fmt.Println("onAnnounce called ", recvMsg.BlockNum)
 	}
 
 	// NOTE let it handle its own logs
@@ -184,6 +188,9 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
+	if consensus.ShardID == 0 {
+		//fmt.Println("onPrepared", recvMsg.BlockNum)
+	}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -398,6 +405,13 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 	if initBn < consensus.BlockNum() {
 		consensus.getLogger().Info().Msg("[OnCommitted] Start consensus timer (new block added)")
 		consensus.consensusTimeout[timeoutConsensus].Start()
+	}
+
+	//fmt.Println("onCommitted", utils.GetPort(), recvMsg.BlockNum)
+	if blk != nil {
+		//consensus.ReshardingNextLeader(blk)
+	} else {
+		//fmt.Println("onCommitted", utils.GetPort(), recvMsg.BlockNum, "blk is nil")
 	}
 }
 
