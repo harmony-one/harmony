@@ -3,6 +3,7 @@ package filters
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -399,7 +400,7 @@ func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery, customId rpc
 		}
 	}()
 
-	fmt.Printf("filter: logs created id='%s'", logsSub.ID)
+	log.Printf("filter: logs created id='%s'\n", logsSub.ID)
 
 	return logsSub.ID, nil
 }

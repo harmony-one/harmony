@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -74,7 +75,7 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 			query.FilterCriteria.ToBlock.Neg(query.FilterCriteria.ToBlock)
 		}
 
-		fmt.Printf("filter: new message id='%s' from=%d to=%d", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
+		log.Printf("filter: new message id='%s' from=%d to=%d\n", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
 		err := rlp.DecodeBytes([]byte(message.Payload), &query)
 		if err != nil {
 			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
@@ -90,7 +91,7 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 		return nil
 	}
 
-	fmt.Printf("filter: send message id='%s' from=%d to=%d", id, getInt(crit.FromBlock), getInt(crit.ToBlock))
+	log.Printf("filter: send message id='%s' from=%d to=%d\n", id, getInt(crit.FromBlock), getInt(crit.ToBlock))
 
 	ev := NewFilterUpdated{
 		ID:                id,
