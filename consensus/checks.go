@@ -56,8 +56,7 @@ func (consensus *Consensus) senderKeySanityChecks(msg *msg_pb.Message, senderKey
 }
 
 func (consensus *Consensus) isRightBlockNumAndViewID(recvMsg *FBFTMessage) bool {
-	blockNum := consensus.getBlockNum()
-	if recvMsg.ViewID != consensus.getCurBlockViewID() || recvMsg.BlockNum != blockNum {
+	if recvMsg.ViewID != consensus.GetCurBlockViewID() || recvMsg.BlockNum != consensus.BlockNum() {
 		consensus.getLogger().Debug().
 			Uint64("blockNum", blockNum).
 			Str("recvMsg", recvMsg.String()).

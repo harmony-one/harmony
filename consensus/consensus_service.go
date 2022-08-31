@@ -1,13 +1,13 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
-	"github.com/harmony-one/harmony/multibls"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -74,12 +74,8 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	return consensus.updatePublicKeys(pubKeys, allowlist)
-}
-
-func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
+	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
+	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
@@ -98,20 +94,15 @@ func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
 	}
-	for i := range pubKeys {
-		consensus.getLogger().Info().
-			Int("index", i).
-			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
-			Msg("Member")
-	}
+	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
-	consensus.updateBitmaps()
-	consensus.resetState()
+	consensus.UpdateBitmaps()
+	consensus.ResetState()
 
 	// do not reset view change state if it is in view changing mode
-	if !consensus.isViewChangingMode() {
-		consensus.resetViewChangeState()
+	if !consensus.IsViewChangingMode() {
+		consensus.ResetViewChangeState()
 	}
 	return consensus.Decider.ParticipantsCount()
 }
@@ -138,7 +129,7 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 }
 
 // UpdateBitmaps update the bitmaps for prepare and commit phase
-func (consensus *Consensus) updateBitmaps() {
+func (consensus *Consensus) UpdateBitmaps() {
 	consensus.getLogger().Debug().
 		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
@@ -148,12 +139,13 @@ func (consensus *Consensus) updateBitmaps() {
 	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
+	consensus.multiSigMutex.Lock()
 	consensus.multiSigBitmap = multiSigBitmap
-
+	consensus.multiSigMutex.Unlock()
 }
 
 // ResetState resets the state of the consensus
-func (consensus *Consensus) resetState() {
+func (consensus *Consensus) ResetState() {
 	consensus.switchPhase("ResetState", FBFTAnnounce)
 
 	consensus.blockHash = [32]byte{}
@@ -171,24 +163,11 @@ func (consensus *Consensus) resetState() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-	return consensus.isValidatorInCommittee(pubKey)
-}
-
-func (consensus *Consensus) isValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
 // SetMode sets the mode of consensus
 func (consensus *Consensus) SetMode(m Mode) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.setMode(m)
-}
-
-// SetMode sets the mode of consensus
-func (consensus *Consensus) setMode(m Mode) {
 	if m == Normal && consensus.isBackup {
 		m = NormalBackup
 	}
@@ -210,13 +189,6 @@ func (consensus *Consensus) SetIsBackup(isBackup bool) {
 
 // Mode returns the mode of consensus
 func (consensus *Consensus) Mode() Mode {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-	return consensus.mode()
-}
-
-// mode returns the mode of consensus
-func (consensus *Consensus) mode() Mode {
 	return consensus.current.Mode()
 }
 
@@ -236,11 +208,12 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 	if consensus.IgnoreViewIDCheck.IsSet() {
 		//in syncing mode, node accepts incoming messages without viewID/leaderKey checking
 		//so only set mode to normal when new node enters consensus and need checking viewID
-		consensus.setMode(Normal)
-		consensus.setViewIDs(msg.ViewID)
+		consensus.SetMode(Normal)
+		consensus.SetViewIDs(msg.ViewID)
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
+		fmt.Println("[checkViewID] Set LEADEER PUB KEY ", msg.SenderPubkeys[0].Bytes.Hex(), utils.GetPort())
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -248,9 +221,9 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 			Str("leaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 			Msg("[checkViewID] Start consensus timer")
 		return nil
-	} else if msg.ViewID > consensus.getCurBlockViewID() {
+	} else if msg.ViewID > consensus.GetCurBlockViewID() {
 		return consensus_engine.ErrViewIDNotMatch
-	} else if msg.ViewID < consensus.getCurBlockViewID() {
+	} else if msg.ViewID < consensus.GetCurBlockViewID() {
 		return errors.New("view ID belongs to the past")
 	}
 	return nil
@@ -261,26 +234,17 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 	atomic.StoreUint64(&consensus.blockNum, blockNum)
 }
 
-// SetBlockNum sets the blockNum in consensus object, called at node bootstrap
-func (consensus *Consensus) setBlockNum(blockNum uint64) {
-	atomic.StoreUint64(&consensus.blockNum, blockNum)
-}
-
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
-func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls_core.Sign, *bls_cosi.Mask, error) {
-	consensus.mutex.RLock()
-	members := consensus.Decider.Participants()
-	consensus.mutex.RUnlock()
-	return consensus.readSignatureBitmapPayload(recvPayload, offset, members)
-}
-
-func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offset int, members multibls.PublicKeys) (*bls_core.Sign, *bls_cosi.Mask, error) {
+func (consensus *Consensus) ReadSignatureBitmapPayload(
+	recvPayload []byte, offset int,
+) (*bls_core.Sign, *bls_cosi.Mask, error) {
 	if offset+bls.BLSSignatureSizeInBytes > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
 
 	// TODO(audit): keep a Mask in the Decider so it won't be reconstructed on the fly.
+	members := consensus.Decider.Participants()
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, members,
 	)
@@ -297,12 +261,6 @@ func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offse
 // (b) node in committed but has any err during processing: Syncing mode
 // (c) node in committed and everything looks good: Normal mode
 func (consensus *Consensus) UpdateConsensusInformation() Mode {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	return consensus.updateConsensusInformation()
-}
-
-func (consensus *Consensus) updateConsensusInformation() Mode {
 	curHeader := consensus.Blockchain().CurrentHeader()
 	curEpoch := curHeader.Epoch()
 	nextEpoch := new(big.Int).Add(curHeader.Epoch(), common.Big1)
@@ -407,7 +365,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 	consensus.getLogger().Info().
 		Int("numPubKeys", len(pubKeys)).
 		Msg("[UpdateConsensusInformation] Successfully updated public keys")
-	consensus.updatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
+	consensus.UpdatePublicKeys(pubKeys, shard.Schedule.InstanceForEpoch(nextEpoch).ExternalAllowlist())
 
 	// Update voters in the committee
 	if _, err := consensus.Decider.SetVoters(
@@ -438,13 +396,16 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
+			consensus.pubKeyLock.Lock()
+			fmt.Println("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain", leaderPubKey.Bytes.Hex(), utils.GetPort())
 			consensus.LeaderPubKey = leaderPubKey
+			consensus.pubKeyLock.Unlock()
 		}
 	}
 
 	for _, key := range pubKeys {
 		// in committee
-		myPubKeys := consensus.getPublicKeys()
+		myPubKeys := consensus.GetPublicKeys()
 		if myPubKeys.Contains(key.Object) {
 			if hasError {
 				consensus.getLogger().Error().
@@ -456,7 +417,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 
 			// If the leader changed and I myself become the leader
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
-				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
+				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
 				go func() {
 					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -477,10 +438,15 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-
-	return consensus.isLeader()
+	consensus.pubKeyLock.Lock()
+	obj := consensus.LeaderPubKey.Object
+	consensus.pubKeyLock.Unlock()
+	for _, key := range consensus.priKey {
+		if key.Pub.Object.IsEqual(obj) {
+			return true
+		}
+	}
+	return false
 }
 
 // isLeader check if the node is a leader or not by comparing the public key of
@@ -498,16 +464,9 @@ func (consensus *Consensus) isLeader() bool {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.setViewIDs(height)
-}
-
-// SetViewIDs set both current view ID and view changing ID to the height
-// of the blockchain. It is used during client startup to recover the state
-func (consensus *Consensus) setViewIDs(height uint64) {
-	consensus.setCurBlockViewID(height)
-	consensus.setViewChangingID(height)
+	fmt.Println("SetViewIDs", height)
+	consensus.SetCurBlockViewID(height)
+	consensus.SetViewChangingID(height)
 }
 
 // SetCurBlockViewID set the current view ID
@@ -515,9 +474,18 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
 }
 
-// SetCurBlockViewID set the current view ID
-func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
-	consensus.current.SetCurBlockViewID(viewID)
+// SetLeaderIndex set the leader index.
+func (consensus *Consensus) SetLeaderIndex(f func(int) int) (current int) {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	consensus.LeaderIndex = f(consensus.LeaderIndex)
+	return consensus.LeaderIndex
+}
+
+func (consensus *Consensus) GetLeaderIndex() int {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	return consensus.LeaderIndex
 }
 
 // SetViewChangingID set the current view change ID
@@ -525,15 +493,19 @@ func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
 }
 
-// SetViewChangingID set the current view change ID
-func (consensus *Consensus) setViewChangingID(viewID uint64) {
-	consensus.current.SetViewChangingID(viewID)
-}
-
 // StartFinalityCount set the finality counter to current time
 func (consensus *Consensus) StartFinalityCount() {
 	consensus.finalityCounter.Store(time.Now().UnixNano())
 }
+
+//func (consensus *Consensus) ReshardingNextLeader(newblock *types.Block) {
+//	consensus.pubKeyLock.Lock()
+//	fmt.Println("nextBlock1 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
+//	consensus.LeaderPubKey = consensus.getNextLeaderKey(consensus.GetCurBlockViewID() + 1)
+//	fmt.Println("nextBlock2 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
+//	consensus.pubKeyLock.Unlock()
+//
+//}
 
 // FinishFinalityCount calculate the current finality
 func (consensus *Consensus) FinishFinalityCount() {
@@ -554,7 +526,8 @@ func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 		Str("to:", desired.String()).
 		Str("switchPhase:", subject)
 
-	consensus.phase = desired
+	consensus.phase.Set(desired)
+	return
 }
 
 var (
@@ -576,13 +549,13 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errGetPreparedBlock
 	}
 
-	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.Decider.Participants())
+	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
 	if err != nil {
 		return errReadBitmapPayload
 	}
 
 	// Have to keep the block hash so the leader can finish the commit phase of prepared block
-	consensus.resetState()
+	consensus.ResetState()
 
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.switchPhase("selfCommit", FBFTCommit)
@@ -639,18 +612,11 @@ func (consensus *Consensus) NumSignaturesIncludedInBlock(block *types.Block) uin
 	return count
 }
 
-// GetLogger returns logger for consensus contexts added.
-func (consensus *Consensus) GetLogger() *zerolog.Logger {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
-	return consensus.getLogger()
-}
-
 // getLogger returns logger for consensus contexts added
 func (consensus *Consensus) getLogger() *zerolog.Logger {
 	logger := utils.Logger().With().
-		Uint64("myBlock", consensus.blockNum).
-		Uint64("myViewID", consensus.getCurBlockViewID()).
+		Uint64("myBlock", consensus.BlockNum()).
+		Uint64("myViewID", consensus.GetCurBlockViewID()).
 		Str("phase", consensus.phase.String()).
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
