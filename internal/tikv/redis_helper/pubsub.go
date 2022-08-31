@@ -2,6 +2,7 @@ package redis_helper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -26,10 +27,8 @@ type BlockUpdate struct {
 
 // NewFilterUpdated new filter update event
 type NewFilterUpdated struct {
-	ID                string
-	NegativeFromBlock bool // rlp: cannot encode negative *big.Int
-	NegativeToBlock   bool // rlp: cannot encode negative *big.Int
-	FilterCriteria    ethereum.FilterQuery
+	ID             string
+	FilterCriteria ethereum.FilterQuery
 }
 
 // SubscribeShardUpdate subscribe block update event
@@ -68,16 +67,9 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 	for message := range pubsub.Channel() {
 		query := NewFilterUpdated{}
 
-		if err := rlp.DecodeBytes([]byte(message.Payload), &query); err != nil {
+		if err := json.Unmarshal([]byte(message.Payload), &query); err != nil {
 			utils.Logger().Warn().Err(err).Msg("redis subscribe new_filter_log error")
 			continue
-		}
-
-		if query.NegativeFromBlock {
-			query.FilterCriteria.FromBlock.Neg(query.FilterCriteria.FromBlock)
-		}
-		if query.NegativeToBlock {
-			query.FilterCriteria.ToBlock.Neg(query.FilterCriteria.ToBlock)
 		}
 
 		log.Printf("filter: new message id='%s' from=%d to=%d\n", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
@@ -94,23 +86,14 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 	log.Printf("filter: send message id='%s' from=%d to=%d\n", id, getInt(crit.FromBlock), getInt(crit.ToBlock))
 
 	ev := NewFilterUpdated{
-		ID:                id,
-		NegativeFromBlock: isBigNegative(crit.FromBlock),
-		NegativeToBlock:   isBigNegative(crit.ToBlock),
+		ID:             id,
+		FilterCriteria: crit,
 	}
-
-	if isBigNegative(crit.FromBlock) {
-		crit.FromBlock.Abs(crit.FromBlock)
-	}
-	if isBigNegative(crit.ToBlock) {
-		crit.ToBlock.Abs(crit.ToBlock)
-	}
-	ev.FilterCriteria = crit
-
-	msg, err := rlp.EncodeToBytes(&ev)
+	msg, err := json.Marshal(ev)
 	if err != nil {
 		return err
 	}
+
 	return redisInstance.
 		Publish(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID), msg).Err()
 }
