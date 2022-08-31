@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -141,6 +142,7 @@ func (consensus *Consensus) getNextViewID() (uint64, time.Duration) {
 		Uint64("stuckBlockViewID", stuckBlockViewID).
 		Msg("[getNextViewID]")
 
+	fmt.Println("end getNextViewID: ", nextViewID, viewChangeDuration)
 	// duration is always the fixed view change duration for synchronous view change
 	return nextViewID, viewChangeDuration
 }
@@ -219,6 +221,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 			lastLeaderPubKey,
 			gap)
 	}
+	fmt.Println("wasfoundNext", consensus.Blockchain.Config().IsAllowlistEpoch(epoch), wasFound, next.Bytes.Hex(), lastLeaderPubKey.Bytes.Hex())
 	if !wasFound {
 		consensus.getLogger().Warn().
 			Str("key", consensus.LeaderPubKey.Bytes.Hex()).
@@ -288,7 +291,9 @@ func (consensus *Consensus) startViewChange() {
 		if !consensus.isValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
+		// Тут уже другой leader
 		msgToSend := consensus.constructViewChangeMessage(&key)
+		fmt.Println("Message to send leader222: ", consensus.LeaderPubKey.Bytes.Hex())
 		if err := consensus.msgSender.SendWithRetry(
 			consensus.getBlockNum(),
 			msg_pb.MessageType_VIEWCHANGE,
@@ -371,6 +376,13 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 			Msg("[onViewChange] I am not the Leader")
 		return
 	}
+
+	consensus.getLogger().Debug().
+		Err(err).
+		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
+		Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
+		Str("myBLSPubKey", consensus.priKey.GetPublicKeys().SerializeToHexStr()).
+		Msg("[onViewChange] I am the Leader")
 
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().

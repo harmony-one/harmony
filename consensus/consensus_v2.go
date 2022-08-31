@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -139,6 +140,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
+	// THIS IS NOT GOOD PLACE FOR LEADER SWITCHING
 	numCommits := consensus.Decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
@@ -530,6 +532,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 // preCommitAndPropose commit the current block with 67% commit signatures and start
 // proposing new block which will wait on the full commit signatures to finish
 func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
+	//fmt.Println("preCommitAndPropose", utils.GetPort(), blk.NumberU64())
 	if blk == nil {
 		return errors.New("block to pre-commit is nil")
 	}
@@ -647,6 +650,7 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
 			return err
 		}
+		//fmt.Println("tryCatchup ", utils.GetPort(), blk.NumberU64())
 		select {
 		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
@@ -661,6 +665,8 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
+	// this function evaluates for all, leader and validators.
+
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
