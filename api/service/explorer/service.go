@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
 	"time"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/harmony-one/harmony/internal/common"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 
 	ethCommon "github.com/ethereum/go-ethereum/common"
@@ -113,12 +115,17 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 
+	fmt.Println("++", addr)
+
 	// Set up router for addresses.
 	// Fetch addresses request, accepts parameter size: how much addresses to read,
 	// parameter prefix: from which address prefix start
 	s.router.Path("/addresses").Queries("size", "{[0-9]*?}", "prefix", "{[a-zA-Z0-9]*?}").HandlerFunc(s.GetAddresses).Methods("GET")
 	s.router.Path("/addresses").HandlerFunc(s.GetAddresses)
 	s.router.Path("/height").HandlerFunc(s.GetHeight)
+	s.router.Path("/leader").HandlerFunc(s.GetLeader)
+	s.router.Path("/blocks").HandlerFunc(s.GetBlocks)
+	s.router.Path("/halt").HandlerFunc(s.halt)
 
 	// Set up router for supply info
 	s.router.Path("/burn-addresses").Queries().HandlerFunc(s.GetInaccessibleAddressInfo).Methods("GET")
@@ -184,6 +191,47 @@ type HeightResponse struct {
 	S1 uint64 `json:"1,omitempty"`
 	S2 uint64 `json:"2,omitempty"`
 	S3 uint64 `json:"3,omitempty"`
+}
+
+func (s *Service) GetLeader(w http.ResponseWriter, r *http.Request) {
+	if s.backend.IsCurrentlyLeader() {
+		w.Write([]byte("true "))
+	} else {
+		w.Write([]byte("false"))
+	}
+
+	keys := ""
+	for _, p := range s.backend.GetPublicKeys() {
+		addr := common.Address{}
+		addrBytes := p.Object.GetAddress()
+		addr.SetBytes(addrBytes[:])
+		keys += fmt.Sprintf("%s ", addr.String())
+		break
+	}
+	//blsPubKeyBytes := leaderKey.Object.GetAddress()
+	//coinbase.SetBytes(blsPubKeyBytes[:])
+
+	w.Write([]byte(fmt.Sprintf(" %d", s.blockchain.ShardID())))
+	w.Write([]byte(fmt.Sprintf(" %s", s.Port)))
+	w.Write([]byte(fmt.Sprintf(" %s", keys)))
+	w.Write([]byte(fmt.Sprintf(" %s", s.backend.GetPublicKeys().SerializeToHexStr())))
+
+}
+
+func (s *Service) GetBlocks(w http.ResponseWriter, r *http.Request) {
+	cur := s.blockchain.CurrentHeader().Number().Uint64()
+
+	for i := cur; i > 0; i-- {
+		block := s.blockchain.GetBlockByNumber(i)
+		w.Write([]byte(fmt.Sprintf("%d ", i)))
+		w.Write([]byte(fmt.Sprintf("%s ", block.Header().ViewID().String())))
+		w.Write([]byte(fmt.Sprintf("%s ", block.Header().Coinbase().Hash().Hex())))
+		w.Write([]byte(fmt.Sprintf("%s\n", block.Header().Coinbase().Hex())))
+	}
+}
+
+func (s *Service) halt(w http.ResponseWriter, r *http.Request) {
+	os.Exit(0)
 }
 
 // GetHeight returns heights of current and beacon chains if needed.
