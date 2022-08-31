@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -22,7 +21,7 @@ var big0 = big.NewInt(0)
 // BlockUpdate block update event
 type BlockUpdate struct {
 	BlkNum uint64
-	Logs   []*types.LogForStorage
+	Logs   []*types.LogForStorage // types.Log will cut some fields when rpl encoding/decoding look at core/types/log.go:83
 }
 
 // NewFilterUpdated new filter update event
@@ -91,7 +90,6 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 			continue
 		}
 
-		log.Printf("filter: new message id='%s' from=%d to=%d\n", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
 		cb(query.ID, query.FilterCriteria)
 	}
 }
@@ -101,8 +99,6 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 	if redisInstance == nil {
 		return nil
 	}
-
-	log.Printf("filter: send message id='%s' from=%d to=%d\n", id, getInt(crit.FromBlock), getInt(crit.ToBlock))
 
 	ev := NewFilterUpdated{
 		ID:             id,
@@ -185,7 +181,7 @@ func SubscribeTxPoolUpdate(shardID uint32, cb func(tx types.PoolTransaction, loc
 		txu := &TxPoolUpdate{}
 		err := rlp.DecodeBytes([]byte(message.Payload), &txu)
 		if err != nil {
-			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe txpool update error")
 			continue
 		}
 		cb(txu.Tx, txu.Local)
@@ -200,19 +196,4 @@ func PublishTxPoolUpdate(shardID uint32, tx types.PoolTransaction, local bool) e
 		return err
 	}
 	return redisInstance.Publish(context.Background(), fmt.Sprintf("txpool_update_%d", shardID), msg).Err()
-}
-
-func isBigNegative(i *big.Int) bool {
-	if i == nil {
-		return false
-	}
-	return i.Cmp(big0) == -1
-}
-
-func getInt(i *big.Int) int64 {
-	if i == nil {
-		return 0
-	}
-
-	return i.Int64()
 }
