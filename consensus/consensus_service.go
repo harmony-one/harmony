@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -236,6 +237,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
+		fmt.Println("[checkViewID] Set LEADEER PUB KEY ", msg.SenderPubkeys[0].Bytes.Hex(), utils.GetPort())
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -512,6 +514,7 @@ func (consensus *Consensus) isLeader() bool {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
+	fmt.Println("SetViewIDs", height)
 	consensus.setViewIDs(height)
 }
 
@@ -527,6 +530,19 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
 }
 
+// SetLeaderIndex set the leader index.
+func (consensus *Consensus) SetLeaderIndex(f func(int) int) (current int) {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	consensus.LeaderIndex = f(consensus.LeaderIndex)
+	return consensus.LeaderIndex
+}
+
+func (consensus *Consensus) GetLeaderIndex() int {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	return consensus.LeaderIndex
+}
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
 	consensus.current.SetCurBlockViewID(viewID)
@@ -536,6 +552,7 @@ func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
 }
+
 
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) setViewChangingID(viewID uint64) {
