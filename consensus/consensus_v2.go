@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -131,6 +132,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
+	// THIS IS NOT GOOD PLACE FOR LEADER SWITCHING
 	numCommits := consensus.Decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
@@ -393,6 +395,7 @@ func (consensus *Consensus) Start(
 				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 
 			case newBlock := <-blockChannel:
+				//consensus.ReshardingNextLeader(newBlock)
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -404,6 +407,7 @@ func (consensus *Consensus) Start(
 				}
 				// Sleep to wait for the full block time
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+
 				<-time.After(time.Until(consensus.NextBlockDue))
 				consensus.StartFinalityCount()
 
@@ -528,6 +532,7 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 // preCommitAndPropose commit the current block with 67% commit signatures and start
 // proposing new block which will wait on the full commit signatures to finish
 func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
+	//fmt.Println("preCommitAndPropose", utils.GetPort(), blk.NumberU64())
 	if blk == nil {
 		return errors.New("block to pre-commit is nil")
 	}
@@ -645,6 +650,7 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
 			return err
 		}
+		//fmt.Println("tryCatchup ", utils.GetPort(), blk.NumberU64())
 		select {
 		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
@@ -659,6 +665,8 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
+	// this function evaluates for all, leader and validators.
+
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
@@ -727,10 +735,29 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
-	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
+	curBlockViewID := consensus.SetCurBlockViewID(committedMsg.ViewID + 1) // first view id is going to be 2.
+	prev := consensus.GetLeaderPubKey()
+	idx := consensus.SetLeaderIndex(func(i int) int {
+		if curBlockViewID%3 == 0 {
+			return i + 1
+		}
+		return i
+	})
+	pps := consensus.Decider.Participants()
 	consensus.pubKeyLock.Lock()
-	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+	consensus.LeaderPubKey = &pps[idx%len(pps)]
+	fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %q\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
 	consensus.pubKeyLock.Unlock()
+	if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
+		// leader changed
+		go func() {
+			fmt.Printf("ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
+			defer fmt.Printf("Defer ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
+			consensus.ReadySignal <- SyncProposal
+
+		}()
+
+	}
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
 		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
