@@ -689,7 +689,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
-	curBlockViewID := consensus.SetCurBlockViewID(committedMsg.ViewID + 1) // first view id is going to be 2.
+	curBlockViewID := consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	prev := consensus.GetLeaderPubKey()
 	idx := consensus.SetLeaderIndex(func(i int) int {
 		if curBlockViewID%3 == 0 {
