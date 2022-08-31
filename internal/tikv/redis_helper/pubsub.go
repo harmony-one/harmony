@@ -15,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var big0 = big.NewInt(0)
+
 // BlockUpdate block update event
 type BlockUpdate struct {
 	BlkNum uint64
@@ -23,10 +25,10 @@ type BlockUpdate struct {
 
 // NewFilterUpdated new filter update event
 type NewFilterUpdated struct {
-	ID             string
-	FromBlock      int64
-	ToBlock        int64
-	FilterCriteria ethereum.FilterQuery
+	ID                string
+	NegativeFromBlock bool // rlp: cannot encode negative *big.Int
+	NegativeToBlock   bool // rlp: cannot encode negative *big.Int
+	FilterCriteria    ethereum.FilterQuery
 }
 
 // SubscribeShardUpdate subscribe block update event
@@ -64,19 +66,20 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 		Subscribe(context.Background(), fmt.Sprintf("%s_new_filter_log_%d", namespace, shardID))
 	for message := range pubsub.Channel() {
 		query := NewFilterUpdated{}
+
+		if query.NegativeFromBlock {
+			query.FilterCriteria.FromBlock.Neg(query.FilterCriteria.FromBlock)
+		}
+		if query.NegativeToBlock {
+			query.FilterCriteria.ToBlock.Neg(query.FilterCriteria.ToBlock)
+		}
+
 		err := rlp.DecodeBytes([]byte(message.Payload), &query)
 		if err != nil {
 			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log_ error")
 			continue
 		}
-		queryCrit := ethereum.FilterQuery{
-			BlockHash: query.FilterCriteria.BlockHash,
-			FromBlock: big.NewInt(query.FromBlock),
-			ToBlock:   big.NewInt(query.ToBlock),
-			Addresses: query.FilterCriteria.Addresses,
-			Topics:    query.FilterCriteria.Topics,
-		}
-		cb(query.ID, queryCrit)
+		cb(query.ID, query.FilterCriteria)
 	}
 }
 
@@ -86,16 +89,20 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 		return nil
 	}
 
-	fromBlock := crit.FromBlock.Int64()
-	toBlock := crit.ToBlock.Int64()
-	crit.ToBlock = nil
-	crit.FromBlock = nil
 	ev := NewFilterUpdated{
-		FilterCriteria: crit,
-		ID:             id,
-		FromBlock:      fromBlock, // rpl has issues processing negative big ints
-		ToBlock:        toBlock,
+		ID:                id,
+		NegativeFromBlock: isBigNegative(crit.FromBlock),
+		NegativeToBlock:   isBigNegative(crit.ToBlock),
 	}
+
+	if isBigNegative(crit.FromBlock) {
+		crit.FromBlock.Abs(crit.FromBlock)
+	}
+	if isBigNegative(crit.ToBlock) {
+		crit.ToBlock.Abs(crit.ToBlock)
+	}
+	ev.FilterCriteria = crit
+
 	msg, err := rlp.EncodeToBytes(&ev)
 	if err != nil {
 		return err
@@ -187,4 +194,11 @@ func PublishTxPoolUpdate(shardID uint32, tx types.PoolTransaction, local bool) e
 		return err
 	}
 	return redisInstance.Publish(context.Background(), fmt.Sprintf("txpool_update_%d", shardID), msg).Err()
+}
+
+func isBigNegative(i *big.Int) bool {
+	if i == nil {
+		return false
+	}
+	return i.Cmp(big0) == -1
 }
