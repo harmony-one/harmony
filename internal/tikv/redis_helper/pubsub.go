@@ -5,18 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
 	stakingTypes "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
-
-var big0 = big.NewInt(0)
 
 // BlockUpdate block update event
 type BlockUpdate struct {
