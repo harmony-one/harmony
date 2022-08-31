@@ -73,6 +73,8 @@ type Consensus struct {
 	priKey multibls.PrivateKeys
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKeyWrapper
+	// index of leader in the list of validators.
+	LeaderIndex int
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
@@ -220,7 +222,9 @@ func New(
 	registry *registry.Registry,
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
-	consensus := Consensus{}
+	consensus := Consensus{
+		ShardID: shard,
+	}
 	consensus.Decider = Decider
 	consensus.registry = registry
 	consensus.MinPeers = minPeers

@@ -3,11 +3,10 @@ package consensus
 import (
 	"time"
 
+	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/common"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
-
-	"github.com/harmony-one/harmony/consensus/signature"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
@@ -200,9 +199,17 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
+	// TODO HERE
+	//if recvMsg.ViewID == 10 {
+	//	return
+	//}
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 	//// Read - Start
+	if consensus.ShardID == 0 {
+		//fmt.Println("onCommit ", recvMsg.BlockNum)
+	}
+
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
@@ -334,4 +341,5 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
+	//fmt.Println("onCommit99:  ", utils.GetPort(), recvMsg.BlockNum)
 }

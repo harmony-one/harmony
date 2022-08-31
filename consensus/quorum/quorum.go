@@ -231,12 +231,17 @@ func (s *cIdentities) NthNextHmy(instance shardingconfig.Instance, pubKey *bls.P
 			Msg("[NthNextHmy] pubKey not found")
 	}
 	numNodes := instance.NumHarmonyOperatedNodesPerShard()
+	//fmt.Println("??idx:", idx, numNodes)
 	// sanity check to avoid out of bound access
 	if numNodes <= 0 || numNodes > len(s.publicKeys) {
 		numNodes = len(s.publicKeys)
 	}
 	idx = (idx + next) % numNodes
-	return found, &s.publicKeys[idx]
+	//fmt.Println("-------idx:", idx)
+
+	new := &s.publicKeys[idx]
+	fmt.Println("NthNextHmy: ", pubKey.Bytes.Hex(), new.Bytes.Hex())
+	return found, new
 }
 
 // NthNextHmyExt return the Nth next pubkey of Harmony + allowlist nodes, next can be negative number

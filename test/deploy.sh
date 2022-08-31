@@ -69,7 +69,7 @@ function launch_localnet() {
   if ${VERBOSE}; then
     verbosity=5
   else
-    verbosity=3
+    verbosity=5
   fi
 
   base_args=(--log_folder "${log_folder}" --min_peers "${MIN}" --bootnodes "${BN_MA}" "--network_type=$NETWORK" --blspass file:"${ROOT}/.hmy/blspass.txt" "--dns=false" "--verbosity=${verbosity}" "--p2p.security.max-conn-per-ip=100")
@@ -80,8 +80,11 @@ function launch_localnet() {
   while IFS='' read -r line || [[ -n "$line" ]]; do
     i=$((i + 1))
 
+
+
     # Read config for i-th node form config file
     IFS=' ' read -r ip port mode bls_key shard node_config <<<"${line}"
+    echo "LINE: ${line} ${shard}"
     args=("${base_args[@]}" --ip "${ip}" --port "${port}" --key "/tmp/${ip}-${port}.key" --db_dir "${ROOT}/db-${ip}-${port}" "--broadcast_invalid_tx=false")
     if [[ -z "$ip" || -z "$port" ]]; then
       echo "skip empty node"
