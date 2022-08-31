@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum"
 
@@ -23,6 +24,8 @@ type BlockUpdate struct {
 // NewFilterUpdated new filter update event
 type NewFilterUpdated struct {
 	ID             string
+	FromBlock      int64
+	ToBlock        int64
 	FilterCriteria ethereum.FilterQuery
 }
 
@@ -66,7 +69,14 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log_ error")
 			continue
 		}
-		cb(query.ID, query.FilterCriteria)
+		queryCrit := ethereum.FilterQuery{
+			BlockHash: query.FilterCriteria.BlockHash,
+			FromBlock: big.NewInt(query.FromBlock),
+			ToBlock:   big.NewInt(query.ToBlock),
+			Addresses: query.FilterCriteria.Addresses,
+			Topics:    query.FilterCriteria.Topics,
+		}
+		cb(query.ID, queryCrit)
 	}
 }
 
@@ -76,9 +86,15 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 		return nil
 	}
 
+	fromBlock := crit.FromBlock.Int64()
+	toBlock := crit.ToBlock.Int64()
+	crit.ToBlock = nil
+	crit.FromBlock = nil
 	ev := NewFilterUpdated{
 		FilterCriteria: crit,
 		ID:             id,
+		FromBlock:      fromBlock, // rpl has issues processing negative big ints
+		ToBlock:        toBlock,
 	}
 	msg, err := rlp.EncodeToBytes(&ev)
 	if err != nil {
