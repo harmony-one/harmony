@@ -74,7 +74,7 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 			query.FilterCriteria.ToBlock.Neg(query.FilterCriteria.ToBlock)
 		}
 
-		fmt.Printf("filter: new message id='%s' from=%d to=%d", query.ID, query.FilterCriteria.FromBlock.Int64(), query.FilterCriteria.ToBlock.Int64())
+		fmt.Printf("filter: new message id='%s' from=%d to=%d", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
 		err := rlp.DecodeBytes([]byte(message.Payload), &query)
 		if err != nil {
 			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
@@ -90,7 +90,7 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 		return nil
 	}
 
-	fmt.Printf("filter: send message id='%s' from=%d to=%d", id, crit.FromBlock.Int64(), crit.ToBlock.Int64())
+	fmt.Printf("filter: send message id='%s' from=%d to=%d", id, getInt(crit.FromBlock), getInt(crit.ToBlock))
 
 	ev := NewFilterUpdated{
 		ID:                id,
@@ -204,4 +204,12 @@ func isBigNegative(i *big.Int) bool {
 		return false
 	}
 	return i.Cmp(big0) == -1
+}
+
+func getInt(i *big.Int) int64 {
+	if i == nil {
+		return 0
+	}
+
+	return i.Int64()
 }
