@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -232,6 +233,7 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
+		fmt.Println("[checkViewID] Set LEADEER PUB KEY ", msg.SenderPubkeys[0].Bytes.Hex(), utils.GetPort())
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -430,6 +432,7 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
 			consensus.pubKeyLock.Lock()
+			fmt.Println("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain", leaderPubKey.Bytes.Hex(), utils.GetPort())
 			consensus.LeaderPubKey = leaderPubKey
 		}
 	}
@@ -502,6 +505,7 @@ func (consensus *Consensus) isLeader() bool {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) SetViewIDs(height uint64) {
+	fmt.Println("SetViewIDs", height)
 	consensus.SetCurBlockViewID(height)
 	consensus.SetViewChangingID(height)
 }
@@ -509,6 +513,20 @@ func (consensus *Consensus) SetViewIDs(height uint64) {
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
+}
+
+// SetLeaderIndex set the leader index.
+func (consensus *Consensus) SetLeaderIndex(f func(int) int) (current int) {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	consensus.LeaderIndex = f(consensus.LeaderIndex)
+	return consensus.LeaderIndex
+}
+
+func (consensus *Consensus) GetLeaderIndex() int {
+	consensus.pubKeyLock.Lock()
+	defer consensus.pubKeyLock.Unlock()
+	return consensus.LeaderIndex
 }
 
 // SetViewChangingID set the current view change ID
@@ -525,6 +543,15 @@ func (consensus *Consensus) setViewChangingID(viewID uint64) {
 func (consensus *Consensus) StartFinalityCount() {
 	consensus.finalityCounter.Store(time.Now().UnixNano())
 }
+
+//func (consensus *Consensus) ReshardingNextLeader(newblock *types.Block) {
+//	consensus.pubKeyLock.Lock()
+//	fmt.Println("nextBlock1 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
+//	consensus.LeaderPubKey = consensus.getNextLeaderKey(consensus.GetCurBlockViewID() + 1)
+//	fmt.Println("nextBlock2 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
+//	consensus.pubKeyLock.Unlock()
+//
+//}
 
 // FinishFinalityCount calculate the current finality
 func (consensus *Consensus) FinishFinalityCount() {

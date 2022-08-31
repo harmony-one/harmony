@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
+	"github.com/harmony-one/harmony/multibls"
 	commonRPC "github.com/harmony-one/harmony/rpc/common"
 	"github.com/harmony-one/harmony/shard"
 	staking "github.com/harmony-one/harmony/staking/types"
@@ -96,6 +97,7 @@ type NodeAPI interface {
 	GetStakingTransactionsCount(address, txType string) (uint64, error)
 	GetTraceResultByHash(hash common.Hash) (json.RawMessage, error)
 	IsCurrentlyLeader() bool
+	GetPublicKeys() multibls.PublicKeys
 	IsOutOfSync(shardID uint32) bool
 	SyncStatus(shardID uint32) (bool, uint64, uint64)
 	SyncPeers() map[string]int
