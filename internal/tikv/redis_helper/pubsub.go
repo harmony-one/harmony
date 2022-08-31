@@ -41,12 +41,26 @@ func SubscribeShardUpdate(shardID uint32, cb func(blkNum uint64, logs []*types.L
 			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
 			continue
 		}
+		for _, l := range block.Logs {
+			if l != nil {
+				log.Printf("subs hash='%s', num='%d'\n", l.TxHash, l.BlockNumber)
+			} else {
+				log.Println("subs log nil")
+			}
+		}
 		cb(block.BlkNum, block.Logs)
 	}
 }
 
 // PublishShardUpdate publish block update event
 func PublishShardUpdate(shardID uint32, blkNum uint64, logs []*types.Log) error {
+	for _, l := range logs {
+		if l != nil {
+			log.Printf("publish hash='%s', num='%d'\n", l.TxHash, l.BlockNumber)
+		} else {
+			log.Println("publish log nil")
+		}
+	}
 	msg, err := rlp.EncodeToBytes(&BlockUpdate{
 		BlkNum: blkNum,
 		Logs:   logs,

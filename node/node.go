@@ -1090,7 +1090,7 @@ func New(
 			if node.Blockchain().IsTikvWriterMaster() {
 				err := redis_helper.PublishTxPoolUpdate(uint32(harmonyconfig.General.ShardID), tx, local)
 				if err != nil {
-					utils.Logger().Info().Err(err).Msg("redis publish txpool update error")
+					utils.Logger().Warn().Err(err).Msg("redis publish txpool update error")
 				}
 			}
 		}
