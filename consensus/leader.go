@@ -190,7 +190,17 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
+	// TODO HERE
+	//if recvMsg.ViewID == 10 {
+	//	return
+	//}
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	//// Read - Start
+	if consensus.ShardID == 0 {
+		//fmt.Println("onCommit ", recvMsg.BlockNum)
+	}
+
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
@@ -322,4 +332,5 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
+	//fmt.Println("onCommit99:  ", utils.GetPort(), recvMsg.BlockNum)
 }
