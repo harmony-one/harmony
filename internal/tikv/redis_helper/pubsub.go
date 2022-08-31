@@ -68,6 +68,11 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 	for message := range pubsub.Channel() {
 		query := NewFilterUpdated{}
 
+		if err := rlp.DecodeBytes([]byte(message.Payload), &query); err != nil {
+			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
+			continue
+		}
+
 		if query.NegativeFromBlock {
 			query.FilterCriteria.FromBlock.Neg(query.FilterCriteria.FromBlock)
 		}
@@ -76,11 +81,6 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 		}
 
 		log.Printf("filter: new message id='%s' from=%d to=%d\n", query.ID, getInt(query.FilterCriteria.FromBlock), getInt(query.FilterCriteria.ToBlock))
-		err := rlp.DecodeBytes([]byte(message.Payload), &query)
-		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
-			continue
-		}
 		cb(query.ID, query.FilterCriteria)
 	}
 }
