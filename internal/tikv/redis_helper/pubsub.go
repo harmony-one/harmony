@@ -22,7 +22,7 @@ var big0 = big.NewInt(0)
 // BlockUpdate block update event
 type BlockUpdate struct {
 	BlkNum uint64
-	Logs   []*types.Log
+	Logs   []*types.LogForStorage
 }
 
 // NewFilterUpdated new filter update event
@@ -41,29 +41,34 @@ func SubscribeShardUpdate(shardID uint32, cb func(blkNum uint64, logs []*types.L
 			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
 			continue
 		}
-		for _, l := range block.Logs {
+		logs := make([]*types.Log, len(block.Logs))
+		for i, l := range block.Logs {
 			if l != nil {
-				log.Printf("subs hash='%s', num='%d'\n", l.TxHash, l.BlockNumber)
+				ls := types.Log(*l)
+				logs[i] = &ls
 			} else {
-				log.Println("subs log nil")
+				logs[i] = nil
 			}
 		}
-		cb(block.BlkNum, block.Logs)
+
+		cb(block.BlkNum, logs)
 	}
 }
 
 // PublishShardUpdate publish block update event
 func PublishShardUpdate(shardID uint32, blkNum uint64, logs []*types.Log) error {
-	for _, l := range logs {
+	logsForStorage := make([]*types.LogForStorage, len(logs))
+	for i, l := range logs {
 		if l != nil {
-			log.Printf("publish hash='%s', num='%d'\n", l.TxHash, l.BlockNumber)
+			ls := types.LogForStorage(*l)
+			logsForStorage[i] = &ls
 		} else {
-			log.Println("publish log nil")
+			logsForStorage[i] = nil
 		}
 	}
 	msg, err := rlp.EncodeToBytes(&BlockUpdate{
 		BlkNum: blkNum,
-		Logs:   logs,
+		Logs:   logsForStorage,
 	})
 	if err != nil {
 		return err
