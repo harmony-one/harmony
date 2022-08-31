@@ -2,6 +2,7 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -88,6 +89,8 @@ func (node *Node) WaitForConsensusReadyV2(readySignal chan consensus.ProposalTyp
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 
 					if err == nil {
+						fmt.Printf("ProposeNewBlock: #%d :%d @%d with leader %s\n", newBlock.NumberU64(), utils.GetPort(), newBlock.Header().ViewID().Int64(), node.Consensus.GetLeaderPubKey().Bytes.Hex())
+
 						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
 							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
 								Msg("Block with the same number was already proposed, abort.")
@@ -145,6 +148,7 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := leaderKey.Object.GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
+		fmt.Println("coinbase.SetBytes leader: ", leaderKey.Bytes.Hex(), coinbase.Hex())
 	}
 
 	emptyAddr := common.Address{}
