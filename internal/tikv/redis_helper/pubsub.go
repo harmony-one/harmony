@@ -74,9 +74,10 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 			query.FilterCriteria.ToBlock.Neg(query.FilterCriteria.ToBlock)
 		}
 
+		fmt.Printf("filter: new message id='%s' from=%d to=%d", query.ID, query.FilterCriteria.FromBlock.Int64(), query.FilterCriteria.ToBlock.Int64())
 		err := rlp.DecodeBytes([]byte(message.Payload), &query)
 		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log_ error")
+			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
 			continue
 		}
 		cb(query.ID, query.FilterCriteria)
@@ -88,6 +89,8 @@ func PublishNewFilterLogEvent(shardID uint32, namespace, id string, crit ethereu
 	if redisInstance == nil {
 		return nil
 	}
+
+	fmt.Printf("filter: send message id='%s' from=%d to=%d", id, crit.FromBlock.Int64(), crit.ToBlock.Int64())
 
 	ev := NewFilterUpdated{
 		ID:                id,

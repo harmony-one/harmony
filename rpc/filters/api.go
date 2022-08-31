@@ -399,6 +399,8 @@ func (api *PublicFilterAPI) createFilter(crit ethereum.FilterQuery, customId rpc
 		}
 	}()
 
+	fmt.Printf("filter: logs created id='%s'", logsSub.ID)
+
 	return logsSub.ID, nil
 }
 
