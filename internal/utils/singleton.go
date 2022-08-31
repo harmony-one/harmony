@@ -8,6 +8,7 @@ import (
 	"path"
 	"runtime/debug"
 	"strconv"
+	"strconv"
 	"sync"
 	"time"
 
@@ -213,36 +214,4 @@ func GetPort() int {
 		}
 	}
 	return 0
-}
-
-func AssertNoLongerThan0[E any](t time.Duration, f func() E) E {
-	ch := make(chan E)
-	defer close(ch)
-	stack := debug.Stack()
-	go func() {
-		select {
-		case <-time.After(t):
-			panic("AssertNoLongerThan0: " + string(stack))
-		case <-ch:
-			return
-		}
-	}()
-
-	return f()
-}
-
-func AssertNoLongerThan(t time.Duration, f func()) {
-	ch := make(chan struct{})
-	defer close(ch)
-	stack := debug.Stack()
-	go func() {
-		select {
-		case <-time.After(t):
-			panic("AssertNoLongerThan0: " + string(stack))
-		case <-ch:
-			return
-		}
-	}()
-
-	f()
 }
