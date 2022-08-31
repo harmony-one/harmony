@@ -39,7 +39,7 @@ func SubscribeShardUpdate(shardID uint32, cb func(blkNum uint64, logs []*types.L
 		block := &BlockUpdate{}
 		err := rlp.DecodeBytes([]byte(message.Payload), block)
 		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe shard update error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
 			continue
 		}
 		cb(block.BlkNum, block.Logs)
@@ -69,7 +69,7 @@ func SubscribeNewFilterLogEvent(shardID uint32, namespace string, cb func(id str
 		query := NewFilterUpdated{}
 
 		if err := rlp.DecodeBytes([]byte(message.Payload), &query); err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe new_filter_log error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe new_filter_log error")
 			continue
 		}
 
@@ -183,7 +183,7 @@ func SubscribeTxPoolUpdate(shardID uint32, cb func(tx types.PoolTransaction, loc
 		txu := &TxPoolUpdate{}
 		err := rlp.DecodeBytes([]byte(message.Payload), &txu)
 		if err != nil {
-			utils.Logger().Info().Err(err).Msg("redis subscribe shard update error")
+			utils.Logger().Warn().Err(err).Msg("redis subscribe shard update error")
 			continue
 		}
 		cb(txu.Tx, txu.Local)
