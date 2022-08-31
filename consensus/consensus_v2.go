@@ -429,10 +429,11 @@ func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
 		consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
 			Msg("[ConsensusMainLoop] received old block, abort")
 		return
-	}
-	// Sleep to wait for the full block time
-	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
-	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
+				}
+				// Sleep to wait for the full block time
+				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+
+				time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
 		consensus.StartFinalityCount()
 		consensus.mutex.Lock()
 		defer consensus.mutex.Unlock()
@@ -650,6 +651,7 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
 			return err
 		}
+		//fmt.Println("tryCatchup ", utils.GetPort(), blk.NumberU64())
 		select {
 		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
