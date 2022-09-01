@@ -167,7 +167,8 @@ func TestLimitPeersWithBound(t *testing.T) {
 	for _, test := range tests {
 		ps := makePeersForTest(test.size)
 
-		res := limitNumPeers(ps, 1)
+		sz, res := limitNumPeers(ps, 1)
+		res = res[:sz]
 
 		if len(res) != test.expSize {
 			t.Errorf("result size unexpected: %v / %v", len(res), test.expSize)
@@ -183,8 +184,10 @@ func TestLimitPeersWithBound_random(t *testing.T) {
 	ps2 := makePeersForTest(100)
 	s1, s2 := int64(1), int64(2)
 
-	res1 := limitNumPeers(ps1, s1)
-	res2 := limitNumPeers(ps2, s2)
+	sz1, res1 := limitNumPeers(ps1, s1)
+	res1 = res1[:sz1]
+	sz2, res2 := limitNumPeers(ps2, s2)
+	res2 = res1[:sz2]
 	if reflect.DeepEqual(res1, res2) {
 		t.Fatal("not randomized limit peer")
 	}
