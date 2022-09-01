@@ -89,7 +89,3 @@ func (status *syncStatus) update(result SyncCheckResult) {
 	status.lastUpdateTime = time.Now()
 	status.lastResult = result
 }
-
-func (status *syncStatus) CurrentCycle() SyncCycle {
-	return status.currentCycle
-}

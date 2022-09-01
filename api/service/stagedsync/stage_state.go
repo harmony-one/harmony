@@ -84,7 +84,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 		if err != nil {
 			utils.Logger().Warn().
 				Err(err).
-				Str("block number", string(i)).
+				Uint64("block number", i).
 				Msg("block RLP decode failed")
 			// TODO: handle bad block
 			s.state.RevertTo(i-1, common.Hash{})

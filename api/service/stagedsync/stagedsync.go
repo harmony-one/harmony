@@ -555,7 +555,7 @@ func (s *StagedSync) pruneStage(firstCycle bool, stage *Stage, db kv.RwDB, tx kv
 			Msgf("[STAGED_SYNC] [%s] CleanUp done in %d", logPrefix, took)
 
 		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] [%s] CleanUp done in ", logPrefix, took)
+			Msgf("[STAGED_SYNC] [%s] CleanUp done in %d", logPrefix, took)
 	}
 	s.timings = append(s.timings, Timing{isCleanUp: true, stage: stage.ID, took: took})
 	return nil
