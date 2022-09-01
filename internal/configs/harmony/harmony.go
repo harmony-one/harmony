@@ -46,14 +46,15 @@ type NetworkConfig struct {
 }
 
 type P2pConfig struct {
-	Port                 int
-	IP                   string
-	KeyFile              string
-	DHTDataStore         *string `toml:",omitempty"`
-	DiscConcurrency      int     // Discovery Concurrency value
-	MaxConnsPerIP        int
-	DisablePrivateIPScan bool
-	MaxPeers             int64
+	Port                     int
+	IP                       string
+	KeyFile                  string
+	DHTDataStore             *string `toml:",omitempty"`
+	DiscConcurrency          int     // Discovery Concurrency value
+	MaxConnsPerIP            int
+	DisablePrivateIPScan     bool
+	MaxPeers                 int64
+	WaitForEachPeerToConnect bool
 }
 
 type GeneralConfig struct {

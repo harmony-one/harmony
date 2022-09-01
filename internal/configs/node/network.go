@@ -63,6 +63,8 @@ const (
 	DefaultMaxConnPerIP = 10
 	// DefaultMaxPeers is the maximum number of remote peers, with 0 representing no limit
 	DefaultMaxPeers = 0
+	// DefaultWaitForEachPeerToConnect sets the sync configs to connect to neighbor peers one by one and waits for each peer to connect
+	DefaultWaitForEachPeerToConnect = false
 )
 
 const (

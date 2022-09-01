@@ -5,7 +5,7 @@ import (
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 )
 
-const tomlConfigVersion = "2.5.9"
+const tomlConfigVersion = "2.5.10"
 
 const (
 	defNetworkType = nodeconfig.Mainnet
@@ -25,13 +25,14 @@ var defaultConfig = harmonyconfig.HarmonyConfig{
 	},
 	Network: getDefaultNetworkConfig(defNetworkType),
 	P2P: harmonyconfig.P2pConfig{
-		Port:                 nodeconfig.DefaultP2PPort,
-		IP:                   nodeconfig.DefaultPublicListenIP,
-		KeyFile:              "./.hmykey",
-		DiscConcurrency:      nodeconfig.DefaultP2PConcurrency,
-		MaxConnsPerIP:        nodeconfig.DefaultMaxConnPerIP,
-		DisablePrivateIPScan: false,
-		MaxPeers:             nodeconfig.DefaultMaxPeers,
+		Port:                     nodeconfig.DefaultP2PPort,
+		IP:                       nodeconfig.DefaultPublicListenIP,
+		KeyFile:                  "./.hmykey",
+		DiscConcurrency:          nodeconfig.DefaultP2PConcurrency,
+		MaxConnsPerIP:            nodeconfig.DefaultMaxConnPerIP,
+		DisablePrivateIPScan:     false,
+		MaxPeers:                 nodeconfig.DefaultMaxPeers,
+		WaitForEachPeerToConnect: nodeconfig.DefaultWaitForEachPeerToConnect,
 	},
 	HTTP: harmonyconfig.HttpConfig{
 		Enabled:        true,
