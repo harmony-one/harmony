@@ -229,12 +229,12 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		utils.Logger().Debug().
-			Int("length of newTxs", len(newTxs)).
-			Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
-		return nil
-	}
+	// if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+	// 	utils.Logger().Debug().
+	// 		Int("length of newTxs", len(newTxs)).
+	// 		Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
+	// 	return nil
+	// }
 
 	// in tikv mode, reader only accept the pending transaction from writer node, ignore the p2p message
 	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
