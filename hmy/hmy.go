@@ -159,7 +159,7 @@ func New(
 	// Setup gas price oracle
 	gpoParams := GasPriceConfig{
 		Blocks:     20,                // take all eligible txs past 20 blocks and sort them
-		Percentile: 95,                // get the 95th percentile when sorted in an ascending manner
+		Percentile: 80,                // get the 80th percentile when sorted in an ascending manner
 		Default:    big.NewInt(100e9), // minimum of 100 gwei
 	}
 	gpo := NewOracle(backend, gpoParams)
