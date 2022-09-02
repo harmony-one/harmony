@@ -187,7 +187,7 @@ func TestLimitPeersWithBound_random(t *testing.T) {
 	sz1, res1 := limitNumPeers(ps1, s1)
 	res1 = res1[:sz1]
 	sz2, res2 := limitNumPeers(ps2, s2)
-	res2 = res1[:sz2]
+	res2 = res2[:sz2]
 	if reflect.DeepEqual(res1, res2) {
 		t.Fatal("not randomized limit peer")
 	}
