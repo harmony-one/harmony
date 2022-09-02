@@ -5,7 +5,6 @@ import (
 
 	"github.com/harmony-one/harmony/crypto/bls"
 	"github.com/harmony-one/harmony/internal/genesis"
-	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/numeric"
 	"github.com/pkg/errors"
 )
@@ -36,7 +35,6 @@ type instance struct {
 	blocksPerEpoch                  uint64
 	slotsLimit                      int // HIP-16: The absolute number of maximum effective slots per shard limit for each validator. 0 means no limit.
 	allowlist                       Allowlist
-	reimbursement                   *params.Reimbursement
 }
 
 // NewInstance creates and validates a new sharding configuration based
@@ -47,7 +45,6 @@ func NewInstance(
 	fnAccounts []genesis.DeployAccount,
 	allowlist Allowlist,
 	reshardingEpoch []*big.Int, blocksE uint64,
-	reimbursement *params.Reimbursement,
 ) (Instance, error) {
 	if numShards < 1 {
 		return nil, errors.Errorf(
@@ -94,7 +91,6 @@ func NewInstance(
 		reshardingEpoch:                 reshardingEpoch,
 		blocksPerEpoch:                  blocksE,
 		slotsLimit:                      slotsLimit,
-		reimbursement:                   reimbursement,
 	}, nil
 }
 
@@ -109,13 +105,11 @@ func MustNewInstance(
 	fnAccounts []genesis.DeployAccount,
 	allowlist Allowlist,
 	reshardingEpoch []*big.Int, blocksPerEpoch uint64,
-	reimbursement *params.Reimbursement,
 ) Instance {
 	slotsLimit := int(float32(numNodesPerShard-numHarmonyOperatedNodesPerShard) * slotsLimitPercent)
 	sc, err := NewInstance(
 		numShards, numNodesPerShard, numHarmonyOperatedNodesPerShard, slotsLimit, harmonyVotePercent,
 		hmyAccounts, fnAccounts, allowlist, reshardingEpoch, blocksPerEpoch,
-		reimbursement,
 	)
 	if err != nil {
 		panic(err)
@@ -205,9 +199,4 @@ func (sc instance) ExternalAllowlist() []bls.PublicKeyWrapper {
 // ExternalAllowlistLimit returns the maximum number of external leader keys on each shard
 func (sc instance) ExternalAllowlistLimit() int {
 	return sc.allowlist.MaxLimitPerShard
-}
-
-// Reimbursement returns config of Reimbursement
-func (sc instance) Reimbursement() *params.Reimbursement {
-	return sc.reimbursement
 }

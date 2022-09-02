@@ -10,7 +10,6 @@ import (
 	"github.com/harmony-one/harmony/numeric"
 
 	"github.com/harmony-one/harmony/internal/genesis"
-	"github.com/harmony-one/harmony/internal/params"
 )
 
 // Schedule returns the sharding configuration instance for the given
@@ -82,9 +81,6 @@ type Instance interface {
 
 	// ExternalAllowlistLimit returns the maximum number of external leader keys on each shard(HIP18)
 	ExternalAllowlistLimit() int
-
-	// Reimbursement returns config of Reimbursement
-	Reimbursement() *params.Reimbursement
 }
 
 // genShardingStructure return sharding structure, given shard number and its patterns.

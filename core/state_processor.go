@@ -404,34 +404,36 @@ func ApplyIncomingReceipt(
 	return nil
 }
 
+// Issue additional 2.391 billion ONE tokens over 3 years to do the reimbursement.
+// params of reimbursement
+const (
+	blockPeriod       int64 = 2
+	secondsThreeYears int64 = (3600 * 24 * 365) * 3
+	blocksThreeYears  int64 = secondsThreeYears / blockPeriod
+)
+
+var ( // 2 second
+	oneUint             = big.NewInt(1e18)                               // decimals of ONE is 18.
+	reimbursementAmount = new(big.Int).Mul(big.NewInt(2.391e9), oneUint) // 2.391 billion ONE
+	mintPerBlock        = new(big.Int).Div(reimbursementAmount, big.NewInt(blocksThreeYears))
+	remainder           = new(big.Int).Sub(reimbursementAmount, new(big.Int).Mul(mintPerBlock, big.NewInt(blocksThreeYears)))
+	receiver            = common.Address{}
+)
+
 func applyReimbursement(config *params.ChainConfig, bc BlockChain, db *state.DB, header *block.Header) {
 	if config.IsReimbursementEpoch(header.Epoch()) {
 		parentHeader := bc.GetHeader(header.ParentHash(), header.Number().Uint64()-1)
-		reimbursement := shard.Schedule.InstanceForEpoch(header.Epoch()).Reimbursement()
 		startNumber := shard.Schedule.EpochLastBlock(config.ReimbursementEpoch.Uint64()-1) + 1
-		startHeader := bc.GetHeaderByNumber(startNumber) // first block to reimburse, use it as the starting time
-		// endTime = startTime + duration
-		endTime := startHeader.Time().Uint64() + reimbursement.Duration.Uint64()
-		parentTime := parentHeader.Time().Uint64()
-		if parentTime >= endTime { // reimburse over
+		endNumber := startNumber + uint64(blocksThreeYears)
+		if header.Number().Uint64() >= endNumber { // Reimbursement completed
 			return
 		}
-		currentTime := header.Time().Uint64()
-		deltaTime := currentTime - parentTime
-		if currentTime > endTime { // parentTime < endTime < currentTime
-			deltaTime = endTime - parentTime
-		}
-		// rate = TotalAmount / Duration
-		rate := new(big.Int).Div(reimbursement.TotalAmount, reimbursement.Duration)
-		// mintOne = deltaTime * rate
-		mintOne := new(big.Int).Mul(rate, big.NewInt(int64(deltaTime)))
+		mintAmount := mintPerBlock
 		if !config.IsReimbursementEpoch(parentHeader.Epoch()) { // first mint, add remainder
-			// remainder = TotalAmount - (reimbursement * onePerSecond)
-			remainder := new(big.Int).Sub(reimbursement.TotalAmount, new(big.Int).Mul(rate, reimbursement.Duration))
-			// mintOne += remainder
-			mintOne = mintOne.Add(mintOne, remainder)
+			// mintOne = mintPerBlock + remainder
+			mintAmount = mintAmount.Add(mintAmount, remainder)
 		}
-		db.AddBalance(reimbursement.Receiver, mintOne)
+		db.AddBalance(receiver, mintAmount)
 	}
 }
 
