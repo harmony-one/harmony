@@ -317,6 +317,7 @@ var (
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1),                      // LeaderRotationEpoch
 		64,                                 // LeaderRotationBlocksCount
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
@@ -711,6 +712,14 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationEpoch, epoch)
+}
+
+func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
+	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.

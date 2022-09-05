@@ -766,6 +766,17 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	consensus.resetState()
 }
 
+func (consensus *Consensus) getEpochFirstBlockViewID(epoch *big.Int) (uint64, error) {
+	if epoch.Uint64() == 0 {
+		return 0, nil
+	}
+	epochBlock := consensus.Blockchain.GetBlockByNumber(epoch.Uint64() - 1)
+	if epochBlock == nil {
+		return 0, errors.Errorf("block not found for number %d", epoch.Uint64()-1)
+	}
+	return epochBlock.Header().ViewID().Uint64() + 1, nil
+}
+
 func (consensus *Consensus) postCatchup(initBN uint64) {
 	if initBN < consensus.getBlockNum() {
 		consensus.getLogger().Info().
