@@ -237,7 +237,7 @@ func createTimeout() map[TimeoutType]*utils.Timeout {
 
 // startViewChange start the view change process
 func (consensus *Consensus) startViewChange() {
-	fmt.Printf("Message to send leader111: %d %s \n", utils.GetPort(), consensus.LeaderPubKey.Bytes.Hex())
+	fmt.Printf("[startViewChange]: %d %s \n", utils.GetPort(), consensus.LeaderPubKey.Bytes.Hex())
 	if consensus.disableViewChange || consensus.IsBackup() {
 		return
 	}
