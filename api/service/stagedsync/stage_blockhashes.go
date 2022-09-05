@@ -87,6 +87,10 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 
 func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
+	if len(s.state.syncConfig.peers) < NumPeersLowBound {
+		return ErrNotEnoughConnectedPeers
+	}
+
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxPeersHeight {
@@ -456,6 +460,25 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 	return p, h, nil
 }
 
+// clearCache removes block hashes from cache db
+func (bh *StageBlockHashes) clearCache() error {
+	tx, err := bh.configs.cachedb.BeginRw(context.Background())
+	if err != nil {
+		return nil
+	}
+	defer tx.Rollback()
+
+	if err := tx.ClearBucket(BlockHashesBucket); err != nil {
+		return nil
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // getHashFromCache fetches block hashes from cache db
 func (bh *StageBlockHashes) getHashFromCache(height uint64) (h []byte, err error) {
 
@@ -571,8 +594,43 @@ func (bh *StageBlockHashes) Revert(firstCycle bool, u *RevertState, s *StageStat
 		defer tx.Rollback()
 	}
 
+	// terminate background process in turbo mode
+	if bh.configs.bgProcRunning {
+		bh.configs.bgProcRunning = false
+		bh.configs.turboModeCh <- struct{}{}
+		close(bh.configs.turboModeCh)
+	}
+
+	// clean block hashes db
+	hashesBucketName := GetBucketName(BlockHashesBucket, bh.configs.isBeacon)
+	if err = tx.ClearBucket(hashesBucketName); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] clear block hashes bucket after revert failed: %v", err)
+		return err
+	}
+
+	// clean cache db as well
+	if err := bh.clearCache(); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] clear block hashes cache failed: %v", err)
+		return err
+	}
+
+	// clear extra block hashes
+	s.state.syncStatus.currentCycle.ExtraHashes = make(map[uint64][]byte)
+
+	// save progress
+	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
+	if err = s.Update(tx, currentHead); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] saving progress for block hashes stage after revert failed: %v", err)
+		return err
+	}
+
 	if err = u.Done(tx); err != nil {
-		return fmt.Errorf(" reset: %w", err)
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] reset after revert failed: %w", err)
+		return err
 	}
 
 	if useInternalTx {

@@ -34,8 +34,13 @@ func NewStageHeadersCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Sta
 
 func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) error {
 
-	if len(s.state.syncConfig.peers) == 0 {
-		return ErrNoConnectedPeers
+	if len(s.state.syncConfig.peers) < NumPeersLowBound {
+		return ErrNotEnoughConnectedPeers
+	}
+
+	// no need to update target if we are redoing the stages because of bad block
+	if invalidBlockRevert {
+		return nil
 	}
 
 	useInternalTx := tx == nil

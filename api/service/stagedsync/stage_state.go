@@ -37,6 +37,16 @@ func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) Stag
 	}
 }
 
+func getBlockHashByHeight(h uint64, isBeacon bool, tx kv.RwTx) common.Hash {
+	var invalidBlockHash common.Hash
+	hashesBucketName := GetBucketName(BlockHashesBucket, isBeacon)
+	blockHeight := marshalData(h)
+	if invalidBlockHashBytes, err := tx.GetOne(hashesBucketName, blockHeight); err == nil {
+		invalidBlockHash.SetBytes(invalidBlockHashBytes)
+	}
+	return invalidBlockHash
+}
+
 // Exec progresses States stage in the forward direction
 func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
@@ -59,7 +69,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 		}
 		defer tx.Rollback()
 	}
-	bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
+	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 	verifyAllSig := false //TODO: move to configs
 	startTime := time.Now()
 	startBlock := currProgress
@@ -70,13 +80,20 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		key := marshalData(i)
-		blockBytes, err := tx.GetOne(bucketName, key)
+		blockBytes, err := tx.GetOne(blocksBucketName, key)
 		if err != nil {
 			return err
 		}
 
+		// if block size is invalid, we have to break the updating state loop
+		// we don't need to do rollback, because the latest batch haven't added to chain yet
 		sz := len(blockBytes)
 		if sz <= 1 {
+			utils.Logger().Warn().
+				Uint64("block number", i).
+				Msg("block size invalid")
+			invalidBlockHash := getBlockHashByHeight(i, s.state.isBeacon, tx)
+			s.state.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), invalidBlockHash)
 			return ErrInvalidBlockBytes
 		}
 
@@ -86,8 +103,8 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 				Err(err).
 				Uint64("block number", i).
 				Msg("block RLP decode failed")
-			// TODO: handle bad block
-			s.state.RevertTo(i-1, common.Hash{})
+			invalidBlockHash := getBlockHashByHeight(i, s.state.isBeacon, tx)
+			s.state.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), invalidBlockHash)
 			return err
 		}
 
@@ -103,6 +120,8 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 				}
 		*/
 		if block.NumberU64() != i {
+			invalidBlockHash := getBlockHashByHeight(i, s.state.isBeacon, tx)
+			s.state.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), invalidBlockHash)
 			return ErrInvalidBlockNumber
 		}
 		if block.NumberU64() <= currProgress {
@@ -117,8 +136,8 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 			verifyCurrentSig := verifyAllSig && haveCurrentSig
 			bc := stg.configs.bc
 			if err = stg.verifyBlockSignatures(bc, block, verifyCurrentSig, verifySeal, verifyAllSig); err != nil {
-				// TODO: handle bad block
-				s.state.RevertTo(i-1, block.Hash())
+				invalidBlockHash := getBlockHashByHeight(i, s.state.isBeacon, tx)
+				s.state.RevertTo(stg.configs.bc.CurrentBlock().NumberU64(), invalidBlockHash)
 				return err
 			}
 

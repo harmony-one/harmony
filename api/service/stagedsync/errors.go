@@ -30,6 +30,7 @@ var (
 	ErrSavingCachedBodiesProgressFail     = WrapStagedSyncError("saving cache progress for blocks stage failed")
 	ErrRetrievingCachedBodiesProgressFail = WrapStagedSyncError("retrieving cache progress for blocks stage failed")
 	ErrNoConnectedPeers                   = WrapStagedSyncError("haven't connected to any peer yet!")
+	ErrNotEnoughConnectedPeers            = WrapStagedSyncError("not enough connected peers")
 	ErrSaveStateProgressFail              = WrapStagedSyncError("saving progress for block States stage failed")
 	ErrPruningCursorCreationFail          = WrapStagedSyncError("failed to create cursor for pruning")
 	ErrInvalidBlockNumber                 = WrapStagedSyncError("invalid block number")

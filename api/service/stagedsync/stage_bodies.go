@@ -86,7 +86,11 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 
 // Exec progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
-
+	
+	if len(s.state.syncConfig.peers) < NumPeersLowBound {
+		return ErrNotEnoughConnectedPeers
+	}
+	
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxPeersHeight {
@@ -581,6 +585,25 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 	return p, nil
 }
 
+// clearCache removes block hashes from cache db
+func (b *StageBodies) clearCache() error {
+	tx, err := b.configs.cachedb.BeginRw(context.Background())
+	if err != nil {
+		return nil
+	}
+	defer tx.Rollback()
+
+	if err := tx.ClearBucket(DownloadedBlocksBucket); err != nil {
+		return nil
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // load blocks from cache db to main sync db and update the progress
 func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx kv.RwTx) (p uint64, err error) {
 
@@ -674,6 +697,36 @@ func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx 
 			return err
 		}
 		defer tx.Rollback()
+	}
+
+	// terminate background process in turbo mode
+	if b.configs.bgProcRunning {
+		b.configs.bgProcRunning = false
+		b.configs.turboModeCh <- struct{}{}
+		close(b.configs.turboModeCh)
+	}
+
+	// clean block hashes db
+	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
+	if err = tx.ClearBucket(blocksBucketName); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] clear blocks bucket after revert failed: %v", err)
+		return err
+	}
+
+	// clean cache db as well
+	if err := b.clearCache(); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] clear blocks cache failed: %v", err)
+		return err
+	}
+
+	// save progress
+	currentHead := b.configs.bc.CurrentBlock().NumberU64()
+	if err = s.Update(tx, currentHead); err != nil {
+		utils.Logger().Error().
+			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed: %v", err)
+		return err
 	}
 
 	if err = u.Done(tx); err != nil {
