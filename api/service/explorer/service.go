@@ -223,9 +223,9 @@ func (s *Service) GetBlocks(w http.ResponseWriter, r *http.Request) {
 
 	for i := cur; i > 0; i-- {
 		block := s.blockchain.GetBlockByNumber(i)
-		w.Write([]byte(fmt.Sprintf("%d ", i)))
-		w.Write([]byte(fmt.Sprintf("%s ", block.Header().ViewID().String())))
-		w.Write([]byte(fmt.Sprintf("%s ", block.Header().Coinbase().Hash().Hex())))
+		w.Write([]byte(fmt.Sprintf("#%d ", i)))
+		w.Write([]byte(fmt.Sprintf("v%s ", block.Header().ViewID().String())))
+		w.Write([]byte(fmt.Sprintf("e%d ", block.Header().Epoch().Uint64())))
 		w.Write([]byte(fmt.Sprintf("%s\n", block.Header().Coinbase().Hex())))
 	}
 }
