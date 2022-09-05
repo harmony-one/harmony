@@ -778,7 +778,7 @@ func (consensus *Consensus) getEpochFirstBlockViewID(epoch *big.Int) (uint64, er
 	if epoch.Uint64() == 0 {
 		return 0, nil
 	}
-	epochBlock := consensus.Blockchain.GetBlockByNumber(epoch.Uint64() - 1)
+	epochBlock := consensus.Blockchain.GetBlockByNumber(shard.Schedule.EpochLastBlock(epoch.Uint64() - 1))
 	if epochBlock == nil {
 		return 0, errors.Errorf("block not found for number %d", epoch.Uint64()-1)
 	}
