@@ -146,7 +146,6 @@ func (node *Node) ProposeNewBlock(commitSigs chan []byte) (*types.Block, error) 
 	if node.Blockchain().Config().IsStaking(header.Epoch()) {
 		blsPubKeyBytes := leaderKey.Object.GetAddress()
 		coinbase.SetBytes(blsPubKeyBytes[:])
-		fmt.Println("coinbase.SetBytes leader: ", leaderKey.Bytes.Hex(), coinbase.Hex())
 	}
 
 	emptyAddr := common.Address{}
