@@ -74,6 +74,7 @@ type Consensus struct {
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
+	epoch    uint64
 	// Blockhash - 32 byte
 	blockHash [32]byte
 	// Block to run consensus on
