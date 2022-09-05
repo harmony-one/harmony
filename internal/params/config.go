@@ -271,8 +271,8 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
-		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     5,
+		LeaderRotationEpoch:           big.NewInt(1),
+		TesnetNinetyPercentEpoch:      EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
@@ -317,6 +317,7 @@ var (
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1),                      // LeaderRotationEpoch
 		64,                                 // LeaderRotationBlocksCount
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 	}
@@ -730,6 +731,14 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 
 func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
 	return isForked(c.LeaderRotationEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationEpoch, epoch)
+}
+
+func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
+	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
