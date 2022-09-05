@@ -223,6 +223,8 @@ func (s *Service) GetBlocks(w http.ResponseWriter, r *http.Request) {
 
 	for i := cur; i > 0; i-- {
 		block := s.blockchain.GetBlockByNumber(i)
+		leaderPubKey, _ := chain.GetLeaderPubKeyFromCoinbase(s.backend.Blockchain(), block.Header())
+		w.Write([]byte(fmt.Sprintf("%s ", leaderPubKey.Bytes.Hex())))
 		w.Write([]byte(fmt.Sprintf("#%d ", i)))
 		w.Write([]byte(fmt.Sprintf("v%s ", block.Header().ViewID().String())))
 		w.Write([]byte(fmt.Sprintf("e%d ", block.Header().Epoch().Uint64())))
