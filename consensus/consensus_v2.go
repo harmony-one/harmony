@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -691,33 +692,59 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	curBlockViewID := consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	prev := consensus.GetLeaderPubKey()
-	idx := consensus.SetLeaderIndex(func(i int) int {
-		if curBlockViewID%3 == 0 {
-			return i + 1
+	if consensus.Blockchain.Config().IsLeaderRotation(blk.Epoch()) {
+		epochBlockViewID, err := consensus.getEpochFirstBlockViewID(blk.Epoch())
+		if err != nil {
+			consensus.getLogger().Error().Err(err).Msgf("[SetupForNewConsensus] Failed to get epoch block viewID for epoch %d", blk.Epoch().Uint64())
+			return
 		}
-		return i
-	})
-	pps := consensus.Decider.Participants()
-	consensus.pubKeyLock.Lock()
-	consensus.LeaderPubKey = &pps[idx%len(pps)]
-	fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %q\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
-	consensus.pubKeyLock.Unlock()
-	if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
-		// leader changed
-		go func() {
-			fmt.Printf("ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
-			defer fmt.Printf("Defer ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
-			consensus.ReadySignal <- SyncProposal
+		if epochBlockViewID > curBlockViewID {
+			consensus.getLogger().Error().Msg("[SetupForNewConsensus] Epoch block viewID is greater than current block viewID")
+			return
+		}
 
-		}()
+		diff := curBlockViewID - epochBlockViewID
 
+		pps := consensus.Decider.Participants()
+		idx := (int(diff) / 3) % len(pps)
+		consensus.pubKeyLock.Lock()
+		fmt.Println("(int(diff)/3)%len(pps) == ", idx)
+		consensus.LeaderPubKey = &pps[idx]
+		fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %v\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
+		consensus.pubKeyLock.Unlock()
+		if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
+			// leader changed
+			go func() {
+				fmt.Printf("ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
+				defer fmt.Printf("Defer ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
+				consensus.ReadySignal <- SyncProposal
+
+			}()
+		}
+	} else {
+		fmt.Printf("SetupForNewConsensus0 :%d future v%d new: %s prev: %s %v\n", utils.GetPort(), curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
+		consensus.pubKeyLock.Lock()
+		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+		consensus.pubKeyLock.Unlock()
 	}
+
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
 	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.ResetState()
+}
+
+func (consensus *Consensus) getEpochFirstBlockViewID(epoch *big.Int) (uint64, error) {
+	if epoch.Uint64() == 0 {
+		return 0, nil
+	}
+	epochBlock := consensus.Blockchain.GetBlockByNumber(epoch.Uint64() - 1)
+	if epochBlock == nil {
+		return 0, errors.Errorf("block not found for number %d", epoch.Uint64()-1)
+	}
+	return epochBlock.Header().ViewID().Uint64() + 1, nil
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
