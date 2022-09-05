@@ -243,43 +243,41 @@ var (
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
 	LocalnetChainConfig = &ChainConfig{
-		ChainID:                                TestnetChainID,
-		EthCompatibleChainID:                   EthTestnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthTestnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(0),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          EpochTBD, // Never enable it for localnet as localnet has no external validator setup
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: big.NewInt(5),
-		LeaderRotationExternalBeaconLeaders:    big.NewInt(6),
-		FeeCollectEpoch:                        big.NewInt(2),
-		ValidatorCodeFixEpoch:                  big.NewInt(2),
+		ChainID:                       TestnetChainID,
+		EthCompatibleChainID:          EthTestnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthTestnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(0),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 EpochTBD, // Never enable it for localnet as localnet has no external validator setup
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               big.NewInt(5),
+		LeaderRotationEpoch:           big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...
@@ -319,8 +317,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
-		big.NewInt(1),                      // LeaderRotationExternalNonBeaconLeaders
-		big.NewInt(1),                      // LeaderRotationExternalBeaconLeaders
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 	}
@@ -362,8 +359,8 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
-		big.NewInt(1),        // LeaderRotationExternalNonBeaconLeaders
-		big.NewInt(1),        // LeaderRotationExternalBeaconLeaders
+		// TODO place correct epoch number
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 	}
@@ -505,9 +502,7 @@ type ChainConfig struct {
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
 
-	LeaderRotationExternalNonBeaconLeaders *big.Int `json:"leader-rotation-external-non-beacon-leaders,omitempty"`
-
-	LeaderRotationExternalBeaconLeaders *big.Int `json:"leader-rotation-external-beacon-leaders,omitempty"`
+	LeaderRotationEpoch *big.Int `json:"leader-rotation-epoch,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -734,17 +729,7 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 }
 
 func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
-	return isForked(c.LeaderRotationExternalNonBeaconLeaders, epoch)
-}
-
-func (c *ChainConfig) IsLeaderRotationExternalValidatorsAllowed(epoch *big.Int, shardID uint32) bool {
-	if !c.IsLeaderRotation(epoch) {
-		return false
-	}
-	if shardID == 0 {
-		return isForked(c.LeaderRotationExternalBeaconLeaders, epoch)
-	}
-	return true
+	return isForked(c.LeaderRotationEpoch, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.
