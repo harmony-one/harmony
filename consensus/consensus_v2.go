@@ -708,21 +708,18 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 		pps := consensus.Decider.Participants()
 		idx := (int(diff) / 3) % len(pps)
 		consensus.pubKeyLock.Lock()
-		fmt.Println("(int(diff)/3)%len(pps) == ", idx)
+		//fmt.Println("(int(diff)/3)%len(pps) == ", idx)
 		consensus.LeaderPubKey = &pps[idx]
-		fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %v\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
+		//fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %v\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
 		consensus.pubKeyLock.Unlock()
 		if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
 			// leader changed
 			go func() {
-				fmt.Printf("ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
-				defer fmt.Printf("Defer ReadySignal :%d for leader %s\n", utils.GetPort(), consensus.GetLeaderPubKey().Bytes.Hex())
 				consensus.ReadySignal <- SyncProposal
-
 			}()
 		}
 	} else {
-		fmt.Printf("SetupForNewConsensus0 :%d future v%d new: %s prev: %s %v\n", utils.GetPort(), curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
+		fmt.Printf("SetupForNewConsensus0 Before LeaderRotation")
 		consensus.pubKeyLock.Lock()
 		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 		consensus.pubKeyLock.Unlock()
