@@ -262,6 +262,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
+		LeaderRotationEpoch:           big.NewInt(1),
 	}
 
 	// AllProtocolChanges ...
@@ -301,6 +302,7 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
@@ -341,6 +343,8 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
+		// TODO place correct epoch number
+		big.NewInt(1), // LeaderRotationEpoch
 		big.NewInt(0),        // FeeCollectEpoch
 	}
 
@@ -480,6 +484,8 @@ type ChainConfig struct {
 
 	// AllowlistEpoch is the first epoch to support allowlist of HIP18
 	AllowlistEpoch *big.Int
+
+	LeaderRotationEpoch *big.Int `json:"leader-rotation-epoch,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.
@@ -685,6 +691,10 @@ func (c *ChainConfig) IsChainIdFix(epoch *big.Int) bool {
 // IsAllowlistEpoch determines whether IsAllowlist of HIP18 is enabled
 func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 	return isForked(c.AllowlistEpoch, epoch)
+}
+
+func (c *ChainConfig) IsLeaderRotation(epoch *big.Int) bool {
+	return isForked(c.LeaderRotationEpoch, epoch)
 }
 
 // IsFeeCollectEpoch determines whether Txn Fees will be collected into the community-managed account.

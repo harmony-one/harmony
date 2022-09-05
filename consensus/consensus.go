@@ -73,8 +73,6 @@ type Consensus struct {
 	priKey multibls.PrivateKeys
 	// the publickey of leader
 	LeaderPubKey *bls.PublicKeyWrapper
-	// index of leader in the list of validators.
-	LeaderIndex int
 	// blockNum: the next blockNumber that FBFT is going to agree on,
 	// should be equal to the blockNumber of next block
 	blockNum uint64
