@@ -82,6 +82,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	consensus.pubKeyLock.Unlock()
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
@@ -677,4 +678,14 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
 	return &logger
+}
+
+func UpdatePublicKeyDefault(consensus *Consensus) {
+	if allKeys := consensus.Decider.Participants(); len(allKeys) > 0 {
+		consensus.LeaderPubKey = &allKeys[0]
+	}
+}
+
+func UpdatePublicKeyRotate(consensus *Consensus) {
+	//consensus
 }
