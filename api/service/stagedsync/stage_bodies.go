@@ -60,20 +60,20 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 	cachedb := mdbx.NewMDBX(log.New()).Path(cachedbName).MustOpen()
 	tx, errRW := cachedb.BeginRw(ctx)
 	if errRW != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(errRW).
 			Msg("[STAGED_SYNC] initializing sync caches failed")
 		return nil, errRW
 	}
 	defer tx.Rollback()
 	if err := tx.CreateBucket(DownloadedBlocksBucket); err != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(err).
 			Msg("[STAGED_SYNC] creating cache bucket failed")
 		return nil, err
 	}
 	if err := tx.CreateBucket(StageProgressBucket); err != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(err).
 			Msg("[STAGED_SYNC] creating progress bucket failed")
 		return nil, err
@@ -86,11 +86,11 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 
 // Exec progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
-	
+
 	if len(s.state.syncConfig.peers) < NumPeersLowBound {
 		return ErrNotEnoughConnectedPeers
 	}
-	
+
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxPeersHeight {
@@ -288,12 +288,13 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 				payload, err := peerConfig.GetBlocks(tasks.blockHashes())
 				if err != nil {
 					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
-					utils.Logger().Warn().Err(err).
+					utils.Logger().Error().
+						Err(err).
 						Str("peerID", peerConfig.ip).
 						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: GetBlocks failed")
 					if err := taskQueue.put(tasks); err != nil {
-						utils.Logger().Warn().
+						utils.Logger().Error().
 							Err(err).
 							Interface("taskIndexes", tasks.indexes()).
 							Msg("cannot add task back to queue")
@@ -310,7 +311,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: no more retrievable blocks")
 					if err := taskQueue.put(tasks); err != nil {
-						utils.Logger().Warn().
+						utils.Logger().Error().
 							Err(err).
 							Interface("taskIndexes", tasks.indexes()).
 							Interface("taskBlockes", tasks.blockHashesStr()).
@@ -333,7 +334,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: handleBlockSyncResult failed")
 					if err := taskQueue.put(tasks); err != nil {
-						utils.Logger().Warn().
+						utils.Logger().Error().
 							Err(err).
 							Interface("taskIndexes", tasks.indexes()).
 							Interface("taskBlockes", tasks.blockHashesStr()).
@@ -352,7 +353,7 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 						Str("port", peerConfig.port).
 						Msg("[STAGED_SYNC] downloadBlocks: some tasks failed")
 					if err := taskQueue.put(failedTasks); err != nil {
-						utils.Logger().Warn().
+						utils.Logger().Error().
 							Err(err).
 							Interface("task Indexes", failedTasks.indexes()).
 							Interface("task Blocks", tasks.blockHashesStr()).
@@ -368,13 +369,14 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 		return
 	})
 	wg.Wait()
-	utils.Logger().Info().Msg("[STAGED_SYNC] downloadBlocks: finished")
+	utils.Logger().Info().
+		Msg("[STAGED_SYNC] downloadBlocks: finished")
 	return nil
 }
 
 func (b *StageBodies) handleBlockSyncResult(s *StageState, payload [][]byte, tasks syncBlockTasks, verifyAllSig bool, tx kv.RwTx) (syncBlockTasks, error) {
 	if len(payload) > len(tasks) {
-		utils.Logger().Warn().
+		utils.Logger().Error().
 			Err(ErrUnexpectedNumberOfBlocks).
 			Int("expect", len(tasks)).
 			Int("got", len(payload))
@@ -419,8 +421,9 @@ func (b *StageBodies) saveProgress(s *StageState, progress uint64, tx kv.RwTx) (
 
 	// save progress
 	if err = s.Update(tx, progress); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed")
 		return ErrSavingBodiesProgressFail
 	}
 
@@ -446,7 +449,7 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 			}
 			if err := s.state.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
 				s.state.stateSyncTaskQueue = queue.New(0)
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Int("taskIndex", id).
 					Str("taskBlock", hex.EncodeToString(blockHash)).
@@ -514,7 +517,7 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 		blkNumber := marshalData(n)
 		bucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
 		if err := tx.Put(bucketName, blkNumber, blockBytes); err != nil {
-			utils.Logger().Warn().
+			utils.Logger().Error().
 				Err(err).
 				Uint64("block height", n).
 				Msg("[STAGED_SYNC] adding block to db failed")
@@ -524,12 +527,13 @@ func (b *StageBodies) saveDownloadedBlocks(s *StageState, progress uint64, tx kv
 	}
 	// check if all block hashes are added to db break the loop
 	if p-progress != uint64(len(downloadedBlocks)) {
-		return progress, fmt.Errorf("save downloaded block bodies failed")
+		return progress, ErrSaveBlocksFail
 	}
 	// save progress
 	if err = s.Update(tx, p); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block bodies stage failed")
 		return progress, ErrSavingBodiesProgressFail
 	}
 	// if it's using its own transaction, commit transaction to db to cache all downloaded blocks
@@ -558,7 +562,7 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 		n := progress + i + 1
 		blkNumber := marshalData(n) // fmt.Sprintf("%020d", p+1)
 		if err := tx.Put(DownloadedBlocksBucket, blkNumber, blockBytes); err != nil {
-			utils.Logger().Warn().
+			utils.Logger().Error().
 				Err(err).
 				Uint64("block height", p).
 				Msg("[STAGED_SYNC] caching block failed")
@@ -568,13 +572,14 @@ func (b *StageBodies) cacheBlocks(s *StageState, progress uint64) (p uint64, err
 	}
 	// check if all block hashes are added to db break the loop
 	if p-progress != uint64(len(downloadedBlocks)) {
-		return p, fmt.Errorf("caching downloaded block bodies failed")
+		return p, ErrCachingBlocksFail
 	}
 
 	// save progress
 	if err = tx.Put(StageProgressBucket, []byte(LastBlockHeight), marshalData(p)); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving cache progress for blocks stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving cache progress for blocks stage failed")
 		return p, ErrSavingCachedBodiesProgressFail
 	}
 
@@ -631,14 +636,16 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 	errV := b.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
 		lastCachedHeightBytes, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHeight))
 		if err != nil {
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed: %v", err)
+			utils.Logger().Error().
+				Err(err).
+				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed")
 			return ErrRetrievingCachedBodiesProgressFail
 		}
 		lastHeight, err := unmarshalData(lastCachedHeightBytes)
 		if err != nil {
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed: %v", err)
+			utils.Logger().Error().
+				Err(err).
+				Msgf("[STAGED_SYNC] retrieving cache progress for blocks stage failed")
 			return ErrRetrievingCachedBodiesProgressFail
 		}
 
@@ -651,7 +658,7 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 			key := marshalData(p + 1)
 			blkBytes, err := rtx.GetOne(DownloadedBlocksBucket, []byte(key))
 			if err != nil {
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Uint64("block height", p+1).
 					Msg("[STAGED_SYNC] retrieve block from cache failed")
@@ -674,8 +681,9 @@ func (b *StageBodies) loadBlocksFromCache(s *StageState, startHeight uint64, tx 
 
 	// save progress
 	if err = s.Update(tx, p); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving retrieved cached progress for blocks stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving retrieved cached progress for blocks stage failed")
 		return startHeight, ErrSavingCachedBodiesProgressFail
 	}
 
@@ -710,14 +718,16 @@ func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx 
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, b.configs.isBeacon)
 	if err = tx.ClearBucket(blocksBucketName); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] clear blocks bucket after revert failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] clear blocks bucket after revert failed")
 		return err
 	}
 
 	// clean cache db as well
 	if err := b.clearCache(); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] clear blocks cache failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] clear blocks cache failed")
 		return err
 	}
 
@@ -725,7 +735,8 @@ func (b *StageBodies) Revert(firstCycle bool, u *RevertState, s *StageState, tx 
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block bodies stage after revert failed")
 		return err
 	}
 

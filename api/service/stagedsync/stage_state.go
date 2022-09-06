@@ -89,7 +89,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 		// we don't need to do rollback, because the latest batch haven't added to chain yet
 		sz := len(blockBytes)
 		if sz <= 1 {
-			utils.Logger().Warn().
+			utils.Logger().Error().
 				Uint64("block number", i).
 				Msg("block size invalid")
 			invalidBlockHash := getBlockHashByHeight(i, s.state.isBeacon, tx)
@@ -99,7 +99,7 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 
 		block, err := RlpDecodeBlockOrBlockWithSig(blockBytes)
 		if err != nil {
-			utils.Logger().Warn().
+			utils.Logger().Error().
 				Err(err).
 				Uint64("block number", i).
 				Msg("block RLP decode failed")
@@ -179,15 +179,17 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 			// TODO: handle chain rollback because of bad block
 			utils.Logger().Error().
 				Err(err).
-				Msgf(
-					"[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
-					block.NumberU64(),
-					block.ShardID(),
-				)
+				Uint64("block number", block.NumberU64()).
+				Uint32("shard", block.ShardID()).
+				Msgf("[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 			// rollback bc
-			utils.Logger().Info().Interface("block", stg.configs.bc.CurrentBlock()).Msg("[STAGED_SYNC] Rolling back last added blocks!")
+			utils.Logger().Info().
+				Interface("block", stg.configs.bc.CurrentBlock()).
+				Msg("[STAGED_SYNC] Rolling back last added blocks!")
 			if rbErr := stg.configs.bc.Rollback([]common.Hash{headHashBeforeNewBlocks}); rbErr != nil {
-				utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+				utils.Logger().Error().
+					Err(rbErr).
+					Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 				return err
 			}
 			s.state.RevertTo(headBeforeNewBlocks, headHashBeforeNewBlocks)
@@ -246,7 +248,9 @@ func (stg *StageStates) verifyBlockSignatures(bc core.BlockChain, block *types.B
 		if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 			return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 		}
-		utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[STAGED_SYNC] VerifyHeaderSignature")
+		utils.Logger().Debug().
+			Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
+			Msg("[STAGED_SYNC] VerifyHeaderSignature")
 	}
 	return nil
 }
@@ -267,7 +271,7 @@ func (stg *StageStates) saveProgress(s *StageState, tx kv.RwTx) (err error) {
 	if err = s.Update(tx, stg.configs.bc.CurrentBlock().NumberU64()); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] saving progress for block States stage failed: %v", err)
+			Msgf("[STAGED_SYNC] saving progress for block States stage failed")
 		return ErrSaveStateProgressFail
 	}
 

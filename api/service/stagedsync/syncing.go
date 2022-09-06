@@ -136,7 +136,7 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to initiate db: %w", err)
+		return err
 	}
 	return nil
 }
@@ -144,7 +144,9 @@ func initDB(ctx context.Context, db kv.RwDB) error {
 // SyncLoop will keep syncing with peers until catches up
 func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, loopMinTime time.Duration) {
 
-	utils.Logger().Info().Msgf("staged sync is executing ... ")
+	utils.Logger().Info().
+		Uint64("current height", bc.CurrentBlock().NumberU64()).
+		Msgf("staged sync is executing ... ")
 
 	if !s.IsBeacon() {
 		s.RegisterNodeInfo()
@@ -155,21 +157,28 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 	if err != nil {
 		return
 	}
-	utils.Logger().Info().Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
+	utils.Logger().Info().
+		Uint64("maxPeersHeight", maxPeersHeight).
+		Msgf("[STAGED_SYNC] max peers height")
 	s.syncStatus.MaxPeersHeight = maxPeersHeight
 
 	for {
 		if len(s.syncConfig.peers) < NumPeersLowBound {
 			// TODO: try to use reserved nodes
-			utils.Logger().Info().Msgf("[STAGED_SYNC] Not enough connected peers: %d)", len(s.syncConfig.peers))
+			utils.Logger().Warn().
+				Int("num peers", len(s.syncConfig.peers)).
+				Msgf("[STAGED_SYNC] Not enough connected peers")
 			break
 		}
 		startHead := bc.CurrentBlock().NumberU64()
 
 		if startHead >= maxPeersHeight {
 			utils.Logger().Info().
-				Msgf("[SYNC] Node is now IN SYNC! (isBeacon: %t, ShardID: %d, otherHeight: %d, currentHeight: %d)",
-					isBeacon, bc.ShardID(), maxPeersHeight, startHead)
+				Bool("isBeacon", isBeacon).
+				Uint32("shard", bc.ShardID()).
+				Uint64("maxPeersHeight", maxPeersHeight).
+				Uint64("currentHeight", startHead).
+				Msgf("[SYNC] Node is now IN SYNC!")
 			break
 		}
 		startTime := time.Now()
@@ -178,9 +187,11 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 		if loopMinTime != 0 {
 			waitTime := loopMinTime - time.Since(startTime)
-			utils.Logger().Info().
-				Msgf("[STAGED SYNC] Node is syncing ..., it's waiting %d seconds until next loop (isBeacon: %t, ShardID: %d)",
-					waitTime, s.IsBeacon(), s.Blockchain().ShardID())
+			utils.Logger().Debug().
+				Bool("isBeacon", isBeacon).
+				Uint32("shard", bc.ShardID()).
+				Interface("duration", waitTime).
+				Msgf("[STAGED SYNC] Node is syncing ..., it's waiting a few seconds until next loop")
 			c := time.After(waitTime)
 			select {
 			case <-s.Context().Done():
@@ -209,14 +220,18 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 	if consensus != nil {
 		if err := s.addConsensusLastMile(s.Blockchain(), consensus); err != nil {
-			utils.Logger().Error().Err(err).Msg("[STAGED_SYNC] Add consensus last mile")
+			utils.Logger().Error().
+				Err(err).
+				Msg("[STAGED_SYNC] Add consensus last mile")
 		}
 		// TODO: move this to explorer handler code.
 		if s.isExplorer {
 			consensus.UpdateConsensusInformation()
 		}
 	}
-	utils.Logger().Info().Msgf("staged sync is executed")
+	utils.Logger().Info().
+		Uint64("new height", bc.CurrentBlock().NumberU64()).
+		Msgf("staged sync is executed")
 	return
 }
 
@@ -236,9 +251,11 @@ func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isB
 	initialCycle := false //s.syncStatus.currentCycle.Number == 0
 	syncErr := s.Run(s.DB(), tx, initialCycle)
 	if syncErr != nil {
-		utils.Logger().Error().Err(syncErr).
-			Msgf("[STAGED_SYNC] Sync loop failed (isBeacon: %t, ShardID: %d, error: %s)",
-				s.IsBeacon(), s.Blockchain().ShardID(), syncErr)
+		utils.Logger().Error().
+			Err(syncErr).
+			Bool("isBeacon", s.IsBeacon()).
+			Uint32("shard", s.Blockchain().ShardID()).
+			Msgf("[STAGED_SYNC] Sync loop failed")
 		s.purgeOldBlocksFromCache()
 		return
 	}

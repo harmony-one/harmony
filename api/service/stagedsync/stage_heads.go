@@ -93,8 +93,9 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 	s.state.syncStatus.currentCycle.TargetHeight = targetHeight
 
 	if err := s.Update(tx, targetHeight); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving progress for headers stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for headers stage failed")
 		return err
 	}
 

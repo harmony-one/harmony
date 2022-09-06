@@ -198,7 +198,9 @@ func (s *StagedSync) IsAfter(stage1, stage2 SyncStageID) bool {
 
 func (s *StagedSync) RevertTo(revertPoint uint64, invalidBlock common.Hash) {
 	utils.Logger().Info().
-		Msgf("[STAGED_SYNC] RevertTo block:%d bad_block_hash:%s", revertPoint, invalidBlock.String())
+		Interface("invalidBlock", invalidBlock).
+		Uint64("revertPoint", revertPoint).
+		Msgf("[STAGED_SYNC] Reverting blocks")
 	s.revertPoint = &revertPoint
 	s.invalidBlock = invalidBlock
 }
@@ -227,9 +229,10 @@ func (s *StagedSync) SetCurrentStage(id SyncStageID) error {
 		}
 	}
 	utils.Logger().Error().
-		Msgf("[STAGED_SYNC] stage not found with id: %v", id)
+		Interface("stage id", id).
+		Msgf("[STAGED_SYNC] stage not found")
 
-	return fmt.Errorf("stage not found with id: %v", id)
+	return ErrStageNotFound
 }
 
 func New(ctx context.Context,
@@ -473,7 +476,8 @@ func (s *StagedSync) runStage(stage *Stage, db kv.RwDB, tx kv.RwTx, firstCycle b
 	if err = stage.Handler.Exec(firstCycle, invalidBlockRevert, stageState, s, tx); err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf("[STAGED_SYNC] stage %s failed", stage.ID)
+			Interface("stage id", stage.ID).
+			Msgf("[STAGED_SYNC] stage failed")
 		return fmt.Errorf("[%s] %w", s.LogPrefix(), err)
 	}
 	utils.Logger().Info().
@@ -742,7 +746,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 				if ready := peerConfig.client.WaitForConnection(1000 * time.Millisecond); !ready {
 					// replace it with reserved peer (in bg mode don't replace because maybe other stages still are using this node)
 					if bgMode {
-						bgModeError = fmt.Errorf("some nodes are not ready")
+						bgModeError = ErrSomeNodesNotReady
 						brk = true //finish whole peers loop
 					} else {
 						if !peerConfig.client.IsConnecting() {
@@ -760,14 +764,15 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 					Msg("[STAGED_SYNC] getConsensusHashes Nil Response, will be replaced with reserved node (if any)")
 				// replace it with reserved peer (in bg mode don't replace because maybe other stages still are using this node)
 				if bgMode {
-					bgModeError = fmt.Errorf("some nodes failed to download block hashes")
+					bgModeError = ErrSomeNodesBlockHashFail
 					brk = true //finish whole peers loop
 				} else {
 					ss.syncConfig.ReplacePeerWithReserved(peerConfig, "receiving nil response for block hashes")
 				}
 				return
 			}
-			utils.Logger().Info().Uint32("queried blockHash size", size).
+			utils.Logger().Info().
+				Uint32("queried blockHash size", size).
 				Int("got blockHashSize", len(response.Payload)).
 				Str("PeerIP", peerConfig.ip).
 				Bool("background Mode", bgMode).
@@ -790,7 +795,8 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 	})
 	wg.Wait()
 
-	utils.Logger().Info().Msg("[STAGED_SYNC] Finished getting consensus block hashes")
+	utils.Logger().Info().
+		Msg("[STAGED_SYNC] Finished getting consensus block hashes")
 	return bgModeError
 }
 
@@ -875,7 +881,7 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc core.BlockChain, tx kv.RwTx)
 		for id, blockHash := range configPeer.blockHashes {
 			if err := ss.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
 				ss.stateSyncTaskQueue = queue.New(0)
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Int("taskIndex", id).
 					Str("taskBlock", hex.EncodeToString(blockHash)).
@@ -894,7 +900,9 @@ func (ss *StagedSync) generateStateSyncTaskQueue(bc core.BlockChain, tx kv.RwTx)
 	if !allTasksAddedToQueue {
 		return ErrAddTaskFailed
 	}
-	utils.Logger().Info().Int64("length", ss.stateSyncTaskQueue.Len()).Msg("[STAGED_SYNC] generateStateSyncTaskQueue: finished")
+	utils.Logger().Info().
+		Int64("length", ss.stateSyncTaskQueue.Len()).
+		Msg("[STAGED_SYNC] generateStateSyncTaskQueue: finished")
 	return nil
 }
 
@@ -1006,7 +1014,10 @@ func (ss *StagedSync) getBlockFromLastMileBlocksByParentHash(parentHash common.H
 // UpdateBlockAndStatus ...
 func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChain, verifyAllSig bool) error {
 	if block.NumberU64() != bc.CurrentBlock().NumberU64()+1 {
-		utils.Logger().Debug().Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).Uint64("receivedBlockNum", block.NumberU64()).Msg("[STAGED_SYNC] Inappropriate block number, ignore!")
+		utils.Logger().Debug().
+			Uint64("curBlockNum", bc.CurrentBlock().NumberU64()).
+			Uint64("receivedBlockNum", block.NumberU64()).
+			Msg("[STAGED_SYNC] Inappropriate block number, ignore!")
 		return nil
 	}
 
@@ -1026,19 +1037,28 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 			if err := bc.Engine().VerifyHeaderSignature(bc, block.Header(), sig, bitmap); err != nil {
 				return errors.Wrapf(err, "verify header signature %v", block.Hash().String())
 			}
-			utils.Logger().Debug().Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).Msg("[STAGED_SYNC] VerifyHeaderSignature")
+			utils.Logger().Debug().
+				Int64("elapsed time", time.Now().Sub(startTime).Milliseconds()).
+				Msg("[STAGED_SYNC] VerifyHeaderSignature")
 		}
 		err := bc.Engine().VerifyHeader(bc, block.Header(), verifySeal)
 		if err == engine.ErrUnknownAncestor {
 			return err
 		} else if err != nil {
-			utils.Logger().Error().Err(err).Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block %d", block.NumberU64())
+			utils.Logger().Error().
+				Err(err).
+				Uint64("block number", block.NumberU64()).
+				Msgf("[STAGED_SYNC] UpdateBlockAndStatus: failed verifying signatures for new block")
 
 			if !verifyAllSig {
-				utils.Logger().Info().Interface("block", bc.CurrentBlock()).Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
+				utils.Logger().Info().
+					Interface("block", bc.CurrentBlock()).
+					Msg("[STAGED_SYNC] UpdateBlockAndStatus: Rolling back last 99 blocks!")
 				for i := uint64(0); i < ss.VerifyHeaderBatchSize-1; i++ {
 					if rbErr := bc.Rollback([]common.Hash{bc.CurrentBlock().Hash()}); rbErr != nil {
-						utils.Logger().Err(rbErr).Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
+						utils.Logger().Error().
+							Err(rbErr).
+							Msg("[STAGED_SYNC] UpdateBlockAndStatus: failed to rollback")
 						return err
 					}
 				}
@@ -1051,11 +1071,9 @@ func (ss *StagedSync) UpdateBlockAndStatus(block *types.Block, bc core.BlockChai
 	if err != nil {
 		utils.Logger().Error().
 			Err(err).
-			Msgf(
-				"[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain %d %d",
-				block.NumberU64(),
-				block.ShardID(),
-			)
+			Uint64("block number", block.NumberU64()).
+			Uint32("shard", block.ShardID()).
+			Msgf("[STAGED_SYNC] UpdateBlockAndStatus: Error adding new block to blockchain")
 		return err
 	}
 	utils.Logger().Info().
@@ -1128,11 +1146,17 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
-				utils.Logger().Warn().Err(err).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]GetBlockChainHeight failed")
+				utils.Logger().Error().
+					Err(err).
+					Str("peerIP", peerConfig.ip).
+					Str("peerPort", peerConfig.port).
+					Msg("[STAGED_SYNC]GetBlockChainHeight failed")
 				ss.syncConfig.RemovePeer(peerConfig, "GetBlockChainHeight failed")
 				return
 			}
-			utils.Logger().Info().Str("peerIP", peerConfig.ip).Uint64("blockHeight", response.BlockHeight).
+			utils.Logger().Info().
+				Str("peerIP", peerConfig.ip).
+				Uint64("blockHeight", response.BlockHeight).
 				Msg("[STAGED_SYNC] getMaxPeerHeight")
 			lock.Lock()
 			if response != nil {
@@ -1147,7 +1171,7 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 	wg.Wait()
 
 	if maxHeight == uint64(math.MaxUint64) {
-		return 0, fmt.Errorf("get max peer height failed")
+		return 0, ErrMaxPeerHeightFail
 	}
 
 	return maxHeight, nil

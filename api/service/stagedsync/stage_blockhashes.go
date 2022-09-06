@@ -61,20 +61,20 @@ func initHashesCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 	// create transaction on cachedb
 	tx, errRW := cachedb.BeginRw(ctx)
 	if errRW != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(errRW).
 			Msg("[STAGED_SYNC] initializing sync caches failed")
 		return nil, errRW
 	}
 	defer tx.Rollback()
 	if err := tx.CreateBucket(BlockHashesBucket); err != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(err).
 			Msg("[STAGED_SYNC] creating cache bucket failed")
 		return nil, err
 	}
 	if err := tx.CreateBucket(StageProgressBucket); err != nil {
-		utils.Logger().
+		utils.Logger().Error().
 			Err(err).
 			Msg("[STAGED_SYNC] creating progress bucket failed")
 		return nil, err
@@ -141,15 +141,17 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *St
 	if canRunInTurboMode && s.state.syncStatus.currentCycle.Number > 0 {
 		var cacheHash []byte
 		if cacheHash, err = bh.getHashFromCache(currProgress + 1); err != nil {
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed: %v", err)
+			utils.Logger().Error().
+				Err(err).
+				Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed")
 		} else {
 			if len(cacheHash[:]) > 0 {
 				// get blocks from cached db rather than calling peers, and update current progress
 				newProgress, newStartHash, err := bh.loadBlockHashesFromCache(s, cacheHash, currProgress, targetHeight, tx)
 				if err != nil {
-					utils.Logger().Info().
-						Msgf("[STAGED_SYNC] fetch cached block hashes failed: %v", err)
+					utils.Logger().Error().
+						Err(err).
+						Msgf("[STAGED_SYNC] fetch cached block hashes failed")
 					bh.clearCache()
 					bh.clearBlockHashesBucket(tx, isBeacon)
 				} else {
@@ -242,8 +244,9 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 	errV := bh.configs.cachedb.View(context.Background(), func(rtx kv.Tx) error {
 
 		if progressBytes, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHeight)); err != nil {
-			utils.Logger().Info().
-				Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed: %v", err)
+			utils.Logger().Error().
+				Err(err).
+				Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed")
 			return ErrRetrieveCachedProgressFail
 		} else {
 			if len(progressBytes[:]) > 0 {
@@ -252,8 +255,9 @@ func (bh *StageBlockHashes) runBackgroundProcess(tx kv.RwTx, s *StageState, isBe
 					currProgress = savedProgress
 					// retrieve start hash
 					if lastBlockHash, err := rtx.GetOne(StageProgressBucket, []byte(LastBlockHash)); err != nil {
-						utils.Logger().Info().
-							Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed: %v", err)
+						utils.Logger().Error().
+							Err(err).
+							Msgf("[STAGED_SYNC] retrieving cache progress for block hashes stage failed")
 						return ErrRetrieveCachedHashProgressFail
 					} else {
 						currHash.SetBytes(lastBlockHash[:])
@@ -356,7 +360,7 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 			key := strconv.FormatUint(p+1, 10)
 			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
 			if err := tx.Put(bucketName, []byte(key), blockHash); err != nil {
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Int("block hash index", id).
 					Str("block hash", hex.EncodeToString(blockHash)).
@@ -378,8 +382,9 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 
 	// save progress
 	if err = s.Update(tx, p); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving progress for block hashes stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block hashes stage failed")
 		return progress, startHash, ErrSaveBlockHashesProgressFail
 	}
 
@@ -415,7 +420,7 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 			}
 			key := strconv.FormatUint(p+1, 10)
 			if err := etx.Put(BlockHashesBucket, []byte(key), blockHash); err != nil {
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Int("block hash index", id).
 					Str("block hash", hex.EncodeToString(blockHash)).
@@ -437,15 +442,17 @@ func (bh *StageBlockHashes) saveBlockHashesInCacheDB(s *StageState, progress uin
 
 	// save cache progress (last block height)
 	if err = etx.Put(StageProgressBucket, []byte(LastBlockHeight), marshalData(p)); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving cache progress for block hashes stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving cache progress for block hashes stage failed")
 		return p, h, ErrSaveCachedBlockHashesProgressFail
 	}
 
 	// save cache progress
 	if err = etx.Put(StageProgressBucket, []byte(LastBlockHash), h.Bytes()); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving cache last block hash for block hashes stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving cache last block hash for block hashes stage failed")
 		return p, h, ErrSavingCacheLastBlockHashFail
 	}
 
@@ -497,8 +504,9 @@ func (bh *StageBlockHashes) getHashFromCache(height uint64) (h []byte, err error
 		return nil, ErrFetchBlockHashProgressFail
 	}
 	if cacheHash, err = tx.GetOne(BlockHashesBucket, []byte(key)); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] fetch cache progress for block hashes stage failed")
 		return nil, ErrFetchBlockHashProgressFail
 	}
 	hv, _ := unmarshalData(cacheHash)
@@ -532,7 +540,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHash []
 			key := strconv.FormatUint(p+1, 10)
 			lastHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
 			if err != nil {
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Str("block height", key).
 					Msg("[STAGED_SYNC] retrieve block hash from cache failed")
@@ -557,7 +565,7 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHash []
 			key := strconv.FormatUint(pExtraHashes+1, 10)
 			newHash, err := rtx.GetOne(BlockHashesBucket, []byte(key))
 			if err != nil {
-				utils.Logger().Warn().
+				utils.Logger().Error().
 					Err(err).
 					Str("block height", key).
 					Msg("[STAGED_SYNC] retrieve extra block hashes for background process failed")
@@ -576,8 +584,9 @@ func (bh *StageBlockHashes) loadBlockHashesFromCache(s *StageState, startHash []
 
 	// save progress
 	if err = s.Update(tx, p); err != nil {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] saving retrieved cached progress for block hashes stage failed: %v", err)
+		utils.Logger().Error().
+			Err(err).
+			Msgf("[STAGED_SYNC] saving retrieved cached progress for block hashes stage failed")
 		h.SetBytes(startHash[:])
 		return startHeight, h, err
 	}
@@ -613,14 +622,16 @@ func (bh *StageBlockHashes) Revert(firstCycle bool, u *RevertState, s *StageStat
 	hashesBucketName := GetBucketName(BlockHashesBucket, bh.configs.isBeacon)
 	if err = tx.ClearBucket(hashesBucketName); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] clear block hashes bucket after revert failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] clear block hashes bucket after revert failed")
 		return err
 	}
 
 	// clean cache db as well
 	if err := bh.clearCache(); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] clear block hashes cache failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] clear block hashes cache failed")
 		return err
 	}
 
@@ -631,13 +642,15 @@ func (bh *StageBlockHashes) Revert(firstCycle bool, u *RevertState, s *StageStat
 	currentHead := bh.configs.bc.CurrentBlock().NumberU64()
 	if err = s.Update(tx, currentHead); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] saving progress for block hashes stage after revert failed: %v", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] saving progress for block hashes stage after revert failed")
 		return err
 	}
 
 	if err = u.Done(tx); err != nil {
 		utils.Logger().Error().
-			Msgf("[STAGED_SYNC] reset after revert failed: %w", err)
+			Err(err).
+			Msgf("[STAGED_SYNC] reset after revert failed")
 		return err
 	}
 

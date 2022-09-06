@@ -37,6 +37,12 @@ var (
 	ErrInvalidBlockBytes                  = WrapStagedSyncError("invalid block bytes to insert into chain")
 	ErrAddTaskFailed                      = WrapStagedSyncError("cannot add task to queue")
 	ErrNodeNotEnoughBlockHashes           = WrapStagedSyncError("some of the nodes didn't provide all block hashes")
+	ErrCachingBlocksFail                  = WrapStagedSyncError("caching downloaded block bodies failed")
+	ErrSaveBlocksFail                     = WrapStagedSyncError("save downloaded block bodies failed")
+	ErrStageNotFound                      = WrapStagedSyncError("stage not found")
+	ErrSomeNodesNotReady                  = WrapStagedSyncError("some nodes are not ready")
+	ErrSomeNodesBlockHashFail             = WrapStagedSyncError("some nodes failed to download block hashes")
+	ErrMaxPeerHeightFail                  = WrapStagedSyncError("get max peer height failed")
 )
 
 // WrapStagedSyncError wraps errors for staged sync and returns error object

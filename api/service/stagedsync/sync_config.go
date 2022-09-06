@@ -177,7 +177,7 @@ func (sc *SyncConfig) SelectRandomPeers(randSeed int64) {
 	targetSize := calcNumPeersWithBound(numPeers, NumPeersLowBound, numPeersHighBound)
 	// if number of peers is less than required number, keep all in list
 	if numPeers <= targetSize {
-		utils.Logger().Info().
+		utils.Logger().Warn().
 			Int("num connected peers", numPeers).
 			Msg("[STAGED_SYNC] not enough connected peers to sync, still sync will on going")
 		return
@@ -243,7 +243,8 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 			break
 		}
 	}
-	utils.Logger().Info().Str("peerIP", peer.ip).
+	utils.Logger().Info().
+		Str("peerIP", peer.ip).
 		Str("peerPortMsg", peer.port).
 		Str("reason", reason).
 		Msg("[STAGED_SYNC] remove GRPC peer")
@@ -338,7 +339,9 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
 
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] before cleanUpPeers")
+	utils.Logger().Debug().
+		Int("peers", len(sc.peers)).
+		Msg("[STAGED_SYNC] before cleanUpPeers")
 	for i := 0; i < len(sc.peers); i++ {
 		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
@@ -350,7 +353,9 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] post cleanUpPeers")
+	utils.Logger().Debug().
+		Int("peers", len(sc.peers)).
+		Msg("[STAGED_SYNC] post cleanUpPeers")
 }
 
 // cleanUpInvalidPeers cleans up all peers whose missed any required block hash or sent any invalid block hash
@@ -359,7 +364,9 @@ func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] before cleanUpPeers")
+	utils.Logger().Debug().
+		Int("peers", len(sc.peers)).
+		Msg("[STAGED_SYNC] before cleanUpPeers")
 	for i := 0; i < len(sc.peers); i++ {
 		if ipm[string(sc.peers[i].peerHash)] == true {
 			sc.peers[i].client.Close()
@@ -368,7 +375,9 @@ func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
-	utils.Logger().Info().Int("peers", len(sc.peers)).Msg("[STAGED_SYNC] post cleanUpPeers")
+	utils.Logger().Debug().
+		Int("peers", len(sc.peers)).
+		Msg("[STAGED_SYNC] post cleanUpPeers")
 }
 
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.
