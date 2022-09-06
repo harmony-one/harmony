@@ -746,7 +746,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 						brk = true //finish whole peers loop
 					} else {
 						if !peerConfig.client.IsConnecting() {
-							ss.syncConfig.ReplacePeerWithReserved(peerConfig)
+							ss.syncConfig.ReplacePeerWithReserved(peerConfig, "not ready to download consensus hashes")
 						}
 					}
 					return
@@ -763,7 +763,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 					bgModeError = fmt.Errorf("some nodes failed to download block hashes")
 					brk = true //finish whole peers loop
 				} else {
-					ss.syncConfig.ReplacePeerWithReserved(peerConfig)
+					ss.syncConfig.ReplacePeerWithReserved(peerConfig, "receiving nil response for block hashes")
 				}
 				return
 			}

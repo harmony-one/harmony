@@ -250,7 +250,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 }
 
 // RemovePeer removes a peer from SyncConfig
-func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig) {
+func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig, reason string) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
 
@@ -265,11 +265,15 @@ func (sc *SyncConfig) ReplacePeerWithReserved(peer *SyncPeerConfig) {
 					Str("peerPort", peer.port).
 					Str("reservedPeerIP", sc.reservedPeers[0].ip).
 					Str("reservedPeerPort", sc.reservedPeers[0].port).
+					Str("reason", reason).
 					Msg("[STAGED_SYNC] replaced GRPC peer by reserved")
 				sc.reservedPeers = sc.reservedPeers[1:]
 			} else {
 				sc.peers = append(sc.peers[:i], sc.peers[i+1:]...)
-				utils.Logger().Info().Str("peerIP", peer.ip).Str("peerPortMsg", peer.port).
+				utils.Logger().Info().
+					Str("peerIP", peer.ip).
+					Str("peerPortMsg", peer.port).
+					Str("reason", reason).
 					Msg("[STAGED_SYNC] remove GRPC peer without replacement")
 			}
 			break
