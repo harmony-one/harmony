@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
 
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -393,7 +393,6 @@ func (consensus *Consensus) Start(
 				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 
 			case newBlock := <-blockChannel:
-				//consensus.ReshardingNextLeader(newBlock)
 				consensus.getLogger().Info().
 					Uint64("MsgBlockNum", newBlock.NumberU64()).
 					Msg("[ConsensusMainLoop] Received Proposed New Block!")
@@ -405,7 +404,6 @@ func (consensus *Consensus) Start(
 				}
 				// Sleep to wait for the full block time
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
-
 				<-time.After(time.Until(consensus.NextBlockDue))
 				consensus.StartFinalityCount()
 
@@ -530,7 +528,6 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 // preCommitAndPropose commit the current block with 67% commit signatures and start
 // proposing new block which will wait on the full commit signatures to finish
 func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
-	//fmt.Println("preCommitAndPropose", utils.GetPort(), blk.NumberU64())
 	if blk == nil {
 		return errors.New("block to pre-commit is nil")
 	}
@@ -687,30 +684,48 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 }
 
 func (consensus *Consensus) updateLeader() {
-	curBlockViewID := consensus.GetCurBlockViewID()
 	prev := consensus.GetLeaderPubKey()
 	epoch := consensus.GetCurEpoch()
+	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
 	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
-		epochBlockViewID, err := consensus.getEpochFirstBlockViewID(epoch)
-		if err != nil {
-			consensus.getLogger().Error().Err(err).Msgf("[SetupForNewConsensus] Failed to get epoch block viewID for epoch %d", epoch)
-			return
+		leader := consensus.GetLeaderPubKey()
+		for i := uint64(0); i < 5; i++ {
+			header := consensus.Blockchain.GetHeaderByNumber(curNumber - i)
+			if header == nil {
+				return
+			}
+			// Previous epoch, we should not change leader.
+			if header.Epoch().Uint64() != epoch.Uint64() {
+				return
+			}
+			// Check if the same leader.
+			pub, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, header)
+			if err != nil {
+				utils.Logger().Error().Err(err).Msg("Failed to get leader public key from coinbase")
+				return
+			}
+			if !pub.Object.IsEqual(leader.Object) {
+				// Another leader.
+				return
+			}
 		}
-		if epochBlockViewID > curBlockViewID {
-			consensus.getLogger().Error().Msg("[SetupForNewConsensus] Epoch block viewID is greater than current block viewID")
-			return
+		// Passed all checks, we can change leader.
+		var (
+			wasFound bool
+			next     *bls.PublicKeyWrapper
+		)
+		// The same leader for N blocks.
+		if consensus.Blockchain.Config().IsAllowlistEpoch(epoch) {
+			wasFound, next = consensus.Decider.NthNextHmyExt(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
+		} else {
+			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
 		}
-
-		diff := curBlockViewID - epochBlockViewID
-
-		pps := consensus.Decider.Participants()
-		fmt.Println("diff ", diff, "epochBlockViewID: ", curBlockViewID, "epochBlockViewID", epochBlockViewID, (int(diff) / 5), len(pps), epoch)
-		idx := (int(diff) / 5) % len(pps)
-		consensus.pubKeyLock.Lock()
-		//fmt.Println("(int(diff)/3)%len(pps) == ", idx)
-		consensus.LeaderPubKey = &pps[idx]
-		//fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %v\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
-		consensus.pubKeyLock.Unlock()
+		if !wasFound {
+			utils.Logger().Error().Msg("Failed to get next leader")
+			return
+		} else {
+			consensus.SetLeaderPubKey(next)
+		}
 		if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
 			// leader changed
 			go func() {
@@ -729,6 +744,9 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		consensus.SetCurEpoch(blk.Epoch().Uint64())
 	}
+	consensus.pubKeyLock.Lock()
+	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
+	consensus.pubKeyLock.Unlock()
 	//prev := consensus.GetLeaderPubKey()
 	if consensus.Blockchain.Config().IsLeaderRotation(consensus.GetCurEpoch()) {
 		//consensus.updateLeader()
@@ -761,10 +779,6 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 				}()
 			}
 		}*/
-	} else {
-		consensus.pubKeyLock.Lock()
-		consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
-		consensus.pubKeyLock.Unlock()
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
