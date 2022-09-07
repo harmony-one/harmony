@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
+	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -530,7 +531,6 @@ func (consensus *Consensus) getLastMileBlocksAndMsg(bnStart uint64) ([]*types.Bl
 // preCommitAndPropose commit the current block with 67% commit signatures and start
 // proposing new block which will wait on the full commit signatures to finish
 func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
-	//fmt.Println("preCommitAndPropose", utils.GetPort(), blk.NumberU64())
 	if blk == nil {
 		return errors.New("block to pre-commit is nil")
 	}
