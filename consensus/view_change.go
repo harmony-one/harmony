@@ -176,7 +176,7 @@ func (consensus *Consensus) getNextLeaderKey(viewID uint64) *bls.PublicKeyWrappe
 
 	cur := consensus.GetCurBlockViewID()
 	if viewID > cur {
-		gap = int(viewID - consensus.GetCurBlockViewID())
+		gap = int(viewID - cur)
 	}
 	var lastLeaderPubKey *bls.PublicKeyWrapper
 	var err error
