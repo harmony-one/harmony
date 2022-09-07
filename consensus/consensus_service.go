@@ -82,8 +82,20 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	allKeys := consensus.Decider.Participants()
 	consensus.pubKeyLock.Unlock()
-	consensus.getLogger().Info().Msg("My Committee updated")
+	if len(allKeys) != 0 {
+		first := consensus.Decider.FirstParticipant(
+			shard.Schedule.InstanceForEpoch(consensus.Blockchain.CurrentHeader().Epoch()))
+		consensus.pubKeyLock.Lock()
+		consensus.LeaderPubKey = first
+		consensus.pubKeyLock.Unlock()
+		consensus.getLogger().Info().
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+	} else {
+		consensus.getLogger().Error().
+			Msg("[UpdatePublicKeys] Participants is empty")
+	}
 	for i := range pubKeys {
 		consensus.getLogger().Info().
 			Int("index", i).
