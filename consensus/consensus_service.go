@@ -77,8 +77,20 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	allKeys := consensus.Decider.Participants()
 	consensus.pubKeyLock.Unlock()
-	consensus.getLogger().Info().Msg("My Committee updated")
+	if len(allKeys) != 0 {
+		first := consensus.Decider.FirstParticipant(
+			shard.Schedule.InstanceForEpoch(consensus.Blockchain.CurrentHeader().Epoch()))
+		consensus.pubKeyLock.Lock()
+		consensus.LeaderPubKey = first
+		consensus.pubKeyLock.Unlock()
+		consensus.getLogger().Info().
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+	} else {
+		consensus.getLogger().Error().
+			Msg("[UpdatePublicKeys] Participants is empty")
+	}
 	for i := range pubKeys {
 		consensus.getLogger().Info().
 			Int("index", i).
@@ -87,20 +99,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	}
 	if consensus.Blockchain.Config().IsLeaderRotation(consensus.GetCurEpoch()) {
 		consensus.updateLeader()
-	} else {
-		consensus.pubKeyLock.Lock()
-		allKeys := consensus.Decider.Participants()
-		consensus.pubKeyLock.Unlock()
-		if len(allKeys) != 0 {
-			consensus.pubKeyLock.Lock()
-			consensus.LeaderPubKey = &allKeys[0]
-			consensus.pubKeyLock.Unlock()
-			consensus.getLogger().Info().
-				Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
-		} else {
-			consensus.getLogger().Error().
-				Msg("[UpdatePublicKeys] Participants is empty")
-		}
 	}
 
 	// reset states after update public keys
@@ -483,7 +481,6 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 }
 
 func (consensus *Consensus) SetCurEpoch(epoch uint64) {
-	fmt.Println("SetCurEpoch", epoch)
 	atomic.StoreUint64(&consensus.epoch, epoch)
 }
 
