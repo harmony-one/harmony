@@ -115,8 +115,6 @@ func (s *Service) Run() *http.Server {
 
 	s.router = mux.NewRouter()
 
-	fmt.Println("++", addr)
-
 	// Set up router for addresses.
 	// Fetch addresses request, accepts parameter size: how much addresses to read,
 	// parameter prefix: from which address prefix start
