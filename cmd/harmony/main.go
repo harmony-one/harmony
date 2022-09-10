@@ -265,8 +265,6 @@ func setupNodeLog(config harmonyconfig.HarmonyConfig) {
 func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	var err error
 
-	fmt.Println("OS: ", os.Args)
-
 	nodeconfigSetShardSchedule(hc)
 	nodeconfig.SetShardingSchedule(shard.Schedule)
 	nodeconfig.SetVersion(getHarmonyVersion())
@@ -787,7 +785,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 
 	// Set the consensus ID to be the current block number
 	viewID := currentNode.Blockchain().CurrentBlock().Header().ViewID().Uint64()
-	fmt.Println("viewID:", viewID)
 	currentConsensus.SetViewIDs(viewID + 1)
 	utils.Logger().Info().
 		Uint64("viewID", viewID).
