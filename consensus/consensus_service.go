@@ -248,7 +248,6 @@ func (consensus *Consensus) checkViewID(msg *FBFTMessage) error {
 		if !msg.HasSingleSender() {
 			return errors.New("Leader message can not have multiple sender keys")
 		}
-		fmt.Println("[checkViewID] Set LEADEER PUB KEY ", msg.SenderPubkeys[0].Bytes.Hex(), utils.GetPort())
 		consensus.LeaderPubKey = msg.SenderPubkeys[0]
 		consensus.IgnoreViewIDCheck.UnSet()
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -555,15 +554,6 @@ func (consensus *Consensus) StartFinalityCount() {
 	consensus.finalityCounter.Store(time.Now().UnixNano())
 }
 
-//func (consensus *Consensus) ReshardingNextLeader(newblock *types.Block) {
-//	consensus.pubKeyLock.Lock()
-//	fmt.Println("nextBlock1 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
-//	consensus.LeaderPubKey = consensus.getNextLeaderKey(consensus.GetCurBlockViewID() + 1)
-//	fmt.Println("nextBlock2 ", newblock.Header().Number().Uint64(), " ", consensus.LeaderPubKey.Bytes.Hex())
-//	consensus.pubKeyLock.Unlock()
-//
-//}
-
 // FinishFinalityCount calculate the current finality
 func (consensus *Consensus) FinishFinalityCount() {
 	d := time.Now().UnixNano()
@@ -684,14 +674,4 @@ func (consensus *Consensus) getLogger() *zerolog.Logger {
 		Str("mode", consensus.current.Mode().String()).
 		Logger()
 	return &logger
-}
-
-func UpdatePublicKeyDefault(consensus *Consensus) {
-	if allKeys := consensus.Decider.Participants(); len(allKeys) > 0 {
-		consensus.LeaderPubKey = &allKeys[0]
-	}
-}
-
-func UpdatePublicKeyRotate(consensus *Consensus) {
-	//consensus
 }
