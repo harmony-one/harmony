@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -73,33 +74,31 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
+	if utils.GetPort() == 9000 {
+		//utils.Logger().Info().Msg("UpdatePublicKeys")
+		fmt.Println("UpdatePublicKeys", len(pubKeys), len(allowlist))
+	}
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
-	allKeys := consensus.Decider.Participants()
-	consensus.pubKeyLock.Unlock()
-	if len(allKeys) != 0 {
-		first := consensus.Decider.FirstParticipant(
-			shard.Schedule.InstanceForEpoch(consensus.Blockchain.CurrentHeader().Epoch()))
-		consensus.pubKeyLock.Lock()
-		consensus.LeaderPubKey = first
-		consensus.pubKeyLock.Unlock()
-		consensus.getLogger().Info().
-			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
-	} else {
-		consensus.getLogger().Error().
-			Msg("[UpdatePublicKeys] Participants is empty")
-	}
+	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
 		consensus.getLogger().Info().
 			Int("index", i).
 			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
 			Msg("Member")
 	}
-	if consensus.Blockchain.Config().IsLeaderRotation(consensus.GetCurEpoch()) {
-		consensus.updateLeader()
-	}
 
+	allKeys := consensus.Decider.Participants()
+	if len(allKeys) != 0 {
+		consensus.LeaderPubKey = &allKeys[0]
+		consensus.getLogger().Info().
+			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
+	} else {
+		consensus.getLogger().Error().
+			Msg("[UpdatePublicKeys] Participants is empty")
+	}
+	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
