@@ -372,7 +372,6 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
-	//fmt.Printf("[onViewChange] received view change message from %+v\n", recvMsg)
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
@@ -394,13 +393,6 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 			Msg("[onViewChange] I am not the Leader")
 		return
 	}
-
-	consensus.getLogger().Debug().
-		Err(err).
-		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
-		Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
-		Str("myBLSPubKey", consensus.priKey.GetPublicKeys().SerializeToHexStr()).
-		Msg("[onViewChange] I am the Leader")
 
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
