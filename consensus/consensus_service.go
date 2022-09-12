@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -74,10 +73,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	if utils.GetPort() == 9000 {
-		//utils.Logger().Info().Msg("UpdatePublicKeys")
-		fmt.Println("UpdatePublicKeys", len(pubKeys), len(allowlist))
-	}
 	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
 	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
