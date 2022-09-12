@@ -475,14 +475,6 @@ func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
 }
 
-func (consensus *Consensus) SetCurEpoch(epoch uint64) {
-	atomic.StoreUint64(&consensus.epoch, epoch)
-}
-
-func (consensus *Consensus) GetCurEpoch() *big.Int {
-	return big.NewInt(int64(atomic.LoadUint64(&consensus.epoch)))
-}
-
 // SetViewChangingID set the current view change ID
 func (consensus *Consensus) SetViewChangingID(viewID uint64) {
 	consensus.current.SetViewChangingID(viewID)
