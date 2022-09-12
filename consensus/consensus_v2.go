@@ -650,7 +650,6 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
 			return err
 		}
-		//fmt.Println("tryCatchup ", utils.GetPort(), blk.NumberU64())
 		select {
 		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
