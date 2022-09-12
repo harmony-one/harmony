@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -81,14 +82,17 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 
 func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
+	consensus.getLogger().Info().Msg("My Committee updated")
+	for i := range pubKeys {
+		consensus.getLogger().Info().
+			Int("index", i).
+			Str("BLSPubKey", pubKeys[i].Bytes.Hex()).
+			Msg("Member")
+	}
+
 	allKeys := consensus.Decider.Participants()
-	consensus.pubKeyLock.Unlock()
 	if len(allKeys) != 0 {
-		first := consensus.Decider.FirstParticipant(
-			shard.Schedule.InstanceForEpoch(consensus.Blockchain.CurrentHeader().Epoch()))
-		consensus.pubKeyLock.Lock()
-		consensus.LeaderPubKey = first
-		consensus.pubKeyLock.Unlock()
+		consensus.LeaderPubKey = &allKeys[0]
 		consensus.getLogger().Info().
 			Str("info", consensus.LeaderPubKey.Bytes.Hex()).Msg("My Leader")
 	} else {
