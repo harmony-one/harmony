@@ -682,9 +682,8 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
-func (consensus *Consensus) rotateLeader() {
+func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	prev := consensus.GetLeaderPubKey()
-	epoch := consensus.GetCurEpoch()
 	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
 	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
 		leader := consensus.GetLeaderPubKey()
@@ -738,16 +737,11 @@ func (consensus *Consensus) rotateLeader() {
 func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
-	if blk.IsLastBlockInEpoch() {
-		consensus.SetCurEpoch(blk.Epoch().Uint64() + 1)
-	} else {
-		consensus.SetCurEpoch(blk.Epoch().Uint64())
-	}
 	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	consensus.pubKeyLock.Unlock()
-	if consensus.Blockchain.Config().IsLeaderRotation(consensus.GetCurEpoch()) {
-		consensus.rotateLeader()
+	if consensus.Blockchain.Config().IsLeaderRotation(blk.Epoch()) {
+		consensus.rotateLeader(blk.Epoch())
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
