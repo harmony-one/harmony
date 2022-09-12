@@ -420,9 +420,8 @@ func setupNodeAndRun(hc harmonyconfig.HarmonyConfig) {
 	if currentNode.NodeConfig.Role() == nodeconfig.Validator {
 		currentNode.RegisterValidatorServices()
 	} else if currentNode.NodeConfig.Role() == nodeconfig.ExplorerNode {
-
+		currentNode.RegisterExplorerServices()
 	}
-	currentNode.RegisterExplorerServices()
 	currentNode.RegisterService(service.CrosslinkSending, crosslink_sending.New(currentNode, currentNode.Blockchain()))
 	if hc.Pprof.Enabled {
 		setupPprofService(currentNode, hc)
