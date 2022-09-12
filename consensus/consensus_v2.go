@@ -660,8 +660,6 @@ func (consensus *Consensus) tryCatchup() error {
 }
 
 func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMessage) error {
-	// this function evaluates for all, leader and validators.
-
 	if consensus.Blockchain().CurrentBlock().NumberU64() < blk.NumberU64() {
 		if _, err := consensus.Blockchain().InsertChain([]*types.Block{blk}, !consensus.FBFTLog.IsBlockVerified(blk.Hash())); err != nil {
 			consensus.getLogger().Error().Err(err).Msg("[commitBlock] Failed to add block to chain")
@@ -758,17 +756,6 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	}
 	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.ResetState()
-}
-
-func (consensus *Consensus) getEpochFirstBlockViewID(epoch *big.Int) (uint64, error) {
-	if epoch.Uint64() == 0 {
-		return 0, nil
-	}
-	epochBlock := consensus.Blockchain.GetBlockByNumber(shard.Schedule.EpochLastBlock(epoch.Uint64() - 1))
-	if epochBlock == nil {
-		return 0, errors.Errorf("block not found for number %d", epoch.Uint64()-1)
-	}
-	return epochBlock.Header().ViewID().Uint64() + 1, nil
 }
 
 func (consensus *Consensus) postCatchup(initBN uint64) {
