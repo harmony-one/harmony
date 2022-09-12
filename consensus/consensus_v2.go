@@ -645,7 +645,6 @@ func (consensus *Consensus) tryCatchup() error {
 			consensus.getLogger().Error().Err(err).Msg("[TryCatchup] Failed to add block to chain")
 			return err
 		}
-		//fmt.Println("tryCatchup ", utils.GetPort(), blk.NumberU64())
 		select {
 		// TODO: Remove this when removing dns sync and stream sync is fully up
 		case consensus.VerifiedNewBlock <- blk:
@@ -683,7 +682,7 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	return nil
 }
 
-func (consensus *Consensus) updateLeader() {
+func (consensus *Consensus) rotateLeader() {
 	prev := consensus.GetLeaderPubKey()
 	epoch := consensus.GetCurEpoch()
 	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
@@ -747,38 +746,8 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	consensus.pubKeyLock.Unlock()
-	//prev := consensus.GetLeaderPubKey()
 	if consensus.Blockchain.Config().IsLeaderRotation(consensus.GetCurEpoch()) {
-		//consensus.updateLeader()
-		consensus.updateLeader()
-
-		/*{
-			epochBlockViewID, err := consensus.getEpochFirstBlockViewID(consensus.GetCurEpoch())
-			if err != nil {
-				consensus.getLogger().Error().Err(err).Msgf("[SetupForNewConsensus] Failed to get epoch block viewID for epoch %d", blk.Epoch().Uint64())
-				return
-			}
-			if epochBlockViewID > curBlockViewID {
-				consensus.getLogger().Error().Msg("[SetupForNewConsensus] Epoch block viewID is greater than current block viewID")
-				return
-			}
-
-			diff := curBlockViewID - epochBlockViewID
-
-			pps := consensus.Decider.Participants()
-			idx := (int(diff) / 3) % len(pps)
-			consensus.pubKeyLock.Lock()
-			//fmt.Println("(int(diff)/3)%len(pps) == ", idx)
-			consensus.LeaderPubKey = &pps[idx]
-			//fmt.Printf("SetupForNewConsensus :%d idx: %d future v%d new: %s prev: %s %v\n", utils.GetPort(), idx, curBlockViewID, consensus.LeaderPubKey.Bytes.Hex(), prev.Bytes.Hex(), consensus.isLeader())
-			consensus.pubKeyLock.Unlock()
-			if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
-				// leader changed
-				go func() {
-					consensus.ReadySignal <- SyncProposal
-				}()
-			}
-		}*/
+		consensus.rotateLeader()
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
