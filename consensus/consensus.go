@@ -240,7 +240,7 @@ func (consensus *Consensus) getBlockNum() uint64 {
 
 // New create a new Consensus record
 func New(
-	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
+	host p2p.Host, shard uint32, leader p2p.Peer, multiBLSPriKey multibls.PrivateKeys,
 	registry *registry.Registry,
 	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
