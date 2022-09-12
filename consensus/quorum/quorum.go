@@ -75,7 +75,6 @@ type ParticipantTracker interface {
 	Participants() multibls.PublicKeys
 	IndexOf(bls.SerializedPublicKey) int
 	ParticipantsCount() int64
-	NthNext(*bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmy(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	NthNextHmyExt(shardingconfig.Instance, *bls.PublicKeyWrapper, int) (bool, *bls.PublicKeyWrapper)
 	FirstParticipant(shardingconfig.Instance) *bls.PublicKeyWrapper
