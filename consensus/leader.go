@@ -322,5 +322,4 @@ func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
 
 		consensus.msgSender.StopRetry(msg_pb.MessageType_PREPARED)
 	}
-	//fmt.Println("onCommit99:  ", utils.GetPort(), recvMsg.BlockNum)
 }
