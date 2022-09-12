@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/internal/chain"
@@ -685,10 +686,11 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 	prev := consensus.GetLeaderPubKey()
 	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
+	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), consensus.Blockchain.Config().IsLeaderRotation(epoch), consensus.Blockchain.Config().LeaderRotationBlocksCount)
 	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
 		leader := consensus.GetLeaderPubKey()
-		for i := uint64(0); i < 5; i++ {
-			header := consensus.Blockchain.GetHeaderByNumber(curNumber - i)
+		for i := 0; i < consensus.Blockchain.Config().LeaderRotationBlocksCount; i++ {
+			header := consensus.Blockchain.GetHeaderByNumber(curNumber - uint64(i))
 			if header == nil {
 				return
 			}
@@ -740,8 +742,14 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	consensus.pubKeyLock.Unlock()
-	if consensus.Blockchain.Config().IsLeaderRotation(blk.Epoch()) {
-		consensus.rotateLeader(blk.Epoch())
+	var epoch *big.Int
+	if blk.IsLastBlockInEpoch() {
+		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
+	} else {
+		epoch = blk.Epoch()
+	}
+	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
+		consensus.rotateLeader(epoch)
 	}
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
