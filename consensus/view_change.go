@@ -367,13 +367,6 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 		return
 	}
 
-	consensus.getLogger().Debug().
-		Err(err).
-		Interface("SenderPubkeys", recvMsg.SenderPubkeys).
-		Str("NextLeader", recvMsg.LeaderPubkey.Bytes.Hex()).
-		Str("myBLSPubKey", consensus.priKey.GetPublicKeys().SerializeToHexStr()).
-		Msg("[onViewChange] I am the Leader")
-
 	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) {
 		consensus.getLogger().Info().
 			Int64("have", consensus.Decider.SignersCount(quorum.ViewChange)).
