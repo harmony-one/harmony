@@ -759,6 +759,12 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 	} else {
 		epoch = blk.Epoch()
 	}
+	var epoch *big.Int
+	if blk.IsLastBlockInEpoch() {
+		epoch = new(big.Int).Add(blk.Epoch(), common.Big1)
+	} else {
+		epoch = blk.Epoch()
+	}
 	if consensus.Blockchain.Config().IsLeaderRotation(epoch) {
 		consensus.rotateLeader(epoch)
 	}
