@@ -277,7 +277,8 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
-		LeaderRotationEpoch:           big.NewInt(1),
+		LeaderRotationEpoch:           big.NewInt(4),
+		LeaderRotationBlocksCount:     5,
 	}
 
 	// AllProtocolChanges ...
@@ -318,6 +319,7 @@ var (
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(1), // LeaderRotationEpoch
+		64,            // LeaderRotationBlocksCount
 		big.NewInt(0),                      // FeeCollectEpoch
 		big.NewInt(0),                      // ValidatorCodeFixEpoch
 	}
@@ -361,6 +363,7 @@ var (
 		big.NewInt(0),        // AllowlistEpoch
 		// TODO place correct epoch number
 		big.NewInt(1), // LeaderRotationEpoch
+		64,            // LeaderRotationBlocksCount
 		big.NewInt(0),        // FeeCollectEpoch
 		big.NewInt(0),        // ValidatorCodeFixEpoch
 	}
@@ -503,6 +506,8 @@ type ChainConfig struct {
 	AllowlistEpoch *big.Int
 
 	LeaderRotationEpoch *big.Int `json:"leader-rotation-epoch,omitempty"`
+
+	LeaderRotationBlocksCount int `json:"leader-rotation-blocks-count,omitempty"`
 
 	// FeeCollectEpoch is the first epoch that enables txn fees to be collected into the community-managed account.
 	// It should >= StakingEpoch.

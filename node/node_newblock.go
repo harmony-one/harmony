@@ -86,7 +86,7 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 					}()
 					newBlock, err := node.ProposeNewBlock(newCommitSigsChan)
 					if err == nil {
-						fmt.Printf("ProposeNewBlock: #%d :%d @%d with leader %s\n", newBlock.NumberU64(), utils.GetPort(), newBlock.Header().ViewID().Int64(), node.Consensus.GetLeaderPubKey().Bytes.Hex())
+						fmt.Printf("ProposeNewBlock: #%d :%d e:%d, sh:%d  with leader %s\n", newBlock.NumberU64(), utils.GetPort(), node.Blockchain().CurrentHeader().Epoch().Uint64(), node.Blockchain().ShardID(), node.Consensus.GetLeaderPubKey().Bytes.Hex())
 
 						if blk, ok := node.proposedBlock[newBlock.NumberU64()]; ok {
 							utils.Logger().Info().Uint64("blockNum", newBlock.NumberU64()).Str("blockHash", blk.Hash().Hex()).
