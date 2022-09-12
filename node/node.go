@@ -1187,9 +1187,10 @@ func (node *Node) InitConsensusWithValidators() (err error) {
 		)
 	}
 	shardID := node.Consensus.ShardID
-	blockNum := node.Blockchain().CurrentBlock().NumberU64()
+	currentBlock := node.Blockchain().CurrentBlock()
+	blockNum := currentBlock.NumberU64()
 	node.Consensus.SetMode(consensus.Listening)
-	epoch := shard.Schedule.CalcEpochNumber(blockNum)
+	epoch := currentBlock.Epoch()
 	utils.Logger().Info().
 		Uint64("blockNum", blockNum).
 		Uint32("shardID", shardID).
