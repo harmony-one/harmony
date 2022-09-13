@@ -108,19 +108,32 @@ type SyncConfig struct {
 	// SyncPeerConfig itself is guarded by its own mutex.
 	mtx sync.RWMutex
 
+	storage *Storage
 	peers   []*SyncPeerConfig
 	shardID uint32
 }
 
-func NewSyncConfig(shardID uint32, peers []*SyncPeerConfig) *SyncConfig {
+func NewSyncConfig(shardID uint32, storage *Storage) *SyncConfig {
 	return &SyncConfig{
-		peers:   peers,
+		storage: storage,
 		shardID: shardID,
 	}
 }
 
 func (sc *SyncConfig) ShardID() uint32 {
 	return sc.shardID
+}
+
+func (sc *SyncConfig) Storage() *Storage {
+	sc.mtx.RLock()
+	defer sc.mtx.RUnlock()
+	if sc == nil {
+		return NewStorage()
+	}
+	if sc.storage == nil {
+		return NewStorage()
+	}
+	return sc.storage
 }
 
 // AddPeer adds the given sync peer.
@@ -383,6 +396,19 @@ func checkPeersDuplicity(ps []p2p.Peer) error {
 	return nil
 }
 
+//// checkPeersDuplicity checks whether there are duplicates in p2p.Peer
+//func uniqPeers(ps []p2p.Peer) (map[peerDupID]p2p.Peer, error) {
+//	m := make(map[peerDupID]p2p.Peer)
+//	for _, p := range ps {
+//		dip := peerDupID{p.IP, p.Port}
+//		if _, ok := m[dip]; ok {
+//			return nil, fmt.Errorf("duplicate peer [%v:%v]", p.IP, p.Port)
+//		}
+//		m[dip] = p
+//	}
+//	return m, nil
+//}
+
 // limitNumPeers limits number of peers to release some server end sources.
 func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
 	targetSize := calcNumPeersWithBound(len(ps), NumPeersLowBound, numPeersHighBound)
@@ -394,6 +420,11 @@ func limitNumPeers(ps []p2p.Peer, randSeed int64) []p2p.Peer {
 	r.Shuffle(len(ps), func(i, j int) { ps[i], ps[j] = ps[j], ps[i] })
 
 	return ps[:targetSize]
+}
+
+// limitNumPeers limits number of peers to release some server end sources.
+func limitNumPeersNum() int {
+	return (NumPeersLowBound + numPeersHighBound) / 2
 }
 
 // Peers are expected to limited at half of the size, capped between lowBound and highBound.

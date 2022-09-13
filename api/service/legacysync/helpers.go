@@ -3,7 +3,6 @@ package legacysync
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
@@ -51,14 +50,17 @@ func getMaxPeerHeight(syncConfig *SyncConfig) uint64 {
 	return maxHeight
 }
 
-func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) (*SyncConfig, error) {
-	// sanity check to ensure no duplicate peers
-	if err := checkPeersDuplicity(peers); err != nil {
-		return syncConfig, err
+func createSyncConfig(syncConfig *SyncConfig, provider SyncingPeerProvider, shardID uint32) (*SyncConfig, error) {
+	peers, err := provider.SyncingPeers(shardID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot get syncing peers for shard %d", shardID)
 	}
+
+	storage := syncConfig.Storage()
+	storage.AddPeers(peers)
+
 	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	peers = limitNumPeers(peers, randSeed)
+	peers = storage.GetPeersN(limitNumPeersNum())
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).
@@ -71,8 +73,9 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 	if syncConfig != nil {
 		syncConfig.CloseConnections()
 	}
-	syncConfig = NewSyncConfig(shardID, nil)
+	syncConfig = NewSyncConfig(shardID, storage)
 
+	ch := make(chan *SyncPeerConfig, len(peers))
 	var wg sync.WaitGroup
 	for _, peer := range peers {
 		wg.Add(1)
@@ -87,10 +90,14 @@ func createSyncConfig(syncConfig *SyncConfig, peers []p2p.Peer, shardID uint32) 
 				port:   peer.Port,
 				client: client,
 			}
-			syncConfig.AddPeer(peerConfig)
+			ch <- peerConfig
 		}(peer)
 	}
 	wg.Wait()
+	close(ch)
+	for v := range ch {
+		syncConfig.AddPeer(v)
+	}
 	utils.Logger().Info().
 		Int("len", len(syncConfig.peers)).
 		Uint32("shardID", shardID).

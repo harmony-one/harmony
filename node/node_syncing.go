@@ -231,6 +231,8 @@ func (node *Node) doBeaconSyncing() {
 		}(node)
 	}
 
+	var syncConfig *legacysync.SyncConfig
+
 	// TODO ek – infinite loop; add shutdown/cleanup logic
 	for {
 		if node.epochSync == nil {
@@ -239,23 +241,15 @@ func (node *Node) doBeaconSyncing() {
 		}
 		peersCount := node.epochSync.GetActivePeerNumber()
 		if peersCount < legacysync.NumPeersLowBound {
-			utils.Logger().Warn().
-				Msgf("[EPOCHSYNC] num peers %d less than low bound %d; bootstrapping beacon sync config", peersCount, legacysync.NumPeersLowBound)
-			peers, err := node.SyncingPeerProvider.SyncingPeers(shard.BeaconChainShardID)
+			rs, err := legacysync.CreateSyncConfig(syncConfig, node.SyncingPeerProvider, shard.BeaconChainShardID)
 			if err != nil {
-				utils.Logger().
-					Err(err).
-					Msg("[EPOCHSYNC] cannot retrieve beacon syncing peers")
-				continue
-			}
-
-			if err := node.epochSync.CreateSyncConfig(peers, shard.BeaconChainShardID); err != nil {
 				utils.Logger().Warn().Err(err).Msg("[EPOCHSYNC] cannot create beacon sync config")
 				continue
 			}
+			syncConfig = rs
 		}
 
-		<-time.After(node.epochSync.SyncLoop(node.EpochChain(), true, nil))
+		<-time.After(legacysync.SyncLoop(node.EpochChain(), syncConfig))
 	}
 }
 
