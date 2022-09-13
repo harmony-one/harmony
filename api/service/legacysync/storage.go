@@ -63,12 +63,27 @@ func (s *Storage) Fail(p p2p.Peer) {
 	s.fail[d] = p
 }
 
+func (s *Storage) IsFail(p p2p.Peer) bool {
+	d := peerDupID{p.IP, p.Port}
+	_, ok := s.fail[d]
+	return ok
+}
+
 func (s *Storage) Success(p p2p.Peer) {
 	d := peerDupID{p.IP, p.Port}
 	delete(s.fail, d)
 	s.succ[d] = p
 }
 
+func (s *Storage) IsSuccess(p p2p.Peer) bool {
+	d := peerDupID{p.IP, p.Port}
+	_, ok := s.succ[d]
+	return ok
+}
+
 func NewStorage() *Storage {
-	return &Storage{}
+	return &Storage{
+		succ: make(map[peerDupID]p2p.Peer),
+		fail: make(map[peerDupID]p2p.Peer),
+	}
 }
