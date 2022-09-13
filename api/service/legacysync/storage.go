@@ -40,6 +40,12 @@ func (s *Storage) GetPeersN(n int) []p2p.Peer {
 			break
 		}
 	}
+	for _, p := range s.fail {
+		peers = append(peers, p)
+		if len(peers) >= n {
+			break
+		}
+	}
 	return peers
 }
 

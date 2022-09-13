@@ -276,18 +276,9 @@ func (node *Node) DoSyncing(bc core.BlockChain, worker *worker.Worker, willJoinC
 func (node *Node) doSync(bc core.BlockChain, worker *worker.Worker, willJoinConsensus bool) {
 	if node.stateSync.GetActivePeerNumber() < legacysync.NumPeersLowBound {
 		shardID := bc.ShardID()
-		peers, err := node.SyncingPeerProvider.SyncingPeers(shardID)
-		if err != nil {
+		if err := node.stateSync.CreateSyncConfig(node.SyncingPeerProvider, shardID); err != nil {
 			utils.Logger().Warn().
 				Err(err).
-				Uint32("shard_id", shardID).
-				Msg("cannot retrieve syncing peers")
-			return
-		}
-		if err := node.stateSync.CreateSyncConfig(peers, shardID); err != nil {
-			utils.Logger().Warn().
-				Err(err).
-				Interface("peers", peers).
 				Msg("[SYNC] create peers error")
 			return
 		}
