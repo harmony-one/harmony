@@ -60,7 +60,7 @@ func createSyncConfig(syncConfig *SyncConfig, provider SyncingPeerProvider, shar
 	storage.AddPeers(peers)
 
 	// limit the number of dns peers to connect
-	peers = storage.GetPeersN(limitPeersNum())
+	peers = storage.GetPeers(limitPeersNum())
 
 	utils.Logger().Debug().
 		Int("len", len(peers)).

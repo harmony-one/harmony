@@ -1,6 +1,10 @@
 package legacysync
 
-import "github.com/harmony-one/harmony/p2p"
+import (
+	"sync"
+
+	"github.com/harmony-one/harmony/p2p"
+)
 
 type peerDupID struct {
 	ip   string
@@ -8,22 +12,20 @@ type peerDupID struct {
 }
 
 type Storage struct {
+	mu   sync.Mutex
 	succ map[peerDupID]p2p.Peer
 	fail map[peerDupID]p2p.Peer
 }
 
 func (s *Storage) Contains(p p2p.Peer) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
 	return s.contains(d)
 }
 
 func (s *Storage) contains(d peerDupID) bool {
-	_, ok := s.succ[d]
-	if ok {
-		return true
-	}
-	_, ok = s.fail[d]
-	return ok
+	return s.isSuccess(d) || s.isFail(d)
 }
 
 func (s *Storage) AddPeers(peers []p2p.Peer) {
@@ -32,7 +34,9 @@ func (s *Storage) AddPeers(peers []p2p.Peer) {
 	}
 }
 
-func (s *Storage) GetPeersN(n int) []p2p.Peer {
+func (s *Storage) GetPeers(n int) []p2p.Peer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	peers := make([]p2p.Peer, 0, n)
 	for _, p := range s.succ {
 		peers = append(peers, p)
@@ -50,6 +54,8 @@ func (s *Storage) GetPeersN(n int) []p2p.Peer {
 }
 
 func (s *Storage) AddPeer(p p2p.Peer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
 	if s.contains(d) {
 		return
@@ -58,27 +64,41 @@ func (s *Storage) AddPeer(p p2p.Peer) {
 }
 
 func (s *Storage) Fail(p p2p.Peer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
 	delete(s.succ, d)
 	s.fail[d] = p
 }
 
 func (s *Storage) IsFail(p p2p.Peer) bool {
-	d := peerDupID{p.IP, p.Port}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.isFail(peerDupID{p.IP, p.Port})
+}
+
+func (s *Storage) isFail(d peerDupID) bool {
 	_, ok := s.fail[d]
 	return ok
 }
 
 func (s *Storage) Success(p p2p.Peer) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
 	delete(s.fail, d)
 	s.succ[d] = p
 }
 
-func (s *Storage) IsSuccess(p p2p.Peer) bool {
-	d := peerDupID{p.IP, p.Port}
+func (s *Storage) isSuccess(d peerDupID) bool {
 	_, ok := s.succ[d]
 	return ok
+}
+
+func (s *Storage) IsSuccess(p p2p.Peer) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.isSuccess(peerDupID{p.IP, p.Port})
 }
 
 func NewStorage() *Storage {

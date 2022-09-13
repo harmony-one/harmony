@@ -15,7 +15,7 @@ func TestStorage(t *testing.T) {
 	s.AddPeer(p1)
 	require.True(t, s.Contains(p1))
 
-	peers := s.GetPeersN(1)
+	peers := s.GetPeers(1)
 	require.Equal(t, 1, len(peers))
 
 	require.True(t, s.IsSuccess(p1))
@@ -26,5 +26,5 @@ func TestStorage(t *testing.T) {
 	require.False(t, s.IsSuccess(p1))
 	require.True(t, s.IsFail(p1))
 
-	require.Equal(t, 1, len(s.GetPeersN(1)))
+	require.Equal(t, 1, len(s.GetPeers(1)))
 }
