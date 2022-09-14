@@ -11,6 +11,7 @@ type peerDupID struct {
 	port string
 }
 
+// Storage keeps successful and failed peers.
 type Storage struct {
 	mu   sync.Mutex
 	succ map[peerDupID]p2p.Peer
@@ -34,6 +35,7 @@ func (s *Storage) AddPeers(peers []p2p.Peer) {
 	}
 }
 
+// GetPeers returns no more than `n` peers. First `succ` then `fail`.
 func (s *Storage) GetPeers(n int) []p2p.Peer {
 	s.mu.Lock()
 	defer s.mu.Unlock()
