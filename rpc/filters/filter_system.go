@@ -193,7 +193,7 @@ func (es *EventSystem) subscribe(sub *subscription) *Subscription {
 // SubscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel. Default value for the from and to
 // block is "latest". If the fromBlock > toBlock an error is returned.
-func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
+func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) (*Subscription, error) {
 	var from, to rpc.BlockNumber
 	if crit.FromBlock == nil {
 		from = rpc.LatestBlockNumber
@@ -208,32 +208,38 @@ func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 
 	// only interested in pending logs
 	if from == rpc.PendingBlockNumber && to == rpc.PendingBlockNumber {
-		return es.subscribePendingLogs(crit, logs), nil
+		return es.subscribePendingLogs(crit, logs, customID), nil
 	}
 	// only interested in new mined logs
 	if from == rpc.LatestBlockNumber && to == rpc.LatestBlockNumber {
-		return es.subscribeLogs(crit, logs), nil
+		return es.subscribeLogs(crit, logs, customID), nil
 	}
 	// only interested in mined logs within a specific block range
 	if from >= 0 && to >= 0 && to >= from {
-		return es.subscribeLogs(crit, logs), nil
+		return es.subscribeLogs(crit, logs, customID), nil
 	}
 	// interested in mined logs from a specific block number, new logs and pending logs
 	if from >= rpc.LatestBlockNumber && to == rpc.PendingBlockNumber {
-		return es.subscribeMinedPendingLogs(crit, logs), nil
+		return es.subscribeMinedPendingLogs(crit, logs, customID), nil
 	}
 	// interested in logs from a specific block number to new mined blocks
 	if from >= 0 && to == rpc.LatestBlockNumber {
-		return es.subscribeLogs(crit, logs), nil
+		return es.subscribeLogs(crit, logs, customID), nil
 	}
 	return nil, fmt.Errorf("invalid from and to block combination: from > to")
 }
 
 // subscribeMinedPendingLogs creates a subscription that returned mined and
 // pending logs that match the given criteria.
-func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
+	var id rpc.ID
+	if customID != nil {
+		id = *customID
+	} else {
+		id = rpc.NewID()
+	}
 	sub := &subscription{
-		id:        rpc.NewID(),
+		id:        id,
 		typ:       MinedAndPendingLogsSubscription,
 		logsCrit:  crit,
 		created:   time.Now(),
@@ -248,9 +254,15 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs
 
 // subscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel.
-func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
+	var id rpc.ID
+	if customID != nil {
+		id = *customID
+	} else {
+		id = rpc.NewID()
+	}
 	sub := &subscription{
-		id:        rpc.NewID(),
+		id:        id,
 		typ:       LogsSubscription,
 		logsCrit:  crit,
 		created:   time.Now(),
@@ -265,9 +277,15 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 
 // subscribePendingLogs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
-func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
+	var id rpc.ID
+	if customID != nil {
+		id = *customID
+	} else {
+		id = rpc.NewID()
+	}
 	sub := &subscription{
-		id:        rpc.NewID(),
+		id:        id,
 		typ:       PendingLogsSubscription,
 		logsCrit:  crit,
 		created:   time.Now(),
