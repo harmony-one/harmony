@@ -232,9 +232,11 @@ func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 // subscribeMinedPendingLogs creates a subscription that returned mined and
 // pending logs that match the given criteria.
 func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
-	id := rpc.NewID()
+	var id rpc.ID
 	if customID != nil {
 		id = *customID
+	} else {
+		id = rpc.NewID()
 	}
 	sub := &subscription{
 		id:        id,
@@ -253,9 +255,11 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs
 // subscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel.
 func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
-	id := rpc.NewID()
+	var id rpc.ID
 	if customID != nil {
 		id = *customID
+	} else {
+		id = rpc.NewID()
 	}
 	sub := &subscription{
 		id:        id,
@@ -274,9 +278,11 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 // subscribePendingLogs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
 func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log, customID *rpc.ID) *Subscription {
-	id := rpc.NewID()
+	var id rpc.ID
 	if customID != nil {
 		id = *customID
+	} else {
+		id = rpc.NewID()
 	}
 	sub := &subscription{
 		id:        id,

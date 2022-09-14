@@ -360,7 +360,7 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 		return "", fmt.Errorf("sending filter logs to other readers: %w", err)
 	}
 
-	time.Sleep(time.Millisecond * 70) // to give time to the other writers to catch up
+	time.Sleep(time.Millisecond * 70) // to give time to the other readers to catch up
 	return api.createFilter(ethereum.FilterQuery(crit), id)
 }
 
