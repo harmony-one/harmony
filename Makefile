@@ -49,7 +49,7 @@ exe:
 	bash ./scripts/go_executable_build.sh -S
 
 race:
-	bash ./scripts/go_executable_build.sh -r
+	bash ./scripts/go_executable_build.sh -Sr
 
 trace-pointer:
 	bash ./scripts/go_executable_build.sh -t
