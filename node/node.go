@@ -1090,7 +1090,7 @@ func New(
 			if node.Blockchain().IsTikvWriterMaster() {
 				err := redis_helper.PublishTxPoolUpdate(uint32(harmonyconfig.General.ShardID), tx, local)
 				if err != nil {
-					utils.Logger().Info().Err(err).Msg("redis publish txpool update error")
+					utils.Logger().Warn().Err(err).Msg("redis publish txpool update error")
 				}
 			}
 		}
@@ -1436,13 +1436,13 @@ func (node *Node) syncFromTiKVWriter() {
 			select {
 			case <-doneChan:
 				return
-			case <-time.After(5 * time.Minute):
+			case <-time.After(2 * time.Minute):
 				buf := bytes.NewBuffer(nil)
 				err := pprof.Lookup("goroutine").WriteTo(buf, 1)
 				if err != nil {
 					panic(err)
 				}
-				err = ioutil.WriteFile(fmt.Sprintf("/tmp/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				err = ioutil.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}
@@ -1452,8 +1452,7 @@ func (node *Node) syncFromTiKVWriter() {
 		}()
 		defer close(doneChan)
 
-		err := bc.SyncFromTiKVWriter(blkNum, logs)
-		if err != nil {
+		if err := bc.SyncFromTiKVWriter(blkNum, logs); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Msg("cannot sync block from tikv writer")
