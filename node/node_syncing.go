@@ -134,6 +134,7 @@ func (node *Node) createStagedSync(bc core.BlockChain) *stagedsync.StagedSync {
 		node.NodeConfig.MaxBlocksPerSyncCycle,
 		node.NodeConfig.MaxBackgroundBlocks,
 		node.NodeConfig.MaxMemSyncCycleSize,
+		node.NodeConfig.VerifyAllSig,
 		node.NodeConfig.VerifyHeaderBatchSize,
 		node.NodeConfig.InsertChainBatchSize); err != nil {
 		return nil

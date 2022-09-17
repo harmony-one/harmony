@@ -73,6 +73,8 @@ type StagedSync struct {
 	MaxMemSyncCycleSize uint64
 	// number of blocks to build a batch and insert to chain in staged sync
 	InsertChainBatchSize int
+	// verify signature for all blocks regardless of height or batch size
+	VerifyAllSig bool
 	// batch size to verify header before insert to chain
 	VerifyHeaderBatchSize uint64
 	// use mem db for staged sync, set to false to use disk
@@ -253,6 +255,7 @@ func New(ctx context.Context,
 	maxBlocksPerCycle uint64,
 	maxBackgroundBlocks uint64,
 	maxMemSyncCycleSize uint64,
+	verifyAllSig bool,
 	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int) *StagedSync {
 
@@ -304,6 +307,7 @@ func New(ctx context.Context,
 		MaxBlocksPerSyncCycle:  maxBlocksPerCycle,
 		MaxBackgroundBlocks:    maxBackgroundBlocks,
 		MaxMemSyncCycleSize:    maxMemSyncCycleSize,
+		VerifyAllSig:           verifyAllSig,
 		VerifyHeaderBatchSize:  verifyHeaderBatchSize,
 		InsertChainBatchSize:   insertChainBatchSize,
 	}

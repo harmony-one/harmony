@@ -70,7 +70,8 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 		defer tx.Rollback()
 	}
 	blocksBucketName := GetBucketName(DownloadedBlocksBucket, s.state.isBeacon)
-	verifyAllSig := false //TODO: move to configs
+	isLastCycle := targetHeight >= maxPeersHeight
+	verifyAllSig := s.state.VerifyAllSig || isLastCycle //if it's last cycle, we have to check all signatures
 	startTime := time.Now()
 	startBlock := currProgress
 	var newBlocks types.Blocks

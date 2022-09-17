@@ -242,6 +242,7 @@ type StagedSyncConfig struct {
 	MaxBackgroundBlocks    uint64 // max number of background blocks in turbo mode
 	InsertChainBatchSize   int    // number of blocks to build a batch and insert to chain in staged sync
 	MaxMemSyncCycleSize    uint64 // max number of blocks to use a single transaction for staged sync
+	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
 }
