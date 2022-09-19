@@ -241,7 +241,7 @@ func newBlockChainWithOptions(
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
-	leaderPubKeyFromCoinbase, _ := lru.New(leaderPubKeyFromCoinbaseLimit)
+	leaderPubKeyFromCoinbase, _ := lru.New(chainConfig.LeaderRotationBlocksCount + 2)
 
 	bc := &BlockChainImpl{
 		chainConfig:                   chainConfig,
