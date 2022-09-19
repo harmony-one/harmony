@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
+	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/block"
 	consensus_engine "github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/consensus/reward"
@@ -47,6 +48,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv"
@@ -181,6 +183,7 @@ type BlockChainImpl struct {
 	validatorListByDelegatorCache *lru.Cache        // Cache of validator list by delegator
 	pendingCrossLinksCache        *lru.Cache        // Cache of last pending crosslinks
 	blockAccumulatorCache         *lru.Cache        // Cache of block accumulators
+	leaderPubKeyFromCoinbase      *lru.Cache        // Cache of leader public key from coinbase
 	quit                          chan struct{}     // blockchain quit channel
 	running                       int32             // running must be called atomically
 	blockchainPruner              *blockchainPruner // use to prune beacon chain
@@ -242,6 +245,7 @@ func newBlockChainWithOptions(
 	validatorListByDelegatorCache, _ := lru.New(validatorListByDelegatorCacheLimit)
 	pendingCrossLinksCache, _ := lru.New(pendingCrossLinksCacheLimit)
 	blockAccumulatorCache, _ := lru.New(blockAccumulatorCacheLimit)
+	leaderPubKeyFromCoinbase, _ := lru.New(chainConfig.LeaderRotationBlocksCount + 2)
 
 	bc := &BlockChainImpl{
 		chainConfig:                   chainConfig,
@@ -265,6 +269,7 @@ func newBlockChainWithOptions(
 		validatorListByDelegatorCache: validatorListByDelegatorCache,
 		pendingCrossLinksCache:        pendingCrossLinksCache,
 		blockAccumulatorCache:         blockAccumulatorCache,
+		leaderPubKeyFromCoinbase:      leaderPubKeyFromCoinbase,
 		blockchainPruner:              newBlockchainPruner(db),
 		engine:                        engine,
 		vmConfig:                      vmConfig,
@@ -3254,6 +3259,60 @@ func (bc *BlockChainImpl) SuperCommitteeForNextEpoch(
 
 	}
 	return nextCommittee, err
+}
+
+// GetLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
+func (bc *BlockChainImpl) GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
+	if cached, ok := bc.leaderPubKeyFromCoinbase.Get(h.Number().Uint64()); ok {
+		return cached.(*bls.PublicKeyWrapper), nil
+	}
+	rs, err := bc.getLeaderPubKeyFromCoinbase(h)
+	if err != nil {
+		return nil, err
+	}
+	bc.leaderPubKeyFromCoinbase.Add(h.Number().Uint64(), rs)
+	return rs, nil
+}
+
+// getLeaderPubKeyFromCoinbase retrieve corresponding blsPublicKey from Coinbase Address
+func (bc *BlockChainImpl) getLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
+	shardState, err := bc.ReadShardState(h.Epoch())
+	if err != nil {
+		return nil, errors.Wrapf(err, "cannot read shard state %v %s",
+			h.Epoch(),
+			h.Coinbase().Hash().Hex(),
+		)
+	}
+
+	committee, err := shardState.FindCommitteeByID(h.ShardID())
+	if err != nil {
+		return nil, err
+	}
+
+	committerKey := new(bls2.PublicKey)
+	isStaking := bc.Config().IsStaking(h.Epoch())
+	for _, member := range committee.Slots {
+		if isStaking {
+			// After staking the coinbase address will be the address of bls public key
+			if utils.GetAddressFromBLSPubKeyBytes(member.BLSPublicKey[:]) == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		} else {
+			if member.EcdsaAddress == h.Coinbase() {
+				if committerKey, err = bls.BytesToBLSPublicKey(member.BLSPublicKey[:]); err != nil {
+					return nil, err
+				}
+				return &bls.PublicKeyWrapper{Object: committerKey, Bytes: member.BLSPublicKey}, nil
+			}
+		}
+	}
+	return nil, errors.Errorf(
+		"cannot find corresponding BLS Public Key coinbase %s",
+		h.Coinbase().Hex(),
+	)
 }
 
 func (bc *BlockChainImpl) EnablePruneBeaconChainFeature() {
