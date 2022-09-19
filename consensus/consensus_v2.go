@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	bls2 "github.com/harmony-one/bls/ffi/go/bls"
 	"github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/internal/chain"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/utils"
 
@@ -697,7 +696,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 				return
 			}
 			// Check if the same leader.
-			pub, err := chain.GetLeaderPubKeyFromCoinbase(consensus.Blockchain, header)
+			pub, err := consensus.Blockchain.GetLeaderPubKeyFromCoinbase(header)
 			if err != nil {
 				utils.Logger().Error().Err(err).Msg("Failed to get leader public key from coinbase")
 				return
@@ -708,16 +707,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 			}
 		}
 		// Passed all checks, we can change leader.
-		var (
-			wasFound bool
-			next     *bls.PublicKeyWrapper
-		)
-		// The same leader for N blocks.
-		if consensus.Blockchain.Config().IsAllowlistEpoch(epoch) {
-			wasFound, next = consensus.Decider.NthNextHmyExt(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-		} else {
-			wasFound, next = consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
-		}
+		wasFound, next := consensus.Decider.NthNextHmy(shard.Schedule.InstanceForEpoch(epoch), leader, 1)
 		if !wasFound {
 			utils.Logger().Error().Msg("Failed to get next leader")
 			return
