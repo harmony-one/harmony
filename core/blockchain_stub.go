@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	"github.com/harmony-one/harmony/crypto/bls"
 	harmonyconfig "github.com/harmony-one/harmony/internal/configs/harmony"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/tikv/redis_helper"
@@ -401,6 +402,10 @@ func (a Stub) IsEnablePruneBeaconChainFeature() bool {
 
 func (a Stub) CommitOffChainData(batch rawdb.DatabaseWriter, block *types.Block, receipts []*types.Receipt, cxReceipts []*types.CXReceipt, stakeMsgs []staking.StakeMsg, payout reward.Reader, state *state.DB) (status WriteStatus, err error) {
 	return 0, errors.Errorf("method CommitOffChainData not implemented for %s", a.Name)
+}
+
+func (a Stub) GetLeaderPubKeyFromCoinbase(h *block.Header) (*bls.PublicKeyWrapper, error) {
+	return nil, errors.Errorf("method GetLeaderPubKeyFromCoinbase not implemented for %s", a.Name)
 }
 
 func (a Stub) IsTikvWriterMaster() bool {
