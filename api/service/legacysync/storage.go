@@ -3,6 +3,7 @@ package legacysync
 import (
 	"sync"
 
+	"github.com/harmony-one/harmony/internal/linkedhashmap"
 	"github.com/harmony-one/harmony/p2p"
 )
 
@@ -14,8 +15,8 @@ type peerDupID struct {
 // Storage keeps successful and failed peers.
 type Storage struct {
 	mu   sync.Mutex
-	succ map[peerDupID]p2p.Peer
-	fail map[peerDupID]p2p.Peer
+	succ *linkedhashmap.HashMap[peerDupID, p2p.Peer]
+	fail *linkedhashmap.HashMap[peerDupID, p2p.Peer]
 }
 
 func (s *Storage) Contains(p p2p.Peer) bool {
@@ -40,14 +41,14 @@ func (s *Storage) GetPeers(n int) []p2p.Peer {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	peers := make([]p2p.Peer, 0, n)
-	for _, p := range s.succ {
-		peers = append(peers, p)
+	for s.succ.HasNext() {
+		peers = append(peers, s.succ.Next().Value)
 		if len(peers) >= n {
 			break
 		}
 	}
-	for _, p := range s.fail {
-		peers = append(peers, p)
+	for s.fail.HasNext() {
+		peers = append(peers, s.fail.Next().Value)
 		if len(peers) >= n {
 			break
 		}
@@ -62,15 +63,15 @@ func (s *Storage) AddPeer(p p2p.Peer) {
 	if s.contains(d) {
 		return
 	}
-	s.succ[d] = p
+	s.succ.Add(d, p)
 }
 
 func (s *Storage) Fail(p p2p.Peer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
-	delete(s.succ, d)
-	s.fail[d] = p
+	s.succ.Remove(d)
+	s.fail.Add(d, p)
 }
 
 func (s *Storage) IsFail(p p2p.Peer) bool {
@@ -80,21 +81,19 @@ func (s *Storage) IsFail(p p2p.Peer) bool {
 }
 
 func (s *Storage) isFail(d peerDupID) bool {
-	_, ok := s.fail[d]
-	return ok
+	return s.fail.Contains(d)
 }
 
 func (s *Storage) Success(p p2p.Peer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
-	delete(s.fail, d)
-	s.succ[d] = p
+	s.fail.Remove(d)
+	s.succ.Add(d, p)
 }
 
 func (s *Storage) isSuccess(d peerDupID) bool {
-	_, ok := s.succ[d]
-	return ok
+	return s.succ.Contains(d)
 }
 
 func (s *Storage) IsSuccess(p p2p.Peer) bool {
@@ -105,7 +104,7 @@ func (s *Storage) IsSuccess(p p2p.Peer) bool {
 
 func NewStorage() *Storage {
 	return &Storage{
-		succ: make(map[peerDupID]p2p.Peer),
-		fail: make(map[peerDupID]p2p.Peer),
+		succ: linkedhashmap.New[peerDupID, p2p.Peer](),
+		fail: linkedhashmap.New[peerDupID, p2p.Peer](),
 	}
 }
