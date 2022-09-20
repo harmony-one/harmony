@@ -369,8 +369,6 @@ func (b *StageBodies) downloadBlocks(s *StageState, verifyAllSig bool, tx kv.RwT
 		return
 	})
 	wg.Wait()
-	utils.Logger().Info().
-		Msg("[STAGED_SYNC] downloadBlocks: finished")
 	return nil
 }
 

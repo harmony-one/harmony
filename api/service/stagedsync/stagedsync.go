@@ -799,8 +799,6 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 	})
 	wg.Wait()
 
-	utils.Logger().Info().
-		Msg("[STAGED_SYNC] Finished getting consensus block hashes")
 	return bgModeError
 }
 
