@@ -270,12 +270,12 @@ func (node *Node) tryBroadcastStaking(stakingTx *staking.StakingTransaction) {
 
 // Add new transactions to the pending transaction list.
 func (node *Node) addPendingTransactions(newTxs types.Transactions) []error {
-	if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
-		utils.Logger().Debug().
-			Int("length of newTxs", len(newTxs)).
-			Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
-		return nil
-	}
+	// if inSync, _, _ := node.SyncStatus(node.Blockchain().ShardID()); !inSync && node.NodeConfig.GetNetworkType() == nodeconfig.Mainnet {
+	// 	utils.Logger().Debug().
+	// 		Int("length of newTxs", len(newTxs)).
+	// 		Msg("[addPendingTransactions] Node out of sync, ignoring transactions")
+	// 	return nil
+	// }
 
 	// in tikv mode, reader only accept the pending transaction from writer node, ignore the p2p message
 	if node.HarmonyConfig.General.RunElasticMode && node.HarmonyConfig.TiKV.Role == tikv.RoleReader {
@@ -1131,7 +1131,7 @@ func New(
 			if node.Blockchain().IsTikvWriterMaster() {
 				err := redis_helper.PublishTxPoolUpdate(uint32(harmonyconfig.General.ShardID), tx, local)
 				if err != nil {
-					utils.Logger().Info().Err(err).Msg("redis publish txpool update error")
+					utils.Logger().Warn().Err(err).Msg("redis publish txpool update error")
 				}
 			}
 		}
@@ -1477,13 +1477,13 @@ func (node *Node) syncFromTiKVWriter() {
 			select {
 			case <-doneChan:
 				return
-			case <-time.After(5 * time.Minute):
+			case <-time.After(2 * time.Minute):
 				buf := bytes.NewBuffer(nil)
 				err := pprof.Lookup("goroutine").WriteTo(buf, 1)
 				if err != nil {
 					panic(err)
 				}
-				err = ioutil.WriteFile(fmt.Sprintf("/tmp/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
+				err = ioutil.WriteFile(fmt.Sprintf("/local/%s", time.Now().Format("hmy_0102150405.error.log")), buf.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}
@@ -1493,8 +1493,7 @@ func (node *Node) syncFromTiKVWriter() {
 		}()
 		defer close(doneChan)
 
-		err := bc.SyncFromTiKVWriter(blkNum, logs)
-		if err != nil {
+		if err := bc.SyncFromTiKVWriter(blkNum, logs); err != nil {
 			utils.Logger().Warn().
 				Err(err).
 				Msg("cannot sync block from tikv writer")

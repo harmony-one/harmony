@@ -1601,7 +1601,7 @@ func (bc *BlockChainImpl) insertChain(chain types.Blocks, verifyHeaders bool) (i
 			if bc.isInitTiKV() {
 				err = redis_helper.PublishShardUpdate(bc.ShardID(), block.NumberU64(), logs)
 				if err != nil {
-					utils.Logger().Info().Err(err).Msg("redis publish shard update error")
+					utils.Logger().Warn().Err(err).Msg("redis publish shard update error")
 				}
 			}
 
