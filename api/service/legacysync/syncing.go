@@ -191,7 +191,7 @@ func (sc *SyncConfig) RemovePeer(peer *SyncPeerConfig, reason string) {
 			break
 		}
 	}
-	sc.storage.Fail(peer.peer)
+	sc.storage.SetFailure(peer.peer)
 	utils.Logger().Info().
 		Str("peerIP", peer.peer.IP).
 		Str("peerPortMsg", peer.peer.Port).

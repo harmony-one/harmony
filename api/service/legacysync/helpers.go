@@ -95,6 +95,7 @@ func createSyncConfig(syncConfig *SyncConfig, provider SyncingPeerProvider, shar
 	wg.Wait()
 	close(ch)
 	for v := range ch {
+		storage.SetSuccess(v.peer)
 		syncConfig.AddPeer(v)
 	}
 	utils.Logger().Info().

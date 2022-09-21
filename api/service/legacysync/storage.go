@@ -27,7 +27,7 @@ func (s *Storage) Contains(p p2p.Peer) bool {
 }
 
 func (s *Storage) contains(d peerDupID) bool {
-	return s.isSuccess(d) || s.isFail(d)
+	return s.isSuccess(d) || s.isFailure(d)
 }
 
 func (s *Storage) AddPeers(peers []p2p.Peer) {
@@ -66,7 +66,7 @@ func (s *Storage) AddPeer(p p2p.Peer) {
 	s.succ.Add(d, p)
 }
 
-func (s *Storage) Fail(p p2p.Peer) {
+func (s *Storage) SetFailure(p p2p.Peer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
@@ -74,17 +74,17 @@ func (s *Storage) Fail(p p2p.Peer) {
 	s.fail.Add(d, p)
 }
 
-func (s *Storage) IsFail(p p2p.Peer) bool {
+func (s *Storage) IsFailure(p p2p.Peer) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.isFail(peerDupID{p.IP, p.Port})
+	return s.isFailure(peerDupID{p.IP, p.Port})
 }
 
-func (s *Storage) isFail(d peerDupID) bool {
+func (s *Storage) isFailure(d peerDupID) bool {
 	return s.fail.Contains(d)
 }
 
-func (s *Storage) Success(p p2p.Peer) {
+func (s *Storage) SetSuccess(p p2p.Peer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	d := peerDupID{p.IP, p.Port}
