@@ -1133,7 +1133,7 @@ func (ss *StagedSync) RegisterNodeInfo() int {
 }
 
 // getMaxPeerHeight gets the maximum blockchain heights from peers
-func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
+func (ss *StagedSync) getMaxPeerHeight() (uint64, error) {
 	maxHeight := uint64(math.MaxUint64)
 	var (
 		wg   sync.WaitGroup
@@ -1144,8 +1144,6 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			//debug
-			// utils.Logger().Debug().Bool("isBeacon", isBeacon).Str("peerIP", peerConfig.ip).Str("peerPort", peerConfig.port).Msg("[STAGED_SYNC]getMaxPeerHeight")
 			response, err := peerConfig.client.GetBlockChainHeight()
 			if err != nil {
 				utils.Logger().Error().
@@ -1181,14 +1179,14 @@ func (ss *StagedSync) getMaxPeerHeight(isBeacon bool) (uint64, error) {
 
 // IsSameBlockchainHeight checks whether the node is out of sync from other peers
 func (ss *StagedSync) IsSameBlockchainHeight(bc core.BlockChain) (uint64, bool) {
-	otherHeight, _ := ss.getMaxPeerHeight(false)
+	otherHeight, _ := ss.getMaxPeerHeight()
 	currentHeight := bc.CurrentBlock().NumberU64()
 	return otherHeight, currentHeight == otherHeight
 }
 
 // GetMaxPeerHeight ..
 func (ss *StagedSync) GetMaxPeerHeight() uint64 {
-	mph, _ := ss.getMaxPeerHeight(false)
+	mph, _ := ss.getMaxPeerHeight()
 	return mph
 }
 
@@ -1264,7 +1262,7 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	if ss.syncConfig == nil {
 		return SyncCheckResult{} // If syncConfig is not instantiated, return not in sync
 	}
-	otherHeight1, _ := ss.getMaxPeerHeight(false)
+	otherHeight1, _ := ss.getMaxPeerHeight()
 	lastHeight := ss.Blockchain().CurrentBlock().NumberU64()
 	wasOutOfSync := lastHeight+inSyncThreshold < otherHeight1
 
@@ -1286,7 +1284,7 @@ func (ss *StagedSync) isSynchronized(doubleCheck bool) SyncCheckResult {
 	// double check the sync status after 1 second to confirm (avoid false alarm)
 	time.Sleep(1 * time.Second)
 
-	otherHeight2, _ := ss.getMaxPeerHeight(false)
+	otherHeight2, _ := ss.getMaxPeerHeight()
 	currentHeight := ss.Blockchain().CurrentBlock().NumberU64()
 
 	isOutOfSync := currentHeight+inSyncThreshold < otherHeight2

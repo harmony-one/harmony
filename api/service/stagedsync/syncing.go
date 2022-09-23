@@ -155,7 +155,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 	}
 
 	// get max peers height
-	maxPeersHeight, err := s.getMaxPeerHeight(s.IsBeacon())
+	maxPeersHeight, err := s.getMaxPeerHeight()
 	if err != nil {
 		return
 	}
@@ -180,12 +180,20 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 				Uint32("shard", bc.ShardID()).
 				Uint64("maxPeersHeight", maxPeersHeight).
 				Uint64("currentHeight", startHead).
-				Msgf("[SYNC] Node is now IN SYNC!")
+				Msgf("[STAGED_SYNC] Node is now IN SYNC!")
 			break
 		}
 		startTime := time.Now()
 
-		s.runSyncCycle(bc, worker, isBeacon, consensus, maxPeersHeight)
+		if err := s.runSyncCycle(bc, worker, isBeacon, consensus, maxPeersHeight); err != nil {
+			utils.Logger().Error().
+				Err(err).
+				Bool("isBeacon", isBeacon).
+				Uint32("shard", bc.ShardID()).
+				Uint64("currentHeight", startHead).
+				Msgf("[STAGED_SYNC] sync cycle failed")
+			break
+		}
 
 		if loopMinTime != 0 {
 			waitTime := loopMinTime - time.Since(startTime)
@@ -238,14 +246,13 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 }
 
 // runSyncCycle will run one cycle of staged syncing
-func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, maxPeersHeight uint64) {
-
+func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isBeacon bool, consensus *consensus.Consensus, maxPeersHeight uint64) error {
 	canRunCycleInOneTransaction := s.MaxBlocksPerSyncCycle > 0 && s.MaxBlocksPerSyncCycle <= s.MaxMemSyncCycleSize
 	var tx kv.RwTx
 	if canRunCycleInOneTransaction {
 		var err error
 		if tx, err = s.DB().BeginRw(context.Background()); err != nil {
-			return
+			return err
 		}
 		defer tx.Rollback()
 	}
@@ -259,13 +266,13 @@ func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isB
 			Uint32("shard", s.Blockchain().ShardID()).
 			Msgf("[STAGED_SYNC] Sync loop failed")
 		s.purgeOldBlocksFromCache()
-		return
+		return syncErr
 	}
 	if tx != nil {
 		errTx := tx.Commit()
 		if errTx != nil {
-			return
+			return errTx
 		}
 	}
-
+	return nil
 }

@@ -72,22 +72,22 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 
 	// if current height is ahead of target height, we need recalculate target height
 	if targetHeight <= currentHeight {
-		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] max peers height: %d)", maxPeersHeight)
 		if maxPeersHeight <= currentHeight {
 			return nil
 		}
 		utils.Logger().Info().
-			Msgf("[STAGED_SYNC] max blocks per sync cycle is: %d)", maxBlocksPerSyncCycle)
-
+			Uint64("max blocks per sync cycle", maxBlocksPerSyncCycle).
+			Uint64("maxPeersHeight", maxPeersHeight).
+			Msgf("[STAGED_SYNC] current height is ahead of target height, target height is readjusted to max peers height")
 		targetHeight = maxPeersHeight
-		if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
-			targetHeight = currentHeight + maxBlocksPerSyncCycle
-		}
 	}
 
 	if targetHeight > maxPeersHeight {
 		targetHeight = maxPeersHeight
+	}
+
+	if maxBlocksPerSyncCycle > 0 && targetHeight-currentHeight > maxBlocksPerSyncCycle {
+		targetHeight = currentHeight + maxBlocksPerSyncCycle
 	}
 
 	s.state.syncStatus.currentCycle.TargetHeight = targetHeight

@@ -38,7 +38,6 @@ type (
 	SyncCycle struct {
 		Number       uint64
 		StartHash    []byte
-		Size         uint32
 		TargetHeight uint64
 		ExtraHashes  map[uint64][]byte
 		lock         sync.RWMutex
