@@ -99,7 +99,8 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	currProgress := uint64(0)
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
-	canRunInTurboMode := b.configs.turbo
+	isLastCycle := targetHeight >= maxPeersHeight
+	canRunInTurboMode := b.configs.turbo && !isLastCycle
 
 	if errV := CreateView(b.configs.ctx, b.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil {
@@ -122,7 +123,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	}
 
 	// load cached blocks to main sync db
-	if canRunInTurboMode {
+	if b.configs.turbo && !firstCycle {
 		if currProgress, err = b.loadBlocksFromCache(s, currProgress, tx); err != nil {
 			return err
 		}

@@ -239,6 +239,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 			consensus.UpdateConsensusInformation()
 		}
 	}
+	s.purgeAllBlocksFromCache()
 	utils.Logger().Info().
 		Uint64("new height", bc.CurrentBlock().NumberU64()).
 		Msgf("staged sync is executed")
@@ -257,7 +258,7 @@ func (s *StagedSync) runSyncCycle(bc core.BlockChain, worker *worker.Worker, isB
 		defer tx.Rollback()
 	}
 	// Do one cycle of staged sync
-	initialCycle := false //s.syncStatus.currentCycle.Number == 0
+	initialCycle := s.syncStatus.currentCycle.Number == 0
 	syncErr := s.Run(s.DB(), tx, initialCycle)
 	if syncErr != nil {
 		utils.Logger().Error().

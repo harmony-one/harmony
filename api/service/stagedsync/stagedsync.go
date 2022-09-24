@@ -669,43 +669,57 @@ func (ss *StagedSync) CreateSyncConfig(peers []p2p.Peer, shardID uint32) error {
 		return err
 	}
 
-	utils.Logger().Debug().
-		Int("len", len(peers)).
-		Msg("[STAGED_SYNC] CreateSyncConfig: len of peers")
+	// limit the number of dns peers to connect
+	randSeed := time.Now().UnixNano()
+	targetSize := ss.syncConfig.SelectRandomPeers(peers, randSeed)
 
-	if len(peers) == 0 {
+	if len(peers) == 0 || targetSize == 0 {
 		return errors.New("[STAGED_SYNC] no peers to connect to")
 	}
+
+	utils.Logger().Debug().
+		Int("peers count", len(peers)).
+		Int("target size", targetSize).
+		Msg("[STAGED_SYNC] CreateSyncConfig: len of peers")
+
 	if ss.syncConfig != nil {
 		ss.syncConfig.CloseConnections()
 	}
 	ss.syncConfig = &SyncConfig{}
 
-	var wg sync.WaitGroup
+	var connectedPeers int
 	for _, peer := range peers {
-		wg.Add(1)
-		go func(peer p2p.Peer) {
-			defer wg.Done()
-			client := downloader.ClientSetup(peer.IP, peer.Port)
-			if client == nil {
-				return
-			}
-			peerConfig := &SyncPeerConfig{
-				ip:     peer.IP,
-				port:   peer.Port,
-				client: client,
-			}
-			ss.syncConfig.AddPeer(peerConfig)
-		}(peer)
+		client := downloader.ClientSetup(peer.IP, peer.Port)
+		if client == nil {
+			continue
+		}
+		peerConfig := &SyncPeerConfig{
+			ip:     peer.IP,
+			port:   peer.Port,
+			client: client,
+		}
+		ss.syncConfig.AddPeer(peerConfig)
+		connectedPeers++
+		if connectedPeers >= targetSize+NumPeersReserved {
+			break
+		}
 	}
-	wg.Wait()
+
+	if connectedPeers == 0 {
+		return errors.New("[STAGED_SYNC] CreateSyncConfig: no ready peers to connect")
+	}
+
+	// select reserved peers
+	if connectedPeers > targetSize {
+		ss.syncConfig.reservedPeers = make([]*SyncPeerConfig, connectedPeers-targetSize)
+		copy(ss.syncConfig.reservedPeers, ss.syncConfig.peers[targetSize:])
+	}
+	// select main peers
+	ss.syncConfig.peers = ss.syncConfig.peers[:targetSize]
+
 	utils.Logger().Info().
 		Int("len", len(ss.syncConfig.peers)).
 		Msg("[STAGED_SYNC] Finished making connection to peers")
-
-	// limit the number of dns peers to connect
-	randSeed := time.Now().UnixNano()
-	ss.syncConfig.SelectRandomPeers(randSeed)
 
 	return nil
 }

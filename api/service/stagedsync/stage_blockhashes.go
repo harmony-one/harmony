@@ -100,7 +100,8 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *St
 	targetHeight := s.state.syncStatus.currentCycle.TargetHeight
 	isBeacon := s.state.isBeacon
 	startHash := bh.configs.bc.CurrentBlock().Hash()
-	canRunInTurboMode := bh.configs.turbo
+	isLastCycle := targetHeight >= maxPeersHeight
+	canRunInTurboMode := bh.configs.turbo && !isLastCycle
 	// retrieve the progress
 	if errV := CreateView(bh.configs.ctx, bh.configs.db, tx, func(etx kv.Tx) error {
 		if currProgress, err = s.CurrentStageProgress(etx); err != nil { //GetStageProgress(etx, BlockHashes, isBeacon); err != nil {
@@ -138,7 +139,7 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *St
 	}
 
 	// check whether any block hashes after curr height is cached
-	if canRunInTurboMode && s.state.syncStatus.currentCycle.Number > 0 {
+	if bh.configs.turbo && !firstCycle {
 		var cacheHash []byte
 		if cacheHash, err = bh.getHashFromCache(currProgress + 1); err != nil {
 			utils.Logger().Error().

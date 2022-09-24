@@ -13,6 +13,7 @@ import (
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/internal/utils"
+	"github.com/harmony-one/harmony/p2p"
 )
 
 // Constants for syncing.
@@ -172,33 +173,21 @@ func (sc *SyncConfig) AddPeer(peer *SyncPeerConfig) {
 }
 
 // SelectRandomPeers limits number of peers to release some server end sources.
-func (sc *SyncConfig) SelectRandomPeers(randSeed int64) {
-	numPeers := len(sc.peers)
+func (sc *SyncConfig) SelectRandomPeers(peers []p2p.Peer, randSeed int64) int {
+	numPeers := len(peers)
 	targetSize := calcNumPeersWithBound(numPeers, NumPeersLowBound, numPeersHighBound)
 	// if number of peers is less than required number, keep all in list
 	if numPeers <= targetSize {
 		utils.Logger().Warn().
 			Int("num connected peers", numPeers).
 			Msg("[STAGED_SYNC] not enough connected peers to sync, still sync will on going")
-		return
+		return numPeers
 	}
 	//shuffle peers list
 	r := rand.New(rand.NewSource(randSeed))
-	r.Shuffle(numPeers, func(i, j int) { sc.peers[i], sc.peers[j] = sc.peers[j], sc.peers[i] })
-	// close connection to other extra peers
-	for i := numPeers - 1; i >= targetSize+NumPeersReserved; i-- {
-		sc.RemovePeer(sc.peers[i], "not selected in random peer selection process")
-	}
-	// select reserved peers
-	if numPeers > targetSize {
-		u := targetSize + NumPeersReserved
-		if u > numPeers {
-			u = numPeers
-		}
-		sc.reservedPeers = sc.peers[targetSize:u]
-	}
-	// select main peers
-	sc.peers = sc.peers[:targetSize]
+	r.Shuffle(numPeers, func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
+
+	return targetSize
 }
 
 // Peers are expected to limited at half of the size, capped between lowBound and highBound.
