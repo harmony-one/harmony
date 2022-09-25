@@ -19,12 +19,12 @@ func TestStorage(t *testing.T) {
 	require.Equal(t, 1, len(peers))
 
 	require.True(t, s.IsSuccess(p1))
-	require.False(t, s.IsFail(p1))
+	require.False(t, s.IsFailure(p1))
 
-	s.Fail(p1)
+	s.SetFailure(p1)
 
 	require.False(t, s.IsSuccess(p1))
-	require.True(t, s.IsFail(p1))
+	require.True(t, s.IsFailure(p1))
 
 	require.Equal(t, 1, len(s.GetPeers(1)))
 }
