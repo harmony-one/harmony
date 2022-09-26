@@ -67,9 +67,6 @@ func (heads *StageHeads) Exec(firstCycle bool, invalidBlockRevert bool, s *Stage
 		return errV
 	}
 
-	utils.Logger().Info().
-		Msgf("[STAGED_SYNC] current block height: %d)", heads.configs.bc.CurrentBlock().NumberU64())
-
 	// if current height is ahead of target height, we need recalculate target height
 	if targetHeight <= currentHeight {
 		if maxPeersHeight <= currentHeight {

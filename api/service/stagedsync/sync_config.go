@@ -327,10 +327,7 @@ func (sc *SyncConfig) InitForTesting(client *downloader.Client, blockHashes [][]
 // consensus block hashes.  Caller shall ensure mtx is locked for RW.
 func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 	fixedPeer := sc.peers[maxFirstID]
-
-	utils.Logger().Debug().
-		Int("peers", len(sc.peers)).
-		Msg("[STAGED_SYNC] before cleanUpPeers")
+	countBeforeCleanUp := len(sc.peers)
 	for i := 0; i < len(sc.peers); i++ {
 		if CompareSyncPeerConfigByblockHashes(fixedPeer, sc.peers[i]) != 0 {
 			// TODO: move it into a util delete func.
@@ -342,9 +339,11 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
-	utils.Logger().Debug().
-		Int("peers", len(sc.peers)).
-		Msg("[STAGED_SYNC] post cleanUpPeers")
+	if len(sc.peers) < countBeforeCleanUp {
+		utils.Logger().Debug().
+			Int("removed peers", len(sc.peers)-countBeforeCleanUp).
+			Msg("[STAGED_SYNC] cleanUpPeers: a few peers removed")
+	}
 }
 
 // cleanUpInvalidPeers cleans up all peers whose missed any required block hash or sent any invalid block hash
@@ -352,10 +351,7 @@ func (sc *SyncConfig) cleanUpPeers(maxFirstID int) {
 func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 	sc.mtx.Lock()
 	defer sc.mtx.Unlock()
-
-	utils.Logger().Debug().
-		Int("peers", len(sc.peers)).
-		Msg("[STAGED_SYNC] before cleanUpPeers")
+	countBeforeCleanUp := len(sc.peers)
 	for i := 0; i < len(sc.peers); i++ {
 		if ipm[string(sc.peers[i].peerHash)] == true {
 			sc.peers[i].client.Close()
@@ -364,9 +360,11 @@ func (sc *SyncConfig) cleanUpInvalidPeers(ipm map[string]bool) {
 			sc.peers = sc.peers[:len(sc.peers)-1]
 		}
 	}
-	utils.Logger().Debug().
-		Int("peers", len(sc.peers)).
-		Msg("[STAGED_SYNC] post cleanUpPeers")
+	if len(sc.peers) < countBeforeCleanUp {
+		utils.Logger().Debug().
+			Int("removed peers", len(sc.peers)-countBeforeCleanUp).
+			Msg("[STAGED_SYNC] cleanUpPeers: a few peers removed")
+	}
 }
 
 // GetBlockHashesConsensusAndCleanUp selects the most common peer config based on their block hashes to download/sync.

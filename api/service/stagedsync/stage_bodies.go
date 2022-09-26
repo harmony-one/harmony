@@ -89,10 +89,6 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 // Exec progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
-	// if len(s.state.syncConfig.peers) < NumPeersLowBound {
-	// 	return ErrNotEnoughConnectedPeers
-	// }
-
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
 	if currentHead >= maxPeersHeight {
