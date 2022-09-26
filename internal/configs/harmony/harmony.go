@@ -245,4 +245,5 @@ type StagedSyncConfig struct {
 	VerifyAllSig           bool   // verify signatures for all blocks regardless of height and batch size
 	VerifyHeaderBatchSize  uint64 // batch size to verify header before insert to chain
 	UseMemDB               bool   // it uses memory by default. set it to false to use disk
+	LogProgress            bool   // log the full sync progress in console
 }

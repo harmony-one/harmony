@@ -18,9 +18,10 @@ type StageStates struct {
 	configs StageStatesCfg
 }
 type StageStatesCfg struct {
-	ctx context.Context
-	bc  core.BlockChain
-	db  kv.RwDB
+	ctx         context.Context
+	bc          core.BlockChain
+	db          kv.RwDB
+	logProgress bool
 }
 
 func NewStageStates(cfg StageStatesCfg) *StageStates {
@@ -29,11 +30,12 @@ func NewStageStates(cfg StageStatesCfg) *StageStates {
 	}
 }
 
-func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB) StageStatesCfg {
+func NewStageStatesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, logProgress bool) StageStatesCfg {
 	return StageStatesCfg{
-		ctx: ctx,
-		bc:  bc,
-		db:  db,
+		ctx:         ctx,
+		bc:          bc,
+		db:          db,
+		logProgress: logProgress,
 	}
 }
 
@@ -77,7 +79,9 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 	var newBlocks types.Blocks
 	nBlock := int(0)
 
-	fmt.Print("\033[s") // save the cursor position
+	if stg.configs.logProgress {
+		fmt.Print("\033[s") // save the cursor position
+	}
 
 	for i := currProgress + 1; i <= targetHeight; i++ {
 		key := marshalData(i)
@@ -215,17 +219,19 @@ func (stg *StageStates) Exec(firstCycle bool, invalidBlockRevert bool, s *StageS
 
 		nBlock = 0
 		newBlocks = newBlocks[:0]
-
-		//calculating block speed
-		dt := time.Now().Sub(startTime).Seconds()
-		speed := float64(0)
-		if dt > 0 {
-			speed = float64(currProgress-startBlock) / dt
+		// log the stage progress in console
+		if stg.configs.logProgress {
+			//calculating block speed
+			dt := time.Now().Sub(startTime).Seconds()
+			speed := float64(0)
+			if dt > 0 {
+				speed = float64(currProgress-startBlock) / dt
+			}
+			blockSpeed := fmt.Sprintf("%.2f", speed)
+			fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+			fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 		}
-		blockSpeed := fmt.Sprintf("%.2f", speed)
 
-		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("insert blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
 	if useInternalTx {

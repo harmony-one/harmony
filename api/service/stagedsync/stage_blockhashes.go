@@ -28,6 +28,7 @@ type StageBlockHashesCfg struct {
 	bgProcRunning bool
 	isBeacon      bool
 	cachedb       kv.RwDB
+	logProgress   bool
 }
 
 func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
@@ -36,18 +37,19 @@ func NewStageBlockHashes(cfg StageBlockHashesCfg) *StageBlockHashes {
 	}
 }
 
-func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool) StageBlockHashesCfg {
+func NewStageBlockHashesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool, logProgress bool) StageBlockHashesCfg {
 	cachedb, err := initHashesCacheDB(ctx, isBeacon)
 	if err != nil {
 		panic("can't initialize sync caches")
 	}
 	return StageBlockHashesCfg{
-		ctx:      ctx,
-		bc:       bc,
-		db:       db,
-		turbo:    turbo,
-		isBeacon: isBeacon,
-		cachedb:  cachedb,
+		ctx:         ctx,
+		bc:          bc,
+		db:          db,
+		turbo:       turbo,
+		isBeacon:    isBeacon,
+		cachedb:     cachedb,
+		logProgress: logProgress,
 	}
 }
 
@@ -173,9 +175,12 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *St
 
 	size := uint32(0)
 
-	fmt.Print("\033[s") // save the cursor position
 	startTime := time.Now()
 	startBlock := currProgress
+	if bh.configs.logProgress {
+		fmt.Print("\033[s") // save the cursor position
+	}
+
 	for ok := true; ok; ok = currProgress < targetHeight {
 		size = uint32(targetHeight - currProgress)
 		if size > SyncLoopBatchSize {
@@ -204,17 +209,18 @@ func (bh *StageBlockHashes) Exec(firstCycle bool, invalidBlockRevert bool, s *St
 		if currProgress, startHash, err = bh.saveDownloadedBlockHashes(s, currProgress, startHash, tx); err != nil {
 			return err
 		}
-
-		//calculating block speed
-		dt := time.Now().Sub(startTime).Seconds()
-		speed := float64(0)
-		if dt > 0 {
-			speed = float64(currProgress-startBlock) / dt
+		// log the stage progress in console
+		if bh.configs.logProgress {
+			//calculating block speed
+			dt := time.Now().Sub(startTime).Seconds()
+			speed := float64(0)
+			if dt > 0 {
+				speed = float64(currProgress-startBlock) / dt
+			}
+			blockSpeed := fmt.Sprintf("%.2f", speed)
+			fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+			fmt.Println("downloading block hash progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 		}
-		blockSpeed := fmt.Sprintf("%.2f", speed)
-
-		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("downloading block hash progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
 	// continue downloading in background
@@ -318,7 +324,6 @@ func (bh *StageBlockHashes) clearBlockHashesBucket(tx kv.RwTx, isBeacon bool) er
 		defer tx.Rollback()
 	}
 	bucketName := GetBucketName(BlockHashesBucket, isBeacon)
-
 	if err := tx.ClearBucket(bucketName); err != nil {
 		return err
 	}
@@ -350,13 +355,16 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 
 	s.state.syncConfig.ForEachPeer(func(configPeer *SyncPeerConfig) (brk bool) {
 		if len(configPeer.blockHashes) == 0 {
-			saved = true
-			brk = true
+			return //fetch the rest from other peer
 		}
 
-		for id, blockHash := range configPeer.blockHashes {
+		for id := 0; id < len(configPeer.blockHashes); id++ {
 			if id <= lastAddedID {
 				continue
+			}
+			blockHash := configPeer.blockHashes[id]
+			if len(blockHash) == 0 {
+				return //fetch the rest from other peer
 			}
 			key := strconv.FormatUint(p+1, 10)
 			bucketName := GetBucketName(BlockHashesBucket, s.state.isBeacon)
@@ -372,7 +380,6 @@ func (bh *StageBlockHashes) saveDownloadedBlockHashes(s *StageState, progress ui
 			h.SetBytes(blockHash[:])
 			lastAddedID = id
 		}
-
 		// check if all block hashes are added to db break the loop
 		if lastAddedID == len(configPeer.blockHashes)-1 {
 			saved = true
@@ -478,7 +485,6 @@ func (bh *StageBlockHashes) clearCache() error {
 		return nil
 	}
 	defer tx.Rollback()
-
 	if err := tx.ClearBucket(BlockHashesBucket); err != nil {
 		return nil
 	}

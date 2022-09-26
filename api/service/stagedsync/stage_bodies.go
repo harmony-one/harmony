@@ -28,6 +28,7 @@ type StageBodiesCfg struct {
 	bgProcRunning bool
 	isBeacon      bool
 	cachedb       kv.RwDB
+	logProgress   bool
 }
 
 func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
@@ -36,18 +37,19 @@ func NewStageBodies(cfg StageBodiesCfg) *StageBodies {
 	}
 }
 
-func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool) StageBodiesCfg {
+func NewStageBodiesCfg(ctx context.Context, bc core.BlockChain, db kv.RwDB, isBeacon bool, turbo bool, logProgress bool) StageBodiesCfg {
 	cachedb, err := initBlocksCacheDB(ctx, isBeacon)
 	if err != nil {
 		panic("can't initialize sync caches")
 	}
 	return StageBodiesCfg{
-		ctx:      ctx,
-		bc:       bc,
-		db:       db,
-		turbo:    turbo,
-		isBeacon: isBeacon,
-		cachedb:  cachedb,
+		ctx:         ctx,
+		bc:          bc,
+		db:          db,
+		turbo:       turbo,
+		isBeacon:    isBeacon,
+		cachedb:     cachedb,
+		logProgress: logProgress,
 	}
 }
 
@@ -87,9 +89,9 @@ func initBlocksCacheDB(ctx context.Context, isBeacon bool) (db kv.RwDB, err erro
 // Exec progresses Bodies stage in the forward direction
 func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageState, reverter Reverter, tx kv.RwTx) (err error) {
 
-	if len(s.state.syncConfig.peers) < NumPeersLowBound {
-		return ErrNotEnoughConnectedPeers
-	}
+	// if len(s.state.syncConfig.peers) < NumPeersLowBound {
+	// 	return ErrNotEnoughConnectedPeers
+	// }
 
 	maxPeersHeight := s.state.syncStatus.MaxPeersHeight
 	currentHead := b.configs.bc.CurrentBlock().NumberU64()
@@ -136,8 +138,10 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 	size := uint64(0)
 	startTime := time.Now()
 	startBlock := currProgress
+	if b.configs.logProgress {
+		fmt.Print("\033[s") // save the cursor position
+	}
 
-	fmt.Print("\033[s") // save the cursor position
 	for ok := true; ok; ok = currProgress < targetHeight {
 		maxSize := targetHeight - currProgress
 		size = uint64(downloadTaskBatch * len(s.state.syncConfig.peers))
@@ -145,6 +149,7 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 			size = maxSize
 		}
 		if err = b.loadBlockHashesToTaskQueue(s, currProgress+1, size, tx); err != nil {
+			s.state.RevertTo(b.configs.bc.CurrentBlock().NumberU64(), b.configs.bc.CurrentBlock().Hash())
 			return err
 		}
 
@@ -157,17 +162,18 @@ func (b *StageBodies) Exec(firstCycle bool, invalidBlockRevert bool, s *StageSta
 		if currProgress, err = b.saveDownloadedBlocks(s, currProgress, tx); err != nil {
 			return err
 		}
-
-		//calculating block speed
-		dt := time.Now().Sub(startTime).Seconds()
-		speed := float64(0)
-		if dt > 0 {
-			speed = float64(currProgress-startBlock) / dt
+		// log the stage progress in console
+		if b.configs.logProgress {
+			//calculating block speed
+			dt := time.Now().Sub(startTime).Seconds()
+			speed := float64(0)
+			if dt > 0 {
+				speed = float64(currProgress-startBlock) / dt
+			}
+			blockSpeed := fmt.Sprintf("%.2f", speed)
+			fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
+			fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 		}
-		blockSpeed := fmt.Sprintf("%.2f", speed)
-
-		fmt.Print("\033[u\033[K") // restore the cursor position and clear the line
-		fmt.Println("downloading blocks progress:", currProgress, "/", targetHeight, "(", blockSpeed, "blocks/s", ")")
 	}
 
 	// Run background process in turbo mode
@@ -445,6 +451,9 @@ func (b *StageBodies) loadBlockHashesToTaskQueue(s *StageState, startIndex uint6
 			blockHash, err := etx.GetOne(bucketName, []byte(key))
 			if err != nil {
 				return err
+			}
+			if blockHash == nil || len(blockHash) == 0 {
+				break
 			}
 			if err := s.state.stateSyncTaskQueue.Put(SyncBlockTask{index: id, blockHash: blockHash}); err != nil {
 				s.state.stateSyncTaskQueue = queue.New(0)

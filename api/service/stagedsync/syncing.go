@@ -60,6 +60,7 @@ func CreateStagedSync(
 	verifyAllSig bool,
 	verifyHeaderBatchSize uint64,
 	insertChainBatchSize int,
+	logProgress bool,
 ) (*StagedSync, error) {
 
 	ctx := context.Background()
@@ -81,9 +82,9 @@ func CreateStagedSync(
 	}
 
 	headsCfg := NewStageHeadersCfg(ctx, bc, db)
-	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon, TurboMode)
-	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon, TurboMode)
-	statesCfg := NewStageStatesCfg(ctx, bc, db)
+	blockHashesCfg := NewStageBlockHashesCfg(ctx, bc, db, isBeacon, TurboMode, logProgress)
+	bodiesCfg := NewStageBodiesCfg(ctx, bc, db, isBeacon, TurboMode, logProgress)
+	statesCfg := NewStageStatesCfg(ctx, bc, db, logProgress)
 	lastMileCfg := NewStageLastMileCfg(ctx, bc, db)
 	finishCfg := NewStageFinishCfg(ctx, db)
 
@@ -117,6 +118,7 @@ func CreateStagedSync(
 		verifyAllSig,
 		verifyHeaderBatchSize,
 		insertChainBatchSize,
+		logProgress,
 	), nil
 }
 
@@ -212,7 +214,7 @@ func (s *StagedSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 		// calculating sync speed (blocks/second)
 		currHead := bc.CurrentBlock().NumberU64()
-		if currHead-startHead > 0 {
+		if s.LogProgress && currHead-startHead > 0 {
 			dt := time.Now().Sub(startTime).Seconds()
 			speed := float64(0)
 			if dt > 0 {

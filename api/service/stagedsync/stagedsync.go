@@ -81,6 +81,8 @@ type StagedSync struct {
 	UseMemDB bool
 	// use turbo mode for staged sync
 	StagedSyncTurboMode bool
+	// log the full sync progress in console
+	LogProgress bool
 }
 
 // BlockWithSig the serialization structure for request DownloaderRequest_BLOCKWITHSIG
@@ -257,7 +259,8 @@ func New(ctx context.Context,
 	maxMemSyncCycleSize uint64,
 	verifyAllSig bool,
 	verifyHeaderBatchSize uint64,
-	insertChainBatchSize int) *StagedSync {
+	insertChainBatchSize int,
+	logProgress bool) *StagedSync {
 
 	revertStages := make([]*Stage, len(stagesList))
 	for i, stageIndex := range revertOrder {
@@ -310,6 +313,7 @@ func New(ctx context.Context,
 		VerifyAllSig:           verifyAllSig,
 		VerifyHeaderBatchSize:  verifyHeaderBatchSize,
 		InsertChainBatchSize:   insertChainBatchSize,
+		LogProgress:            logProgress,
 	}
 }
 
@@ -785,7 +789,10 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 					bgModeError = ErrSomeNodesBlockHashFail
 					brk = true //finish whole peers loop
 				} else {
-					ss.syncConfig.ReplacePeerWithReserved(peerConfig, "receiving nil response for block hashes")
+					isBrokenPeer := peerConfig.AddFailedTime(downloadBlocksRetryLimit)
+					if isBrokenPeer {
+						ss.syncConfig.ReplacePeerWithReserved(peerConfig, "receiving nil response for block hashes")
+					}
 				}
 				return
 			}
@@ -803,9 +810,7 @@ func (ss *StagedSync) getConsensusHashes(startHash []byte, size uint32, bgMode b
 					Msg("[STAGED_SYNC] getConsensusHashes: receive more blockHashes than requested!")
 				peerConfig.blockHashes = response.Payload[:size+1]
 			} else {
-				//peerConfig.mux.Lock()
 				peerConfig.blockHashes = response.Payload
-				//peerConfig.mux.Unlock()
 			}
 
 		}()

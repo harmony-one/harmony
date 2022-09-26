@@ -39,7 +39,7 @@ func (finish *StageFinish) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 		defer tx.Rollback()
 	}
 
-	// TODO: prepare indices (useful for RPC) and finalize 
+	// TODO: prepare indices (useful for RPC) and finalize
 
 	if useInternalTx {
 		if err := tx.Commit(); err != nil {
