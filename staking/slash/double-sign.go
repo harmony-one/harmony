@@ -9,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/shard"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
 	"github.com/harmony-one/harmony/core/state"
@@ -21,33 +20,6 @@ import (
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
 )
-
-// invariant assumes snapshot, current can be rlp.EncodeToBytes
-func payDebt(
-	snapshot, current *staking.ValidatorWrapper,
-	slashDebt, payment *big.Int,
-	slashDiff *Application,
-) error {
-	utils.Logger().Info().
-		RawJSON("snapshot", []byte(snapshot.String())).
-		RawJSON("current", []byte(current.String())).
-		Uint64("slash-debt", slashDebt.Uint64()).
-		Uint64("payment", payment.Uint64()).
-		RawJSON("slash-track", []byte(slashDiff.String())).
-		Msg("slash debt payment before application")
-	slashDiff.TotalSlashed.Add(slashDiff.TotalSlashed, payment)
-	slashDebt.Sub(slashDebt, payment)
-	if slashDebt.Cmp(common.Big0) == -1 {
-		x1, _ := rlp.EncodeToBytes(snapshot)
-		x2, _ := rlp.EncodeToBytes(current)
-		utils.Logger().Info().
-			Str("snapshot-rlp", hex.EncodeToString(x1)).
-			Str("current-rlp", hex.EncodeToString(x2)).
-			Msg("slashdebt balance cannot go below zero")
-		return errSlashDebtCannotBeNegative
-	}
-	return nil
-}
 
 // Moment ..
 type Moment struct {
@@ -332,32 +304,53 @@ func (r Records) SetDifference(ys Records) Records {
 	return diff
 }
 
-func payDownAsMuchAsCan(
-	snapshot, current *staking.ValidatorWrapper,
-	slashDebt, nowAmt *big.Int,
-	slashDiff *Application,
-) error {
-	if nowAmt.Cmp(common.Big0) == 1 && slashDebt.Cmp(common.Big0) == 1 {
-		// 0.50_amount > 0.06_debt => slash == 0.0, nowAmt == 0.44
-		if nowAmt.Cmp(slashDebt) >= 0 {
-			nowAmt.Sub(nowAmt, slashDebt)
-			if err := payDebt(
-				snapshot, current, slashDebt, slashDebt, slashDiff,
-			); err != nil {
-				return err
-			}
-		} else {
-			// 0.50_amount < 2.4_debt =>, slash == 1.9, nowAmt == 0.0
-			if err := payDebt(
-				snapshot, current, slashDebt, nowAmt, slashDiff,
-			); err != nil {
-				return err
-			}
-			nowAmt.Sub(nowAmt, nowAmt)
+func payDownByDelegationStaked(
+	delegation *staking.Delegation,
+	slashDebt, totalSlashed *big.Int,
+) {
+	payDown(delegation.Amount, slashDebt, totalSlashed)
+}
+
+func payDownByUndelegation(
+	undelegation *staking.Undelegation,
+	slashDebt, totalSlashed *big.Int,
+) {
+	payDown(undelegation.Amount, slashDebt, totalSlashed)
+}
+
+func payDownByReward(
+	delegation *staking.Delegation,
+	slashDebt, totalSlashed *big.Int,
+) {
+	payDown(delegation.Reward, slashDebt, totalSlashed)
+}
+
+func payDown(
+	balance, debt, totalSlashed *big.Int,
+) {
+	slashAmount := new(big.Int).Set(debt)
+	if balance.Cmp(debt) < 0 {
+		slashAmount.Set(balance)
+	}
+	balance.Sub(balance, slashAmount)
+	debt.Sub(debt, slashAmount)
+	totalSlashed.Add(totalSlashed, slashAmount)
+}
+
+func makeSlashList(snapshot, current *staking.ValidatorWrapper) ([][2]int, *big.Int) {
+	slashIndexPairs := make([][2]int, 0, len(snapshot.Delegations))
+	slashDelegations := make(map[common.Address]int, len(snapshot.Delegations))
+	totalStake := big.NewInt(0)
+	for index, delegation := range snapshot.Delegations {
+		slashDelegations[delegation.DelegatorAddress] = index
+		totalStake.Add(totalStake, delegation.Amount)
+	}
+	for index, delegation := range current.Delegations {
+		if oldIndex, exist := slashDelegations[delegation.DelegatorAddress]; exist {
+			slashIndexPairs = append(slashIndexPairs, [2]int{oldIndex, index})
 		}
 	}
-
-	return nil
+	return slashIndexPairs, totalStake
 }
 
 // delegatorSlashApply applies slashing to all delegators including the validator.
@@ -372,131 +365,80 @@ func delegatorSlashApply(
 ) error {
 	// First delegation is validator's own stake
 	validatorDebt := new(big.Int).Div(snapshot.Delegations[0].Amount, common.Big2)
-	validatorSlashed, err := applySlashingToDelegator(snapshot, current, state, rewardBeneficiary, doubleSignEpoch, slashTrack, validatorDebt, snapshot.Delegations[0])
-	if err != nil {
+	return delegatorSlashApplyDebt(snapshot, current, state, validatorDebt, rewardBeneficiary, doubleSignEpoch, slashTrack)
+}
+
+// delegatorSlashApply applies slashing to all delegators including the validator.
+// The validator’s self-owned stake is slashed by 50%.
+// The stake of external delegators is slashed by 80% of the leader’s self-owned slashed stake, each one proportionally to their stake.
+func delegatorSlashApplyDebt(
+	snapshot, current *staking.ValidatorWrapper,
+	state *state.DB,
+	validatorDebt *big.Int,
+	rewardBeneficiary common.Address,
+	doubleSignEpoch *big.Int,
+	slashTrack *Application,
+) error {
+	slashIndexPairs, totalStake := makeSlashList(snapshot, current)
+	validatorDelegation := &current.Delegations[0]
+	totalExternalStake := new(big.Int).Sub(totalStake, validatorDelegation.Amount)
+	validatorSlashed := applySlashingToDelegation(validatorDelegation, state, rewardBeneficiary, doubleSignEpoch, validatorDebt)
+	totalSlahsed := new(big.Int).Set(validatorSlashed)
+	// External delegators
+
+	aggregateDebt := applySlashRate(validatorSlashed, numeric.MustNewDecFromStr("0.8"))
+
+	for _, indexPair := range slashIndexPairs[1:] {
+		snapshotIndex := indexPair[0]
+		currentIndex := indexPair[1]
+		delegationSnapshot := snapshot.Delegations[snapshotIndex]
+		delegationCurrent := &current.Delegations[currentIndex]
+		// A*(B/C) => (A*B)/C
+		// slashDebt = aggregateDebt*(Amount/totalExternalStake)
+		slashDebt := new(big.Int).Mul(delegationSnapshot.Amount, aggregateDebt)
+		slashDebt.Div(slashDebt, totalExternalStake)
+
+		slahsed := applySlashingToDelegation(delegationCurrent, state, rewardBeneficiary, doubleSignEpoch, slashDebt)
+		totalSlahsed.Add(totalSlahsed, slahsed)
+	}
+
+	// finally, kick them off forever
+	current.Status = effective.Banned
+	if err := current.SanityCheck(); err != nil {
 		return err
 	}
-
-	// External delegators
-	totalExternalDelegation := big.NewInt(0)
-	for _, delegationSnapshot := range snapshot.Delegations[1:] {
-		totalExternalDelegation.Add(totalExternalDelegation, delegationSnapshot.Amount)
-	}
-
-	totalDebt := applySlashRate(validatorSlashed, numeric.MustNewDecFromStr("0.8"))
-
-	for _, delegationSnapshot := range snapshot.Delegations[1:] {
-		totalDelegationDec := numeric.NewDecFromBigInt(totalExternalDelegation)
-		percentage := numeric.NewDecFromBigInt(delegationSnapshot.Amount).Quo(totalDelegationDec)
-		slashDebt := applySlashRate(totalDebt, percentage)
-		_, err = applySlashingToDelegator(snapshot, current, state, rewardBeneficiary, doubleSignEpoch, slashTrack, slashDebt, delegationSnapshot)
-		if err != nil {
-			return err
-		}
-	}
+	state.UpdateValidatorWrapper(current.Address, current)
+	beneficiaryReward := new(big.Int).Div(totalSlahsed, common.Big2)
+	state.AddBalance(rewardBeneficiary, beneficiaryReward)
+	slashTrack.TotalBeneficiaryReward.Add(slashTrack.TotalBeneficiaryReward, beneficiaryReward)
+	slashTrack.TotalSlashed.Add(slashTrack.TotalSlashed, totalSlahsed)
 	return nil
 }
 
-// applySlashingToDelegator applies slashing to a delegator, given the amount that should be slashed.
+// applySlashingToDelegation applies slashing to a delegator, given the amount that should be slashed.
 // Also, rewards the beneficiary half of the amount that was successfully slashed.
-func applySlashingToDelegator(snapshot, current *staking.ValidatorWrapper, state *state.DB, rewardBeneficiary common.Address, doubleSignEpoch *big.Int, slashTrack *Application, slashDebt *big.Int, delegationSnapshot staking.Delegation) (*big.Int, error) {
-	snapshotAddr := delegationSnapshot.DelegatorAddress
-	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
-	for i := range current.Delegations {
-		delegationNow := current.Delegations[i]
-		if nowAmt := delegationNow.Amount; delegationNow.DelegatorAddress == snapshotAddr {
-			utils.Logger().Info().
-				RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-				RawJSON("delegation-current", []byte(delegationNow.String())).
-				Uint64("initial-slash-debt", slashDebt.Uint64()).
-				Msg("attempt to apply slashing based on snapshot amount to current state")
-			// Current delegation has some money and slashdebt is still not paid off
-			// so contribute as much as can with current delegation amount
-			if err := payDownAsMuchAsCan(
-				snapshot, current, slashDebt, nowAmt, slashDiff,
-			); err != nil {
-				return nil, err
-			}
+func applySlashingToDelegation(delegation *staking.Delegation, state *state.DB, rewardBeneficiary common.Address, doubleSignEpoch *big.Int, slashDebt *big.Int) *big.Int {
+	slashed := big.NewInt(0)
+	debtCopy := new(big.Int).Set(slashDebt)
 
-			// NOTE Assume did as much as could above, now check the undelegations
-			for i := range delegationNow.Undelegations {
-				undelegate := delegationNow.Undelegations[i]
-				// the epoch matters, only those undelegation
-				// such that epoch>= doubleSignEpoch should be slashable
-				if undelegate.Epoch.Cmp(doubleSignEpoch) >= 0 {
-					if slashDebt.Cmp(common.Big0) <= 0 {
-						utils.Logger().Info().
-							RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-							RawJSON("delegation-current", []byte(delegationNow.String())).
-							Msg("paid off the slash debt")
-						break
-					}
-					nowAmt := undelegate.Amount
-					if err := payDownAsMuchAsCan(
-						snapshot, current, slashDebt, nowAmt, slashDiff,
-					); err != nil {
-						return nil, err
-					}
+	payDownByDelegationStaked(delegation, debtCopy, slashed)
 
-					if nowAmt.Cmp(common.Big0) == 0 {
-						utils.Logger().Info().
-							RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-							RawJSON("delegation-current", []byte(delegationNow.String())).
-							Msg("delegation amount after paying slash debt is 0")
-					}
-				}
-			}
-
-			// if we still have a slashdebt
-			// even after taking away from delegation amount
-			// and even after taking away from undelegate,
-			// then we need to take from their pending rewards
-			if slashDebt.Cmp(common.Big0) == 1 {
-				nowAmt := delegationNow.Reward
-				utils.Logger().Info().
-					RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-					RawJSON("delegation-current", []byte(delegationNow.String())).
-					Uint64("slash-debt", slashDebt.Uint64()).
-					Uint64("now-amount-reward", nowAmt.Uint64()).
-					Msg("needed to dig into reward to pay off slash debt")
-				if err := payDownAsMuchAsCan(
-					snapshot, current, slashDebt, nowAmt, slashDiff,
-				); err != nil {
-					return nil, err
-				}
-			}
-
-			// NOTE only need to pay beneficiary here,
-			// they only get half of what was actually dispersed
-			halfOfSlashDebt := new(big.Int).Div(slashDiff.TotalSlashed, common.Big2)
-			slashDiff.TotalBeneficiaryReward.Add(slashDiff.TotalBeneficiaryReward, halfOfSlashDebt)
-			utils.Logger().Info().
-				RawJSON("delegation-snapshot", []byte(delegationSnapshot.String())).
-				RawJSON("delegation-current", []byte(delegationNow.String())).
-				Uint64("beneficiary-reward", halfOfSlashDebt.Uint64()).
-				RawJSON("application", []byte(slashDiff.String())).
-				Msg("completed an application of slashing")
-			state.AddBalance(rewardBeneficiary, halfOfSlashDebt)
-			slashTrack.TotalBeneficiaryReward.Add(
-				slashTrack.TotalBeneficiaryReward, slashDiff.TotalBeneficiaryReward,
-			)
-			slashTrack.TotalSlashed.Add(
-				slashTrack.TotalSlashed, slashDiff.TotalSlashed,
-			)
+	// NOTE Assume did as much as could above, now check the undelegations
+	for i := range delegation.Undelegations {
+		if debtCopy.Sign() == 0 {
+			break
+		}
+		undelegation := &delegation.Undelegations[i]
+		// the epoch matters, only those undelegation
+		// such that epoch>= doubleSignEpoch should be slashable
+		if undelegation.Epoch.Cmp(doubleSignEpoch) >= 0 {
+			payDownByUndelegation(undelegation, debtCopy, slashed)
 		}
 	}
-	// after the loops, paid off as much as could
-	if slashDebt.Cmp(common.Big0) == -1 {
-		x1, _ := rlp.EncodeToBytes(snapshot)
-		x2, _ := rlp.EncodeToBytes(current)
-		utils.Logger().Error().
-			Str("snapshot-rlp", hex.EncodeToString(x1)).
-			Str("current-rlp", hex.EncodeToString(x2)).
-			Msg("slash debt not paid off")
-		return nil, errors.Wrapf(errSlashDebtCannotBeNegative, "amt %v", slashDebt)
+	if debtCopy.Sign() == 1 {
+		payDownByReward(delegation, debtCopy, slashed)
 	}
-
-	return slashDiff.TotalSlashed, nil
+	return slashed
 }
 
 // Apply ..
@@ -533,16 +475,11 @@ func Apply(
 			return nil, err
 		}
 
-		// finally, kick them off forever
-		current.Status = effective.Banned
 		utils.Logger().Info().
 			RawJSON("delegation-current", []byte(current.String())).
 			RawJSON("slash", []byte(slash.String())).
-			Msg("about to update staking info for a validator after a slash")
+			Msg("slash applyed")
 
-		if err := current.SanityCheck(); err != nil {
-			return nil, err
-		}
 	}
 	return slashDiff, nil
 }
