@@ -146,12 +146,12 @@ var defaultPrometheusConfig = harmonyconfig.PrometheusConfig{
 var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 	TurboMode:              true,
 	DoubleCheckBlockHashes: false,
-	MaxBlocksPerSyncCycle:  1024,  // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
+	MaxBlocksPerSyncCycle:  512,   // sync new blocks in each cycle, if set to zero means all blocks in one full cycle
 	MaxBackgroundBlocks:    512,   // max blocks to be downloaded at background process in turbo mode
 	InsertChainBatchSize:   128,   // number of blocks to build a batch and insert to chain in staged sync
 	VerifyAllSig:           false, // whether it should verify signatures for all blocks
 	VerifyHeaderBatchSize:  100,   // batch size to verify block header before insert to chain
-	MaxMemSyncCycleSize:    8192,  // max number of blocks to use a single transaction for staged sync
+	MaxMemSyncCycleSize:    4096,  // max number of blocks to use a single transaction for staged sync
 	UseMemDB:               true,  // it uses memory by default. set it to false to use disk
 	LogProgress:            false, // log the full sync progress in console
 }

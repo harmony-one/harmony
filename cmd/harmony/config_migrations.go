@@ -296,6 +296,7 @@ func init() {
 	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
 		if confTree.Get("Sync.StagedSync") == nil {
 			confTree.Set("Sync.StagedSync", defaultConfig.Sync.StagedSync)
+			confTree.Set("Sync.StagedSyncCfg", defaultConfig.Sync.StagedSyncCfg)
 		}
 		confTree.Set("Version", "2.5.8")
 		return confTree
