@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/c2h5oh/datasize"
 	"github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/core"
 	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
@@ -13,7 +14,6 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 
 	"github.com/ledgerwatch/erigon-lib/kv/mdbx"
-	"github.com/ledgerwatch/erigon-lib/kv/memdb"
 	"github.com/ledgerwatch/log/v3"
 )
 
@@ -68,7 +68,17 @@ func CreateStagedSync(
 
 	var db kv.RwDB
 	if UseMemDB {
-		db = memdb.New()
+		// maximum Blocks in memory is maxMemSyncCycleSize + maxBackgroundBlocks
+		var dbMapSize datasize.ByteSize
+		if isBeacon {
+			// for memdb, maximum 512 kb for beacon chain each block (in average) should be enough
+			dbMapSize = datasize.ByteSize(maxMemSyncCycleSize+maxBackgroundBlocks) * 512 * datasize.KB
+		} else {
+			// for memdb, maximum 256 kb for each shard chains block (in average) should be enough
+			dbMapSize = datasize.ByteSize(maxMemSyncCycleSize+maxBackgroundBlocks) * 256 * datasize.KB
+		}
+		// we manually create memory db because "db = memdb.New()" sets the default map size (64 MB) which is not enough for some cases
+		db = mdbx.NewMDBX(log.New()).MapSize(dbMapSize).InMem().MustOpen()
 	} else {
 		if isBeacon {
 			db = mdbx.NewMDBX(log.New()).Path("cache_beacon_db").MustOpen()

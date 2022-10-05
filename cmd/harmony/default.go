@@ -151,7 +151,7 @@ var defaultStagedSyncConfig = harmonyconfig.StagedSyncConfig{
 	InsertChainBatchSize:   128,   // number of blocks to build a batch and insert to chain in staged sync
 	VerifyAllSig:           false, // whether it should verify signatures for all blocks
 	VerifyHeaderBatchSize:  100,   // batch size to verify block header before insert to chain
-	MaxMemSyncCycleSize:    4096,  // max number of blocks to use a single transaction for staged sync
+	MaxMemSyncCycleSize:    1024,  // max number of blocks to use a single transaction for staged sync
 	UseMemDB:               true,  // it uses memory by default. set it to false to use disk
 	LogProgress:            false, // log the full sync progress in console
 }
