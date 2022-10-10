@@ -9,13 +9,14 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-type Gater struct{}
+type Gater struct {
+	isGating bool
+}
 
 func NewGater(disablePrivateIPScan bool) connmgr.ConnectionGater {
-	if !disablePrivateIPScan {
-		return nil
+	return Gater{
+		isGating: disablePrivateIPScan,
 	}
-	return Gater{}
 }
 
 func (gater Gater) InterceptPeerDial(p peer.ID) (allow bool) {
@@ -24,10 +25,14 @@ func (gater Gater) InterceptPeerDial(p peer.ID) (allow bool) {
 
 // Blocking connections at this stage is typical for address filtering.
 func (gater Gater) InterceptAddrDial(p peer.ID, m ma.Multiaddr) (allow bool) {
-	return libp2p_dht.PublicQueryFilter(nil, peer.AddrInfo{
-		ID:    p,
-		Addrs: []ma.Multiaddr{m},
-	})
+	if gater.isGating {
+		return libp2p_dht.PublicQueryFilter(nil, peer.AddrInfo{
+			ID:    p,
+			Addrs: []ma.Multiaddr{m},
+		})
+	} else {
+		return true
+	}
 }
 
 func (gater Gater) InterceptAccept(network.ConnMultiaddrs) (allow bool) {
