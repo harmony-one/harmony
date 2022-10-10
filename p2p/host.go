@@ -135,10 +135,6 @@ func NewHost(cfg HostConfig) (Host, error) {
 		BootNodes:       cfg.BootNodes,
 		DataStoreFile:   cfg.DataStoreFile,
 		DiscConcurrency: cfg.DiscConcurrency,
-		// prevent saving (for querying) peer's public IP
-		// TODO mm: remove this once blocking dialing is tested
-		// since it supersedes blocking querying
-		DisablePrivateIPScan: cfg.DisablePrivateIPScan,
 	})
 	if err != nil {
 		cancel()
