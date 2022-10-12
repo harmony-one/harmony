@@ -284,7 +284,7 @@ func DeleteValidatorStats(db DatabaseDeleter, addr common.Address) error {
 	return nil
 }
 
-// ReadValidatorStats retrieves validator's stats by its address,
+// ReadValidatorStats retrieves validator's stats by its address.
 func ReadValidatorStats(
 	db DatabaseReader, addr common.Address,
 ) (*staking.ValidatorStats, error) {
@@ -292,11 +292,7 @@ func ReadValidatorStats(
 	if err != nil {
 		return nil, err
 	}
-	stats := staking.ValidatorStats{}
-	if err := rlp.DecodeBytes(data, &stats); err != nil {
-		return nil, err
-	}
-	return &stats, nil
+	return staking.DecodeValidatorStats(data)
 }
 
 // WriteValidatorStats stores validator's stats by its address

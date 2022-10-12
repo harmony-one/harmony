@@ -3,8 +3,10 @@ package committee
 import (
 	"encoding/json"
 	"math/big"
+	"sort"
 
 	"github.com/harmony-one/harmony/core/state"
+	"github.com/harmony-one/harmony/internal/utils/pseudorandom"
 
 	"github.com/harmony-one/harmony/crypto/bls"
 
@@ -84,8 +86,7 @@ func (p CandidateOrder) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// NewEPoSRound runs a fresh computation of EPoS using
-// latest data always
+// NewEPoSRound runs a fresh computation of EPoS using the latest data always.
 func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtendedBound bool, slotsLimit, shardCount int) (
 	*CompletedEPoSRound, error,
 ) {
@@ -99,9 +100,8 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 	median, winners := effective.Apply(
 		eligibleCandidate, maxExternalSlots, isExtendedBound,
 	)
-	auctionCandidates := make([]*CandidateOrder, len(eligibleCandidate))
+	auctionCandidates := make([]*CandidateOrder, 0, len(eligibleCandidate))
 
-	i := 0
 	for key := range eligibleCandidate {
 		// NOTE in principle, a div-by-zero should not
 		// happen by this point but the risk of not being explicit about
@@ -114,12 +114,11 @@ func NewEPoSRound(epoch *big.Int, stakedReader StakingCandidatesReader, isExtend
 				),
 			)
 		}
-		auctionCandidates[i] = &CandidateOrder{
+		auctionCandidates = append(auctionCandidates, &CandidateOrder{
 			SlotOrder:   eligibleCandidate[key],
 			StakePerKey: perKey,
 			Validator:   key,
-		}
-		i++
+		})
 	}
 
 	return &CompletedEPoSRound{
@@ -332,13 +331,13 @@ func eposStakedCommittee(
 	epoch *big.Int, s shardingconfig.Instance, stakerReader DataProvider,
 ) (*shard.State, error) {
 	shardCount := int(s.NumShards())
-	shardState := &shard.State{}
-	shardState.Shards = make([]shard.Committee, shardCount)
+	//shardState := &shard.State{}
+	shards := make([]shard.Committee, shardCount)
 	hAccounts := s.HmyAccounts()
 	shardHarmonyNodes := s.NumHarmonyOperatedNodesPerShard()
 
 	for i := 0; i < shardCount; i++ {
-		shardState.Shards[i] = shard.Committee{ShardID: uint32(i), Slots: shard.SlotList{}}
+		shards[i] = shard.Committee{ShardID: uint32(i), Slots: shard.SlotList{}}
 		for j := 0; j < shardHarmonyNodes; j++ {
 			index := i + j*shardCount
 			pub := &bls_core.PublicKey{}
@@ -354,7 +353,7 @@ func eposStakedCommittee(
 			if err != nil {
 				return nil, err
 			}
-			shardState.Shards[i].Slots = append(shardState.Shards[i].Slots, shard.Slot{
+			shards[i].Slots = append(shards[i].Slots, shard.Slot{
 				EcdsaAddress: addr,
 				BLSPublicKey: pubKey,
 			})
@@ -363,23 +362,83 @@ func eposStakedCommittee(
 
 	// TODO(audit): make sure external validator BLS key are also not duplicate to Harmony's keys
 	completedEPoSRound, err := NewEPoSRound(epoch, stakerReader, stakerReader.Config().IsEPoSBound35(epoch), s.SlotsLimit(), shardCount)
-
 	if err != nil {
 		return nil, err
 	}
 
 	shardBig := big.NewInt(int64(shardCount))
-	for i := range completedEPoSRound.AuctionWinners {
-		purchasedSlot := completedEPoSRound.AuctionWinners[i]
+	for _, purchasedSlot := range completedEPoSRound.AuctionWinners {
+		//purchasedSlot := completedEPoSRound.AuctionWinners[i]
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
-		shardState.Shards[shardID].Slots = append(
-			shardState.Shards[shardID].Slots, shard.Slot{
+		shards[shardID].Slots = append(
+			shards[shardID].Slots, shard.Slot{
 				EcdsaAddress:   purchasedSlot.Addr,
 				BLSPublicKey:   purchasedSlot.Key,
 				EffectiveStake: &purchasedSlot.EPoSStake,
+				RawStake:       purchasedSlot.RawStake,
 			},
 		)
 	}
+
+	// <Resharding>
+	// 1) Detect which shards have lowest/highest stake.
+	type shardRawStake struct {
+		shardID  int
+		rawStake numeric.Dec
+	}
+	shardsRawStake := make([]shardRawStake, 0, len(shards))
+	for i, shard := range shards {
+		total := numeric.ZeroDec()
+		for _, slot := range shard.Slots {
+			total = total.Add(slot.RawStake) // TODO: raw stake possible nil
+		}
+		shardsRawStake = append(shardsRawStake, shardRawStake{
+			shardID:  i,
+			rawStake: total,
+		})
+	}
+	// Highest stake should be first.
+	sort.SliceStable(shardsRawStake, func(i, j int) bool {
+		if shardsRawStake[i].rawStake.Equal(shardsRawStake[j].rawStake) {
+			return shardsRawStake[i].shardID > shardsRawStake[j].shardID
+		}
+		return shardsRawStake[i].rawStake.GT(shardsRawStake[j].rawStake)
+	})
+
+	highest, lowest := shardsRawStake[:len(shardsRawStake)/2], shardsRawStake[len(shardsRawStake)/2:]
+
+	// TODO: use VRF as seed
+	rnd := pseudorandom.NewXorshiftPseudorandom(uint32(epoch.Uint64()))
+
+	// 2) Take 5% of slots from high stake shards and apply to low stake shards.
+	for _, shard := range highest {
+		fivePercentCount := int(float64(len(shards[shard.shardID].Slots)) * 0.05)
+		// It's going to be difficult to test without this assignment.
+		if fivePercentCount == 0 {
+			if len(shards[shard.shardID].Slots) > 1 {
+				fivePercentCount = 1
+			} else {
+				continue
+			}
+		}
+		for i := 0; i < fivePercentCount; i++ {
+			// Pick a random slot from the shard.
+			n := int(rnd.Uint32n(uint32(len(shards[shard.shardID].Slots))))
+			slot := shards[shard.shardID].Slots[n]
+			// Remove the slot from the shard.
+			shards[shard.shardID].Slots = append(
+				shards[shard.shardID].Slots[:n],
+				shards[shard.shardID].Slots[n+1:]...,
+			)
+			n = int(rnd.Uint32n(uint32(len(lowest))))
+			// Add the slot to the lowest stake shard.
+			shards[n].Slots = append(
+				shards[n].Slots,
+				slot,
+			)
+		}
+	}
+	// </Resharding>
 
 	if len(completedEPoSRound.AuctionWinners) == 0 {
 		instance := shard.Schedule.InstanceForEpoch(epoch)
@@ -394,7 +453,10 @@ func eposStakedCommittee(
 		utils.Logger().Warn().Msg("No elected validators in the new epoch!!! Reuse old shard state.")
 		return stakerReader.ReadShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
 	}
-	return shardState, nil
+	return &shard.State{
+		Epoch:  nil,
+		Shards: shards,
+	}, nil
 }
 
 // ReadFromDB is a wrapper on ReadShardState

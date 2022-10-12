@@ -2728,9 +2728,8 @@ func (bc *BlockChainImpl) ComputeAndUpdateAPR(
 	block *types.Block, now *big.Int,
 	wrapper *staking.ValidatorWrapper, stats *staking.ValidatorStats,
 ) error {
-	if aprComputed, err := apr.ComputeForValidator(
-		bc, block, wrapper,
-	); err != nil {
+	aprComputed, err := apr.ComputeForValidator(bc, block, wrapper)
+	if err != nil {
 		if errors.Cause(err) == apr.ErrInsufficientEpoch {
 			utils.Logger().Info().Err(err).Msg("apr could not be computed")
 		} else {
@@ -2808,7 +2807,7 @@ func (bc *BlockChainImpl) ReadDelegationsByDelegator(
 	delegator common.Address,
 ) (m staking.DelegationIndexes, err error) {
 	rawResult := staking.DelegationIndexes{}
-	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
+	if cached, ok := bc.validatorListByDelegatorCache.Get(delegator); ok {
 		by := cached.([]byte)
 		if err := rlp.DecodeBytes(by, &rawResult); err != nil {
 			return nil, err
@@ -2835,7 +2834,7 @@ func (bc *BlockChainImpl) ReadDelegationsByDelegatorAt(
 	delegator common.Address, blockNum *big.Int,
 ) (m staking.DelegationIndexes, err error) {
 	rawResult := staking.DelegationIndexes{}
-	if cached, ok := bc.validatorListByDelegatorCache.Get(string(delegator.Bytes())); ok {
+	if cached, ok := bc.validatorListByDelegatorCache.Get(delegator); ok {
 		by := cached.([]byte)
 		if err := rlp.DecodeBytes(by, &rawResult); err != nil {
 			return nil, err
@@ -2870,7 +2869,7 @@ func (bc *BlockChainImpl) writeDelegationsByDelegator(
 	}
 	bytes, err := rlp.EncodeToBytes(indices)
 	if err == nil {
-		bc.validatorListByDelegatorCache.Add(string(delegator.Bytes()), bytes)
+		bc.validatorListByDelegatorCache.Add(delegator, bytes)
 	}
 	return nil
 }
