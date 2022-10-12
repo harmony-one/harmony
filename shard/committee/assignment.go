@@ -353,6 +353,7 @@ func eposStakedCommittee(
 			if err != nil {
 				return nil, err
 			}
+			// TODO: assign by random.
 			shards[i].Slots = append(shards[i].Slots, shard.Slot{
 				EcdsaAddress: addr,
 				BLSPublicKey: pubKey,
@@ -368,7 +369,7 @@ func eposStakedCommittee(
 
 	shardBig := big.NewInt(int64(shardCount))
 	for _, purchasedSlot := range completedEPoSRound.AuctionWinners {
-		//purchasedSlot := completedEPoSRound.AuctionWinners[i]
+		// TODO: assign by random.
 		shardID := int(new(big.Int).Mod(purchasedSlot.Key.Big(), shardBig).Int64())
 		shards[shardID].Slots = append(
 			shards[shardID].Slots, shard.Slot{
