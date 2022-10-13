@@ -50,7 +50,7 @@ func (finish *StageFinish) Exec(firstCycle bool, invalidBlockRevert bool, s *Sta
 	return nil
 }
 
-func (bh *StageBlockHashes) clearBucket(tx kv.RwTx, isBeacon bool) error {
+func (bh *StageFinish) clearBucket(tx kv.RwTx, isBeacon bool) error {
 	useInternalTx := tx == nil
 	if useInternalTx {
 		var err error
