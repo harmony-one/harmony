@@ -123,6 +123,8 @@ func NewHost(cfg HostConfig) (Host, error) {
 		libp2p.EnableNATService(),
 		libp2p.ForceReachabilityPublic(),
 		libp2p.BandwidthReporter(newCounter()),
+		// prevent dialing of public addresses
+		libp2p.ConnectionGater(NewGater(cfg.DisablePrivateIPScan)),
 	)
 	if err != nil {
 		cancel()
@@ -130,10 +132,9 @@ func NewHost(cfg HostConfig) (Host, error) {
 	}
 
 	disc, err := discovery.NewDHTDiscovery(p2pHost, discovery.DHTConfig{
-		BootNodes:            cfg.BootNodes,
-		DataStoreFile:        cfg.DataStoreFile,
-		DiscConcurrency:      cfg.DiscConcurrency,
-		DisablePrivateIPScan: cfg.DisablePrivateIPScan,
+		BootNodes:       cfg.BootNodes,
+		DataStoreFile:   cfg.DataStoreFile,
+		DiscConcurrency: cfg.DiscConcurrency,
 	})
 	if err != nil {
 		cancel()

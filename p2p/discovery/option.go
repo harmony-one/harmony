@@ -11,10 +11,9 @@ import (
 // DHTConfig is the configurable DHT options.
 // For normal nodes, only BootNodes field need to be specified.
 type DHTConfig struct {
-	BootNodes            []string
-	DataStoreFile        *string // File path to store DHT data. Shall be only used for bootstrap nodes.
-	DiscConcurrency      int
-	DisablePrivateIPScan bool
+	BootNodes       []string
+	DataStoreFile   *string // File path to store DHT data. Shall be only used for bootstrap nodes.
+	DiscConcurrency int
 }
 
 // getLibp2pRawOptions get the raw libp2p options as a slice.
@@ -39,13 +38,6 @@ func (opt DHTConfig) getLibp2pRawOptions() ([]libp2p_dht.Option, error) {
 	// the concurrency num meaning you can see Section 2.3 in the KAD paper https://pdos.csail.mit.edu/~petar/papers/maymounkov-kademlia-lncs.pdf
 	if opt.DiscConcurrency > 0 {
 		opts = append(opts, libp2p_dht.Concurrency(opt.DiscConcurrency))
-	}
-
-	if opt.DisablePrivateIPScan {
-		// QueryFilter sets a function that approves which peers may be dialed in a query
-		// PublicQueryFilter returns true if the peer is suspected of being publicly accessible
-		// includes RFC1918 + some other ranges + a stricter definition for IPv6
-		opts = append(opts, libp2p_dht.QueryFilter(libp2p_dht.PublicQueryFilter))
 	}
 
 	return opts, nil
