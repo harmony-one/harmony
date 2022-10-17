@@ -110,7 +110,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
 		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
+		LeaderRotationBlocksCount: 64,
 		FeeCollectEpoch:               EpochTBD,
 	}
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
