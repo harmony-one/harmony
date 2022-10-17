@@ -110,7 +110,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
 		LeaderRotationEpoch:           EpochTBD,
-		LeaderRotationBlocksCount:     64,
+		LeaderRotationBlocksCount: 64,
 		TesnetNinetyPercentEpoch:      big.NewInt(399),
 		FeeCollectEpoch:               EpochTBD,
 	}
