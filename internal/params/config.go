@@ -109,7 +109,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
-		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationEpoch:           big.NewInt(290),
 		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
 	}
