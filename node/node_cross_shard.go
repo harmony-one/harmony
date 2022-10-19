@@ -1,7 +1,6 @@
 package node
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	proto_node "github.com/harmony-one/harmony/api/proto/node"
 	"github.com/harmony-one/harmony/core"
@@ -10,7 +9,6 @@ import (
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/p2p"
 	"github.com/harmony-one/harmony/shard"
-	"github.com/pkg/errors"
 )
 
 // BroadcastCXReceipts broadcasts cross shard receipts to correspoding
@@ -114,50 +112,6 @@ func (node *Node) BroadcastMissingCXReceipts() {
 	for _, entry := range sendNextTime {
 		node.CxPool.Add(entry)
 	}
-}
-
-var (
-	errDoubleSpent = errors.New("[verifyIncomingReceipts] Double Spent")
-)
-
-func (node *Node) verifyIncomingReceipts(block *types.Block) error {
-	m := make(map[common.Hash]struct{})
-	cxps := block.IncomingReceipts()
-	for _, cxp := range cxps {
-		// double spent
-		if node.Blockchain().IsSpent(cxp) {
-			return errDoubleSpent
-		}
-		hash := cxp.MerkleProof.BlockHash
-		// duplicated receipts
-		if _, ok := m[hash]; ok {
-			return errDoubleSpent
-		}
-		m[hash] = struct{}{}
-
-		for _, item := range cxp.Receipts {
-			if s := node.Blockchain().ShardID(); item.ToShardID != s {
-				return errors.Errorf(
-					"[verifyIncomingReceipts] Invalid ToShardID %d expectShardID %d",
-					s, item.ToShardID,
-				)
-			}
-		}
-
-		if err := node.Blockchain().Validator().ValidateCXReceiptsProof(cxp); err != nil {
-			return errors.Wrapf(err, "[verifyIncomingReceipts] verification failed")
-		}
-	}
-
-	incomingReceiptHash := types.EmptyRootHash
-	if len(cxps) > 0 {
-		incomingReceiptHash = types.DeriveSha(cxps)
-	}
-	if incomingReceiptHash != block.Header().IncomingReceiptHash() {
-		return errors.New("[verifyIncomingReceipts] Invalid IncomingReceiptHash in block header")
-	}
-
-	return nil
 }
 
 // ProcessReceiptMessage store the receipts and merkle proof in local data store
