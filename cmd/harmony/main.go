@@ -755,7 +755,8 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 		Msg("Init Blockchain")
 
 	// Assign closure functions to the consensus object
-	currentConsensus.SetBlockVerifier(currentNode.VerifyNewBlock)
+	currentConsensus.SetBlockVerifier(
+		node.VerifyNewBlock(currentNode.NodeConfig, currentNode.Blockchain(), currentNode.Beaconchain()))
 	currentConsensus.PostConsensusJob = currentNode.PostConsensusProcessing
 	// update consensus information based on the blockchain
 	currentConsensus.SetMode(currentConsensus.UpdateConsensusInformation())
