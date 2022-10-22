@@ -219,7 +219,7 @@ func newBlockChainWithOptions(
 	engine consensus_engine.Engine, vmConfig vm.Config, options Options) (*BlockChainImpl, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
-			TrieNodeLimit: 256 * 1024 * 1024,
+			TrieNodeLimit: 256,
 			TrieTimeLimit: 2 * time.Minute,
 		}
 	}
@@ -1214,7 +1214,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 
 	// Flush trie state into disk if it's archival node or the block is epoch block
 	triedb := bc.stateCache.TrieDB()
-	if bc.cacheConfig.Disabled || block.IsLastBlockInEpoch() {
+	if bc.cacheConfig.Disabled {
 		if err := triedb.Commit(root, false); err != nil {
 			if isUnrecoverableErr(err) {
 				fmt.Printf("Unrecoverable error when committing triedb: %v\nExitting\n", err)
@@ -3282,6 +3282,7 @@ var (
 //  3. Corrupted db data. (leveldb.errors.ErrCorrupted)
 //  4. OS error when open file (too many open files, ...)
 //  5. OS error when write file (read-only, not enough disk space, ...)
+//
 // Among all the above leveldb errors, only `too many open files` error is known to be recoverable,
 // thus the unrecoverable errors refers to error that is
 //  1. The error is from the lower storage level (from module leveldb)
