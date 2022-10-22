@@ -3145,11 +3145,16 @@ func (bc *BlockChainImpl) tikvCleanCache() {
 			if err != nil {
 				continue
 			}
-
-			// build current block statedb
-			toBlock := bc.GetBlockByNumber(i + 1)
-			toTrie, err := state.New(toBlock.Root(), bc.stateCache)
-			if err != nil {
+			var toTrie *state.DB
+			// find next state trie
+			for j := i + 1; j <= to+1; j++ {
+				toBlock := bc.GetBlockByNumber(j)
+				toTrie, err = state.New(toBlock.Root(), bc.stateCache)
+				if err != nil {
+					continue
+				}
+			}
+			if toTrie == nil {
 				continue
 			}
 
