@@ -211,10 +211,14 @@ func (consensus *Consensus) BlockNum() uint64 {
 // New create a new Consensus record
 func New(
 	host p2p.Host, shard uint32, multiBLSPriKey multibls.PrivateKeys,
-	Decider quorum.Decider,
+	blockchain core.BlockChain,
+	Decider quorum.Decider, minPeers int, aggregateSig bool,
 ) (*Consensus, error) {
 	consensus := Consensus{}
 	consensus.Decider = Decider
+	consensus.Blockchain = blockchain
+	consensus.MinPeers = minPeers
+	consensus.AggregateSig = aggregateSig
 	consensus.host = host
 	consensus.msgSender = NewMessageSender(host)
 	consensus.BlockNumLowChan = make(chan struct{}, 1)
