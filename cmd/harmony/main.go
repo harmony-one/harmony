@@ -665,7 +665,7 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	// TODO: consensus object shouldn't start here
 	decider := quorum.NewDecider(quorum.SuperMajorityVote, uint32(hc.General.ShardID))
 	currentConsensus, err := consensus.New(
-		myHost, nodeConfig.ShardID, p2p.Peer{}, nodeConfig.ConsensusPriKey, decider)
+		myHost, nodeConfig.ShardID, nodeConfig.ConsensusPriKey, decider)
 
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error :%v \n", err)
