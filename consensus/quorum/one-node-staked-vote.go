@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/harmony-one/harmony/crypto/bls"
-
 	"github.com/harmony-one/harmony/internal/utils"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -45,8 +44,6 @@ type VoteTally struct {
 
 type stakedVoteWeight struct {
 	SignatureReader
-	DependencyInjectionWriter
-	DependencyInjectionReader
 	roster    votepower.Roster
 	voteTally VoteTally
 	lastPower map[Phase]numeric.Dec
@@ -300,21 +297,6 @@ func (v *stakedVoteWeight) MarshalJSON() ([]byte, error) {
 		totalRaw.String(),
 		v.roster.TotalEffectiveStake.String(),
 	})
-}
-
-func (v *stakedVoteWeight) AmIMemberOfCommitee() bool {
-	pubKeyFunc := v.MyPublicKey()
-	if pubKeyFunc == nil {
-		return false
-	}
-	identity, _ := pubKeyFunc()
-	for _, key := range identity {
-		_, ok := v.roster.Voters[key.Bytes]
-		if ok {
-			return true
-		}
-	}
-	return false
 }
 
 func newVoteTally() VoteTally {
