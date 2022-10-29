@@ -1262,6 +1262,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 					}
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
+					bc.pruneOldTrie(lastWrite, chosen)
 					lastWrite = chosen
 					bc.gcproc = 0
 				}
@@ -1339,6 +1340,22 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 
 	bc.futureBlocks.Remove(block.Hash())
 	return CanonStatTy, nil
+}
+
+func (bc *BlockChainImpl) pruneOldTrie(old, new uint64) error {
+	oldHeader := bc.GetHeaderByNumber(old)
+	newHeader := bc.GetHeaderByNumber(new)
+	oldStateDB, err := bc.StateAt(oldHeader.Root())
+	if err != nil {
+		return err
+	}
+	newStateDB, err := bc.StateAt(newHeader.Root())
+	if err != nil {
+		return err
+	}
+	batch := bc.ChainDb().NewBatch()
+	state.DiffAndPrune(oldStateDB, newStateDB, batch)
+	return batch.Write()
 }
 
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
