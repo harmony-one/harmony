@@ -9,11 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
-func generateTestData(mod int64) map[common.Hash]common.Hash {
+func generateTestData(base int64) map[common.Hash]common.Hash {
 	data := make(map[common.Hash]common.Hash)
 	for i := int64(0); i < 1000; i++ {
 		key := common.BigToHash(big.NewInt(i))
-		val := common.BigToHash(big.NewInt(i + mod))
+		val := common.BigToHash(big.NewInt(i + base))
 		data[key] = val
 	}
 	return data
