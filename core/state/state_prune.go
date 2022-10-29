@@ -47,7 +47,7 @@ func DiffAndPrune(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, error
 			newAccountTrie := newObject(newDB, addr, newAccount).getTrie(newDB.db)
 			newTrieIt := newAccountTrie.NodeIterator(nil)
 			oldTrieIt := oldAccountTrie.NodeIterator(nil)
-			accountDifferIt, _ := NewDifferenceIterator(newTrieIt, oldTrieIt)
+			accountDifferIt, _ := trie.NewDifferenceIterator(newTrieIt, oldTrieIt)
 
 			for accountDifferIt.Next(true) {
 				if !accountDifferIt.Leaf() {
