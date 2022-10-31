@@ -735,9 +735,6 @@ func setupConsensusAndNode(hc harmonyconfig.HarmonyConfig, nodeConfig *nodeconfi
 	} else {
 		currentNode.SyncingPeerProvider = node.NewDNSSyncingPeerProvider(hc.DNSSync.Zone, strconv.Itoa(hc.DNSSync.Port))
 	}
-
-	// TODO: refactor the creation of blockchain out of node.New()
-	currentConsensus.Blockchain = currentNode.Blockchain()
 	currentNode.NodeConfig.DNSZone = hc.DNSSync.Zone
 
 	currentNode.NodeConfig.SetBeaconGroupID(
