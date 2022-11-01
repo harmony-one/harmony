@@ -299,7 +299,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(
-	stopChan, stoppedChan, startChannel chan struct{},
+	stopChan chan struct{},
 ) {
 	go func() {
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Consensus started")
@@ -311,70 +311,28 @@ func (consensus *Consensus) Start(
 				case <-stopChan:
 					return
 				case <-ticker.C:
-					consensus.Tick()
+					consensus.tick()
 				}
 			}
 		}()
 
-		consensus.mutex.Lock()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
 		// Set up next block due time.
 		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-		consensus.start = false
-		for {
-			select {
-			case <-toStart:
-				consensus.start = true
-			case <-ticker.C:
-				if !consensus.start && isInitialLeader {
-					continue
-				}
-				for k, v := range consensus.consensusTimeout {
-					// stop timer in listening mode
-					if consensus.current.Mode() == Listening {
-						v.Stop()
-						continue
-					}
-
-					if consensus.current.Mode() == Syncing {
-						// never stop bootstrap timer here in syncing mode as it only starts once
-						// if it is stopped, bootstrap will be stopped and nodes
-						// can't start view change or join consensus
-						// the bootstrap timer will be stopped once consensus is reached or view change
-						// is succeeded
-						if k != timeoutBootstrap {
-							consensus.getLogger().Debug().
-								Str("k", k.String()).
-								Str("Mode", consensus.current.Mode().String()).
-								Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
-							v.Stop()
-							continue
-						}
-					}
-					if !v.CheckExpire() {
-						continue
-					}
-					if k != timeoutViewChange {
-						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
-						consensus.startViewChange()
-						break
-					} else {
-						consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
-						consensus.startViewChange()
-						break
-					}
-				}
-
-			case <-stopChan:
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] stopChan")
-				return
-			}
-		}
 	}()
 
 	if consensus.dHelper != nil {
 		consensus.dHelper.start()
+	}
+}
+
+func (consensus *Consensus) StartChannel() {
+	consensus.isInitialLeader = consensus.IsLeader()
+	if consensus.isInitialLeader {
+		consensus.start = true
+		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
+		consensus.ReadySignal <- SyncProposal
 	}
 }
 
@@ -398,7 +356,6 @@ func (consensus *Consensus) syncReadyChan() {
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
 	}
-
 }
 
 func (consensus *Consensus) syncNotReadyChan() {
@@ -409,7 +366,48 @@ func (consensus *Consensus) syncNotReadyChan() {
 	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
 }
 
-// Close close the consensus. If current is in normal commit phase, wait until the commit
+func (consensus *Consensus) tick() {
+	if !consensus.start && consensus.isInitialLeader {
+		return
+	}
+	for k, v := range consensus.consensusTimeout {
+		// stop timer in listening mode
+		if consensus.current.Mode() == Listening {
+			v.Stop()
+			continue
+		}
+
+		if consensus.current.Mode() == Syncing {
+			// never stop bootstrap timer here in syncing mode as it only starts once
+			// if it is stopped, bootstrap will be stopped and nodes
+			// can't start view change or join consensus
+			// the bootstrap timer will be stopped once consensus is reached or view change
+			// is succeeded
+			if k != timeoutBootstrap {
+				consensus.getLogger().Debug().
+					Str("k", k.String()).
+					Str("Mode", consensus.current.Mode().String()).
+					Msg("[ConsensusMainLoop] consensusTimeout stopped!!!")
+				v.Stop()
+				continue
+			}
+		}
+		if !v.CheckExpire() {
+			continue
+		}
+		if k != timeoutViewChange {
+			consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops Consensus Timeout!!!")
+			consensus.startViewChange()
+			break
+		} else {
+			consensus.getLogger().Warn().Msg("[ConsensusMainLoop] Ops View Change Timeout!!!")
+			consensus.startViewChange()
+			break
+		}
+	}
+}
+
+// Close closes the consensus. If current is in normal commit phase, wait until the commit
 // phase end.
 func (consensus *Consensus) Close() error {
 	if consensus.dHelper != nil {
