@@ -255,10 +255,7 @@ func (consensus *Consensus) startViewChange() {
 	// aganist the consensus.LeaderPubKey variable.
 	// Ideally, we shall use another variable to keep track of the
 	// leader pubkey in viewchange mode
-	consensus.pubKeyLock.Lock()
-	lpk := consensus.getNextLeaderKey(nextViewID)
-	consensus.LeaderPubKey = lpk
-	consensus.pubKeyLock.Unlock()
+	consensus.LeaderPubKey = consensus.getNextLeaderKey(nextViewID)
 
 	consensus.getLogger().Warn().
 		Uint64("nextViewID", nextViewID).
@@ -550,9 +547,8 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 
 	// newView message verified success, override my state
 	consensus.SetViewIDs(recvMsg.ViewID)
-	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = senderKey
-	consensus.resetViewChangeState()
+	consensus.ResetViewChangeState()
 
 	consensus.msgSender.StopRetry(msg_pb.MessageType_VIEWCHANGE)
 
