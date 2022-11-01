@@ -58,8 +58,6 @@ func (pm *State) GetCurBlockViewID() uint64 {
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
-	pm.cViewMux.Lock()
-	defer pm.cViewMux.Unlock()
 	pm.blockViewID = viewID
 	return pm.blockViewID
 }
