@@ -85,7 +85,7 @@ type Consensus struct {
 	// IgnoreViewIDCheck determines whether to ignore viewID check
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	// mutex for verify new block
 	verifyBlockMutex sync.Mutex
 	// ViewChange struct
@@ -114,10 +114,6 @@ type Consensus struct {
 	host p2p.Host
 	// MessageSender takes are of sending consensus message and the corresponding retry logic.
 	msgSender *MessageSender
-	// Used to convey to the consensus main loop that block syncing has finished.
-	syncReadyChan chan struct{}
-	// Used to convey to the consensus main loop that node is out of sync
-	syncNotReadyChan chan struct{}
 	// If true, this consensus will not propose view change.
 	disableViewChange bool
 	// Have a dedicated reader thread pull from this chan, like in node
@@ -136,6 +132,9 @@ type Consensus struct {
 	finalityCounter atomic.Value //int64
 
 	dHelper *downloadHelper
+
+	// Flag only for initialization state.
+	start bool
 }
 
 // Blockchain returns the blockchain.
@@ -157,12 +156,14 @@ func (consensus *Consensus) VerifyBlock(block *types.Block) error {
 // BlocksSynchronized lets the main loop know that block synchronization finished
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
-	consensus.syncReadyChan <- struct{}{}
+	consensus.mutex.Lock()
+	consensus.syncReadyChan()
+	consensus.mutex.Unlock()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
 func (consensus *Consensus) BlocksNotSynchronized() {
-	consensus.syncNotReadyChan <- struct{}{}
+	consensus.syncNotReadyChan()
 }
 
 // VdfSeedSize returns the number of VRFs for VDF computation
@@ -265,8 +266,6 @@ func New(
 	// displayed on explorer as Height right now
 	consensus.SetCurBlockViewID(0)
 	consensus.ShardID = shard
-	consensus.syncReadyChan = make(chan struct{})
-	consensus.syncNotReadyChan = make(chan struct{})
 	consensus.SlashChan = make(chan slash.Record)
 	consensus.ReadySignal = make(chan ProposalType)
 	consensus.CommitSigChannel = make(chan []byte)

@@ -100,7 +100,6 @@ type ISync interface {
 // Node represents a protocol-participating node in the network
 type Node struct {
 	Consensus             *consensus.Consensus              // Consensus object containing all Consensus related data (e.g. committee members, signatures, commits)
-	BlockChannel          chan *types.Block                 // The channel to send newly proposed blocks
 	ConfirmedBlockChannel chan *types.Block                 // The channel to send confirmed blocks
 	BeaconBlockChannel    chan *types.Block                 // The channel to send beacon blocks for non-beaconchain nodes
 	pendingCXReceipts     map[string]*types.CXReceiptsProof // All the receipts received but not yet processed for Consensus
@@ -1083,7 +1082,6 @@ func New(
 			}
 		}
 
-		node.BlockChannel = make(chan *types.Block)
 		node.ConfirmedBlockChannel = make(chan *types.Block)
 		node.BeaconBlockChannel = make(chan *types.Block)
 		txPoolConfig := core.DefaultTxPoolConfig
