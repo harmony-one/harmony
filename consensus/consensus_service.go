@@ -73,8 +73,6 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
-	// TODO: use mutex for updating public keys pointer. No need to lock on all these logic.
-	consensus.pubKeyLock.Lock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
@@ -93,7 +91,6 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 		consensus.getLogger().Error().
 			Msg("[UpdatePublicKeys] Participants is empty")
 	}
-	consensus.pubKeyLock.Unlock()
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
@@ -393,9 +390,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 			consensus.getLogger().Info().
 				Str("leaderPubKey", leaderPubKey.Bytes.Hex()).
 				Msg("[UpdateConsensusInformation] Most Recent LeaderPubKey Updated Based on BlockChain")
-			consensus.pubKeyLock.Lock()
 			consensus.LeaderPubKey = leaderPubKey
-			consensus.pubKeyLock.Unlock()
 		}
 	}
 
@@ -434,9 +429,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	consensus.pubKeyLock.Lock()
 	obj := consensus.LeaderPubKey.Object
-	consensus.pubKeyLock.Unlock()
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
 			return true
