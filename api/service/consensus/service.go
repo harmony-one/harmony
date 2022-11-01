@@ -10,22 +10,19 @@ import (
 type Service struct {
 	consensus   *consensus.Consensus
 	stopChan    chan struct{}
-	stoppedChan chan struct{}
-	startChan   chan struct{}
 	messageChan chan *msg_pb.Message
 }
 
 // New returns consensus service.
-func New(consensus *consensus.Consensus, startChan chan struct{}) *Service {
-	return &Service{consensus: consensus, startChan: startChan}
+func New(consensus *consensus.Consensus) *Service {
+	return &Service{consensus: consensus}
 }
 
 // Start starts consensus service.
 func (s *Service) Start() error {
 	utils.Logger().Info().Msg("[consensus/service] Starting consensus service.")
 	s.stopChan = make(chan struct{})
-	s.stoppedChan = make(chan struct{})
-	s.consensus.Start(s.stopChan, s.stoppedChan, s.startChan)
+	s.consensus.Start(s.stopChan)
 	s.consensus.WaitForNewRandomness()
 	return nil
 }
@@ -33,8 +30,7 @@ func (s *Service) Start() error {
 // Stop stops consensus service.
 func (s *Service) Stop() error {
 	utils.Logger().Info().Msg("Stopping consensus service.")
-	s.stopChan <- struct{}{}
-	<-s.stoppedChan
+	close(s.stopChan)
 	utils.Logger().Info().Msg("Consensus service stopped.")
 	return s.consensus.Close()
 }
