@@ -14,7 +14,7 @@ func (node *Node) RegisterValidatorServices() {
 	// Register consensus service.
 	node.serviceManager.Register(
 		service.Consensus,
-		consensus.New(node.Consensus),
+		consensus.New(node.Consensus, node.startConsensus),
 	)
 	// Register new block service.
 	node.serviceManager.Register(

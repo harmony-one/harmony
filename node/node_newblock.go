@@ -102,7 +102,9 @@ func (node *Node) WaitForConsensusReadyV2(cs *consensus.Consensus, stopChan chan
 							Msg("=========Successfully Proposed New Block==========")
 
 						// Send the new block to Consensus so it can be confirmed.
-						cs.BlockChannel(newBlock)
+						node.proposedBlock[newBlock.NumberU64()] = newBlock
+						delete(node.proposedBlock, newBlock.NumberU64()-10)
+						node.Consensus.BlockChannel(newBlock)
 						break
 					} else {
 						utils.Logger().Err(err).Int("retryCount", retryCount).

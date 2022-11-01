@@ -84,6 +84,8 @@ type Consensus struct {
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
 	mutex sync.RWMutex
+	// mutex for verify new block
+	verifyBlockMutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -129,9 +131,8 @@ type Consensus struct {
 
 	dHelper *downloadHelper
 
-	// Both flags only for initialization state.
-	start           bool
-	isInitialLeader bool
+	// Flag only for initialization state.
+	start bool
 }
 
 // Blockchain returns the blockchain.
@@ -170,8 +171,8 @@ func (consensus *Consensus) verifyBlock(block *types.Block) error {
 // thus the blockchain is likely to be up to date.
 func (consensus *Consensus) BlocksSynchronized() {
 	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	consensus.syncReadyChan()
+	consensus.mutex.Unlock()
 }
 
 // BlocksNotSynchronized lets the main loop know that block is not synchronized
