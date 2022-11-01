@@ -126,9 +126,7 @@ type Node struct {
 	serviceManager               *service.Manager
 	ContractDeployerCurrentNonce uint64 // The nonce of the deployer contract at current block
 	ContractAddresses            []common.Address
-	// Channel to notify consensus service to really start consensus
-	startConsensus chan struct{}
-	HarmonyConfig  *harmonyconfig.HarmonyConfig
+	HarmonyConfig                *harmonyconfig.HarmonyConfig
 	// node configuration, including group ID, shard ID, etc
 	NodeConfig *nodeconfig.ConfigType
 	// Chain configuration.
@@ -1130,7 +1128,6 @@ func New(
 		Msg("Genesis block hash")
 	// Setup initial state of syncing.
 	node.peerRegistrationRecord = map[string]*syncConfig{}
-	node.startConsensus = make(chan struct{})
 	// Broadcast double-signers reported by consensus
 	if node.Consensus != nil {
 		go func() {
