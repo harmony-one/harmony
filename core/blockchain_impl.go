@@ -1262,7 +1262,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 					}
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
-					bc.pruneOldTrie(lastWrite, chosen)
+					bc.pruneOldTrieSync(lastWrite, chosen)
 					lastWrite = chosen
 					bc.gcproc = 0
 				}
@@ -1342,7 +1342,13 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	return CanonStatTy, nil
 }
 
-func (bc *BlockChainImpl) pruneOldTrie(old, new uint64) error {
+// Do not run this function in goroutine!!!!
+// For example:
+// At State-1, A=1.
+// At State-2, A=0. This means A will be removed from the trie.
+// At State-3, A=1.
+// Assuming that the pruning of (State-1, State-2) is performed after State-3 is flushed to disk, the A will be removed. State-3 will have the wrong value for A.
+func (bc *BlockChainImpl) pruneOldTrieSync(old, new uint64) error {
 	oldHeader := bc.GetHeaderByNumber(old)
 	newHeader := bc.GetHeaderByNumber(new)
 	oldStateDB, err := bc.StateAt(oldHeader.Root())
@@ -1354,7 +1360,7 @@ func (bc *BlockChainImpl) pruneOldTrie(old, new uint64) error {
 		return err
 	}
 	batch := bc.ChainDb().NewBatch()
-	state.DiffAndPrune(oldStateDB, newStateDB, batch)
+	state.DiffAndPruneSync(oldStateDB, newStateDB, batch)
 	return batch.Write()
 }
 

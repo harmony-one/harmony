@@ -8,8 +8,8 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
-// DiffAndPrune deletes data exists in oldDB, but not in newDB
-func DiffAndPrune(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, error) {
+// DiffAndPruneSync deletes data exists in oldDB, but not in newDB
+func DiffAndPruneSync(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, error) {
 	// create difference iterator
 	differIt, _ := trie.NewDifferenceIterator(newDB.trie.NodeIterator(nil), oldDB.trie.NodeIterator(nil))
 

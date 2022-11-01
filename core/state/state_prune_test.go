@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (
-	DataMod1  int64 = 5
-	DataSize1 int64 = 1000
-	DataMod2  int64 = 19
-	DataSize2 int64 = 1000
+	DataSize int64 = 1000
+	DataMod1 int64 = 5
+	DataMod2 int64 = 19
 )
 
 func generateTestData(dataSize, mod int64) map[common.Hash]common.Hash {
@@ -26,14 +26,14 @@ func generateTestData(dataSize, mod int64) map[common.Hash]common.Hash {
 	return data
 }
 
-func writeTestData(s *stateTest, data map[common.Hash]common.Hash) {
-	obj := s.state.GetOrNewStateObject(common.BytesToAddress([]byte{0x01}))
+func writeTestData(stateDB *DB, data map[common.Hash]common.Hash) {
+	obj := stateDB.GetOrNewStateObject(common.BytesToAddress([]byte{0x01}))
 	obj.SetNonce(uint64(len(data)))
 	for k, v := range data {
-		s.state.SetState(obj.address, k, v)
+		stateDB.SetState(obj.address, k, v)
 	}
-	root, _ := s.state.Commit(true)
-	s.state.db.TrieDB().Commit(root, false)
+	root, _ := stateDB.Commit(true)
+	stateDB.db.TrieDB().Commit(root, false)
 }
 
 func equal(db1, db2 ethdb.Database) bool {
@@ -53,26 +53,48 @@ func equal(db1, db2 ethdb.Database) bool {
 	return !it2.Next()
 }
 
-func stateNew(root common.Hash, db ethdb.Database) *stateTest {
-	sdb, _ := New(root, NewDatabase(db))
-	return &stateTest{db: db, state: sdb}
+func newStateDB(root common.Hash, db ethdb.Database) *DB {
+	sdb, err := New(root, NewDatabase(db))
+	if err != nil {
+		panic("invalid state root")
+	}
+	return sdb
+}
+
+func writeAndPrune(db ethdb.Database, root common.Hash, data map[common.Hash]common.Hash) common.Hash {
+	oldStateDB := newStateDB(root, db)
+	newStateDB := oldStateDB.Copy()
+	writeTestData(newStateDB, data)
+	batch := db.NewBatch()
+	DiffAndPruneSync(oldStateDB, newStateDB, batch)
+	batch.Write()
+	return newStateDB.trie.Hash()
 }
 
 func TestDiffAndPrune(t *testing.T) {
-	db1State1 := newStateTest()
-	writeTestData(db1State1, generateTestData(DataSize1, DataMod1))
-	db1State2 := stateNew(db1State1.state.trie.Hash(), db1State1.db)
-	writeTestData(db1State2, generateTestData(DataSize2, DataMod2))
-	db2State := newStateTest()
-	writeTestData(db2State, generateTestData(DataSize2, DataMod2))
-	prune := func(old *stateTest, new *stateTest) {
-		batch := old.db.NewBatch()
-		DiffAndPrune(old.state, new.state, batch)
-		batch.Write()
-	}
-	prune(db1State1, db1State2)
-	if !equal(db1State2.db, db2State.db) {
-		t.Error("db state not equal")
+	writeAndCheck := func(db ethdb.Database, root common.Hash, data map[common.Hash]common.Hash) common.Hash {
+		newRoot := writeAndPrune(db, root, data)
+		pureDB := rawdb.NewMemoryDatabase()
+		pureDBRoot := writeAndPrune(pureDB, common.Hash{}, data)
+		if newRoot != pureDBRoot {
+			t.Fatal("root hash not equal")
+		}
+		if !equal(db, pureDB) {
+			t.Fatal("databases are not equal")
+		}
+		return newRoot
 	}
 
+	dataset1 := generateTestData(DataSize, DataMod1)
+	dataset2 := generateTestData(DataSize, DataMod2)
+	datasets := []map[common.Hash]common.Hash{
+		dataset1,
+		dataset2,
+		dataset1,
+	}
+	db := rawdb.NewMemoryDatabase()
+	root := common.Hash{}
+	for _, dataset := range datasets {
+		root = writeAndCheck(db, root, dataset)
+	}
 }
