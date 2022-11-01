@@ -138,9 +138,8 @@ func (consensus *Consensus) UpdateBitmaps() {
 	multiSigBitmap, _ := bls_cosi.NewMask(members, nil)
 	consensus.prepareBitmap = prepareBitmap
 	consensus.commitBitmap = commitBitmap
-	consensus.multiSigMutex.Lock()
 	consensus.multiSigBitmap = multiSigBitmap
-	consensus.multiSigMutex.Unlock()
+
 }
 
 // ResetState resets the state of the consensus
