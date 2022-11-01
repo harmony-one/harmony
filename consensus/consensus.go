@@ -66,8 +66,7 @@ type Consensus struct {
 	registry *registry.Registry
 	// Minimal number of peers in the shard
 	// If the number of validators is less than minPeers, the consensus won't start
-	MinPeers   int
-	pubKeyLock sync.Mutex
+	MinPeers int
 	// private/public keys of current node
 	priKey multibls.PrivateKeys
 	// the publickey of leader
@@ -177,8 +176,6 @@ func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
 }
 
 func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
-	consensus.pubKeyLock.Lock()
-	defer consensus.pubKeyLock.Unlock()
 	return consensus.LeaderPubKey
 }
 
