@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/harmony-one/harmony/internal/chain"
@@ -25,26 +24,21 @@ const MaxViewIDDiff = 249
 
 // State contains current mode and current viewID
 type State struct {
-	mode    Mode
-	modeMux sync.RWMutex
+	mode Mode
 
 	// current view id in normal mode
 	// it changes per successful consensus
 	blockViewID uint64
-	cViewMux    sync.RWMutex
 
 	// view changing id is used during view change mode
 	// it is the next view id
 	viewChangingID uint64
 
-	viewMux  sync.RWMutex
 	isBackup bool
 }
 
 // Mode return the current node mode
 func (pm *State) Mode() Mode {
-	pm.modeMux.RLock()
-	defer pm.modeMux.RUnlock()
 	return pm.mode
 }
 
@@ -54,22 +48,16 @@ func (pm *State) SetMode(s Mode) {
 		s = NormalBackup
 	}
 
-	pm.modeMux.Lock()
-	defer pm.modeMux.Unlock()
 	pm.mode = s
 }
 
 // GetCurBlockViewID return the current view id
 func (pm *State) GetCurBlockViewID() uint64 {
-	pm.cViewMux.RLock()
-	defer pm.cViewMux.RUnlock()
 	return pm.blockViewID
 }
 
 // SetCurBlockViewID sets the current view id
 func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
-	pm.cViewMux.Lock()
-	defer pm.cViewMux.Unlock()
 	pm.blockViewID = viewID
 	return pm.blockViewID
 }
@@ -77,26 +65,18 @@ func (pm *State) SetCurBlockViewID(viewID uint64) uint64 {
 // GetViewChangingID return the current view changing id
 // It is meaningful during view change mode
 func (pm *State) GetViewChangingID() uint64 {
-	pm.viewMux.RLock()
-	defer pm.viewMux.RUnlock()
 	return pm.viewChangingID
 }
 
 // SetViewChangingID set the current view changing id
 // It is meaningful during view change mode
 func (pm *State) SetViewChangingID(id uint64) {
-	pm.viewMux.Lock()
-	defer pm.viewMux.Unlock()
 	pm.viewChangingID = id
 }
 
 // GetViewChangeDuraion return the duration of the current view change
 // It increase in the power of difference betweeen view changing ID and current view ID
 func (pm *State) GetViewChangeDuraion() time.Duration {
-	pm.viewMux.RLock()
-	pm.cViewMux.RLock()
-	defer pm.viewMux.RUnlock()
-	defer pm.cViewMux.RUnlock()
 	diff := int64(pm.viewChangingID - pm.blockViewID)
 	return time.Duration(diff * diff * int64(viewChangeDuration))
 }
