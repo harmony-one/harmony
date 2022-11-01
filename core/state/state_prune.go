@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/harmony-one/harmony/core/rawdb"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // DiffAndPrune deletes data exists in oldDB, but not in newDB
@@ -45,15 +46,20 @@ func DiffAndPrune(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, error
 			// create account difference iterator
 			oldAccountTrie := newObject(oldDB, addr, oldAccount).getTrie(oldDB.db)
 			newAccountTrie := newObject(newDB, addr, newAccount).getTrie(newDB.db)
+
+			leafKeyCache, _ := lru.New(32 * 1024)
 			newTrieIt := newAccountTrie.NodeIterator(nil)
 			oldTrieIt := oldAccountTrie.NodeIterator(nil)
-			accountDifferIt, _ := trie.NewDifferenceIterator(newTrieIt, oldTrieIt)
-
+			accountDifferIt, _ := NewPruneIterator(newTrieIt, oldTrieIt)
 			for accountDifferIt.Next(true) {
+				if newTrieIt.Leaf() {
+					leafKeyCache.Add(string(newTrieIt.LeafKey()), struct{}{})
+				}
 				if !accountDifferIt.Leaf() {
 					count++
 					batch.Delete(accountDifferIt.Hash().Bytes())
-				} else if !newTrieIt.Leaf() {
+				} else if !leafKeyCache.Contains(string(accountDifferIt.LeafKey())) {
+					leafKeyCache.Remove(string(accountDifferIt.LeafKey()))
 					batch.Delete(append(append([]byte{}, secureKeyPrefix...), accountDifferIt.LeafKey()...))
 				}
 			}
