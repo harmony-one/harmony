@@ -292,7 +292,7 @@ func (consensus *Consensus) BlockCommitSigs(blockNum uint64) ([]byte, error) {
 
 // Start waits for the next new block and run consensus
 func (consensus *Consensus) Start(
-	blockChannel chan *types.Block, stopChan, stoppedChan, startChannel chan struct{},
+	stopChan, stoppedChan, startChannel chan struct{},
 ) {
 	go func() {
 		toStart := make(chan struct{}, 1)
@@ -317,13 +317,13 @@ func (consensus *Consensus) Start(
 
 		// Set up next block due time.
 		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-		start := false
+		consensus.start = false
 		for {
 			select {
 			case <-toStart:
-				start = true
+				consensus.start = true
 			case <-ticker.C:
-				if !start && isInitialLeader {
+				if !consensus.start && isInitialLeader {
 					continue
 				}
 				for k, v := range consensus.consensusTimeout {
@@ -362,74 +362,88 @@ func (consensus *Consensus) Start(
 					}
 				}
 
-			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
-			case <-consensus.syncReadyChan:
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
-				consensus.mutex.Lock()
-				if consensus.BlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
-					consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-					consensus.SetViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-					mode := consensus.UpdateConsensusInformation()
-					consensus.current.SetMode(mode)
-					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-					consensus.consensusTimeout[timeoutConsensus].Start()
-					consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
-					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
-				} else if consensus.Mode() == Syncing {
-					// Corner case where sync is triggered before `onCommitted` and there is a race
-					// for block insertion between consensus and downloader.
-					mode := consensus.UpdateConsensusInformation()
-					consensus.SetMode(mode)
-					consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
-					consensus.consensusTimeout[timeoutConsensus].Start()
-					consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
-				}
-				consensus.mutex.Unlock()
-
-			// TODO: Refactor this piece of code to consensus/downloader.go after DNS legacy sync is removed
-			case <-consensus.syncNotReadyChan:
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
-				consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
-				consensus.current.SetMode(Syncing)
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
-				consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
-
-			case newBlock := <-blockChannel:
-				//consensus.ReshardingNextLeader(newBlock)
-				consensus.getLogger().Info().
-					Uint64("MsgBlockNum", newBlock.NumberU64()).
-					Msg("[ConsensusMainLoop] Received Proposed New Block!")
-
-				if newBlock.NumberU64() < consensus.BlockNum() {
-					consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
-						Msg("[ConsensusMainLoop] received old block, abort")
-					continue
-				}
-				// Sleep to wait for the full block time
-				consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
-
-				<-time.After(time.Until(consensus.NextBlockDue))
-				consensus.StartFinalityCount()
-
-				// Update time due for next block
-				consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
-
-				startTime = time.Now()
-				consensus.msgSender.Reset(newBlock.NumberU64())
-
-				consensus.getLogger().Info().
-					Int("numTxs", len(newBlock.Transactions())).
-					Int("numStakingTxs", len(newBlock.StakingTransactions())).
-					Time("startTime", startTime).
-					Int64("publicKeys", consensus.Decider.ParticipantsCount()).
-					Msg("[ConsensusMainLoop] STARTING CONSENSUS")
-				consensus.announce(newBlock)
 			case <-stopChan:
 				consensus.getLogger().Info().Msg("[ConsensusMainLoop] stopChan")
 				return
 			}
 		}
 	}()
+
+	if consensus.dHelper != nil {
+		consensus.dHelper.start()
+	}
+}
+
+func (consensus *Consensus) syncReadyChan() {
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncReadyChan")
+	if consensus.BlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
+		consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+		consensus.SetViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
+		mode := consensus.UpdateConsensusInformation()
+		consensus.current.SetMode(mode)
+		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
+		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensus.getLogger().Info().Str("Mode", mode.String()).Msg("Node is IN SYNC")
+		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
+	} else if consensus.Mode() == Syncing {
+		// Corner case where sync is triggered before `onCommitted` and there is a race
+		// for block insertion between consensus and downloader.
+		mode := consensus.UpdateConsensusInformation()
+		consensus.SetMode(mode)
+		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
+		consensus.consensusTimeout[timeoutConsensus].Start()
+		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
+	}
+
+}
+
+func (consensus *Consensus) syncNotReadyChan() {
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] syncNotReadyChan")
+	consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
+	consensus.current.SetMode(Syncing)
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Node is OUT OF SYNC")
+	consensusSyncCounterVec.With(prometheus.Labels{"consensus": "out_of_sync"}).Inc()
+}
+
+// Close close the consensus. If current is in normal commit phase, wait until the commit
+// phase end.
+func (consensus *Consensus) Close() error {
+	if consensus.dHelper != nil {
+		consensus.dHelper.close()
+	}
+	consensus.waitForCommit()
+	return nil
+}
+
+func (consensus *Consensus) BlockChannel(newBlock *types.Block) {
+	//consensus.ReshardingNextLeader(newBlock)consensus.getLogger().Info().
+		Uint64("MsgBlockNum", newBlock.NumberU64()).
+		Msg("[ConsensusMainLoop] Received Proposed New Block!")
+
+	if newBlock.NumberU64() < consensus.BlockNum() {
+		consensus.getLogger().Warn().Uint64("newBlockNum", newBlock.NumberU64()).
+			Msg("[ConsensusMainLoop] received old block, abort")
+		return
+	}
+	// Sleep to wait for the full block time
+	consensus.getLogger().Info().Msg("[ConsensusMainLoop] Waiting for Block Time")
+	time.AfterFunc(time.Until(consensus.NextBlockDue), func() {
+		consensus.StartFinalityCount()
+
+		// Update time due for next block
+		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+
+		startTime = time.Now()
+		consensus.msgSender.Reset(newBlock.NumberU64())
+
+		consensus.getLogger().Info().
+			Int("numTxs", len(newBlock.Transactions())).
+			Int("numStakingTxs", len(newBlock.StakingTransactions())).
+			Time("startTime", startTime).
+			Int64("publicKeys", consensus.Decider.ParticipantsCount()).
+			Msg("[ConsensusMainLoop] STARTING CONSENSUS")
+		consensus.announce(newBlock)
+	})
 
 	if consensus.dHelper != nil {
 		consensus.dHelper.start()
