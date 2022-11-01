@@ -61,7 +61,6 @@ type Consensus struct {
 	commitBitmap         *bls_cosi.Mask
 
 	multiSigBitmap *bls_cosi.Mask // Bitmap for parsing multisig bitmap from validators
-	multiSigMutex  sync.RWMutex
 
 	// Registry for services.
 	registry *registry.Registry

@@ -360,9 +360,7 @@ func (consensus *Consensus) ParseFBFTMessage(msg *msg_pb.Message) (*FBFTMessage,
 		copy(pbftMsg.SenderPubkeys[0].Bytes[:], consensusMsg.SenderPubkey[:])
 	} else {
 		// else, it should be a multi-key message where the bitmap is populated
-		consensus.multiSigMutex.RLock()
 		pubKeys, err := consensus.multiSigBitmap.GetSignedPubKeysFromBitmap(pbftMsg.SenderPubkeyBitmap)
-		consensus.multiSigMutex.RUnlock()
 		if err != nil {
 			return nil, err
 		}
