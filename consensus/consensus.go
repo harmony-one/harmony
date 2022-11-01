@@ -133,8 +133,9 @@ type Consensus struct {
 
 	dHelper *downloadHelper
 
-	// Flag only for initialization state.
-	start bool
+	// Both flags only for initialization state.
+	start           bool
+	isInitialLeader bool
 }
 
 // Blockchain returns the blockchain.
