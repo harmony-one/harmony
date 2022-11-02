@@ -26,12 +26,8 @@ func (consensus *Consensus) announce(block *types.Block) {
 		return
 	}
 
-	//// Lock Write - Start
-	consensus.mutex.Lock()
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = encodedBlock // Must set block bytes before consensus.construct()
-	consensus.mutex.Unlock()
-	//// Lock Write - End
 
 	key, err := consensus.GetConsensusLeaderPrivateKey()
 	if err != nil {
