@@ -79,10 +79,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 }
 
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
-	// Lock to prevent race condition between announce and prepare
-	consensus.verifyBlockMutex.Lock()
-	defer consensus.verifyBlockMutex.Unlock()
-
 	if consensus.FBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
 
@@ -188,12 +184,6 @@ func (consensus *Consensus) sendCommitMessages(blockObj *types.Block) {
 // if onPrepared accepts the prepared message from the leader, then
 // it will send a COMMIT message for the leader to receive on the network.
 func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
-	if consensus.ShardID == 0 {
-		//fmt.Println("onPrepared", recvMsg.BlockNum)
-	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
