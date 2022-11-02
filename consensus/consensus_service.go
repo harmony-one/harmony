@@ -396,7 +396,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 	for _, key := range pubKeys {
 		// in committee
-		myPubKeys := consensus.GetPublicKeys()
+		myPubKeys := consensus.getPublicKeys()
 		if myPubKeys.Contains(key.Object) {
 			if hasError {
 				consensus.getLogger().Error().
