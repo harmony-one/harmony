@@ -84,8 +84,6 @@ type Consensus struct {
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
 	mutex sync.RWMutex
-	// mutex for verify new block
-	verifyBlockMutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
@@ -172,6 +170,10 @@ func (consensus *Consensus) VdfSeedSize() int {
 
 // GetPublicKeys returns the public keys
 func (consensus *Consensus) GetPublicKeys() multibls.PublicKeys {
+	return consensus.getPublicKeys()
+}
+
+func (consensus *Consensus) getPublicKeys() multibls.PublicKeys {
 	return consensus.priKey.GetPublicKeys()
 }
 
