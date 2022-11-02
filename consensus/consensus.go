@@ -84,8 +84,6 @@ type Consensus struct {
 	IgnoreViewIDCheck *abool.AtomicBool
 	// consensus mutex
 	mutex sync.RWMutex
-	// mutex for verify new block
-	verifyBlockMutex sync.Mutex
 	// ViewChange struct
 	vc *viewChange
 	// Signal channel for proposing a new block and start new consensus
