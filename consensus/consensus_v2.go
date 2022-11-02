@@ -47,8 +47,6 @@ const (
 
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
-	//consensus.mutex.RLock()
-	//defer consensus.mutex.RUnlock()
 	return consensus.isViewChangingMode()
 }
 
