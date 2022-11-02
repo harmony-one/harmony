@@ -47,6 +47,12 @@ const (
 
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
+	//consensus.mutex.RLock()
+	//defer consensus.mutex.RUnlock()
+	return consensus.isViewChangingMode()
+}
+
+func (consensus *Consensus) isViewChangingMode() bool {
 	return consensus.current.Mode() == ViewChanging
 }
 
@@ -56,7 +62,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
 	// so we just ignore those messages
-	if consensus.IsViewChangingMode() &&
+	if consensus.isViewChangingMode() &&
 		(msg.Type == msg_pb.MessageType_PREPARE ||
 			msg.Type == msg_pb.MessageType_COMMIT) {
 		return nil
@@ -784,7 +790,7 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
-	if initBN < consensus.BlockNum() && consensus.IsViewChangingMode() {
+	if initBN < consensus.BlockNum() && consensus.isViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
