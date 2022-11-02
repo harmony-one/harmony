@@ -495,7 +495,6 @@ func (consensus *Consensus) switchPhase(subject string, desired FBFTPhase) {
 		Str("switchPhase:", subject)
 
 	consensus.phase.Set(desired)
-	return
 }
 
 var (
