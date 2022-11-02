@@ -86,7 +86,7 @@ func (consensus *Consensus) onAnnounceSanityChecks(recvMsg *FBFTMessage) bool {
 				Str("recvMsg", recvMsg.String()).
 				Str("LeaderKey", consensus.LeaderPubKey.Bytes.Hex()).
 				Msg("[OnAnnounce] Leader is malicious")
-			if consensus.IsViewChangingMode() {
+			if consensus.isViewChangingMode() {
 				consensus.getLogger().Debug().Msg(
 					"[OnAnnounce] Already in ViewChanging mode, conflicing announce, doing noop",
 				)
@@ -161,7 +161,7 @@ func (consensus *Consensus) onViewChangeSanityCheck(recvMsg *FBFTMessage) bool {
 			Msg("[onViewChangeSanityCheck] MsgBlockNum is different from my BlockNumber")
 		return false
 	}
-	if consensus.IsViewChangingMode() &&
+	if consensus.isViewChangingMode() &&
 		consensus.GetCurBlockViewID() > recvMsg.ViewID {
 		consensus.getLogger().Debug().Uint64("curBlockViewID", consensus.GetCurBlockViewID()).
 			Uint64("msgViewID", recvMsg.ViewID).
