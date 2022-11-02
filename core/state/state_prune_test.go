@@ -66,7 +66,7 @@ func writeAndPrune(db ethdb.Database, root common.Hash, data map[common.Hash]com
 	newStateDB := oldStateDB.Copy()
 	writeTestData(newStateDB, data)
 	batch := db.NewBatch()
-	DiffAndPruneSync(oldStateDB, newStateDB, batch)
+	DiffAndPruneSync(oldStateDB, newStateDB, batch, nil)
 	batch.Write()
 	return newStateDB.trie.Hash()
 }
@@ -96,5 +96,37 @@ func TestDiffAndPrune(t *testing.T) {
 	root := common.Hash{}
 	for _, dataset := range datasets {
 		root = writeAndCheck(db, root, dataset)
+	}
+}
+
+func writeAndPruneAbort(db ethdb.Database, root common.Hash, data map[common.Hash]common.Hash) (error, common.Hash) {
+	oldStateDB := newStateDB(root, db)
+	newStateDB := oldStateDB.Copy()
+	writeTestData(newStateDB, data)
+	batch := db.NewBatch()
+	abortCh := make(chan struct{}, 1)
+	abortCh <- struct{}{}
+	if _, err := DiffAndPruneSync(oldStateDB, newStateDB, batch, abortCh); err != nil {
+		return err, root
+	}
+	batch.Write()
+	return nil, newStateDB.trie.Hash()
+}
+
+func TestDiffAndPruneAbort(t *testing.T) {
+	dataset1 := generateTestData(DataSize, DataMod1)
+	dataset2 := generateTestData(DataSize, DataMod2)
+	datasets := []map[common.Hash]common.Hash{
+		dataset1,
+		dataset2,
+		dataset1,
+	}
+	db := rawdb.NewMemoryDatabase()
+	root := common.Hash{}
+	for _, dataset := range datasets {
+		err, root := writeAndPruneAbort(db, root, dataset)
+		if err == nil || (root != common.Hash{}) {
+			t.Fatal("pruning should be aborted")
+		}
 	}
 }

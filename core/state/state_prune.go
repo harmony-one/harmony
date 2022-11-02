@@ -1,6 +1,8 @@
 package state
 
 import (
+	"errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
@@ -9,12 +11,17 @@ import (
 )
 
 // DiffAndPruneSync deletes data exists in oldDB, but not in newDB
-func DiffAndPruneSync(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, error) {
+func DiffAndPruneSync(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter, abortChan chan struct{}) (int, error) {
 	// create difference iterator
 	differIt, _ := trie.NewDifferenceIterator(newDB.trie.NodeIterator(nil), oldDB.trie.NodeIterator(nil))
 
 	count := 0
 	for differIt.Next(true) {
+		select {
+		case <-abortChan:
+			return count, errors.New("aborted")
+		default:
+		}
 		if !differIt.Leaf() {
 			count++
 			batch.Delete(differIt.Hash().Bytes())
@@ -52,6 +59,11 @@ func DiffAndPruneSync(oldDB *DB, newDB *DB, batch rawdb.DatabaseDeleter) (int, e
 			oldTrieIt := oldAccountTrie.NodeIterator(nil)
 			accountDifferIt, _ := NewPruneIterator(newTrieIt, oldTrieIt)
 			for accountDifferIt.Next(true) {
+				select {
+				case <-abortChan:
+					return count, errors.New("aborted")
+				default:
+				}
 				if newTrieIt.Leaf() {
 					leafKeyCache.Add(string(newTrieIt.LeafKey()), struct{}{})
 				}

@@ -139,7 +139,9 @@ type BlockChainImpl struct {
 	// This can improve the cache hit rate of redis
 	latestCleanCacheNum uint64      // The most recently cleaned cache of block num
 	cleanCacheChan      chan uint64 // Used to notify blocks that will be cleaned up
-
+	lastWrite           uint64
+	pruneRuning         sync.WaitGroup
+	pruneAbortChan      chan struct{}
 	// redisPreempt used in tikv mode, write nodes preempt for write permissions and publish updates to reader nodes
 	redisPreempt *redis_helper.RedisPreempt
 
@@ -246,6 +248,7 @@ func newBlockChainWithOptions(
 		db:                            db,
 		triegc:                        prque.New(nil),
 		stateCache:                    stateCache,
+		pruneAbortChan:                make(chan struct{}),
 		quit:                          make(chan struct{}),
 		bodyCache:                     bodyCache,
 		bodyRLPCache:                  bodyRLPCache,
@@ -289,6 +292,7 @@ func newBlockChainWithOptions(
 		return nil, err
 	}
 	bc.shardID = bc.CurrentBlock().ShardID()
+	bc.lastWrite = bc.CurrentBlock().NumberU64()
 	// Take ownership of this particular state
 	go bc.update()
 	return bc, nil
@@ -899,7 +903,8 @@ func (bc *BlockChainImpl) Stop() {
 	bc.scope.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
-
+	// wait pruning completed
+	bc.waitPruning(false)
 	// Ensure the state of a recent block is also stored to disk before exiting.
 	// We're writing three different states to catch different restart scenarios:
 	//  - HEAD:     So we don't need to reprocess any blocks in the general case
@@ -1174,8 +1179,6 @@ func (bc *BlockChainImpl) InsertReceiptChain(blockChain types.Blocks, receiptCha
 	return 0, nil
 }
 
-var lastWrite uint64
-
 func (bc *BlockChainImpl) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
@@ -1253,17 +1256,17 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 				if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
 					// If we're exceeding limits but haven't reached a large enough memory gap,
 					// warn the user that the system is becoming unstable.
-					if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+					if chosen < bc.lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
 						utils.Logger().Info().
 							Dur("time", bc.gcproc).
 							Dur("allowance", bc.cacheConfig.TrieTimeLimit).
-							Float64("optimum", float64(chosen-lastWrite)/triesInMemory).
+							Float64("optimum", float64(chosen-bc.lastWrite)/triesInMemory).
 							Msg("State in memory for too long, committing")
 					}
+					bc.pruneOldTrieAsync(bc.lastWrite, chosen, true)
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
-					bc.pruneOldTrieSync(lastWrite, chosen)
-					lastWrite = chosen
+					bc.lastWrite = chosen
 					bc.gcproc = 0
 				}
 				// Garbage collect anything below our required write retention
@@ -1342,13 +1345,14 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 	return CanonStatTy, nil
 }
 
-// Do not run this function in goroutine!!!!
-// For example:
+// pruneOldTrieAsync prune old trie in async.
+// The task must be completed before the next call, or it will be aborted.
+// Example of why:
 // At State-1, A=1.
 // At State-2, A=0. This means A will be removed from the trie.
 // At State-3, A=1.
 // Assuming that the pruning of (State-1, State-2) is performed after State-3 is flushed to disk, the A will be removed. State-3 will have the wrong value for A.
-func (bc *BlockChainImpl) pruneOldTrieSync(old, new uint64) error {
+func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64, abort bool) error {
 	oldHeader := bc.GetHeaderByNumber(old)
 	newHeader := bc.GetHeaderByNumber(new)
 	oldStateDB, err := bc.StateAt(oldHeader.Root())
@@ -1359,9 +1363,26 @@ func (bc *BlockChainImpl) pruneOldTrieSync(old, new uint64) error {
 	if err != nil {
 		return err
 	}
-	batch := bc.ChainDb().NewBatch()
-	state.DiffAndPruneSync(oldStateDB, newStateDB, batch)
-	return batch.Write()
+	bc.waitPruning(abort)
+	bc.pruneRuning.Add(1)
+	go func() {
+		batch := bc.ChainDb().NewBatch()
+		if _, err := state.DiffAndPruneSync(oldStateDB, newStateDB, batch, bc.pruneAbortChan); err == nil {
+			batch.Write()
+		}
+		bc.pruneRuning.Done()
+	}()
+	return nil
+}
+
+func (bc *BlockChainImpl) waitPruning(abort bool) {
+	if abort {
+		select {
+		case bc.pruneAbortChan <- struct{}{}:
+		default:
+		}
+	}
+	bc.pruneRuning.Wait()
 }
 
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
