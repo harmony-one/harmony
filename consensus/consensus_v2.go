@@ -46,8 +46,8 @@ const (
 
 // IsViewChangingMode return true if curernt mode is viewchanging
 func (consensus *Consensus) IsViewChangingMode() bool {
-	consensus.mutex.RLock()
-	defer consensus.mutex.RUnlock()
+	//consensus.mutex.RLock()
+	//defer consensus.mutex.RUnlock()
 	return consensus.isViewChangingMode()
 }
 
@@ -904,7 +904,7 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 		consensus.switchPhase("TryCatchup", FBFTAnnounce)
 	}
 	// catch up and skip from view change trap
-	if initBN < consensus.getBlockNum() && consensus.isViewChangingMode() {
+	if initBN < consensus.BlockNum() && consensus.isViewChangingMode() {
 		consensus.current.SetMode(Normal)
 		consensus.consensusTimeout[timeoutViewChange].Stop()
 	}
