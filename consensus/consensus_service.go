@@ -97,7 +97,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	consensus.ResetState()
 
 	// do not reset view change state if it is in view changing mode
-	if !consensus.IsViewChangingMode() {
+	if !consensus.isViewChangingMode() {
 		consensus.ResetViewChangeState()
 	}
 	return consensus.Decider.ParticipantsCount()

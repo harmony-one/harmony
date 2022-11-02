@@ -237,8 +237,6 @@ func (consensus *Consensus) startViewChange() {
 	if consensus.disableViewChange || consensus.IsBackup() {
 		return
 	}
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 
 	consensus.consensusTimeout[timeoutConsensus].Stop()
 	consensus.consensusTimeout[timeoutBootstrap].Stop()
@@ -300,7 +298,7 @@ func (consensus *Consensus) startViewChange() {
 
 // startNewView stops the current view change
 func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.PrivateKeyWrapper, reset bool) error {
-	if !consensus.IsViewChangingMode() {
+	if !consensus.isViewChangingMode() {
 		return errors.New("not in view changing mode anymore")
 	}
 
@@ -421,7 +419,7 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 	}
 
 	// received enough view change messages, change state to normal consensus
-	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.IsViewChangingMode() {
+	if consensus.Decider.IsQuorumAchievedByMask(consensus.vc.GetViewIDBitmap(recvMsg.ViewID)) && consensus.isViewChangingMode() {
 		// no previous prepared message, go straight to normal mode
 		// and start proposing new block
 		if consensus.vc.IsM1PayloadEmpty() {
@@ -537,7 +535,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		}
 	}
 
-	if !consensus.IsViewChangingMode() {
+	if !consensus.isViewChangingMode() {
 		consensus.getLogger().Info().Msg("Not in ViewChanging Mode.")
 		return
 	}
