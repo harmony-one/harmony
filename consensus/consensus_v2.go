@@ -310,16 +310,19 @@ func (consensus *Consensus) Start(
 				case <-stopChan:
 					return
 				case <-ticker.C:
+					consensus.mutex.Lock()
 					consensus.tick()
+					consensus.mutex.Unlock()
 				}
 			}
 		}()
 
+		consensus.mutex.Lock()
 		consensus.consensusTimeout[timeoutBootstrap].Start()
 		consensus.getLogger().Info().Msg("[ConsensusMainLoop] Start bootstrap timeout (only once)")
-
 		// Set up next block due time.
 		consensus.NextBlockDue = time.Now().Add(consensus.BlockPeriod)
+		consensus.mutex.Unlock()
 	}()
 
 	if consensus.dHelper != nil {
