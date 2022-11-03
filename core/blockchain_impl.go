@@ -140,8 +140,9 @@ type BlockChainImpl struct {
 	latestCleanCacheNum uint64      // The most recently cleaned cache of block num
 	cleanCacheChan      chan uint64 // Used to notify blocks that will be cleaned up
 	lastWrite           uint64
-	pruneRuning         sync.WaitGroup
-	pruneAbortChan      chan struct{}
+	statePruneEnable    bool
+	statePruneRuning    sync.WaitGroup
+	statePruneAbortChan chan struct{}
 	// redisPreempt used in tikv mode, write nodes preempt for write permissions and publish updates to reader nodes
 	redisPreempt *redis_helper.RedisPreempt
 
@@ -248,7 +249,7 @@ func newBlockChainWithOptions(
 		db:                            db,
 		triegc:                        prque.New(nil),
 		stateCache:                    stateCache,
-		pruneAbortChan:                make(chan struct{}),
+		statePruneAbortChan:           make(chan struct{}),
 		quit:                          make(chan struct{}),
 		bodyCache:                     bodyCache,
 		bodyRLPCache:                  bodyRLPCache,
@@ -1263,9 +1264,13 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 							Float64("optimum", float64(chosen-bc.lastWrite)/triesInMemory).
 							Msg("State in memory for too long, committing")
 					}
-					bc.pruneOldTrieAsync(bc.lastWrite, chosen, true)
+					// before flush next state tire, must ensure pre-pruning finished
+					bc.waitPruning(true)
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
+					if bc.statePruneEnable {
+						bc.pruneOldTrieAsync(bc.lastWrite, chosen)
+					}
 					bc.lastWrite = chosen
 					bc.gcproc = 0
 				}
@@ -1352,7 +1357,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 // At State-2, A=0. This means A will be removed from the trie.
 // At State-3, A=1.
 // Assuming that the pruning of (State-1, State-2) is performed after State-3 is flushed to disk, the A will be removed. State-3 will have the wrong value for A.
-func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64, abort bool) error {
+func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64) error {
 	oldHeader := bc.GetHeaderByNumber(old)
 	newHeader := bc.GetHeaderByNumber(new)
 	oldStateDB, err := bc.StateAt(oldHeader.Root())
@@ -1363,14 +1368,13 @@ func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64, abort bool) error {
 	if err != nil {
 		return err
 	}
-	bc.waitPruning(abort)
-	bc.pruneRuning.Add(1)
+	bc.statePruneRuning.Add(1)
 	go func() {
 		batch := bc.ChainDb().NewBatch()
-		if _, err := state.DiffAndPruneSync(oldStateDB, newStateDB, batch, bc.pruneAbortChan); err == nil {
+		if _, err := state.DiffAndPruneSync(oldStateDB, newStateDB, batch, bc.statePruneAbortChan); err == nil {
 			batch.Write()
 		}
-		bc.pruneRuning.Done()
+		bc.statePruneRuning.Done()
 	}()
 	return nil
 }
@@ -1378,11 +1382,11 @@ func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64, abort bool) error {
 func (bc *BlockChainImpl) waitPruning(abort bool) {
 	if abort {
 		select {
-		case bc.pruneAbortChan <- struct{}{}:
+		case bc.statePruneAbortChan <- struct{}{}:
 		default:
 		}
 	}
-	bc.pruneRuning.Wait()
+	bc.statePruneRuning.Wait()
 }
 
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
@@ -3139,6 +3143,10 @@ func (bc *BlockChainImpl) EnablePruneBeaconChainFeature() {
 
 func (bc *BlockChainImpl) IsEnablePruneBeaconChainFeature() bool {
 	return bc.pruneBeaconChainEnable
+}
+
+func (bc *BlockChainImpl) EnableStatePrune() {
+	bc.statePruneEnable = true
 }
 
 // SyncFromTiKVWriter used for tikv mode, all reader or follower writer used to sync block from master writer
