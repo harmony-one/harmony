@@ -288,6 +288,13 @@ func init() {
 		confTree.Set("Version", "2.5.7")
 		return confTree
 	}
+	migrations["2.5.7"] = func(confTree *toml.Tree) *toml.Tree {
+		if confTree.Get("General.StatePruneEnable") == nil {
+			confTree.Set("General.StatePruneEnable", defaultConfig.General.StatePruneEnable)
+		}
+		confTree.Set("Version", "2.5.8")
+		return confTree
+	}
 
 	// check that the latest version here is the same as in default.go
 	largestKey := getNextVersion(migrations)
