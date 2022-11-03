@@ -418,3 +418,5 @@ func (a Stub) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log) error {
 func (a Stub) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 	return
 }
+
+func (s Stub) EnableStatePrune() {}

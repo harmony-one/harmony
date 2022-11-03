@@ -323,3 +323,5 @@ func (bc *EpochChain) IsSameLeaderAsPreviousBlock(block *types.Block) bool {
 func (bc *EpochChain) GetVMConfig() *vm.Config {
 	return bc.vmConfig
 }
+
+func (bc *EpochChain) EnableStatePrune() {}

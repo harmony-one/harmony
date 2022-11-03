@@ -31,6 +31,7 @@ var (
 		legacyDataDirFlag,
 
 		taraceFlag,
+		statePruneFlag,
 	}
 
 	dnsSyncFlags = []cli.Flag{
@@ -319,6 +320,12 @@ var (
 		Usage:    "indicates if full transaction tracing should be enabled",
 		DefValue: defaultConfig.General.TraceEnable,
 	}
+
+	statePruneFlag = cli.BoolFlag{
+		Name:     "pruning",
+		Usage:    "enable node to prune state tire in run-time",
+		DefValue: defaultConfig.General.TraceEnable,
+	}
 )
 
 func getRootFlags() []cli.Flag {
@@ -391,6 +398,10 @@ func applyGeneralFlags(cmd *cobra.Command, config *harmonyconfig.HarmonyConfig) 
 
 	if cli.IsFlagChanged(cmd, taraceFlag) {
 		config.General.TraceEnable = cli.GetBoolFlagValue(cmd, taraceFlag)
+	}
+
+	if cli.IsFlagChanged(cmd, statePruneFlag) {
+		config.General.StatePruneEnable = cli.GetBoolFlagValue(cmd, statePruneFlag)
 	}
 
 	if cli.IsFlagChanged(cmd, isBackupFlag) {

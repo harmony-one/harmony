@@ -319,6 +319,8 @@ type BlockChain interface {
 		header *block.Header,
 		isVerify bool,
 	) (*shard.State, error)
+	// EnableStatePrune enabled prune state trie feature.
+	EnableStatePrune()
 	// EnablePruneBeaconChainFeature enabled prune BeaconChain feature.
 	EnablePruneBeaconChainFeature()
 	// IsEnablePruneBeaconChainFeature returns is enable prune BeaconChain feature.
