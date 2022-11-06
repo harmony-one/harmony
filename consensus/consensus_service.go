@@ -465,6 +465,15 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+
+	return consensus.isLeader()
+}
+
+// IsLeader check if the node is a leader or not by comparing the public key of
+// the node with the leader public key
+func (consensus *Consensus) isLeader() bool {
 	obj := consensus.LeaderPubKey.Object
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
