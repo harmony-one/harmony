@@ -26,9 +26,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 			Msg("[OnAnnounce] Unparseable leader message")
 		return
 	}
-	if consensus.ShardID == 0 {
-		//fmt.Println("onAnnounce called ", recvMsg.BlockNum)
-	}
 
 	// NOTE let it handle its own logs
 	if !consensus.onAnnounceSanityChecks(recvMsg) {
