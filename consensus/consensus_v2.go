@@ -100,8 +100,8 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 
 	canHandleViewChange := true
 	intendedForValidator, intendedForLeader :=
-		!consensus.IsLeader(),
-		consensus.IsLeader()
+		!consensus.isLeader(),
+		consensus.isLeader()
 
 	// if in backup normal mode, force ignore view change event and leader event.
 	if consensus.current.Mode() == NormalBackup {
@@ -183,7 +183,7 @@ func (consensus *Consensus) finalCommit() {
 	// Note: leader already sent 67% commit in preCommit. The 100% commit won't be sent immediately
 	// to save network traffic. It will only be sent in retry if consensus doesn't move forward.
 	// Or if the leader is changed for next block, the 100% committed sig will be sent to the next leader immediately.
-	if !consensus.IsLeader() || block.IsLastBlockInEpoch() {
+	if !consensus.isLeader() || block.IsLastBlockInEpoch() {
 		// send immediately
 		if err := consensus.msgSender.SendWithRetry(
 			block.NumberU64(),
@@ -248,7 +248,7 @@ func (consensus *Consensus) finalCommit() {
 
 	// If still the leader, send commit sig/bitmap to finish the new block proposal,
 	// else, the block proposal will timeout by itself.
-	if consensus.IsLeader() {
+	if consensus.isLeader() {
 		if block.IsLastBlockInEpoch() {
 			// No pipelining
 			go func() {
@@ -330,7 +330,7 @@ func (consensus *Consensus) Start(
 
 func (consensus *Consensus) StartChannel() {
 	consensus.mutex.Lock()
-	consensus.isInitialLeader = consensus.IsLeader()
+	consensus.isInitialLeader = consensus.isLeader()
 	if consensus.isInitialLeader {
 		consensus.start = true
 		consensus.getLogger().Info().Time("time", time.Now()).Msg("[ConsensusMainLoop] Send ReadySignal")
