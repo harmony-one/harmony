@@ -662,7 +662,7 @@ func (consensus *Consensus) tryCatchup() error {
 		}
 		blk.SetCurrentCommitSig(msg.Payload)
 
-		if err := consensus.VerifyBlock(blk); err != nil {
+		if err := consensus.verifyBlock(blk); err != nil {
 			consensus.getLogger().Err(err).Msg("[TryCatchup] failed block verifier")
 			return err
 		}

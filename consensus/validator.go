@@ -42,8 +42,6 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Msg("[OnAnnounce] Announce message Added")
 	consensus.FBFTLog.AddVerifiedMessage(recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	consensus.blockHash = recvMsg.BlockHash
 	// we have already added message and block, skip check viewID
 	// and send prepare message if is in ViewChanging mode
@@ -78,6 +76,11 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	}
 }
 
+func (consensus *Consensus) ValidateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
+	return consensus.validateNewBlock(recvMsg)
+}
 func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block, error) {
 	if consensus.FBFTLog.IsBlockVerified(recvMsg.BlockHash) {
 		var blockObj *types.Block
@@ -132,7 +135,7 @@ func (consensus *Consensus) validateNewBlock(recvMsg *FBFTMessage) (*types.Block
 		return nil, errors.New("nil block verifier")
 	}
 
-	if err := consensus.VerifyBlock(&blockObj); err != nil {
+	if err := consensus.verifyBlock(&blockObj); err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[validateNewBlock] Block verification failed")
 		return nil, errors.New("Block verification failed")
 	}
