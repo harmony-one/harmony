@@ -143,7 +143,7 @@ func (consensus *Consensus) construct(
 		return nil, err
 	}
 
-	FBFTMsg, err2 := consensus.ParseFBFTMessage(message)
+	FBFTMsg, err2 := consensus.parseFBFTMessage(message)
 
 	if err2 != nil {
 		utils.Logger().Error().Err(err).
