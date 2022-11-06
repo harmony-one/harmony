@@ -772,7 +772,7 @@ func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg 
 		consensus.SetMode(consensus.UpdateConsensusInformation())
 	}
 	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
-	consensus.ResetState()
+	consensus.resetState()
 }
 
 func (consensus *Consensus) getEpochFirstBlockViewID(epoch *big.Int) (uint64, error) {
