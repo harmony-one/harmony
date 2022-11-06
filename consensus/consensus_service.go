@@ -408,7 +408,7 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 
 			// If the leader changed and I myself become the leader
 			if (oldLeader != nil && consensus.LeaderPubKey != nil &&
-				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.IsLeader() {
+				!consensus.LeaderPubKey.Object.IsEqual(oldLeader.Object)) && consensus.isLeader() {
 				go func() {
 					consensus.getLogger().Info().
 						Str("myKey", myPubKeys.SerializeToHexStr()).
@@ -429,6 +429,15 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+
+	return consensus.isLeader()
+}
+
+// IsLeader check if the node is a leader or not by comparing the public key of
+// the node with the leader public key
+func (consensus *Consensus) isLeader() bool {
 	obj := consensus.LeaderPubKey.Object
 	for _, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(obj) {
