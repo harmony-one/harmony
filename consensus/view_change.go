@@ -338,7 +338,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 	// TODO: consider make ResetState unified and only called in one place like finalizeCommit()
 	if reset {
-		consensus.ResetState()
+		consensus.resetState()
 	}
 	consensus.SetLeaderPubKey(newLeaderPriKey.Pub)
 
@@ -551,7 +551,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 		consensus.sendCommitMessages(preparedBlock)
 		consensus.switchPhase("onNewView", FBFTCommit)
 	} else {
-		consensus.ResetState()
+		consensus.resetState()
 		consensus.getLogger().Info().Msg("onNewView === announce")
 	}
 	consensus.getLogger().Info().
