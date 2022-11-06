@@ -94,7 +94,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
 	consensus.UpdateBitmaps()
-	consensus.ResetState()
+	consensus.resetState()
 
 	// do not reset view change state if it is in view changing mode
 	if !consensus.isViewChangingMode() {
@@ -140,7 +140,7 @@ func (consensus *Consensus) UpdateBitmaps() {
 }
 
 // ResetState resets the state of the consensus
-func (consensus *Consensus) ResetState() {
+func (consensus *Consensus) resetState() {
 	consensus.switchPhase("ResetState", FBFTAnnounce)
 
 	consensus.blockHash = [32]byte{}
@@ -520,7 +520,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 	}
 
 	// Have to keep the block hash so the leader can finish the commit phase of prepared block
-	consensus.ResetState()
+	consensus.resetState()
 
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.switchPhase("selfCommit", FBFTCommit)
