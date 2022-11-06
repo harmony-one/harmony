@@ -94,7 +94,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	}
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
-	consensus.updateBitmaps()
+	consensus.UpdateBitmaps()
 	consensus.resetState()
 
 	// do not reset view change state if it is in view changing mode
