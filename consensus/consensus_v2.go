@@ -92,7 +92,7 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 		members := consensus.Decider.Participants()
 		fbftMsg, err = ParseNewViewMessage(msg, members)
 	default:
-		fbftMsg, err = consensus.ParseFBFTMessage(msg)
+		fbftMsg, err = consensus.parseFBFTMessage(msg)
 	}
 	if err != nil || fbftMsg == nil {
 		return errors.Wrapf(err, "unable to parse consensus msg with type: %s", msg.Type)
