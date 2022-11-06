@@ -140,7 +140,7 @@ func (consensus *Consensus) Blockchain() core.BlockChain {
 }
 
 // VerifyBlock is a function used to verify the block and keep trace of verified blocks.
-func (consensus *Consensus) VerifyBlock(block *types.Block) error {
+func (consensus *Consensus) verifyBlock(block *types.Block) error {
 	if !consensus.FBFTLog.IsBlockVerified(block.Hash()) {
 		if err := consensus.BlockVerifier(block); err != nil {
 			return errors.Errorf("Block verification failed: %s", err)
@@ -217,7 +217,7 @@ func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapp
 // SetBlockVerifier sets the block verifier
 func (consensus *Consensus) SetBlockVerifier(verifier VerifyBlockFunc) {
 	consensus.BlockVerifier = verifier
-	consensus.vc.SetVerifyBlock(consensus.VerifyBlock)
+	consensus.vc.SetVerifyBlock(consensus.verifyBlock)
 }
 
 func (consensus *Consensus) IsBackup() bool {
