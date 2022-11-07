@@ -15,7 +15,7 @@ import (
 func (consensus *Consensus) didReachPrepareQuorum() error {
 	logger := utils.Logger()
 	logger.Info().Msg("[OnPrepare] Received Enough Prepare Signatures")
-	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		utils.Logger().Warn().Err(err).Msg("[OnPrepare] leader not found")
 		return err
