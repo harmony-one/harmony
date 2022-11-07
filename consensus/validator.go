@@ -62,7 +62,7 @@ func (consensus *Consensus) onAnnounce(msg *msg_pb.Message) {
 	if len(recvMsg.Block) > 0 {
 		go func() {
 			// Best effort check, no need to error out.
-			_, err := consensus.validateNewBlock(recvMsg)
+			_, err := consensus.ValidateNewBlock(recvMsg)
 
 			if err == nil {
 				consensus.getLogger().Info().
@@ -205,7 +205,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	// check validity of prepared signature
 	blockHash := recvMsg.BlockHash
-	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 0)
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 0, consensus.Decider.Participants())
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("ReadSignatureBitmapPayload failed!")
 		return

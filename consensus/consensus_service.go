@@ -7,6 +7,7 @@ import (
 
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/crypto/bls"
+	"github.com/harmony-one/harmony/multibls"
 
 	"github.com/ethereum/go-ethereum/common"
 	protobuf "github.com/golang/protobuf/proto"
@@ -229,16 +230,20 @@ func (consensus *Consensus) SetBlockNum(blockNum uint64) {
 }
 
 // ReadSignatureBitmapPayload read the payload for signature and bitmap; offset is the beginning position of reading
-func (consensus *Consensus) ReadSignatureBitmapPayload(
-	recvPayload []byte, offset int,
-) (*bls_core.Sign, *bls_cosi.Mask, error) {
+func (consensus *Consensus) ReadSignatureBitmapPayload(recvPayload []byte, offset int) (*bls_core.Sign, *bls_cosi.Mask, error) {
+	consensus.mutex.RLock()
+	members := consensus.Decider.Participants()
+	consensus.mutex.RUnlock()
+	return consensus.readSignatureBitmapPayload(recvPayload, offset, members)
+}
+
+func (consensus *Consensus) readSignatureBitmapPayload(recvPayload []byte, offset int, members multibls.PublicKeys) (*bls_core.Sign, *bls_cosi.Mask, error) {
 	if offset+bls.BLSSignatureSizeInBytes > len(recvPayload) {
 		return nil, nil, errors.New("payload not have enough length")
 	}
 	sigAndBitmapPayload := recvPayload[offset:]
 
 	// TODO(audit): keep a Mask in the Decider so it won't be reconstructed on the fly.
-	members := consensus.Decider.Participants()
 	return chain.ReadSignatureBitmapByPublicKeys(
 		sigAndBitmapPayload, members,
 	)
@@ -524,7 +529,7 @@ func (consensus *Consensus) selfCommit(payload []byte) error {
 		return errGetPreparedBlock
 	}
 
-	aggSig, mask, err := consensus.ReadSignatureBitmapPayload(payload, 32)
+	aggSig, mask, err := consensus.readSignatureBitmapPayload(payload, 32, consensus.Decider.Participants())
 	if err != nil {
 		return errReadBitmapPayload
 	}

@@ -501,7 +501,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 			utils.CountOneBits(m3Mask.Bitmap) > utils.CountOneBits(m2Mask.Bitmap)) {
 		// m1 is not empty, check it's valid
 		blockHash := recvMsg.Payload[:32]
-		aggSig, mask, err := consensus.ReadSignatureBitmapPayload(recvMsg.Payload, 32)
+		aggSig, mask, err := consensus.readSignatureBitmapPayload(recvMsg.Payload, 32, consensus.Decider.Participants())
 		if err != nil {
 			consensus.getLogger().Error().Err(err).
 				Msg("[onNewView] ReadSignatureBitmapPayload Failed")
