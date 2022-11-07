@@ -74,6 +74,8 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 // UpdatePublicKeys updates the PublicKeys for
 // quorum on current subcommittee, protected by a mutex
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
@@ -94,7 +96,7 @@ func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.Publi
 	}
 	// reset states after update public keys
 	// TODO: incorporate bitmaps in the decider, so their state can't be inconsistent.
-	consensus.UpdateBitmaps()
+	consensus.updateBitmaps()
 	consensus.resetState()
 
 	// do not reset view change state if it is in view changing mode
@@ -126,7 +128,7 @@ func (consensus *Consensus) signConsensusMessage(message *msg_pb.Message,
 }
 
 // UpdateBitmaps update the bitmaps for prepare and commit phase
-func (consensus *Consensus) UpdateBitmaps() {
+func (consensus *Consensus) updateBitmaps() {
 	consensus.getLogger().Debug().
 		Str("MessageType", consensus.phase.String()).
 		Msg("[UpdateBitmaps] Updating consensus bitmaps")
@@ -440,9 +442,8 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	// TODO: if remove locks blockchain stucks.
-	//consensus.mutex.RLock()
-	//defer consensus.mutex.RUnlock()
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 
 	return consensus.isLeader()
 }
