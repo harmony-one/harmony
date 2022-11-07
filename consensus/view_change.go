@@ -353,10 +353,6 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 
 // onViewChange is called when the view change message is received.
 func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
-	//fmt.Printf("[onViewChange] received view change message from %+v\n", recvMsg)
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Debug().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -457,9 +453,6 @@ func (consensus *Consensus) onViewChange(recvMsg *FBFTMessage) {
 // Or the validator will enter announce phase to wait for the new block proposed
 // from the new leader
 func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Info().
 		Uint64("viewID", recvMsg.ViewID).
 		Uint64("blockNum", recvMsg.BlockNum).
@@ -546,7 +539,7 @@ func (consensus *Consensus) onNewView(recvMsg *FBFTMessage) {
 	consensus.consensusTimeout[timeoutViewChange].Stop()
 
 	// newView message verified success, override my state
-	consensus.SetViewIDs(recvMsg.ViewID)
+	consensus.setViewIDs(recvMsg.ViewID)
 	consensus.LeaderPubKey = senderKey
 	consensus.ResetViewChangeState()
 
