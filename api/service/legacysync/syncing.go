@@ -18,6 +18,7 @@ import (
 	"github.com/harmony-one/harmony/api/service/legacysync/downloader"
 	pb "github.com/harmony-one/harmony/api/service/legacysync/downloader/proto"
 	"github.com/harmony-one/harmony/consensus"
+	consensus2 "github.com/harmony-one/harmony/consensus"
 	"github.com/harmony-one/harmony/consensus/engine"
 	"github.com/harmony-one/harmony/core"
 	"github.com/harmony-one/harmony/core/types"
@@ -1142,20 +1143,19 @@ func (ss *StateSync) SyncLoop(bc core.BlockChain, worker *worker.Worker, isBeaco
 
 func (ss *StateSync) addConsensusLastMile(bc core.BlockChain, consensus *consensus.Consensus) error {
 	curNumber := bc.CurrentBlock().NumberU64()
-	blockIter, err := consensus.GetLastMileBlockIter(curNumber + 1)
-	if err != nil {
-		return err
-	}
-	for {
-		block := blockIter.Next()
-		if block == nil {
-			break
+	err := consensus.GetLastMileBlockIter(curNumber+1, func(blockIter *consensus2.LastMileBlockIter) error {
+		for {
+			block := blockIter.Next()
+			if block == nil {
+				break
+			}
+			if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
+				return errors.Wrap(err, "failed to InsertChain")
+			}
 		}
-		if _, err := bc.InsertChain(types.Blocks{block}, true); err != nil {
-			return errors.Wrap(err, "failed to InsertChain")
-		}
-	}
-	return nil
+		return nil
+	})
+	return err
 }
 
 // GetSyncingPort returns the syncing port.
