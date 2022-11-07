@@ -408,7 +408,7 @@ func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
 func (consensus *Consensus) getPriKeysInCommittee() []*bls.PrivateKeyWrapper {
 	priKeys := []*bls.PrivateKeyWrapper{}
 	for i, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+		if !consensus.isValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
 		priKeys = append(priKeys, &consensus.priKey[i])
