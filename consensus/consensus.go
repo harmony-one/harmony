@@ -200,7 +200,7 @@ func (consensus *Consensus) GetPrivateKeys() multibls.PrivateKeys {
 }
 
 // GetLeaderPrivateKey returns leader private key if node is the leader
-func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
+func (consensus *Consensus) getLeaderPrivateKey(leaderKey *bls_core.PublicKey) (*bls.PrivateKeyWrapper, error) {
 	for i, key := range consensus.priKey {
 		if key.Pub.Object.IsEqual(leaderKey) {
 			return &consensus.priKey[i], nil
@@ -209,9 +209,9 @@ func (consensus *Consensus) GetLeaderPrivateKey(leaderKey *bls_core.PublicKey) (
 	return nil, errors.Wrapf(errLeaderPriKeyNotFound, leaderKey.SerializeToHexStr())
 }
 
-// GetConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
-func (consensus *Consensus) GetConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
-	return consensus.GetLeaderPrivateKey(consensus.LeaderPubKey.Object)
+// getConsensusLeaderPrivateKey returns consensus leader private key if node is the leader
+func (consensus *Consensus) getConsensusLeaderPrivateKey() (*bls.PrivateKeyWrapper, error) {
+	return consensus.getLeaderPrivateKey(consensus.LeaderPubKey.Object)
 }
 
 // SetBlockVerifier sets the block verifier
