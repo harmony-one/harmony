@@ -271,6 +271,8 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 			return
 		}
 		curBlockNum := consensus.BlockNum()
+		consensus.mutex.Lock()
+		defer consensus.mutex.Unlock()
 		for _, committedMsg := range consensus.FBFTLog.GetNotVerifiedCommittedMessages(blockObj.NumberU64(), blockObj.Header().ViewID().Uint64(), blockObj.Hash()) {
 			if committedMsg != nil {
 				consensus.onCommitted(committedMsg)
@@ -284,9 +286,6 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommitted(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	consensus.getLogger().Info().
 		Uint64("MsgBlockNum", recvMsg.BlockNum).
 		Uint64("MsgViewID", recvMsg.ViewID).
