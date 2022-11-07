@@ -470,9 +470,8 @@ func (consensus *Consensus) updateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	// TODO: if remove locks blockchain stucks.
-	//consensus.mutex.RLock()
-	//defer consensus.mutex.RUnlock()
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
 
 	return consensus.isLeader()
 }
