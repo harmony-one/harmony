@@ -29,7 +29,7 @@ func (consensus *Consensus) announce(block *types.Block) {
 	copy(consensus.blockHash[:], blockHash[:])
 	consensus.block = encodedBlock // Must set block bytes before consensus.construct()
 
-	key, err := consensus.GetConsensusLeaderPrivateKey()
+	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Warn().Err(err).Msg("[Announce] Node not a leader")
 		return
@@ -102,11 +102,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Msg("[OnPrepare] No Matching Announce message")
 	}
-
-	//// Read - Start
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
 	}
@@ -195,8 +190,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	//// Read - Start
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
