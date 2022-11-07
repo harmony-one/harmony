@@ -190,8 +190,6 @@ func (consensus *Consensus) onPrepare(recvMsg *FBFTMessage) {
 }
 
 func (consensus *Consensus) onCommit(recvMsg *FBFTMessage) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
 	//// Read - Start
 	if !consensus.isRightBlockNumAndViewID(recvMsg) {
 		return
