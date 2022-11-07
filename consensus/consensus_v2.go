@@ -55,6 +55,8 @@ func (consensus *Consensus) isViewChangingMode() bool {
 
 // HandleMessageUpdate will update the consensus state according to received message
 func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb.Message, senderKey *bls.SerializedPublicKey) error {
+	consensus.mutex.Lock()
+	defer consensus.mutex.Unlock()
 	// when node is in ViewChanging mode, it still accepts normal messages into FBFTLog
 	// in order to avoid possible trap forever but drop PREPARE and COMMIT
 	// which are message types specifically for a node acting as leader
@@ -143,7 +145,7 @@ func (consensus *Consensus) finalCommit() {
 		Msg("[finalCommit] Finalizing Consensus")
 	beforeCatchupNum := consensus.BlockNum()
 
-	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[finalCommit] leader not found")
 		return
@@ -558,7 +560,7 @@ func (consensus *Consensus) preCommitAndPropose(blk *types.Block) error {
 		return errors.New("block to pre-commit is nil")
 	}
 
-	leaderPriKey, err := consensus.GetConsensusLeaderPrivateKey()
+	leaderPriKey, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		consensus.getLogger().Error().Err(err).Msg("[preCommitAndPropose] leader not found")
 		return err
@@ -803,7 +805,7 @@ func (consensus *Consensus) postCatchup(initBN uint64) {
 
 // GenerateVrfAndProof generates new VRF/Proof from hash of previous block
 func (consensus *Consensus) GenerateVrfAndProof(newHeader *block.Header) error {
-	key, err := consensus.GetConsensusLeaderPrivateKey()
+	key, err := consensus.getConsensusLeaderPrivateKey()
 	if err != nil {
 		return errors.New("[GenerateVrfAndProof] no leader private key provided")
 	}
