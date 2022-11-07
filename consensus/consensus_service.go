@@ -442,7 +442,11 @@ func (consensus *Consensus) UpdateConsensusInformation() Mode {
 // IsLeader check if the node is a leader or not by comparing the public key of
 // the node with the leader public key
 func (consensus *Consensus) IsLeader() bool {
-	consensus.mutex.RLock()
+	_ = utils.AssertNoLongerThan0(5*time.Second, func() error {
+		consensus.mutex.RLock()
+		return nil
+	})
+
 	defer consensus.mutex.RUnlock()
 
 	return consensus.isLeader()
