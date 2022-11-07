@@ -516,7 +516,7 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
-	require(c.TesnetNinetyPercentEpoch.Cmp(EpochTBD) >= 0 || c == TestChainConfig,
+	require(c.TesnetNinetyPercentEpoch.Cmp(EpochTBD) >= 0 || c == TestnetChainConfig,
 		"must satisfy: TesnetNinetyPercentEpoch >= EpochTBD for non testnet chains")
 }
 
@@ -685,7 +685,7 @@ func (c *ChainConfig) IsAllowlistEpoch(epoch *big.Int) bool {
 }
 
 func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
-	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestChainConfig
+	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
 }
 
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
