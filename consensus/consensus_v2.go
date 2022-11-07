@@ -703,11 +703,14 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 	}
 
 	consensus.FinishFinalityCount()
-	consensus.PostConsensusJob(blk)
-	consensus.SetupForNewConsensus(blk, committedMsg)
+	go func() {
+		consensus.PostConsensusJob(blk)
+	}()
+	consensus.setupForNewConsensus(blk, committedMsg)
 	utils.Logger().Info().Uint64("blockNum", blk.NumberU64()).
 		Str("hash", blk.Header().Hash().Hex()).
 		Msg("Added New Block to Blockchain!!!")
+
 	return nil
 }
 
@@ -756,7 +759,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 }
 
 // SetupForNewConsensus sets the state for new consensus
-func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
+func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
