@@ -159,6 +159,12 @@ func (consensus *Consensus) resetState() {
 
 // IsValidatorInCommittee returns whether the given validator BLS address is part of my committee
 func (consensus *Consensus) IsValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
+	consensus.mutex.RLock()
+	defer consensus.mutex.RUnlock()
+	return consensus.isValidatorInCommittee(pubKey)
+}
+
+func (consensus *Consensus) isValidatorInCommittee(pubKey bls.SerializedPublicKey) bool {
 	return consensus.Decider.IndexOf(pubKey) != -1
 }
 
