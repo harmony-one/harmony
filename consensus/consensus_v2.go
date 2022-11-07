@@ -496,24 +496,24 @@ type LastMileBlockIter struct {
 }
 
 // GetLastMileBlockIter get the iterator of the last mile blocks starting from number bnStart
-func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64) (*LastMileBlockIter, error) {
+func (consensus *Consensus) GetLastMileBlockIter(bnStart uint64, cb func(iter *LastMileBlockIter) error) error {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
 
 	if consensus.BlockVerifier == nil {
-		return nil, errors.New("consensus haven't initialized yet")
+		return errors.New("consensus haven't initialized yet")
 	}
 	blocks, _, err := consensus.getLastMileBlocksAndMsg(bnStart)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &LastMileBlockIter{
+	return cb(&LastMileBlockIter{
 		blockCandidates: blocks,
 		fbftLog:         consensus.FBFTLog,
 		verify:          consensus.BlockVerifier,
 		curIndex:        0,
 		logger:          consensus.getLogger(),
-	}, nil
+	})
 }
 
 // Next iterate to the next last mile block
