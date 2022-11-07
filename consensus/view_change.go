@@ -279,7 +279,7 @@ func (consensus *Consensus) startViewChange() {
 	// for view change, send separate view change per public key
 	// do not do multi-sign of view change message
 	for _, key := range consensus.priKey {
-		if !consensus.IsValidatorInCommittee(key.Pub.Bytes) {
+		if !consensus.isValidatorInCommittee(key.Pub.Bytes) {
 			continue
 		}
 		msgToSend := consensus.constructViewChangeMessage(&key)
