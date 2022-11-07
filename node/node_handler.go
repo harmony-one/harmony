@@ -361,9 +361,8 @@ func VerifyNewBlock(nodeConfig *nodeconfig.ConfigType, blockChain core.BlockChai
 }
 
 // PostConsensusProcessing is called by consensus participants, after consensus is done, to:
-// 1. add the new block to blockchain
-// 2. [leader] send new block to the client
-// 3. [leader] send cross shard tx receipts to destination shard
+// 1. [leader] send new block to the client
+// 2. [leader] send cross shard tx receipts to destination shard
 func (node *Node) PostConsensusProcessing(newBlock *types.Block) error {
 	if node.Consensus.IsLeader() {
 		if node.IsRunningBeaconChain() {
