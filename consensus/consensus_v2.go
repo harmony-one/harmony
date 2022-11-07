@@ -869,7 +869,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 }
 
 // SetupForNewConsensus sets the state for new consensus
-func (consensus *Consensus) SetupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
+func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
 	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
