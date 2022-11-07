@@ -107,7 +107,7 @@ var (
 		ChainIdFixEpoch:               big.NewInt(0),
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
-		TesnetNinetyPercentEpoch:      EpochTBD,
+		TesnetNinetyPercentEpoch:      big.NewInt(399),
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
