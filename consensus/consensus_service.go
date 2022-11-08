@@ -76,6 +76,10 @@ func (consensus *Consensus) signAndMarshalConsensusMessage(message *msg_pb.Messa
 func (consensus *Consensus) UpdatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.mutex.Lock()
 	defer consensus.mutex.Unlock()
+	return consensus.updatePublicKeys(pubKeys, allowlist)
+}
+
+func (consensus *Consensus) updatePublicKeys(pubKeys, allowlist []bls_cosi.PublicKeyWrapper) int64 {
 	consensus.Decider.UpdateParticipants(pubKeys, allowlist)
 	consensus.getLogger().Info().Msg("My Committee updated")
 	for i := range pubKeys {
@@ -510,13 +514,18 @@ func (consensus *Consensus) SetViewIDs(height uint64) {
 // SetViewIDs set both current view ID and view changing ID to the height
 // of the blockchain. It is used during client startup to recover the state
 func (consensus *Consensus) setViewIDs(height uint64) {
-	consensus.SetCurBlockViewID(height)
-	consensus.SetViewChangingID(height)
+	consensus.setCurBlockViewID(height)
+	consensus.setViewChangingID(height)
 }
 
 // SetCurBlockViewID set the current view ID
 func (consensus *Consensus) SetCurBlockViewID(viewID uint64) uint64 {
 	return consensus.current.SetCurBlockViewID(viewID)
+}
+
+// SetCurBlockViewID set the current view ID
+func (consensus *Consensus) setCurBlockViewID(viewID uint64) {
+	consensus.current.SetCurBlockViewID(viewID)
 }
 
 // SetViewChangingID set the current view change ID
