@@ -348,7 +348,7 @@ func (consensus *Consensus) syncReadyChan() {
 	if consensus.BlockNum() < consensus.Blockchain().CurrentHeader().Number().Uint64()+1 {
 		consensus.SetBlockNum(consensus.Blockchain().CurrentHeader().Number().Uint64() + 1)
 		consensus.SetViewIDs(consensus.Blockchain().CurrentHeader().ViewID().Uint64() + 1)
-		mode := consensus.UpdateConsensusInformation()
+		mode := consensus.updateConsensusInformation()
 		consensus.current.SetMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
@@ -357,8 +357,8 @@ func (consensus *Consensus) syncReadyChan() {
 	} else if consensus.Mode() == Syncing {
 		// Corner case where sync is triggered before `onCommitted` and there is a race
 		// for block insertion between consensus and downloader.
-		mode := consensus.UpdateConsensusInformation()
-		consensus.SetMode(mode)
+		mode := consensus.updateConsensusInformation()
+		consensus.setMode(mode)
 		consensus.getLogger().Info().Msg("[syncReadyChan] Start consensus timer")
 		consensus.consensusTimeout[timeoutConsensus].Start()
 		consensusSyncCounterVec.With(prometheus.Labels{"consensus": "in_sync"}).Inc()
@@ -761,7 +761,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 // SetupForNewConsensus sets the state for new consensus
 func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg *FBFTMessage) {
 	atomic.StoreUint64(&consensus.blockNum, blk.NumberU64()+1)
-	consensus.SetCurBlockViewID(committedMsg.ViewID + 1)
+	consensus.setCurBlockViewID(committedMsg.ViewID + 1)
 	consensus.LeaderPubKey = committedMsg.SenderPubkeys[0]
 	var epoch *big.Int
 	if blk.IsLastBlockInEpoch() {
@@ -775,7 +775,7 @@ func (consensus *Consensus) setupForNewConsensus(blk *types.Block, committedMsg 
 
 	// Update consensus keys at last so the change of leader status doesn't mess up normal flow
 	if blk.IsLastBlockInEpoch() {
-		consensus.SetMode(consensus.UpdateConsensusInformation())
+		consensus.setMode(consensus.updateConsensusInformation())
 	}
 	consensus.FBFTLog.PruneCacheBeforeBlock(blk.NumberU64())
 	consensus.resetState()
