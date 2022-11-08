@@ -315,8 +315,8 @@ var (
 		big.NewInt(0),                      // SlotsLimitedEpoch
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
-		big.NewInt(1), // LeaderRotationEpoch
-		64,            // LeaderRotationBlocksCount
+		big.NewInt(1),                      // LeaderRotationEpoch
+		64,                                 // LeaderRotationBlocksCount
 		big.NewInt(0),                      // FeeCollectEpoch
 	}
 
@@ -360,7 +360,7 @@ var (
 
 		big.NewInt(1), // LeaderRotationEpoch
 		64,            // LeaderRotationBlocksCount
-		big.NewInt(0),        // FeeCollectEpoch
+		big.NewInt(0), // FeeCollectEpoch
 	}
 
 	// TestRules ...
