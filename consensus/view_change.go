@@ -340,7 +340,7 @@ func (consensus *Consensus) startNewView(viewID uint64, newLeaderPriKey *bls.Pri
 	if reset {
 		consensus.resetState()
 	}
-	consensus.SetLeaderPubKey(newLeaderPriKey.Pub)
+	consensus.setLeaderPubKey(newLeaderPriKey.Pub)
 
 	return nil
 }
