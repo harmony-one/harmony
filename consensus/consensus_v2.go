@@ -732,9 +732,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Msg("Failed to get next leader")
 		return
 	} else {
-		consensus.SetLeaderPubKey(next)
+		consensus.setLeaderPubKey(next)
 	}
-	if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
+	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
 		go func() {
 			consensus.ReadySignal <- SyncProposal
