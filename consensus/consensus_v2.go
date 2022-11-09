@@ -137,7 +137,6 @@ func (consensus *Consensus) HandleMessageUpdate(ctx context.Context, msg *msg_pb
 }
 
 func (consensus *Consensus) finalCommit() {
-	// THIS IS NOT GOOD PLACE FOR LEADER SWITCHING
 	numCommits := consensus.Decider.SignersCount(quorum.Commit)
 
 	consensus.getLogger().Info().
@@ -714,7 +713,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		if header == nil {
 			return
 		}
-		// Previous epoch, we should not change leader.
+		// Previous block was epoch block, we should not change leader.
 		if header.Epoch().Uint64() != epoch.Uint64() {
 			return
 		}
