@@ -201,43 +201,42 @@ var (
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
 	// All features except for CrossLink are enabled at launch.
 	StressnetChainConfig = &ChainConfig{
-		ChainID:                                StressnetChainID,
-		EthCompatibleChainID:                   EthStressnetShard0ChainID,
-		EthCompatibleShard0ChainID:             EthStressnetShard0ChainID,
-		EthCompatibleEpoch:                     big.NewInt(0),
-		CrossTxEpoch:                           big.NewInt(0),
-		CrossLinkEpoch:                         big.NewInt(2),
-		AggregatedRewardEpoch:                  big.NewInt(3),
-		StakingEpoch:                           big.NewInt(2),
-		PreStakingEpoch:                        big.NewInt(1),
-		QuickUnlockEpoch:                       big.NewInt(0),
-		FiveSecondsEpoch:                       big.NewInt(0),
-		TwoSecondsEpoch:                        big.NewInt(0),
-		SixtyPercentEpoch:                      big.NewInt(10),
-		RedelegationEpoch:                      big.NewInt(0),
-		NoEarlyUnlockEpoch:                     big.NewInt(0),
-		VRFEpoch:                               big.NewInt(0),
-		PrevVRFEpoch:                           big.NewInt(0),
-		MinDelegation100Epoch:                  big.NewInt(0),
-		MinCommissionRateEpoch:                 big.NewInt(0),
-		MinCommissionPromoPeriod:               big.NewInt(10),
-		EPoSBound35Epoch:                       big.NewInt(0),
-		EIP155Epoch:                            big.NewInt(0),
-		S3Epoch:                                big.NewInt(0),
-		DataCopyFixEpoch:                       big.NewInt(0),
-		IstanbulEpoch:                          big.NewInt(0),
-		ReceiptLogEpoch:                        big.NewInt(0),
-		SHA3Epoch:                              big.NewInt(0),
-		HIP6And8Epoch:                          big.NewInt(0),
-		StakingPrecompileEpoch:                 big.NewInt(2),
-		ChainIdFixEpoch:                        big.NewInt(0),
-		SlotsLimitedEpoch:                      EpochTBD, // epoch to enable HIP-16
-		CrossShardXferPrecompileEpoch:          big.NewInt(1),
-		AllowlistEpoch:                         EpochTBD,
-		FeeCollectEpoch:                        EpochTBD,
-		LeaderRotationExternalNonBeaconLeaders: EpochTBD,
-		LeaderRotationExternalBeaconLeaders:    EpochTBD,
-		ValidatorCodeFixEpoch:                  EpochTBD,
+		ChainID:                       StressnetChainID,
+		EthCompatibleChainID:          EthStressnetShard0ChainID,
+		EthCompatibleShard0ChainID:    EthStressnetShard0ChainID,
+		EthCompatibleEpoch:            big.NewInt(0),
+		CrossTxEpoch:                  big.NewInt(0),
+		CrossLinkEpoch:                big.NewInt(2),
+		AggregatedRewardEpoch:         big.NewInt(3),
+		StakingEpoch:                  big.NewInt(2),
+		PreStakingEpoch:               big.NewInt(1),
+		QuickUnlockEpoch:              big.NewInt(0),
+		FiveSecondsEpoch:              big.NewInt(0),
+		TwoSecondsEpoch:               big.NewInt(0),
+		SixtyPercentEpoch:             big.NewInt(10),
+		RedelegationEpoch:             big.NewInt(0),
+		NoEarlyUnlockEpoch:            big.NewInt(0),
+		VRFEpoch:                      big.NewInt(0),
+		PrevVRFEpoch:                  big.NewInt(0),
+		MinDelegation100Epoch:         big.NewInt(0),
+		MinCommissionRateEpoch:        big.NewInt(0),
+		MinCommissionPromoPeriod:      big.NewInt(10),
+		EPoSBound35Epoch:              big.NewInt(0),
+		EIP155Epoch:                   big.NewInt(0),
+		S3Epoch:                       big.NewInt(0),
+		DataCopyFixEpoch:              big.NewInt(0),
+		IstanbulEpoch:                 big.NewInt(0),
+		ReceiptLogEpoch:               big.NewInt(0),
+		SHA3Epoch:                     big.NewInt(0),
+		HIP6And8Epoch:                 big.NewInt(0),
+		StakingPrecompileEpoch:        big.NewInt(2),
+		ChainIdFixEpoch:               big.NewInt(0),
+		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
+		CrossShardXferPrecompileEpoch: big.NewInt(1),
+		AllowlistEpoch:                EpochTBD,
+		FeeCollectEpoch:               EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -276,7 +275,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(5),
-		LeaderRotationEpoch:           big.NewInt(4),
+		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 	}
 
@@ -360,10 +359,9 @@ var (
 		big.NewInt(0),        // SlotsLimitedEpoch
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
-		// TODO place correct epoch number
-		big.NewInt(1), // LeaderRotationEpoch
-		64,            // LeaderRotationBlocksCount
-		big.NewInt(0), // FeeCollectEpoch
+		big.NewInt(1),        // LeaderRotationEpoch
+		64,                   // LeaderRotationBlocksCount
+		big.NewInt(0),        // FeeCollectEpoch
 	}
 
 	// TestRules ...
