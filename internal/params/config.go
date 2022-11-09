@@ -274,7 +274,7 @@ var (
 		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 		FeeCollectEpoch:               big.NewInt(5),
-		LeaderRotationEpoch:           big.NewInt(4),
+		LeaderRotationEpoch:           EpochTBD,
 		LeaderRotationBlocksCount:     5,
 	}
 
