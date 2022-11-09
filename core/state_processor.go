@@ -31,9 +31,11 @@ import (
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/core/types"
 	"github.com/harmony-one/harmony/core/vm"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
 	"github.com/harmony-one/harmony/shard"
+	"github.com/harmony-one/harmony/staking/effective"
 	"github.com/harmony-one/harmony/staking/slash"
 	staking "github.com/harmony-one/harmony/staking/types"
 	"github.com/pkg/errors"
@@ -172,6 +174,18 @@ func (p *StateProcessor) Process(
 			return nil, nil, nil, nil, 0, nil, statedb, errors.New(
 				"[Process] Cannot finalize block",
 			)
+		}
+	}
+
+	isBeaconChain := block.ShardID() == shard.BeaconChainShardID
+	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet &&
+		isBeaconChain &&
+		block.IsLastBlockInEpoch() {
+		curInstance := shard.Schedule.InstanceForEpoch(block.Epoch())
+		nextEpoch := big.NewInt(block.Epoch().Int64() + 1)
+		nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
+		if err := mayTestnetShardReduction(p.bc, statedb, curInstance.NumShards(), nextInstance.NumShards()); err != nil {
+			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	}
 
@@ -424,4 +438,38 @@ func StakingToMessage(
 	}
 	msg.SetType(types.StakingTypeMap[stkType])
 	return msg, nil
+}
+
+// mayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// This function does not handle all cases, only for ShardNum from 4 to 2.
+func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, nextNumShards uint32) error {
+	if curNumShards == nextNumShards {
+		return nil
+	}
+	if curNumShards != 4 && nextNumShards != 2 {
+		return errors.New("can only handle the reduction from 4 to 2")
+	}
+	addresses, err := bc.ReadValidatorList()
+	if err != nil {
+		return err
+	}
+	for _, address := range addresses {
+		validator, err := statedb.ValidatorWrapper(address, true, false)
+		if err != nil {
+			return err
+		}
+		if validator.Status == effective.Inactive {
+			continue
+		}
+		for _, pubKey := range validator.SlotPubKeys {
+			curShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(curNumShards))).Uint64()
+			nextShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(nextNumShards))).Uint64()
+			if curShard >= uint64(nextNumShards) || curShard != nextShard {
+				validator.Status = effective.Inactive
+				statedb.UpdateValidatorWrapper(address, validator)
+				break
+			}
+		}
+	}
+	return nil
 }
