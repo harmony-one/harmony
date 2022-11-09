@@ -6,7 +6,6 @@ import (
 	"github.com/harmony-one/harmony/eth/rpc"
 	"github.com/harmony-one/harmony/hmy"
 	"github.com/harmony-one/harmony/internal/tikv"
-	"github.com/harmony-one/harmony/multibls"
 	"github.com/harmony-one/harmony/rosetta"
 	hmy_rpc "github.com/harmony-one/harmony/rpc"
 	rpc_common "github.com/harmony-one/harmony/rpc/common"
@@ -17,11 +16,6 @@ import (
 // IsCurrentlyLeader exposes if node is currently the leader node
 func (node *Node) IsCurrentlyLeader() bool {
 	return node.Consensus.IsLeader()
-}
-
-// GetPublicKeys exposes if node is currently the leader node
-func (node *Node) GetPublicKeys() multibls.PublicKeys {
-	return node.Consensus.GetPrivateKeys().GetPublicKeys()
 }
 
 // PeerConnectivity ..
