@@ -713,7 +713,7 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		if header == nil {
 			return
 		}
-		// Previous block was epoch block, we should not change leader.
+		// Previous epoch, we should not change leader.
 		if header.Epoch().Uint64() != epoch.Uint64() {
 			return
 		}
