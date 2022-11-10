@@ -202,16 +202,15 @@ func (consensus *Consensus) GetLeaderPubKey() *bls_cosi.PublicKeyWrapper {
 func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
 	return consensus.LeaderPubKey
 }
+
+func (consensus *Consensus) getLeaderPubKey() *bls_cosi.PublicKeyWrapper {
+	return consensus.LeaderPubKey
+}
+
 func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
 	consensus.pubKeyLock.Lock()
 	consensus.LeaderPubKey = pub
 	consensus.pubKeyLock.Unlock()
-}
-
-func (consensus *Consensus) SetLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
-	consensus.mutex.Lock()
-	defer consensus.mutex.Unlock()
-	consensus.setLeaderPubKey(pub)
 }
 
 func (consensus *Consensus) setLeaderPubKey(pub *bls_cosi.PublicKeyWrapper) {
