@@ -70,6 +70,8 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1323), // Around Wed 8 Feb 11:30PM UTC
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -147,6 +149,8 @@ var (
 		SlotsLimitedEpoch:             EpochTBD, // epoch to enable HIP-16
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 		FeeCollectEpoch:               EpochTBD,
 	}
 
@@ -187,6 +191,8 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		FeeCollectEpoch:               big.NewInt(574),
+		LeaderRotationEpoch:           EpochTBD,
+		LeaderRotationBlocksCount:     64,
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
