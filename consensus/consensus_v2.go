@@ -683,10 +683,10 @@ func (consensus *Consensus) commitBlock(blk *types.Block, committedMsg *FBFTMess
 // rotateLeader rotates the leader to the next leader in the committee.
 // This function must be called with enabled leader rotation.
 func (consensus *Consensus) rotateLeader(epoch *big.Int) {
-	prev := consensus.getLeaderPubKey()
+	prev := consensus.GetLeaderPubKey()
 	curNumber := consensus.Blockchain.CurrentHeader().Number().Uint64()
 	utils.Logger().Info().Msgf("[Rotating leader] epoch: %v rotation:%v numblocks:%d", epoch.Uint64(), consensus.Blockchain.Config().IsLeaderRotation(epoch), consensus.Blockchain.Config().LeaderRotationBlocksCount)
-	leader := consensus.getLeaderPubKey()
+	leader := consensus.GetLeaderPubKey()
 	for i := 0; i < consensus.Blockchain.Config().LeaderRotationBlocksCount; i++ {
 		header := consensus.Blockchain.GetHeaderByNumber(curNumber - uint64(i))
 		if header == nil {
@@ -713,9 +713,9 @@ func (consensus *Consensus) rotateLeader(epoch *big.Int) {
 		utils.Logger().Error().Msg("Failed to get next leader")
 		return
 	} else {
-		consensus.setLeaderPubKey(next)
+		consensus.SetLeaderPubKey(next)
 	}
-	if consensus.isLeader() && !consensus.getLeaderPubKey().Object.IsEqual(prev.Object) {
+	if consensus.IsLeader() && !consensus.GetLeaderPubKey().Object.IsEqual(prev.Object) {
 		// leader changed
 		go func() {
 			consensus.ReadySignal <- SyncProposal
