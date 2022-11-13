@@ -113,6 +113,8 @@ func NewGenesisSpec(netType nodeconfig.NetworkType, shardID uint32) *Genesis {
 		chainConfig = *params.PartnerChainConfig
 	case nodeconfig.Stressnet:
 		chainConfig = *params.StressnetChainConfig
+	case nodeconfig.Localnet:
+		chainConfig = *params.LocalnetChainConfig
 	default: // all other types share testnet config
 		chainConfig = *params.TestChainConfig
 	}
