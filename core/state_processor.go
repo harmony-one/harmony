@@ -178,9 +178,11 @@ func (p *StateProcessor) Process(
 	}
 
 	isBeaconChain := block.ShardID() == shard.BeaconChainShardID
-	if nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet &&
-		isBeaconChain &&
-		block.IsLastBlockInEpoch() {
+	// the committee of the next epoch is generated before proposing the last block.
+	// so we need to do this before the last block.
+	preLastBlock := shard.Schedule.EpochLastBlock(block.Epoch().Uint64()) == block.Number().Uint64()
+	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
+	if isTestnet && isBeaconChain && preLastBlock {
 		curInstance := shard.Schedule.InstanceForEpoch(block.Epoch())
 		nextEpoch := big.NewInt(block.Epoch().Int64() + 1)
 		nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
