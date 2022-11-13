@@ -13,6 +13,7 @@ import (
 	"github.com/harmony-one/harmony/block"
 	"github.com/harmony-one/harmony/core/types"
 	common2 "github.com/harmony-one/harmony/internal/common"
+	nodeconfig "github.com/harmony-one/harmony/internal/configs/node"
 	shardingconfig "github.com/harmony-one/harmony/internal/configs/sharding"
 	"github.com/harmony-one/harmony/internal/params"
 	"github.com/harmony-one/harmony/internal/utils"
@@ -380,6 +381,14 @@ func eposStakedCommittee(
 		)
 	}
 
+	instance := shard.Schedule.InstanceForEpoch(epoch)
+	preInstance := shard.Schedule.InstanceForEpoch(new(big.Int).Sub(epoch, big.NewInt(1)))
+	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
+	isShardReduction := preInstance.NumShards() != instance.NumShards()
+	// If the shard-reduction happens, we cannot use the old committee.
+	if isTestnet && isShardReduction {
+		return shardState, nil
+	}
 	if len(completedEPoSRound.AuctionWinners) == 0 {
 		utils.Logger().Warn().Msg("No elected validators in the new epoch!!! Reuse old shard state.")
 		return stakerReader.ReadShardState(big.NewInt(0).Sub(epoch, big.NewInt(1)))
