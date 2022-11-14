@@ -180,13 +180,14 @@ func (p *StateProcessor) Process(
 	isBeaconChain := block.ShardID() == shard.BeaconChainShardID
 	// the committee of the next epoch is generated before proposing the last block.
 	// so we need to do this before the last block.
-	preLastBlock := shard.Schedule.EpochLastBlock(block.Epoch().Uint64()) == block.Number().Uint64()
+	preLastBlock := shard.Schedule.EpochLastBlock(block.Epoch().Uint64()) == block.Number().Uint64()+1
 	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
 	if isTestnet && isBeaconChain && preLastBlock {
 		curInstance := shard.Schedule.InstanceForEpoch(block.Epoch())
 		nextEpoch := big.NewInt(block.Epoch().Int64() + 1)
 		nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
-		if err := mayTestnetShardReduction(p.bc, statedb, curInstance.NumShards(), nextInstance.NumShards()); err != nil {
+		isS3 := p.bc.Config().IsS3(header.Epoch())
+		if err := mayTestnetShardReduction(p.bc, statedb, curInstance.NumShards(), nextInstance.NumShards(), isS3); err != nil {
 			return nil, nil, nil, nil, 0, nil, statedb, err
 		}
 	}
@@ -444,7 +445,7 @@ func StakingToMessage(
 
 // mayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
 // This function does not handle all cases, only for ShardNum from 4 to 2.
-func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, nextNumShards uint32) error {
+func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, nextNumShards uint32, isS3 bool) error {
 	if curNumShards == nextNumShards {
 		return nil
 	}
@@ -469,6 +470,7 @@ func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, 
 			if curShard >= uint64(nextNumShards) || curShard != nextShard {
 				validator.Status = effective.Inactive
 				statedb.UpdateValidatorWrapper(address, validator)
+				statedb.IntermediateRoot(isS3)
 				break
 			}
 		}
