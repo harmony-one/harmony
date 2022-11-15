@@ -177,19 +177,8 @@ func (p *StateProcessor) Process(
 		}
 	}
 
-	isBeaconChain := block.ShardID() == shard.BeaconChainShardID
-	// the committee of the next epoch is generated before proposing the last block.
-	// so we need to do this before the last block.
-	preLastBlock := shard.Schedule.EpochLastBlock(block.Epoch().Uint64()) == block.Number().Uint64()+1
-	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
-	if isTestnet && isBeaconChain && preLastBlock {
-		curInstance := shard.Schedule.InstanceForEpoch(block.Epoch())
-		nextEpoch := big.NewInt(block.Epoch().Int64() + 1)
-		nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
-		isS3 := p.bc.Config().IsS3(header.Epoch())
-		if err := mayTestnetShardReduction(p.bc, statedb, curInstance.NumShards(), nextInstance.NumShards(), isS3); err != nil {
-			return nil, nil, nil, nil, 0, nil, statedb, err
-		}
+	if err := MayTestnetShardReduction(p.bc, statedb, header); err != nil {
+		return nil, nil, nil, nil, 0, nil, statedb, err
 	}
 
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
@@ -443,12 +432,25 @@ func StakingToMessage(
 	return msg, nil
 }
 
-// mayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
+// MayTestnetShardReduction handles the change in the number of Shards. It will mark the affected validator as inactive.
 // This function does not handle all cases, only for ShardNum from 4 to 2.
-func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, nextNumShards uint32, isS3 bool) error {
+func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.Header) error {
+	isBeaconChain := header.ShardID() == shard.BeaconChainShardID
+	isLastBlock := shard.Schedule.IsLastBlock(header.Number().Uint64())
+	isTestnet := nodeconfig.GetDefaultConfig().GetNetworkType() == nodeconfig.Testnet
+	if !(isTestnet && isBeaconChain && isLastBlock) {
+		return nil
+	}
+	curInstance := shard.Schedule.InstanceForEpoch(header.Epoch())
+	nextEpoch := big.NewInt(header.Epoch().Int64() + 1)
+	nextInstance := shard.Schedule.InstanceForEpoch(nextEpoch)
+	curNumShards := curInstance.NumShards()
+	nextNumShards := nextInstance.NumShards()
+
 	if curNumShards == nextNumShards {
 		return nil
 	}
+
 	if curNumShards != 4 && nextNumShards != 2 {
 		return errors.New("can only handle the reduction from 4 to 2")
 	}
@@ -456,6 +458,7 @@ func mayTestnetShardReduction(bc ChainContext, statedb *state.DB, curNumShards, 
 	if err != nil {
 		return err
 	}
+	isS3 := bc.Config().IsS3(header.Epoch())
 	for _, address := range addresses {
 		validator, err := statedb.ValidatorWrapper(address, true, false)
 		if err != nil {
