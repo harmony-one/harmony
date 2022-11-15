@@ -240,7 +240,7 @@ var (
 		PreStakingEpoch:               big.NewInt(0),
 		QuickUnlockEpoch:              big.NewInt(0),
 		FiveSecondsEpoch:              big.NewInt(0),
-		TwoSecondsEpoch:               big.NewInt(3),
+		TwoSecondsEpoch:               big.NewInt(0),
 		SixtyPercentEpoch:             EpochTBD, // Never enable it for localnet as localnet has no external validator setup
 		RedelegationEpoch:             big.NewInt(0),
 		NoEarlyUnlockEpoch:            big.NewInt(0),
