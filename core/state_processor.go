@@ -458,7 +458,6 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 	if err != nil {
 		return err
 	}
-	isS3 := bc.Config().IsS3(header.Epoch())
 	for _, address := range addresses {
 		validator, err := statedb.ValidatorWrapper(address, true, false)
 		if err != nil {
@@ -472,11 +471,10 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 			nextShard := new(big.Int).Mod(pubKey.Big(), big.NewInt(int64(nextNumShards))).Uint64()
 			if curShard >= uint64(nextNumShards) || curShard != nextShard {
 				validator.Status = effective.Inactive
-				statedb.UpdateValidatorWrapper(address, validator)
-				statedb.IntermediateRoot(isS3)
 				break
 			}
 		}
 	}
+	statedb.IntermediateRoot(bc.Config().IsS3(header.Epoch()))
 	return nil
 }
