@@ -125,8 +125,8 @@ func (ls localnetSchedule) GetShardingStructure(numShard, shardID int) []map[str
 		res = append(res, map[string]interface{}{
 			"current": int(shardID) == i,
 			"shardID": i,
-			"http":    fmt.Sprintf("http://127.0.0.1:%d", 9500+i),
-			"ws":      fmt.Sprintf("ws://127.0.0.1:%d", 9800+i),
+			"http":    fmt.Sprintf("http://127.0.0.1:%d", 9500+2*i),
+			"ws":      fmt.Sprintf("ws://127.0.0.1:%d", 9800+2*i),
 		})
 	}
 	return res
