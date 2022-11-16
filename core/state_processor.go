@@ -463,7 +463,7 @@ func MayTestnetShardReduction(bc ChainContext, statedb *state.DB, header *block.
 		if err != nil {
 			return err
 		}
-		if validator.Status == effective.Inactive {
+		if validator.Status == effective.Inactive || validator.Status == effective.Banned {
 			continue
 		}
 		for _, pubKey := range validator.SlotPubKeys {
