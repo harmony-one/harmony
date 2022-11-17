@@ -323,7 +323,7 @@ var (
 
 	statePruneFlag = cli.BoolFlag{
 		Name:     "pruning",
-		Usage:    "enable node to prune state tire in run-time",
+		Usage:    "enable node to prune state trie in run-time",
 		DefValue: defaultConfig.General.TraceEnable,
 	}
 )

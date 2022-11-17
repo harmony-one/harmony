@@ -141,7 +141,7 @@ type BlockChainImpl struct {
 	cleanCacheChan      chan uint64 // Used to notify blocks that will be cleaned up
 	lastWrite           uint64
 	statePruneEnable    bool
-	statePruneRuning    sync.WaitGroup
+	statePruneRunning   sync.WaitGroup
 	statePruneAbortChan chan struct{}
 	// redisPreempt used in tikv mode, write nodes preempt for write permissions and publish updates to reader nodes
 	redisPreempt *redis_helper.RedisPreempt
@@ -1227,7 +1227,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 			return NonStatTy, err
 		}
 
-		// clean block tire info in redis, used for tikv mode
+		// clean block trie info in redis, used for tikv mode
 		if block.NumberU64() > triesInRedis {
 			select {
 			case bc.cleanCacheChan <- block.NumberU64() - triesInRedis:
@@ -1264,7 +1264,7 @@ func (bc *BlockChainImpl) WriteBlockWithState(
 							Float64("optimum", float64(chosen-bc.lastWrite)/triesInMemory).
 							Msg("State in memory for too long, committing")
 					}
-					// before flush next state tire, must ensure pre-pruning finished
+					// before flush next state trie, must ensure pre-pruning finished
 					bc.waitPruning(true)
 					// Flush an entire trie and restart the counters
 					triedb.Commit(header.Root(), true)
@@ -1368,13 +1368,13 @@ func (bc *BlockChainImpl) pruneOldTrieAsync(old, new uint64) error {
 	if err != nil {
 		return err
 	}
-	bc.statePruneRuning.Add(1)
+	bc.statePruneRunning.Add(1)
 	go func() {
 		batch := bc.ChainDb().NewBatch()
 		if _, err := state.DiffAndPruneSync(oldStateDB, newStateDB, batch, bc.statePruneAbortChan); err == nil {
 			batch.Write()
 		}
-		bc.statePruneRuning.Done()
+		bc.statePruneRunning.Done()
 	}()
 	return nil
 }
@@ -1386,7 +1386,7 @@ func (bc *BlockChainImpl) waitPruning(abort bool) {
 		default:
 		}
 	}
-	bc.statePruneRuning.Wait()
+	bc.statePruneRunning.Wait()
 }
 
 func (bc *BlockChainImpl) GetMaxGarbageCollectedBlockNumber() int64 {
@@ -3186,7 +3186,7 @@ func (bc *BlockChainImpl) SyncFromTiKVWriter(newBlkNum uint64, logs []*types.Log
 	return nil
 }
 
-// tikvCleanCache used for tikv mode, clean block tire data from redis
+// tikvCleanCache used for tikv mode, clean block trie data from redis
 func (bc *BlockChainImpl) tikvCleanCache() {
 	var count int
 	for to := range bc.cleanCacheChan {
@@ -3322,7 +3322,7 @@ func (bc *BlockChainImpl) InitTiKV(conf *harmonyconfig.TiKVConfig) {
 		}
 	}
 
-	// start clean block tire data process
+	// start clean block trie data process
 	go bc.tikvCleanCache()
 }
 

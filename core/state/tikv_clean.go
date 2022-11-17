@@ -13,7 +13,7 @@ import (
 
 var secureKeyPrefix = []byte("secure-key-")
 
-// DiffAndCleanCache clean block tire data from redis, Used to reduce redis storage and increase hit rate
+// DiffAndCleanCache clean block trie data from redis, Used to reduce redis storage and increase hit rate
 func (s *DB) DiffAndCleanCache(shardId uint32, to *DB) (int, error) {
 	// create difference iterator
 	it, _ := trie.NewDifferenceIterator(to.trie.NodeIterator(nil), s.trie.NodeIterator(nil))
