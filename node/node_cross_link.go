@@ -48,6 +48,7 @@ func (node *Node) VerifyBlockCrossLinks(block *types.Block) error {
 		cl, err := node.Blockchain().ReadCrossLink(crossLink.ShardID(), crossLink.BlockNum())
 		if err == nil && cl != nil {
 			utils.Logger().Err(errAlreadyExist).
+				Uint64("beacon-block-number", block.NumberU64()).
 				Interface("remote", crossLink).
 				Interface("local", cl).
 				Msg("[CrossLinkVerification]")

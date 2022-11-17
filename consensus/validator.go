@@ -230,7 +230,7 @@ func (consensus *Consensus) onPrepared(recvMsg *FBFTMessage) {
 
 	var blockObj *types.Block
 	if blockObj, err = consensus.validateNewBlock(recvMsg); err != nil {
-		consensus.getLogger().Warn().
+		consensus.getLogger().Err(err).
 			Uint64("MsgBlockNum", recvMsg.BlockNum).
 			Uint64("MsgViewID", recvMsg.ViewID).
 			Msg("[OnPrepared] failed to verify new block")
