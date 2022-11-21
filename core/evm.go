@@ -298,12 +298,24 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 		db.AddBalance(collectRewards.DelegatorAddress, totalRewards)
 
 		// Add log if everything is good
-		db.AddLog(&types.Log{
-			Address:     collectRewards.DelegatorAddress,
-			Topics:      []common.Hash{staking.CollectRewardsTopic},
-			Data:        totalRewards.Bytes(),
-			BlockNumber: ref.Number().Uint64(),
-		})
+		if chain.Config().IsMigrationPrecompile(ref.Epoch()) {
+			// The standard way to calculate the topic hash
+			// is the full signature, including parameter types
+			// https://github.com/harmony-one/harmony/pull/3906#issuecomment-1080256104
+			db.AddLog(&types.Log{
+				Address:     collectRewards.DelegatorAddress,
+				Topics:      []common.Hash{staking.CollectRewardsTopicV2},
+				Data:        totalRewards.Bytes(),
+				BlockNumber: ref.Number().Uint64(),
+			})
+		} else {
+			db.AddLog(&types.Log{
+				Address:     collectRewards.DelegatorAddress,
+				Topics:      []common.Hash{staking.CollectRewardsTopic},
+				Data:        totalRewards.Bytes(),
+				BlockNumber: ref.Number().Uint64(),
+			})
+		}
 
 		//add rosetta log
 		if rosettaTracer != nil {

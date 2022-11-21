@@ -124,6 +124,13 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if evm.Context.ShardID != shard.BeaconChainShardID {
 		return nil, errors.New("Staking not supported on this shard")
 	}
+	// disable payable contract
+	if evm.chainRules.IsMigrationPrecompile {
+		// prevent issues like https://github.com/harmony-one/harmony/issues/4152
+		if contract.Value().Cmp(common.Big0) > 0 {
+			return nil, errors.New("precompile does not accept funds")
+		}
+	}
 	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input,
 		evm.chainRules.IsMigrationPrecompile)
 	if err != nil {
