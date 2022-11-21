@@ -70,6 +70,7 @@ var (
 		CrossShardXferPrecompileEpoch: EpochTBD,
 		AllowlistEpoch:                EpochTBD,
 		TesnetNinetyPercentEpoch:      EpochTBD, // never enabled
+		MigrationPrecompileEpoch:      EpochTBD,
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the harmony test network.
@@ -108,6 +109,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(2),
 		AllowlistEpoch:                big.NewInt(2),
 		TesnetNinetyPercentEpoch:      big.NewInt(399),
+		MigrationPrecompileEpoch:      EpochTBD,
 	}
 
 	// PangaeaChainConfig contains the chain parameters for the Pangaea network.
@@ -147,6 +149,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		TesnetNinetyPercentEpoch:      EpochTBD,
+		MigrationPrecompileEpoch:      big.NewInt(2),
 	}
 
 	// PartnerChainConfig contains the chain parameters for the Partner network.
@@ -186,6 +189,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		TesnetNinetyPercentEpoch:      EpochTBD,
+		MigrationPrecompileEpoch:      big.NewInt(2),
 	}
 
 	// StressnetChainConfig contains the chain parameters for the Stress test network.
@@ -225,6 +229,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		TesnetNinetyPercentEpoch:      EpochTBD,
+		MigrationPrecompileEpoch:      big.NewInt(2),
 	}
 
 	// LocalnetChainConfig contains the chain parameters to run for local development.
@@ -263,6 +268,7 @@ var (
 		CrossShardXferPrecompileEpoch: big.NewInt(1),
 		AllowlistEpoch:                EpochTBD,
 		TesnetNinetyPercentEpoch:      EpochTBD,
+		MigrationPrecompileEpoch:      big.NewInt(2),
 	}
 
 	// AllProtocolChanges ...
@@ -303,6 +309,7 @@ var (
 		big.NewInt(1),                      // CrossShardXferPrecompileEpoch
 		big.NewInt(0),                      // AllowlistEpoch
 		big.NewInt(0),                      // TesnetNinetyPercentEpoch
+		big.NewInt(0),                      // MigrationPrecompileEpoch
 	}
 
 	// TestChainConfig ...
@@ -343,6 +350,7 @@ var (
 		big.NewInt(1),        // CrossShardXferPrecompileEpoch
 		big.NewInt(0),        // AllowlistEpoch
 		big.NewInt(0),        // TesnetNinetyPercentEpoch
+		big.NewInt(0),        // MigrationPrecompileEpoch
 	}
 
 	// TestRules ...
@@ -485,11 +493,14 @@ type ChainConfig struct {
 	// Testnet only ninety percent epoch to restore internal voting power to 90%
 	// keeps the tesnet stable
 	TesnetNinetyPercentEpoch *big.Int `json:"testnet-ninety-percent-epoch,omitempty"`
+
+	// The epoch at which the migration feature was enabled in the staking precompile (0xfc)
+	MigrationPrecompileEpoch *big.Int `json:"staking-precompile-migration-support-epoch,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v}",
+	return fmt.Sprintf("{ChainID: %v EthCompatibleChainID: %v EIP155: %v CrossTx: %v Staking: %v CrossLink: %v ReceiptLog: %v SHA3Epoch: %v StakingPrecompileEpoch: %v ChainIdFixEpoch: %v CrossShardXferPrecompileEpoch: %v MigrationPrecompileEpoch: %v}",
 		c.ChainID,
 		c.EthCompatibleChainID,
 		c.EIP155Epoch,
@@ -501,6 +512,7 @@ func (c *ChainConfig) String() string {
 		c.StakingPrecompileEpoch,
 		c.ChainIdFixEpoch,
 		c.CrossShardXferPrecompileEpoch,
+		c.MigrationPrecompileEpoch,
 	)
 }
 
@@ -514,6 +526,8 @@ func (c *ChainConfig) mustValid() {
 		"must satisfy: PreStakingEpoch < StakingEpoch")
 	require(c.StakingPrecompileEpoch.Cmp(c.PreStakingEpoch) >= 0,
 		"must satisfy: StakingPrecompileEpoch >= PreStakingEpoch")
+	require(c.MigrationPrecompileEpoch.Cmp(c.StakingPrecompileEpoch) >= 0,
+		"must satisfy: MigrationPrecompileEpoch >= StakingPrecompileEpoch")
 	require(c.CrossShardXferPrecompileEpoch.Cmp(c.CrossTxEpoch) > 0,
 		"must satisfy: CrossShardXferPrecompileEpoch > CrossTxEpoch")
 	require(c.TesnetNinetyPercentEpoch.Cmp(EpochTBD) >= 0 || c == TestnetChainConfig,
@@ -688,6 +702,10 @@ func (c *ChainConfig) IsTestnetNinetyPercent(epoch *big.Int) bool {
 	return isForked(c.TesnetNinetyPercentEpoch, epoch) && c == TestnetChainConfig
 }
 
+func (c *ChainConfig) IsMigrationPrecompile(epoch *big.Int) bool {
+	return isForked(c.MigrationPrecompileEpoch, epoch)
+}
+
 // UpdateEthChainIDByShard update the ethChainID based on shard ID.
 func UpdateEthChainIDByShard(shardID uint32) {
 	once.Do(func() {
@@ -743,6 +761,7 @@ type Rules struct {
 	// precompiles
 	IsIstanbul, IsVRF, IsPrevVRF, IsSHA3,
 	IsStakingPrecompile, IsCrossShardXferPrecompile,
+	IsMigrationPrecompile,
 	// eip-155 chain id fix
 	IsChainIdFix bool
 }
@@ -769,5 +788,6 @@ func (c *ChainConfig) Rules(epoch *big.Int) Rules {
 		IsStakingPrecompile:        c.IsStakingPrecompile(epoch),
 		IsCrossShardXferPrecompile: c.IsCrossShardXferPrecompile(epoch),
 		IsChainIdFix:               c.IsChainIdFix(epoch),
+		IsMigrationPrecompile:      c.IsMigrationPrecompile(epoch),
 	}
 }

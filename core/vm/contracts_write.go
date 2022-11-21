@@ -84,11 +84,14 @@ func (c *stakingPrecompile) RequiredGas(
 		// meaning all the expected parameters are available
 		// and that we are only trying to perform staking tx
 		// on behalf of the correct entity
-		stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
+		stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input,
+			evm.chainRules.IsMigrationPrecompile)
 		if err == nil {
 			// otherwise charge similar to a regular staking tx
 			if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
 				// charge per delegation to migrate
+				// will only reach here if ParseStakeMsg returns a MigrationMsg
+				// which will only happen if IsMigrationPrecompile
 				return evm.CalculateMigrationGas(evm.StateDB,
 					migrationMsg,
 					evm.ChainConfig().IsS3(evm.EpochNumber),
@@ -121,7 +124,8 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if evm.Context.ShardID != shard.BeaconChainShardID {
 		return nil, errors.New("Staking not supported on this shard")
 	}
-	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input)
+	stakeMsg, err := staking.ParseStakeMsg(contract.Caller(), input,
+		evm.chainRules.IsMigrationPrecompile)
 	if err != nil {
 		return nil, err
 	}
@@ -145,22 +149,22 @@ func (c *stakingPrecompile) RunWriteCapable(
 	if collectRewards, ok := stakeMsg.(*stakingTypes.CollectRewards); ok {
 		return nil, evm.CollectRewards(evm.StateDB, rosettaBlockTracer, collectRewards)
 	}
-	// Migrate is not supported in precompile and will be done in a batch hard fork
-	//if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
-	//	stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
-	//	if err != nil {
-	//		return nil, err
-	//	} else {
-	//		for _, stakeMsg := range stakeMsgs {
-	//			if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
-	//				evm.StakeMsgs = append(evm.StakeMsgs, delegate)
-	//			} else {
-	//				return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from evm.MigrateDelegations")
-	//			}
-	//		}
-	//		return nil, nil
-	//	}
-	//}
+	// will only happen if IsMigrationPrecompile is true
+	if migrationMsg, ok := stakeMsg.(*stakingTypes.MigrationMsg); ok {
+		stakeMsgs, err := evm.MigrateDelegations(evm.StateDB, migrationMsg)
+		if err != nil {
+			return nil, err
+		} else {
+			for _, stakeMsg := range stakeMsgs {
+				if delegate, ok := stakeMsg.(*stakingTypes.Delegate); ok {
+					evm.StakeMsgs = append(evm.StakeMsgs, delegate)
+				} else {
+					return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from evm.MigrateDelegations")
+				}
+			}
+			return nil, nil
+		}
+	}
 	return nil, errors.New("[StakingPrecompile] Received incompatible stakeMsg from staking.ParseStakeMsg")
 }
 

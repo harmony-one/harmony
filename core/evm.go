@@ -97,6 +97,7 @@ func NewEVMContext(msg Message, header *block.Header, chain ChainContext, author
 		Delegate:              DelegateFn(header, chain),
 		Undelegate:            UndelegateFn(header, chain),
 		CollectRewards:        CollectRewardsFn(header, chain),
+		MigrateDelegations:    MigrateDelegationsFn(header, chain),
 		CalculateMigrationGas: CalculateMigrationGasFn(chain),
 		ShardID:               chain.ShardID(),
 		NumShards:             shard.Schedule.InstanceForEpoch(header.Epoch()).NumShards(),
@@ -320,27 +321,27 @@ func CollectRewardsFn(ref *block.Header, chain ChainContext) vm.CollectRewardsFu
 	}
 }
 
-//func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDelegationsFunc {
-//	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
-//		// get existing delegations
-//		fromDelegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
-//		if err != nil {
-//			return nil, err
-//		}
-//		// get list of modified wrappers
-//		wrappers, delegates, err := VerifyAndMigrateFromMsg(db, migrationMsg, fromDelegations)
-//		if err != nil {
-//			return nil, err
-//		}
-//		// add to state db
-//		for _, wrapper := range wrappers {
-//			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
-//				return nil, err
-//			}
-//		}
-//		return delegates, nil
-//	}
-//}
+func MigrateDelegationsFn(ref *block.Header, chain ChainContext) vm.MigrateDelegationsFunc {
+	return func(db vm.StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error) {
+		// get existing delegations
+		fromDelegations, err := chain.ReadDelegationsByDelegator(migrationMsg.From)
+		if err != nil {
+			return nil, err
+		}
+		// get list of modified wrappers
+		wrappers, delegates, err := VerifyAndMigrateFromMsg(db, migrationMsg, fromDelegations)
+		if err != nil {
+			return nil, err
+		}
+		// add to state db
+		for _, wrapper := range wrappers {
+			if err := db.UpdateValidatorWrapperWithRevert(wrapper.Address, wrapper); err != nil {
+				return nil, err
+			}
+		}
+		return delegates, nil
+	}
+}
 
 // calculate the gas for migration; no checks done here similar to other functions
 // the checks are handled by staking_verifier.go, ex, if you try to delegate to an address

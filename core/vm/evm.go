@@ -61,7 +61,7 @@ type (
 	UndelegateFunc      func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.Undelegate) error
 	CollectRewardsFunc  func(db StateDB, rosettaTracer RosettaTracer, stakeMsg *stakingTypes.CollectRewards) error
 	// Used for migrating delegations via the staking precompile
-	//MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
+	MigrateDelegationsFunc    func(db StateDB, migrationMsg *stakingTypes.MigrationMsg) ([]interface{}, error)
 	CalculateMigrationGasFunc func(db StateDB, migrationMsg *stakingTypes.MigrationMsg, homestead bool, istanbul bool) (uint64, error)
 )
 
@@ -177,6 +177,7 @@ type Context struct {
 	Delegate              DelegateFunc
 	Undelegate            UndelegateFunc
 	CollectRewards        CollectRewardsFunc
+	MigrateDelegations    MigrateDelegationsFunc
 	CalculateMigrationGas CalculateMigrationGasFunc
 
 	ShardID   uint32 // Used by staking and cross shard transfer precompile
