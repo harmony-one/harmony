@@ -242,6 +242,17 @@ func TestGeneralFlags(t *testing.T) {
 				DataDir:    "./",
 			},
 		},
+		{
+			args: []string{"--pruning"},
+			expConfig: harmonyconfig.GeneralConfig{
+				NodeType:         "validator",
+				NoStaking:        false,
+				ShardID:          -1,
+				IsArchival:       false,
+				DataDir:          "./",
+				StatePruneEnable: true,
+			},
+		},
 	}
 	for i, test := range tests {
 		ts := newFlagTestSuite(t, generalFlags, applyGeneralFlags)
