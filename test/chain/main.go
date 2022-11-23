@@ -94,7 +94,7 @@ func fundFaucetContract(chain core.BlockChain) {
 	fmt.Println("--------- Funding addresses for Faucet Contract Call ---------")
 	fmt.Println()
 
-	contractworker = pkgworker.New(params.TestChainConfig, chain, chain.Engine())
+	contractworker = pkgworker.New(params.TestChainConfig, chain, nil, chain.Engine())
 	nonce = contractworker.GetCurrentState().GetNonce(crypto.PubkeyToAddress(FaucetPriKey.PublicKey))
 	dataEnc = common.FromHex(FaucetContractBinary)
 	ftx, _ := types.SignTx(
@@ -206,7 +206,7 @@ func playFaucetContract(chain core.BlockChain) {
 
 func main() {
 	genesis := gspec.MustCommit(database)
-	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, gspec.Config, chain.Engine(), vm.Config{})
+	chain, _ := core.NewBlockChain(database, harmonyState.NewDatabase(database), nil, nil, gspec.Config, chain.Engine(), vm.Config{})
 	txpool := core.NewTxPool(core.DefaultTxPoolConfig, chainConfig, chain, types.NewTransactionErrorSink())
 
 	backend := &testWorkerBackend{

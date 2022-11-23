@@ -49,7 +49,8 @@ const (
 // StateProcessor implements Processor.
 type StateProcessor struct {
 	config      *params.ChainConfig     // Chain configuration options
-	bc          BlockChain              // Canonical block chain
+	bc          BlockChain              // Canonical blockchain
+	beacon      BlockChain              // Beacon chain
 	engine      consensus_engine.Engine // Consensus engine used for block rewards
 	resultCache *lru.Cache              // Cache for result after a certain block is processed
 }
@@ -67,12 +68,13 @@ type ProcessorResult struct {
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(
-	config *params.ChainConfig, bc BlockChain, engine consensus_engine.Engine,
+	config *params.ChainConfig, bc BlockChain, beacon BlockChain, engine consensus_engine.Engine,
 ) *StateProcessor {
 	resultCache, _ := lru.New(resultCacheLimit)
 	return &StateProcessor{
 		config:      config,
 		bc:          bc,
+		beacon:      beacon,
 		engine:      engine,
 		resultCache: resultCache,
 	}
@@ -182,7 +184,9 @@ func (p *StateProcessor) Process(
 		sigsReady <- true
 	}()
 	_, payout, err := p.engine.Finalize(
-		p.bc, header, statedb, block.Transactions(),
+		p.bc,
+		p.beacon,
+		header, statedb, block.Transactions(),
 		receipts, outcxs, incxs, block.StakingTransactions(), slashes, sigsReady, func() uint64 { return header.ViewID().Uint64() },
 	)
 	if err != nil {
