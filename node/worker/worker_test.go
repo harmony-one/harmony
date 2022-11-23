@@ -45,7 +45,7 @@ func TestNewWorker(t *testing.T) {
 
 	genesis := gspec.MustCommit(database)
 	_ = genesis
-	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, gspec.Config, engine, vm.Config{})
+	chain, err := core.NewBlockChain(database, state.NewDatabase(database), &core.BlockChainImpl{}, nil, nil, gspec.Config, engine, vm.Config{})
 
 	if err != nil {
 		t.Error(err)
