@@ -125,7 +125,8 @@ func (d *Downloader) SyncStatus() (bool, uint64, uint64) {
 	if !syncing { // means synced
 		target = current
 	}
-	return syncing, target, current - target
+	// isSyncing, target, blocks to target
+	return syncing, target, target - current
 }
 
 // SubscribeDownloadStarted subscribe download started
